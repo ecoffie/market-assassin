@@ -22,8 +22,18 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.businessType || !formData.naicsCode) {
-      alert('Please fill in all required fields');
+    // Business type is always required
+    if (!formData.businessType) {
+      alert('Please select a business type');
+      return;
+    }
+
+    // Either NAICS code OR PSC code is required
+    const hasNaics = formData.naicsCode && formData.naicsCode.trim();
+    const hasPsc = formData.pscCode && formData.pscCode.trim();
+
+    if (!hasNaics && !hasPsc) {
+      alert('Please enter either a NAICS code or select a PSC code/category');
       return;
     }
 
@@ -129,10 +139,10 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
 
           {/* NAICS Code and PSC Code - Grid Layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* NAICS Code - Required */}
+            {/* NAICS Code */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
-                2. NAICS Code <span className="text-red-500">*</span>
+                2. NAICS Code <span className="text-slate-400 text-xs">(or use PSC)</span>
               </label>
               <input
                 type="text"
@@ -140,17 +150,16 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
                 onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
                 placeholder="e.g., 541330"
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
               />
               <p className="mt-1 text-xs text-slate-500">
                 Industry code (e.g., 541330 for Engineering)
               </p>
             </div>
 
-            {/* PSC Code - Optional */}
+            {/* PSC Code */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
-                PSC Code <span className="text-slate-400 text-xs">(Optional - used if no NAICS)</span>
+                PSC Code <span className="text-slate-400 text-xs">(or use NAICS)</span>
               </label>
               <input
                 type="text"
