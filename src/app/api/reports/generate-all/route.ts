@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { suggestPrimesForAgencies, getPrimesByNAICS } from '@/lib/utils/prime-contractors';
+import { suggestPrimesForAgencies, getPrimesByNAICS, suggestTier2ForAgencies } from '@/lib/utils/prime-contractors';
 import { suggestTribesForAgencies, getTribesByNAICS } from '@/lib/utils/tribal-businesses';
 import { getPainPointsForAgency, getSimilarAgencies, generateAgencyNeeds, generateAgencyNeedsWithCommands, getPainPointsForCommand } from '@/lib/utils/pain-points';
 import { getOpportunitiesByCoreInputs, getUrgencyLevel, getQuickWinStrategy } from '@/lib/utils/december-spend';
@@ -48,67 +48,54 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Generate Tier 2 Subcontracting Report using bootcamp database
-    // Get all suggested primes once, then split between Tier 2 and Prime Contractor sections
+    // Generate Tier 2 Subcontracting Report using ONLY Tier 2 contractors (not prime contractors)
     // Supports both NAICS and PSC code searches
-    const allSuggestedPrimes = suggestPrimesForAgencies(
+    const tier2Contractors = suggestTier2ForAgencies(
+      inputs.naicsCode,
+      inputs.pscCode
+    );
+
+    // Get prime contractors for the Prime Contractor section (separate from Tier 2)
+    const primeContractorPrimes = suggestPrimesForAgencies(
       agenciesWithPainPoints,
       inputs.naicsCode,
       inputs.pscCode
     );
 
-    // Tier 2: Prioritize primes with subcontracting plans and supplier portals
-    const tier2Primes = allSuggestedPrimes
-      .filter(p => p.hasSubcontractPlan || p.supplierPortal)
-      .slice(0, 10);
-
-    // Prime Contractor: Use remaining primes not in Tier 2
-    const tier2Names = new Set(tier2Primes.map(p => p.name));
-    const primeContractorPrimes = allSuggestedPrimes
-      .filter(p => !tier2Names.has(p.name))
-      .slice(0, 10);
-
-    // If Tier 2 has fewer than 10, fill from remaining
-    if (tier2Primes.length < 10) {
-      const needed = 10 - tier2Primes.length;
-      const additionalForTier2 = allSuggestedPrimes
-        .filter(p => !tier2Names.has(p.name) && !primeContractorPrimes.slice(0, 10 - needed).map(pc => pc.name).includes(p.name))
-        .slice(0, needed);
-      tier2Primes.push(...additionalForTier2);
-    }
-
     const tier2Subcontracting = {
-      suggestedPrimes: tier2Primes.slice(0, 10).map(prime => ({
-        name: prime.name,
-        reason: `Works with your target agencies${prime.naicsCategories?.length ? (inputs.naicsCode ? ' in your NAICS code' : inputs.pscCode ? ' in your PSC category' : '') : ''}`,
-        opportunities: prime.specialties || [],
-        relevantAgencies: prime.agencies?.slice(0, 5) || [],
-        contactStrategy: prime.supplierPortal
-          ? `Register in ${prime.name} supplier portal at ${prime.supplierPortal}`
-          : prime.sbloName && prime.email
-          ? `Contact ${prime.sbloName} at ${prime.email}`
-          : `Contact SBLO at ${prime.name}`,
+      suggestedPrimes: tier2Contractors.map(tier2 => ({
+        name: tier2.name,
+        reason: `Tier 2 subcontractor${tier2.naicsCategories?.length ? (inputs.naicsCode ? ' matching your NAICS code' : inputs.pscCode ? ' matching your PSC category' : '') : ''}`,
+        opportunities: tier2.specialties || [],
+        relevantAgencies: tier2.agencies?.slice(0, 5) || [],
+        contactStrategy: tier2.sbloName && tier2.email
+          ? `Contact ${tier2.sbloName} at ${tier2.email}`
+          : tier2.email
+          ? `Contact at ${tier2.email}`
+          : `Contact ${tier2.name} for subcontracting opportunities`,
         // Enhanced contact card data
-        sbloName: prime.sbloName || null,
-        email: prime.email || null,
-        phone: prime.phone || null,
-        contractCount: prime.contractCount || null,
-        totalContractValue: prime.totalContractValue || null,
-        hasSubcontractPlan: prime.hasSubcontractPlan || false,
-        supplierPortal: prime.supplierPortal || null,
-        naicsCategories: prime.naicsCategories || [],
+        sbloName: tier2.sbloName || null,
+        email: tier2.email || null,
+        phone: tier2.phone || null,
+        contractCount: null, // Not available for Tier 2
+        totalContractValue: null, // Not available for Tier 2
+        hasSubcontractPlan: false, // Not applicable for Tier 2
+        supplierPortal: null, // Not applicable for Tier 2
+        naicsCategories: tier2.naicsCategories || [],
+        tierClassification: tier2.tierClassification || 'Tier 2',
+        certifications: tier2.certifications || [],
       })),
       summary: {
-        totalPrimes: tier2Primes.length,
-        opportunityCount: tier2Primes.reduce((sum, p) => sum + (p.specialties?.length || 0), 0),
+        totalPrimes: tier2Contractors.length,
+        opportunityCount: tier2Contractors.reduce((sum, t) => sum + (t.specialties?.length || 0), 0),
       },
       recommendations: [
-        'Register in prime contractor supplier portals',
-        'Attend prime contractor small business outreach events',
-        'Develop relationships with prime subcontracting managers',
-        tier2Primes.some(p => p.supplierPortal)
-          ? 'Use provided supplier portal URLs to register your company'
-          : 'Contact SBLOs directly using provided email addresses',
+        'Contact Tier 2 subcontractors directly for partnership opportunities',
+        'Attend small business networking events to meet these contractors',
+        'Review their NAICS codes to ensure capability alignment',
+        tier2Contractors.some(t => t.email)
+          ? 'Use provided email addresses to reach out directly'
+          : 'Search SAM.gov for additional contact information',
       ],
     };
 

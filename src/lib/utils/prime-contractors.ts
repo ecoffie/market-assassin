@@ -254,7 +254,7 @@ export function getTier2ByNAICS(naicsCode: string): Tier2Contractor[] {
  */
 export function getTier2ByPrimes(primeNames: string[]): Tier2Contractor[] {
   const results: Tier2Contractor[] = [];
-  
+
   tier2DB.tier2Contractors.forEach(tier2 => {
     // Check if tier2 company name appears in prime names (or vice versa)
     const tier2Lower = tier2.name.toLowerCase();
@@ -262,13 +262,90 @@ export function getTier2ByPrimes(primeNames: string[]): Tier2Contractor[] {
       tier2Lower.includes(primeName.toLowerCase()) ||
       primeName.toLowerCase().includes(tier2Lower)
     );
-    
+
     if (!matches) {
       results.push(tier2);
     }
   });
-  
+
   return results;
+}
+
+/**
+ * Suggest Tier 2 contractors based on NAICS or PSC code
+ * Returns Tier 2 contractors (not prime contractors) for subcontracting opportunities
+ */
+export function suggestTier2ForAgencies(
+  naicsCode?: string,
+  pscCode?: string
+): Tier2Contractor[] {
+  const suggestions = new Map<string, Tier2Contractor>();
+
+  // Add Tier 2 contractors matching NAICS code
+  if (naicsCode && naicsCode.trim()) {
+    getTier2ByNAICS(naicsCode).forEach(tier2 => {
+      const normalizedKey = normalizeCompanyName(tier2.name);
+      if (!suggestions.has(normalizedKey)) {
+        suggestions.set(normalizedKey, tier2);
+      }
+    });
+  }
+
+  // If no NAICS but PSC code provided, map PSC to NAICS and get Tier 2
+  if ((!naicsCode || !naicsCode.trim()) && pscCode && pscCode.trim()) {
+    const pscPrefix = pscCode.trim().toUpperCase().substring(0, 2);
+    const pscFirstChar = pscCode.trim().toUpperCase().charAt(0);
+    const relatedNaics = pscToNaicsMap[pscPrefix] || pscToNaicsMap[pscFirstChar] || [];
+
+    if (relatedNaics.length > 0) {
+      // Get Tier 2 contractors for each related NAICS
+      relatedNaics.forEach(naics => {
+        getTier2ByNAICS(naics).forEach(tier2 => {
+          const normalizedKey = normalizeCompanyName(tier2.name);
+          if (!suggestions.has(normalizedKey)) {
+            suggestions.set(normalizedKey, tier2);
+          }
+        });
+      });
+    }
+  }
+
+  // If no matches found, return all Tier 2 contractors sorted by contact info
+  if (suggestions.size === 0) {
+    const seen = new Set<string>();
+    return tier2DB.tier2Contractors
+      .filter(tier2 => {
+        const normalizedName = normalizeCompanyName(tier2.name);
+        if (seen.has(normalizedName)) return false;
+        seen.add(normalizedName);
+        return true;
+      })
+      .sort((a, b) => {
+        const scoreContact = (t: Tier2Contractor): number => {
+          let score = 0;
+          if (t.email) score += 3;
+          if (t.phone) score += 2;
+          if (t.sbloName) score += 1;
+          return score;
+        };
+        return scoreContact(b) - scoreContact(a);
+      })
+      .slice(0, 25);
+  }
+
+  // Sort by contact info availability and return top 25
+  return Array.from(suggestions.values())
+    .sort((a, b) => {
+      const scoreContact = (t: Tier2Contractor): number => {
+        let score = 0;
+        if (t.email) score += 3;
+        if (t.phone) score += 2;
+        if (t.sbloName) score += 1;
+        return score;
+      };
+      return scoreContact(b) - scoreContact(a);
+    })
+    .slice(0, 25);
 }
 
 /**
