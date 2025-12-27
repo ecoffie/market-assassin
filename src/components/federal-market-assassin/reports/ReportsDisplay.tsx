@@ -581,11 +581,6 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
               {reports.metadata.inputs.veteranStatus}
             </span>
           )}
-          {reports.metadata.inputs.goodsOrServices && (
-            <span className="px-3 py-1.5 bg-slate-200 text-slate-700 text-sm font-medium rounded-full">
-              {reports.metadata.inputs.goodsOrServices}
-            </span>
-          )}
           {reports.metadata.inputs.pscCode && (
             <span className="px-3 py-1.5 bg-teal-100 text-teal-800 text-sm font-medium rounded-full">
               PSC: {reports.metadata.inputs.pscCode}
