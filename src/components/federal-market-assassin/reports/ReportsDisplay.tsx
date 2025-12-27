@@ -328,6 +328,7 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
     <div>
       ${inputs.businessType ? `<span class="meta-item">📋 ${inputs.businessType}</span>` : ''}
       ${inputs.naicsCode ? `<span class="meta-item">🔢 NAICS: ${inputs.naicsCode}</span>` : ''}
+      ${inputs.pscCode ? `<span class="meta-item">🏷️ PSC: ${inputs.pscCode}</span>` : ''}
       ${inputs.zipCode ? `<span class="meta-item">📍 ZIP: ${inputs.zipCode}</span>` : ''}
       ${inputs.veteranStatus && inputs.veteranStatus !== 'Not Applicable' ? `<span class="meta-item">🎖️ ${inputs.veteranStatus}</span>` : ''}
       ${inputs.companyName ? `<span class="meta-item">🏢 ${inputs.companyName}</span>` : ''}
@@ -583,6 +584,11 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
           {reports.metadata.inputs.goodsOrServices && (
             <span className="px-3 py-1.5 bg-slate-200 text-slate-700 text-sm font-medium rounded-full">
               {reports.metadata.inputs.goodsOrServices}
+            </span>
+          )}
+          {reports.metadata.inputs.pscCode && (
+            <span className="px-3 py-1.5 bg-teal-100 text-teal-800 text-sm font-medium rounded-full">
+              PSC: {reports.metadata.inputs.pscCode}
             </span>
           )}
         </div>

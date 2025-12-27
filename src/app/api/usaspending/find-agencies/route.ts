@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
       naicsCode,
       zipCode,
       veteranStatus,
-      goodsOrServices
+      goodsOrServices,
+      pscCode
     } = body;
 
     console.log('🔍 Government contract search request:', body);
@@ -221,10 +222,17 @@ export async function POST(request: NextRequest) {
       filters.set_aside_type_codes = setAsideTypeCodes;
     }
 
-    // Add goods/services filter using PSC (Product/Service Code) categories
-    // Products (Goods): PSC codes starting with digits (10-99) - FSC codes
-    // Services: PSC codes starting with letters (A-Z)
-    if (goodsOrServices) {
+    // Add PSC (Product/Service Code) filter
+    // Priority: Specific PSC code > Goods/Services category
+    if (pscCode && pscCode.trim()) {
+      // User provided a specific PSC code - use it directly
+      const trimmedPsc = pscCode.trim().toUpperCase();
+      filters.psc_codes = [trimmedPsc];
+      console.log(`🎯 Filtering by specific PSC code: ${trimmedPsc}`);
+    } else if (goodsOrServices && goodsOrServices !== 'Both') {
+      // Fall back to broad goods/services filtering
+      // Products (Goods): PSC codes starting with digits (10-99) - FSC codes
+      // Services: PSC codes starting with letters (A-Z)
       if (goodsOrServices === 'Goods') {
         // Products (FSC - Federal Supply Classification) have PSC codes starting with numbers
         // Major product categories: 10-99 (e.g., 10=Weapons, 15=Aircraft, 23=Motor Vehicles, etc.)

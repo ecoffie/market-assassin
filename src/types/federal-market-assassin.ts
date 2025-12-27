@@ -25,6 +25,7 @@ export interface CoreInputs {
   zipCode?: string;
   veteranStatus?: VeteranStatus;
   goodsOrServices?: GoodsOrServices;
+  pscCode?: string;  // Product/Service Code (4-character) for precise filtering
   companyName?: string;
 }
 

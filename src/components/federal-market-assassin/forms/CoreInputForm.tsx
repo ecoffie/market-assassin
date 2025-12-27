@@ -15,6 +15,7 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
     zipCode: '',
     veteranStatus: 'Not Applicable',
     goodsOrServices: undefined,
+    pscCode: '',
     companyName: '',
   });
 
@@ -137,23 +138,44 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
             </div>
           </div>
 
-          {/* Goods or Services - Optional */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              5. Goods or Services? <span className="text-slate-400 text-xs">(Optional)</span>
-            </label>
-            <select
-              value={formData.goodsOrServices || ''}
-              onChange={(e) => setFormData({ ...formData, goodsOrServices: e.target.value as GoodsOrServices })}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select...</option>
-              {goodsOrServicesOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+          {/* Goods or Services and PSC Code - Grid Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Goods or Services - Optional */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                5. Goods or Services? <span className="text-slate-400 text-xs">(Optional)</span>
+              </label>
+              <select
+                value={formData.goodsOrServices || ''}
+                onChange={(e) => setFormData({ ...formData, goodsOrServices: e.target.value as GoodsOrServices })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select...</option>
+                {goodsOrServicesOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* PSC Code - Optional */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                PSC Code <span className="text-slate-400 text-xs">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.pscCode || ''}
+                onChange={(e) => setFormData({ ...formData, pscCode: e.target.value.toUpperCase() })}
+                placeholder="e.g., D310, 7030"
+                maxLength={4}
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                4-char Product/Service Code for precise filtering
+              </p>
+            </div>
           </div>
 
           {/* Company Name - Optional */}
