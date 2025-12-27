@@ -1699,7 +1699,7 @@ function IDVContractsReport({ data, inputs }: { data: any; inputs: CoreInputs })
       {idvContracts.length === 0 && (
         <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl">
           <p className="mb-2 text-lg font-semibold">No IDV contracts found</p>
-          <p className="text-sm">No IDV contracts found for NAICS code {inputs.naicsCode || 'your criteria'}</p>
+          <p className="text-sm">No IDV contracts found for {inputs.naicsCode ? `NAICS code ${inputs.naicsCode}` : inputs.pscCode ? `PSC code ${inputs.pscCode}` : 'your criteria'}</p>
         </div>
       )}
 
@@ -2074,7 +2074,7 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
           </span>
         </div>
         <p className="text-sm text-green-800 mb-4">
-          Curated + dynamic opportunities from your NAICS code ({inputs.naicsCode}) with higher win probability
+          Curated + dynamic opportunities from your {inputs.naicsCode ? `NAICS code (${inputs.naicsCode})` : inputs.pscCode ? `PSC code (${inputs.pscCode})` : 'search criteria'} with higher win probability
         </p>
 
         {loadingHitList ? (
