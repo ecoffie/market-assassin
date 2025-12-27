@@ -1,0 +1,2445 @@
+'use client';
+
+import { ComprehensiveReport, CoreInputs } from '@/types/federal-market-assassin';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  getHitListByCoreInputs,
+  getCombinedHitList,
+  getDaysUntilDeadline,
+  getUrgencyBadge,
+  getHitListActionStrategy,
+  getHitListStats,
+  HitListOpportunity,
+} from '@/lib/utils/december-hit-list';
+
+interface ReportsDisplayProps {
+  reports: ComprehensiveReport;
+  onReset: () => void;
+}
+
+interface AgencyForModal {
+  name: string;
+  contractingOffice?: string;
+  subAgency?: string;
+  parentAgency?: string;
+  spending?: number;
+  contractCount?: number;
+  location?: string;
+  officeId?: string;
+}
+
+interface CategorizedPainPoints {
+  [category: string]: string[];
+}
+
+interface PainPointsApiResponse {
+  success: boolean;
+  agency: string;
+  painPoints: string[];
+  categorized: CategorizedPainPoints;
+  ndaaPainPoints: string[];
+  count: number;
+}
+
+type ReportTab =
+  | 'buyers'
+  | 'subcontracting'
+  | 'idvContracts'
+  | 'osbpContacts'
+  | 'december'
+  | 'tribal';
+
+// Helper function to format currency values intelligently
+function formatCurrency(value: number): string {
+  if (value >= 1000000000) {
+    // Billions
+    return `$${(value / 1000000000).toFixed(1)}B`;
+  } else if (value >= 1000000) {
+    // Millions
+    return `$${(value / 1000000).toFixed(1)}M`;
+  } else if (value >= 1000) {
+    // Thousands
+    return `$${(value / 1000).toFixed(1)}K`;
+  } else {
+    // Less than 1000
+    return `$${value.toFixed(0)}`;
+  }
+}
+
+export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps) {
+  const [activeTab, setActiveTab] = useState<ReportTab>('buyers');
+  const [showAllForExport, setShowAllForExport] = useState(false);
+
+  // Modal state
+  const [modalAgency, setModalAgency] = useState<AgencyForModal | null>(null);
+  const [painPointsData, setPainPointsData] = useState<PainPointsApiResponse | null>(null);
+  const [loadingPainPoints, setLoadingPainPoints] = useState(false);
+  const [matchedCommand, setMatchedCommand] = useState<string | null>(null);
+  const [additionalCommands, setAdditionalCommands] = useState<Array<{command: string, painPoints: PainPointsApiResponse}>>([]);
+
+  // Helper to extract DoD command abbreviations from agency names
+  // Maps to exact database keys for pain points lookup
+  const extractDoDCommands = (name: string): string[] => {
+    const commands: string[] = [];
+    const text = name.toUpperCase();
+
+    // Navy commands (exact database keys)
+    if (text.includes('NAVFAC') || text.includes('NAVAL FACILITIES')) commands.push('NAVFAC');
+    if (text.includes('NAVSEA') || text.includes('NAVAL SEA SYSTEMS')) commands.push('NAVSEA');
+    if (text.includes('NAVAIR') || text.includes('NAVAL AIR SYSTEMS')) commands.push('NAVAIR');
+    if (text.includes('NAVWAR') || text.includes('SPAWAR') || text.includes('INFORMATION WARFARE')) commands.push('NAVWAR');
+    if (text.includes('MARINE CORPS SYSTEMS')) commands.push('Marine Corps Systems Command');
+
+    // Army commands (exact database keys)
+    if (text.includes('USACE') || text.includes('CORPS OF ENGINEERS') || text.includes('ARMY CORPS')) commands.push('USACE');
+    if (text.includes('ARMY CONTRACTING COMMAND') || (text.includes('ACC') && text.includes('ARMY'))) commands.push('Army Contracting Command');
+    if (text.includes('ARMY MATERIEL COMMAND') || (text.includes('AMC') && text.includes('ARMY'))) commands.push('Army Materiel Command');
+
+    // Air Force commands (exact database keys)
+    if (text.includes('AIR FORCE MATERIEL') || text.includes('AFLCMC') || text.includes('LIFE CYCLE')) commands.push('Air Force Materiel Command');
+    if (text.includes('AIR FORCE SUSTAINMENT') || text.includes('AFSC')) commands.push('Air Force Sustainment Center');
+    if (text.includes('SPACE SYSTEMS COMMAND') || text.includes('SSC')) commands.push('Space Systems Command');
+
+    // Defense agencies (exact database keys)
+    if (text.includes('DISA') || text.includes('DEFENSE INFORMATION SYSTEMS')) commands.push('Defense Information Systems Agency');
+    if (text.includes('DLA') || text.includes('DEFENSE LOGISTICS')) commands.push('Defense Logistics Agency');
+    if (text.includes('DARPA') || text.includes('ADVANCED RESEARCH PROJECTS')) commands.push('DARPA');
+    if (text.includes('MDA') || text.includes('MISSILE DEFENSE')) commands.push('Missile Defense Agency');
+    if (text.includes('DCMA') || text.includes('DEFENSE CONTRACT MANAGEMENT')) commands.push('Defense Contract Management Agency');
+    if (text.includes('DCAA') || text.includes('DEFENSE CONTRACT AUDIT')) commands.push('Defense Contract Audit Agency');
+    if (text.includes('DHA') || text.includes('DEFENSE HEALTH')) commands.push('Defense Health Agency');
+
+    return commands;
+  };
+
+  // Get all sub-commands for a parent agency
+  const getSubCommandsForParent = (parentName: string): string[] => {
+    const name = parentName.toUpperCase();
+    if (name.includes('NAVY')) {
+      return ['NAVSEA', 'NAVFAC', 'NAVAIR', 'NAVWAR', 'Marine Corps Systems Command'];
+    }
+    if (name.includes('ARMY')) {
+      return ['USACE', 'Army Contracting Command', 'Army Materiel Command'];
+    }
+    if (name.includes('AIR FORCE')) {
+      return ['Air Force Materiel Command', 'Air Force Sustainment Center', 'Space Systems Command'];
+    }
+    if (name.includes('DEFENSE') && !name.includes('DEPARTMENT')) {
+      return ['Defense Logistics Agency', 'Defense Information Systems Agency', 'DARPA', 'Missile Defense Agency', 'Defense Health Agency'];
+    }
+    return [];
+  };
+
+  // Modal functions
+  const openAgencyModal = useCallback(async (agency: AgencyForModal) => {
+    setModalAgency(agency);
+    setPainPointsData(null);
+    setMatchedCommand(null);
+    setAdditionalCommands([]);
+    setLoadingPainPoints(true);
+
+    try {
+      // Build comprehensive search strategies
+      const allTexts = [agency.name, agency.contractingOffice, agency.subAgency].filter(Boolean).join(' ');
+      const extractedCommands = extractDoDCommands(allTexts);
+
+      // First, try to find pain points for ALL extracted commands
+      const commandResults: Array<{command: string, painPoints: PainPointsApiResponse}> = [];
+
+      for (const command of extractedCommands) {
+        try {
+          const response = await fetch(`/api/pain-points?agency=${encodeURIComponent(command)}`);
+          const data = await response.json();
+          if (data.success && data.painPoints && data.painPoints.length > 0) {
+            commandResults.push({ command, painPoints: data });
+          }
+        } catch (e) {
+          console.error(`Error fetching pain points for ${command}:`, e);
+        }
+      }
+
+      // If we found command-specific results, use those
+      if (commandResults.length > 0) {
+        setPainPointsData(commandResults[0].painPoints);
+        setMatchedCommand(commandResults[0].command);
+        setAdditionalCommands(commandResults.slice(1));
+      } else {
+        // No specific commands found - check if this is a parent agency
+        // If so, fetch ALL sub-commands for that service branch
+        const subCommands = getSubCommandsForParent(agency.name) ||
+                          getSubCommandsForParent(agency.subAgency || '') ||
+                          getSubCommandsForParent(agency.parentAgency || '');
+
+        if (subCommands.length > 0) {
+          // Fetch pain points for all sub-commands
+          for (const command of subCommands) {
+            try {
+              const response = await fetch(`/api/pain-points?agency=${encodeURIComponent(command)}`);
+              const data = await response.json();
+              if (data.success && data.painPoints && data.painPoints.length > 0) {
+                commandResults.push({ command, painPoints: data });
+              }
+            } catch (e) {
+              console.error(`Error fetching pain points for ${command}:`, e);
+            }
+          }
+
+          if (commandResults.length > 0) {
+            setPainPointsData(commandResults[0].painPoints);
+            setMatchedCommand(commandResults[0].command);
+            setAdditionalCommands(commandResults.slice(1));
+          }
+        }
+
+        // If still nothing, try the parent agency directly
+        if (commandResults.length === 0) {
+          const fallbackStrategies = [
+            agency.subAgency,
+            agency.parentAgency,
+            agency.parentAgency?.replace('Department of the ', '').replace('Department of ', ''),
+          ].filter(Boolean);
+
+          for (const searchName of fallbackStrategies) {
+            if (!searchName) continue;
+            const response = await fetch(`/api/pain-points?agency=${encodeURIComponent(searchName)}`);
+            const data = await response.json();
+            if (data.success && data.painPoints && data.painPoints.length > 0) {
+              setPainPointsData(data);
+              setMatchedCommand(searchName);
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading pain points:', error);
+    } finally {
+      setLoadingPainPoints(false);
+    }
+  }, []);
+
+  const closeAgencyModal = useCallback(() => {
+    setModalAgency(null);
+    setPainPointsData(null);
+    setMatchedCommand(null);
+    setAdditionalCommands([]);
+  }, []);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && modalAgency) {
+        closeAgencyModal();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [modalAgency, closeAgencyModal]);
+
+  const getSamSearchUrl = (agencyName: string) => {
+    const encoded = encodeURIComponent(agencyName);
+    return `https://sam.gov/search/?index=opp&page=1&pageSize=25&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&q=${encoded}`;
+  };
+
+  const tabs = [
+    { id: 'buyers' as ReportTab, label: '👥 Government Buyers', icon: '👥' },
+    { id: 'subcontracting' as ReportTab, label: '🔗 Subcontracting', icon: '🔗' },
+    { id: 'idvContracts' as ReportTab, label: '📋 IDV Contracts', icon: '📋' },
+    { id: 'december' as ReportTab, label: '💰 December Spend', icon: '💰' },
+    { id: 'tribal' as ReportTab, label: '🏛️ Tribal Contracting', icon: '🏛️' },
+    { id: 'osbpContacts' as ReportTab, label: '📞 OSBP Contacts', icon: '📞' },
+  ];
+
+  const handleExportPDF = () => {
+    // Show all reports for printing
+    setShowAllForExport(true);
+    // Use setTimeout to allow React to render all reports before printing
+    setTimeout(() => {
+      window.print();
+      // Reset back to tabbed view after print dialog closes
+      setTimeout(() => {
+        setShowAllForExport(false);
+      }, 1000);
+    }, 100);
+  };
+
+  const handleExportJSON = () => {
+    const dataStr = JSON.stringify(reports, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `federal-market-assassin-report-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+  };
+
+  // Export all reports as a single HTML file that can be saved/printed
+  const handleExportHTML = () => {
+    const date = new Date().toLocaleDateString();
+    const inputs = reports.metadata.inputs;
+
+    // Build HTML content for all reports
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Federal Market Assassin - Comprehensive Report - ${date}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 1200px; margin: 0 auto; padding: 20px; }
+    h1 { color: #1e40af; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
+    h2 { color: #1e3a8a; margin-top: 40px; border-bottom: 2px solid #93c5fd; padding-bottom: 8px; page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+    h3 { color: #1e40af; margin-top: 20px; }
+    .meta { background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
+    .meta-item { display: inline-block; background: #e2e8f0; padding: 5px 12px; border-radius: 20px; margin: 3px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f1f5f9; font-weight: 600; }
+    tr:hover { background: #f8fafc; }
+    .amount { font-weight: 600; color: #059669; }
+    .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 10px 0; }
+    .card-title { font-weight: 600; color: #1e3a8a; margin-bottom: 8px; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-purple { background: #f3e8ff; color: #7c3aed; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+    .stat-card { background: #f1f5f9; padding: 15px; border-radius: 8px; text-align: center; }
+    .stat-value { font-size: 24px; font-weight: 700; color: #1e40af; }
+    .stat-label { font-size: 12px; color: #64748b; margin-top: 5px; }
+    @media print { h2 { page-break-before: always; } h2:first-of-type { page-break-before: avoid; } .no-print { display: none; } }
+    .section-intro { background: #eff6ff; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3b82f6; }
+  </style>
+</head>
+<body>
+  <h1>🎯 Federal Market Assassin - Comprehensive Report</h1>
+
+  <div class="meta">
+    <p><strong>Generated:</strong> ${date}</p>
+    <p><strong>Search Criteria:</strong></p>
+    <div>
+      ${inputs.businessType ? `<span class="meta-item">📋 ${inputs.businessType}</span>` : ''}
+      ${inputs.naicsCode ? `<span class="meta-item">🔢 NAICS: ${inputs.naicsCode}</span>` : ''}
+      ${inputs.zipCode ? `<span class="meta-item">📍 ZIP: ${inputs.zipCode}</span>` : ''}
+      ${inputs.veteranStatus && inputs.veteranStatus !== 'Not Applicable' ? `<span class="meta-item">🎖️ ${inputs.veteranStatus}</span>` : ''}
+      ${inputs.companyName ? `<span class="meta-item">🏢 ${inputs.companyName}</span>` : ''}
+    </div>
+    <p><strong>Agencies Analyzed:</strong> ${reports.metadata.selectedAgencies.length}</p>
+  </div>
+
+  <!-- Government Buyers Report -->
+  <h2>👥 Government Buyers Report</h2>
+  <div class="section-intro">Top government agencies matching your criteria, ranked by spending in your NAICS code.</div>
+  <table>
+    <thead>
+      <tr><th>Rank</th><th>Agency / Office</th><th>Parent Agency</th><th>Spending</th><th>Contracts</th></tr>
+    </thead>
+    <tbody>
+      ${reports.governmentBuyers.agencies.slice(0, 50).map((agency: any, i: number) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${agency.contractingOffice || agency.name}</strong></td>
+          <td>${agency.parentAgency || agency.subAgency || '-'}</td>
+          <td class="amount">$${(agency.spending / 1000000).toFixed(2)}M</td>
+          <td>${agency.contractCount || '-'}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <!-- OSBP Contacts Report -->
+  <h2>📞 OSBP Contacts</h2>
+  <div class="section-intro">Small Business Office contacts for the agencies in your report.</div>
+  ${(() => {
+    const osbpMap = new Map();
+    reports.governmentBuyers.agencies.forEach((agency: any) => {
+      if (agency.osbpContact?.email) {
+        const key = agency.osbpContact.email;
+        if (!osbpMap.has(key)) {
+          osbpMap.set(key, { ...agency.osbpContact, agencies: [agency.name] });
+        } else {
+          osbpMap.get(key).agencies.push(agency.name);
+        }
+      }
+    });
+    return Array.from(osbpMap.values()).map((contact: any) => `
+      <div class="card">
+        <div class="card-title">${contact.name || 'Small Business Office'}</div>
+        <p><strong>Director:</strong> ${contact.director || 'Contact office for details'}</p>
+        <p><strong>Email:</strong> ${contact.email}</p>
+        <p><strong>Phone:</strong> ${contact.phone || 'N/A'}</p>
+        <p><strong>Covers:</strong> ${contact.agencies.slice(0, 5).join(', ')}${contact.agencies.length > 5 ? ` +${contact.agencies.length - 5} more` : ''}</p>
+      </div>
+    `).join('');
+  })()}
+
+  <!-- Subcontracting Report -->
+  <h2>🤝 Subcontracting Opportunities</h2>
+  <div class="section-intro">Prime contractors and Tier 2 subcontracting opportunities.</div>
+
+  <h3>Subcontracting Summary</h3>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">${reports.tier2Subcontracting.summary.totalPrimes}</div>
+      <div class="stat-label">Total Primes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${reports.tier2Subcontracting.summary.opportunityCount}</div>
+      <div class="stat-label">Opportunities</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${reports.primeContractor.suggestedPrimes?.length || 0}</div>
+      <div class="stat-label">Suggested Primes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${reports.primeContractor.otherAgencies?.length || 0}</div>
+      <div class="stat-label">Other Agencies</div>
+    </div>
+  </div>
+
+  <h3>Suggested Prime Contractors</h3>
+  <table>
+    <thead>
+      <tr><th>Prime Contractor</th><th>Reason</th><th>SB Level</th><th>Contract Types</th></tr>
+    </thead>
+    <tbody>
+      ${(reports.primeContractor.suggestedPrimes || []).slice(0, 20).map((prime: any) => `
+        <tr>
+          <td><strong>${prime.name || 'Unknown'}</strong></td>
+          <td>${prime.reason || '-'}</td>
+          <td>${prime.smallBusinessLevel || 'N/A'}</td>
+          <td>${(prime.contractTypes || []).slice(0, 2).join(', ') || '-'}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <!-- IDV Contracts Report -->
+  <h2>📋 IDV Vehicle Contracts</h2>
+  <div class="section-intro">Indefinite Delivery Vehicles (IDVs) and contract vehicles for your NAICS code.</div>
+  <table>
+    <thead>
+      <tr><th>Contract</th><th>Agency</th><th>Value</th><th>Type</th></tr>
+    </thead>
+    <tbody>
+      ${(reports.idvContracts?.contracts || []).slice(0, 20).map((contract: any) => `
+        <tr>
+          <td><strong>${contract.name || contract.title || 'Contract'}</strong></td>
+          <td>${contract.agency || 'N/A'}</td>
+          <td class="amount">${contract.value ? '$' + (contract.value / 1000000).toFixed(2) + 'M' : 'N/A'}</td>
+          <td><span class="badge badge-green">${contract.type || contract.setAside || 'IDV'}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <!-- December Spend Report -->
+  <h2>💰 December Spend / Q4 Opportunities</h2>
+  <div class="section-intro">End-of-year spending opportunities with higher urgency and win probability.</div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">$${(reports.decemberSpend.summary.totalQ4Spend / 1000000).toFixed(1)}M</div>
+      <div class="stat-label">Est. Q4 Spend</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${reports.decemberSpend.summary.urgentOpportunities}</div>
+      <div class="stat-label">Urgent Opportunities</div>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Agency</th><th>Program</th><th>Est. Q4 Spend</th><th>Urgency</th></tr>
+    </thead>
+    <tbody>
+      ${reports.decemberSpend.opportunities.slice(0, 20).map((opp: any) => `
+        <tr>
+          <td><strong>${opp.agency}</strong></td>
+          <td>${opp.program || '-'}</td>
+          <td class="amount">$${(opp.estimatedQ4Spend / 1000000).toFixed(2)}M</td>
+          <td><span class="badge ${opp.urgencyLevel === 'high' ? 'badge-purple' : 'badge-blue'}">${opp.urgencyLevel}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <!-- Tribal Contracting Report -->
+  <h2>🏛️ Tribal Contracting Opportunities</h2>
+  <div class="section-intro">8(a) and tribal contracting opportunities.</div>
+  <table>
+    <thead>
+      <tr><th>Agency</th><th>Program</th><th>Est. Value</th></tr>
+    </thead>
+    <tbody>
+      ${(reports.tribalContracting?.opportunities || []).slice(0, 15).map((opp: any) => `
+        <tr>
+          <td><strong>${opp.agency || 'N/A'}</strong></td>
+          <td>${opp.tribalProgram || 'Tribal Program'}</td>
+          <td class="amount">${opp.estimatedValue ? '$' + (opp.estimatedValue / 1000000).toFixed(2) + 'M' : 'N/A'}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <hr style="margin-top: 40px;">
+  <p style="text-align: center; color: #64748b; font-size: 12px;">
+    Generated by Federal Market Assassin | ${new Date().toISOString()}
+  </p>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `federal-market-assassin-full-report-${new Date().toISOString().split('T')[0]}.html`;
+    link.click();
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg">
+      {/* Header */}
+      <div className="p-8 border-b border-slate-200">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">
+              Your Comprehensive Market Reports
+            </h2>
+            <p className="text-slate-600">
+              Generated for <strong>{reports.metadata.selectedAgencies.length}</strong> agencies on{' '}
+              {new Date(reports.metadata.generatedAt).toLocaleDateString()}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={handleExportHTML}
+              className="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 font-semibold rounded-lg transition-colors"
+            >
+              📥 Export All (HTML)
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded-lg transition-colors"
+            >
+              📄 Print All (PDF)
+            </button>
+            <button
+              onClick={handleExportJSON}
+              className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 font-semibold rounded-lg transition-colors"
+            >
+              💾 Export JSON
+            </button>
+            <button
+              onClick={onReset}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors"
+            >
+              🔄 New Report
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Criteria */}
+      <div className="px-8 py-4 bg-slate-50 border-b border-slate-200">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Search Criteria</p>
+        <div className="flex flex-wrap gap-3">
+          {reports.metadata.inputs.businessType && (
+            <span className="px-3 py-1.5 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+              {reports.metadata.inputs.businessType}
+            </span>
+          )}
+          {reports.metadata.inputs.naicsCode && (
+            <span className="px-3 py-1.5 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
+              NAICS: {reports.metadata.inputs.naicsCode}
+            </span>
+          )}
+          {reports.metadata.inputs.zipCode && (
+            <span className="px-3 py-1.5 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+              ZIP: {reports.metadata.inputs.zipCode}
+            </span>
+          )}
+          {reports.metadata.inputs.veteranStatus && reports.metadata.inputs.veteranStatus !== 'Not Applicable' && (
+            <span className="px-3 py-1.5 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
+              {reports.metadata.inputs.veteranStatus}
+            </span>
+          )}
+          {reports.metadata.inputs.goodsOrServices && (
+            <span className="px-3 py-1.5 bg-slate-200 text-slate-700 text-sm font-medium rounded-full">
+              {reports.metadata.inputs.goodsOrServices}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs - hide when showing all for export */}
+      {!showAllForExport && (
+        <div className="border-b border-slate-200 overflow-x-auto print:hidden">
+          <div className="flex px-8">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-4 font-semibold text-sm whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Report Content - Show all when exporting, otherwise show active tab */}
+      <div className="p-8">
+        {showAllForExport ? (
+          // Show ALL reports for printing/exporting
+          <div className="space-y-12">
+            <div className="print:break-after-page">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">👥 Government Buyers Report</h2>
+              <GovernmentBuyersReport data={reports.governmentBuyers} onAgencyClick={openAgencyModal} />
+            </div>
+
+            <div className="print:break-after-page">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">📞 OSBP Contacts</h2>
+              <OSBPContactsReport data={reports.governmentBuyers} />
+            </div>
+
+            <div className="print:break-after-page">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">🤝 Subcontracting Opportunities</h2>
+              <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />
+            </div>
+
+            <div className="print:break-after-page">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">📋 IDV Vehicle Contracts</h2>
+              <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />
+            </div>
+
+            <div className="print:break-after-page">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">💰 December Spend / Q4 Opportunities</h2>
+              <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">🏛️ Tribal Contracting</h2>
+              <TribalReport data={reports.tribalContracting} />
+            </div>
+          </div>
+        ) : (
+          // Normal tabbed view
+          <>
+            {activeTab === 'buyers' && <GovernmentBuyersReport data={reports.governmentBuyers} onAgencyClick={openAgencyModal} />}
+            {activeTab === 'subcontracting' && <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />}
+            {activeTab === 'idvContracts' && <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />}
+            {activeTab === 'osbpContacts' && <OSBPContactsReport data={reports.governmentBuyers} />}
+            {activeTab === 'december' && <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />}
+            {activeTab === 'tribal' && <TribalReport data={reports.tribalContracting} />}
+          </>
+        )}
+      </div>
+
+      {/* Agency Details Modal */}
+      {modalAgency && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={closeAgencyModal}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-900">{modalAgency.name}</h2>
+              <button
+                onClick={closeAgencyModal}
+                className="text-slate-400 hover:text-slate-600 text-3xl font-bold leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Key Statistics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="text-sm text-slate-600 mb-1">Spending</div>
+                  <div className="text-2xl font-bold text-blue-600">{modalAgency.spending ? formatCurrency(modalAgency.spending) : 'N/A'}</div>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <div className="text-sm text-slate-600 mb-1">Contracts</div>
+                  <div className="text-2xl font-bold text-slate-700">{modalAgency.contractCount || 'N/A'}</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="text-sm text-slate-600 mb-1">Location</div>
+                  <div className="text-lg font-bold text-green-600">{modalAgency.location || 'N/A'}</div>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <div className="text-sm text-slate-600 mb-1">Office ID</div>
+                  <div className="text-lg font-bold text-purple-600">{modalAgency.officeId || 'N/A'}</div>
+                </div>
+              </div>
+
+              {/* Office Information */}
+              <div className="bg-slate-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Office Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-slate-600">Contracting Office</div>
+                    <div className="text-base font-semibold text-slate-900">{modalAgency.contractingOffice || modalAgency.name}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-600">Sub-Agency</div>
+                    <div className="text-base font-semibold text-slate-900">{modalAgency.subAgency || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-600">Parent Agency</div>
+                    <div className="text-base font-semibold text-slate-900">{modalAgency.parentAgency || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-600">Location</div>
+                    <div className="text-base text-slate-900">{modalAgency.location || 'Not specified'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Links */}
+              <div className="bg-blue-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Market Research Links</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <a
+                    href={getSamSearchUrl(modalAgency.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between bg-white rounded-lg p-4 hover:bg-blue-100 transition border border-blue-200"
+                  >
+                    <div>
+                      <div className="font-semibold text-slate-900">SAM.gov Opportunities</div>
+                      <div className="text-sm text-slate-600">Search active contracts</div>
+                    </div>
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                  <a
+                    href="https://www.usaspending.gov/search"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between bg-white rounded-lg p-4 hover:bg-blue-100 transition border border-blue-200"
+                  >
+                    <div>
+                      <div className="font-semibold text-slate-900">USAspending.gov</div>
+                      <div className="text-sm text-slate-600">View spending history</div>
+                    </div>
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+
+              {/* Agency Pain Points */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-500 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-purple-900 mb-3">Agency Priorities & Pain Points</h3>
+                {loadingPainPoints ? (
+                  <p className="text-sm text-purple-800">Loading agency insights...</p>
+                ) : painPointsData && painPointsData.painPoints && painPointsData.painPoints.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Show which command was matched */}
+                    {matchedCommand && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-3 py-1 bg-purple-600 text-white text-sm font-bold rounded-full">
+                          {matchedCommand}
+                        </span>
+                        <span className="text-xs text-purple-700">
+                          {painPointsData.painPoints.length} priorities identified
+                        </span>
+                      </div>
+                    )}
+                    {/* Show categorized pain points if available */}
+                    {painPointsData.categorized && Object.keys(painPointsData.categorized).length > 0 ? (
+                      Object.entries(painPointsData.categorized).map(([category, points]) => (
+                        points && points.length > 0 && (
+                          <div key={category}>
+                            <h4 className="font-semibold text-purple-900 mb-2 capitalize">{category}</h4>
+                            <ul className="space-y-2 text-sm text-purple-800">
+                              {points.map((painPoint, index) => (
+                                <li key={index} className="flex items-start">
+                                  <span className="text-purple-600 mr-2">•</span>
+                                  <span className="flex-1">{painPoint}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )
+                      ))
+                    ) : (
+                      /* Fallback: show raw pain points if categorized is empty */
+                      <div>
+                        <h4 className="font-semibold text-purple-900 mb-2">Key Priorities</h4>
+                        <ul className="space-y-2 text-sm text-purple-800">
+                          {painPointsData.painPoints.map((painPoint, index) => (
+                            <li key={index} className="flex items-start">
+                              <span className="text-purple-600 mr-2">•</span>
+                              <span className="flex-1">{painPoint}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {painPointsData.ndaaPainPoints && painPointsData.ndaaPainPoints.length > 0 && (
+                      <div className="pt-4 border-t border-purple-200">
+                        <h4 className="font-semibold text-purple-900 mb-2">NDAA Priorities</h4>
+                        <ul className="space-y-2 text-sm text-purple-700">
+                          {painPointsData.ndaaPainPoints.map((painPoint, index) => (
+                            <li key={index} className="flex items-start">
+                              <span className="text-purple-500 mr-2">•</span>
+                              <span>{painPoint}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Show additional commands if found */}
+                    {additionalCommands.length > 0 && (
+                      <div className="pt-4 border-t border-purple-200 space-y-4">
+                        <h4 className="font-semibold text-purple-900">Related Commands</h4>
+                        {additionalCommands.map((cmd, cmdIdx) => (
+                          <div key={cmdIdx} className="bg-white bg-opacity-50 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="px-2 py-1 bg-indigo-500 text-white text-xs font-bold rounded">
+                                {cmd.command}
+                              </span>
+                              <span className="text-xs text-indigo-700">
+                                {cmd.painPoints.painPoints.length} priorities
+                              </span>
+                            </div>
+                            <ul className="space-y-1 text-sm text-purple-800">
+                              {cmd.painPoints.painPoints.slice(0, 3).map((pp, ppIdx) => (
+                                <li key={ppIdx} className="flex items-start">
+                                  <span className="text-indigo-500 mr-2">•</span>
+                                  <span className="flex-1">{pp}</span>
+                                </li>
+                              ))}
+                              {cmd.painPoints.painPoints.length > 3 && (
+                                <li className="text-xs text-indigo-600 italic">
+                                  +{cmd.painPoints.painPoints.length - 3} more priorities...
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-purple-700 italic">
+                    Agency priorities data not available for this office yet.
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  onClick={closeAgencyModal}
+                  className="px-4 py-2 text-slate-600 hover:text-slate-900 font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Individual Report Components (simplified versions - can be expanded)
+
+function SubcontractingReport({ tier2Data, primeData }: { tier2Data: any; primeData: any }) {
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 className="text-xl font-bold text-blue-900 mb-4">Executive Summary</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm text-blue-700">Tier 2 Opportunities</p>
+            <p className="text-2xl font-bold text-blue-900">{tier2Data.summary.totalPrimes}</p>
+          </div>
+          <div>
+            <p className="text-sm text-blue-700">Prime Opportunities</p>
+            <p className="text-2xl font-bold text-blue-900">{primeData.summary.totalPrimes}</p>
+          </div>
+          <div>
+            <p className="text-sm text-blue-700">Other Agencies</p>
+            <p className="text-2xl font-bold text-blue-900">{primeData.summary.totalOtherAgencies}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tier 2 Subcontracting Opportunities */}
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Tier 2 Subcontracting Opportunities</h3>
+        <div className="space-y-4">
+          {tier2Data.suggestedPrimes.map((prime: any, idx: number) => (
+            <div key={`tier2-${idx}`} className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+              {/* Header Row */}
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h4 className="font-bold text-slate-900 text-xl mb-2">{prime.name}</h4>
+                  {/* Contact Tags */}
+                  <div className="flex flex-wrap gap-2">
+                    {prime.phone && (
+                      <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-full flex items-center gap-1">
+                        📱 PHONE
+                      </span>
+                    )}
+                    {prime.email && (
+                      <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full flex items-center gap-1">
+                        ✉️ EMAIL
+                      </span>
+                    )}
+                    {prime.hasSubcontractPlan && (
+                      <span className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full flex items-center gap-1">
+                        📋 SUBCONTRACT PLAN
+                      </span>
+                    )}
+                    {prime.supplierPortal && (
+                      <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full flex items-center gap-1">
+                        🌐 PORTAL
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Contract Value Badge */}
+                {prime.totalContractValue && (
+                  <span className="px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-lg">
+                    {formatCurrency(prime.totalContractValue)}
+                  </span>
+                )}
+              </div>
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-3 gap-6 mb-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">CONTRACTS</p>
+                  <p className="text-slate-900 font-medium">{prime.contractCount ? `${prime.contractCount} contracts` : 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">SBLO CONTACT</p>
+                  <p className="text-slate-900 font-medium">{prime.sbloName || 'Contact SBLO'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">PHONE</p>
+                  {prime.phone ? (
+                    <a href={`tel:${prime.phone}`} className="text-emerald-600 font-medium hover:underline">
+                      {prime.phone}
+                    </a>
+                  ) : (
+                    <p className="text-slate-400">N/A</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Email Row */}
+              {prime.email && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">EMAIL</p>
+                  <a href={`mailto:${prime.email}`} className="text-blue-600 font-medium hover:underline">
+                    {prime.email}
+                  </a>
+                </div>
+              )}
+
+              {/* Agencies */}
+              {prime.relevantAgencies && prime.relevantAgencies.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">PRIMARY AGENCIES</p>
+                  <div className="flex flex-wrap gap-2">
+                    {prime.relevantAgencies.map((agency: string, aIdx: number) => (
+                      <span key={aIdx} className="px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full">
+                        {agency}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* NAICS Codes */}
+              {prime.naicsCategories && prime.naicsCategories.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">NAICS CODES</p>
+                  <div className="flex flex-wrap gap-2">
+                    {prime.naicsCategories.slice(0, 6).map((naics: string, nIdx: number) => (
+                      <span key={nIdx} className="px-3 py-1 bg-purple-50 text-purple-700 text-sm font-medium rounded-full">
+                        {naics}
+                      </span>
+                    ))}
+                    {prime.naicsCategories.length > 6 && (
+                      <span className="px-3 py-1 bg-slate-100 text-slate-500 text-sm rounded-full">
+                        +{prime.naicsCategories.length - 6} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Prime Contractor Opportunities */}
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Prime Contractor Opportunities</h3>
+        <div className="space-y-4">
+          {primeData.suggestedPrimes.map((prime: any, idx: number) => (
+            <div key={`prime-${idx}`} className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+              {/* Header Row */}
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h4 className="font-bold text-slate-900 text-xl mb-2">{prime.name}</h4>
+                  {/* Contact Tags */}
+                  <div className="flex flex-wrap gap-2">
+                    {prime.phone && (
+                      <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-full flex items-center gap-1">
+                        📱 PHONE
+                      </span>
+                    )}
+                    {prime.email && (
+                      <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full flex items-center gap-1">
+                        ✉️ EMAIL
+                      </span>
+                    )}
+                    {prime.hasSubcontractPlan && (
+                      <span className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full flex items-center gap-1">
+                        📋 SUBCONTRACT PLAN
+                      </span>
+                    )}
+                    {prime.supplierPortal && (
+                      <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full flex items-center gap-1">
+                        🌐 PORTAL
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Contract Value Badge */}
+                {prime.totalContractValue && (
+                  <span className="px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-lg">
+                    {formatCurrency(prime.totalContractValue)}
+                  </span>
+                )}
+              </div>
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-3 gap-6 mb-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">CONTRACTS</p>
+                  <p className="text-slate-900 font-medium">{prime.contractCount ? `${prime.contractCount} contracts` : 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">SBLO CONTACT</p>
+                  <p className="text-slate-900 font-medium">{prime.sbloName || 'Contact SBLO'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">PHONE</p>
+                  {prime.phone ? (
+                    <a href={`tel:${prime.phone}`} className="text-emerald-600 font-medium hover:underline">
+                      {prime.phone}
+                    </a>
+                  ) : (
+                    <p className="text-slate-400">N/A</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Email Row */}
+              {prime.email && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">EMAIL</p>
+                  <a href={`mailto:${prime.email}`} className="text-blue-600 font-medium hover:underline">
+                    {prime.email}
+                  </a>
+                </div>
+              )}
+
+              {/* Agencies */}
+              {prime.agencies && prime.agencies.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">PRIMARY AGENCIES</p>
+                  <div className="flex flex-wrap gap-2">
+                    {prime.agencies.map((agency: string, aIdx: number) => (
+                      <span key={aIdx} className="px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full">
+                        {agency}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* NAICS Codes */}
+              {prime.naicsCategories && prime.naicsCategories.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">NAICS CODES</p>
+                  <div className="flex flex-wrap gap-2">
+                    {prime.naicsCategories.slice(0, 6).map((naics: string, nIdx: number) => (
+                      <span key={nIdx} className="px-3 py-1 bg-purple-50 text-purple-700 text-sm font-medium rounded-full">
+                        {naics}
+                      </span>
+                    ))}
+                    {prime.naicsCategories.length > 6 && (
+                      <span className="px-3 py-1 bg-slate-100 text-slate-500 text-sm rounded-full">
+                        +{prime.naicsCategories.length - 6} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Other Agencies to Consider */}
+      {primeData.otherAgencies && primeData.otherAgencies.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 mb-4">Other Agencies to Consider</h3>
+          <div className="space-y-3">
+            {primeData.otherAgencies.map((agency: any, idx: number) => (
+              <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50">
+                <p className="font-semibold text-slate-900 mb-2">{agency.name}</p>
+                <p className="text-sm text-slate-700 mb-2"><strong>Reason:</strong> {agency.reason}</p>
+                {agency.matchingPainPoints && agency.matchingPainPoints.length > 0 && (
+                  <div className="text-sm text-blue-700 mb-2">
+                    <strong>Matching Pain Points:</strong>
+                    <ul className="list-disc list-inside mt-1">
+                      {agency.matchingPainPoints.map((pp: string, ppIdx: number) => (
+                        <li key={ppIdx}>{pp}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-sm text-green-700"><strong>Relevance:</strong> {agency.relevance}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-slate-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3">Recommendations</h3>
+        <ul className="space-y-2">
+          {tier2Data.recommendations.map((rec: string, idx: number) => (
+            <li key={`tier2-rec-${idx}`} className="flex items-start">
+              <span className="text-blue-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+          {primeData.recommendations.map((rec: string, idx: number) => (
+            <li key={`prime-rec-${idx}`} className="flex items-start">
+              <span className="text-blue-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyClick: (agency: AgencyForModal) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 className="text-xl font-bold text-blue-900 mb-4">Executive Summary</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm text-blue-700">Total Agencies</p>
+            <p className="text-2xl font-bold text-blue-900">{data.summary.totalAgencies}</p>
+          </div>
+          <div>
+            <p className="text-sm text-blue-700">Total Spending</p>
+            <p className="text-2xl font-bold text-blue-900">
+              {formatCurrency(data.summary.totalSpending)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-blue-700">Total Contracts</p>
+            <p className="text-2xl font-bold text-blue-900">{data.summary.totalContracts}</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Contracting Offices</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Office ID</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Contracting Office / Command</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Sub-Agency</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Location</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Spending</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Contracts</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-slate-200">
+              {data.agencies.slice(0, 20).map((agency: any, idx: number) => {
+                // Contracting office is the command/office that awards contracts (e.g., "Naval Sea Systems Command")
+                const contractingOffice = agency.contractingOffice || agency.name;
+                // Sub-agency is the intermediate level (e.g., "Department of the Navy")
+                // If subAgency equals contractingOffice (no distinct command), show parentAgency instead
+                const rawSubAgency = agency.subAgency;
+                const subAgency = (rawSubAgency && rawSubAgency !== contractingOffice)
+                  ? rawSubAgency
+                  : agency.parentAgency || '—';
+
+                return (
+                  <tr key={idx} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <a
+                        href={`https://sam.gov/search/?index=opp&page=1&pageSize=25&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&q=${encodeURIComponent(contractingOffice)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100 hover:underline"
+                        title={`Search SAM.gov for opportunities from ${contractingOffice}`}
+                      >
+                        {agency.officeId || agency.subAgencyCode || 'N/A'}
+                      </a>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onAgencyClick({
+                          name: contractingOffice,
+                          contractingOffice,
+                          subAgency: agency.subAgency,
+                          parentAgency: agency.parentAgency,
+                          spending: agency.spending,
+                          contractCount: agency.contractCount,
+                          location: agency.location,
+                          officeId: agency.officeId || agency.subAgencyCode,
+                        })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') onAgencyClick({
+                            name: contractingOffice,
+                            contractingOffice,
+                            subAgency: agency.subAgency,
+                            parentAgency: agency.parentAgency,
+                            spending: agency.spending,
+                            contractCount: agency.contractCount,
+                            location: agency.location,
+                            officeId: agency.officeId || agency.subAgencyCode,
+                          });
+                        }}
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-sm cursor-pointer"
+                      >
+                        {contractingOffice}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-slate-600">{subAgency}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-xs text-slate-500">{agency.location}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <p className="font-semibold text-green-600 text-sm">{formatCurrency(agency.spending)}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <p className="text-sm text-slate-600">{agency.contractCount}</p>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-slate-500 mt-2 italic">
+          Click on Office ID to search for active opportunities on <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">SAM.gov</a>
+        </p>
+      </div>
+
+      <div className="bg-slate-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3">Recommendations</h3>
+        <ul className="space-y-2">
+          {data.recommendations.map((rec: string, idx: number) => (
+            <li key={idx} className="flex items-start">
+              <span className="text-green-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function Tier2Report({ data }: { data: any }) {
+  return (
+    <div className="space-y-6">
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+        <h3 className="text-xl font-bold text-purple-900 mb-4">Executive Summary</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-purple-700">Suggested Primes</p>
+            <p className="text-2xl font-bold text-purple-900">{data.summary.totalPrimes}</p>
+          </div>
+          <div>
+            <p className="text-sm text-purple-700">Opportunities</p>
+            <p className="text-2xl font-bold text-purple-900">{data.summary.opportunityCount}</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Suggested Prime Contractors</h3>
+        <div className="space-y-3">
+          {data.suggestedPrimes.map((prime: any, idx: number) => (
+            <div key={idx} className="border border-slate-200 rounded-lg p-4">
+              <p className="font-semibold text-slate-900 text-lg mb-2">{prime.name}</p>
+              <p className="text-sm text-slate-700 mb-3"><strong>Reason:</strong> {prime.reason}</p>
+              <p className="text-sm text-slate-700 mb-2"><strong>Opportunities:</strong> {prime.opportunities.join(', ')}</p>
+              <p className="text-sm text-blue-600">{prime.contactStrategy}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3">Recommendations</h3>
+        <ul className="space-y-2">
+          {data.recommendations.map((rec: string, idx: number) => (
+            <li key={idx} className="flex items-start">
+              <span className="text-purple-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function ForecastReport({ data }: { data: any }) {
+  return (
+    <div className="space-y-6">
+      <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+        <h3 className="text-xl font-bold text-orange-900 mb-4">Executive Summary</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm text-orange-700">Total Forecasts</p>
+            <p className="text-2xl font-bold text-orange-900">{data.summary.totalForecasts}</p>
+          </div>
+          <div>
+            <p className="text-sm text-orange-700">Estimated Value</p>
+            <p className="text-2xl font-bold text-orange-900">
+              ${(data.summary.totalValue / 1000000).toFixed(1)}M
+            </p>
+          </div>
+          {data.summary.forecastSources > 0 && (
+            <div>
+              <p className="text-sm text-orange-700">Forecast Sources</p>
+              <p className="text-2xl font-bold text-orange-900">{data.summary.forecastSources}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Command-Specific Forecast Resources */}
+      {data.forecastResources && data.forecastResources.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h3 className="text-lg font-bold text-blue-900 mb-4">🔗 Command Forecast Websites</h3>
+          <p className="text-sm text-blue-700 mb-4">
+            Direct links to forecast pages for your target commands. Check these regularly for new opportunities.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {data.forecastResources.map((resource: any, idx: number) => (
+              <div key={idx} className="bg-white border border-blue-100 rounded-lg p-4">
+                <p className="font-semibold text-slate-900 mb-2">{resource.command}</p>
+                <div className="space-y-2">
+                  <a
+                    href={resource.forecastUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    <span className="mr-2">📋</span>
+                    Official Forecast Page
+                  </a>
+                  <a
+                    href={resource.samForecastUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    <span className="mr-2">🔍</span>
+                    Search on SAM.gov
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.forecasts.length > 0 ? (
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 mb-4">Upcoming Forecasts</h3>
+          <div className="space-y-3">
+            {data.forecasts.map((forecast: any, idx: number) => (
+              <div key={idx} className="border border-slate-200 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <p className="font-semibold text-slate-900">{forecast.agency}</p>
+                    <p className="text-sm text-slate-600">{forecast.quarter}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-green-600">${(forecast.estimatedValue / 1000000).toFixed(1)}M</p>
+                    <p className="text-xs text-slate-500">{forecast.solicitationDate}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-700">{forecast.description}</p>
+                {(forecast.naicsCode || forecast.setAside) && (
+                  <div className="flex gap-2 mt-2">
+                    {forecast.naicsCode && (
+                      <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">
+                        NAICS: {forecast.naicsCode}
+                      </span>
+                    )}
+                    {forecast.setAside && (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
+                        {forecast.setAside}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8 text-slate-500">
+          <p className="mb-2">No forecasts available at this time.</p>
+          <p className="text-sm">Check the command forecast websites above for the latest opportunities.</p>
+        </div>
+      )}
+
+      <div className="bg-slate-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3">Recommendations</h3>
+        <ul className="space-y-2">
+          {data.recommendations.map((rec: string, idx: number) => (
+            <li key={idx} className="flex items-start">
+              <span className="text-orange-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+interface IDVContract {
+  awardId: string;
+  recipientName: string;
+  recipientUei: string;
+  awardAmount: number;
+  description: string;
+  startDate: string;
+  endDate: string;
+  agency: string;
+  subAgency: string;
+  naicsCode: string;
+  naicsDescription: string;
+  recipientState: string;
+  popState: string;
+  generatedId: string;
+  usaSpendingUrl: string;
+}
+
+interface SBLOContact {
+  sbloName: string | null;
+  email: string | null;
+  phone: string | null;
+  supplierPortal: string | null;
+}
+
+
+function IDVContractsReport({ data, inputs }: { data: any; inputs: CoreInputs }) {
+  const [sbloLookup, setSbloLookup] = useState<Record<string, SBLOContact>>({});
+
+  // Load prime contractors database for SBLO lookup
+  useEffect(() => {
+    async function loadPrimeContractors() {
+      try {
+        const primeDB = await import('@/data/prime-contractors-database.json');
+        const lookup: Record<string, SBLOContact> = {};
+
+        primeDB.primes.forEach((prime: any) => {
+          const normalizedName = prime.name?.toUpperCase().trim();
+          if (normalizedName) {
+            lookup[normalizedName] = {
+              sbloName: prime.sbloName,
+              email: prime.email,
+              phone: prime.phone,
+              supplierPortal: prime.supplierPortal
+            };
+          }
+        });
+
+        setSbloLookup(lookup);
+      } catch (err) {
+        console.error('Failed to load prime contractors database:', err);
+      }
+    }
+
+    loadPrimeContractors();
+  }, []);
+
+  // Function to find SBLO contact by company name
+  function findSBLOContact(recipientName: string): SBLOContact | null {
+    if (!recipientName) return null;
+
+    const normalizedSearch = recipientName.toUpperCase().trim();
+
+    if (sbloLookup[normalizedSearch]) {
+      return sbloLookup[normalizedSearch];
+    }
+
+    for (const [name, contact] of Object.entries(sbloLookup)) {
+      if (name.includes(normalizedSearch) || normalizedSearch.includes(name)) {
+        return contact;
+      }
+    }
+
+    const searchWords = normalizedSearch.split(/\s+/).filter(w => w.length > 3);
+    for (const [name, contact] of Object.entries(sbloLookup)) {
+      for (const word of searchWords) {
+        if (name.includes(word)) {
+          return contact;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  const idvContracts = data?.contracts || [];
+  const totalValue = data?.summary?.totalValue || 0;
+  const uniquePrimes = data?.summary?.uniquePrimes || 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Info Banner */}
+      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5">
+        <h3 className="text-lg font-bold text-emerald-900 mb-2">Why IDV Contracts Matter</h3>
+        <p className="text-sm text-emerald-700">
+          IDV (Indefinite Delivery Vehicle) contracts are pre-competed vehicles where prime contractors have already won.
+          Instead of bidding on new opportunities, you can partner with these primes as a subcontractor.
+          This is often the <strong>fastest path to federal revenue</strong> for small businesses.
+        </p>
+      </div>
+
+      {/* Stats Bar */}
+      {idvContracts.length > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-indigo-900">{idvContracts.length}</p>
+            <p className="text-sm text-indigo-700">IDV Contracts</p>
+          </div>
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-indigo-900">{formatCurrency(totalValue)}</p>
+            <p className="text-sm text-indigo-700">Total Value</p>
+          </div>
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-indigo-900">{uniquePrimes}</p>
+            <p className="text-sm text-indigo-700">Prime Contractors</p>
+          </div>
+        </div>
+      )}
+
+      {/* IDV Contracts List */}
+      {idvContracts.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 mb-4">Active IDV Contracts</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {idvContracts.map((contract: IDVContract, idx: number) => {
+              const sbloContact = findSBLOContact(contract.recipientName);
+              const hasContactInfo = sbloContact && (sbloContact.email || sbloContact.phone || sbloContact.sbloName);
+
+              return (
+                <div key={idx} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-lg transition-shadow">
+                  {/* Header Row */}
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <p className="text-sm text-slate-600 line-clamp-2 mb-2">
+                        {contract.description || 'IDV Contract'}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {contract.naicsCode && (
+                          <span className="px-2 py-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-xs font-semibold rounded">
+                            {contract.naicsCode}
+                          </span>
+                        )}
+                        <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">
+                          {contract.subAgency || contract.agency}
+                        </span>
+                        {hasContactInfo && (
+                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded">
+                            SBLO Contact Available
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded ml-2">
+                      IDV
+                    </span>
+                  </div>
+
+                  {/* Prime Contractor Box */}
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
+                    <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1">PRIME CONTRACTOR</p>
+                    <p className="font-bold text-slate-900">{contract.recipientName}</p>
+                    <p className="text-sm text-slate-600">
+                      {contract.recipientState && `${contract.recipientState}`}
+                      {contract.recipientUei && ` | UEI: ${contract.recipientUei}`}
+                    </p>
+                  </div>
+
+                  {/* SBLO Contact Info */}
+                  {hasContactInfo && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-2">SBLO CONTACT</p>
+                      {sbloContact.sbloName && (
+                        <p className="text-sm text-slate-900 font-medium">{sbloContact.sbloName}</p>
+                      )}
+                      {sbloContact.email && (
+                        <p className="text-sm">
+                          <a href={`mailto:${sbloContact.email}`} className="text-indigo-600 hover:underline">
+                            {sbloContact.email}
+                          </a>
+                        </p>
+                      )}
+                      {sbloContact.phone && (
+                        <p className="text-sm">
+                          <a href={`tel:${sbloContact.phone}`} className="text-emerald-600 hover:underline">
+                            {sbloContact.phone}
+                          </a>
+                        </p>
+                      )}
+                      {sbloContact.supplierPortal && (
+                        <p className="text-sm mt-2">
+                          <a href={sbloContact.supplierPortal} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            Supplier Portal →
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Info Grid */}
+                  <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">Contract Value</p>
+                      <p className="font-bold text-indigo-600">{formatCurrency(contract.awardAmount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">End Date</p>
+                      <p className="text-slate-900">{contract.endDate || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  {/* Contract ID */}
+                  <div className="mb-4">
+                    <p className="text-xs text-slate-500 uppercase">Award ID</p>
+                    <p className="text-sm text-slate-700 font-mono">{contract.awardId}</p>
+                  </div>
+
+                  {/* Action Link */}
+                  <a
+                    href={contract.usaSpendingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 transition-colors"
+                  >
+                    View on USAspending.gov →
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {idvContracts.length === 0 && (
+        <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl">
+          <p className="mb-2 text-lg font-semibold">No IDV contracts found</p>
+          <p className="text-sm">No IDV contracts found for NAICS code {inputs.naicsCode || 'your criteria'}</p>
+        </div>
+      )}
+
+      {/* Recommendations */}
+      <div className="bg-slate-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3">IDV Subcontracting Strategy</h3>
+        <ul className="space-y-2">
+          {(data?.recommendations || [
+            'Contact the SBLO (Small Business Liaison Officer) at each prime contractor',
+            'Focus on IDVs with 1-2 years remaining - they need to meet subcontracting goals',
+            'Register in prime contractor supplier portals (many have them)',
+            'Prepare a strong capability statement highlighting your certifications',
+            'Large primes are required to subcontract with small businesses - use this leverage',
+          ]).map((rec: string, idx: number) => (
+            <li key={idx} className="flex items-start">
+              <span className="text-indigo-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function OSBPContactsReport({ data }: { data: any }) {
+  // Filter agencies that have OSBP contacts
+  const agenciesWithOSBP = data.agencies.filter((agency: any) => agency.osbp);
+
+  // Build unique OSBP contacts grouped by email, with list of offices they cover
+  interface OSBPEntry {
+    osbp: any;
+    subAgency: string;
+    parentAgency: string;
+    website: string | null;
+    forecastUrl: string | null;
+    samForecastUrl: string | null;
+    command: string | null;
+    offices: Array<{ name: string; spending: number; contractCount: number }>;
+  }
+
+  const uniqueOSBPs = new Map<string, OSBPEntry>();
+
+  agenciesWithOSBP.forEach((agency: any) => {
+    const email = agency.osbp?.email || 'unknown';
+
+    if (!uniqueOSBPs.has(email)) {
+      // Determine the correct subAgency based on the OSBP name/email, not the agency
+      // This ensures Navy OSBP is grouped under Navy, not wherever the first agency happened to be
+      let osbpSubAgency = agency.subAgency || agency.parentAgency;
+
+      // Check if OSBP email indicates the true parent agency
+      const osbpEmail = agency.osbp?.email?.toLowerCase() || '';
+      const osbpName = agency.osbp?.name?.toLowerCase() || '';
+
+      if (osbpEmail.includes('navy') || osbpName.includes('navy')) {
+        osbpSubAgency = 'Department of the Navy';
+      } else if (osbpEmail.includes('army') || osbpName.includes('army')) {
+        osbpSubAgency = 'Department of the Army';
+      } else if (osbpEmail.includes('.af.') || osbpName.includes('air force')) {
+        osbpSubAgency = 'Department of the Air Force';
+      } else if (osbpEmail.includes('epa.gov') || osbpName.includes('epa')) {
+        osbpSubAgency = 'Environmental Protection Agency';
+      } else if (osbpEmail.includes('va.gov') || osbpName.includes('veterans')) {
+        osbpSubAgency = 'Department of Veterans Affairs';
+      } else if (osbpEmail.includes('gsa.gov') || osbpName.includes('general services')) {
+        osbpSubAgency = 'General Services Administration';
+      } else if (osbpEmail.includes('dhs.gov') || osbpName.includes('homeland')) {
+        osbpSubAgency = 'Department of Homeland Security';
+      } else if (osbpEmail.includes('doj.gov') || osbpName.includes('justice')) {
+        osbpSubAgency = 'Department of Justice';
+      } else if (osbpEmail.includes('commerce.gov') || osbpName.includes('commerce')) {
+        osbpSubAgency = 'Department of Commerce';
+      } else if (osbpEmail.includes('interior.gov') || osbpName.includes('interior')) {
+        osbpSubAgency = 'Department of the Interior';
+      }
+
+      uniqueOSBPs.set(email, {
+        osbp: agency.osbp,
+        subAgency: osbpSubAgency,
+        parentAgency: agency.parentAgency,
+        website: agency.website,
+        forecastUrl: agency.forecastUrl,
+        samForecastUrl: agency.samForecastUrl,
+        command: agency.command,
+        offices: [],
+      });
+    }
+
+    // Add this office to the list
+    const entry = uniqueOSBPs.get(email)!;
+    entry.offices.push({
+      name: agency.contractingOffice || agency.name,
+      spending: agency.spending || 0,
+      contractCount: agency.contractCount || 0,
+    });
+  });
+
+  // Convert to array and sort by total spending across offices
+  const osbpList = Array.from(uniqueOSBPs.values())
+    .map(entry => ({
+      ...entry,
+      totalSpending: entry.offices.reduce((sum, o) => sum + o.spending, 0),
+      totalContracts: entry.offices.reduce((sum, o) => sum + o.contractCount, 0),
+    }))
+    .sort((a, b) => b.totalSpending - a.totalSpending);
+
+  // Group by subAgency for display
+  const groupedBySubAgency = osbpList.reduce((acc: Record<string, typeof osbpList>, entry) => {
+    const key = entry.subAgency || entry.parentAgency || 'Other';
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(entry);
+    return acc;
+  }, {});
+
+  const subAgencies = Object.keys(groupedBySubAgency).sort();
+  const totalContacts = osbpList.length;
+  const totalOffices = osbpList.reduce((sum, e) => sum + e.offices.length, 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Executive Summary */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 className="text-xl font-bold text-blue-900 mb-4">Office of Small Business Programs (OSBP) Contacts</h3>
+        <p className="text-blue-700 mb-4">
+          Direct contacts for small business programs at your selected agencies. These offices help small businesses
+          navigate federal contracting and can provide guidance on upcoming opportunities.
+        </p>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm text-blue-700">Unique OSBP Contacts</p>
+            <p className="text-2xl font-bold text-blue-900">{totalContacts}</p>
+          </div>
+          <div>
+            <p className="text-sm text-blue-700">Sub-Agencies / Branches</p>
+            <p className="text-2xl font-bold text-blue-900">{subAgencies.length}</p>
+          </div>
+          <div>
+            <p className="text-sm text-blue-700">Contracting Offices Covered</p>
+            <p className="text-2xl font-bold text-blue-900">{totalOffices}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* OSBP Contacts by Sub-Agency */}
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">OSBP Contacts by Sub-Agency</h3>
+
+        {totalContacts === 0 ? (
+          <div className="bg-slate-50 rounded-lg p-8 text-center">
+            <p className="text-slate-600">No OSBP contact information available for the selected agencies.</p>
+            <p className="text-sm text-slate-500 mt-2">
+              Try searching for DoD commands or major civilian agencies to find OSBP contacts.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {subAgencies.map((subAgencyName, subIdx) => {
+              const entries = groupedBySubAgency[subAgencyName];
+              const totalAgencySpending = entries.reduce((sum, e) => sum + e.totalSpending, 0);
+
+              return (
+                <div key={subIdx} className="border border-slate-200 rounded-lg overflow-hidden">
+                  {/* Sub-Agency Header */}
+                  <div className="bg-slate-100 px-4 py-3 border-b border-slate-200">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-bold text-slate-900">{subAgencyName}</h4>
+                      <div className="flex gap-4 text-sm text-slate-600">
+                        <span>{entries.length} OSBP contact{entries.length !== 1 ? 's' : ''}</span>
+                        <span>{formatCurrency(totalAgencySpending)} total spending</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* OSBP Contacts for this sub-agency */}
+                  <div className="divide-y divide-slate-100">
+                    {entries.map((entry, idx: number) => (
+                      <div key={idx} className="p-4 hover:bg-slate-50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {entry.command || entry.osbp?.name || entry.subAgency}
+                            </p>
+                            {entry.osbp?.name && entry.command && (
+                              <p className="text-sm text-slate-600">{entry.osbp.name}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            {entry.website && (
+                              <a
+                                href={entry.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 text-sm"
+                              >
+                                🌐 Website
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          {entry.osbp?.director && (
+                            <div className="flex items-center">
+                              <span className="text-slate-500 w-20">Director:</span>
+                              <span className="font-medium text-slate-800">{entry.osbp.director}</span>
+                            </div>
+                          )}
+                          {entry.osbp?.phone && (
+                            <div className="flex items-center">
+                              <span className="text-slate-500 w-20">Phone:</span>
+                              <a href={`tel:${entry.osbp.phone}`} className="font-medium text-blue-600 hover:text-blue-800">
+                                {entry.osbp.phone}
+                              </a>
+                            </div>
+                          )}
+                          {entry.osbp?.email && (
+                            <div className="flex items-center">
+                              <span className="text-slate-500 w-20">Email:</span>
+                              <a href={`mailto:${entry.osbp.email}`} className="font-medium text-blue-600 hover:text-blue-800">
+                                {entry.osbp.email}
+                              </a>
+                            </div>
+                          )}
+                          {entry.osbp?.address && (
+                            <div className="flex items-start">
+                              <span className="text-slate-500 w-20">Address:</span>
+                              <span className="text-slate-700">{entry.osbp.address}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Contracting Offices Covered */}
+                        {entry.offices.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-slate-100">
+                            <p className="text-xs text-slate-500 mb-2">
+                              Covers {entry.offices.length} contracting office{entry.offices.length !== 1 ? 's' : ''}
+                              ({formatCurrency(entry.totalSpending)} spending, {entry.totalContracts} contracts):
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {entry.offices.slice(0, 10).map((office, oIdx) => (
+                                <span
+                                  key={oIdx}
+                                  className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded"
+                                  title={`${formatCurrency(office.spending)} - ${office.contractCount} contracts`}
+                                >
+                                  {office.name.length > 40 ? office.name.substring(0, 40) + '...' : office.name}
+                                </span>
+                              ))}
+                              {entry.offices.length > 10 && (
+                                <span className="text-xs px-2 py-1 bg-slate-200 text-slate-600 rounded">
+                                  +{entry.offices.length - 10} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Forecast URLs */}
+                        {(entry.forecastUrl || entry.samForecastUrl) && (
+                          <div className="mt-3 pt-3 border-t border-slate-100 flex gap-3">
+                            {entry.forecastUrl && (
+                              <a
+                                href={entry.forecastUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-full hover:bg-green-200"
+                              >
+                                📋 Agency Forecast
+                              </a>
+                            )}
+                            {entry.samForecastUrl && (
+                              <a
+                                href={entry.samForecastUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200"
+                              >
+                                🔍 SAM.gov Search
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Tips for Contacting OSBP */}
+      <div className="bg-green-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-green-900 mb-3">Tips for Contacting OSBP Offices</h3>
+        <ul className="space-y-2">
+          <li className="flex items-start">
+            <span className="text-green-600 mr-2">✓</span>
+            <span className="text-green-800">Introduce your company and specific capabilities relevant to the agency&apos;s mission</span>
+          </li>
+          <li className="flex items-start">
+            <span className="text-green-600 mr-2">✓</span>
+            <span className="text-green-800">Ask about upcoming vendor outreach events and industry days</span>
+          </li>
+          <li className="flex items-start">
+            <span className="text-green-600 mr-2">✓</span>
+            <span className="text-green-800">Request information about subcontracting opportunities with prime contractors</span>
+          </li>
+          <li className="flex items-start">
+            <span className="text-green-600 mr-2">✓</span>
+            <span className="text-green-800">Inquire about mentor-protégé programs and set-aside opportunities</span>
+          </li>
+          <li className="flex items-start">
+            <span className="text-green-600 mr-2">✓</span>
+            <span className="text-green-800">Ask about the agency&apos;s procurement forecast for your NAICS code</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }) {
+  // State for combined hit list (curated + dynamic from USAspending)
+  const [hitListOpps, setHitListOpps] = useState<HitListOpportunity[]>([]);
+  const [loadingHitList, setLoadingHitList] = useState(true);
+  const hitListStats = getHitListStats();
+
+  // Fetch combined hit list on mount
+  useEffect(() => {
+    async function loadHitList() {
+      setLoadingHitList(true);
+      const combined = await getCombinedHitList(inputs);
+      setHitListOpps(combined);
+      setLoadingHitList(false);
+    }
+    loadHitList();
+  }, [inputs]);
+
+  return (
+    <div className="space-y-6">
+      {/* Executive Summary */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <h3 className="text-xl font-bold text-yellow-900 mb-4">Executive Summary</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm text-yellow-700">Total Q4 Spend</p>
+            <p className="text-2xl font-bold text-yellow-900">
+              {formatCurrency(data.summary.totalQ4Spend)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-yellow-700">Urgent Opportunities</p>
+            <p className="text-2xl font-bold text-yellow-900">{data.summary.urgentOpportunities}</p>
+          </div>
+          <div>
+            <p className="text-sm text-yellow-700">Low Competition Contracts</p>
+            <p className="text-2xl font-bold text-yellow-900">{hitListOpps.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* December Hit List - Low Competition Contracts */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-green-900">🎯 December Hit List - Low Competition Contracts</h3>
+          <span className="px-3 py-1 bg-green-600 text-white text-sm font-bold rounded-full">
+            {hitListOpps.length} TOTAL
+          </span>
+        </div>
+        <p className="text-sm text-green-800 mb-4">
+          Curated + dynamic opportunities from your NAICS code ({inputs.naicsCode}) with higher win probability
+        </p>
+
+        {loadingHitList ? (
+          <div className="flex items-center justify-center py-8">
+            <svg className="animate-spin h-8 w-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="ml-3 text-green-700 font-semibold">Finding more opportunities from USAspending.gov...</span>
+          </div>
+        ) : hitListOpps.length > 0 ? (
+          <div className="space-y-3">
+            {hitListOpps.map((opp: HitListOpportunity, idx: number) => {
+              const daysUntil = getDaysUntilDeadline(opp.deadline);
+              const urgencyBadge = getUrgencyBadge(opp);
+              const actionStrategy = getHitListActionStrategy(opp, inputs);
+
+              const isCurated = opp.source === 'curated';
+              const isDynamic = opp.source === 'usaspending';
+
+              return (
+                <div
+                  key={opp.id}
+                  className="bg-white border-2 border-green-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {isCurated && (
+                          <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded">
+                            CURATED
+                          </span>
+                        )}
+                        {isDynamic && (
+                          <span className="px-2 py-1 bg-purple-600 text-white text-xs font-bold rounded">
+                            SIMILAR AWARD
+                          </span>
+                        )}
+                        <span className={`px-3 py-1 text-xs font-bold rounded ${
+                          urgencyBadge.color === 'red'
+                            ? 'bg-red-100 text-red-700'
+                            : urgencyBadge.color === 'orange'
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {urgencyBadge.text}
+                        </span>
+                        {daysUntil !== null && daysUntil > 0 && (
+                          <span className="text-xs text-slate-600">
+                            {daysUntil} days left
+                          </span>
+                        )}
+                        {opp.winProbability && (
+                          <span className={`px-2 py-1 text-xs font-bold rounded ${
+                            opp.winProbability === 'high'
+                              ? 'bg-green-100 text-green-800'
+                              : opp.winProbability === 'medium'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {opp.winProbability.toUpperCase()} WIN PROB
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-bold text-slate-900 text-base mb-1">{opp.title}</h4>
+                      <p className="text-sm text-slate-600 mb-2">
+                        {opp.agency && <><strong>Agency:</strong> {opp.agency} | </>}
+                        <strong>NAICS:</strong> {opp.naics}
+                        {opp.amount && <> | <strong>Value:</strong> ${(opp.amount / 1000).toFixed(0)}K</>}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {isCurated && opp.deadline && (
+                      <p className="text-sm text-slate-700">
+                        <strong>Deadline:</strong> {opp.deadline}
+                      </p>
+                    )}
+                    {isDynamic && opp.awardDate && (
+                      <p className="text-sm text-slate-700">
+                        <strong>Award Date:</strong> {new Date(opp.awardDate).toLocaleDateString()}
+                      </p>
+                    )}
+                    {opp.setAside && opp.setAside !== 'Unrestricted' && (
+                      <p className="text-sm text-green-700">
+                        <strong>Set-Aside:</strong> {opp.setAside}
+                      </p>
+                    )}
+                    {opp.description && (
+                      <p className="text-sm text-slate-700">
+                        <strong>Description:</strong> {opp.description}
+                      </p>
+                    )}
+                    {opp.poc && (
+                      <p className="text-sm text-blue-700">
+                        <strong>POC:</strong> {opp.poc}
+                      </p>
+                    )}
+                    {isCurated && (
+                      <p className="text-sm text-emerald-700 bg-emerald-50 p-2 rounded">
+                        <strong>Action Strategy:</strong> {actionStrategy}
+                      </p>
+                    )}
+                    {isDynamic && (
+                      <p className="text-sm text-purple-700 bg-purple-50 p-2 rounded">
+                        <strong>Why This Matters:</strong> Similar contract was awarded in your NAICS - contact this office to present capabilities for upcoming opportunities
+                      </p>
+                    )}
+                    <a
+                      href={isCurated
+                        ? `https://sam.gov/search/?index=opp&page=1&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&keywords=${encodeURIComponent(opp.noticeId || opp.title)}`
+                        : opp.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block text-sm text-blue-600 hover:text-blue-800 font-semibold"
+                    >
+                      📄 {isCurated ? `Search SAM.gov for ${opp.noticeId || 'this opportunity'}` : 'View Award Details on USAspending.gov'} →
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-slate-600">
+            <p>No hit list opportunities found for your criteria.</p>
+            <p className="text-sm mt-2">Try adjusting your NAICS code or business type.</p>
+          </div>
+        )}
+      </div>
+
+      {/* December Spend Opportunities */}
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">💰 December Spend Forecast Opportunities</h3>
+        <div className="space-y-3">
+          {data.opportunities.map((opp: any, idx: number) => (
+            <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <p className="font-semibold text-slate-900">{opp.agency}</p>
+                  {opp.program && <p className="text-sm text-slate-600">{opp.program}</p>}
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-green-600">
+                    {formatCurrency(opp.estimatedQ4Spend)}
+                  </p>
+                  <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                    opp.urgencyLevel === 'high'
+                      ? 'bg-red-100 text-red-700'
+                      : opp.urgencyLevel === 'medium'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-green-100 text-green-700'
+                  }`}>
+                    {opp.urgencyLevel.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-blue-700 mb-2"><strong>Quick Win Strategy:</strong> {opp.quickWinStrategy}</p>
+              {opp.primeContractor && (
+                <p className="text-sm text-slate-700 mb-1"><strong>Prime:</strong> {opp.primeContractor}</p>
+              )}
+              {opp.hotNaics && (
+                <p className="text-sm text-slate-700 mb-1"><strong>Hot NAICS:</strong> {opp.hotNaics}</p>
+              )}
+              {opp.sbloContact && (
+                <p className="text-sm text-green-700">
+                  <strong>Office of Small Business Contact:</strong> {opp.sbloContact.name} - {opp.sbloContact.email}
+                </p>
+              )}
+              <a
+                href={`https://sam.gov/search/?index=opp&page=1&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&keywords=${encodeURIComponent(opp.agency || '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-2 text-sm text-blue-600 hover:text-blue-800 font-semibold"
+              >
+                🔍 Search SAM.gov for {opp.agency} opportunities →
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recommendations */}
+      <div className="bg-slate-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3">Recommendations</h3>
+        <ul className="space-y-2">
+          {hitListOpps.length > 0 && (
+            <>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">✓</span>
+                <span className="text-slate-700">
+                  <strong>PRIORITY:</strong> Focus on {hitListOpps.filter((o: HitListOpportunity) => o.isUrgent).length} urgent hit list opportunities with imminent deadlines
+                </span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-600 mr-2">✓</span>
+                <span className="text-slate-700">
+                  Hit list contracts have lower competition - prioritize these for higher win probability
+                </span>
+              </li>
+            </>
+          )}
+          {data.recommendations.map((rec: string, idx: number) => (
+            <li key={idx} className="flex items-start">
+              <span className="text-yellow-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function TribalReport({ data }: { data: any }) {
+  return (
+    <div className="space-y-6">
+      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6">
+        <h3 className="text-xl font-bold text-indigo-900 mb-4">Executive Summary</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-indigo-700">Total Opportunities</p>
+            <p className="text-2xl font-bold text-indigo-900">{data.summary.totalOpportunities}</p>
+          </div>
+          <div>
+            <p className="text-sm text-indigo-700">Estimated Value</p>
+            <p className="text-2xl font-bold text-indigo-900">
+              ${(data.summary.totalValue / 1000000).toFixed(1)}M
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Suggested Tribal Businesses</h3>
+        <div className="space-y-3">
+          {data.suggestedTribes.map((tribe: any, idx: number) => (
+            <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50">
+              <div className="flex justify-between items-start mb-2">
+                <p className="font-semibold text-slate-900 text-lg">{tribe.name}</p>
+                <p className="text-sm text-slate-600">{tribe.region}</p>
+              </div>
+              {tribe.capabilities && tribe.capabilities.length > 0 && (
+                <p className="text-sm text-slate-700 mb-2">
+                  <strong>Capabilities:</strong> {tribe.capabilities.join(', ')}
+                </p>
+              )}
+              {tribe.certifications && tribe.certifications.length > 0 && (
+                <p className="text-sm text-green-700 mb-2">
+                  <strong>Certifications:</strong> {tribe.certifications.join(', ')}
+                </p>
+              )}
+              {tribe.naicsCategories && tribe.naicsCategories.length > 0 && (
+                <p className="text-sm text-slate-700 mb-2">
+                  <strong>NAICS:</strong> {tribe.naicsCategories.join(', ')}
+                </p>
+              )}
+              {tribe.contactInfo && (
+                <p className="text-sm text-blue-700">
+                  <strong>Contact:</strong> {tribe.contactInfo.name} - {tribe.contactInfo.email}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {data.recommendedAgencies && data.recommendedAgencies.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 mb-4">Recommended Agencies</h3>
+          <div className="flex flex-wrap gap-2">
+            {data.recommendedAgencies.map((agency: string, idx: number) => (
+              <span key={idx} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
+                {agency}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-slate-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3">Recommendations</h3>
+        <ul className="space-y-2">
+          {data.recommendations.map((rec: string, idx: number) => (
+            <li key={idx} className="flex items-start">
+              <span className="text-indigo-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function PrimesReport({ data }: { data: any }) {
+  return (
+    <div className="space-y-6">
+      <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-6">
+        <h3 className="text-xl font-bold text-cyan-900 mb-4">Executive Summary</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-cyan-700">Suggested Primes</p>
+            <p className="text-2xl font-bold text-cyan-900">{data.summary.totalPrimes}</p>
+          </div>
+          <div>
+            <p className="text-sm text-cyan-700">Other Agencies</p>
+            <p className="text-2xl font-bold text-cyan-900">{data.summary.totalOtherAgencies}</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Prime Contractors in Your Industry</h3>
+        <div className="space-y-3">
+          {data.suggestedPrimes.map((prime: any, idx: number) => (
+            <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50">
+              <div className="flex justify-between items-start mb-2">
+                <p className="font-semibold text-slate-900 text-lg">{prime.name}</p>
+                <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                  prime.smallBusinessLevel === 'high'
+                    ? 'bg-green-100 text-green-700'
+                    : prime.smallBusinessLevel === 'medium'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {prime.smallBusinessLevel?.toUpperCase() || 'N/A'}
+                </span>
+              </div>
+              <p className="text-sm text-slate-700 mb-2"><strong>Reason:</strong> {prime.reason}</p>
+              {prime.subcontractingOpportunities && prime.subcontractingOpportunities.length > 0 && (
+                <p className="text-sm text-blue-700 mb-2">
+                  <strong>Opportunities:</strong> {prime.subcontractingOpportunities.join(', ')}
+                </p>
+              )}
+              {prime.contractTypes && prime.contractTypes.length > 0 && (
+                <p className="text-sm text-slate-700">
+                  <strong>Contract Types:</strong> {prime.contractTypes.join(', ')}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {data.otherAgencies && data.otherAgencies.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 mb-4">Other Agencies to Consider</h3>
+          <div className="space-y-3">
+            {data.otherAgencies.map((agency: any, idx: number) => (
+              <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50">
+                <p className="font-semibold text-slate-900 mb-2">{agency.name}</p>
+                <p className="text-sm text-slate-700 mb-2"><strong>Reason:</strong> {agency.reason}</p>
+                {agency.matchingPainPoints && agency.matchingPainPoints.length > 0 && (
+                  <div className="text-sm text-blue-700 mb-2">
+                    <strong>Matching Pain Points:</strong>
+                    <ul className="list-disc list-inside mt-1">
+                      {agency.matchingPainPoints.map((pp: string, ppIdx: number) => (
+                        <li key={ppIdx}>{pp}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-sm text-green-700"><strong>Relevance:</strong> {agency.relevance}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-slate-50 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3">Recommendations</h3>
+        <ul className="space-y-2">
+          {data.recommendations.map((rec: string, idx: number) => (
+            <li key={idx} className="flex items-start">
+              <span className="text-cyan-600 mr-2">✓</span>
+              <span className="text-slate-700">{rec}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}

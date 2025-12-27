@@ -1,0 +1,548 @@
+{
+  "agencies": {
+    "Department of Defense": {
+      "painPoints": [
+        "Cybersecurity modernization and zero-trust architecture implementation",
+        "Cloud migration and DevSecOps adoption",
+        "Supply chain security and resilience",
+        "AI/ML integration for decision support",
+        "5G and advanced communications infrastructure",
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - model tampering, prompt injection, lifecycle security",
+        "FY2026 NDAA: Procurement security framework (NIST/CMMC alignment) - contractor cybersecurity compliance",
+        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - domestic manufacturing capacity",
+        "FY2026 NDAA: Outbound investment controls - hypersonic technology and expanded country restrictions"
+      ]
+    },
+    "Department of the Navy": {
+      "painPoints": [
+        "Shipyard modernization and maintenance backlogs",
+        "Undersea warfare technology development",
+        "Cybersecurity for naval systems",
+        "Autonomous systems and unmanned vehicles",
+        "Port infrastructure resilience"
+      ]
+    },
+    "NAVFAC": {
+      "painPoints": [
+        "Infrastructure modernization and facility upgrades",
+        "Energy efficiency and renewable energy projects",
+        "Climate resilience and sea-level rise adaptation",
+        "Base realignment and closure (BRAC) support",
+        "Emergency response and disaster recovery",
+        "FY2026 NDAA: Progressive design-build contract implementation - complex facility projects",
+        "FY2026 NDAA: Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and smart water grids",
+        "FY2026 NDAA: Renewable energy integration - solar, wind, battery storage for installations"
+      ]
+    },
+    "NAVSEA": {
+      "painPoints": [
+        "Ship design and engineering modernization",
+        "Maintenance and repair optimization",
+        "Digital transformation of shipyard operations",
+        "Submarine and surface ship modernization",
+        "Supply chain management for ship components"
+      ]
+    },
+    "NAVWAR": {
+      "painPoints": [
+        "Cybersecurity and information warfare capabilities",
+        "Network modernization and 5G integration",
+        "Command and control systems",
+        "Electronic warfare systems",
+        "Data analytics and AI for naval operations"
+      ]
+    },
+    "NAVAIR": {
+      "painPoints": [
+        "Aircraft modernization and sustainment",
+        "Unmanned aerial systems (UAS) development",
+        "Avionics and sensor integration",
+        "Training systems and simulators",
+        "Aircraft carrier integration",
+        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - maritime UAS capabilities",
+        "FY2026 NDAA: Counter-UAS (C-UAS) systems for base and ship defense"
+      ]
+    },
+    "USACE": {
+      "note": "USACE has multiple mission areas - use usace-office-specific-pain-points.json for office-specific mappings",
+      "painPoints": [
+        "Water resources management and flood control (Civil Works offices only)",
+        "Infrastructure resilience and climate adaptation (Civil Works offices only)",
+        "Environmental restoration and remediation (Environmental offices)",
+        "Military construction and base support (MILCON offices only)",
+        "Emergency response and disaster recovery (All offices)",
+        "FY2026 NDAA: Progressive design-build contract implementation - complex infrastructure projects",
+        "FY2026 NDAA: Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and water resilience (MILCON offices)"
+      ],
+      "see_also": "bootcamp/usace-office-specific-pain-points.json"
+    },
+    "Department of the Army": {
+      "painPoints": [
+        "Soldier modernization and equipment",
+        "Network modernization and tactical communications",
+        "Base infrastructure and facilities",
+        "Training and simulation systems",
+        "Supply chain and logistics optimization",
+        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - ground force UAS capabilities",
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) for tactical systems"
+      ]
+    },
+    "Army Materiel Command": {
+      "painPoints": [
+        "Acquisition process acceleration - reducing unacceptably slow delivery and fielding times",
+        "Fragmented accountability - no single leader with necessary authorities to urgently deliver results",
+        "Portfolio Acquisition Executive (PAE) transition - implementing 6 new capability area leaders by Jan 2026",
+        "Sustainment enterprise consolidation - restructuring Joint Munitions Command and Army Sustainment Command",
+        "Long-range precision fires and air defense modernization",
+        "Industry investment disincentives - broken procurement behaviors limiting growth"
+      ]
+    },
+    "Army Contracting Command": {
+      "painPoints": [
+        "Processing 190,000+ contracts annually ($60.9B) with growing workload demands",
+        "Expeditionary contracting surge capacity for deployed forces",
+        "Acquisition speed vs compliance balance - bureaucracy hampering delivery",
+        "Small business participation across 115+ worldwide locations",
+        "Contracting workforce retention and training at 6,100+ employee scale",
+        "FY2026 NDAA: Cost Accounting Standards (CAS) threshold changes - $2M to $35M applicability",
+        "FY2026 NDAA: Cost or pricing data threshold changes - $2M to $10M (contracts after June 30, 2026)"
+      ]
+    },
+    "Department of the Air Force": {
+      "painPoints": [
+        "Aircraft modernization and sustainment",
+        "Space systems and capabilities",
+        "Cybersecurity and IT modernization",
+        "Base infrastructure and facilities",
+        "Advanced training and simulation",
+        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - air force UAS capabilities",
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) for air and space systems"
+      ]
+    },
+    "Air Force Materiel Command": {
+      "painPoints": [
+        "Acquisition speed prioritization - streamlining requirements processes for rapid delivery",
+        "AcqDemo workforce conversion - 18,000+ employees transitioning to modernized compensation ($80B budget)",
+        "Integrated Development Office (IDO) - increasing speed to warfighter capability delivery",
+        "Advanced nuclear modernization - B-21, Sentinel, Long-Range Standoff programs",
+        "Next-Generation Air Dominance and Collaborative Combat Aircraft investment",
+        "Digital Materiel Management transformation",
+        "Program management flexibility and accountability reforms"
+      ]
+    },
+    "Air Force Sustainment Center": {
+      "painPoints": [
+        "Aircraft maintenance and repair optimization across 3 Air Logistics Complexes",
+        "Supply chain management and logistics for global reach",
+        "Workforce development and training - attracting high-caliber talent",
+        "Facility modernization at Tinker, Hill, and Robins AFBs",
+        "Process improvement and lean manufacturing",
+        "Aging aircraft fleet sustainment challenges"
+      ]
+    },
+    "Marine Corps Systems Command": {
+      "painPoints": [
+        "Managing 450+ acquisition programs across MAGTF elements",
+        "Ground weapon and IT systems modernization",
+        "Tactical communications and electromagnetic warfare systems",
+        "Combat support systems acquisition and sustainment",
+        "Training systems and simulation modernization",
+        "Small business contracting across specialized technical areas"
+      ]
+    },
+    "Space Systems Command": {
+      "painPoints": [
+        "Developing lethal and resilient space capabilities",
+        "Rapid acquisition for space domain awareness",
+        "Launch and satellite system modernization",
+        "Commercial space integration and partnerships",
+        "Space cyber defense and resilience",
+        "Accelerating fielding timelines for contested space environment",
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - AI for space operations",
+        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - space-based UAS capabilities"
+      ]
+    },
+    "Department of Veterans Affairs": {
+      "painPoints": [
+        "Electronic health records (EHR) modernization",
+        "Telehealth and virtual care expansion",
+        "Claims processing automation",
+        "IT infrastructure modernization",
+        "Veteran homelessness prevention"
+      ]
+    },
+    "Department of Homeland Security": {
+      "painPoints": [
+        "Border security technology and infrastructure",
+        "Cybersecurity for critical infrastructure",
+        "Emergency response and preparedness",
+        "Biometric identification systems",
+        "Counter-terrorism technology"
+      ]
+    },
+    "U.S. Customs and Border Protection": {
+      "painPoints": [
+        "Border surveillance and detection systems",
+        "Port of entry modernization",
+        "Biometric entry/exit systems",
+        "Cargo screening and inspection technology",
+        "Data analytics for threat detection"
+      ]
+    },
+    "U.S. Coast Guard": {
+      "painPoints": [
+        "Shore infrastructure backlog - $7 billion needed to address deteriorating boat stations, piers, and operational buildings",
+        "Offshore Patrol Cutter (OPC) program delays - OPC 1 delivery 5+ years late, OPCs 3 and 4 terminated",
+        "Acquisition cost overruns - OPC program costs increased from $12.5B to $17.6B (2012-2022)",
+        "Deferred maintenance crisis - nearly 40,000 shore assets in mediocre to fair condition",
+        "Shore infrastructure funding gap - requested $709M for FY2025 but only allocated $167M",
+        "Aviation readiness decline - aging aircraft fleet requiring modernization",
+        "Polar Security Cutter (PSC) program execution challenges",
+        "Acquisition process modernization needs - improving contracting and design stability",
+        "National Security Cutter (NSC) construction issues - NSC 11 cancelled due to material conformance concerns"
+      ]
+    },
+    "General Services Administration": {
+      "painPoints": [
+        "Federal building modernization and sustainability",
+        "IT acquisition and cloud services",
+        "Fleet vehicle electrification",
+        "Workplace modernization and hybrid work support",
+        "Supply chain and procurement optimization"
+      ]
+    },
+    "NASA": {
+      "painPoints": [
+        "Space exploration technology development",
+        "Earth observation and climate monitoring",
+        "Aeronautics research and development",
+        "IT infrastructure and cybersecurity",
+        "Facility modernization and maintenance"
+      ]
+    },
+    "Department of Energy": {
+      "painPoints": [
+        "Clean energy technology development",
+        "Grid modernization and resilience",
+        "Nuclear security and non-proliferation",
+        "Cybersecurity for energy infrastructure",
+        "Environmental cleanup and remediation",
+        "FY2026 NDAA: BIOSECURE Act compliance - biotechnology research programs (if applicable)"
+      ]
+    },
+    "NNSA": {
+      "painPoints": [
+        "Nuclear weapons modernization - $21B+ budget for warhead life extension and upgrades",
+        "Nonproliferation technology development - detecting and preventing nuclear threats",
+        "Naval reactor support - submarine and carrier propulsion systems",
+        "Security and safeguards modernization - protecting nuclear materials and facilities",
+        "Emergency response capabilities - Nuclear Emergency Support Team (NEST) readiness",
+        "Laboratory infrastructure upgrades - Los Alamos, Livermore, Sandia modernization",
+        "Production facility recapitalization - Y-12, Pantex, Kansas City, Savannah River",
+        "Supply chain security - critical materials and components for nuclear enterprise"
+      ]
+    },
+    "DOE Office of Science": {
+      "painPoints": [
+        "Scientific research infrastructure - $8B+ budget managing 10 national laboratories",
+        "High-performance computing - exascale and beyond for scientific discovery",
+        "User facility operations - maintaining cutting-edge research capabilities",
+        "Advanced instrumentation development - next-generation scientific tools",
+        "Fusion energy research - ITER collaboration and domestic fusion programs",
+        "Quantum information science - quantum computing and sensing technologies",
+        "AI/ML for scientific research - computational modeling and data analysis",
+        "Workforce development - attracting top scientific talent to national labs"
+      ]
+    },
+    "DOE Nuclear Energy": {
+      "painPoints": [
+        "Advanced reactor development - next-generation nuclear technologies",
+        "Small modular reactors (SMRs) - commercialization and deployment support",
+        "Nuclear fuel cycle modernization - enrichment, fabrication, and recycling",
+        "Microreactor technology - portable reactors for remote/military applications",
+        "Spent fuel management - storage, transportation, and disposal solutions",
+        "Reactor licensing support - navigating NRC approval for innovative designs",
+        "Idaho National Laboratory infrastructure - research reactor and testing facilities",
+        "Nuclear energy R&D partnerships - industry collaboration programs"
+      ]
+    },
+    "DOE Fossil Energy": {
+      "painPoints": [
+        "Carbon capture and storage (CCS) - deployment at scale for emissions reduction",
+        "Hydrogen production and infrastructure - clean hydrogen economy development",
+        "Critical minerals extraction - rare earth elements and battery materials",
+        "Coal technology modernization - CCUS integration for existing plants",
+        "Natural gas infrastructure - pipeline safety and methane emissions reduction",
+        "NETL research capabilities - only government-owned, government-operated DOE lab",
+        "Energy storage solutions - grid-scale battery and thermal storage",
+        "Fossil energy cybersecurity - protecting energy infrastructure from threats"
+      ]
+    },
+    "Department of Health and Human Services": {
+      "painPoints": [
+        "Public health data systems and analytics",
+        "Healthcare IT modernization",
+        "Biomedical research infrastructure",
+        "Emergency preparedness and response",
+        "Cybersecurity for health data"
+      ]
+    },
+    "NIH": {
+      "painPoints": [
+        "Workforce reduction impact - managing 1,200 employee reduction during FY2025 reorganization",
+        "Clinical trials infrastructure modernization - 27 institutes and centers needing unified systems",
+        "Biomedical research data management - AI/ML integration for $49B+ research portfolio",
+        "Laboratory equipment and facility upgrades - aging infrastructure at Bethesda campus",
+        "Grant management system modernization - processing thousands of research awards annually",
+        "Cybersecurity for sensitive health research data",
+        "Professional services for specialized biomedical research support",
+        "Collaboration platforms for multi-institute research initiatives",
+        "FY2026 NDAA: BIOSECURE Act compliance - vetting biotechnology research equipment and services",
+        "FY2026 NDAA: Replacement of prohibited biotechnology systems in research laboratories",
+        "FY2026 NDAA: Alternative supplier identification for critical biotech research capabilities"
+      ]
+    },
+    "CDC": {
+      "painPoints": [
+        "Workforce capacity crisis - 20% reduction (2,400 employees) impacting public health mission",
+        "Public health surveillance system modernization - real-time disease tracking nationwide",
+        "Laboratory diagnostics capacity - COVID-19 exposed gaps in testing infrastructure",
+        "Emergency response surge capability - rapid deployment for outbreaks and pandemics",
+        "Data analytics and epidemiology platforms - AI-driven disease prediction and modeling",
+        "Health communications and public outreach systems",
+        "Interagency data sharing - coordination with state/local health departments",
+        "Supply chain for laboratory reagents and diagnostic equipment",
+        "FY2026 NDAA: BIOSECURE Act compliance - vetting laboratory equipment and diagnostic systems",
+        "FY2026 NDAA: Replacement of prohibited biotechnology equipment in diagnostic laboratories",
+        "FY2026 NDAA: Compliance monitoring and reporting for BIOSECURE Act requirements"
+      ]
+    },
+    "FDA": {
+      "painPoints": [
+        "Workforce reduction - managing 19% cut (3,500 employees) while maintaining safety mission",
+        "Laboratory testing modernization - advanced analytical equipment for drug/food safety",
+        "Regulatory science research - keeping pace with novel therapies and technologies",
+        "Inspection and compliance systems - tracking manufacturers and supply chains",
+        "IT modernization - digital transformation of regulatory review processes",
+        "Drug safety monitoring - adverse event reporting and pharmacovigilance systems",
+        "Cybersecurity for regulated industry data",
+        "Accelerated approval pathways - balancing speed with safety for critical therapies",
+        "FY2026 NDAA: BIOSECURE Act compliance - vetting testing equipment and regulatory systems",
+        "FY2026 NDAA: Replacement of prohibited biotechnology systems in testing laboratories",
+        "FY2026 NDAA: Risk assessment for existing biotechnology equipment and services"
+      ]
+    },
+    "CMS": {
+      "painPoints": [
+        "IT and professional services dominance - 76% of contract obligations in technology",
+        "Healthcare data systems modernization - managing $1.5T+ in program payments",
+        "Claims processing optimization - billions of Medicare/Medicaid transactions annually",
+        "Fraud detection and prevention - AI/ML for identifying improper payments",
+        "Quality measurement and reporting - value-based care analytics",
+        "Interoperability standards - connecting providers, payers, and patients",
+        "Cybersecurity for beneficiary data - protecting sensitive health information",
+        "Cloud migration - moving legacy systems to modern platforms"
+      ]
+    },
+    "Department of Commerce": {
+      "painPoints": [
+        "Weather forecasting and climate monitoring",
+        "Cybersecurity and IT modernization",
+        "Trade and economic data systems",
+        "Broadband infrastructure deployment",
+        "Intellectual property protection"
+      ]
+    },
+    "NOAA": {
+      "painPoints": [
+        "Weather satellite systems - GOES-R and JPSS constellation modernization ($6B+ budget)",
+        "Supercomputing and modeling - advancing weather prediction and climate models",
+        "Marine research vessels - aging fleet replacement and modernization",
+        "Fisheries enforcement technology - monitoring and compliance systems",
+        "Climate data systems - long-term observation and analysis infrastructure",
+        "National Weather Service modernization - forecasting technology and communication",
+        "Ocean observation systems - buoys, sensors, and autonomous platforms",
+        "Coastal resilience - storm surge prediction and sea level rise monitoring"
+      ]
+    },
+    "NIST": {
+      "painPoints": [
+        "Cybersecurity framework development - standards for critical infrastructure protection",
+        "Advanced manufacturing research - Industry 4.0 and smart manufacturing",
+        "Quantum information science - quantum computing and communications standards",
+        "Artificial intelligence standards - AI safety, testing, and evaluation",
+        "Measurement science - next-generation metrology and calibration",
+        "Physical infrastructure upgrades - Gaithersburg campus modernization",
+        "Bioscience and health IT standards - medical device interoperability",
+        "Emerging technology standards - 5G/6G, IoT, blockchain"
+      ]
+    },
+    "Census Bureau": {
+      "painPoints": [
+        "IT infrastructure and data systems - cloud migration for massive datasets",
+        "Survey data collection technology - mobile and web-based platforms",
+        "Cybersecurity for sensitive data - protecting personally identifiable information (PII)",
+        "Address canvassing systems - geospatial technology and field operations",
+        "Data dissemination platforms - making census data accessible to public",
+        "2030 Census preparation - technology planning for next decennial count",
+        "American Community Survey (ACS) modernization - continuous data collection",
+        "Economic census systems - business data collection and analysis"
+      ]
+    },
+    "Department of Transportation": {
+      "painPoints": [
+        "Infrastructure modernization and repair",
+        "Transportation safety systems",
+        "Electric vehicle infrastructure",
+        "Aviation safety and modernization",
+        "Smart transportation technologies"
+      ]
+    },
+    "FAA": {
+      "painPoints": [
+        "Air traffic control modernization (NextGen) - transitioning from radar to satellite-based navigation",
+        "Airport infrastructure grants - supporting 3,300+ airports nationwide",
+        "Aviation safety equipment - modernizing inspection and certification systems",
+        "Cybersecurity for aviation systems - protecting critical air traffic infrastructure",
+        "Unmanned aircraft systems (UAS) integration - enabling safe drone operations",
+        "Workforce challenges - hiring and retaining 45,000+ employees including controllers",
+        "Aging infrastructure replacement - towers, radar systems, communications equipment",
+        "Commercial space launch oversight - supporting growing space industry"
+      ]
+    },
+    "FHWA": {
+      "painPoints": [
+        "Highway infrastructure funding - coordinating with states on $140B+ annual investments",
+        "Bridge repair and replacement - addressing structurally deficient bridges nationwide",
+        "Intelligent transportation systems (ITS) - deploying connected vehicle technology",
+        "Safety technology and research - reducing highway fatalities and serious injuries",
+        "Environmental mitigation - sustainable highway design and construction",
+        "Climate resilience - adapting highways to extreme weather and flooding",
+        "Workforce development - supporting state DOT technical capacity",
+        "Data systems modernization - highway performance monitoring and analytics"
+      ]
+    },
+    "FTA": {
+      "painPoints": [
+        "Transit system grants - Capital Investment Grants (CIG) for major projects",
+        "Bus and rail vehicle procurement - supporting fleet modernization",
+        "Zero-emission bus transition - electrification of transit fleets nationwide",
+        "Station modernization - ADA compliance and accessibility upgrades",
+        "Transit cybersecurity - protecting rider data and operational systems",
+        "State of Good Repair - addressing maintenance backlogs",
+        "Rural transit solutions - serving underserved communities",
+        "Transit-oriented development - coordinating land use and transportation"
+      ]
+    },
+    "FRA": {
+      "painPoints": [
+        "High-speed rail development - Amtrak corridor improvements and new routes",
+        "Positive Train Control (PTC) systems - mandated safety technology implementation",
+        "Railroad infrastructure improvements - bridge, tunnel, and track upgrades",
+        "Safety technology - automated track inspection and predictive maintenance",
+        "Grade crossing elimination - reducing vehicle-train collisions",
+        "Rail cybersecurity - protecting signaling and control systems",
+        "Freight rail efficiency - supporting supply chain resilience",
+        "Regulatory compliance - enforcing safety standards across rail industry"
+      ]
+    },
+    "Defense Health Agency": {
+      "painPoints": [
+        "Electronic health records integration",
+        "Telehealth and virtual care",
+        "Medical readiness and training",
+        "Pharmacy and supply chain management",
+        "IT infrastructure modernization",
+        "FY2026 NDAA: BIOSECURE Act compliance - vetting biotechnology suppliers and equipment",
+        "FY2026 NDAA: Replacement of prohibited biotechnology systems and medical equipment",
+        "FY2026 NDAA: Alternative supplier identification for critical biotech capabilities"
+      ]
+    },
+    "Defense Logistics Agency": {
+      "painPoints": [
+        "Contested logistics in multi-domain operations - supply chain resilience against adversaries",
+        "Legacy system modernization - integrating 9 different supply chain systems",
+        "Digital and technical data modernization - DOD Digital Engineering Strategy implementation",
+        "AI and predictive analytics - deploying 55+ AI models for disruption prevention",
+        "Data quality and interoperability - standardization across legacy systems",
+        "Just Enough Logistics model - reducing excess inventory while maintaining readiness",
+        "$2B+ distribution center infrastructure backlog",
+        "Supply chain visibility - real-time tracking across global network",
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - securing 55+ AI models",
+        "FY2026 NDAA: Progressive design-build for distribution center modernization projects"
+      ]
+    },
+    "Missile Defense Agency": {
+      "painPoints": [
+        "Hypersonic defense development - Glide Phase Interceptor (GPI) for maneuvering threats",
+        "Sensing architecture modernization - tracking complex exoatmospheric and hypersonic scenes",
+        "Integration complexity - blurred boundary between ballistic missile and air defense",
+        "Budget constraints - $13.7B total, down $500M from FY24",
+        "Hypersonic and Ballistic Tracking Space Sensor (HBTSS) integration with Aegis",
+        "Increased raid sizes and complex countermeasures",
+        "Enhanced electronic warfare capabilities countering",
+        "Command and control for multi-domain threat tracking",
+        "FY2026 NDAA: Outbound investment controls - hypersonic technology export restrictions",
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - AI for threat detection"
+      ]
+    },
+    "Defense Information Systems Agency": {
+      "painPoints": [
+        "Zero Trust architecture implementation - integrating ICAM with common IT environment",
+        "milCloud 2.0 migration - transitioning 120 accounts from legacy infrastructure",
+        "Global network modernization - building infrastructure impervious to denial",
+        "Classified network security - protecting information at highest levels",
+        "5G integration for military installations",
+        "Joint Regional Security Stacks (JRSS) deployment",
+        "Defense Information Systems Network (DISN) upgrade",
+        "Common IT environment consolidation across DoD",
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - department-wide policy",
+        "FY2026 NDAA: Procurement security framework (NIST/CMMC alignment) - contractor compliance"
+      ]
+    },
+    "Defense Contract Management Agency": {
+      "painPoints": [
+        "Contract administration system modernization - Modernization and Analytics Initiative (MAI)",
+        "Legacy IT system sustainment - reducing 56 FTEs for system maintenance",
+        "AI and ML integration - automated anomaly detection for contractor oversight",
+        "Platform as a Service (PaaS) and Software as a Service (SaaS) migration",
+        "Contractor business system surveillance - monitoring 300,000+ contracts ($4T value)",
+        "Cyber vs non-cyber workload shift - reallocating resources",
+        "Defense Industrial Base (DIB) collaboration and visibility",
+        "Robotic process automation for contract management",
+        "FY2026 NDAA: Procurement security framework (NIST/CMMC alignment) - contractor cybersecurity compliance monitoring",
+        "FY2026 NDAA: Cost Accounting Standards (CAS) threshold changes - $2M to $35M applicability"
+      ]
+    },
+    "Defense Contract Audit Agency": {
+      "painPoints": [
+        "Incurred cost audit completion - maintaining 12-month review cycle for auditable statements",
+        "Independent Public Accountant (IPA) management - assessing future use after backlog elimination",
+        "Legacy system modernization - records management and learning management system replacement",
+        "Risk-based audit methodology - optimizing audit selection for $599B in contract costs",
+        "Audit quality assurance - addressing DoD IG concerns about IPA work products",
+        "Technology integration - AI and automation for fraud detection",
+        "Workforce capability development - multi-talented auditor skillsets",
+        "Remote auditing capabilities - accessing contractor accounting systems virtually",
+        "FY2026 NDAA: Cost Accounting Standards (CAS) threshold changes - audit methodology updates for $35M threshold",
+        "FY2026 NDAA: Cost or pricing data threshold changes - $2M to $10M (contracts after June 30, 2026)"
+      ]
+    },
+    "DARPA": {
+      "painPoints": [
+        "Rapid technology transition - moving breakthrough innovations from lab to field deployment",
+        "High-risk R&D management - balancing innovation with accountability",
+        "Hypersonic weapons development - HAWC program and air-breathing cruise missiles",
+        "AI and machine learning applications - computational social science and reasoning",
+        "Quantum computing research - developing quantum advantage for defense",
+        "Biotechnology advancement - human-machine interface and synthetic biology",
+        "Microelectronics and semiconductors - advanced chip design for defense applications",
+        "Emerging technology assessment - identifying and exploiting technological surprise",
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - securing AI research programs",
+        "FY2026 NDAA: Outbound investment controls - hypersonic technology export restrictions",
+        "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - advanced UAS research"
+      ]
+    }
+  }
+}
+
