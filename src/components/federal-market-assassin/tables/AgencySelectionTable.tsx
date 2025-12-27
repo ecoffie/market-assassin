@@ -340,7 +340,18 @@ export default function AgencySelectionTable({
 
       {/* Action Bar - Sticky at top */}
       <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Back Button - Prominent */}
+          <button
+            onClick={onBack}
+            className="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center"
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+          <div className="w-px h-6 bg-slate-300"></div>
           <button
             onClick={() => handleSelectTop(10)}
             className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-semibold rounded-lg transition-colors"
@@ -499,16 +510,6 @@ export default function AgencySelectionTable({
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Back Button */}
-      <div className="mt-4">
-        <button
-          onClick={onBack}
-          className="px-4 py-2 text-slate-600 hover:text-slate-900 font-medium transition-colors"
-        >
-          ← Back to Inputs
-        </button>
       </div>
 
       {/* Agency Details Modal */}
