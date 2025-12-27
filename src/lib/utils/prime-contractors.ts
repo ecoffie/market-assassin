@@ -164,8 +164,15 @@ export function getPrimesByPSC(pscCode: string): PrimeContractor[] {
   let relatedNaics = pscToNaicsMap[pscPrefix] || pscToNaicsMap[pscFirstChar] || [];
 
   if (relatedNaics.length === 0) {
-    // Fallback: return all primes sorted by contact info
+    // Fallback: return diverse primes sorted by contact info, deduplicated
+    const seen = new Set<string>();
     return primesDB.primes
+      .filter(prime => {
+        const normalizedName = normalizeCompanyName(prime.name);
+        if (seen.has(normalizedName)) return false;
+        seen.add(normalizedName);
+        return true;
+      })
       .sort((a, b) => {
         const scoreContact = (prime: PrimeContractor): number => {
           let score = 0;
@@ -176,15 +183,25 @@ export function getPrimesByPSC(pscCode: string): PrimeContractor[] {
         };
         return scoreContact(b) - scoreContact(a);
       })
-      .slice(0, 20);
+      .slice(0, 25);
   }
 
-  // Find primes matching any of the related NAICS codes
-  const matchingPrimes = primesDB.primes.filter(prime =>
-    prime.naicsCategories?.some(code =>
+  // Find primes matching any of the related NAICS codes, deduplicated
+  const seen = new Set<string>();
+  const matchingPrimes = primesDB.primes.filter(prime => {
+    const normalizedName = normalizeCompanyName(prime.name);
+    if (seen.has(normalizedName)) return false;
+
+    const matches = prime.naicsCategories?.some(code =>
       relatedNaics.some(naics => code.startsWith(naics.substring(0, 3)) || naics.startsWith(code.substring(0, 3)))
-    )
-  );
+    );
+
+    if (matches) {
+      seen.add(normalizedName);
+      return true;
+    }
+    return false;
+  });
 
   return matchingPrimes.sort((a, b) => {
     const scoreContact = (prime: PrimeContractor): number => {
@@ -195,7 +212,7 @@ export function getPrimesByPSC(pscCode: string): PrimeContractor[] {
       return score;
     };
     return scoreContact(b) - scoreContact(a);
-  });
+  }).slice(0, 25);
 }
 
 /**
@@ -343,7 +360,7 @@ export function suggestPrimesForAgencies(
       };
       return scoreContact(b) - scoreContact(a);
     })
-    .slice(0, 10)
+    .slice(0, 25) // Return top 25 prime contractors with best contact info
     .map(prime => enrichPrimeContractor(prime));
 }
 
