@@ -158,7 +158,7 @@ export function suggestTribesForAgencies(
       };
       return scoreContact(b) - scoreContact(a);
     })
-    .slice(0, 10);
+    .slice(0, 25); // Return top 25 tribal businesses with best contact info
 }
 
 /**
