@@ -17,13 +17,15 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
     pscCode: '',
     companyName: '',
   });
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError(null);
 
     // Business type is always required
     if (!formData.businessType) {
-      alert('Please select a business type');
+      setValidationError('Please select a business type');
       return;
     }
 
@@ -32,7 +34,7 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
     const hasPsc = formData.pscCode && formData.pscCode.trim();
 
     if (!hasNaics && !hasPsc) {
-      alert('Please enter either a NAICS code or select a PSC code/category');
+      setValidationError('Please enter either a NAICS code or select a PSC code/category');
       return;
     }
 
@@ -238,6 +240,16 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
               />
             </div>
           </div>
+
+          {/* Validation Error */}
+          {validationError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start">
+              <svg className="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="text-sm text-red-800">{validationError}</span>
+            </div>
+          )}
 
           {/* Submit Button */}
           <div className="pt-2">
