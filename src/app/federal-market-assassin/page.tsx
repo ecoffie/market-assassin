@@ -140,6 +140,10 @@ export default function FederalMarketAssassinPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
+          <div className="mb-4">
+            <span className="text-3xl font-bold text-blue-700">GovCon</span>
+            <span className="text-3xl font-bold text-amber-500">Giants</span>
+          </div>
           <h1 className="text-5xl font-bold text-slate-900 mb-4">
             🎯 Federal Market Assassin
           </h1>
@@ -244,11 +248,18 @@ export default function FederalMarketAssassinPage() {
 
         {/* Footer */}
         <div className="text-center mt-12 text-slate-500">
+          <div className="mb-2">
+            <span className="text-lg font-bold text-blue-700">GovCon</span>
+            <span className="text-lg font-bold text-amber-500">Giants</span>
+          </div>
           <p className="text-sm">
             Federal Market Assassin - Your Strategic Advantage in Government Contracting
           </p>
           <p className="text-xs mt-2">
             Enter 5 inputs. Select agencies. Dominate the market.
+          </p>
+          <p className="text-xs mt-1 text-slate-400">
+            © {new Date().getFullYear()} GovCon Giants. All rights reserved.
           </p>
         </div>
       </div>
