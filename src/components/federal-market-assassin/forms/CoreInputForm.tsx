@@ -51,6 +51,49 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
     'Both',
   ];
 
+  // PSC Category options for dropdown
+  const pscCategories = [
+    { value: '', label: 'Select PSC Category...' },
+    // Services (A-Z)
+    { value: 'D', label: 'D - IT & Telecom Services' },
+    { value: 'R', label: 'R - Professional Services' },
+    { value: 'J', label: 'J - Maintenance & Repair' },
+    { value: 'S', label: 'S - Utilities & Housekeeping' },
+    { value: 'Y', label: 'Y - Construction of Structures' },
+    { value: 'Z', label: 'Z - Maintenance of Real Property' },
+    { value: 'B', label: 'B - Special Studies & Analysis' },
+    { value: 'C', label: 'C - Architect & Engineering' },
+    { value: 'F', label: 'F - Natural Resources Management' },
+    { value: 'G', label: 'G - Social Services' },
+    { value: 'H', label: 'H - Quality Control & Testing' },
+    { value: 'K', label: 'K - Modification of Equipment' },
+    { value: 'L', label: 'L - Technical Representative' },
+    { value: 'M', label: 'M - Operation of Facilities' },
+    { value: 'N', label: 'N - Installation of Equipment' },
+    { value: 'P', label: 'P - Salvage Services' },
+    { value: 'Q', label: 'Q - Medical Services' },
+    { value: 'T', label: 'T - Photo, Map, Print, Publishing' },
+    { value: 'U', label: 'U - Education & Training' },
+    { value: 'V', label: 'V - Transportation & Travel' },
+    { value: 'W', label: 'W - Lease/Rental of Equipment' },
+    { value: 'X', label: 'X - Lease/Rental of Facilities' },
+    { value: 'A', label: 'A - R&D Services' },
+    // Products/Goods (numeric)
+    { value: '70', label: '70 - IT Equipment & Software' },
+    { value: '58', label: '58 - Communication Equipment' },
+    { value: '65', label: '65 - Medical & Dental Equipment' },
+    { value: '66', label: '66 - Instruments & Lab Equipment' },
+    { value: '75', label: '75 - Office Supplies' },
+    { value: '71', label: '71 - Furniture' },
+    { value: '23', label: '23 - Motor Vehicles' },
+    { value: '25', label: '25 - Vehicular Equipment' },
+    { value: '15', label: '15 - Aircraft & Airframe Components' },
+    { value: '59', label: '59 - Electrical Equipment' },
+    { value: '36', label: '36 - Special Industry Machinery' },
+    { value: '89', label: '89 - Subsistence (Food)' },
+    { value: '84', label: '84 - Clothing & Textiles' },
+  ];
+
   return (
     <div className="flex justify-center">
       <div className="bg-white rounded-xl shadow-lg p-6 max-w-2xl w-full">
@@ -84,22 +127,43 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
             </select>
           </div>
 
-          {/* NAICS Code - Required */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              2. NAICS Code <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.naicsCode || ''}
-              onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
-              placeholder="e.g., 541330"
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              Your primary industry code (e.g., 541330 for Engineering Services)
-            </p>
+          {/* NAICS Code and PSC Code - Grid Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* NAICS Code - Required */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                2. NAICS Code <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.naicsCode || ''}
+                onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
+                placeholder="e.g., 541330"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Industry code (e.g., 541330 for Engineering)
+              </p>
+            </div>
+
+            {/* PSC Code - Optional */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                PSC Code <span className="text-slate-400 text-xs">(Optional - used if no NAICS)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.pscCode || ''}
+                onChange={(e) => setFormData({ ...formData, pscCode: e.target.value.toUpperCase() })}
+                placeholder="e.g., D310, 7030"
+                maxLength={4}
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Product/Service Code (4-char)
+              </p>
+            </div>
           </div>
 
           {/* Optional Fields - Grid Layout */}
@@ -138,7 +202,7 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
             </div>
           </div>
 
-          {/* Goods or Services and PSC Code - Grid Layout */}
+          {/* Goods or Services and PSC Category - Grid Layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Goods or Services - Optional */}
             <div>
@@ -159,22 +223,22 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
               </select>
             </div>
 
-            {/* PSC Code - Optional */}
+            {/* PSC Category Dropdown - Optional */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
-                PSC Code <span className="text-slate-400 text-xs">(Optional)</span>
+                PSC Category <span className="text-slate-400 text-xs">(Optional)</span>
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.pscCode || ''}
-                onChange={(e) => setFormData({ ...formData, pscCode: e.target.value.toUpperCase() })}
-                placeholder="e.g., D310, 7030"
-                maxLength={4}
+                onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                4-char Product/Service Code for precise filtering
-              </p>
+              >
+                {pscCategories.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

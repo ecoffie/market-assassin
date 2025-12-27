@@ -223,13 +223,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Add PSC (Product/Service Code) filter
-    // Priority: Specific PSC code > Goods/Services category
-    if (pscCode && pscCode.trim()) {
-      // User provided a specific PSC code - use it directly
+    // Priority: NAICS code takes priority - only use PSC if no NAICS provided
+    // If NAICS is provided, PSC code is ignored to avoid over-filtering
+    const hasNaicsFilter = naicsCode && naicsCode.trim();
+
+    if (!hasNaicsFilter && pscCode && pscCode.trim()) {
+      // No NAICS provided, so use PSC code directly
       const trimmedPsc = pscCode.trim().toUpperCase();
       filters.psc_codes = [trimmedPsc];
-      console.log(`🎯 Filtering by specific PSC code: ${trimmedPsc}`);
-    } else if (goodsOrServices && goodsOrServices !== 'Both') {
+      console.log(`🎯 Filtering by specific PSC code: ${trimmedPsc} (no NAICS provided)`);
+    } else if (pscCode && pscCode.trim() && hasNaicsFilter) {
+      // NAICS takes priority - log that PSC is being ignored
+      console.log(`ℹ️ PSC code ${pscCode} ignored - NAICS ${naicsCode} takes priority`);
+    }
+
+    // Apply Goods/Services filter only if no specific PSC code was used
+    if (!filters.psc_codes && goodsOrServices && goodsOrServices !== 'Both') {
       // Fall back to broad goods/services filtering
       // Products (Goods): PSC codes starting with digits (10-99) - FSC codes
       // Services: PSC codes starting with letters (A-Z)
