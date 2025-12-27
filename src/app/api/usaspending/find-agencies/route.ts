@@ -793,8 +793,7 @@ export async function POST(request: NextRequest) {
         businessType,
         naicsCode,
         zipCode,
-        veteranStatus,
-        goodsOrServices
+        veteranStatus
       });
 
       // Estimate results for each alternative (async, but we'll do a few key ones)
