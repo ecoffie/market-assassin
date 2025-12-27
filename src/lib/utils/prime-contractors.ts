@@ -125,6 +125,80 @@ export function findPrimeByName(primeName: string): PrimeContractor | null {
 }
 
 /**
+ * PSC to NAICS mapping for finding relevant primes
+ * Maps PSC categories to related NAICS codes
+ */
+const pscToNaicsMap: Record<string, string[]> = {
+  // Services
+  'D': ['541511', '541512', '541513', '541519', '518210'], // IT & Telecom
+  'R': ['541611', '541612', '541613', '541614', '541618', '541620', '541690'], // Professional Services
+  'J': ['811111', '811112', '811118', '811310'], // Maintenance & Repair
+  'S': ['561210', '561720', '561730'], // Utilities & Housekeeping
+  'Y': ['236220', '237110', '237310', '237990'], // Construction
+  'Z': ['236118', '238990'], // Maintenance of Real Property
+  'B': ['541720', '541990'], // Special Studies
+  'C': ['541310', '541320', '541330', '541340', '541350'], // A&E
+  'Q': ['621111', '621210', '621310'], // Medical Services
+  'U': ['611430', '611710'], // Education & Training
+  'A': ['541713', '541714', '541715'], // R&D
+  // Products (numeric)
+  '70': ['334111', '334112', '334118', '511210'], // IT Equipment
+  '58': ['334210', '334220', '334290'], // Communication Equipment
+  '65': ['339112', '339113', '339114'], // Medical Equipment
+  '66': ['334510', '334511', '334512', '334513'], // Instruments
+  '75': ['339940', '424120'], // Office Supplies
+  '71': ['337211', '337214', '337215'], // Furniture
+  '23': ['336110', '336111', '336112'], // Motor Vehicles
+  '15': ['336411', '336412', '336413'], // Aircraft
+};
+
+/**
+ * Find prime contractors by PSC code
+ * Maps PSC to related NAICS codes and finds matching primes
+ */
+export function getPrimesByPSC(pscCode: string): PrimeContractor[] {
+  const pscPrefix = pscCode.trim().toUpperCase().substring(0, 2);
+  const pscFirstChar = pscCode.trim().toUpperCase().charAt(0);
+
+  // Try to find NAICS codes for this PSC
+  let relatedNaics = pscToNaicsMap[pscPrefix] || pscToNaicsMap[pscFirstChar] || [];
+
+  if (relatedNaics.length === 0) {
+    // Fallback: return all primes sorted by contact info
+    return primesDB.primes
+      .sort((a, b) => {
+        const scoreContact = (prime: PrimeContractor): number => {
+          let score = 0;
+          if (prime.email) score += 3;
+          if (prime.phone) score += 2;
+          if (prime.sbloName) score += 1;
+          return score;
+        };
+        return scoreContact(b) - scoreContact(a);
+      })
+      .slice(0, 20);
+  }
+
+  // Find primes matching any of the related NAICS codes
+  const matchingPrimes = primesDB.primes.filter(prime =>
+    prime.naicsCategories?.some(code =>
+      relatedNaics.some(naics => code.startsWith(naics.substring(0, 3)) || naics.startsWith(code.substring(0, 3)))
+    )
+  );
+
+  return matchingPrimes.sort((a, b) => {
+    const scoreContact = (prime: PrimeContractor): number => {
+      let score = 0;
+      if (prime.email) score += 3;
+      if (prime.phone) score += 2;
+      if (prime.sbloName) score += 1;
+      return score;
+    };
+    return scoreContact(b) - scoreContact(a);
+  });
+}
+
+/**
  * Find tier 2 contractors by NAICS code (prioritizes those with contact info)
  */
 export function getTier2ByNAICS(naicsCode: string): Tier2Contractor[] {
@@ -181,21 +255,30 @@ export function getTier2ByPrimes(primeNames: string[]): Tier2Contractor[] {
 }
 
 /**
- * Suggest prime contractors based on NAICS, agencies, and pain points
+ * Suggest prime contractors based on NAICS or PSC, agencies, and pain points
  * Uses normalized company names to prevent duplicates like "LLC" vs ", LLC"
  */
 export function suggestPrimesForAgencies(
   agencies: Array<{ name: string; painPoints?: string[] }>,
-  naicsCode?: string
+  naicsCode?: string,
+  pscCode?: string
 ): PrimeContractor[] {
   // Use normalized name as key to prevent duplicates like "ALEUT LLC" vs "ALEUT, LLC"
   const suggestions = new Map<string, PrimeContractor>();
 
-  // Add primes matching NAICS code
-  if (naicsCode) {
+  // Add primes matching NAICS code (takes priority)
+  if (naicsCode && naicsCode.trim()) {
     getPrimesByNAICS(naicsCode).forEach(prime => {
       const normalizedKey = normalizeCompanyName(prime.name);
       // Only add if not already present (keeps first match)
+      if (!suggestions.has(normalizedKey)) {
+        suggestions.set(normalizedKey, prime);
+      }
+    });
+  } else if (pscCode && pscCode.trim()) {
+    // If no NAICS but PSC code provided, get primes by PSC category
+    getPrimesByPSC(pscCode).forEach(prime => {
+      const normalizedKey = normalizeCompanyName(prime.name);
       if (!suggestions.has(normalizedKey)) {
         suggestions.set(normalizedKey, prime);
       }

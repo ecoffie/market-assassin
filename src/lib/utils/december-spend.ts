@@ -204,7 +204,7 @@ export function getOpportunitiesByAgencies(agencyNames: string[]): DecemberSpend
 }
 
 /**
- * Get opportunities matching core inputs (business type, NAICS, agencies)
+ * Get opportunities matching core inputs (business type, NAICS or PSC, agencies)
  */
 export function getOpportunitiesByCoreInputs(
   inputs: CoreInputs,
@@ -212,12 +212,18 @@ export function getOpportunitiesByCoreInputs(
 ): DecemberSpendOpportunity[] {
   let opportunities = getAllDecemberOpportunities();
 
-  // Filter by NAICS code if provided
-  if (inputs.naicsCode) {
+  // Filter by NAICS code if provided (takes priority)
+  if (inputs.naicsCode && inputs.naicsCode.trim()) {
     const naicsFiltered = getOpportunitiesByNAICS(inputs.naicsCode);
     if (naicsFiltered.length > 0) {
       opportunities = naicsFiltered;
     }
+  } else if (inputs.pscCode && inputs.pscCode.trim()) {
+    // If no NAICS but PSC code provided, filter by PSC-related opportunities
+    // PSC codes don't directly match our december spend data (which uses NAICS),
+    // so we return all opportunities filtered by selected agencies only
+    // This allows PSC-based searches to still see December spend opportunities
+    console.log(`December Spend: Using PSC code ${inputs.pscCode} - returning agency-filtered results`);
   }
 
   // Filter by selected agencies
@@ -346,11 +352,13 @@ export function getQuickWinStrategy(
 
   strategies.push(`Focus on ${opportunity.program} program area`);
   
-  const naicsCodes = opportunity.naicsCodes.length > 0 
-    ? opportunity.naicsCodes 
+  const naicsCodes = opportunity.naicsCodes.length > 0
+    ? opportunity.naicsCodes
     : extractNAICSCodes(opportunity.hot_naics || opportunity.hotNaics || '');
   if (naicsCodes.length > 0) {
     strategies.push(`Highlight your capabilities in NAICS: ${naicsCodes.slice(0, 3).join(', ')}`);
+  } else if (inputs.pscCode) {
+    strategies.push(`Highlight your capabilities in PSC: ${inputs.pscCode}`);
   }
 
   if (inputs.businessType) {

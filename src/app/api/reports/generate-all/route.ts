@@ -50,9 +50,11 @@ export async function POST(request: NextRequest) {
 
     // Generate Tier 2 Subcontracting Report using bootcamp database
     // Get all suggested primes once, then split between Tier 2 and Prime Contractor sections
+    // Supports both NAICS and PSC code searches
     const allSuggestedPrimes = suggestPrimesForAgencies(
       agenciesWithPainPoints,
-      inputs.naicsCode
+      inputs.naicsCode,
+      inputs.pscCode
     );
 
     // Tier 2: Prioritize primes with subcontracting plans and supplier portals
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
     const tier2Subcontracting = {
       suggestedPrimes: tier2Primes.slice(0, 10).map(prime => ({
         name: prime.name,
-        reason: `Works with your target agencies${prime.naicsCategories?.length ? ' in your NAICS code' : ''}`,
+        reason: `Works with your target agencies${prime.naicsCategories?.length ? (inputs.naicsCode ? ' in your NAICS code' : inputs.pscCode ? ' in your PSC category' : '') : ''}`,
         opportunities: prime.specialties || [],
         relevantAgencies: prime.agencies?.slice(0, 5) || [],
         contactStrategy: prime.supplierPortal
