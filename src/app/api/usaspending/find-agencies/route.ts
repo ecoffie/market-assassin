@@ -11,7 +11,8 @@ import {
   getExtendedRegionStates,
   getStatesByTier,
   generateAlternativeSearchOptions,
-  estimateAlternativeSearchResults
+  estimateAlternativeSearchResults,
+  validateNaicsCode
 } from '@/lib/utils/usaspending-helpers';
 import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
 
@@ -51,10 +52,35 @@ export async function POST(request: NextRequest) {
     };
 
     let naicsCorrectionMessage: string | null = null;
+    let naicsValidationError: string | null = null;
+    let suggestedNaicsCodes: Array<{ code: string; name: string; }> = [];
 
     // Add NAICS filter if provided
     if (naicsCode && naicsCode.trim()) {
       let trimmedNaics = naicsCode.trim();
+
+      // Validate the NAICS code first
+      const validation = validateNaicsCode(trimmedNaics);
+      if (!validation.isValid) {
+        console.log(`❌ Invalid NAICS code: ${trimmedNaics}`);
+        console.log(`   Error: ${validation.errorMessage}`);
+        console.log(`   Suggestions: ${validation.suggestedCodes.map(s => s.code).join(', ')}`);
+
+        naicsValidationError = validation.errorMessage || `NAICS code "${trimmedNaics}" is not recognized.`;
+        suggestedNaicsCodes = validation.suggestedCodes;
+
+        // Return early with validation error and suggestions
+        return NextResponse.json({
+          success: false,
+          error: 'invalid_naics',
+          naicsValidationError,
+          suggestedNaicsCodes,
+          agencies: [],
+          totalCount: 0,
+          totalSpending: 0,
+          message: `The NAICS code "${trimmedNaics}" does not exist. Please select from the suggested codes below or enter a valid NAICS code.`
+        });
+      }
 
       // Normalize NAICS codes with trailing zeros to their sector/subsector equivalent
       // This handles cases where users enter codes like "81000", "810000", "8100", etc.

@@ -590,6 +590,166 @@ export function getStatesByTier(state: string): {
 
 
 /**
+ * Validate a NAICS code and suggest alternatives if invalid
+ * Returns validation result with suggested similar codes
+ */
+export function validateNaicsCode(naicsCode: string): {
+  isValid: boolean;
+  normalizedCode: string;
+  errorMessage?: string;
+  suggestedCodes: Array<{ code: string; name: string; }>;
+} {
+  const trimmed = naicsCode.trim();
+
+  // Check for non-numeric characters
+  if (!/^\d+$/.test(trimmed)) {
+    return {
+      isValid: false,
+      normalizedCode: trimmed,
+      errorMessage: `NAICS code "${trimmed}" contains invalid characters. NAICS codes must be numeric (2-6 digits).`,
+      suggestedCodes: getSuggestedNaicsCodes(trimmed)
+    };
+  }
+
+  // Check length (2-6 digits)
+  if (trimmed.length < 2 || trimmed.length > 6) {
+    return {
+      isValid: false,
+      normalizedCode: trimmed,
+      errorMessage: `NAICS code "${trimmed}" has invalid length. NAICS codes are 2-6 digits (e.g., 54 for Professional Services, 541330 for Engineering).`,
+      suggestedCodes: getSuggestedNaicsCodes(trimmed)
+    };
+  }
+
+  // Check if it's a valid sector (2-digit)
+  const sector = trimmed.substring(0, 2);
+  const validSectors = ['11', '21', '22', '23', '31', '32', '33', '42', '44', '45', '48', '49', '51', '52', '53', '54', '55', '56', '61', '62', '71', '72', '81', '92'];
+
+  if (!validSectors.includes(sector)) {
+    return {
+      isValid: false,
+      normalizedCode: trimmed,
+      errorMessage: `NAICS code "${trimmed}" starts with "${sector}" which is not a valid sector. Valid sectors are: 11 (Agriculture), 21 (Mining), 22 (Utilities), 23 (Construction), 31-33 (Manufacturing), 42 (Wholesale), 44-45 (Retail), 48-49 (Transportation), 51 (Information), 52 (Finance), 53 (Real Estate), 54 (Professional Services), 55 (Management), 56 (Administrative), 61 (Education), 62 (Healthcare), 71 (Arts/Entertainment), 72 (Accommodation/Food), 81 (Other Services), 92 (Public Admin).`,
+      suggestedCodes: getSuggestedNaicsCodes(trimmed)
+    };
+  }
+
+  // For 2-digit codes, check if we have expansion
+  if (trimmed.length === 2) {
+    if (naicsExpansion[trimmed]) {
+      return { isValid: true, normalizedCode: trimmed, suggestedCodes: [] };
+    }
+  }
+
+  // For 3-digit codes, check if we have expansion or if it's part of a valid sector
+  if (trimmed.length === 3) {
+    if (naicsExpansion[trimmed] || naicsExpansion[sector]) {
+      return { isValid: true, normalizedCode: trimmed, suggestedCodes: [] };
+    }
+    // Check if this 3-digit code exists in any expansion
+    const existsInExpansion = Object.values(naicsExpansion).some(codes =>
+      codes.some(code => code.startsWith(trimmed))
+    );
+    if (!existsInExpansion) {
+      return {
+        isValid: false,
+        normalizedCode: trimmed,
+        errorMessage: `NAICS code "${trimmed}" is not a recognized subsector. This code may not exist.`,
+        suggestedCodes: getSuggestedNaicsCodes(trimmed)
+      };
+    }
+  }
+
+  // For 4-6 digit codes, check if they exist in any expansion
+  if (trimmed.length >= 4) {
+    const existsInExpansion = Object.values(naicsExpansion).some(codes =>
+      codes.includes(trimmed) || codes.some(code => code.startsWith(trimmed) || trimmed.startsWith(code))
+    );
+
+    if (!existsInExpansion) {
+      // Check if the 3-digit prefix is valid
+      const prefix3 = trimmed.substring(0, 3);
+      const prefixValid = naicsExpansion[prefix3] || Object.values(naicsExpansion).some(codes =>
+        codes.some(code => code.startsWith(prefix3))
+      );
+
+      if (!prefixValid) {
+        return {
+          isValid: false,
+          normalizedCode: trimmed,
+          errorMessage: `NAICS code "${trimmed}" does not exist. The subsector "${prefix3}" is not recognized.`,
+          suggestedCodes: getSuggestedNaicsCodes(trimmed)
+        };
+      }
+
+      // The prefix is valid but this specific code doesn't exist
+      return {
+        isValid: false,
+        normalizedCode: trimmed,
+        errorMessage: `NAICS code "${trimmed}" does not exist. Try using the broader category "${prefix3}" (${industryNames[prefix3] || 'Unknown'}) or check for similar codes.`,
+        suggestedCodes: getSuggestedNaicsCodes(trimmed)
+      };
+    }
+  }
+
+  return { isValid: true, normalizedCode: trimmed, suggestedCodes: [] };
+}
+
+/**
+ * Get suggested NAICS codes similar to the invalid input
+ */
+function getSuggestedNaicsCodes(invalidCode: string): Array<{ code: string; name: string; }> {
+  const suggestions: Array<{ code: string; name: string; }> = [];
+  const trimmed = invalidCode.trim().replace(/\D/g, ''); // Remove non-digits
+
+  if (trimmed.length === 0) {
+    // Return popular sectors
+    return [
+      { code: '54', name: 'Professional, Scientific, and Technical Services' },
+      { code: '23', name: 'Construction' },
+      { code: '56', name: 'Administrative and Support Services' },
+      { code: '33', name: 'Manufacturing (Electronics, Transportation Equipment)' },
+      { code: '51', name: 'Information' },
+    ];
+  }
+
+  // Try to find codes that start with the same digits
+  const prefix = trimmed.substring(0, Math.min(3, trimmed.length));
+
+  // First, check 2-digit sector
+  const sector = trimmed.substring(0, 2);
+  if (industryNames[sector]) {
+    suggestions.push({ code: sector, name: industryNames[sector] });
+  }
+
+  // Find 3-digit subsectors in this sector
+  Object.keys(industryNames).forEach(code => {
+    if (code.length === 3 && code.startsWith(sector) && code !== prefix) {
+      suggestions.push({ code, name: industryNames[code] });
+    }
+  });
+
+  // If we don't have sector matches, suggest popular codes
+  if (suggestions.length === 0) {
+    // Find codes that are numerically close
+    const numericValue = parseInt(trimmed.substring(0, 2), 10);
+    const closeSectors = ['11', '21', '22', '23', '31', '32', '33', '42', '44', '45', '48', '49', '51', '52', '53', '54', '55', '56', '61', '62', '71', '72', '81', '92']
+      .map(s => ({ sector: s, diff: Math.abs(parseInt(s, 10) - numericValue) }))
+      .sort((a, b) => a.diff - b.diff)
+      .slice(0, 5);
+
+    closeSectors.forEach(({ sector }) => {
+      if (industryNames[sector]) {
+        suggestions.push({ code: sector, name: industryNames[sector] });
+      }
+    });
+  }
+
+  // Limit to 5 suggestions
+  return suggestions.slice(0, 5);
+}
+
+/**
  * Generate alternative search options when no results are found
  * Progressively relaxes filters to find more results
  */

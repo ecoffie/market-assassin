@@ -15,10 +15,14 @@ export default function FederalMarketAssassinPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alternativeSearches, setAlternativeSearches] = useState<AlternativeSearchOption[] | undefined>(undefined);
+  const [naicsError, setNaicsError] = useState<string | null>(null);
+  const [suggestedNaicsCodes, setSuggestedNaicsCodes] = useState<Array<{ code: string; name: string }>>([]);
 
   const handleFindAgencies = async (inputs: CoreInputs) => {
     setLoading(true);
     setError(null);
+    setNaicsError(null);
+    setSuggestedNaicsCodes([]);
     setAlternativeSearches(undefined);
 
     try {
@@ -28,11 +32,20 @@ export default function FederalMarketAssassinPage() {
         body: JSON.stringify(inputs),
       });
 
+      const data = await response.json();
+
+      // Check for NAICS validation error
+      if (data.error === 'invalid_naics') {
+        setNaicsError(data.naicsValidationError || 'Invalid NAICS code');
+        setSuggestedNaicsCodes(data.suggestedNaicsCodes || []);
+        setCoreInputs(inputs); // Keep the inputs so user can modify
+        return;
+      }
+
       if (!response.ok) {
         throw new Error('Failed to fetch agencies');
       }
 
-      const data = await response.json();
       setCoreInputs(inputs);
       setAgencies(data.agencies || []);
       setAlternativeSearches(data.alternativeSearches);
@@ -219,10 +232,53 @@ export default function FederalMarketAssassinPage() {
         {/* Content */}
         <div className="max-w-6xl mx-auto">
           {step === 'inputs' && (
-            <CoreInputForm
-              onSubmit={handleFindAgencies}
-              loading={loading}
-            />
+            <>
+              <CoreInputForm
+                onSubmit={handleFindAgencies}
+                loading={loading}
+              />
+
+              {/* NAICS Validation Error */}
+              {naicsError && (
+                <div className="mt-6 max-w-2xl mx-auto">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+                    <div className="flex items-start">
+                      <svg className="w-6 h-6 text-red-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-red-900 mb-2">Invalid NAICS Code</h3>
+                        <p className="text-sm text-red-800 mb-4">{naicsError}</p>
+
+                        {suggestedNaicsCodes.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-red-900 mb-2">Try one of these similar codes:</h4>
+                            <div className="space-y-2">
+                              {suggestedNaicsCodes.map((suggestion) => (
+                                <button
+                                  key={suggestion.code}
+                                  onClick={() => {
+                                    setNaicsError(null);
+                                    setSuggestedNaicsCodes([]);
+                                    if (coreInputs) {
+                                      handleFindAgencies({ ...coreInputs, naicsCode: suggestion.code });
+                                    }
+                                  }}
+                                  className="w-full text-left px-4 py-3 bg-white border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
+                                >
+                                  <span className="font-bold text-red-700">{suggestion.code}</span>
+                                  <span className="text-red-600 ml-2">- {suggestion.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {step === 'agencies' && (
