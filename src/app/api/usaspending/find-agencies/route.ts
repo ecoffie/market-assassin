@@ -221,6 +221,39 @@ export async function POST(request: NextRequest) {
       filters.set_aside_type_codes = setAsideTypeCodes;
     }
 
+    // Add goods/services filter using PSC (Product/Service Code) categories
+    // Products (Goods): PSC codes starting with digits (10-99) - FSC codes
+    // Services: PSC codes starting with letters (A-Z)
+    if (goodsOrServices) {
+      if (goodsOrServices === 'Goods') {
+        // Products (FSC - Federal Supply Classification) have PSC codes starting with numbers
+        // Major product categories: 10-99 (e.g., 10=Weapons, 15=Aircraft, 23=Motor Vehicles, etc.)
+        const productPrefixes = [
+          '10', '11', '12', '13', '14', '15', '16', '17', '18', '19',
+          '20', '21', '22', '23', '24', '25', '26', '27', '28', '29',
+          '30', '31', '32', '33', '34', '35', '36', '37', '38', '39',
+          '40', '41', '42', '43', '44', '45', '46', '47', '48', '49',
+          '50', '51', '52', '53', '54', '55', '56', '58', '59',
+          '60', '61', '62', '63', '65', '66', '67', '68', '69',
+          '70', '71', '72', '73', '74', '75', '76', '77', '78', '79',
+          '80', '81', '83', '84', '85', '87', '88', '89',
+          '91', '93', '94', '95', '96', '99'
+        ];
+        filters.psc_codes = productPrefixes;
+        console.log('📦 Filtering to GOODS (Products) only - FSC codes 10-99');
+      } else if (goodsOrServices === 'Services') {
+        // Services have PSC codes starting with letters (A-Z)
+        // Major service categories: A-Z (e.g., R=Professional Services, D=IT Services, J=Maintenance, etc.)
+        const servicePrefixes = [
+          'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K',
+          'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+          'W', 'X', 'Y', 'Z'
+        ];
+        filters.psc_codes = servicePrefixes;
+        console.log('🔧 Filtering to SERVICES only - PSC codes A-Z');
+      }
+    }
+
     // Add location filter based on zip code - start with just the user's state (Tier 1)
     let userState: string | null = null;
     let currentLocationTier = 1;
