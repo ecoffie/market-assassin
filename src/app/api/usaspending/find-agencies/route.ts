@@ -24,10 +24,14 @@ export async function POST(request: NextRequest) {
       naicsCode,
       zipCode,
       veteranStatus,
-      pscCode
+      pscCode,
+      excludeDOD
     } = body;
 
     console.log('🔍 Government contract search request:', body);
+    if (excludeDOD) {
+      console.log('🚫 DOD exclusion enabled - will filter out Department of Defense agencies');
+    }
 
     // Build set-aside type codes array for USAspending API
     const setAsideTypeCodes: string[] = [];
@@ -820,6 +824,44 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Final: ${agencies.length} unique agencies, $${totalSpending.toLocaleString()} total spending`);
+
+    // ============================================
+    // DOD EXCLUSION FILTER
+    // ============================================
+    // If user requested civilian agencies only, filter out DOD
+    if (excludeDOD) {
+      const beforeCount = agencies.length;
+      agencies = agencies.filter(agency => {
+        const parentUpper = (agency.parentAgency || '').toUpperCase();
+        const subUpper = (agency.subAgency || '').toUpperCase();
+        const nameUpper = (agency.name || '').toUpperCase();
+
+        // Check if this is a DOD agency
+        const isDOD =
+          parentUpper.includes('DEPARTMENT OF DEFENSE') ||
+          parentUpper.includes('DEPT OF DEFENSE') ||
+          parentUpper.includes('DOD') ||
+          subUpper.includes('DEPARTMENT OF THE NAVY') ||
+          subUpper.includes('DEPARTMENT OF THE ARMY') ||
+          subUpper.includes('DEPARTMENT OF THE AIR FORCE') ||
+          subUpper.includes('DEFENSE LOGISTICS AGENCY') ||
+          subUpper.includes('DEFENSE INFORMATION') ||
+          subUpper.includes('DEFENSE CONTRACT') ||
+          nameUpper.includes('NAVFAC') ||
+          nameUpper.includes('NAVSEA') ||
+          nameUpper.includes('USACE') ||
+          nameUpper.includes('ARMY CORPS') ||
+          nameUpper.includes('AIR FORCE');
+
+        return !isDOD; // Keep only non-DOD agencies
+      });
+
+      // Recalculate total spending after filtering
+      totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
+
+      console.log(`🚫 DOD exclusion: Filtered from ${beforeCount} to ${agencies.length} civilian agencies`);
+      console.log(`   Civilian agency spending: $${totalSpending.toLocaleString()}`);
+    }
 
     // If still no results after fallback, generate alternative search options
     let alternativeSearches;

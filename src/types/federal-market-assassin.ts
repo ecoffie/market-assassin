@@ -27,6 +27,7 @@ export interface CoreInputs {
   goodsOrServices?: GoodsOrServices;
   pscCode?: string;  // Product/Service Code (4-character) for precise filtering
   companyName?: string;
+  excludeDOD?: boolean;  // Exclude Department of Defense agencies (civilian agencies only)
 }
 
 // Agency Data from USAspending.gov

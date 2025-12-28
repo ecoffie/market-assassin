@@ -16,6 +16,7 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
     veteranStatus: 'Not Applicable',
     pscCode: '',
     companyName: '',
+    excludeDOD: false,
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -239,6 +240,24 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+          </div>
+
+          {/* Exclude DOD Checkbox */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <label className="flex items-start cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.excludeDOD || false}
+                onChange={(e) => setFormData({ ...formData, excludeDOD: e.target.checked })}
+                className="mt-0.5 h-4 w-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+              />
+              <div className="ml-3">
+                <span className="text-sm font-semibold text-amber-900">Civilian Agencies Only</span>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Exclude Department of Defense (DOD) agencies. Civilian agencies are often more accessible for startups and small businesses with simpler procurement processes.
+                </p>
+              </div>
+            </label>
           </div>
 
           {/* Validation Error */}
