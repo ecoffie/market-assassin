@@ -2004,6 +2004,1406 @@
         "website": "https://www.gpo.gov/how-to-work-with-us/vendors/contracting-opportunities"
       },
       "keyCapabilities": ["Printing", "Publishing", "Digital Services", "Secure Credentials", "Document Management"]
+    },
+    "NPS": {
+      "fullName": "National Park Service",
+      "abbreviation": "NPS",
+      "parentAgency": "Department of the Interior",
+      "website": "https://www.nps.gov",
+      "forecastUrl": "https://www.nps.gov/aboutus/doingbusinesswithus.htm",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=National%20Park%20Service",
+      "smallBusinessOffice": {
+        "name": "NPS Office of Small Business Programs",
+        "director": "NPS OSBP Director",
+        "phone": "(202) 354-1820",
+        "email": "nps_osdbu@nps.gov",
+        "address": "1849 C Street NW, Washington, DC 20240"
+      },
+      "acquisitionOffice": {
+        "name": "NPS Contracting and Property Management Division",
+        "website": "https://www.nps.gov/aboutus/doingbusinesswithus.htm"
+      },
+      "keyCapabilities": ["Facilities Management", "Construction", "Environmental Services", "Visitor Services", "Historic Preservation"]
+    },
+    "FWS": {
+      "fullName": "U.S. Fish and Wildlife Service",
+      "abbreviation": "FWS",
+      "parentAgency": "Department of the Interior",
+      "website": "https://www.fws.gov",
+      "forecastUrl": "https://www.fws.gov/office/contracting-and-general-services",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Fish%20and%20Wildlife%20Service",
+      "smallBusinessOffice": {
+        "name": "FWS Office of Small Business Programs",
+        "director": "FWS OSBP Director",
+        "phone": "(703) 358-2548",
+        "email": "fws_osdbu@fws.gov",
+        "address": "5275 Leesburg Pike, Falls Church, VA 22041"
+      },
+      "acquisitionOffice": {
+        "name": "FWS Contracting and General Services",
+        "website": "https://www.fws.gov/office/contracting-and-general-services"
+      },
+      "keyCapabilities": ["Wildlife Conservation", "Habitat Restoration", "Environmental Studies", "Construction", "Scientific Research"]
+    },
+    "BLM": {
+      "fullName": "Bureau of Land Management",
+      "abbreviation": "BLM",
+      "parentAgency": "Department of the Interior",
+      "website": "https://www.blm.gov",
+      "forecastUrl": "https://www.blm.gov/services/contracting",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Bureau%20of%20Land%20Management",
+      "smallBusinessOffice": {
+        "name": "BLM Office of Small Business Programs",
+        "director": "BLM OSBP Director",
+        "phone": "(202) 912-7400",
+        "email": "blm_osdbu@blm.gov",
+        "address": "1849 C Street NW, Washington, DC 20240"
+      },
+      "acquisitionOffice": {
+        "name": "BLM National Acquisition Office",
+        "website": "https://www.blm.gov/services/contracting"
+      },
+      "keyCapabilities": ["Land Management", "Fire Services", "Environmental Services", "Construction", "Mining/Minerals"]
+    },
+    "USGS": {
+      "fullName": "U.S. Geological Survey",
+      "abbreviation": "USGS",
+      "parentAgency": "Department of the Interior",
+      "website": "https://www.usgs.gov",
+      "forecastUrl": "https://www.usgs.gov/about/organization/science-support/acquisition-grants-and-partnerships",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=U.S.%20Geological%20Survey",
+      "smallBusinessOffice": {
+        "name": "USGS Office of Small Business Programs",
+        "director": "USGS OSBP Director",
+        "phone": "(703) 648-7373",
+        "email": "usgs_osdbu@usgs.gov",
+        "address": "12201 Sunrise Valley Drive, Reston, VA 20192"
+      },
+      "acquisitionOffice": {
+        "name": "USGS Office of Acquisition and Grants",
+        "website": "https://www.usgs.gov/about/organization/science-support/acquisition-grants-and-partnerships"
+      },
+      "keyCapabilities": ["Scientific Research", "Mapping", "IT Systems", "Laboratory Services", "Environmental Monitoring"]
+    },
+    "BOR": {
+      "fullName": "Bureau of Reclamation",
+      "abbreviation": "BOR",
+      "parentAgency": "Department of the Interior",
+      "website": "https://www.usbr.gov",
+      "forecastUrl": "https://www.usbr.gov/main/business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Bureau%20of%20Reclamation",
+      "smallBusinessOffice": {
+        "name": "Bureau of Reclamation OSBP",
+        "director": "BOR OSBP Director",
+        "phone": "(303) 445-2684",
+        "email": "bor_osdbu@usbr.gov",
+        "address": "1849 C Street NW, Washington, DC 20240"
+      },
+      "acquisitionOffice": {
+        "name": "Bureau of Reclamation Acquisitions Division",
+        "website": "https://www.usbr.gov/main/business/"
+      },
+      "keyCapabilities": ["Water Management", "Dam Construction", "Power Generation", "Environmental Services", "Engineering"]
+    },
+    "ARS": {
+      "fullName": "Agricultural Research Service",
+      "abbreviation": "ARS",
+      "parentAgency": "Department of Agriculture",
+      "website": "https://www.ars.usda.gov",
+      "forecastUrl": "https://www.ars.usda.gov/office-of-administrative-and-financial-management/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Agricultural%20Research%20Service",
+      "smallBusinessOffice": {
+        "name": "ARS Office of Small Business Programs",
+        "director": "ARS OSBP Director",
+        "phone": "(301) 504-1702",
+        "email": "ars_osdbu@usda.gov",
+        "address": "5601 Sunnyside Avenue, Beltsville, MD 20705"
+      },
+      "acquisitionOffice": {
+        "name": "ARS Acquisition and Property Division",
+        "website": "https://www.ars.usda.gov/office-of-administrative-and-financial-management/"
+      },
+      "keyCapabilities": ["Scientific Research", "Laboratory Services", "IT Systems", "Facilities Management", "Agricultural Technology"]
+    },
+    "APHIS": {
+      "fullName": "Animal and Plant Health Inspection Service",
+      "abbreviation": "APHIS",
+      "parentAgency": "Department of Agriculture",
+      "website": "https://www.aphis.usda.gov",
+      "forecastUrl": "https://www.aphis.usda.gov/aphis/resources/business",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Animal%20and%20Plant%20Health%20Inspection",
+      "smallBusinessOffice": {
+        "name": "APHIS Office of Small Business Programs",
+        "director": "APHIS OSBP Director",
+        "phone": "(301) 851-2900",
+        "email": "aphis_osdbu@usda.gov",
+        "address": "4700 River Road, Riverdale, MD 20737"
+      },
+      "acquisitionOffice": {
+        "name": "APHIS Marketing and Regulatory Programs Business Services",
+        "website": "https://www.aphis.usda.gov/aphis/resources/business"
+      },
+      "keyCapabilities": ["Animal Health", "Plant Protection", "Veterinary Services", "Inspection Services", "IT Systems"]
+    },
+    "NRCS": {
+      "fullName": "Natural Resources Conservation Service",
+      "abbreviation": "NRCS",
+      "parentAgency": "Department of Agriculture",
+      "website": "https://www.nrcs.usda.gov",
+      "forecastUrl": "https://www.nrcs.usda.gov/about/business",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Natural%20Resources%20Conservation%20Service",
+      "smallBusinessOffice": {
+        "name": "NRCS Office of Small Business Programs",
+        "director": "NRCS OSBP Director",
+        "phone": "(202) 720-1845",
+        "email": "nrcs_osdbu@usda.gov",
+        "address": "1400 Independence Avenue SW, Washington, DC 20250"
+      },
+      "acquisitionOffice": {
+        "name": "NRCS Acquisitions Division",
+        "website": "https://www.nrcs.usda.gov/about/business"
+      },
+      "keyCapabilities": ["Conservation", "Soil Science", "Environmental Services", "IT Systems", "Technical Assistance"]
+    },
+    "FLETC": {
+      "fullName": "Federal Law Enforcement Training Center",
+      "abbreviation": "FLETC",
+      "parentAgency": "Department of Homeland Security",
+      "website": "https://www.fletc.gov",
+      "forecastUrl": "https://www.fletc.gov/acquisition",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Federal%20Law%20Enforcement%20Training%20Center",
+      "smallBusinessOffice": {
+        "name": "FLETC Office of Small Business Programs",
+        "director": "FLETC OSBP Director",
+        "phone": "(912) 267-2100",
+        "email": "fletc.osdbu@fletc.dhs.gov",
+        "address": "1131 Chapel Crossing Road, Glynco, GA 31524"
+      },
+      "acquisitionOffice": {
+        "name": "FLETC Office of Acquisitions",
+        "website": "https://www.fletc.gov/acquisition"
+      },
+      "keyCapabilities": ["Training Services", "Simulation Systems", "Facilities Management", "IT Systems", "Security Services"]
+    },
+    "PBS": {
+      "fullName": "Public Buildings Service",
+      "abbreviation": "PBS",
+      "parentAgency": "General Services Administration",
+      "website": "https://www.gsa.gov/real-estate",
+      "forecastUrl": "https://www.gsa.gov/real-estate/real-estate-services/for-businesses",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Public%20Buildings%20Service",
+      "smallBusinessOffice": {
+        "name": "GSA Office of Small Business Utilization",
+        "director": "GSA OSBU Director",
+        "phone": "(202) 501-1021",
+        "email": "small.business@gsa.gov",
+        "address": "1800 F Street NW, Washington, DC 20405"
+      },
+      "acquisitionOffice": {
+        "name": "PBS Acquisition Management",
+        "website": "https://www.gsa.gov/real-estate/real-estate-services/for-businesses"
+      },
+      "keyCapabilities": ["Construction", "Building Management", "Lease Administration", "Facilities Services", "Real Estate"]
+    },
+    "FAS": {
+      "fullName": "Federal Acquisition Service",
+      "abbreviation": "FAS",
+      "parentAgency": "General Services Administration",
+      "website": "https://www.gsa.gov/about-us/organization/federal-acquisition-service",
+      "forecastUrl": "https://www.gsa.gov/buying-selling",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Federal%20Acquisition%20Service",
+      "smallBusinessOffice": {
+        "name": "GSA Office of Small Business Utilization",
+        "director": "GSA OSBU Director",
+        "phone": "(202) 501-1021",
+        "email": "small.business@gsa.gov",
+        "address": "1800 F Street NW, Washington, DC 20405"
+      },
+      "acquisitionOffice": {
+        "name": "FAS Acquisition Operations",
+        "website": "https://www.gsa.gov/buying-selling"
+      },
+      "keyCapabilities": ["IT Solutions", "Telecommunications", "Fleet Management", "Travel Services", "Professional Services"]
+    },
+    "OASAM": {
+      "fullName": "Office of the Assistant Secretary for Administration and Management",
+      "abbreviation": "OASAM",
+      "parentAgency": "Department of Labor",
+      "website": "https://www.dol.gov/agencies/oasam",
+      "forecastUrl": "https://www.dol.gov/agencies/oasam/business-operations-center",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Department%20of%20Labor",
+      "smallBusinessOffice": {
+        "name": "DOL Office of Small and Disadvantaged Business Utilization",
+        "director": "DOL OSDBU Director",
+        "phone": "(202) 693-6460",
+        "email": "osdbu@dol.gov",
+        "address": "200 Constitution Avenue NW, Washington, DC 20210"
+      },
+      "acquisitionOffice": {
+        "name": "DOL Business Operations Center",
+        "website": "https://www.dol.gov/agencies/oasam/business-operations-center"
+      },
+      "keyCapabilities": ["IT Systems", "Administrative Services", "Facilities Management", "Human Resources", "Financial Services"]
+    },
+    "IHS": {
+      "fullName": "Indian Health Service",
+      "abbreviation": "IHS",
+      "parentAgency": "Department of Health and Human Services",
+      "website": "https://www.ihs.gov",
+      "forecastUrl": "https://www.ihs.gov/oam/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Indian%20Health%20Service",
+      "smallBusinessOffice": {
+        "name": "HHS Office of Small and Disadvantaged Business Utilization",
+        "director": "HHS OSDBU Director",
+        "phone": "(202) 690-7300",
+        "email": "osdbu@hhs.gov",
+        "address": "200 Independence Avenue SW, Washington, DC 20201"
+      },
+      "acquisitionOffice": {
+        "name": "IHS Office of Acquisition Management",
+        "website": "https://www.ihs.gov/oam/"
+      },
+      "keyCapabilities": ["Healthcare Services", "Medical Equipment", "Facilities Construction", "IT Systems", "Public Health"]
+    },
+    "FHWA": {
+      "fullName": "Federal Highway Administration",
+      "abbreviation": "FHWA",
+      "parentAgency": "Department of Transportation",
+      "website": "https://www.fhwa.dot.gov",
+      "forecastUrl": "https://www.fhwa.dot.gov/resources/acquisition/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Federal%20Highway%20Administration",
+      "smallBusinessOffice": {
+        "name": "DOT Office of Small and Disadvantaged Business Utilization",
+        "director": "DOT OSDBU Director",
+        "phone": "(202) 366-1930",
+        "email": "osdbu@dot.gov",
+        "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
+      },
+      "acquisitionOffice": {
+        "name": "FHWA Office of Acquisition and Grants Management",
+        "website": "https://www.fhwa.dot.gov/resources/acquisition/"
+      },
+      "keyCapabilities": ["Highway Construction", "Engineering Services", "IT Systems", "Research", "Environmental Services"]
+    },
+    "FRA": {
+      "fullName": "Federal Railroad Administration",
+      "abbreviation": "FRA",
+      "parentAgency": "Department of Transportation",
+      "website": "https://railroads.dot.gov",
+      "forecastUrl": "https://railroads.dot.gov/about-fra/office-administrator/office-acquisition-and-grants-management",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Federal%20Railroad%20Administration",
+      "smallBusinessOffice": {
+        "name": "DOT Office of Small and Disadvantaged Business Utilization",
+        "director": "DOT OSDBU Director",
+        "phone": "(202) 366-1930",
+        "email": "osdbu@dot.gov",
+        "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
+      },
+      "acquisitionOffice": {
+        "name": "FRA Office of Acquisition and Grants Management",
+        "website": "https://railroads.dot.gov/about-fra/office-administrator/office-acquisition-and-grants-management"
+      },
+      "keyCapabilities": ["Railroad Safety", "Engineering Services", "IT Systems", "Research", "Inspection Services"]
+    },
+    "FTA": {
+      "fullName": "Federal Transit Administration",
+      "abbreviation": "FTA",
+      "parentAgency": "Department of Transportation",
+      "website": "https://www.transit.dot.gov",
+      "forecastUrl": "https://www.transit.dot.gov/about/regional-offices/headquarters/office-administration",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Federal%20Transit%20Administration",
+      "smallBusinessOffice": {
+        "name": "DOT Office of Small and Disadvantaged Business Utilization",
+        "director": "DOT OSDBU Director",
+        "phone": "(202) 366-1930",
+        "email": "osdbu@dot.gov",
+        "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
+      },
+      "acquisitionOffice": {
+        "name": "FTA Office of Administration",
+        "website": "https://www.transit.dot.gov/about/regional-offices/headquarters/office-administration"
+      },
+      "keyCapabilities": ["Transit Systems", "Engineering Services", "IT Systems", "Research", "Grant Administration"]
+    },
+    "MARAD": {
+      "fullName": "Maritime Administration",
+      "abbreviation": "MARAD",
+      "parentAgency": "Department of Transportation",
+      "website": "https://www.maritime.dot.gov",
+      "forecastUrl": "https://www.maritime.dot.gov/about-us/contracting-opportunities",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Maritime%20Administration",
+      "smallBusinessOffice": {
+        "name": "DOT Office of Small and Disadvantaged Business Utilization",
+        "director": "DOT OSDBU Director",
+        "phone": "(202) 366-1930",
+        "email": "osdbu@dot.gov",
+        "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
+      },
+      "acquisitionOffice": {
+        "name": "MARAD Office of Acquisition",
+        "website": "https://www.maritime.dot.gov/about-us/contracting-opportunities"
+      },
+      "keyCapabilities": ["Maritime Operations", "Ship Construction", "Environmental Services", "IT Systems", "Training"]
+    },
+    "OSHA": {
+      "fullName": "Occupational Safety and Health Administration",
+      "abbreviation": "OSHA",
+      "parentAgency": "Department of Labor",
+      "website": "https://www.osha.gov",
+      "forecastUrl": "https://www.osha.gov/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Occupational%20Safety%20and%20Health",
+      "smallBusinessOffice": {
+        "name": "DOL Office of Small and Disadvantaged Business Utilization",
+        "director": "DOL OSDBU Director",
+        "phone": "(202) 693-6460",
+        "email": "osdbu@dol.gov",
+        "address": "200 Constitution Avenue NW, Washington, DC 20210"
+      },
+      "acquisitionOffice": {
+        "name": "OSHA Acquisition and Assistance Branch",
+        "website": "https://www.osha.gov/"
+      },
+      "keyCapabilities": ["Training Services", "IT Systems", "Inspection Services", "Research", "Compliance Assistance"]
+    },
+    "ETA": {
+      "fullName": "Employment and Training Administration",
+      "abbreviation": "ETA",
+      "parentAgency": "Department of Labor",
+      "website": "https://www.dol.gov/agencies/eta",
+      "forecastUrl": "https://www.dol.gov/agencies/eta/grants",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Employment%20and%20Training%20Administration",
+      "smallBusinessOffice": {
+        "name": "DOL Office of Small and Disadvantaged Business Utilization",
+        "director": "DOL OSDBU Director",
+        "phone": "(202) 693-6460",
+        "email": "osdbu@dol.gov",
+        "address": "200 Constitution Avenue NW, Washington, DC 20210"
+      },
+      "acquisitionOffice": {
+        "name": "ETA Office of Grants Management",
+        "website": "https://www.dol.gov/agencies/eta/grants"
+      },
+      "keyCapabilities": ["Training Services", "IT Systems", "Program Support", "Research", "Workforce Development"]
+    },
+    "MSHA": {
+      "fullName": "Mine Safety and Health Administration",
+      "abbreviation": "MSHA",
+      "parentAgency": "Department of Labor",
+      "website": "https://www.msha.gov",
+      "forecastUrl": "https://www.msha.gov/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Mine%20Safety%20and%20Health",
+      "smallBusinessOffice": {
+        "name": "DOL Office of Small and Disadvantaged Business Utilization",
+        "director": "DOL OSDBU Director",
+        "phone": "(202) 693-6460",
+        "email": "osdbu@dol.gov",
+        "address": "200 Constitution Avenue NW, Washington, DC 20210"
+      },
+      "acquisitionOffice": {
+        "name": "MSHA Office of Administration and Management",
+        "website": "https://www.msha.gov/"
+      },
+      "keyCapabilities": ["Mining Safety", "Training Services", "IT Systems", "Inspection Equipment", "Technical Support"]
+    },
+    "Census": {
+      "fullName": "United States Census Bureau",
+      "abbreviation": "Census",
+      "parentAgency": "Department of Commerce",
+      "website": "https://www.census.gov",
+      "forecastUrl": "https://www.census.gov/about/business-opportunities.html",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Census%20Bureau",
+      "smallBusinessOffice": {
+        "name": "DOC Office of Small and Disadvantaged Business Utilization",
+        "director": "DOC OSDBU Director",
+        "phone": "(202) 482-1472",
+        "email": "osdbu@doc.gov",
+        "address": "1401 Constitution Avenue NW, Washington, DC 20230"
+      },
+      "acquisitionOffice": {
+        "name": "Census Bureau Acquisitions Division",
+        "website": "https://www.census.gov/about/business-opportunities.html"
+      },
+      "keyCapabilities": ["IT Systems", "Data Processing", "Printing Services", "Survey Support", "Statistical Services"]
+    },
+    "NIST": {
+      "fullName": "National Institute of Standards and Technology",
+      "abbreviation": "NIST",
+      "parentAgency": "Department of Commerce",
+      "website": "https://www.nist.gov",
+      "forecastUrl": "https://www.nist.gov/oam",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=National%20Institute%20of%20Standards",
+      "smallBusinessOffice": {
+        "name": "DOC Office of Small and Disadvantaged Business Utilization",
+        "director": "DOC OSDBU Director",
+        "phone": "(202) 482-1472",
+        "email": "osdbu@doc.gov",
+        "address": "1401 Constitution Avenue NW, Washington, DC 20230"
+      },
+      "acquisitionOffice": {
+        "name": "NIST Office of Acquisition and Agreements Management",
+        "website": "https://www.nist.gov/oam"
+      },
+      "keyCapabilities": ["Laboratory Services", "IT Systems", "Research Equipment", "Scientific Services", "Standards Development"]
+    },
+    "USPTO": {
+      "fullName": "United States Patent and Trademark Office",
+      "abbreviation": "USPTO",
+      "parentAgency": "Department of Commerce",
+      "website": "https://www.uspto.gov",
+      "forecastUrl": "https://www.uspto.gov/about-us/vendor-information",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Patent%20and%20Trademark%20Office",
+      "smallBusinessOffice": {
+        "name": "DOC Office of Small and Disadvantaged Business Utilization",
+        "director": "DOC OSDBU Director",
+        "phone": "(202) 482-1472",
+        "email": "osdbu@doc.gov",
+        "address": "1401 Constitution Avenue NW, Washington, DC 20230"
+      },
+      "acquisitionOffice": {
+        "name": "USPTO Office of Procurement",
+        "website": "https://www.uspto.gov/about-us/vendor-information"
+      },
+      "keyCapabilities": ["IT Systems", "Document Management", "Search Systems", "Administrative Support", "Legal Services"]
+    },
+    "FSA": {
+      "fullName": "Farm Service Agency",
+      "abbreviation": "FSA",
+      "parentAgency": "Department of Agriculture",
+      "website": "https://www.fsa.usda.gov",
+      "forecastUrl": "https://www.fsa.usda.gov/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Farm%20Service%20Agency",
+      "smallBusinessOffice": {
+        "name": "USDA Office of Small and Disadvantaged Business Utilization",
+        "director": "USDA OSDBU Director",
+        "phone": "(202) 720-7117",
+        "email": "osdbu@usda.gov",
+        "address": "1400 Independence Avenue SW, Washington, DC 20250"
+      },
+      "acquisitionOffice": {
+        "name": "FSA Administrative Services Division",
+        "website": "https://www.fsa.usda.gov/"
+      },
+      "keyCapabilities": ["IT Systems", "Administrative Services", "Program Support", "Farm Loans", "Conservation Programs"]
+    },
+    "RD": {
+      "fullName": "Rural Development",
+      "abbreviation": "RD",
+      "parentAgency": "Department of Agriculture",
+      "website": "https://www.rd.usda.gov",
+      "forecastUrl": "https://www.rd.usda.gov/about-rd",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Rural%20Development%20USDA",
+      "smallBusinessOffice": {
+        "name": "USDA Office of Small and Disadvantaged Business Utilization",
+        "director": "USDA OSDBU Director",
+        "phone": "(202) 720-7117",
+        "email": "osdbu@usda.gov",
+        "address": "1400 Independence Avenue SW, Washington, DC 20250"
+      },
+      "acquisitionOffice": {
+        "name": "Rural Development Procurement",
+        "website": "https://www.rd.usda.gov/about-rd"
+      },
+      "keyCapabilities": ["Rural Utilities", "Housing Programs", "Business Development", "IT Systems", "Community Facilities"]
+    },
+    "VBA": {
+      "fullName": "Veterans Benefits Administration",
+      "abbreviation": "VBA",
+      "parentAgency": "Department of Veterans Affairs",
+      "website": "https://www.benefits.va.gov",
+      "forecastUrl": "https://www.va.gov/opal/nac/fss/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Veterans%20Benefits%20Administration",
+      "smallBusinessOffice": {
+        "name": "VA Office of Small and Disadvantaged Business Utilization",
+        "director": "VA OSDBU Director",
+        "phone": "(202) 461-4300",
+        "email": "osdbu@va.gov",
+        "address": "810 Vermont Avenue NW, Washington, DC 20420"
+      },
+      "acquisitionOffice": {
+        "name": "VBA Office of Resource Management",
+        "website": "https://www.va.gov/opal/nac/"
+      },
+      "keyCapabilities": ["Claims Processing", "IT Systems", "Administrative Services", "Training", "Customer Service"]
+    },
+    "NCA": {
+      "fullName": "National Cemetery Administration",
+      "abbreviation": "NCA",
+      "parentAgency": "Department of Veterans Affairs",
+      "website": "https://www.cem.va.gov",
+      "forecastUrl": "https://www.va.gov/opal/nac/fss/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=National%20Cemetery%20Administration",
+      "smallBusinessOffice": {
+        "name": "VA Office of Small and Disadvantaged Business Utilization",
+        "director": "VA OSDBU Director",
+        "phone": "(202) 461-4300",
+        "email": "osdbu@va.gov",
+        "address": "810 Vermont Avenue NW, Washington, DC 20420"
+      },
+      "acquisitionOffice": {
+        "name": "NCA Contracting Office",
+        "website": "https://www.va.gov/opal/nac/"
+      },
+      "keyCapabilities": ["Cemetery Operations", "Construction", "Grounds Maintenance", "Memorial Services", "Facilities Management"]
+    },
+    "BIA": {
+      "fullName": "Bureau of Indian Affairs",
+      "abbreviation": "BIA",
+      "parentAgency": "Department of the Interior",
+      "website": "https://www.bia.gov",
+      "forecastUrl": "https://www.bia.gov/as-ia/acquisition",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Bureau%20of%20Indian%20Affairs",
+      "smallBusinessOffice": {
+        "name": "DOI Office of Small and Disadvantaged Business Utilization",
+        "director": "DOI OSDBU Director",
+        "phone": "(202) 208-3493",
+        "email": "osdbu@ios.doi.gov",
+        "address": "1849 C Street NW, Washington, DC 20240"
+      },
+      "acquisitionOffice": {
+        "name": "BIA Acquisition Services",
+        "website": "https://www.bia.gov/as-ia/acquisition"
+      },
+      "keyCapabilities": ["Tribal Services", "Education", "Social Services", "Construction", "Environmental Services"]
+    },
+    "BOEM": {
+      "fullName": "Bureau of Ocean Energy Management",
+      "abbreviation": "BOEM",
+      "parentAgency": "Department of the Interior",
+      "website": "https://www.boem.gov",
+      "forecastUrl": "https://www.boem.gov/about-boem/procurement",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Bureau%20of%20Ocean%20Energy",
+      "smallBusinessOffice": {
+        "name": "DOI Office of Small and Disadvantaged Business Utilization",
+        "director": "DOI OSDBU Director",
+        "phone": "(202) 208-3493",
+        "email": "osdbu@ios.doi.gov",
+        "address": "1849 C Street NW, Washington, DC 20240"
+      },
+      "acquisitionOffice": {
+        "name": "BOEM Procurement Division",
+        "website": "https://www.boem.gov/about-boem/procurement"
+      },
+      "keyCapabilities": ["Environmental Research", "Energy Development", "Marine Science", "IT Systems", "Technical Services"]
+    },
+    "BSEE": {
+      "fullName": "Bureau of Safety and Environmental Enforcement",
+      "abbreviation": "BSEE",
+      "parentAgency": "Department of the Interior",
+      "website": "https://www.bsee.gov",
+      "forecastUrl": "https://www.bsee.gov/what-we-do/procurement",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Bureau%20of%20Safety%20Environmental",
+      "smallBusinessOffice": {
+        "name": "DOI Office of Small and Disadvantaged Business Utilization",
+        "director": "DOI OSDBU Director",
+        "phone": "(202) 208-3493",
+        "email": "osdbu@ios.doi.gov",
+        "address": "1849 C Street NW, Washington, DC 20240"
+      },
+      "acquisitionOffice": {
+        "name": "BSEE Procurement Division",
+        "website": "https://www.bsee.gov/what-we-do/procurement"
+      },
+      "keyCapabilities": ["Safety Inspection", "Environmental Compliance", "Engineering Services", "IT Systems", "Training"]
+    },
+    "FinCEN": {
+      "fullName": "Financial Crimes Enforcement Network",
+      "abbreviation": "FinCEN",
+      "parentAgency": "Department of the Treasury",
+      "website": "https://www.fincen.gov",
+      "forecastUrl": "https://www.fincen.gov/about/contracting",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=FinCEN",
+      "smallBusinessOffice": {
+        "name": "Treasury Office of Small and Disadvantaged Business Utilization",
+        "director": "Treasury OSDBU Director",
+        "phone": "(202) 622-0530",
+        "email": "osdbu@treasury.gov",
+        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220"
+      },
+      "acquisitionOffice": {
+        "name": "FinCEN Procurement Division",
+        "website": "https://www.fincen.gov/about/contracting"
+      },
+      "keyCapabilities": ["IT Systems", "Data Analytics", "Financial Intelligence", "Cybersecurity", "Software Development"]
+    },
+    "OCC": {
+      "fullName": "Office of the Comptroller of the Currency",
+      "abbreviation": "OCC",
+      "parentAgency": "Department of the Treasury",
+      "website": "https://www.occ.gov",
+      "forecastUrl": "https://www.occ.gov/about/who-we-are/careers/contracting-opportunities.html",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Comptroller%20of%20the%20Currency",
+      "smallBusinessOffice": {
+        "name": "Treasury Office of Small and Disadvantaged Business Utilization",
+        "director": "Treasury OSDBU Director",
+        "phone": "(202) 622-0530",
+        "email": "osdbu@treasury.gov",
+        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220"
+      },
+      "acquisitionOffice": {
+        "name": "OCC Procurement Services",
+        "website": "https://www.occ.gov/about/who-we-are/careers/contracting-opportunities.html"
+      },
+      "keyCapabilities": ["IT Systems", "Financial Analysis", "Regulatory Support", "Examination Services", "Training"]
+    },
+    "TTB": {
+      "fullName": "Alcohol and Tobacco Tax and Trade Bureau",
+      "abbreviation": "TTB",
+      "parentAgency": "Department of the Treasury",
+      "website": "https://www.ttb.gov",
+      "forecastUrl": "https://www.ttb.gov/about-ttb/contracts",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Alcohol%20Tobacco%20Tax%20Trade",
+      "smallBusinessOffice": {
+        "name": "Treasury Office of Small and Disadvantaged Business Utilization",
+        "director": "Treasury OSDBU Director",
+        "phone": "(202) 622-0530",
+        "email": "osdbu@treasury.gov",
+        "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220"
+      },
+      "acquisitionOffice": {
+        "name": "TTB Procurement Division",
+        "website": "https://www.ttb.gov/about-ttb/contracts"
+      },
+      "keyCapabilities": ["IT Systems", "Laboratory Services", "Regulatory Support", "Tax Administration", "Compliance"]
+    },
+    "OBO": {
+      "fullName": "Bureau of Overseas Buildings Operations",
+      "abbreviation": "OBO",
+      "parentAgency": "Department of State",
+      "website": "https://www.state.gov/obo",
+      "forecastUrl": "https://www.state.gov/obo-industry-partners/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Overseas%20Buildings%20Operations",
+      "smallBusinessOffice": {
+        "name": "State Department Office of Small and Disadvantaged Business Utilization",
+        "director": "State OSDBU Director",
+        "phone": "(703) 875-6822",
+        "email": "smallbusiness@state.gov",
+        "address": "2201 C Street NW, Washington, DC 20520"
+      },
+      "acquisitionOffice": {
+        "name": "OBO Industry Partners",
+        "website": "https://www.state.gov/obo-industry-partners/"
+      },
+      "keyCapabilities": ["Construction", "Architecture", "Engineering", "Security Systems", "Facilities Management"]
+    },
+    "DS": {
+      "fullName": "Bureau of Diplomatic Security",
+      "abbreviation": "DS",
+      "parentAgency": "Department of State",
+      "website": "https://www.state.gov/bureaus-offices/under-secretary-for-management/bureau-of-diplomatic-security/",
+      "forecastUrl": "https://www.state.gov/doing-business-with-the-department-of-state/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Diplomatic%20Security",
+      "smallBusinessOffice": {
+        "name": "State Department Office of Small and Disadvantaged Business Utilization",
+        "director": "State OSDBU Director",
+        "phone": "(703) 875-6822",
+        "email": "smallbusiness@state.gov",
+        "address": "2201 C Street NW, Washington, DC 20520"
+      },
+      "acquisitionOffice": {
+        "name": "DS Contracting Office",
+        "website": "https://www.state.gov/doing-business-with-the-department-of-state/"
+      },
+      "keyCapabilities": ["Security Services", "Protective Operations", "IT Systems", "Training", "Investigation Support"]
+    },
+    "HRSA": {
+      "fullName": "Health Resources and Services Administration",
+      "abbreviation": "HRSA",
+      "parentAgency": "Department of Health and Human Services",
+      "website": "https://www.hrsa.gov",
+      "forecastUrl": "https://www.hrsa.gov/grants/contracts",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Health%20Resources%20Services%20Administration",
+      "smallBusinessOffice": {
+        "name": "HHS Office of Small and Disadvantaged Business Utilization",
+        "director": "HHS OSDBU Director",
+        "phone": "(202) 690-7300",
+        "email": "osdbu@hhs.gov",
+        "address": "200 Independence Avenue SW, Washington, DC 20201"
+      },
+      "acquisitionOffice": {
+        "name": "HRSA Division of Acquisition Management",
+        "website": "https://www.hrsa.gov/grants/contracts"
+      },
+      "keyCapabilities": ["Healthcare Services", "IT Systems", "Training", "Program Support", "Research"]
+    },
+    "ACF": {
+      "fullName": "Administration for Children and Families",
+      "abbreviation": "ACF",
+      "parentAgency": "Department of Health and Human Services",
+      "website": "https://www.acf.hhs.gov",
+      "forecastUrl": "https://www.acf.hhs.gov/grants",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Administration%20for%20Children%20Families",
+      "smallBusinessOffice": {
+        "name": "HHS Office of Small and Disadvantaged Business Utilization",
+        "director": "HHS OSDBU Director",
+        "phone": "(202) 690-7300",
+        "email": "osdbu@hhs.gov",
+        "address": "200 Independence Avenue SW, Washington, DC 20201"
+      },
+      "acquisitionOffice": {
+        "name": "ACF Office of Grants Management",
+        "website": "https://www.acf.hhs.gov/grants"
+      },
+      "keyCapabilities": ["Social Services", "IT Systems", "Research", "Program Support", "Training"]
+    },
+    "SAMHSA": {
+      "fullName": "Substance Abuse and Mental Health Services Administration",
+      "abbreviation": "SAMHSA",
+      "parentAgency": "Department of Health and Human Services",
+      "website": "https://www.samhsa.gov",
+      "forecastUrl": "https://www.samhsa.gov/grants-awards-by-state",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=SAMHSA",
+      "smallBusinessOffice": {
+        "name": "HHS Office of Small and Disadvantaged Business Utilization",
+        "director": "HHS OSDBU Director",
+        "phone": "(202) 690-7300",
+        "email": "osdbu@hhs.gov",
+        "address": "200 Independence Avenue SW, Washington, DC 20201"
+      },
+      "acquisitionOffice": {
+        "name": "SAMHSA Division of Acquisition Management",
+        "website": "https://www.samhsa.gov/grants-awards-by-state"
+      },
+      "keyCapabilities": ["Mental Health Services", "IT Systems", "Research", "Training", "Program Support"]
+    },
+    "DFAS": {
+      "fullName": "Defense Finance and Accounting Service",
+      "abbreviation": "DFAS",
+      "parentAgency": "Department of Defense",
+      "website": "https://www.dfas.mil",
+      "forecastUrl": "https://www.dfas.mil/contractorsvendors/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=DFAS",
+      "smallBusinessOffice": {
+        "name": "DoD Office of Small Business Programs",
+        "director": "Ms. Farooq Mitha",
+        "phone": "(571) 372-6289",
+        "email": "osd.osbp@mail.mil",
+        "address": "4800 Mark Center Drive, Suite 15G08, Alexandria, VA 22350"
+      },
+      "acquisitionOffice": {
+        "name": "DFAS Procurement Services",
+        "website": "https://www.dfas.mil/contractorsvendors/"
+      },
+      "keyCapabilities": ["Financial Systems", "Accounting Services", "IT Systems", "Payroll", "Travel Systems"]
+    },
+    "DTRA": {
+      "fullName": "Defense Threat Reduction Agency",
+      "abbreviation": "DTRA",
+      "parentAgency": "Department of Defense",
+      "website": "https://www.dtra.mil",
+      "forecastUrl": "https://www.dtra.mil/Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=DTRA",
+      "smallBusinessOffice": {
+        "name": "DoD Office of Small Business Programs",
+        "director": "Ms. Farooq Mitha",
+        "phone": "(571) 372-6289",
+        "email": "osd.osbp@mail.mil",
+        "address": "4800 Mark Center Drive, Suite 15G08, Alexandria, VA 22350"
+      },
+      "acquisitionOffice": {
+        "name": "DTRA Acquisition Management",
+        "website": "https://www.dtra.mil/Business/"
+      },
+      "keyCapabilities": ["CBRN Defense", "Counter-WMD", "Research", "Technical Services", "Training"]
+    },
+    "NGA": {
+      "fullName": "National Geospatial-Intelligence Agency",
+      "abbreviation": "NGA",
+      "parentAgency": "Department of Defense",
+      "website": "https://www.nga.mil",
+      "forecastUrl": "https://www.nga.mil/resources/Doing_Business_with_NGA.html",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=NGA",
+      "smallBusinessOffice": {
+        "name": "NGA Office of Small Business Programs",
+        "director": "NGA OSBP Director",
+        "phone": "(571) 557-5400",
+        "email": "NGASmallBusiness@nga.mil",
+        "address": "7500 GEOINT Drive, Springfield, VA 22150"
+      },
+      "acquisitionOffice": {
+        "name": "NGA Acquisition Directorate",
+        "website": "https://www.nga.mil/resources/Doing_Business_with_NGA.html"
+      },
+      "keyCapabilities": ["Geospatial Intelligence", "Imagery Analysis", "IT Systems", "Data Analytics", "Mapping"]
+    },
+    "NSA": {
+      "fullName": "National Security Agency",
+      "abbreviation": "NSA",
+      "parentAgency": "Department of Defense",
+      "website": "https://www.nsa.gov",
+      "forecastUrl": "https://www.nsa.gov/Business-Opportunities/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=NSA",
+      "smallBusinessOffice": {
+        "name": "NSA Office of Small Business Programs",
+        "director": "NSA OSBP Director",
+        "phone": "(443) 634-4333",
+        "email": "SmallBusiness@nsa.gov",
+        "address": "9800 Savage Road, Fort Meade, MD 20755"
+      },
+      "acquisitionOffice": {
+        "name": "NSA Acquisition and Procurement",
+        "website": "https://www.nsa.gov/Business-Opportunities/"
+      },
+      "keyCapabilities": ["Cybersecurity", "Cryptography", "IT Systems", "Signals Intelligence", "Research"]
+    },
+    "DIA": {
+      "fullName": "Defense Intelligence Agency",
+      "abbreviation": "DIA",
+      "parentAgency": "Department of Defense",
+      "website": "https://www.dia.mil",
+      "forecastUrl": "https://www.dia.mil/Business-Opportunities/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=DIA",
+      "smallBusinessOffice": {
+        "name": "DIA Office of Small Business Programs",
+        "director": "DIA OSBP Director",
+        "phone": "(202) 231-5554",
+        "email": "DIASmallBusiness@dia.mil",
+        "address": "200 MacDill Boulevard, Washington, DC 20340"
+      },
+      "acquisitionOffice": {
+        "name": "DIA Acquisition Directorate",
+        "website": "https://www.dia.mil/Business-Opportunities/"
+      },
+      "keyCapabilities": ["Intelligence Analysis", "IT Systems", "Research", "Training", "Technical Services"]
+    },
+    "WHS": {
+      "fullName": "Washington Headquarters Services",
+      "abbreviation": "WHS",
+      "parentAgency": "Department of Defense",
+      "website": "https://www.whs.mil",
+      "forecastUrl": "https://www.whs.mil/our-services/contracting/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Washington%20Headquarters%20Services",
+      "smallBusinessOffice": {
+        "name": "WHS Office of Small Business Programs",
+        "director": "WHS OSBP Director",
+        "phone": "(703) 545-0790",
+        "email": "whs.smallbusiness@mail.mil",
+        "address": "1155 Defense Pentagon, Washington, DC 20301"
+      },
+      "acquisitionOffice": {
+        "name": "WHS Acquisition Directorate",
+        "website": "https://www.whs.mil/our-services/contracting/"
+      },
+      "keyCapabilities": ["Administrative Services", "Facilities Management", "IT Systems", "Pentagon Operations", "Human Resources"]
+    },
+    "AFLCMC": {
+      "fullName": "Air Force Life Cycle Management Center",
+      "abbreviation": "AFLCMC",
+      "parentAgency": "Department of the Air Force",
+      "website": "https://www.aflcmc.af.mil",
+      "forecastUrl": "https://www.aflcmc.af.mil/Organizations/Contracting/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=AFLCMC",
+      "smallBusinessOffice": {
+        "name": "AFLCMC Office of Small Business",
+        "director": "AFLCMC Small Business Director",
+        "phone": "(937) 255-5437",
+        "email": "aflcmc.sb@us.af.mil",
+        "address": "2275 D Street, Wright-Patterson AFB, OH 45433"
+      },
+      "acquisitionOffice": {
+        "name": "AFLCMC Contracting Directorate",
+        "website": "https://www.aflcmc.af.mil/Organizations/Contracting/"
+      },
+      "keyCapabilities": ["Aircraft Systems", "Weapons Systems", "C3I Systems", "IT Systems", "Sustainment"]
+    },
+    "SMC": {
+      "fullName": "Space and Missile Systems Center",
+      "abbreviation": "SMC",
+      "parentAgency": "Department of the Air Force",
+      "website": "https://www.losangeles.spaceforce.mil",
+      "forecastUrl": "https://www.losangeles.spaceforce.mil/About-Us/Fact-Sheets/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Space%20and%20Missile%20Systems",
+      "smallBusinessOffice": {
+        "name": "SMC Office of Small Business",
+        "director": "SMC Small Business Director",
+        "phone": "(310) 653-3095",
+        "email": "smc.sb@spaceforce.mil",
+        "address": "483 N Aviation Blvd, El Segundo, CA 90245"
+      },
+      "acquisitionOffice": {
+        "name": "SMC Contracting Directorate",
+        "website": "https://www.losangeles.spaceforce.mil/About-Us/Fact-Sheets/"
+      },
+      "keyCapabilities": ["Space Systems", "Satellite Systems", "Launch Services", "Ground Systems", "GPS"]
+    },
+    "AFNWC": {
+      "fullName": "Air Force Nuclear Weapons Center",
+      "abbreviation": "AFNWC",
+      "parentAgency": "Department of the Air Force",
+      "website": "https://www.afnwc.af.mil",
+      "forecastUrl": "https://www.afnwc.af.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Nuclear%20Weapons%20Center",
+      "smallBusinessOffice": {
+        "name": "Air Force Office of Small Business Programs",
+        "director": "Mr. Mark Teskey",
+        "phone": "(571) 256-8052",
+        "email": "saf.sb.workflow@us.af.mil",
+        "address": "1060 Air Force Pentagon, Washington, DC 20330"
+      },
+      "acquisitionOffice": {
+        "name": "AFNWC Contracting",
+        "website": "https://www.afnwc.af.mil/"
+      },
+      "keyCapabilities": ["Nuclear Systems", "ICBM Systems", "Weapons Integration", "Security Systems", "Sustainment"]
+    },
+    "AFDW": {
+      "fullName": "Air Force District of Washington",
+      "abbreviation": "AFDW",
+      "parentAgency": "Department of the Air Force",
+      "website": "https://www.afdw.af.mil",
+      "forecastUrl": "https://www.afdw.af.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Air%20Force%20District%20Washington",
+      "smallBusinessOffice": {
+        "name": "Air Force Office of Small Business Programs",
+        "director": "Mr. Mark Teskey",
+        "phone": "(571) 256-8052",
+        "email": "saf.sb.workflow@us.af.mil",
+        "address": "1060 Air Force Pentagon, Washington, DC 20330"
+      },
+      "acquisitionOffice": {
+        "name": "AFDW Contracting",
+        "website": "https://www.afdw.af.mil/"
+      },
+      "keyCapabilities": ["Base Operations", "Security Services", "Facilities Management", "Ceremonial Support", "Emergency Services"]
+    },
+    "AFCEC": {
+      "fullName": "Air Force Civil Engineer Center",
+      "abbreviation": "AFCEC",
+      "parentAgency": "Department of the Air Force",
+      "website": "https://www.afcec.af.mil",
+      "forecastUrl": "https://www.afcec.af.mil/Home/AFCEC-Contracting/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=Air%20Force%20Civil%20Engineer",
+      "smallBusinessOffice": {
+        "name": "AFCEC Office of Small Business",
+        "director": "AFCEC Small Business Director",
+        "phone": "(210) 395-8000",
+        "email": "afcec.sb@us.af.mil",
+        "address": "2261 Hughes Ave, JBSA-Lackland, TX 78236"
+      },
+      "acquisitionOffice": {
+        "name": "AFCEC Contracting Directorate",
+        "website": "https://www.afcec.af.mil/Home/AFCEC-Contracting/"
+      },
+      "keyCapabilities": ["Construction", "Environmental", "Facilities Management", "Energy", "Real Property"]
+    },
+    "PEO Soldier": {
+      "fullName": "Program Executive Office Soldier",
+      "abbreviation": "PEO Soldier",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.peosoldier.army.mil",
+      "forecastUrl": "https://www.peosoldier.army.mil/About/Doing-Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20Soldier",
+      "smallBusinessOffice": {
+        "name": "Army Office of Small Business Programs",
+        "director": "Dr. Craig Spisak",
+        "phone": "(703) 697-2868",
+        "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
+        "address": "106 Army Pentagon, Washington, DC 20310"
+      },
+      "acquisitionOffice": {
+        "name": "PEO Soldier Contracting",
+        "website": "https://www.peosoldier.army.mil/About/Doing-Business/"
+      },
+      "keyCapabilities": ["Soldier Equipment", "Protective Gear", "Weapons", "Communications", "Clothing"]
+    },
+    "PEO Aviation": {
+      "fullName": "Program Executive Office Aviation",
+      "abbreviation": "PEO Aviation",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.peoaviation.army.mil",
+      "forecastUrl": "https://www.peoaviation.army.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20Aviation",
+      "smallBusinessOffice": {
+        "name": "Army Office of Small Business Programs",
+        "director": "Dr. Craig Spisak",
+        "phone": "(703) 697-2868",
+        "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
+        "address": "106 Army Pentagon, Washington, DC 20310"
+      },
+      "acquisitionOffice": {
+        "name": "PEO Aviation Contracting",
+        "website": "https://www.peoaviation.army.mil/"
+      },
+      "keyCapabilities": ["Rotorcraft", "Unmanned Aircraft", "Aviation Systems", "Avionics", "Flight Training"]
+    },
+    "PEO C3T": {
+      "fullName": "Program Executive Office Command, Control, Communications-Tactical",
+      "abbreviation": "PEO C3T",
+      "parentAgency": "Department of the Army",
+      "website": "https://peoc3t.army.mil",
+      "forecastUrl": "https://peoc3t.army.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20C3T",
+      "smallBusinessOffice": {
+        "name": "Army Office of Small Business Programs",
+        "director": "Dr. Craig Spisak",
+        "phone": "(703) 697-2868",
+        "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
+        "address": "106 Army Pentagon, Washington, DC 20310"
+      },
+      "acquisitionOffice": {
+        "name": "PEO C3T Contracting",
+        "website": "https://peoc3t.army.mil/"
+      },
+      "keyCapabilities": ["Tactical Networks", "Radios", "Satellite Communications", "Network Security", "C2 Systems"]
+    },
+    "PEO CS CSS": {
+      "fullName": "Program Executive Office Combat Support & Combat Service Support",
+      "abbreviation": "PEO CS CSS",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.peocscss.army.mil",
+      "forecastUrl": "https://www.peocscss.army.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20Combat%20Support",
+      "smallBusinessOffice": {
+        "name": "Army Office of Small Business Programs",
+        "director": "Dr. Craig Spisak",
+        "phone": "(703) 697-2868",
+        "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
+        "address": "106 Army Pentagon, Washington, DC 20310"
+      },
+      "acquisitionOffice": {
+        "name": "PEO CS CSS Contracting",
+        "website": "https://www.peocscss.army.mil/"
+      },
+      "keyCapabilities": ["Petroleum Systems", "Water Systems", "Power Generation", "Logistics Equipment", "Material Handling"]
+    },
+    "PEO EIS": {
+      "fullName": "Program Executive Office Enterprise Information Systems",
+      "abbreviation": "PEO EIS",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.eis.army.mil",
+      "forecastUrl": "https://www.eis.army.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20EIS",
+      "smallBusinessOffice": {
+        "name": "Army Office of Small Business Programs",
+        "director": "Dr. Craig Spisak",
+        "phone": "(703) 697-2868",
+        "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
+        "address": "106 Army Pentagon, Washington, DC 20310"
+      },
+      "acquisitionOffice": {
+        "name": "PEO EIS Contracting",
+        "website": "https://www.eis.army.mil/"
+      },
+      "keyCapabilities": ["Enterprise IT", "Cloud Services", "Cybersecurity", "HR Systems", "Financial Systems"]
+    },
+    "PEO GCS": {
+      "fullName": "Program Executive Office Ground Combat Systems",
+      "abbreviation": "PEO GCS",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.peogcs.army.mil",
+      "forecastUrl": "https://www.peogcs.army.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20Ground%20Combat",
+      "smallBusinessOffice": {
+        "name": "Army Office of Small Business Programs",
+        "director": "Dr. Craig Spisak",
+        "phone": "(703) 697-2868",
+        "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
+        "address": "106 Army Pentagon, Washington, DC 20310"
+      },
+      "acquisitionOffice": {
+        "name": "PEO GCS Contracting",
+        "website": "https://www.peogcs.army.mil/"
+      },
+      "keyCapabilities": ["Tanks", "Infantry Fighting Vehicles", "Armored Vehicles", "Vehicle Upgrades", "Survivability"]
+    },
+    "PEO IEW&S": {
+      "fullName": "Program Executive Office Intelligence, Electronic Warfare & Sensors",
+      "abbreviation": "PEO IEW&S",
+      "parentAgency": "Department of the Army",
+      "website": "https://peoiews.army.mil",
+      "forecastUrl": "https://peoiews.army.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20IEW",
+      "smallBusinessOffice": {
+        "name": "Army Office of Small Business Programs",
+        "director": "Dr. Craig Spisak",
+        "phone": "(703) 697-2868",
+        "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
+        "address": "106 Army Pentagon, Washington, DC 20310"
+      },
+      "acquisitionOffice": {
+        "name": "PEO IEW&S Contracting",
+        "website": "https://peoiews.army.mil/"
+      },
+      "keyCapabilities": ["Electronic Warfare", "Intelligence Systems", "Sensors", "ISR", "Cyber"]
+    },
+    "PEO M&S": {
+      "fullName": "Program Executive Office Missiles and Space",
+      "abbreviation": "PEO M&S",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.peomissiles.army.mil",
+      "forecastUrl": "https://www.peomissiles.army.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20Missiles",
+      "smallBusinessOffice": {
+        "name": "Army Office of Small Business Programs",
+        "director": "Dr. Craig Spisak",
+        "phone": "(703) 697-2868",
+        "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
+        "address": "106 Army Pentagon, Washington, DC 20310"
+      },
+      "acquisitionOffice": {
+        "name": "PEO M&S Contracting",
+        "website": "https://www.peomissiles.army.mil/"
+      },
+      "keyCapabilities": ["Missile Systems", "Air Defense", "Rocket Systems", "Space Systems", "Directed Energy"]
+    },
+    "PEO STRI": {
+      "fullName": "Program Executive Office Simulation, Training, and Instrumentation",
+      "abbreviation": "PEO STRI",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.peostri.army.mil",
+      "forecastUrl": "https://www.peostri.army.mil/doing-business",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20STRI",
+      "smallBusinessOffice": {
+        "name": "PEO STRI Office of Small Business",
+        "director": "PEO STRI Small Business Director",
+        "phone": "(407) 384-3843",
+        "email": "usarmy.orlando.peo-stri.mbx.small-business@army.mil",
+        "address": "12350 Research Parkway, Orlando, FL 32826"
+      },
+      "acquisitionOffice": {
+        "name": "PEO STRI Contracting",
+        "website": "https://www.peostri.army.mil/doing-business"
+      },
+      "keyCapabilities": ["Simulation", "Training Systems", "Virtual Reality", "Gaming Technology", "Instrumentation"]
+    },
+    "CECOM": {
+      "fullName": "Communications-Electronics Command",
+      "abbreviation": "CECOM",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.cecom.army.mil",
+      "forecastUrl": "https://www.cecom.army.mil/contracting/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=CECOM",
+      "smallBusinessOffice": {
+        "name": "CECOM Office of Small Business",
+        "director": "CECOM Small Business Director",
+        "phone": "(443) 395-6405",
+        "email": "usarmy.apg.cecom.mbx.small-business@army.mil",
+        "address": "6585 Surveillance Loop, Aberdeen Proving Ground, MD 21005"
+      },
+      "acquisitionOffice": {
+        "name": "CECOM Contracting Center",
+        "website": "https://www.cecom.army.mil/contracting/"
+      },
+      "keyCapabilities": ["Electronics", "Communications", "IT Systems", "Sustainment", "Software"]
+    },
+    "TACOM": {
+      "fullName": "Tank-automotive and Armaments Command",
+      "abbreviation": "TACOM",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.tacom.army.mil",
+      "forecastUrl": "https://www.tacom.army.mil/ilsc/contracting/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=TACOM",
+      "smallBusinessOffice": {
+        "name": "TACOM Office of Small Business",
+        "director": "TACOM Small Business Director",
+        "phone": "(586) 282-5890",
+        "email": "usarmy.detroit.tacom.mbx.small-business@army.mil",
+        "address": "6501 E 11 Mile Road, Warren, MI 48397"
+      },
+      "acquisitionOffice": {
+        "name": "TACOM Contracting Center",
+        "website": "https://www.tacom.army.mil/ilsc/contracting/"
+      },
+      "keyCapabilities": ["Ground Vehicles", "Armaments", "Vehicle Parts", "Maintenance", "Sustainment"]
+    },
+    "AMCOM": {
+      "fullName": "Aviation and Missile Command",
+      "abbreviation": "AMCOM",
+      "parentAgency": "Department of the Army",
+      "website": "https://www.amcom.army.mil",
+      "forecastUrl": "https://www.amcom.army.mil/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=AMCOM",
+      "smallBusinessOffice": {
+        "name": "AMCOM Office of Small Business",
+        "director": "AMCOM Small Business Director",
+        "phone": "(256) 842-9675",
+        "email": "usarmy.redstone.amcom.mbx.small-business@army.mil",
+        "address": "Building 5681, Redstone Arsenal, AL 35898"
+      },
+      "acquisitionOffice": {
+        "name": "AMCOM Contracting Center",
+        "website": "https://www.amcom.army.mil/"
+      },
+      "keyCapabilities": ["Aviation Sustainment", "Missile Sustainment", "Depot Operations", "Logistics", "Maintenance"]
+    },
+    "PEO Ships": {
+      "fullName": "Program Executive Office Ships",
+      "abbreviation": "PEO Ships",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navsea.navy.mil/Home/PEO-Ships/",
+      "forecastUrl": "https://www.navsea.navy.mil/Business/Small-Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20Ships",
+      "smallBusinessOffice": {
+        "name": "NAVSEA Office of Small Business Programs",
+        "director": "Mark Krzysko",
+        "phone": "(202) 781-3939",
+        "email": "navsea_small_business@navy.mil",
+        "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
+      },
+      "acquisitionOffice": {
+        "name": "PEO Ships Contracting",
+        "website": "https://www.navsea.navy.mil/Home/PEO-Ships/"
+      },
+      "keyCapabilities": ["Surface Ships", "Amphibious Ships", "Auxiliary Ships", "Shipbuilding", "Ship Modernization"]
+    },
+    "PEO Carriers": {
+      "fullName": "Program Executive Office Aircraft Carriers",
+      "abbreviation": "PEO Carriers",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navsea.navy.mil/Home/PEO-Aircraft-Carriers/",
+      "forecastUrl": "https://www.navsea.navy.mil/Business/Small-Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20Carriers",
+      "smallBusinessOffice": {
+        "name": "NAVSEA Office of Small Business Programs",
+        "director": "Mark Krzysko",
+        "phone": "(202) 781-3939",
+        "email": "navsea_small_business@navy.mil",
+        "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
+      },
+      "acquisitionOffice": {
+        "name": "PEO Carriers Contracting",
+        "website": "https://www.navsea.navy.mil/Home/PEO-Aircraft-Carriers/"
+      },
+      "keyCapabilities": ["Aircraft Carriers", "Nuclear Propulsion", "Carrier Systems", "EMALS", "Carrier Modernization"]
+    },
+    "PEO Subs": {
+      "fullName": "Program Executive Office Submarines",
+      "abbreviation": "PEO Subs",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navsea.navy.mil/Home/PEO-Submarines/",
+      "forecastUrl": "https://www.navsea.navy.mil/Business/Small-Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20Submarines",
+      "smallBusinessOffice": {
+        "name": "NAVSEA Office of Small Business Programs",
+        "director": "Mark Krzysko",
+        "phone": "(202) 781-3939",
+        "email": "navsea_small_business@navy.mil",
+        "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
+      },
+      "acquisitionOffice": {
+        "name": "PEO Subs Contracting",
+        "website": "https://www.navsea.navy.mil/Home/PEO-Submarines/"
+      },
+      "keyCapabilities": ["Submarines", "Nuclear Propulsion", "Submarine Systems", "Undersea Warfare", "Submarine Modernization"]
+    },
+    "PEO USC": {
+      "fullName": "Program Executive Office Unmanned and Small Combatants",
+      "abbreviation": "PEO USC",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navsea.navy.mil/Home/PEO-USC/",
+      "forecastUrl": "https://www.navsea.navy.mil/Business/Small-Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=PEO%20USC",
+      "smallBusinessOffice": {
+        "name": "NAVSEA Office of Small Business Programs",
+        "director": "Mark Krzysko",
+        "phone": "(202) 781-3939",
+        "email": "navsea_small_business@navy.mil",
+        "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
+      },
+      "acquisitionOffice": {
+        "name": "PEO USC Contracting",
+        "website": "https://www.navsea.navy.mil/Home/PEO-USC/"
+      },
+      "keyCapabilities": ["Unmanned Systems", "LCS", "Small Combatants", "Patrol Craft", "Mine Countermeasures"]
+    },
+    "NSWCDD": {
+      "fullName": "Naval Surface Warfare Center Dahlgren Division",
+      "abbreviation": "NSWCDD",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Dahlgren/",
+      "forecastUrl": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Dahlgren/Partnerships/Small-Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=NSWCDD",
+      "smallBusinessOffice": {
+        "name": "NSWCDD Office of Small Business",
+        "director": "NSWCDD Small Business Director",
+        "phone": "(540) 653-8753",
+        "email": "nswcdd_smallbusiness@navy.mil",
+        "address": "17632 Dahlgren Road, Dahlgren, VA 22448"
+      },
+      "acquisitionOffice": {
+        "name": "NSWCDD Contracts Department",
+        "website": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Dahlgren/Partnerships/Small-Business/"
+      },
+      "keyCapabilities": ["Weapons Systems", "Combat Systems", "Cybersecurity", "Research", "Engineering"]
+    },
+    "NSWC Crane": {
+      "fullName": "Naval Surface Warfare Center Crane Division",
+      "abbreviation": "NSWC Crane",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Crane/",
+      "forecastUrl": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Crane/Partnerships/Small-Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=NSWC%20Crane",
+      "smallBusinessOffice": {
+        "name": "NSWC Crane Office of Small Business",
+        "director": "NSWC Crane Small Business Director",
+        "phone": "(812) 854-1631",
+        "email": "crane_smallbusiness@navy.mil",
+        "address": "300 Highway 361, Crane, IN 47522"
+      },
+      "acquisitionOffice": {
+        "name": "NSWC Crane Contracts Department",
+        "website": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Crane/Partnerships/Small-Business/"
+      },
+      "keyCapabilities": ["Electronics", "Ordnance", "Special Warfare", "Expeditionary Systems", "Microelectronics"]
+    },
+    "NSWC Corona": {
+      "fullName": "Naval Surface Warfare Center Corona Division",
+      "abbreviation": "NSWC Corona",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Corona/",
+      "forecastUrl": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Corona/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=NSWC%20Corona",
+      "smallBusinessOffice": {
+        "name": "NSWC Corona Office of Small Business",
+        "director": "NSWC Corona Small Business Director",
+        "phone": "(951) 273-5201",
+        "email": "corona_smallbusiness@navy.mil",
+        "address": "1999 4th Street, Norco, CA 92860"
+      },
+      "acquisitionOffice": {
+        "name": "NSWC Corona Contracts Department",
+        "website": "https://www.navsea.navy.mil/Home/Warfare-Centers/NSWC-Corona/"
+      },
+      "keyCapabilities": ["Metrology", "Calibration", "Data Analytics", "Quality Assurance", "Assessment"]
+    },
+    "NUWC": {
+      "fullName": "Naval Undersea Warfare Center",
+      "abbreviation": "NUWC",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navsea.navy.mil/Home/Warfare-Centers/NUWC-Newport/",
+      "forecastUrl": "https://www.navsea.navy.mil/Home/Warfare-Centers/NUWC-Newport/Partnerships/Small-Business/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=NUWC",
+      "smallBusinessOffice": {
+        "name": "NUWC Office of Small Business",
+        "director": "NUWC Small Business Director",
+        "phone": "(401) 832-3573",
+        "email": "nuwc_smallbusiness@navy.mil",
+        "address": "1176 Howell Street, Newport, RI 02841"
+      },
+      "acquisitionOffice": {
+        "name": "NUWC Contracts Department",
+        "website": "https://www.navsea.navy.mil/Home/Warfare-Centers/NUWC-Newport/Partnerships/Small-Business/"
+      },
+      "keyCapabilities": ["Undersea Systems", "Torpedoes", "Submarines", "Autonomous Systems", "Sonar"]
+    },
+    "NAWC": {
+      "fullName": "Naval Air Warfare Center",
+      "abbreviation": "NAWC",
+      "parentAgency": "Department of the Navy",
+      "website": "https://www.navair.navy.mil/nawcad/",
+      "forecastUrl": "https://www.navair.navy.mil/osbp/",
+      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=NAWC",
+      "smallBusinessOffice": {
+        "name": "NAVAIR Office of Small Business Programs",
+        "director": "Roshanda Clemons",
+        "phone": "(301) 342-2358",
+        "email": "navair_small_business@navy.mil",
+        "address": "Building 2272, 47123 Buse Rd, Patuxent River, MD 20670"
+      },
+      "acquisitionOffice": {
+        "name": "NAWC Contracts Department",
+        "website": "https://www.navair.navy.mil/nawcad/"
+      },
+      "keyCapabilities": ["Aircraft Systems", "Avionics", "Weapons Integration", "Test & Evaluation", "Research"]
     }
   },
   "serviceBranches": {

@@ -44,6 +44,16 @@ export interface Agency {
   subAgencyCode?: string;
   command?: string;             // Specific DoD command (e.g., "NAVFAC", "NAVSEA") for pain points matching
   hasSpecificOffice?: boolean;  // True if we have distinct contracting office data
+  website?: string | null;      // Command/agency website URL
+  forecastUrl?: string | null;  // Forecast opportunities URL
+  samForecastUrl?: string;      // SAM.gov forecast search URL
+  osbp?: {                      // Office of Small Business Programs contact info
+    name: string;
+    director: string;
+    phone: string;
+    email: string;
+    address: string;
+  } | null;
 }
 
 // Pain Point

@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
 
   const options: IDVSearchOptions = {
     naicsCode: searchParams.get('naicsCode') || undefined,
+    pscCode: searchParams.get('pscCode') || undefined,
     agency: searchParams.get('agency') || undefined,
     minValue: searchParams.get('minValue') ? parseInt(searchParams.get('minValue')!) : undefined,
     dateFrom: searchParams.get('dateFrom') || undefined,

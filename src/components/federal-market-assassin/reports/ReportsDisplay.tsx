@@ -26,6 +26,7 @@ interface AgencyForModal {
   contractCount?: number;
   location?: string;
   officeId?: string;
+  command?: string | null;
 }
 
 interface CategorizedPainPoints {
@@ -64,6 +65,39 @@ function formatCurrency(value: number): string {
     // Less than 1000
     return `$${value.toFixed(0)}`;
   }
+}
+
+// Helper to format Office ID for display
+// For DOD expanded agencies, officeId might be "department-of-defense|Dept...|...-USACE"
+// We want to show just the command abbreviation (e.g., "USACE") or the numeric ID
+function formatOfficeId(rawOfficeId: string | undefined, command?: string | null): string {
+  if (!rawOfficeId) return 'N/A';
+
+  // If it's a simple numeric ID, return as-is
+  if (/^\d+$/.test(rawOfficeId)) {
+    return rawOfficeId;
+  }
+
+  // If it contains path separators, extract the command abbreviation
+  if (rawOfficeId.includes('|') || rawOfficeId.includes('-')) {
+    // Try to extract command abbreviation from the end (e.g., "...-USACE" -> "USACE")
+    const parts = rawOfficeId.split(/[-|]/);
+    const lastPart = parts[parts.length - 1];
+    // Use the command abbreviation if it looks like one (all caps, short)
+    if (lastPart && lastPart.length <= 10 && /^[A-Z0-9]+$/.test(lastPart)) {
+      return lastPart;
+    } else if (command) {
+      // Fall back to using the command field directly
+      return command;
+    }
+  }
+
+  // Fall back to command if provided
+  if (command) {
+    return command;
+  }
+
+  return rawOfficeId;
 }
 
 export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps) {
@@ -245,7 +279,7 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
     { id: 'buyers' as ReportTab, label: '👥 Government Buyers', icon: '👥' },
     { id: 'subcontracting' as ReportTab, label: '🔗 Subcontracting', icon: '🔗' },
     { id: 'idvContracts' as ReportTab, label: '📋 IDV Contracts', icon: '📋' },
-    { id: 'december' as ReportTab, label: '💰 December Spend', icon: '💰' },
+    { id: 'december' as ReportTab, label: '📊 Similar Awards', icon: '📊' },
     { id: 'tribal' as ReportTab, label: '🏛️ Tribal Contracting', icon: '🏛️' },
     { id: 'osbpContacts' as ReportTab, label: '📞 OSBP Contacts', icon: '📞' },
   ];
@@ -442,22 +476,22 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
     </tbody>
   </table>
 
-  <!-- December Spend Report -->
-  <h2>💰 December Spend / Q4 Opportunities</h2>
-  <div class="section-intro">End-of-year spending opportunities with higher urgency and win probability.</div>
+  <!-- Similar Awards Report -->
+  <h2>📊 Similar Awards in Your NAICS</h2>
+  <div class="section-intro">Historical contract awards matching your NAICS code - use these to identify buying offices and present your capabilities.</div>
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-value">$${(reports.decemberSpend.summary.totalQ4Spend / 1000000).toFixed(1)}M</div>
-      <div class="stat-label">Est. Q4 Spend</div>
+      <div class="stat-label">Total Award Value</div>
     </div>
     <div class="stat-card">
       <div class="stat-value">${reports.decemberSpend.summary.urgentOpportunities}</div>
-      <div class="stat-label">Urgent Opportunities</div>
+      <div class="stat-label">Similar Awards Found</div>
     </div>
   </div>
   <table>
     <thead>
-      <tr><th>Agency</th><th>Program</th><th>Est. Q4 Spend</th><th>Urgency</th></tr>
+      <tr><th>Agency</th><th>Description</th><th>Award Value</th><th>Relevance</th></tr>
     </thead>
     <tbody>
       ${reports.decemberSpend.opportunities.slice(0, 20).map((opp: any) => `
@@ -636,7 +670,7 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
             </div>
 
             <div className="print:break-after-page">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">💰 December Spend / Q4 Opportunities</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">📊 Similar Awards in Your NAICS</h2>
               <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />
             </div>
 
@@ -695,7 +729,7 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
                 </div>
                 <div className="bg-purple-50 rounded-lg p-4">
                   <div className="text-sm text-slate-600 mb-1">Office ID</div>
-                  <div className="text-lg font-bold text-purple-600">{modalAgency.officeId || 'N/A'}</div>
+                  <div className="text-lg font-bold text-purple-600">{formatOfficeId(modalAgency.officeId, modalAgency.command)}</div>
                 </div>
               </div>
 
@@ -1216,6 +1250,9 @@ function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyCl
                   ? rawSubAgency
                   : agency.parentAgency || '—';
 
+                // Use helper to format office ID for display
+                const displayOfficeId = formatOfficeId(agency.officeId || agency.subAgencyCode, agency.command);
+
                 return (
                   <tr key={idx} className="hover:bg-slate-50">
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -1226,7 +1263,7 @@ function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyCl
                         className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100 hover:underline"
                         title={`Search SAM.gov for opportunities from ${contractingOffice}`}
                       >
-                        {agency.officeId || agency.subAgencyCode || 'N/A'}
+                        {displayOfficeId || 'N/A'}
                       </a>
                     </td>
                     <td className="px-4 py-3">
@@ -1242,6 +1279,7 @@ function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyCl
                           contractCount: agency.contractCount,
                           location: agency.location,
                           officeId: agency.officeId || agency.subAgencyCode,
+                          command: agency.command,
                         })}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') onAgencyClick({
@@ -1253,6 +1291,7 @@ function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyCl
                             contractCount: agency.contractCount,
                             location: agency.location,
                             officeId: agency.officeId || agency.subAgencyCode,
+                            command: agency.command,
                           });
                         }}
                         className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-sm cursor-pointer"
@@ -1260,8 +1299,8 @@ function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyCl
                         {contractingOffice}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-slate-600">{subAgency}</p>
+                    <td className="px-4 py-3 min-w-[150px]">
+                      <p className="text-sm text-slate-600 break-words">{subAgency}</p>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-xs text-slate-500">{agency.location}</p>
@@ -2207,9 +2246,9 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
         )}
       </div>
 
-      {/* December Spend Opportunities */}
+      {/* Similar Awards */}
       <div>
-        <h3 className="text-lg font-bold text-slate-900 mb-4">💰 December Spend Forecast Opportunities</h3>
+        <h3 className="text-lg font-bold text-slate-900 mb-4">📊 Similar Awards in Your NAICS</h3>
         <div className="space-y-3">
           {data.opportunities.map((opp: any, idx: number) => (
             <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50">

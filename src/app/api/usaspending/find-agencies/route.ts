@@ -15,6 +15,7 @@ import {
   validateNaicsCode
 } from '@/lib/utils/usaspending-helpers';
 import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
+import { expandGenericDoDAgency } from '@/lib/utils/command-info';
 
 export async function POST(request: NextRequest) {
   try {
@@ -805,21 +806,117 @@ export async function POST(request: NextRequest) {
 
               console.log(`   📊 Final: ${agencies.length} agencies (${nonDoDAgencies.length} non-DoD + ${dodFpdsAgencies.length} DoD commands)`);
             } else {
-              // FPDS didn't return enough DoD data, keep the original USAspending DoD agencies
+              // FPDS didn't return enough DoD data - EXPAND using static command data
               console.log(`   ⚠️ FPDS only returned ${dodFpdsAgencies.length} DoD commands (need ${dodAgenciesNeedingDetail.length})`);
-              console.log(`   Keeping original ${dodAgenciesNeedingDetail.length} DoD agencies from USAspending:`);
-              dodAgenciesNeedingDetail.slice(0, 5).forEach(a => {
-                console.log(`     - ${a.name} (${a.subAgency}): $${a.setAsideSpending.toLocaleString()}`);
-              });
-              // Don't modify agencies array - keep the original DOD agencies
+              console.log(`   🔄 Expanding generic DoD agencies using static command database...`);
+
+              // Expand each generic DoD agency into specific commands
+              const expandedAgencies: any[] = [];
+              const genericDoDIds = new Set<string>();
+
+              for (const genericAgency of dodAgenciesNeedingDetail) {
+                const expanded = expandGenericDoDAgency(genericAgency, 5);
+                if (expanded.length > 0) {
+                  expandedAgencies.push(...expanded);
+                  genericDoDIds.add(genericAgency.id);
+                  console.log(`     Expanded "${genericAgency.subAgency}" into ${expanded.length} commands:`);
+                  expanded.forEach(e => console.log(`       - ${e.command}: ${e.name}`));
+                }
+              }
+
+              if (expandedAgencies.length > 0) {
+                // Remove generic DoD entries that were expanded
+                const nonExpandedAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
+
+                // Merge: non-expanded agencies + expanded DoD commands
+                agencies = [...nonExpandedAgencies, ...expandedAgencies];
+
+                // Re-sort by spending
+                agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+
+                // Recalculate total spending
+                totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
+
+                console.log(`   ✅ Expanded to ${expandedAgencies.length} specific DoD commands`);
+              } else {
+                console.log(`   Keeping original ${dodAgenciesNeedingDetail.length} DoD agencies from USAspending`);
+              }
             }
           } else {
             console.log('   ⚠️ FPDS returned no offices for this NAICS code');
+
+            // Still expand using static command data even if FPDS failed
+            console.log(`   🔄 Expanding generic DoD agencies using static command database...`);
+
+            const expandedAgencies: any[] = [];
+            const genericDoDIds = new Set<string>();
+
+            for (const genericAgency of dodAgenciesNeedingDetail) {
+              const expanded = expandGenericDoDAgency(genericAgency, 5);
+              if (expanded.length > 0) {
+                expandedAgencies.push(...expanded);
+                genericDoDIds.add(genericAgency.id);
+                console.log(`     Expanded "${genericAgency.subAgency}" into ${expanded.length} commands`);
+              }
+            }
+
+            if (expandedAgencies.length > 0) {
+              const nonExpandedAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
+              agencies = [...nonExpandedAgencies, ...expandedAgencies];
+              agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+              totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
+              console.log(`   ✅ Expanded to ${expandedAgencies.length} specific DoD commands`);
+            }
           }
         } // end else (sixDigitCodes.length > 0)
       } catch (fpdsError) {
         console.error('   ❌ Error fetching FPDS data:', fpdsError);
-        // Continue with USAspending data only
+
+        // Even if FPDS fails, expand using static command data
+        console.log(`   🔄 Falling back to static command database expansion...`);
+
+        const expandedAgencies: any[] = [];
+        const genericDoDIds = new Set<string>();
+
+        for (const genericAgency of dodAgenciesNeedingDetail) {
+          const expanded = expandGenericDoDAgency(genericAgency, 5);
+          if (expanded.length > 0) {
+            expandedAgencies.push(...expanded);
+            genericDoDIds.add(genericAgency.id);
+          }
+        }
+
+        if (expandedAgencies.length > 0) {
+          const nonExpandedAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
+          agencies = [...nonExpandedAgencies, ...expandedAgencies];
+          agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+          totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
+          console.log(`   ✅ Expanded to ${expandedAgencies.length} specific DoD commands`);
+        }
+      }
+    } else if (dodAgenciesNeedingDetail.length > 0) {
+      // No NAICS code provided, but we have generic DoD agencies - expand using static data
+      console.log(`\n🎖️ Found ${dodAgenciesNeedingDetail.length} DoD agencies without command-level detail`);
+      console.log('   🔄 Expanding using static command database (no NAICS for FPDS)...');
+
+      const expandedAgencies: any[] = [];
+      const genericDoDIds = new Set<string>();
+
+      for (const genericAgency of dodAgenciesNeedingDetail) {
+        const expanded = expandGenericDoDAgency(genericAgency, 5);
+        if (expanded.length > 0) {
+          expandedAgencies.push(...expanded);
+          genericDoDIds.add(genericAgency.id);
+          console.log(`     Expanded "${genericAgency.subAgency}" into ${expanded.length} commands`);
+        }
+      }
+
+      if (expandedAgencies.length > 0) {
+        const nonExpandedAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
+        agencies = [...nonExpandedAgencies, ...expandedAgencies];
+        agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+        totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
+        console.log(`   ✅ Expanded to ${expandedAgencies.length} specific DoD commands`);
       }
     }
 

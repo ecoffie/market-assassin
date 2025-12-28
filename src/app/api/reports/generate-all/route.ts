@@ -227,6 +227,14 @@ export async function POST(request: NextRequest) {
               agency.command
             );
 
+            // Use OSBP from agency if available (from expanded DOD agencies), otherwise from command lookup
+            const osbpContact = agency.osbp || commandInfo?.smallBusinessContact || null;
+
+            // Debug: Log civilian agencies without OSBP
+            if (!osbpContact && agency.parentAgency && !agency.parentAgency.includes('Defense')) {
+              console.log(`⚠️ No OSBP for civilian agency: "${agency.contractingOffice}" | sub: "${agency.subAgency}" | parent: "${agency.parentAgency}"`);
+            }
+
             return {
               contractingOffice: agency.contractingOffice || agency.name,
               subAgency: agency.subAgency || agency.name,
@@ -236,16 +244,16 @@ export async function POST(request: NextRequest) {
               contractCount: agency.contractCount,
               officeId: agency.officeId || agency.id,
               subAgencyCode: agency.subAgencyCode || '',
-              contactStrategy: commandInfo?.smallBusinessContact
-                ? `Contact ${commandInfo.smallBusinessContact.director} at ${commandInfo.smallBusinessContact.email}`
+              contactStrategy: osbpContact
+                ? `Contact ${osbpContact.director} at ${osbpContact.email}`
                 : 'Contact the Office of Small Business Programs (OSBP)',
               location: agency.location || 'Unknown',
               // Enhanced command info
               command: agency.command || commandInfo?.command || null,
-              website: commandInfo?.website || null,
-              forecastUrl: commandInfo?.forecastUrl || null,
-              samForecastUrl: commandInfo?.samForecastUrl || null,
-              osbp: commandInfo?.smallBusinessContact || null,
+              website: agency.website || commandInfo?.website || null,
+              forecastUrl: agency.forecastUrl || commandInfo?.forecastUrl || null,
+              samForecastUrl: agency.samForecastUrl || commandInfo?.samForecastUrl || null,
+              osbp: osbpContact,
             };
           });
 
@@ -478,9 +486,19 @@ export async function POST(request: NextRequest) {
         try {
           const idvResult = await searchIDVContracts({
             naicsCode: inputs.naicsCode,
+            pscCode: inputs.pscCode,  // Pass PSC code for filtering
             minValue: 1000000, // $1M+ for meaningful IDV contracts
             limit: 50
           });
+
+          // Generate search context for recommendations
+          const searchContext = inputs.pscCode && inputs.naicsCode
+            ? `NAICS ${inputs.naicsCode} and PSC ${inputs.pscCode}`
+            : inputs.pscCode
+            ? `PSC ${inputs.pscCode}`
+            : inputs.naicsCode
+            ? `NAICS ${inputs.naicsCode}`
+            : 'your industry';
 
           return {
             contracts: idvResult.contracts,
@@ -490,6 +508,7 @@ export async function POST(request: NextRequest) {
               uniquePrimes: new Set(idvResult.contracts.map(c => c.recipientName)).size,
             },
             recommendations: [
+              `These contracts match ${searchContext} - contact primes for subcontracting`,
               'Contact the SBLO (Small Business Liaison Officer) at each prime contractor',
               'Focus on IDVs with 1-2 years remaining - they need to meet subcontracting goals',
               'Register in prime contractor supplier portals (many have them)',

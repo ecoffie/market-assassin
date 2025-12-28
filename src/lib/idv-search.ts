@@ -12,6 +12,7 @@ const TASK_ORDER_CODES = ["A", "B", "C", "D"];
 // Types
 export interface IDVSearchOptions {
   naicsCode?: string;
+  pscCode?: string;
   agency?: string;
   minValue?: number;
   dateFrom?: string;
@@ -34,6 +35,8 @@ export interface IDVContract {
   subAgency: string;
   naicsCode: string;
   naicsDescription: string;
+  pscCode: string;
+  pscDescription: string;
   recipientState: string;
   popState: string;
   generatedId: string;
@@ -54,6 +57,7 @@ export interface IDVSearchResult {
 export async function searchIDVContracts(options: IDVSearchOptions = {}): Promise<IDVSearchResult> {
   const {
     naicsCode,
+    pscCode,
     agency,
     minValue = 0,
     dateFrom,
@@ -84,6 +88,8 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
       "Awarding Sub Agency",
       "NAICS Code",
       "NAICS Description",
+      "Product or Service Code",
+      "Product or Service Code Description",
       "Contract Award Type",
       "Recipient State Code",
       "Place of Performance State Code",
@@ -115,6 +121,14 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
     else if (cleanNaics.length === 3) cleanNaics = cleanNaics.substring(0, 2);
     else if (cleanNaics.length === 5) cleanNaics = cleanNaics + '0';
     filters.naics_codes = { require: [cleanNaics] };
+  }
+
+  // Add PSC code filter
+  if (pscCode) {
+    // PSC codes are typically 4 characters (e.g., "R425", "J045", "Z2JZ")
+    // The API accepts the full code or prefix for broader matching
+    const cleanPsc = pscCode.trim().toUpperCase();
+    filters.psc_codes = { require: [cleanPsc] };
   }
 
   // Add agency filter
@@ -167,6 +181,8 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
     subAgency: c['Awarding Sub Agency'] as string || '',
     naicsCode: c['NAICS Code'] as string || '',
     naicsDescription: c['NAICS Description'] as string || '',
+    pscCode: c['Product or Service Code'] as string || '',
+    pscDescription: c['Product or Service Code Description'] as string || '',
     recipientState: c['Recipient State Code'] as string || '',
     popState: c['Place of Performance State Code'] as string || '',
     generatedId: c['generated_unique_award_id'] as string || '',
