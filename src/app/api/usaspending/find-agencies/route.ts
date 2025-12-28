@@ -762,13 +762,6 @@ export async function POST(request: NextRequest) {
             // Map FPDS data to agency format
             const fpdsAgencies = mapFPDSToAgencies(fpdsResult);
 
-            // Remove the generic DoD entries that we're replacing
-            const genericDoDIds = new Set(dodAgenciesNeedingDetail.map(a => a.id));
-            const nonDoDAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
-
-            // Calculate total DoD spending from the generic entries (to compare)
-            const originalDoDSpending = dodAgenciesNeedingDetail.reduce((sum, a) => sum + a.setAsideSpending, 0);
-
             // Add FPDS agencies (these have specific command data)
             // Filter to only DoD offices
             const dodFpdsAgencies = fpdsAgencies.filter(a => {
@@ -778,27 +771,44 @@ export async function POST(request: NextRequest) {
                      dodSubAgencies.some(s => subUpper.includes(s));
             });
 
-            console.log(`   Adding ${dodFpdsAgencies.length} specific DoD commands:`);
-            dodFpdsAgencies.slice(0, 10).forEach(a => {
-              console.log(`     - ${a.name} (${a.subAgency}): $${a.setAsideSpending.toLocaleString()}`);
-            });
+            console.log(`   Found ${dodFpdsAgencies.length} specific DoD commands from FPDS`);
 
-            // Merge: non-DoD from USAspending + DoD commands from FPDS
-            agencies = [
-              ...nonDoDAgencies,
-              ...dodFpdsAgencies.map(a => ({
-                ...a,
-                hasSpecificOffice: true, // Mark as having specific office data
-              })),
-            ];
+            // Only replace if FPDS returned meaningful DoD data (at least as many as we're removing)
+            if (dodFpdsAgencies.length >= dodAgenciesNeedingDetail.length) {
+              // Remove the generic DoD entries and replace with FPDS data
+              const genericDoDIds = new Set(dodAgenciesNeedingDetail.map(a => a.id));
+              const nonDoDAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
 
-            // Re-sort by spending
-            agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+              console.log(`   Replacing ${dodAgenciesNeedingDetail.length} generic DoD entries with ${dodFpdsAgencies.length} specific commands:`);
+              dodFpdsAgencies.slice(0, 10).forEach(a => {
+                console.log(`     - ${a.name} (${a.subAgency}): $${a.setAsideSpending.toLocaleString()}`);
+              });
 
-            // Recalculate total spending
-            totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
+              // Merge: non-DoD from USAspending + DoD commands from FPDS
+              agencies = [
+                ...nonDoDAgencies,
+                ...dodFpdsAgencies.map(a => ({
+                  ...a,
+                  hasSpecificOffice: true, // Mark as having specific office data
+                })),
+              ];
 
-            console.log(`   📊 Final: ${agencies.length} agencies (${nonDoDAgencies.length} non-DoD + ${dodFpdsAgencies.length} DoD commands)`);
+              // Re-sort by spending
+              agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+
+              // Recalculate total spending
+              totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
+
+              console.log(`   📊 Final: ${agencies.length} agencies (${nonDoDAgencies.length} non-DoD + ${dodFpdsAgencies.length} DoD commands)`);
+            } else {
+              // FPDS didn't return enough DoD data, keep the original USAspending DoD agencies
+              console.log(`   ⚠️ FPDS only returned ${dodFpdsAgencies.length} DoD commands (need ${dodAgenciesNeedingDetail.length})`);
+              console.log(`   Keeping original ${dodAgenciesNeedingDetail.length} DoD agencies from USAspending:`);
+              dodAgenciesNeedingDetail.slice(0, 5).forEach(a => {
+                console.log(`     - ${a.name} (${a.subAgency}): $${a.setAsideSpending.toLocaleString()}`);
+              });
+              // Don't modify agencies array - keep the original DOD agencies
+            }
           } else {
             console.log('   ⚠️ FPDS returned no offices for this NAICS code');
           }
