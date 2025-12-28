@@ -1,0 +1,193 @@
+{
+  "name": "Department of the Navy",
+  "abbreviation": "Navy",
+  "parentAgency": "Department of Defense",
+  "description": "The Department of the Navy includes both the United States Navy and the United States Marine Corps, responsible for naval warfare and expeditionary operations.",
+  "website": "https://www.navy.mil",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$255.8 billion",
+    "procurementBudget": "$61.5 billion, $32.4 billion shipbuilding"
+  },
+  "painPoints": [
+    {
+      "point": "Shipyard Infrastructure Optimization Program (SIOP) cost explosion - first 3 dry dock projects grew by $4B, Pearl Harbor alone increased from $6.1B to $16B",
+      "source": "GAO-23-106067 Navy Readiness & GAO-22-105993 Naval Shipyards Reports",
+      "priority": "critical"
+    },
+    {
+      "point": "SIOP planning delays - detailed shipyard investment plans delayed 3 years, now won't be complete until FY2025",
+      "source": "GAO-23-106067 Navy Readiness Report",
+      "priority": "critical"
+    },
+    {
+      "point": "Growing deferred maintenance backlog - increased by $1.6B over 5 years, now totals over $7 billion",
+      "source": "GAO-22-105993 Naval Shipyards Report & Federal News Network May 2022",
+      "priority": "critical"
+    },
+    {
+      "point": "Aging equipment crisis - more than half of shipyard capital equipment past expected service life",
+      "source": "GAO-22-105993 Naval Shipyards Report",
+      "priority": "high"
+    },
+    {
+      "point": "Columbia-class submarine program budget pressure - $126.4B total cost for 12 boats, $3.3B FY2025 for boat 2",
+      "source": "Navy Columbia Class CRS Report R41129 & Congress Report February 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity for naval platforms - split responsibility between NAVWAR (networks) and NAVSEA (combat systems) requiring coordination",
+      "source": "NAVSEA Cybersecurity Campaign Plan & NAVSEA Media News",
+      "priority": "high"
+    },
+    {
+      "point": "Private shipyard industrial base investment challenges requiring strategic approach",
+      "source": "GAO-25-106286 Shipbuilding and Repair Report",
+      "priority": "medium"
+    },
+    {
+      "point": "Autonomous systems integration and AI/ML tool deployment across unmanned platforms",
+      "source": "NAVWAR WEST 2025 Conference & Pentagon FY2026 Budget Autonomy Allocation",
+      "priority": "medium"
+    },
+    {
+      "point": "Weapon systems acquisition delays including Ship to Shore Connector Amphibious Craft experiencing 15-month delays due to testing problems, reflecting broader Navy acquisition process challenges",
+      "source": "GAO Testimony 2024 - Weapon Systems Acquisition Delays",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Shipyard Infrastructure Optimization Program (SIOP) - 20-year, $21B+ modernization effort (now significantly over budget)",
+      "source": "GAO-22-105993 & Navy SIOP Program Overview",
+      "funding": "Originally $21B, now significantly higher due to cost overruns",
+      "deadline": "2018-2038 (20-year program)"
+    },
+    {
+      "priority": "Columbia-class ballistic missile submarine production - 12 boats, transition to 1 per year starting FY2026",
+      "source": "Navy CRS Report R41129 & FY2025 Budget Request",
+      "funding": "$126.4B total, $3.3B FY2025 for boat 2, $6.2B advance procurement",
+      "deadline": "Boats 3-12 procured FY2026-FY2035"
+    },
+    {
+      "priority": "Unmanned and autonomous systems expansion - $5.3B for all autonomy systems (+$2.2B increase)",
+      "source": "Pentagon FY2026 Budget Request & DefenseScoop June 2025",
+      "funding": "$5.3B Navy autonomy systems FY2026 (+$2.2B from FY2025)",
+      "deadline": "MQ-25 first flight planned 2026"
+    },
+    {
+      "priority": "SeaPort Next Generation (SeaPort NxG) professional services acquisition - 1,023 contractors awarded January 2025",
+      "source": "NAVSEA SeaPort NxG & 2025 Rolling Admissions II Awards",
+      "funding": "$5B annually, $7.5B remaining ceiling value",
+      "deadline": "Base period 2.5 years, 5-year ordering period"
+    },
+    {
+      "priority": "Cybersecurity across naval platforms - NAVSEA Campaign Plan priority for hull, mechanical, electrical, combat systems",
+      "source": "NAVSEA Enterprise Strategy January 2025 & Cybersecurity Campaign Plan",
+      "priority": "high"
+    },
+    {
+      "priority": "AI/ML and autonomous warfare capabilities - multi-domain warfare innovation focus",
+      "source": "NAVWAR WEST 2025 Conference & NAVWAR Commander Rear Adm. Okano remarks",
+      "priority": "high"
+    },
+    {
+      "priority": "Shipbuilding industrial base strengthening - systemic change required per GAO",
+      "source": "GAO-25-108136 Navy Shipbuilding Generational Imperative Report",
+      "priority": "high"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GAO-23-106067 Navy Readiness Shipyard Improvement - https://www.gao.gov/products/gao-23-106067",
+      "GAO-22-105993 Naval Shipyards Ongoing Challenges - https://www.gao.gov/products/gao-22-105993",
+      "GAO-25-106286 Shipbuilding Private Sector Investments - https://files.gao.gov/reports/GAO-25-106286/index.html",
+      "GAO-25-108136 Navy Shipbuilding Generational Imperative - https://www.gao.gov/products/gao-25-108136",
+      "Navy CRS Report R41129 Columbia-Class Program - https://www.congress.gov/crs-product/R41129",
+      "SECNAV FY2025 Budget - https://www.secnav.navy.mil/fmc/Pages/Fiscal-Year-2025.aspx"
+    ],
+    "secondary": [
+      "NAVSEA SeaPort NxG - https://www.navsea.navy.mil/Business-Partnerships/SeaPort-NxG/",
+      "NAVSEA Enterprise Strategy January 2025",
+      "NAVWAR WEST 2025 Conference - https://www.dvidshub.net/news/490012/navwar-west-2025-future-multi-domain-warfare-demands-agility-and-audacious-innovation",
+      "DefenseScoop Pentagon FY2026 Budget Autonomy - https://defensescoop.com/2025/06/26/dod-fy26-budget-request-autonomy-unmanned-systems/",
+      "Federal News Network Shipyard Overhaul May 2022 - https://federalnewsnetwork.com/navy/2022/05/amid-grave-concerns-about-facility-conditions-navy-learned-lessons-about-shipyard-overhaul/"
+    ]
+  },
+  "commonNAICSCodes": [
+    "336611",
+    "336612",
+    "541330",
+    "541512",
+    "236220",
+    "541519",
+    "334511",
+    "541715",
+    "541712",
+    "541511"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "Multiple Award Contracts (MAC)",
+    "SeaPort Next Generation (SeaPort NxG)"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Very strong preference - 85% of SeaPort contracts awarded to small businesses, goal of 25%",
+    "WOSB": "Active use - goal of 5%",
+    "8a": "Extensive use - significant SeaPort NxG awards",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference - many SeaPort NxG awards",
+    "VOSB": "Active use - veteran-owned businesses prioritized"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $10M (professional services, engineering support)",
+    "medium": "$10M - $100M (facility modernization, system integration)",
+    "large": "$100M - $16B+ (shipyard infrastructure, Columbia-class submarines, dry dock projects)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "SeaPort NxG contract holders (1,023 awarded January 2025)",
+      "NAVFAC, NAVSEA, NAVWAR, NAVAIR domain expertise",
+      "Naval shipyard and dry dock construction experience",
+      "Cybersecurity for combat systems and naval platforms",
+      "Autonomous systems and AI/ML capabilities",
+      "Submarine construction and maintenance expertise",
+      "Security clearances (required for most contracts)",
+      "Small business partnerships and subcontracting"
+    ],
+    "contractingTimeline": "6-18 months average, multi-year for major shipbuilding programs",
+    "competitionLevel": "Highly competitive for major contracts, moderate for SeaPort NxG task orders",
+    "evaluationFactors": [
+      "Technical expertise in naval systems and shipbuilding",
+      "Past performance with Navy/Marine Corps",
+      "SeaPort NxG contract holder status",
+      "Price/cost reasonableness",
+      "Small business participation and subcontracting plan",
+      "Security clearances and facility security",
+      "Cybersecurity capabilities"
+    ]
+  },
+  "keyOffices": [
+    "NAVFAC (Naval Facilities Engineering Command)",
+    "NAVSEA (Naval Sea Systems Command)",
+    "NAVWAR (Naval Information Warfare Systems Command)",
+    "NAVAIR (Naval Air Systems Command)",
+    "NAVSUP (Naval Supply Systems Command)",
+    "Strategic Systems Programs (SSP) - Columbia-class",
+    "Naval Shipyard Commands (4 public shipyards)"
+  ],
+  "insights": [
+    "SeaPort NxG awarded 1,023 contractors January 2025 with 85% small business participation - major opportunity vehicle",
+    "SIOP cost overruns are severe - first 3 dry docks alone exceeded original $4B budget for all 17 dry docks",
+    "Pearl Harbor shipyard estimate exploded from $6.1B to $16B - massive construction opportunity but high risk",
+    "$7B deferred maintenance backlog growing despite $21B+ SIOP investment - sustained contracting need",
+    "Columbia-class represents $126.4B submarine program through 2035 - predictable annual procurement starting FY2026",
+    "$5.3B in Navy autonomy systems FY2026 (+$2.2B increase) - unmanned systems priority area",
+    "Cybersecurity split between NAVWAR (networks) and NAVSEA (combat systems) creates opportunities in both domains",
+    "GAO has 9 open recommendations on SIOP - compliance and risk management contracts likely",
+    "More than half of shipyard equipment past service life - equipment replacement contracts imminent",
+    "85% of SeaPort contracts go to small businesses - strongest small business preference of any Navy vehicle"
+  ]
+}

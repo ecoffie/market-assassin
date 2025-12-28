@@ -1,0 +1,137 @@
+{
+  "name": "Nuclear Regulatory Commission",
+  "abbreviation": "NRC",
+  "parentAgency": null,
+  "description": "The Nuclear Regulatory Commission licenses and regulates civilian use of radioactive materials to protect public health and safety and the environment.",
+  "website": "https://www.nrc.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$963 million",
+    "procurementBudget": "$200M+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Nuclear safety and licensing system modernization to improve efficiency and regulatory oversight",
+      "source": "NRC Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "IT infrastructure modernization for regulatory data management and inspection systems",
+      "source": "NRC IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity enhancements for critical nuclear infrastructure protection",
+      "source": "NRC Cybersecurity Strategy",
+      "priority": "critical"
+    },
+    {
+      "point": "Regulatory data collection and analysis system improvements",
+      "source": "NRC Budget Justification FY2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Nuclear materials tracking and reporting system modernization",
+      "source": "NRC Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting nuclear regulatory IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Nuclear Safety System Modernization",
+      "source": "NRC Strategic Plan",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Cybersecurity Enhancement for Nuclear Infrastructure",
+      "source": "NRC Cybersecurity Strategy",
+      "deadline": "Ongoing critical priority"
+    },
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "NRC IT Modernization Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Regulatory Data Management Improvements",
+      "source": "NRC Budget Justification FY2025",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "NRC Budget Justification FY2025 - https://www.nrc.gov/about-nrc/budget.html",
+      "NRC Strategic Plan - https://www.nrc.gov/about-nrc/strategic-plan.html",
+      "NRC Small Business Forecast - https://www.nrc.gov/about-nrc/contracting/small-business/forecast.html",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on NRC IT Systems"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "541330",
+    "541715",
+    "541712",
+    "541611"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $25M",
+    "large": "$25M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Regulatory system experience",
+      "Cybersecurity capabilities",
+      "Nuclear industry knowledge",
+      "Data analytics and reporting",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with regulatory systems",
+      "Cybersecurity capabilities",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Office of the Chief Information Officer (OCIO)",
+    "Office of Small Business and Civil Rights",
+    "Office of Nuclear Reactor Regulation",
+    "Office of Nuclear Material Safety and Safeguards"
+  ],
+  "insights": [
+    "Cybersecurity is critical priority for nuclear infrastructure protection",
+    "Regulatory system modernization is ongoing focus",
+    "Strong emphasis on small business participation",
+    "IT infrastructure modernization priorities across regulatory functions",
+    "Data management and analysis capabilities are important"
+  ]
+}
+

@@ -1,0 +1,150 @@
+{
+  "name": "Agency for International Development",
+  "abbreviation": "USAID",
+  "parentAgency": null,
+  "description": "USAID leads international development and humanitarian efforts to save lives, reduce poverty, strengthen democratic governance, and help people emerge from humanitarian crises.",
+  "website": "https://www.usaid.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$27.8 billion",
+    "procurementBudget": "$8B+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Global IT infrastructure and systems modernization for worldwide mission operations and program management",
+      "source": "USAID Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity and data protection critical for sensitive international development and humanitarian information",
+      "source": "USAID Cybersecurity Strategy & GAO Reports",
+      "priority": "critical"
+    },
+    {
+      "point": "Program management and monitoring system improvements for international development projects",
+      "source": "USAID Budget Justification FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Grant and contract management system modernization for international partners and organizations",
+      "source": "USAID Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Data analytics and reporting capabilities for program effectiveness and impact measurement",
+      "source": "USAID Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Legacy system integration and data migration challenges across global operations",
+      "source": "USAID IT Modernization Strategy",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting global development IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Global IT Infrastructure Modernization",
+      "source": "USAID IT Modernization Strategy",
+      "deadline": "Ongoing multi-year initiative"
+    },
+    {
+      "priority": "Cybersecurity and Data Protection Enhancement",
+      "source": "USAID Cybersecurity Strategy",
+      "deadline": "Ongoing critical priority"
+    },
+    {
+      "priority": "Program Management and Monitoring System Improvements",
+      "source": "USAID Budget Justification FY2025",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Grant and Contract Management System Modernization",
+      "source": "USAID Strategic Plan",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "USAID Budget Justification FY2025 - https://www.usaid.gov/budget",
+      "USAID Strategic Plan - https://www.usaid.gov/about-us/strategic-plan",
+      "USAID Business Forecast - https://www.usaid.gov/business-forecast",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on USAID IT Systems and Program Management"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "541715",
+    "541712",
+    "541614",
+    "541618"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 25%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $50M",
+    "large": "$50M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "International development program experience",
+      "Global infrastructure experience",
+      "Grant and contract management system knowledge",
+      "Cybersecurity capabilities",
+      "Data analytics and reporting",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "12-24 months average (complex global projects)",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with international development or global systems",
+      "Global infrastructure experience",
+      "Cybersecurity capabilities",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Bureau for Management",
+    "Office of Acquisition and Assistance",
+    "Office of the Chief Information Officer (OCIO)",
+    "Bureau for Policy, Planning and Learning"
+  ],
+  "insights": [
+    "Global IT infrastructure modernization is major focus for worldwide operations",
+    "Cybersecurity is critical due to sensitive international development data",
+    "Program management and monitoring system improvements are high priority",
+    "Grant and contract management system modernization ongoing",
+    "Large-scale international development programs require robust systems",
+    "Strong emphasis on measuring program effectiveness and impact"
+  ]
+}
+

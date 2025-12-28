@@ -1,0 +1,140 @@
+{
+  "name": "Social Security Administration",
+  "abbreviation": "SSA",
+  "parentAgency": null,
+  "description": "The Social Security Administration delivers social security services that meet the changing needs of the public.",
+  "website": "https://www.ssa.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$1.3 trillion (benefits)",
+    "procurementBudget": "$2B+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Legacy mainframe systems modernization critical for processing millions of Social Security benefits and applications",
+      "source": "SSA Strategic Plan & GAO Reports",
+      "priority": "critical"
+    },
+    {
+      "point": "Disability claims processing system improvements to reduce backlog and processing times",
+      "source": "SSA Budget Justification FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Customer service technology modernization for online services and field office operations",
+      "source": "SSA Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity and data protection for sensitive Social Security numbers and personal information",
+      "source": "SSA Cybersecurity Strategy",
+      "priority": "critical"
+    },
+    {
+      "point": "IT infrastructure modernization to replace aging mainframe systems while maintaining service continuity",
+      "source": "SSA IT Modernization Strategy",
+      "priority": "critical"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting Social Security benefits processing systems, with over $100 billion annually invested in federal IT",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Mainframe Modernization and IT Infrastructure Replacement",
+      "source": "SSA Strategic Plan",
+      "deadline": "Ongoing critical multi-year initiative"
+    },
+    {
+      "priority": "Disability Claims Processing System Improvements",
+      "source": "SSA Budget Justification FY2025",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Cybersecurity and Data Protection Enhancement",
+      "source": "SSA Cybersecurity Strategy",
+      "deadline": "Ongoing critical priority"
+    },
+    {
+      "priority": "Customer Service Technology Modernization",
+      "source": "SSA Strategic Plan",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "SSA Budget Justification FY2025 - https://www.ssa.gov/budget",
+      "SSA Strategic Plan - https://www.ssa.gov/strategicplan",
+      "SSA Contract Forecast - https://www.ssa.gov/osdbu/contract-forecast-intro.html",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on SSA IT Modernization and Mainframe Replacement"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "334111"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $50M",
+    "large": "$50M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Mainframe migration experience",
+      "Large-scale system integration",
+      "Disability claims processing system knowledge",
+      "Cybersecurity capabilities",
+      "Data analytics and reporting",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "12-24 months average (complex systems)",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with large-scale government systems",
+      "Mainframe modernization experience",
+      "Cybersecurity capabilities",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Office of the Chief Information Officer (OCIO)",
+    "Office of Small and Disadvantaged Business Utilization (OSDBU)",
+    "Office of Systems",
+    "Office of Disability Adjudication and Review"
+  ],
+  "insights": [
+    "Mainframe modernization is critical priority - one of largest IT modernization efforts in government",
+    "Disability claims processing improvements are major focus",
+    "Cybersecurity is critical due to sensitivity of Social Security data",
+    "Large-scale system integration and migration expertise highly valued",
+    "Customer service technology modernization is ongoing priority"
+  ]
+}
+

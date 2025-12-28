@@ -1,0 +1,192 @@
+{
+  "name": "NAVFAC",
+  "fullName": "Naval Facilities Engineering Command",
+  "abbreviation": "NAVFAC",
+  "parentAgency": "Department of the Navy",
+  "description": "NAVFAC provides the Navy and Marine Corps with facilities engineering, planning, design, construction, real estate, environmental, and public works support worldwide.",
+  "website": "https://www.navfac.navy.mil",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "Part of Navy's $255.8B budget",
+    "procurementBudget": "$700M+ in active small business MACCs"
+  },
+  "painPoints": [
+    {
+      "point": "SIOP execution responsibility - delivering complex $21B+ shipyard infrastructure modernization with severe cost overruns",
+      "source": "NAVFAC PMO-555 SIOP & GAO-22-105993 Naval Shipyards Report",
+      "priority": "critical"
+    },
+    {
+      "point": "Portsmouth Naval Shipyard dry dock concrete repairs - $8.6M SIOP contract awarded FY2025 as part of broader SIOP challenges",
+      "source": "DVIDS NAVFAC Mid-Atlantic SIOP Contract Award 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Climate resilience infrastructure adaptation - rising sea levels and extreme weather threatening naval installations",
+      "source": "NAVFAC Climate Change Planning Handbook & GAO-20-511 Climate Resilience Report",
+      "priority": "high"
+    },
+    {
+      "point": "Energy resilience and microgrid deployment requirements per Executive Order 14057 and Climate Action 2030",
+      "source": "GAO-23-105239 Environmental Sustainability & NAVFAC SIOP Microgrid Study",
+      "priority": "high"
+    },
+    {
+      "point": "Small business MACC contract renewals - NAVFAC Southeast has 2 contracts expiring FY25 with no renewal decision",
+      "source": "NAVFAC Southeast Industry Brief 2025 SAME Charleston",
+      "priority": "medium"
+    },
+    {
+      "point": "Energy Conservation Investment Program (ECIP) reporting and measurement gaps",
+      "source": "GAO-16-162 Defense Infrastructure Energy Conservation Report",
+      "priority": "medium"
+    },
+    {
+      "point": "Climate risk integration into acquisition and supply chain processes",
+      "source": "GAO-20-511 Climate Resilience Contractor Risk Assessment",
+      "priority": "medium"
+    },
+    {
+      "point": "Facility sustainment backlog across Naval installations worldwide",
+      "source": "NAVFAC 2025 Strategic Plan",
+      "priority": "medium"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "SIOP program execution - dry dock recapitalization, infrastructure reconfiguration, industrial equipment modernization",
+      "source": "NAVFAC PMO-555 SIOP & NAVFAC Northwest Program Overview 2025",
+      "funding": "Part of Navy's $21B+ SIOP program",
+      "deadline": "2018-2038 (20-year program)"
+    },
+    {
+      "priority": "Small Business MACC programs - $700M active contracts across regions, 13 Facility Support Contracts ($107M), 12 Environmental Contracts ($108M)",
+      "source": "NAVFAC Southeast Industry Brief 2025 & Regional MACC Programs",
+      "funding": "$700M+ in active small business MACCs",
+      "deadline": "Various - some expiring FY25"
+    },
+    {
+      "priority": "Climate Action 2030 implementation - infrastructure resilience to extreme weather and sea-level rise",
+      "source": "Department of Navy Climate Action 2030 Strategy",
+      "deadline": "2030 targets",
+      "priority": "high"
+    },
+    {
+      "priority": "Energy resilience and renewable energy - microgrids, solar, wind, advanced biofuels per Executive Order 14057",
+      "source": "GAO-23-105239 Environmental Sustainability & Navy Climate Action 2030",
+      "priority": "high"
+    },
+    {
+      "priority": "8(a) small business construction programs - dedicated MACCs for SBA-certified firms across all regions",
+      "source": "NAVFAC Marianas $75M MACC Award & NAVFAC Washington $249M 8(a) MACC",
+      "funding": "$75M Marianas, $249M Washington, regional programs",
+      "priority": "high"
+    },
+    {
+      "priority": "Naval Academy climate resilience pier reconstruction and waterfront infrastructure",
+      "source": "NAVFAC Washington Naval Academy Climate Resilience Projects",
+      "priority": "medium"
+    },
+    {
+      "priority": "Environmental restoration and compliance across installations",
+      "source": "NAVFAC 2025 Strategic Plan",
+      "funding": "$108M in environmental contracts (10 for 8(a), 2 for SB)",
+      "priority": "medium"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "NAVFAC 2025 Strategic Plan - https://www.navfac.navy.mil/Portals/68/NAVFAC/Strategic%20Plans/2025-navfac-strategicplan.pdf",
+      "GAO-22-105993 Naval Shipyards Report - https://www.gao.gov/products/gao-22-105993",
+      "GAO-23-105239 Environmental Sustainability - https://www.gao.gov/assets/gao-23-105239.pdf",
+      "GAO-20-511 Climate Resilience Contractor Risk - https://www.gao.gov/products/gao-20-511",
+      "NAVFAC Southeast Industry Brief 2025 - https://www.same.org/wp-content/uploads/2025/03/04_NAVFAC-Southeast.pdf"
+    ],
+    "secondary": [
+      "NAVFAC PMO-555 SIOP Program - https://www.navfac.navy.mil/PEO-Industrial-Infrastructure/PMO-555-SIOP/",
+      "NAVFAC Northwest Program Overview 2025 - https://www.same.org/wp-content/uploads/2025/04/2025-SBS-NAVFAC-FINAL.pdf",
+      "DVIDS NAVFAC Mid-Atlantic SIOP Contract - https://www.dvidshub.net/news/549142",
+      "NAVFAC SIOP Microgrid Study - https://www.navfac.navy.mil/Home/News-Detail/Article/3922047",
+      "GAO-16-162 Energy Conservation Investment Program - https://www.gao.gov/products/gao-16-162",
+      "Department of Navy Climate Action 2030 - https://news.usni.org/2022/05/24/department-of-the-navy-climate-action-2030"
+    ]
+  },
+  "commonNAICSCodes": [
+    "236220",
+    "237990",
+    "541310",
+    "541330",
+    "541611",
+    "541512",
+    "238220",
+    "238210",
+    "541519",
+    "561210"
+  ],
+  "contractTypes": [
+    "Fixed-Price Construction",
+    "Design-Build",
+    "Multiple Award Construction Contracts (MACC)",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "Job Order Contracts (JOC)",
+    "8(a) Set-Aside MACCs"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Very strong preference - $700M+ in dedicated small business MACCs, 85% of contracts to small businesses",
+    "WOSB": "Active use - dedicated contract opportunities",
+    "8a": "Extensive use - dedicated 8(a) MACC programs across all regions ($75M Marianas, $249M Washington, $108M environmental)",
+    "HUBZone": "Regular use in construction contracts",
+    "SDVOSB": "Strong preference - dedicated facility support contracts",
+    "VOSB": "Active use across all regions"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M (facility support, minor construction)",
+    "medium": "$5M - $50M (major facility projects, environmental restoration)",
+    "large": "$50M - $249M (MACC programs, SIOP dry dock projects, waterfront infrastructure)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "NAVFAC MACC contract holders (regional and specialty)",
+      "8(a) SBA-certified construction firms",
+      "Past performance with military construction (MILCON)",
+      "DBE/MBE/WBE certifications",
+      "Energy-efficient design and renewable energy experience",
+      "Climate resilience and sea-level rise adaptation expertise",
+      "Environmental compliance and restoration capabilities",
+      "Design-build experience for complex facilities"
+    ],
+    "contractingTimeline": "3-12 months average for task orders, 6-18 months for MACC awards",
+    "competitionLevel": "Competitive for unrestricted, moderate for set-asides due to dedicated small business programs",
+    "evaluationFactors": [
+      "Technical approach and construction methodology",
+      "Past performance in military construction and NAVFAC projects",
+      "Price/cost reasonableness",
+      "Small business participation and subcontracting plan",
+      "Energy efficiency and sustainability approach",
+      "Climate resilience integration",
+      "8(a) certification status (for set-aside contracts)"
+    ]
+  },
+  "keyLocations": [
+    "NAVFAC Mid-Atlantic (Norfolk, VA)",
+    "NAVFAC Southeast (Jacksonville, FL)",
+    "NAVFAC Southwest (San Diego, CA)",
+    "NAVFAC Midwest (Great Lakes, IL)",
+    "NAVFAC Pacific (Pearl Harbor, HI)",
+    "NAVFAC Washington (Washington, DC)",
+    "NAVFAC Northwest (Silverdale, WA)",
+    "NAVFAC Marianas (Guam)"
+  ],
+  "insights": [
+    "$700M+ in active small business MACCs across regions - major opportunity for 8(a) and small business construction firms",
+    "NAVFAC executes Navy's SIOP program - $8.6M Portsmouth dry dock contract is small piece of $21B+ total program",
+    "Climate Action 2030 driving major infrastructure resilience contracts for sea-level rise and extreme weather adaptation",
+    "8(a) programs extensively used - dedicated MACCs in every region ($75M Marianas, $249M Washington examples)",
+    "NAVFAC Southeast has 13 Facility Support Contracts ($107M) and 12 Environmental Contracts ($108M) planned",
+    "Energy resilience contracts growing - microgrids, solar, renewable energy per Executive Order 14057",
+    "2 small business MACC contracts expiring FY25 at NAVFAC Southeast - recompete opportunities likely",
+    "NAVFAC Washington has $249M 8(a) MACC with 2-year base + two 3-year options (8 years total)",
+    "Climate resilience pier reconstruction at Naval Academy represents new contract category",
+    "Environmental restoration contracts heavily favor 8(a) firms - 10 of 12 planned contracts are 8(a) set-asides"
+  ]
+}

@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opportunity Scout - LinkedIn Deal Magnet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #0077B5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        linkedin: {
+                            blue: '#0077B5',
+                            dark: '#004182',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-white to-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Opportunity Scout</h1>
+            <p class="text-gray-600">Discover 50+ agencies awarding contracts to businesses like yours</p>
+        </div>
+
+        <!-- Priority Filter Banner -->
+        <div id="priority-banner" class="hidden bg-blue-100 border-2 border-blue-300 rounded-xl p-4 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="font-semibold text-blue-900">Priority Filter Active:</p>
+                    <p id="priority-filter-text" class="text-blue-800 text-sm"></p>
+                </div>
+                <button onclick="clearPriorityFilter()" class="text-blue-600 hover:text-blue-800 underline text-sm">Clear</button>
+            </div>
+        </div>
+
+        <!-- Sticky Loading State -->
+        <div id="loading-state" class="hidden sticky top-4 z-50 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-2xl p-4 mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="loading border-white border-t-transparent"></div>
+                    <div>
+                        <p class="font-semibold">Scouting Opportunities...</p>
+                        <p class="text-sm opacity-90" id="loading-status">Connecting to USAspending API...</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-2xl font-bold" id="progress-percent">0%</p>
+                    <p class="text-xs opacity-75">Complete</p>
+                </div>
+            </div>
+            <div class="mt-3 bg-white bg-opacity-20 rounded-full h-2 overflow-hidden">
+                <div id="progress-bar" class="bg-white h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Compact Search Form -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <form id="test-form">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Business Features -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">
+                            Business Type
+                        </label>
+                        <select id="business-formation"
+                            class="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-linkedin-blue focus:border-transparent">
+                            <option value="">Select type</option>
+                            <option value="women-owned">Women Owned</option>
+                            <option value="hubzone">HUBZone</option>
+                            <option value="8a">8(a) Certified</option>
+                            <option value="small-business">Small Business</option>
+                            <option value="dot-certified">DOT Certified</option>
+                        </select>
+                    </div>
+
+                    <!-- NAICS Code -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">
+                            NAICS Code
+                        </label>
+                        <input type="text" id="naics-code"
+                            placeholder="e.g., 541330"
+                            class="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-linkedin-blue focus:border-transparent">
+                    </div>
+
+                    <!-- Zip Code -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">
+                            Zip Code
+                        </label>
+                        <input type="text" id="zip-code"
+                            placeholder="e.g., 10001"
+                            maxlength="5"
+                            pattern="[0-9]{5}"
+                            class="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-linkedin-blue focus:border-transparent">
+                    </div>
+
+                    <!-- Goods or Services -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">
+                            Goods or Services?
+                        </label>
+                        <select id="goods-or-services"
+                            class="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-linkedin-blue focus:border-transparent">
+                            <option value="">Select one</option>
+                            <option value="goods">Goods</option>
+                            <option value="services">Services</option>
+                            <option value="both">Both</option>
+                        </select>
+                    </div>
+
+                    <!-- Veteran Status -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">
+                            Veteran Status
+                        </label>
+                        <select id="veteran-status"
+                            class="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-linkedin-blue focus:border-transparent">
+                            <option value="">Select status</option>
+                            <option value="veteran-owned">Veteran Owned</option>
+                            <option value="service-disabled-veteran">Service Disabled Vet</option>
+                            <option value="not-applicable">Not Applicable</option>
+                        </select>
+                    </div>
+
+                    <!-- Search Button -->
+                    <div class="flex items-end">
+                        <button type="submit" id="generate-btn"
+                            class="w-full bg-linkedin-blue text-white px-6 py-2 text-sm rounded-lg font-bold hover:bg-linkedin-dark transition shadow-md hover:shadow-lg">
+                            🔍 Scout Opportunities
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden space-y-6">
+            <!-- Summary -->
+            <div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+                <h2 class="text-xl font-bold text-blue-900 mb-4">📊 Search Summary</h2>
+                <div id="insights" class="text-blue-800"></div>
+            </div>
+
+            <!-- Search Suggestions (shown when results are limited) -->
+            <div id="suggestions-container" class="hidden"></div>
+
+            <!-- Top Agencies -->
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Top Government Agencies</h2>
+                <p class="text-gray-600 mb-4">These agencies have awarded the most contracts matching your business profile</p>
+                <div id="posts-container" class="space-y-6"></div>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="hidden bg-red-50 border-2 border-red-200 rounded-xl p-6">
+            <h2 class="text-xl font-bold text-red-900 mb-2">Error</h2>
+            <p id="error-message" class="text-red-800"></p>
+        </div>
+
+    </div>
+
+    <script>
+        // Global variables
+        let currentSuggestions = [];
+
+        // Check for priority filter from homepage or set from dropdown
+        let priorityFilter = sessionStorage.getItem('priorityFilter');
+        const priorityFilterDropdown = document.getElementById('priority-filter');
+        
+        // If priority filter was set from homepage, apply it to dropdown
+        if (priorityFilter && priorityFilterDropdown) {
+            priorityFilterDropdown.value = priorityFilter;
+            const banner = document.getElementById('priority-banner');
+            const filterText = document.getElementById('priority-filter-text');
+            if (banner && filterText) {
+                const filterLabels = {
+                    'business-formation': 'Business Feature',
+                    'naics': 'NAICS Code',
+                    'state': 'State',
+                    'veteran': 'Veteran Status'
+                };
+                filterText.textContent = filterLabels[priorityFilter] || priorityFilter;
+                banner.classList.remove('hidden');
+            }
+        }
+        
+        // Update priority filter when dropdown changes
+        if (priorityFilterDropdown) {
+            priorityFilterDropdown.addEventListener('change', (e) => {
+                const value = e.target.value;
+                if (value) {
+                    sessionStorage.setItem('priorityFilter', value);
+                    priorityFilter = value;
+                } else {
+                    sessionStorage.removeItem('priorityFilter');
+                    priorityFilter = null;
+                }
+            });
+        }
+        
+        function clearPriorityFilter() {
+            sessionStorage.removeItem('priorityFilter');
+            if (priorityFilterDropdown) {
+                priorityFilterDropdown.value = '';
+            }
+            document.getElementById('priority-banner')?.classList.add('hidden');
+            priorityFilter = null;
+        }
+        
+        const form = document.getElementById('test-form');
+        const loadingState = document.getElementById('loading-state');
+        const results = document.getElementById('results');
+        const errorState = document.getElementById('error-state');
+        const loadingStatus = document.getElementById('loading-status');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Hide previous results
+            results.classList.add('hidden');
+            errorState.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+
+            // Collect form data
+            const priorityFilterValue = document.getElementById('priority-filter')?.value || sessionStorage.getItem('priorityFilter');
+            const data = {
+                businessFormation: document.getElementById('business-formation').value,
+                naicsCode: document.getElementById('naics-code').value,
+                zipCode: document.getElementById('zip-code').value,
+                goodsOrServices: document.getElementById('goods-or-services').value,
+                veteranStatus: document.getElementById('veteran-status').value
+            };
+            
+            // Add priority filter to query string if set
+            // Use full URL to work with file:// protocol when testing locally
+            let apiUrl = '/api/government-contracts/search';
+            if (priorityFilterValue) {
+                apiUrl += `?priority=${encodeURIComponent(priorityFilterValue)}`;
+            }
+
+            try {
+                // Simulate progress updates
+                let progress = 0;
+                const progressBar = document.getElementById('progress-bar');
+                const progressPercent = document.getElementById('progress-percent');
+                const loadingMessages = [
+                    'Connecting to USAspending API...',
+                    'Fetching contract data...',
+                    'Analyzing set-aside types...',
+                    'Matching NAICS codes...',
+                    'Ranking agencies by spending...',
+                    'Enhancing agency names...',
+                    'Almost done...'
+                ];
+
+                let messageIndex = 0;
+                const progressInterval = setInterval(() => {
+                    progress = Math.min(progress + Math.random() * 15, 95);
+                    progressBar.style.width = progress + '%';
+                    progressPercent.textContent = Math.floor(progress) + '%';
+
+                    if (messageIndex < loadingMessages.length) {
+                        loadingStatus.textContent = loadingMessages[messageIndex];
+                        messageIndex++;
+                    }
+                }, 3000);
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to search government contracts');
+                }
+
+                const result = await response.json();
+
+                // Complete progress
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressPercent.textContent = '100%';
+                loadingStatus.textContent = 'Complete!';
+
+                // Wait a moment to show completion, then hide
+                setTimeout(() => {
+                    loadingState.classList.add('hidden');
+                }, 500);
+
+                // Show results
+                displayResults(result);
+
+            } catch (error) {
+                console.error('Error:', error);
+                if (typeof progressInterval !== 'undefined') clearInterval(progressInterval);
+                loadingState.classList.add('hidden');
+                errorState.classList.remove('hidden');
+
+                // Handle API unavailable error
+                let errorMessage = error.message || 'Failed to search government contracts. Please try again.';
+                if (error.message && error.message.includes('temporarily unavailable')) {
+                    errorMessage = '🚨 The USAspending API is temporarily unavailable. Please try again in a few minutes.';
+                }
+
+                document.getElementById('error-message').textContent = errorMessage;
+            }
+        });
+
+        function displayResults(result) {
+            // Debug: Log the actual data structure
+            console.log('Received result:', result);
+            console.log('Has suggestions?', result.suggestions);
+            console.log('Suggestions alternatives:', result.suggestions?.alternatives);
+
+            if (result.agencies && result.agencies.length > 0) {
+                console.log('First agency data:', result.agencies[0]);
+                console.log('First agency.agencyId type:', typeof result.agencies[0].agencyId);
+                console.log('First agency.agencyId value:', result.agencies[0].agencyId);
+            }
+            
+            // Display summary
+            if (result.summary) {
+                const insightsDiv = document.getElementById('insights');
+                let summaryHtml = `
+                    <div class="space-y-2">
+                        <p><strong>Total Contracts Found:</strong> ${result.summary.totalAwards.toLocaleString()}</p>
+                        <p><strong>Agencies Spending in Your Category:</strong> ${result.summary.totalAgencies}</p>
+                        <p><strong>Total Contract Value:</strong> $${(result.summary.totalSpending / 1000000).toFixed(2)}M</p>
+                        <p><strong>Search Criteria:</strong> ${formatSearchCriteria(result.searchCriteria)}</p>
+                `;
+
+                // Show NAICS correction and auto-fallback messages if present
+                if (result.naicsCorrectionMessage) {
+                    // Split by double newline to handle multiple messages
+                    const messages = result.naicsCorrectionMessage.split('\n\n');
+
+                    messages.forEach(message => {
+                        // Check if this is an auto-fallback message (indicates search was broadened)
+                        const isFallbackMessage = message.includes('No contracts found') || message.includes('Showing nationwide') || message.includes('Showing all');
+                        const bgColor = isFallbackMessage ? 'bg-yellow-100 border-yellow-400' : 'bg-blue-100 border-blue-300';
+                        const textColor = isFallbackMessage ? 'text-yellow-900' : 'text-blue-900';
+                        const icon = isFallbackMessage ? '🔄' : 'ℹ️';
+                        const title = isFallbackMessage ? 'Search Auto-Adjusted' : 'Search Info';
+
+                        summaryHtml += `
+                            <div class="mt-3 p-3 ${bgColor} border rounded-lg">
+                                <p class="text-sm ${textColor}">
+                                    <strong>${icon} ${title}:</strong> ${message}
+                                </p>
+                            </div>
+                        `;
+                    });
+                }
+
+                summaryHtml += `</div>`;
+                insightsDiv.innerHTML = summaryHtml;
+            }
+
+            // Display search suggestions if available
+            if (result.suggestions && result.suggestions.alternatives && result.suggestions.alternatives.length > 0) {
+                // Store suggestions globally
+                currentSuggestions = result.suggestions.alternatives;
+
+                const suggestionsDiv = document.getElementById('suggestions-container');
+                if (suggestionsDiv) {
+                    suggestionsDiv.innerHTML = `
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6 mb-6">
+                            <h3 class="text-lg font-bold text-blue-900 mb-2">💡 Expand Your Search</h3>
+                            <p class="text-sm text-blue-800 mb-4">${result.suggestions.message}</p>
+                            <div class="space-y-3">
+                                ${result.suggestions.alternatives.map((alt, index) => `
+                                    <div class="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-400"
+                                         onclick="applySuggestion(${index})">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex-1">
+                                                <h4 class="font-semibold text-gray-900 mb-1">${alt.label}</h4>
+                                                <p class="text-sm text-gray-600">${alt.description}</p>
+                                            </div>
+                                            <div class="ml-4 text-right">
+                                                <p class="text-2xl font-bold text-green-600">~${alt.estimatedContracts.toLocaleString()}</p>
+                                                <p class="text-xs text-gray-500">contracts</p>
+                                            </div>
+                                        </div>
+                                        <button class="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+                                            Search with this option →
+                                        </button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    suggestionsDiv.classList.remove('hidden');
+                } else {
+                    console.warn('suggestions-container element not found');
+                }
+            } else {
+                const suggestionsDiv = document.getElementById('suggestions-container');
+                if (suggestionsDiv) {
+                    suggestionsDiv.classList.add('hidden');
+                }
+            }
+
+            // Display agencies in table format like SAM.gov
+            const postsContainer = document.getElementById('posts-container');
+            if (result.agencies && result.agencies.length > 0) {
+                // Check if any agencies have the noSetAsidesFound flag
+                const hasNoSetAsides = result.agencies.some(a => a.noSetAsidesFound);
+                
+                // Store agencies globally for modal access
+                window.currentAgencies = result.agencies;
+                
+                postsContainer.innerHTML = `
+                    <div class="bg-white rounded-xl shadow overflow-hidden">
+                        ${hasNoSetAsides ? `
+                        <div class="p-4 bg-yellow-50 border-l-4 border-yellow-400">
+                            <p class="text-sm text-yellow-800 font-semibold mb-2">⚠️ No set-aside contracts found</p>
+                            <p class="text-sm text-yellow-700">
+                                These offices award contracts in your NAICS category, but no ${result.searchCriteria.businessFormation || 'set-aside'} contracts were found in recent data. 
+                                They may still award ${result.searchCriteria.businessFormation || 'set-aside'} contracts - check SAM.gov for active opportunities.
+                            </p>
+                        </div>
+                        ` : ''}
+                        <p class="p-4 text-sm text-gray-700 bg-blue-50">
+                            <strong>📊 Market Research Guide:</strong> Contracting offices below are ranked by set-aside spending for ${result.searchCriteria.businessFormation ? result.searchCriteria.businessFormation.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') + ' businesses' : 'your business type'}${result.searchCriteria.veteranStatus && result.searchCriteria.veteranStatus !== 'not-applicable' ? ' (' + result.searchCriteria.veteranStatus.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') + ')' : ''}.
+                            Use the <strong>Contracting Office</strong> and <strong>Subagency</strong> columns to identify program needs and gaps.
+                            The <strong>Office ID</strong> can be searched on <a href="https://sam.gov" target="_blank" class="text-linkedin-blue underline font-semibold">SAM.gov</a> to find active opportunities.
+                        </p>
+                        <table class="w-full">
+                            <thead class="bg-gray-100 border-b-2 border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Agency ID</th>
+                                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Contracting Office</th>
+                                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Set-Aside Spending</th>
+                                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Total Spending</th>
+                                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Contracts</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                ${result.agencies.map((agency, index) => {
+                                    // Safely convert agencyId to string - handle objects
+                                    let agencyIdStr = 'N/A';
+                                    if (agency.agencyId) {
+                                        if (typeof agency.agencyId === 'string') {
+                                            agencyIdStr = agency.agencyId;
+                                        } else if (typeof agency.agencyId === 'object' && agency.agencyId._) {
+                                            agencyIdStr = String(agency.agencyId._);
+                                        } else {
+                                            try {
+                                                agencyIdStr = String(agency.agencyId);
+                                                if (agencyIdStr === '[object Object]') agencyIdStr = 'N/A';
+                                            } catch (e) {
+                                                agencyIdStr = 'N/A';
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Safely convert agencyName to string (this is the subagency)
+                                    let agencyNameStr = 'Unknown Office';
+                                    if (agency.agencyName) {
+                                        if (typeof agency.agencyName === 'string') {
+                                            agencyNameStr = agency.agencyName;
+                                        } else if (typeof agency.agencyName === 'object' && agency.agencyName._) {
+                                            agencyNameStr = String(agency.agencyName._);
+                                        } else {
+                                            try {
+                                                agencyNameStr = String(agency.agencyName);
+                                                if (agencyNameStr === '[object Object]') agencyNameStr = 'Unknown Office';
+                                            } catch (e) {
+                                                agencyNameStr = 'Unknown Office';
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Safely convert parentAgency to string (this is the parent agency)
+                                    let parentAgencyStr = agency.parentAgency || 'N/A';
+                                    if (parentAgencyStr !== 'N/A' && typeof parentAgencyStr !== 'string') {
+                                        try {
+                                            parentAgencyStr = String(parentAgencyStr);
+                                            if (parentAgencyStr === '[object Object]') parentAgencyStr = 'N/A';
+                                        } catch (e) {
+                                            parentAgencyStr = 'N/A';
+                                        }
+                                    }
+                                    
+                                    // Extract city and base location from primaryPlaceOfPerformance
+                                    let cityName = '';
+                                    let baseName = '';
+                                    if (agency.primaryPlaceOfPerformance) {
+                                        const place = agency.primaryPlaceOfPerformance;
+                                        cityName = place.city_name || '';
+                                        baseName = cityName;
+                                    }
+
+                                    // Display the sub-agency code as the Agency ID
+                                    // This code can be searched on SAM.gov to find active opportunities
+                                    let displayAgencyId = agency.searchableOfficeCode || agency.subAgencyCode || agency.agencyCode || agencyIdStr;
+                                    
+                                    // Create SAM.gov search URL using the contracting office name for better matching
+                                    const officeNameForSearch = encodeURIComponent(agencyNameStr);
+                                    const samSearchUrl = `https://sam.gov/search/?index=opp&page=1&pageSize=25&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&q=${officeNameForSearch}`;
+
+                                    return `
+                                    <tr class="hover:bg-blue-50 transition cursor-pointer office-row" 
+                                        onclick="showOfficeDetails(${index})"
+                                        style="cursor: pointer;">
+                                        <td class="px-6 py-4">
+                                            <a href="${samSearchUrl}"
+                                               target="_blank"
+                                               onclick="event.stopPropagation();"
+                                               class="text-linkedin-blue hover:underline font-semibold text-sm"
+                                               title="Search SAM.gov for opportunities from ${agencyNameStr}">
+                                                ${displayAgencyId}
+                                            </a>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="font-semibold text-sm text-gray-900">${agencyNameStr}</div>
+                                            ${baseName ? `<div class="text-xs text-gray-600 mt-1">${baseName}${agency.location ? `, ${agency.location}` : ''}</div>` : agency.location ? `<div class="text-xs text-gray-600 mt-1">📍 ${agency.location}</div>` : ''}
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <span class="text-sm font-bold ${agency.setAsideSpending > 0 ? 'text-green-600' : 'text-gray-400'}">
+                                                $${(agency.setAsideSpending / 1000000).toFixed(2)}M
+                                            </span>
+                                            ${agency.setAsideContractCount > 0 ? `<br><span class="text-xs text-gray-600">${agency.setAsideContractCount} contracts</span>` : ''}
+                                        </td>
+                                        <td class="px-6 py-4 text-sm font-semibold text-gray-600">$${(agency.totalSpending / 1000000).toFixed(2)}M</td>
+                                        <td class="px-6 py-4 text-sm text-gray-900">${agency.contractCount}</td>
+                                    </tr>
+                                `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else {
+                // Provide helpful guidance based on search criteria
+                const businessFormation = result.searchCriteria?.businessFormation || '';
+                const isHardFilter = businessFormation === 'women-owned' || businessFormation === 'hubzone';
+                
+                let guidanceHtml = '<div class="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6">';
+                guidanceHtml += '<h3 class="text-lg font-bold text-yellow-900 mb-3">No agencies found matching your criteria</h3>';
+                
+                if (isHardFilter) {
+                    guidanceHtml += '<p class="text-yellow-800 mb-3"><strong>Hard filter active:</strong> Only offices with matching set-asides are shown.</p>';
+                    guidanceHtml += '<ul class="list-disc list-inside text-yellow-800 space-y-2 mb-4">';
+                    guidanceHtml += '<li>Check if your NAICS code is eligible for ' + (businessFormation === 'women-owned' ? 'WOSB' : 'HUBZone') + ' set-asides</li>';
+                    guidanceHtml += '<li>Try removing geographic restrictions (zip code) to search nationwide</li>';
+                    guidanceHtml += '<li>Verify your NAICS code is correct (use 3-6 digit code)</li>';
+                    if (businessFormation === 'women-owned') {
+                        guidanceHtml += '<li>Top WOSB agencies: DoD, GSA, DHS, VA, DOE, NASA - try searching without location filter</li>';
+                    }
+                    guidanceHtml += '</ul>';
+                } else {
+                    guidanceHtml += '<ul class="list-disc list-inside text-yellow-800 space-y-2 mb-4">';
+                    guidanceHtml += '<li>Try adjusting your NAICS code or removing geographic restrictions</li>';
+                    guidanceHtml += '<li>Verify your search criteria are correct</li>';
+                    guidanceHtml += '<li>Some NAICS codes have limited contract activity</li>';
+                    guidanceHtml += '</ul>';
+                }
+                
+                guidanceHtml += '<p class="text-sm text-yellow-700 mt-4">Found ' + (result.summary?.totalAwards || 0) + ' contracts but no matching offices. This may indicate filtering is too restrictive.</p>';
+                guidanceHtml += '</div>';
+                
+                postsContainer.innerHTML = guidanceHtml;
+            }
+
+            results.classList.remove('hidden');
+        }
+
+        function formatSearchCriteria(criteria) {
+            const parts = [];
+            if (criteria.naicsCode) parts.push(`NAICS ${criteria.naicsCode}`);
+            if (criteria.businessFormation) parts.push(criteria.businessFormation.replace('-', ' '));
+            if (criteria.veteranStatus && criteria.veteranStatus !== 'not-applicable') parts.push(criteria.veteranStatus.replace('-', ' '));
+            if (criteria.goodsOrServices) parts.push(criteria.goodsOrServices);
+            if (criteria.zipCode) parts.push(`ZIP ${criteria.zipCode}`);
+            return parts.join(', ') || 'All contracts';
+        }
+
+        function copyPost(index) {
+            const post = window.generatedPosts[index];
+            if (post) {
+                navigator.clipboard.writeText(post.content).then(() => {
+                    alert('Post copied to clipboard!');
+                });
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Apply a search suggestion
+        function applySuggestion(index) {
+            const suggestion = currentSuggestions[index];
+            if (!suggestion) {
+                console.error('Invalid suggestion index:', index);
+                return;
+            }
+
+            console.log('Applying suggestion:', suggestion);
+
+            // Update form based on suggestion type
+            switch(suggestion.type) {
+                case 'set-aside':
+                    // Change business formation type
+                    document.getElementById('business-formation').value = suggestion.value;
+                    break;
+
+                case 'location':
+                    // Remove location filter for nationwide search
+                    if (suggestion.value === 'nationwide') {
+                        document.getElementById('zip-code').value = '';
+                    }
+                    break;
+
+                case 'naics-prefix':
+                    // Extract the 3-digit prefix from the suggestion value (format: "naics-prefix:236")
+                    // Update NAICS input to use this prefix
+                    const naicsInput = document.getElementById('naics-code');
+                    if (naicsInput && suggestion.value) {
+                        // Extract prefix from "naics-prefix:236" format
+                        const prefixMatch = suggestion.value.match(/naics-prefix:(\d+)/);
+                        if (prefixMatch && prefixMatch[1]) {
+                            naicsInput.value = prefixMatch[1];
+                            console.log('Updated NAICS code to prefix:', prefixMatch[1]);
+                        } else if (naicsInput.value.length >= 3) {
+                            // Fallback: extract from current input value
+                            const prefix = naicsInput.value.substring(0, 3);
+                            naicsInput.value = prefix;
+                        }
+                    }
+                    break;
+
+                case 'naics-setaside-nationwide':
+                    // Remove location filter - keep NAICS and business formation as-is
+                    console.log('Applying nationwide suggestion - removing zip code');
+                    console.log('Current NAICS:', document.getElementById('naics-code').value);
+                    console.log('Current Business Formation:', document.getElementById('business-formation').value);
+                    document.getElementById('zip-code').value = '';
+                    console.log('Zip code cleared for nationwide search');
+                    break;
+
+                case 'naics':
+                    // Remove NAICS filter
+                    if (suggestion.value === 'all') {
+                        document.getElementById('naics-code').value = '';
+                    }
+                    break;
+            }
+
+            // Scroll to top of page
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Trigger the search with updated form values
+            setTimeout(() => {
+                const submitBtn = document.getElementById('generate-btn');
+                if (submitBtn) {
+                    submitBtn.click();
+                } else {
+                    // Fallback: submit the form directly
+                    document.getElementById('test-form').requestSubmit();
+                }
+            }, 500);
+        }
+    </script>
+    
+    <!-- Office Details Modal -->
+    <div id="office-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-gray-900" id="modal-office-name">Contracting Office Details</h2>
+                <button onclick="closeOfficeModal()" class="text-gray-400 hover:text-gray-600 text-3xl font-bold">&times;</button>
+            </div>
+            <div class="p-6" id="modal-content">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showOfficeDetails(agencyIndex) {
+            const agency = window.currentAgencies[agencyIndex];
+            if (!agency) return;
+            
+            const modal = document.getElementById('office-modal');
+            const modalOfficeName = document.getElementById('modal-office-name');
+            const modalContent = document.getElementById('modal-content');
+            
+            // Format agency data for display
+            const setAsidePercent = agency.totalSpending > 0 ? 
+                ((agency.setAsideSpending / agency.totalSpending) * 100).toFixed(1) : 0;
+            
+            // Extract city/base from primaryPlaceOfPerformance if available
+            let cityName = '';
+            let baseName = '';
+            if (agency.primaryPlaceOfPerformance) {
+                const place = agency.primaryPlaceOfPerformance;
+                if (typeof place === 'object') {
+                    cityName = place.city_name || '';
+                    baseName = cityName;
+                }
+            }
+            
+            const locationDisplay = [
+                cityName || baseName || agency.city || '',
+                agency.location || ''
+            ].filter(Boolean).join(', ') || 'Location not specified';
+            
+            // Build website search URLs
+            const officeNameForSearch = encodeURIComponent(agency.agencyName);
+            const samUrl = `https://sam.gov/search/?index=opp&page=1&pageSize=25&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&q=${officeNameForSearch}`;
+            
+            // Map specific contracting offices/sub-agencies to their websites
+            // Prioritize command/branch level over agency level
+            let officeWebsiteUrl = null;
+            let displayOfficeName = agency.agencyName || 'Contracting Office'; // Default display name
+            
+            // Combine office names and location for searching
+            const officeName = (agency.agencyName || '').toLowerCase();
+            const contractingOffice = (agency.contractingOffice || '').toLowerCase();
+            const location = (agency.location || '').toLowerCase();
+            const city = (cityName || baseName || agency.city || '').toLowerCase();
+            const combinedSearch = `${officeName} ${contractingOffice} ${location} ${city}`;
+            
+            // FIRST PRIORITY: Use contractingOffice field directly if it contains SPECIFIC command/office names
+            // Check if it's more specific than just generic terms like "USACE" or "Department of..."
+            const contractOfficeLower = (contractingOffice || '').trim().toLowerCase();
+            const isGenericTerm = contractOfficeLower === 'usace' || 
+                                  contractOfficeLower.startsWith('department of the navy') ||
+                                  contractOfficeLower.startsWith('department of navy') ||
+                                  contractOfficeLower.startsWith('department of the army') ||
+                                  contractOfficeLower.startsWith('department of army') ||
+                                  contractOfficeLower.startsWith('department of the air force') ||
+                                  contractOfficeLower.startsWith('department of air force');
+            
+            // If contractingOffice contains a SPECIFIC command/office name (not just generic), use it directly
+            // This automatically handles NAVSEA, NAVWAR, NAVAIR, NAVFAC commands, specific USACE districts, etc.
+            const hasSpecificCommandName = !isGenericTerm && contractOfficeLower.length > 5 && (
+                contractOfficeLower.includes('navfac') || 
+                contractOfficeLower.includes('navsea') ||
+                contractOfficeLower.includes('navwar') ||
+                contractOfficeLower.includes('navair') ||
+                contractOfficeLower.includes('navsup') ||
+                // For USACE, only use directly if it mentions a specific district
+                (contractOfficeLower.includes('usace') && (contractOfficeLower.includes('district') || contractOfficeLower.includes('fort worth') || contractOfficeLower.includes('mobile') || contractOfficeLower.includes('omaha') || contractOfficeLower.includes('memphis') || contractOfficeLower.includes('norfolk') || contractOfficeLower.includes('louisville') || contractOfficeLower.includes('sacramento') || contractOfficeLower.includes('baltimore') || contractOfficeLower.includes('vicksburg') || contractOfficeLower.includes('charleston'))) ||
+                // For Army Corps, only if it mentions a specific district
+                (contractOfficeLower.includes('army corps') && contractOfficeLower.includes('district')) ||
+                contractOfficeLower.includes('army engineer district') ||
+                contractOfficeLower.includes('army contracting command') ||
+                contractOfficeLower.includes('acc') ||
+                contractOfficeLower.includes('afmc') ||
+                contractOfficeLower.includes('afsc') ||
+                contractOfficeLower.includes('enterprise sourcing') ||
+                contractOfficeLower.includes('installation contracting') ||
+                contractOfficeLower.includes('defense health agency') ||
+                contractOfficeLower.includes('dha') ||
+                contractOfficeLower.includes('cbp') ||
+                contractOfficeLower.includes('customs and border') ||
+                contractOfficeLower.includes('gsa') ||
+                contractOfficeLower.includes('general services')
+            );
+            
+            // If contractingOffice already has a specific command name (not generic), use it directly
+            if (hasSpecificCommandName && agency.contractingOffice) {
+                displayOfficeName = agency.contractingOffice;
+            }
+            
+            
+            // Pattern-based matching for command/branch level offices (priority order)
+            // NAVFAC (Navy Facilities Engineering Command)
+            if (combinedSearch.includes('navfac') || combinedSearch.includes('naval facilities engineering')) {
+                if (combinedSearch.includes('midwest') || combinedSearch.includes('great lakes') || combinedSearch.includes('illinois') || combinedSearch.includes(' il ')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_midwest.html';
+                    displayOfficeName = 'NAVFAC Midwest';
+                } else if (combinedSearch.includes('mid-atlantic') || combinedSearch.includes('mid atlantic')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_mid-atlantic.html';
+                    displayOfficeName = 'NAVFAC Mid-Atlantic';
+                } else if (combinedSearch.includes('atlantic')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_atlantic.html';
+                    displayOfficeName = 'NAVFAC Atlantic';
+                } else if (combinedSearch.includes('pacific')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_pacific.html';
+                    displayOfficeName = 'NAVFAC Pacific';
+                } else if (combinedSearch.includes('northwest')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_northwest.html';
+                    displayOfficeName = 'NAVFAC Northwest';
+                } else if (combinedSearch.includes('southeast')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_southeast.html';
+                    displayOfficeName = 'NAVFAC Southeast';
+                } else if (combinedSearch.includes('southwest')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_southwest.html';
+                    displayOfficeName = 'NAVFAC Southwest';
+                } else {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil';
+                    displayOfficeName = 'NAVFAC';
+                }
+            }
+            // USACE (Army Corps of Engineers) - use location to determine specific district
+            // Only do location-based inference if we don't already have a specific district name
+            if (!hasSpecificCommandName && (combinedSearch.includes('usace') || combinedSearch.includes('army corps') || combinedSearch.includes('army engineer') || contractOfficeLower === 'usace')) {
+                if (combinedSearch.includes('columbia') || combinedSearch.includes('south carolina') || combinedSearch.includes(' sc') || combinedSearch.includes('sc ') || combinedSearch.includes(',sc')) {
+                    officeWebsiteUrl = 'https://www.sac.usace.army.mil';
+                    displayOfficeName = 'USACE Charleston District';
+                } else if (combinedSearch.includes('memphis') || combinedSearch.includes('tn') || combinedSearch.includes('tennessee') || combinedSearch.includes('millington')) {
+                    officeWebsiteUrl = 'https://www.mvm.usace.army.mil';
+                    displayOfficeName = 'USACE Memphis District';
+                } else if (combinedSearch.includes('fort worth') || (combinedSearch.includes('dallas') && combinedSearch.includes('tx'))) {
+                    officeWebsiteUrl = 'https://www.swf.usace.army.mil';
+                    displayOfficeName = 'USACE Fort Worth District';
+                } else if (combinedSearch.includes('mobile') || (combinedSearch.includes('alabama') && combinedSearch.includes(' al'))) {
+                    officeWebsiteUrl = 'https://www.sam.usace.army.mil';
+                    displayOfficeName = 'USACE Mobile District';
+                } else if (combinedSearch.includes('omaha') || (combinedSearch.includes('nebraska') && combinedSearch.includes(' ne'))) {
+                    officeWebsiteUrl = 'https://www.nwo.usace.army.mil';
+                    displayOfficeName = 'USACE Omaha District';
+                } else if (combinedSearch.includes('louisville') || (combinedSearch.includes('kentucky') && combinedSearch.includes(' ky'))) {
+                    officeWebsiteUrl = 'https://www.lrl.usace.army.mil';
+                    displayOfficeName = 'USACE Louisville District';
+                } else if (combinedSearch.includes('norfolk') || (combinedSearch.includes('virginia') && combinedSearch.includes(' va') && !combinedSearch.includes('vicksburg'))) {
+                    officeWebsiteUrl = 'https://www.nao.usace.army.mil';
+                    displayOfficeName = 'USACE Norfolk District';
+                } else if (combinedSearch.includes('sacramento') || (combinedSearch.includes('california') && combinedSearch.includes(' ca') && combinedSearch.includes('sacramento'))) {
+                    officeWebsiteUrl = 'https://www.spk.usace.army.mil';
+                    displayOfficeName = 'USACE Sacramento District';
+                } else if (combinedSearch.includes('baltimore') || (combinedSearch.includes('maryland') && combinedSearch.includes(' md'))) {
+                    officeWebsiteUrl = 'https://www.nab.usace.army.mil';
+                    displayOfficeName = 'USACE Baltimore District';
+                } else if (combinedSearch.includes('vicksburg') || (combinedSearch.includes('mississippi') && combinedSearch.includes(' ms'))) {
+                    officeWebsiteUrl = 'https://www.mvk.usace.army.mil';
+                    displayOfficeName = 'USACE Vicksburg District';
+                } else if (combinedSearch.includes('huntsville') || combinedSearch.includes('support center') || combinedSearch.includes('engineering and support')) {
+                    officeWebsiteUrl = 'https://www.hnd.usace.army.mil';
+                    displayOfficeName = 'USACE Engineering and Support Center';
+                } else {
+                    officeWebsiteUrl = 'https://www.usace.army.mil';
+                    if (!hasSpecificCommandName) {
+                        displayOfficeName = 'USACE';
+                    }
+                }
+            }
+            // Army Contracting Command (ACC)
+            else if (combinedSearch.includes('army contracting command') || combinedSearch.includes(' acc ') || 
+                     (combinedSearch.includes('acc-') && !combinedSearch.includes('accord'))) {
+                officeWebsiteUrl = 'https://www.acc.army.mil';
+                displayOfficeName = 'Army Contracting Command (ACC)';
+            }
+            // NAVSUP (Navy Supply Systems Command)
+            else if (combinedSearch.includes('navsup') || combinedSearch.includes('naval supply')) {
+                officeWebsiteUrl = 'https://www.navsup.navy.mil';
+                displayOfficeName = 'NAVSUP';
+            }
+            // Department of the Navy - use location to determine specific command
+            else if (combinedSearch.includes('department of the navy') || combinedSearch.includes('department of navy')) {
+                // Use location to infer specific NAVFAC or Navy command
+                if (combinedSearch.includes('great lakes') || combinedSearch.includes('illinois') || combinedSearch.includes(' il ')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_midwest.html';
+                    displayOfficeName = 'NAVFAC Midwest';
+                } else if (combinedSearch.includes('jacksonville') || combinedSearch.includes('florida') || combinedSearch.includes(' fl')) {
+                    // Jacksonville, FL is NAVFAC Southeast area
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_southeast.html';
+                    displayOfficeName = 'NAVFAC Southeast';
+                } else if (combinedSearch.includes('norfolk') || combinedSearch.includes('virginia') || combinedSearch.includes(' va')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_mid-atlantic.html';
+                    displayOfficeName = 'NAVFAC Mid-Atlantic';
+                } else if (combinedSearch.includes('san diego') || combinedSearch.includes('california') || combinedSearch.includes(' ca')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_southwest.html';
+                    displayOfficeName = 'NAVFAC Southwest';
+                } else if (combinedSearch.includes('pearl harbor') || combinedSearch.includes('hawaii')) {
+                    officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_pacific.html';
+                    displayOfficeName = 'NAVFAC Pacific';
+                } else {
+                    // Generic Navy link
+                    officeWebsiteUrl = 'https://www.navy.mil';
+                    // Keep original name for generic Navy
+                }
+            }
+            // Department of the Army - use location to determine USACE district
+            else if (combinedSearch.includes('department of the army') || combinedSearch.includes('department of army')) {
+                // Use location to infer USACE district
+                if (combinedSearch.includes('tennessee') || combinedSearch.includes(' tn') || combinedSearch.includes('millington') || combinedSearch.includes('memphis')) {
+                    officeWebsiteUrl = 'https://www.mvm.usace.army.mil';
+                    displayOfficeName = 'USACE Memphis District';
+                } else if (combinedSearch.includes('texas') || combinedSearch.includes(' tx') || combinedSearch.includes('dallas') || combinedSearch.includes('fort worth')) {
+                    officeWebsiteUrl = 'https://www.swf.usace.army.mil';
+                    displayOfficeName = 'USACE Fort Worth District';
+                } else if (combinedSearch.includes('alabama') || combinedSearch.includes(' al') || combinedSearch.includes('mobile')) {
+                    officeWebsiteUrl = 'https://www.sam.usace.army.mil';
+                    displayOfficeName = 'USACE Mobile District';
+                } else if (combinedSearch.includes('nebraska') || combinedSearch.includes(' ne') || combinedSearch.includes('omaha')) {
+                    officeWebsiteUrl = 'https://www.nwo.usace.army.mil';
+                    displayOfficeName = 'USACE Omaha District';
+                } else if (combinedSearch.includes('kentucky') || combinedSearch.includes(' ky') || combinedSearch.includes('louisville')) {
+                    officeWebsiteUrl = 'https://www.lrl.usace.army.mil';
+                    displayOfficeName = 'USACE Louisville District';
+                } else if (combinedSearch.includes('virginia') || (combinedSearch.includes(' va') && !combinedSearch.includes('vicksburg')) || combinedSearch.includes('norfolk')) {
+                    officeWebsiteUrl = 'https://www.nao.usace.army.mil';
+                    displayOfficeName = 'USACE Norfolk District';
+                } else if (combinedSearch.includes('california') || combinedSearch.includes(' ca') || combinedSearch.includes('sacramento')) {
+                    officeWebsiteUrl = 'https://www.spk.usace.army.mil';
+                    displayOfficeName = 'USACE Sacramento District';
+                } else if (combinedSearch.includes('mississippi') || combinedSearch.includes(' ms') || combinedSearch.includes('vicksburg')) {
+                    officeWebsiteUrl = 'https://www.mvk.usace.army.mil';
+                    displayOfficeName = 'USACE Vicksburg District';
+                } else if (combinedSearch.includes('maryland') || combinedSearch.includes(' md') || combinedSearch.includes('baltimore')) {
+                    officeWebsiteUrl = 'https://www.nab.usace.army.mil';
+                    displayOfficeName = 'USACE Baltimore District';
+                } else {
+                    // Generic USACE link
+                    officeWebsiteUrl = 'https://www.usace.army.mil';
+                    displayOfficeName = 'USACE';
+                }
+            }
+            // Check contracting office name for specific Air Force commands/offices first (before generic "Department")
+            // This catches offices like "772 Enterprise Sourcing Squadron" even when parent is "Department of the Air Force"
+            if (contractingOffice && contractingOffice.length > 0) {
+                if (combinedSearch.includes('enterprise sourcing squadron') || combinedSearch.includes('772 ess') || combinedSearch.includes('772 enterprise') || contractingOffice.includes('772')) {
+                    officeWebsiteUrl = 'https://www.wpafb.af.mil';
+                    displayOfficeName = '772 Enterprise Sourcing Squadron';
+                } else if (combinedSearch.includes('installation contracting') || contractingOffice.includes('installation contracting')) {
+                    officeWebsiteUrl = 'https://www.af.mil';
+                    displayOfficeName = 'Air Force Installation Contracting Agency';
+                } else if (combinedSearch.includes('air force materiel command') || combinedSearch.includes('afmc') || contractingOffice.includes('AFMC') || contractingOffice.includes('Materiel Command')) {
+                    officeWebsiteUrl = 'https://www.afmc.af.mil';
+                    displayOfficeName = 'Air Force Materiel Command (AFMC)';
+                } else if (combinedSearch.includes('air force sustainment') || combinedSearch.includes('afsc') || contractingOffice.includes('AFSC') || contractingOffice.includes('Sustainment Center')) {
+                    if (combinedSearch.includes('hill') || contractingOffice.includes('Hill')) {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center - Hill AFB';
+                    } else if (combinedSearch.includes('tinker') || contractingOffice.includes('Tinker')) {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center - Tinker AFB';
+                    } else if (combinedSearch.includes('robins') || contractingOffice.includes('Robins')) {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center - Robins AFB';
+                    } else if (combinedSearch.includes('maxwell') || contractingOffice.includes('Maxwell')) {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center - Maxwell AFB';
+                    } else {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center (AFSC)';
+                    }
+                }
+            }
+            
+            // Air Force Materiel Command
+            if (!officeWebsiteUrl && (combinedSearch.includes('air force materiel command') || combinedSearch.includes('afmc'))) {
+                officeWebsiteUrl = 'https://www.afmc.af.mil';
+                displayOfficeName = 'Air Force Materiel Command (AFMC)';
+            }
+            // Air Force Sustainment Center
+            if (!officeWebsiteUrl && (combinedSearch.includes('air force sustainment') || combinedSearch.includes('afsc'))) {
+                if (combinedSearch.includes('hill')) {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center - Hill AFB';
+                } else if (combinedSearch.includes('tinker')) {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center - Tinker AFB';
+                } else if (combinedSearch.includes('robins')) {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center - Robins AFB';
+                } else if (combinedSearch.includes('maxwell')) {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center - Maxwell AFB';
+                } else {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center (AFSC)';
+                }
+            }
+            // Air Force Enterprise Sourcing Squadron / 772 ESS
+            if (!officeWebsiteUrl && (combinedSearch.includes('enterprise sourcing squadron') || combinedSearch.includes('772 ess') || combinedSearch.includes('772 enterprise'))) {
+                officeWebsiteUrl = 'https://www.wpafb.af.mil';
+                displayOfficeName = '772 Enterprise Sourcing Squadron';
+            }
+            // Department of the Air Force - use location/keywords to determine specific command/office
+            else if (!officeWebsiteUrl && (combinedSearch.includes('department of the air force') || combinedSearch.includes('department of air force'))) {
+                if (combinedSearch.includes('wright-patterson') || combinedSearch.includes('wpafb') || combinedSearch.includes('wright patterson') || combinedSearch.includes('ohio') || combinedSearch.includes(' oh')) {
+                    if (combinedSearch.includes('enterprise sourcing') || combinedSearch.includes('772')) {
+                        officeWebsiteUrl = 'https://www.wpafb.af.mil';
+                        displayOfficeName = '772 Enterprise Sourcing Squadron';
+                    } else {
+                        officeWebsiteUrl = 'https://www.afmc.af.mil';
+                        displayOfficeName = 'Air Force Materiel Command (AFMC)';
+                    }
+                } else if (combinedSearch.includes('maxwell') || combinedSearch.includes('maxwell afb')) {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center - Maxwell AFB';
+                } else if (combinedSearch.includes('hill afb') || combinedSearch.includes('hill air force base') || combinedSearch.includes('utah') || combinedSearch.includes(' ut')) {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center - Hill AFB';
+                } else if (combinedSearch.includes('tinker') || combinedSearch.includes('tinker afb') || combinedSearch.includes('oklahoma') || combinedSearch.includes(' ok')) {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center - Tinker AFB';
+                } else if (combinedSearch.includes('robins') || combinedSearch.includes('robins afb') || combinedSearch.includes('georgia') || combinedSearch.includes(' ga')) {
+                    officeWebsiteUrl = 'https://www.afsc.af.mil';
+                    displayOfficeName = 'Air Force Sustainment Center - Robins AFB';
+                } else {
+                    officeWebsiteUrl = 'https://www.af.mil';
+                    displayOfficeName = 'Department of the Air Force';
+                }
+            }
+            // Defense Health Agency
+            else if (combinedSearch.includes('defense health agency') || combinedSearch.includes('dha')) {
+                officeWebsiteUrl = 'https://www.health.mil/About-MHS/OASDHA/Defense-Health-Agency';
+                displayOfficeName = 'Defense Health Agency (DHA)';
+            }
+            // GSA (General Services Administration)
+            else if (combinedSearch.includes('general services administration') || combinedSearch.includes(' gsa ')) {
+                officeWebsiteUrl = 'https://www.gsa.gov';
+                displayOfficeName = 'General Services Administration (GSA)';
+            }
+            // VA Office of Acquisition
+            else if (combinedSearch.includes('veterans affairs') && combinedSearch.includes('acquisition')) {
+                officeWebsiteUrl = 'https://www.va.gov/oca';
+                displayOfficeName = 'VA Office of Acquisition';
+            }
+            // Department of Veterans Affairs
+            else if (combinedSearch.includes('department of veterans affairs') || combinedSearch.includes('department of va')) {
+                officeWebsiteUrl = 'https://www.va.gov/oca';
+                displayOfficeName = 'Department of Veterans Affairs';
+            }
+            // CBP (Customs and Border Protection)
+            else if (combinedSearch.includes('customs and border protection') || combinedSearch.includes(' cbp ')) {
+                officeWebsiteUrl = 'https://www.cbp.gov';
+                displayOfficeName = 'U.S. Customs and Border Protection (CBP)';
+            }
+            // Department of Homeland Security
+            else if (combinedSearch.includes('department of homeland security') || combinedSearch.includes('dhs')) {
+                officeWebsiteUrl = 'https://www.dhs.gov';
+                displayOfficeName = 'Department of Homeland Security (DHS)';
+            }
+            // NASA
+            else if (combinedSearch.includes('nasa') || combinedSearch.includes('national aeronautics')) {
+                officeWebsiteUrl = 'https://www.nasa.gov';
+                displayOfficeName = 'NASA';
+            }
+            // Department of Energy
+            else if (combinedSearch.includes('department of energy') || combinedSearch.includes('doe')) {
+                officeWebsiteUrl = 'https://www.energy.gov';
+                displayOfficeName = 'Department of Energy (DOE)';
+            }
+            // Department of Commerce
+            else if (combinedSearch.includes('department of commerce') || combinedSearch.includes('doc')) {
+                officeWebsiteUrl = 'https://www.commerce.gov';
+                displayOfficeName = 'Department of Commerce';
+            }
+            // Department of Transportation
+            else if (combinedSearch.includes('department of transportation') || combinedSearch.includes('dot')) {
+                officeWebsiteUrl = 'https://www.transportation.gov';
+                displayOfficeName = 'Department of Transportation (DOT)';
+            }
+            // Department of Health and Human Services
+            else if (combinedSearch.includes('department of health and human services') || combinedSearch.includes('hhs')) {
+                officeWebsiteUrl = 'https://www.hhs.gov';
+                displayOfficeName = 'Department of Health and Human Services (HHS)';
+            }
+            
+            // If no match found, try sub-agency code mapping with location awareness
+            if (!officeWebsiteUrl && agency.subAgencyCode) {
+                const code = agency.subAgencyCode;
+                
+                // Navy (1700) - use location to determine NAVFAC command
+                if (code === '1700' || code.startsWith('17')) {
+                    if (combinedSearch.includes('great lakes') || combinedSearch.includes('illinois') || combinedSearch.includes(' il ')) {
+                        officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_midwest.html';
+                        displayOfficeName = 'NAVFAC Midwest';
+                    } else if (combinedSearch.includes('jacksonville') || combinedSearch.includes('florida') || combinedSearch.includes(' fl')) {
+                        officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_southeast.html';
+                        displayOfficeName = 'NAVFAC Southeast';
+                    } else if (combinedSearch.includes('norfolk') || combinedSearch.includes('virginia') || combinedSearch.includes(' va')) {
+                        officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_mid-atlantic.html';
+                        displayOfficeName = 'NAVFAC Mid-Atlantic';
+                    } else if (combinedSearch.includes('san diego') || (combinedSearch.includes('california') && !combinedSearch.includes('sacramento')) || combinedSearch.includes(' ca')) {
+                        officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_southwest.html';
+                        displayOfficeName = 'NAVFAC Southwest';
+                    } else if (combinedSearch.includes('pearl harbor') || combinedSearch.includes('hawaii')) {
+                        officeWebsiteUrl = 'https://www.navfac.navy.mil/navfac_worldwide/specialty_centers/navfac_pacific.html';
+                        displayOfficeName = 'NAVFAC Pacific';
+                    } else {
+                        // Default to NAVFAC main site for Navy
+                        officeWebsiteUrl = 'https://www.navfac.navy.mil';
+                        displayOfficeName = 'NAVFAC';
+                    }
+                }
+                // Army (2100) - use location to determine USACE district
+                else if (code === '2100' || code.startsWith('21')) {
+                    if (!hasSpecificCommandName) {
+                        if (combinedSearch.includes('columbia') || combinedSearch.includes('south carolina') || combinedSearch.includes(' sc') || combinedSearch.includes('sc ') || combinedSearch.includes(',sc')) {
+                            officeWebsiteUrl = 'https://www.sac.usace.army.mil';
+                            displayOfficeName = 'USACE Charleston District';
+                        } else if (combinedSearch.includes('tennessee') || combinedSearch.includes(' tn') || combinedSearch.includes('millington') || combinedSearch.includes('memphis')) {
+                            officeWebsiteUrl = 'https://www.mvm.usace.army.mil';
+                            displayOfficeName = 'USACE Memphis District';
+                        } else if (combinedSearch.includes('texas') || combinedSearch.includes(' tx') || combinedSearch.includes('fort worth') || combinedSearch.includes('dallas')) {
+                            officeWebsiteUrl = 'https://www.swf.usace.army.mil';
+                            displayOfficeName = 'USACE Fort Worth District';
+                        } else if (combinedSearch.includes('alabama') || combinedSearch.includes(' al') || combinedSearch.includes('mobile')) {
+                            officeWebsiteUrl = 'https://www.sam.usace.army.mil';
+                            displayOfficeName = 'USACE Mobile District';
+                        } else if (combinedSearch.includes('nebraska') || combinedSearch.includes(' ne') || combinedSearch.includes('omaha')) {
+                            officeWebsiteUrl = 'https://www.nwo.usace.army.mil';
+                            displayOfficeName = 'USACE Omaha District';
+                        } else if (combinedSearch.includes('kentucky') || combinedSearch.includes(' ky') || combinedSearch.includes('louisville')) {
+                            officeWebsiteUrl = 'https://www.lrl.usace.army.mil';
+                            displayOfficeName = 'USACE Louisville District';
+                        } else if (combinedSearch.includes('virginia') || (combinedSearch.includes(' va') && !combinedSearch.includes('vicksburg')) || combinedSearch.includes('norfolk')) {
+                            officeWebsiteUrl = 'https://www.nao.usace.army.mil';
+                            displayOfficeName = 'USACE Norfolk District';
+                        } else if (combinedSearch.includes('california') || combinedSearch.includes(' ca') || combinedSearch.includes('sacramento')) {
+                            officeWebsiteUrl = 'https://www.spk.usace.army.mil';
+                            displayOfficeName = 'USACE Sacramento District';
+                        } else if (combinedSearch.includes('mississippi') || combinedSearch.includes(' ms') || combinedSearch.includes('vicksburg')) {
+                            officeWebsiteUrl = 'https://www.mvk.usace.army.mil';
+                            displayOfficeName = 'USACE Vicksburg District';
+                        } else if (combinedSearch.includes('maryland') || combinedSearch.includes(' md') || combinedSearch.includes('baltimore')) {
+                            officeWebsiteUrl = 'https://www.nab.usace.army.mil';
+                            displayOfficeName = 'USACE Baltimore District';
+                        } else {
+                            // Default to USACE main site for Army
+                            officeWebsiteUrl = 'https://www.usace.army.mil';
+                            displayOfficeName = 'USACE';
+                        }
+                    }
+                }
+                // Air Force (5700) - use location/keywords to determine specific command/office
+                else if (code === '5700' || code.startsWith('57')) {
+                    // Check contracting office name first for specific commands
+                    if (contractingOffice && (contractingOffice.includes('772') || contractingOffice.includes('Enterprise Sourcing'))) {
+                        officeWebsiteUrl = 'https://www.wpafb.af.mil';
+                        displayOfficeName = '772 Enterprise Sourcing Squadron';
+                    } else if (contractingOffice && (contractingOffice.includes('Installation Contracting') || contractingOffice.includes('IC'))) {
+                        officeWebsiteUrl = 'https://www.af.mil';
+                        displayOfficeName = 'Air Force Installation Contracting Agency';
+                    } else if (combinedSearch.includes('wright-patterson') || combinedSearch.includes('wpafb') || combinedSearch.includes('wright patterson') || combinedSearch.includes('ohio') || combinedSearch.includes(' oh')) {
+                        if (combinedSearch.includes('enterprise sourcing') || combinedSearch.includes('772')) {
+                            officeWebsiteUrl = 'https://www.wpafb.af.mil';
+                            displayOfficeName = '772 Enterprise Sourcing Squadron';
+                        } else {
+                            officeWebsiteUrl = 'https://www.afmc.af.mil';
+                            displayOfficeName = 'Air Force Materiel Command (AFMC)';
+                        }
+                    } else if (combinedSearch.includes('maxwell') || combinedSearch.includes('maxwell afb') || combinedSearch.includes('alabama') || combinedSearch.includes(' al')) {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center - Maxwell AFB';
+                    } else if (combinedSearch.includes('hill afb') || combinedSearch.includes('hill air force base') || combinedSearch.includes('utah') || combinedSearch.includes(' ut')) {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center - Hill AFB';
+                    } else if (combinedSearch.includes('tinker') || combinedSearch.includes('tinker afb') || combinedSearch.includes('oklahoma') || combinedSearch.includes(' ok')) {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center - Tinker AFB';
+                    } else if (combinedSearch.includes('robins') || combinedSearch.includes('robins afb') || combinedSearch.includes('georgia') || combinedSearch.includes(' ga')) {
+                        officeWebsiteUrl = 'https://www.afsc.af.mil';
+                        displayOfficeName = 'Air Force Sustainment Center - Robins AFB';
+                    } else {
+                        officeWebsiteUrl = 'https://www.af.mil';
+                        displayOfficeName = 'Department of the Air Force';
+                    }
+                }
+                // Department of Defense (9700)
+                else if (code === '9700' || code.startsWith('97')) {
+                    officeWebsiteUrl = 'https://www.defense.gov';
+                    displayOfficeName = 'Department of Defense';
+                }
+                // Department of Veterans Affairs (3600)
+                else if (code === '3600' || code.startsWith('36')) {
+                    officeWebsiteUrl = 'https://www.va.gov/oca';
+                    displayOfficeName = 'Department of Veterans Affairs';
+                }
+                // Department of Energy (8900)
+                else if (code === '8900' || code.startsWith('89')) {
+                    officeWebsiteUrl = 'https://www.energy.gov';
+                    displayOfficeName = 'Department of Energy (DOE)';
+                }
+                // General Services Administration (4700)
+                else if (code === '4700' || code.startsWith('47')) {
+                    officeWebsiteUrl = 'https://www.gsa.gov';
+                    displayOfficeName = 'General Services Administration (GSA)';
+                }
+                // Department of Homeland Security (7000)
+                else if (code === '7000' || code.startsWith('70')) {
+                    officeWebsiteUrl = 'https://www.dhs.gov';
+                    displayOfficeName = 'Department of Homeland Security (DHS)';
+                }
+                // NASA (8000)
+                else if (code === '8000' || code.startsWith('80')) {
+                    officeWebsiteUrl = 'https://www.nasa.gov';
+                    displayOfficeName = 'NASA';
+                }
+                // Other agencies (fallback to generic)
+                else {
+                    const subAgencyCodeMap = {
+                        '9700': 'https://www.defense.gov', // Department of Defense
+                    };
+                    
+                    if (subAgencyCodeMap[code]) {
+                        officeWebsiteUrl = subAgencyCodeMap[code];
+                        displayOfficeName = 'Department of Defense';
+                    }
+                }
+            }
+            
+            modalOfficeName.textContent = displayOfficeName || agency.agencyName || 'Contracting Office';
+
+            // Store agency info for pain points loading
+            window.currentModalAgency = {
+                officeName: displayOfficeName || agency.agencyName,
+                parentAgency: agency.parentAgency,
+                location: agency.location || agency.city || ''
+            };
+            
+            modalContent.innerHTML = `
+                <div class="space-y-6">
+                    <!-- Key Statistics -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <div class="text-sm text-gray-600 mb-1">Set-Aside Spending</div>
+                            <div class="text-2xl font-bold text-blue-600">$${(agency.setAsideSpending / 1000000).toFixed(2)}M</div>
+                            <div class="text-xs text-gray-500 mt-1">${agency.setAsideContractCount || 0} contracts</div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="text-sm text-gray-600 mb-1">Total Spending</div>
+                            <div class="text-2xl font-bold text-gray-700">$${(agency.totalSpending / 1000000).toFixed(2)}M</div>
+                            <div class="text-xs text-gray-500 mt-1">${agency.contractCount || 0} contracts</div>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <div class="text-sm text-gray-600 mb-1">Set-Aside %</div>
+                            <div class="text-2xl font-bold text-green-600">${setAsidePercent}%</div>
+                            <div class="text-xs text-gray-500 mt-1">of total spending</div>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-4">
+                            <div class="text-sm text-gray-600 mb-1">Agency ID</div>
+                            <div class="text-xl font-bold text-purple-600">${agency.searchableOfficeCode || agency.subAgencyCode || agency.agencyCode || 'N/A'}</div>
+                            <div class="text-xs text-gray-500 mt-1">Agency ID</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Office Information -->
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Office Information</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-sm text-gray-600">Contracting Office</div>
+                                <div class="text-base font-semibold text-gray-900">${displayOfficeName || agency.agencyName || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-600">Parent Agency</div>
+                                <div class="text-base font-semibold text-gray-900">${agency.parentAgency || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <div class="text-sm text-gray-600">Location</div>
+                                <div class="text-base text-gray-900">${locationDisplay}</div>
+                            </div>
+                            ${agency.contractingOffice && agency.contractingOffice !== agency.agencyName && agency.contractingOffice !== 'null' && agency.contractingOffice !== null ? `
+                            <div>
+                                <div class="text-sm text-gray-600">Office Detail</div>
+                                <div class="text-base text-gray-900">${agency.contractingOffice}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Links -->
+                    <div class="bg-blue-50 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Market Research Links</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <a href="${samUrl}" target="_blank" class="flex items-center justify-between bg-white rounded-lg p-4 hover:bg-blue-100 transition border border-blue-200">
+                                <div>
+                                    <div class="font-semibold text-gray-900">SAM.gov Opportunities</div>
+                                    <div class="text-sm text-gray-600">Search active contracts</div>
+                                </div>
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                </svg>
+                            </a>
+                            ${officeWebsiteUrl ? `
+                            <a href="${officeWebsiteUrl}" target="_blank" class="flex items-center justify-between bg-white rounded-lg p-4 hover:bg-blue-100 transition border border-blue-200">
+                                <div>
+                                    <div class="font-semibold text-gray-900">Office Website</div>
+                                    <div class="text-sm text-gray-600">${displayOfficeName || agency.agencyName || agency.contractingOffice || 'Learn more'}</div>
+                                </div>
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                </svg>
+                            </a>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- Bonus: Agency Pain Points -->
+                    <div class="bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-500 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-purple-900 mb-3">🎯 Bonus: Agency Priorities & Pain Points</h3>
+                        <div id="pain-points-content" class="space-y-2">
+                            <p class="text-sm text-purple-800">Loading agency insights...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Market Research Tips -->
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-yellow-900 mb-3">💡 Market Research Tips</h3>
+                        <ul class="space-y-2 text-sm text-yellow-800">
+                            <li>• Check SAM.gov for active opportunities from this office</li>
+                            <li>• Research this office's typical contract sizes and durations</li>
+                            <li>• Identify past awardees to understand competition</li>
+                            <li>• Look for upcoming solicitations in your NAICS code</li>
+                            <li>• Align your capabilities with the agency priorities shown above</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            
+            // Load agency pain points from knowledge base
+            loadAgencyPainPoints(displayOfficeName || agency.agencyName || agency.parentAgency, agency.parentAgency);
+        }
+        
+        async function loadAgencyPainPoints(officeName, parentAgency) {
+            try {
+                const painPointsContent = document.getElementById('pain-points-content');
+                if (!painPointsContent) return;
+
+                // Try multiple search strategies
+                const searchStrategies = [
+                    officeName,  // Try office name first
+                    // Extract DHS component agencies
+                    officeName?.match(/U\.S\. Coast Guard|Coast Guard/i) ? 'U.S. Coast Guard' : null,
+                    officeName?.match(/U\.S\. Customs and Border Protection|Customs and Border Protection|CBP/i) ? 'U.S. Customs and Border Protection' : null,
+                    officeName?.match(/CISA|Cybersecurity and Infrastructure Security Agency/i) ? 'CISA' : null,
+                    officeName?.match(/FEMA|Federal Emergency Management Agency/i) ? 'FEMA' : null,
+                    officeName?.match(/ICE|Immigration and Customs Enforcement/i) ? 'ICE' : null,
+                    officeName?.match(/TSA|Transportation Security Administration/i) ? 'TSA' : null,
+                    // Extract DoD Army components
+                    officeName?.match(/Army Materiel Command|AMC/i) && !officeName?.match(/AFMC/i) ? 'Army Materiel Command' : null,
+                    officeName?.match(/Army Contracting Command|ACC-/i) && !officeName?.match(/Air|AFMC/i) ? 'Army Contracting Command' : null,
+                    officeName?.match(/U\.S\. Army Corps of Engineers|USACE/i) ? extractUSACEComponent(officeName) : null,
+                    // Extract DoD Navy/Marine components
+                    officeName?.match(/Marine Corps Systems Command|MCSC|MARCORSYSCOM/i) ? 'Marine Corps Systems Command' : null,
+                    // Extract DoD Air Force/Space Force components
+                    officeName?.match(/Air Force Materiel Command|AFMC/i) ? 'Air Force Materiel Command' : null,
+                    officeName?.match(/Air Force Sustainment Center|AFSC/i) && !officeName?.match(/AFMC/i) ? 'Air Force Sustainment Center' : null,
+                    officeName?.match(/Space Systems Command|SSC/i) && officeName?.match(/Space|Force/i) ? 'Space Systems Command' : null,
+                    // Extract HHS components
+                    officeName?.match(/National Institutes of Health|\bNIH\b/i) ? 'NIH' : null,
+                    officeName?.match(/Centers for Disease Control|\bCDC\b/i) ? 'CDC' : null,
+                    officeName?.match(/Food and Drug Administration|\bFDA\b/i) ? 'FDA' : null,
+                    officeName?.match(/Centers for Medicare|Medicaid Services|\bCMS\b/i) ? 'CMS' : null,
+                    // Extract DOE components
+                    officeName?.match(/National Nuclear Security|\bNNSA\b|Los Alamos|Livermore|Sandia/i) ? 'NNSA' : null,
+                    officeName?.match(/Office of Science|Argonne|Oak Ridge|Brookhaven|Fermilab|Berkeley Lab|PNNL|Princeton Plasma|SLAC|Ames Laboratory|Jefferson Lab/i) && !officeName?.match(/NNSA/i) ? 'DOE Office of Science' : null,
+                    officeName?.match(/Idaho National Laboratory|\bINL\b/i) ? 'DOE Nuclear Energy' : null,
+                    officeName?.match(/National Energy Technology Laboratory|\bNETL\b/i) ? 'DOE Fossil Energy' : null,
+                    // Extract DOT components
+                    officeName?.match(/Federal Aviation Administration|\bFAA\b|NextGen/i) && !officeName?.match(/FHWA|FTA|FRA/i) ? 'FAA' : null,
+                    officeName?.match(/Federal Highway Administration|\bFHWA\b/i) ? 'FHWA' : null,
+                    officeName?.match(/Federal Transit Administration|\bFTA\b/i) ? 'FTA' : null,
+                    officeName?.match(/Federal Railroad Administration|\bFRA\b/i) ? 'FRA' : null,
+                    // Extract DOC components
+                    officeName?.match(/National Oceanic|Atmospheric Administration|\bNOAA\b/i) ? 'NOAA' : null,
+                    officeName?.match(/National Institute of Standards|\bNIST\b/i) ? 'NIST' : null,
+                    officeName?.match(/Census Bureau|\bCensus\b/i) && !officeName?.match(/NIST/i) ? 'Census Bureau' : null,
+                    // Extract Defense-Wide Agencies
+                    officeName?.match(/Defense Logistics Agency|\bDLA\b/i) ? 'Defense Logistics Agency' : null,
+                    officeName?.match(/Missile Defense Agency|\bMDA\b/i) ? 'Missile Defense Agency' : null,
+                    officeName?.match(/Defense Information Systems Agency|\bDISA\b/i) ? 'Defense Information Systems Agency' : null,
+                    officeName?.match(/Defense Contract Management Agency|\bDCMA\b/i) ? 'Defense Contract Management Agency' : null,
+                    officeName?.match(/Defense Contract Audit Agency|\bDCAA\b/i) ? 'Defense Contract Audit Agency' : null,
+                    officeName?.match(/Defense Advanced Research Projects Agency|\bDARPA\b/i) ? 'DARPA' : null,
+                    parentAgency, // Then parent agency as fallback
+                    // Extract known agency abbreviations from office name
+                    officeName?.match(/NAVFAC|NAVSEA|NAVWAR|NAVAIR|DoD|VA|DHS|GSA|NASA|DOE|HHS|EPA/i)?.[0],
+                    // If it contains "Department of", try with and without
+                    parentAgency?.replace('Department of the ', '').replace('Department of ', '')
+                ].filter(Boolean);
+
+                // Helper function to extract USACE component (now uses API for mission-specific detection)
+                function extractUSACEComponent(name) {
+                    // Signal that this is USACE and needs mission-area detection
+                    return 'USACE';
+                }
+
+                let result = null;
+                let searchName = '';
+
+                // SPECIAL HANDLING FOR USACE - Use mission-specific API
+                if (searchStrategies.includes('USACE')) {
+                    console.log(`🔍 USACE detected - using mission-specific pain points API`);
+
+                    // Get current modal agency info for location
+                    const currentAgency = window.currentModalAgency;
+                    const location = currentAgency?.location || '';
+
+                    try {
+                        const usaceResponse = await fetch(`/api/usace-mission-pain-points?officeName=${encodeURIComponent(officeName)}&location=${encodeURIComponent(location)}`);
+                        const usaceData = await usaceResponse.json();
+
+                        if (usaceData.success && usaceData.painPoints) {
+                            console.log(`✅ USACE Mission Detected: ${usaceData.missionArea} (${usaceData.matchMethod})`);
+
+                            // Format as agency data
+                            result = {
+                                success: true,
+                                data: {
+                                    name: `USACE - ${usaceData.missionArea.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`,
+                                    abbreviation: 'USACE',
+                                    description: usaceData.description,
+                                    painPoints: usaceData.painPoints.map(pp => ({
+                                        point: pp,
+                                        priority: 'high'
+                                    }))
+                                }
+                            };
+                            searchName = `USACE (${usaceData.missionArea})`;
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ USACE mission API failed, falling back to standard search:', error);
+                    }
+                }
+
+                // Try standard search strategies if USACE API didn't work or for non-USACE agencies
+                if (!result) {
+                    for (const name of searchStrategies) {
+                        if (!name) continue;
+
+                        console.log(`🔍 Trying to load pain points for: ${name}`);
+                        const response = await fetch(`/api/agency-knowledge-base/${encodeURIComponent(name)}`);
+                        const data = await response.json();
+
+                        if (data.success && data.data) {
+                            result = data;
+                            searchName = name;
+                            console.log(`✅ Found pain points for: ${name}`);
+                            break;
+                        }
+                    }
+                }
+
+                if (!result || !result.success || !result.data) {
+                    painPointsContent.innerHTML = `
+                        <p class="text-sm text-purple-700 italic">Agency priorities data not available for this office yet. Check the office website for current priorities.</p>
+                        <p class="text-xs text-purple-600 mt-2">Searched: ${searchStrategies.join(', ')}</p>
+                    `;
+                    return;
+                }
+
+                const agencyData = result.data;
+                console.log('✅ Loaded knowledge base for:', agencyData.name);
+
+                // Display pain points and key information
+                let html = '';
+                
+                if (agencyData.painPoints && agencyData.painPoints.length > 0) {
+                    // Handle both old format (strings) and new format (objects with source)
+                    const painPointsList = agencyData.painPoints.map(item => {
+                        if (typeof item === 'string') {
+                            return { point: item, source: null, priority: null };
+                        }
+                        return item;
+                    });
+                    
+                    // Sort by priority: critical > high > medium > low > null
+                    const priorityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+                    painPointsList.sort((a, b) => {
+                        const aPriority = priorityOrder[a.priority] ?? 4;
+                        const bPriority = priorityOrder[b.priority] ?? 4;
+                        return aPriority - bPriority;
+                    });
+                    
+                    html += `
+                        <div class="mb-4">
+                            <h4 class="font-semibold text-purple-900 mb-2">Key Priorities & Pain Points</h4>
+                            <ul class="space-y-2 text-sm text-purple-800">
+                                ${painPointsList.map(item => {
+                                    let itemHtml = `<li class="flex items-start">
+                                        <span class="text-purple-600 mr-2">•</span>
+                                        <div class="flex-1">
+                                            <span>${item.point}</span>`;
+                                    if (item.source) {
+                                        itemHtml += `<span class="text-purple-600 text-xs ml-2 italic">(${item.source})</span>`;
+                                    }
+                                    if (item.priority) {
+                                        const priorityBadge = item.priority === 'critical' ? 'bg-red-100 text-red-800' : 
+                                                             item.priority === 'high' ? 'bg-orange-100 text-orange-800' : 
+                                                             'bg-blue-100 text-blue-800';
+                                        itemHtml += `<span class="ml-2 px-1.5 py-0.5 text-xs rounded ${priorityBadge}">${item.priority}</span>`;
+                                    }
+                                    itemHtml += `</div></li>`;
+                                    return itemHtml;
+                                }).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                
+                if (agencyData.strategicPriorities && agencyData.strategicPriorities.length > 0) {
+                    // Handle both old format (strings) and new format (objects)
+                    const prioritiesList = agencyData.strategicPriorities.map(item => {
+                        if (typeof item === 'string') {
+                            return { priority: item, source: null, funding: null, deadline: null };
+                        }
+                        return item;
+                    });
+                    
+                    html += `
+                        <div class="mb-4">
+                            <h4 class="font-semibold text-purple-900 mb-2">Strategic Priorities</h4>
+                            <ul class="space-y-2 text-sm text-purple-800">
+                                ${prioritiesList.map(item => {
+                                    let itemHtml = `<li class="flex items-start">
+                                        <span class="text-purple-600 mr-2">•</span>
+                                        <div class="flex-1">
+                                            <span>${item.priority}</span>`;
+                                    if (item.funding) {
+                                        itemHtml += `<span class="text-purple-700 font-semibold text-xs ml-2">${item.funding}</span>`;
+                                    }
+                                    if (item.deadline) {
+                                        itemHtml += `<span class="text-purple-600 text-xs ml-2">(${item.deadline})</span>`;
+                                    }
+                                    if (item.source) {
+                                        itemHtml += `<span class="text-purple-600 text-xs ml-2 italic">— ${item.source}</span>`;
+                                    }
+                                    itemHtml += `</div></li>`;
+                                    return itemHtml;
+                                }).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                
+                if (agencyData.insights && agencyData.insights.length > 0) {
+                    html += `
+                        <div class="mt-4 pt-4 border-t border-purple-200">
+                            <h4 class="font-semibold text-purple-900 mb-2">💡 Market Insights</h4>
+                            <ul class="space-y-2 text-sm text-purple-700">
+                                ${agencyData.insights.map(insight => `<li class="flex items-start">
+                                    <span class="text-purple-500 mr-2">•</span>
+                                    <span>${insight}</span>
+                                </li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                
+                if (html) {
+                    painPointsContent.innerHTML = html;
+                } else {
+                    painPointsContent.innerHTML = `
+                        <p class="text-sm text-purple-700 italic">Agency priorities data not available for this office. Check the office website for current priorities.</p>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading agency knowledge base:', error);
+                const painPointsContent = document.getElementById('pain-points-content');
+                if (painPointsContent) {
+                    painPointsContent.innerHTML = `
+                        <p class="text-sm text-purple-700 italic">Unable to load agency priorities. Check the office website for current priorities.</p>
+                    `;
+                }
+            }
+        }
+        
+        function closeOfficeModal() {
+            const modal = document.getElementById('office-modal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = ''; // Restore scrolling
+        }
+        
+        // Auto-fill form from onboarding data
+        function loadOnboardingData() {
+            // Check if user has completed onboarding
+            const userDataStr = localStorage.getItem('user_data');
+            if (!userDataStr) return;
+
+            try {
+                const userData = JSON.parse(userDataStr);
+                const company = userData.company;
+
+                if (!company) return;
+
+                // Auto-fill NAICS code if available
+                if (company.naicsCodes && company.naicsCodes.length > 0) {
+                    const naicsInput = document.getElementById('naics-code');
+                    if (naicsInput && !naicsInput.value) {
+                        naicsInput.value = company.naicsCodes[0]; // Use primary NAICS
+                    }
+                }
+
+                // Auto-fill business type if we can determine it from certifications
+                if (company.certifications && company.certifications.length > 0) {
+                    const businessFormationSelect = document.getElementById('business-formation');
+                    if (businessFormationSelect && !businessFormationSelect.value) {
+                        // Map certifications to business formation options
+                        const cert = company.certifications[0];
+                        const certMap = {
+                            'wosb': 'women-owned',
+                            'hubzone': 'hubzone',
+                            '8a': '8a',
+                            'vosb': 'small-business',
+                            'sdvosb': 'small-business'
+                        };
+                        if (certMap[cert]) {
+                            businessFormationSelect.value = certMap[cert];
+                        }
+                    }
+
+                    // Auto-fill veteran status
+                    const veteranStatusSelect = document.getElementById('veteran-status');
+                    if (veteranStatusSelect && !veteranStatusSelect.value) {
+                        if (company.certifications.includes('sdvosb')) {
+                            veteranStatusSelect.value = 'service-disabled-veteran';
+                        } else if (company.certifications.includes('vosb')) {
+                            veteranStatusSelect.value = 'veteran-owned';
+                        }
+                    }
+                }
+
+                console.log('✅ Auto-filled Opportunity Scout from onboarding data');
+            } catch (error) {
+                console.error('Error loading onboarding data:', error);
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load onboarding data on page load
+            loadOnboardingData();
+
+            const modal = document.getElementById('office-modal');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        closeOfficeModal();
+                    }
+                });
+            }
+            
+            // Close modal with Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeOfficeModal();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+

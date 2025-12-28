@@ -1,0 +1,153 @@
+{
+  "agencies": {
+    "Department of Defense": {
+      "file": "dod.json",
+      "aliases": ["DoD", "Defense", "DOD"]
+    },
+    "Department of the Navy": {
+      "file": "navy.json",
+      "aliases": ["Navy", "USN", "Department of Navy"]
+    },
+    "NAVFAC": {
+      "file": "navfac.json",
+      "aliases": ["Naval Facilities Engineering Command", "NAVFAC", "NavFac"]
+    },
+    "NAVSEA": {
+      "file": "navy.json",
+      "aliases": ["Naval Sea Systems Command", "NAVSEA"]
+    },
+    "NAVWAR": {
+      "file": "navy.json",
+      "aliases": ["Naval Information Warfare Systems Command", "NAVWAR", "SPAWAR"]
+    },
+    "NAVAIR": {
+      "file": "navy.json",
+      "aliases": ["Naval Air Systems Command", "NAVAIR"]
+    },
+    "USACE": {
+      "file": "usace.json",
+      "aliases": ["U.S. Army Corps of Engineers", "Army Corps", "USACE", "Corps of Engineers"]
+    },
+    "Department of the Army": {
+      "file": "dod.json",
+      "aliases": ["Army", "Department of Army", "US Army"]
+    },
+    "Department of the Air Force": {
+      "file": "air-force.json",
+      "aliases": ["Air Force", "Department of Air Force", "USAF", "US Air Force"]
+    },
+    "Air Force Materiel Command": {
+      "file": "dod.json",
+      "aliases": ["AFMC", "Air Force Materiel Command"]
+    },
+    "Air Force Sustainment Center": {
+      "file": "dod.json",
+      "aliases": ["AFSC", "Air Force Sustainment Center"]
+    },
+    "Department of Veterans Affairs": {
+      "file": "va.json",
+      "aliases": ["VA", "Veterans Affairs", "Department of VA"]
+    },
+    "Department of Homeland Security": {
+      "file": "dhs.json",
+      "aliases": ["DHS", "Homeland Security", "Department of DHS"]
+    },
+    "U.S. Customs and Border Protection": {
+      "file": "dhs.json",
+      "aliases": ["CBP", "Customs and Border Protection", "Customs"]
+    },
+    "General Services Administration": {
+      "file": "gsa.json",
+      "aliases": ["GSA", "General Services"]
+    },
+    "NASA": {
+      "file": "nasa.json",
+      "aliases": ["NASA", "National Aeronautics and Space Administration"]
+    },
+    "Department of Energy": {
+      "file": "doe.json",
+      "aliases": ["DOE", "Energy", "Department of Energy"]
+    },
+    "Department of Health and Human Services": {
+      "file": "hhs.json",
+      "aliases": ["HHS", "Health and Human Services", "Department of HHS"]
+    },
+    "Department of the Treasury": {
+      "file": "treasury.json",
+      "aliases": ["Treasury", "Treasury Department", "DOT", "IRS", "Internal Revenue Service"]
+    },
+    "Environmental Protection Agency": {
+      "file": "epa.json",
+      "aliases": ["EPA", "Environmental Protection"]
+    },
+    "Department of Commerce": {
+      "file": "commerce.json",
+      "aliases": ["Commerce", "DOC", "Department of Commerce"]
+    },
+    "Department of Transportation": {
+      "file": "dot.json",
+      "aliases": ["DOT", "Transportation", "Department of Transportation", "FAA", "Federal Aviation Administration", "FTA", "Federal Transit Administration", "FHWA", "Federal Highway Administration"]
+    },
+    "Department of the Interior": {
+      "file": "doi.json",
+      "aliases": ["DOI", "Interior", "Department of Interior", "BLM", "Bureau of Land Management", "BIA", "Bureau of Indian Affairs", "NPS", "National Park Service"]
+    },
+    "Department of Agriculture": {
+      "file": "usda.json",
+      "aliases": ["USDA", "Agriculture", "Department of Agriculture", "Forest Service", "USFS", "FSA", "Farm Service Agency", "Rural Development"]
+    },
+    "Defense Health Agency": {
+      "file": "dod.json",
+      "aliases": ["DHA", "Defense Health Agency"]
+    },
+    "Department of Education": {
+      "file": "education.json",
+      "aliases": ["ED", "Education", "Department of ED"]
+    },
+    "Department of Labor": {
+      "file": "labor.json",
+      "aliases": ["DOL", "Labor", "Department of Labor"]
+    },
+    "Small Business Administration": {
+      "file": "sba.json",
+      "aliases": ["SBA", "Small Business Administration"]
+    },
+    "Office of Personnel Management": {
+      "file": "opm.json",
+      "aliases": ["OPM", "Personnel Management", "Office of Personnel Management"]
+    },
+    "Social Security Administration": {
+      "file": "ssa.json",
+      "aliases": ["SSA", "Social Security", "Social Security Administration"]
+    },
+    "Nuclear Regulatory Commission": {
+      "file": "nrc.json",
+      "aliases": ["NRC", "Nuclear Regulatory", "Nuclear Regulatory Commission"]
+    },
+    "Federal Communications Commission": {
+      "file": "fcc.json",
+      "aliases": ["FCC", "Communications Commission", "Federal Communications Commission"]
+    },
+    "Department of State": {
+      "file": "state.json",
+      "aliases": ["DOS", "State", "Department of State", "State Department"]
+    },
+    "Department of Justice": {
+      "file": "doj.json",
+      "aliases": ["DOJ", "Justice", "Department of Justice"]
+    },
+    "Department of Housing and Urban Development": {
+      "file": "hud.json",
+      "aliases": ["HUD", "Housing and Urban Development", "Department of HUD"]
+    },
+    "National Science Foundation": {
+      "file": "nsf.json",
+      "aliases": ["NSF", "Science Foundation", "National Science Foundation"]
+    },
+    "Agency for International Development": {
+      "file": "usaid.json",
+      "aliases": ["USAID", "Agency for International Development", "U.S. Agency for International Development"]
+    }
+  }
+}
+

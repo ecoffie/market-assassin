@@ -1,0 +1,177 @@
+{
+  "name": "Department of Defense",
+  "abbreviation": "DoD",
+  "parentAgency": null,
+  "description": "The Department of Defense is the largest federal agency, responsible for coordinating and supervising all agencies and functions of the government related to national security and the United States Armed Forces.",
+  "website": "https://www.defense.gov",
+  "budget": {
+    "fiscalYear": "2024",
+    "totalBudget": "$816.7 billion",
+    "procurementBudget": "$145.9 billion"
+  },
+  "painPoints": [
+    {
+      "point": "IT acquisition delays and legacy system modernization challenges",
+      "source": "GAO High-Risk List 2025 - IT Management and Acquisition",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity maturity model certification (CMMC) implementation delays affecting contractor onboarding",
+      "source": "DoD Acquisition Forecast FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Accelerating acquisition timelines to counter emerging threats while maintaining oversight",
+      "source": "DoD Strategic Plan 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Supply chain security and resilience gaps in critical defense components",
+      "source": "GAO Defense Supply Chain Reports 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Weapon systems acquisition delays with over half of major defense programs experiencing new delays in 2023, average cycle time extending to nearly 12 years from program start, requiring improved oversight and adoption of iterative design and testing practices",
+      "source": "GAO-25-108528 DoD Weapon Systems Acquisition Assessment 2025 & GAO Testimony",
+      "priority": "high"
+    },
+    {
+      "point": "Specific weapon program delays including Army Improved Turbine Engine Program (21-month delay due to staffing and flight testing issues) and Navy Ship to Shore Connector (15-month delay due to testing problems), highlighting systemic acquisition process challenges",
+      "source": "GAO Testimony 2024 - Weapon Systems Acquisition Delays",
+      "priority": "high"
+    },
+    {
+      "point": "Cloud migration delays and DevSecOps adoption challenges across services",
+      "source": "DoD IT Modernization Strategy",
+      "priority": "medium"
+    },
+    {
+      "point": "Zero-trust architecture implementation complexity and timeline pressures",
+      "source": "DoD Zero Trust Strategy 2025",
+      "priority": "high"
+    },
+    {
+      "point": "AI/ML integration for decision support while ensuring responsible AI governance",
+      "source": "DoD AI Strategy and Ethical AI Framework",
+      "priority": "medium"
+    },
+    {
+      "point": "Workforce capacity gaps in cybersecurity and acquisition professionals",
+      "source": "OPM Federal Workforce Priorities Report 2025",
+      "priority": "medium"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Joint All-Domain Command and Control (JADC2) implementation",
+      "source": "DoD Budget Justification FY2025",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Zero Trust Cybersecurity Architecture deployment",
+      "source": "DoD Zero Trust Strategy",
+      "deadline": "FY2027"
+    },
+    {
+      "priority": "Cloud Computing modernization (JEDI/Cloud Contracts)",
+      "source": "DoD Cloud Strategy",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Artificial Intelligence and Machine Learning for operational advantage",
+      "source": "DoD AI Strategy 2025",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Advanced Manufacturing and Supply Chain Resilience",
+      "source": "DoD Industrial Base Strategy",
+      "priority": "high"
+    },
+    {
+      "priority": "5G Technology Integration for tactical networks",
+      "source": "DoD 5G Strategy",
+      "priority": "medium"
+    },
+    {
+      "priority": "Autonomous Systems and Robotics development",
+      "source": "DoD Unmanned Systems Roadmap",
+      "priority": "high"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GAO High-Risk List 2025 - https://www.gao.gov/highrisk",
+      "DoD Acquisition Forecast - https://business.defense.gov",
+      "DoD Strategic Plan - https://media.defense.gov",
+      "DoD Budget Justification FY2025 - https://comptroller.defense.gov"
+    ],
+    "secondary": [
+      "OPM Federal Workforce Priorities Report 2025",
+      "GSA Acquisition Gateway Forecasts"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "541330",
+    "541715",
+    "541712",
+    "334111",
+    "334220",
+    "334511",
+    "336411"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "GWAC (Government-Wide Acquisition Contracts)"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23% of prime contracts",
+    "WOSB": "Active use - goal of 5%",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference - goal of 3%",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $10M",
+    "medium": "$10M - $100M",
+    "large": "$100M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Multiple award IDIQ contracts",
+      "Past performance with DoD",
+      "Security clearances",
+      "CMMC compliance",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-18 months average",
+    "competitionLevel": "Highly competitive",
+    "evaluationFactors": [
+      "Technical approach",
+      "Past performance",
+      "Price/cost",
+      "Small business participation",
+      "Security capabilities"
+    ]
+  },
+  "keyOffices": [
+    "Defense Advanced Research Projects Agency (DARPA)",
+    "Defense Information Systems Agency (DISA)",
+    "Defense Logistics Agency (DLA)",
+    "Defense Health Agency (DHA)"
+  ],
+  "insights": [
+    "DoD has aggressive small business goals and actively seeks diverse suppliers",
+    "Cybersecurity and supply chain security are top priorities",
+    "Multi-year IDIQ contracts are common for IT and professional services",
+    "CMMC (Cybersecurity Maturity Model Certification) compliance is becoming mandatory",
+    "Strong emphasis on innovation and rapid technology adoption"
+  ]
+}
+

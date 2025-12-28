@@ -1,0 +1,149 @@
+{
+  "name": "Department of Justice",
+  "abbreviation": "DOJ",
+  "parentAgency": null,
+  "description": "The Department of Justice enforces the law, defends the interests of the United States, ensures public safety, prevents and controls crime, seeks just punishment, and ensures fair and impartial administration of justice.",
+  "website": "https://www.justice.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$38.8 billion",
+    "procurementBudget": "$4B+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "IT infrastructure modernization across multiple components including FBI, DEA, ATF, and US Marshals Service",
+      "source": "DOJ Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity and data protection critical for sensitive law enforcement and investigative information",
+      "source": "DOJ Cybersecurity Strategy & GAO Reports",
+      "priority": "critical"
+    },
+    {
+      "point": "Case management and litigation support system improvements for federal prosecutors and courts",
+      "source": "DOJ Budget Justification FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Digital evidence management and forensic analysis system modernization",
+      "source": "FBI Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Data analytics and intelligence systems for threat detection and criminal investigation",
+      "source": "DOJ IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Legacy system integration and migration challenges across multiple law enforcement components",
+      "source": "DOJ IT Modernization Strategy",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting law enforcement IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "DOJ IT Modernization Strategy",
+      "deadline": "Ongoing multi-year initiative"
+    },
+    {
+      "priority": "Cybersecurity and Data Protection Enhancement",
+      "source": "DOJ Cybersecurity Strategy",
+      "deadline": "Ongoing critical priority"
+    },
+    {
+      "priority": "Case Management and Litigation Support System Improvements",
+      "source": "DOJ Budget Justification FY2025",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Digital Evidence and Forensic Analysis Systems",
+      "source": "FBI Strategic Plan",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "DOJ Budget Justification FY2025 - https://www.justice.gov/doj/page/file/1574196/download",
+      "DOJ Strategic Plan - https://www.justice.gov/doj/doj-strategic-plan",
+      "DOJ Contracting Opportunities - https://www.justice.gov/osdbu/find-contracting-opportunities",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on DOJ IT Systems and Cybersecurity"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "541715",
+    "541712"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $50M",
+    "large": "$50M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Cybersecurity capabilities",
+      "Law enforcement system experience",
+      "Digital forensics knowledge",
+      "Data analytics and intelligence systems",
+      "Case management system experience",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "12-24 months average (complex systems)",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with government or law enforcement systems",
+      "Cybersecurity capabilities",
+      "Clearance levels if required",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Office of the Chief Information Officer (OCIO)",
+    "Office of Small and Disadvantaged Business Utilization (OSDBU)",
+    "Federal Bureau of Investigation (FBI)",
+    "Drug Enforcement Administration (DEA)",
+    "Bureau of Alcohol, Tobacco, Firearms and Explosives (ATF)",
+    "U.S. Marshals Service"
+  ],
+  "insights": [
+    "Cybersecurity is critical priority due to sensitive law enforcement data",
+    "IT infrastructure modernization across multiple components is major focus",
+    "Digital evidence and forensic analysis systems are high priority",
+    "Case management and litigation support system improvements ongoing",
+    "Strong emphasis on data analytics and intelligence capabilities",
+    "Clearance requirements may be needed for some contracts"
+  ]
+}
+

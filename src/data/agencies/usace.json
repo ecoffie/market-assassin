@@ -1,0 +1,198 @@
+{
+  "name": "USACE",
+  "fullName": "U.S. Army Corps of Engineers",
+  "abbreviation": "USACE",
+  "parentAgency": "Department of the Army",
+  "description": "USACE provides engineering services to the Army, other military services, federal agencies, and state and local governments. It manages water resources, military construction, and environmental restoration.",
+  "website": "https://www.usace.army.mil",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$8.70 billion (civil works)",
+    "procurementBudget": "$17.1 billion from Bipartisan Infrastructure Law through 2026"
+  },
+  "painPoints": [
+    {
+      "point": "Navigation infrastructure backlog - inland waterways locks and dams well beyond 50-year design life, $56.5M backlog for Atlantic Intracoastal Waterway alone",
+      "source": "ASCE Inland Waterways Infrastructure Report 2021 & Atlantic Intracoastal Waterway Association FY2025 Priorities",
+      "priority": "critical"
+    },
+    {
+      "point": "PFAS contamination at 586 DOD military sites requiring remediation after EPA designated PFOA and PFOS as hazardous substances",
+      "source": "GAO-25-107401 Persistent Chemicals Report & EPA PFAS Actions 2024",
+      "priority": "critical"
+    },
+    {
+      "point": "Deferred maintenance tracking gaps - GAO 2018 found USACE lacked approach for tracking deferred maintenance, limiting management ability",
+      "source": "GAO 2018 Inland Waterways Report & National Academies Review",
+      "priority": "high"
+    },
+    {
+      "point": "Climate resilience for Superfund sites - 945 sites (60% of NPL) in areas affected by flooding, storm surge, wildfires, or sea-level rise",
+      "source": "EPA Superfund Climate Resilience & USACE Climate Adaptation Screening",
+      "priority": "high"
+    },
+    {
+      "point": "Inadequate navigation funding - current budget does not provide adequate funding to keep all channels open to authorized levels",
+      "source": "Atlantic Intracoastal Waterway Association & USACE FY2025 Budget",
+      "priority": "high"
+    },
+    {
+      "point": "Hazardous waste infrastructure pressure - PFAS designation increasing site investigations, remediation capacity, and treatment technology needs",
+      "source": "ASCE Hazardous Waste Infrastructure Report Card",
+      "priority": "medium"
+    },
+    {
+      "point": "Coastal flood risk management execution challenges - $2.55B BIL allocation requires complex storm risk management project delivery",
+      "source": "Bipartisan Infrastructure Law USACE Allocation & Resilient Norfolk Project",
+      "priority": "medium"
+    },
+    {
+      "point": "Environmental justice requirements - 25% of BIL inland flood funds must benefit economically disadvantaged communities",
+      "source": "Infrastructure Investment and Jobs Act USACE Equity Requirements",
+      "priority": "medium"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Bipartisan Infrastructure Law execution - $17.1B for water infrastructure including nearly 50 agreements and 100+ construction activities",
+      "source": "Infrastructure Investment and Jobs Act CRS Report IN11723",
+      "funding": "$17.1 billion total through 2026",
+      "deadline": "BIL funds available until expended"
+    },
+    {
+      "priority": "Flood risk management - coastal storm risk ($2.55B) and inland flood risk ($2.50B) infrastructure",
+      "source": "BIL USACE Allocation & NWF Nature-based Funding Database",
+      "funding": "$2.55B coastal, $2.50B inland flood risk",
+      "priority": "critical"
+    },
+    {
+      "priority": "Navigation infrastructure and dredging - 44% of FY2026 budget request ($2.99B) for harbor and waterway maintenance",
+      "source": "USACE FY2026 Appropriations CRS Report IF13039",
+      "funding": "$2.99 billion FY2026 request",
+      "priority": "high"
+    },
+    {
+      "priority": "PFAS contamination remediation at 586 military sites using DOD-funded demonstration projects",
+      "source": "GAO-25-107401 & Waste Dive DOD PFAS Demo Projects",
+      "deadline": "DOD regional screening levels guidance Q1 FY2025",
+      "priority": "high"
+    },
+    {
+      "priority": "Small Business MATOC programs - $400M Savannah District, $99M Sacramento & Omaha Districts, $90M New England, $75M Dam/Levee Safety",
+      "source": "USACE District MATOC Solicitations 2025",
+      "funding": "$750M+ in active small business MATOCs",
+      "deadline": "Various solicitations Dec 2025 - ongoing"
+    },
+    {
+      "priority": "Climate adaptation for Superfund remedies - incorporating climate resilience as core factor in cleanup design",
+      "source": "EPA Superfund Climate Resilience Directive",
+      "priority": "high"
+    },
+    {
+      "priority": "Environmental restoration and remediation with equity focus - prioritizing economically disadvantaged communities",
+      "source": "BIL USACE Equity Requirements & Flood Plain Management Services",
+      "funding": "$45M Flood Plain Management, $51.4M Section 205 Flood Damage Protection",
+      "priority": "medium"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "USACE FY2025 Appropriations CRS Report IF12648 - https://www.congress.gov/crs-product/IF12648",
+      "GAO-25-107401 Persistent Chemicals DOD PFAS Report - https://www.gao.gov/assets/gao-25-107401.pdf",
+      "Infrastructure Investment and Jobs Act USACE Funding CRS IN11723 - https://www.congress.gov/crs-product/IN11723",
+      "ASCE Inland Waterways Infrastructure Report - https://infrastructurereportcard.org/cat-item/inland-waterways-infrastructure/",
+      "EPA Superfund Climate Resilience - https://www.epa.gov/superfund/superfund-climate-resilience"
+    ],
+    "secondary": [
+      "USACE FY2026 Appropriations CRS Report IF13039 - https://www.congress.gov/crs-product/IF13039",
+      "Atlantic Intracoastal Waterway Association FY2025 Priorities - https://dredgewire.com/atlantic-intracoastal-waterway-association-fiscal-year-2025-federal-funding-priorities/",
+      "DOD PFAS Remediation Demo Projects - https://www.wastedive.com/news/dod-pfas-destruction-disposal-demos-waste/805991/",
+      "EPA Key PFAS Actions - https://www.epa.gov/pfas/key-epa-actions-address-pfas",
+      "USACE Civil Works Budget - https://www.usace.army.mil/Missions/Civil-Works/Budget/"
+    ]
+  },
+  "commonNAICSCodes": [
+    "237990",
+    "237110",
+    "237130",
+    "541310",
+    "541330",
+    "236220",
+    "541512",
+    "541611",
+    "541519",
+    "562910"
+  ],
+  "contractTypes": [
+    "Fixed-Price Construction",
+    "Design-Build",
+    "Cost-Plus-Fixed-Fee",
+    "Multiple Award Task Order Contracts (MATOC)",
+    "Single Award Task Order Contracts (SATOC)",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "Two-Phase Design-Build"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Very strong preference - $750M+ in active small business MATOCs, multiple districts with 100% small business set-asides",
+    "WOSB": "Active use in A-E and construction MATOCs",
+    "8a": "Extensive use across all districts",
+    "HUBZone": "Regular use for economically disadvantaged community projects",
+    "SDVOSB": "Strong preference - $99M dedicated SDVOSB MATOC Omaha District",
+    "VOSB": "Active use - veteran-owned prioritized"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M (task orders, minor construction, environmental assessments)",
+    "medium": "$5M - $50M (flood control projects, dredging, facility restoration)",
+    "large": "$50M - $400M (MATOC programs, major navigation projects, coastal resilience infrastructure)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "USACE MATOC holders across districts",
+      "Past performance with civil works or military construction",
+      "PFAS contamination remediation expertise and treatment technology",
+      "Climate resilience and flood risk management experience",
+      "Navigation and dredging capabilities",
+      "Environmental compliance and Superfund cleanup expertise",
+      "Design-build experience for complex water infrastructure",
+      "Small business partnerships and economically disadvantaged community engagement"
+    ],
+    "contractingTimeline": "3-12 months average for MATOCs, 6-18 months for major civil works projects",
+    "competitionLevel": "Competitive for unrestricted, moderate for set-asides due to dedicated small business programs",
+    "evaluationFactors": [
+      "Technical approach and civil works expertise",
+      "Past performance with USACE or similar water resource agencies",
+      "Price/cost reasonableness",
+      "Small business participation and subcontracting plan",
+      "Environmental compliance and climate resilience approach",
+      "Equity and disadvantaged community benefits (for BIL projects)",
+      "PFAS remediation capabilities (for environmental contracts)"
+    ]
+  },
+  "keyDistricts": [
+    "USACE Savannah District (Small Business MATOC $400M)",
+    "USACE Sacramento District (Small Business MATOC $99M)",
+    "USACE Omaha District (SDVOSB MATOC $99M)",
+    "USACE New England District (Small Business MATOC $90M)",
+    "USACE Baltimore District (Civil Works A/E MATOC)",
+    "USACE Charleston District",
+    "USACE Fort Worth District",
+    "USACE Mobile District",
+    "USACE Memphis District",
+    "USACE Norfolk District (Resilient Norfolk $399M)",
+    "USACE Louisville District",
+    "USACE Vicksburg District",
+    "USACE Seattle District"
+  ],
+  "insights": [
+    "$750M+ in active small business MATOCs across districts - major opportunity for construction and A-E firms",
+    "Savannah District $400M Design-Build MATOC is 100% small business set-aside - largest dedicated small business construction opportunity",
+    "586 military sites with PFAS contamination require remediation - multi-billion dollar environmental cleanup opportunity",
+    "60% of Superfund sites (945 sites) threatened by climate change - climate adaptation contracts integrated into all cleanup designs",
+    "$17.1B Bipartisan Infrastructure Law funding through 2026 with nearly 50 agreements already - rapid contract execution",
+    "25% of BIL inland flood funds ($625M) must benefit economically disadvantaged communities - equity requirements create targeting opportunities",
+    "Navigation funding inadequate for all channels - $56.5M Atlantic Intracoastal backlog example of broader systemic underfunding",
+    "SDVOSB-dedicated MATOCs ($99M Omaha) demonstrate strong veteran business preference across USACE",
+    "Inland waterways locks and dams beyond 50-year design life - sustained infrastructure replacement contracts for decades",
+    "Multiple 2025 MATOC solicitations closing Dec 2025 - immediate opportunities for qualified small businesses"
+  ]
+}

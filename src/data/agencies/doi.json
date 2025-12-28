@@ -1,0 +1,199 @@
+{
+  "name": "Department of the Interior",
+  "abbreviation": "DOI",
+  "parentAgency": null,
+  "description": "The Department of the Interior protects and manages the Nation's natural resources and cultural heritage, provides scientific and other information about those resources, and honors its trust responsibilities to American Indians, Alaska Natives, and affiliated island communities.",
+  "website": "https://www.doi.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$18.4 billion",
+    "procurementBudget": "$14.7 billion annually (average FY2020-2023 in grants and contracts)"
+  },
+  "painPoints": [
+    {
+      "point": "Deferred maintenance crisis - backlog grew from $170 billion in 2017 to $370 billion in 2024",
+      "source": "GAO-25-108028 Federal Real Property Report & GAO High-Risk Series 2025",
+      "priority": "critical"
+    },
+    {
+      "point": "High risk of fraud and mismanagement in grants and contracts due to inadequate internal controls and oversight",
+      "source": "DOI Office of Inspector General FY2025 Budget - Data Analytics Unit findings",
+      "priority": "critical"
+    },
+    {
+      "point": "Cybersecurity vulnerabilities - malicious actors continue to present risks to Federal systems and critical infrastructure",
+      "source": "DOI FY2025 Budget in Brief - FBMS Zero Trust Architecture",
+      "priority": "critical"
+    },
+    {
+      "point": "Wildfire crisis intensifying due to climate change requiring expanded workforce and aviation contracts",
+      "source": "DOI FY2024 Budget - Wildfire Management $1.33 billion allocation",
+      "priority": "high"
+    },
+    {
+      "point": "Challenges deploying Bipartisan Infrastructure Law funding promptly while maintaining staffing capacity and program controls",
+      "source": "DOI FY2024 Annual Performance Report",
+      "priority": "high"
+    },
+    {
+      "point": "Difficulty accurately and reliably estimating deferred maintenance costs across bureaus",
+      "source": "DOI Office of Inspector General oversight findings FY2024",
+      "priority": "high"
+    },
+    {
+      "point": "IT consolidation challenges - implementing enterprise-wide Tier 1 and Tier 2 service standardization across bureaus",
+      "source": "Federal News Network IT Consolidation Report September 2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Lifecycle investment approach implementation gaps - transitioning from reactive to preventive maintenance",
+      "source": "DOI FY2025 Budget - $2.7 billion lifecycle management allocation",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting federal real property and land management IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Wildland fire management expansion - $1.33 billion for preparedness, aviation contracts, and tribal support",
+      "source": "DOI FY2024 Budget Wildfire Management",
+      "funding": "$1.33 billion (+$233.1M from FY2023)",
+      "deadline": "FY2024-2025"
+    },
+    {
+      "priority": "Deferred maintenance reduction and lifecycle asset management - $2.7 billion for real property",
+      "source": "DOI FY2025 Budget & GAO Federal Real Property Report",
+      "funding": "$2.7 billion for lifecycle management",
+      "priority": "critical"
+    },
+    {
+      "priority": "Tribal climate resilience and relocation support - $440 million investment through BIL and IRA",
+      "source": "DOI Tribal Climate Resilience Programs 2024-2025",
+      "funding": "$440 million (BIL, IRA, and appropriations)",
+      "priority": "high"
+    },
+    {
+      "priority": "IT modernization and zero trust architecture implementation for Financial and Business Management System (FBMS)",
+      "source": "DOI FY2025 Budget - FBMS allocation",
+      "funding": "$57.8 million for FBMS operations and security upgrades",
+      "priority": "high"
+    },
+    {
+      "priority": "IT consolidation across bureaus - enterprise service standardization and quality control",
+      "source": "DOI IT Transformation Initiative September 2025",
+      "deadline": "FY2025-2026"
+    },
+    {
+      "priority": "Buy Indian Act procurement expansion for tribal vendors across BIA, BIE, and AS-IA",
+      "source": "Bureau of Indian Affairs Buy Indian Act Primer 2025",
+      "priority": "high"
+    },
+    {
+      "priority": "Acquisition oversight enhancement - improved controls for $14.7B annual grant and contract spending",
+      "source": "DOI OIG FY2025 Budget - Financial Management Oversight (+3 FTE)",
+      "funding": "$669,000 for acquisition oversight",
+      "priority": "high"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "DOI FY2025 Budget in Brief - https://www.doi.gov/budget/appropriations/2025/highlights",
+      "DOI FY2025 OIG Budget Justification - https://www.doi.gov/sites/default/files/documents/2024-03/fy2025-508-oig-greenbook.pdf",
+      "GAO-25-108028 Federal Real Property - https://www.gao.gov/products/gao-25-108028",
+      "GAO-25-107743 High-Risk Series 2025 - https://files.gao.gov/reports/GAO-25-108125/index.html",
+      "DOI FY2024 Annual Performance Report - https://www.doi.gov/sites/default/files/documents/2025-01/2024-annual-performance-report.pdf"
+    ],
+    "secondary": [
+      "DOI Wildfire Management Budget FY2024 - https://www.doi.gov/pressreleases/presidents-2024-budget-advances-efforts-address-nations-wildfire-crisis-through",
+      "DOI Tribal Climate Resilience Programs - https://www.doi.gov/pressreleases/biden-harris-administration-announces-120-million-presidents-investing-america-agenda",
+      "Federal News Network IT Consolidation Report September 2025",
+      "BIA Buy Indian Act Primer - https://www.bia.gov/sites/default/files/dup/assets/as-ia/ieed/Primer on Buy Indian Act 508 Compliant 2.6.18(Reload).pdf"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541330",
+    "541620",
+    "541690",
+    "562910",
+    "237110",
+    "541614",
+    "541618",
+    "541360",
+    "541370",
+    "115310"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "BPA (Blanket Purchase Agreement)",
+    "Buy Indian Act Contracts",
+    "Tribal Self-Governance Contracts",
+    "GSA Schedule contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - actively seeks small business participation",
+    "WOSB": "Active use for eligible contracts",
+    "8a": "Regular use for environmental and infrastructure services",
+    "HUBZone": "Active use - many DOI locations in HUBZones",
+    "SDVOSB": "Strong preference - veteran-owned businesses prioritized",
+    "VOSB": "Active use",
+    "BuyIndian": "Mandatory preference for tribal vendors under Buy Indian Act"
+  },
+  "typicalContractSizes": {
+    "small": "$100K - $5M (environmental assessments, IT services, facility maintenance)",
+    "medium": "$5M - $50M (infrastructure projects, wildfire aviation contracts)",
+    "large": "$50M - $500M+ (major construction, IT modernization, multi-year wildfire management)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "Environmental and natural resource management expertise",
+      "Wildfire management and aviation services",
+      "Facilities construction and deferred maintenance capabilities",
+      "IT modernization and cybersecurity (zero trust architecture)",
+      "Tribal engagement and Buy Indian Act eligibility",
+      "Climate adaptation and resilience planning",
+      "Real property lifecycle management",
+      "Land management and conservation services"
+    ],
+    "contractingTimeline": "6-24 months average (longer for major infrastructure), expedited for wildfire emergencies",
+    "competitionLevel": "Moderate to high - specialized expertise required, strong tribal vendor preference",
+    "evaluationFactors": [
+      "Technical approach and environmental expertise",
+      "Past performance with DOI or natural resource agencies",
+      "Tribal vendor status (Buy Indian Act)",
+      "Small business participation",
+      "Price/cost reasonableness",
+      "Local presence and community engagement",
+      "Cybersecurity and IT security capabilities"
+    ]
+  },
+  "keyOffices": [
+    "Bureau of Land Management (BLM)",
+    "Bureau of Indian Affairs (BIA)",
+    "Bureau of Indian Education (BIE)",
+    "National Park Service (NPS)",
+    "U.S. Fish and Wildlife Service (FWS)",
+    "U.S. Geological Survey (USGS)",
+    "Bureau of Reclamation (BOR)",
+    "Office of Surface Mining Reclamation and Enforcement (OSMRE)",
+    "Bureau of Ocean Energy Management (BOEM)",
+    "Bureau of Safety and Environmental Enforcement (BSEE)"
+  ],
+  "insights": [
+    "$370 billion deferred maintenance backlog represents enormous multi-decade construction and infrastructure opportunity",
+    "Wildfire management is urgent priority with $1.33B annual spending including aviation contracts and tribal support",
+    "Buy Indian Act creates mandatory set-aside pathway for tribal vendors - significant competitive advantage",
+    "GAO identified DOI real property as high-risk area since 2003 - sustained oversight and reform pressure",
+    "$14.7B annual contract spending vulnerable to fraud per OIG - increased compliance and oversight contracts likely",
+    "Tribal climate resilience $440M investment creates opportunities for environmental consulting and infrastructure",
+    "IT consolidation across 10 bureaus represents multi-year modernization contracts",
+    "Bipartisan Infrastructure Law deployment challenges create need for program management and controls expertise",
+    "Zero trust architecture cybersecurity implementation is mandatory priority for all IT systems",
+    "GSA Acquisition Gateway now hosts DOI forecast - check annually in October for updated opportunities"
+  ]
+}

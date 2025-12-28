@@ -1,0 +1,165 @@
+{
+  "name": "Department of the Army",
+  "abbreviation": "Army",
+  "parentAgency": "Department of Defense",
+  "description": "The Department of the Army is responsible for land-based military operations, including ground forces, facilities, and infrastructure support.",
+  "website": "https://www.army.mil",
+  "budget": {
+    "fiscalYear": "2024",
+    "totalBudget": "$185.5 billion",
+    "procurementBudget": "$26.8 billion"
+  },
+  "painPoints": [
+    {
+      "point": "Soldier modernization and equipment procurement delays",
+      "source": "GAO Defense Acquisitions Reports 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Network modernization and tactical communications integration challenges",
+      "source": "Army Network Modernization Strategy 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Base infrastructure and facilities modernization backlogs",
+      "source": "GAO Defense Infrastructure Reports & USACE Military Construction Programs",
+      "priority": "high"
+    },
+    {
+      "point": "Training and simulation systems technology refresh needs",
+      "source": "Army Training and Doctrine Command Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Supply chain and logistics optimization for distributed operations",
+      "source": "Army Materiel Command Strategic Plan 2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Cybersecurity for tactical systems and expeditionary networks",
+      "source": "Army Cybersecurity Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Autonomous ground vehicle integration and testing delays",
+      "source": "Army Next Generation Combat Vehicle Program",
+      "priority": "medium"
+    },
+    {
+      "point": "Weapon systems acquisition delays including Improved Turbine Engine Program experiencing 21-month delays due to staffing issues and postponed flight testing, reflecting broader Army acquisition process challenges",
+      "source": "GAO Testimony 2024 - Weapon Systems Acquisition Delays",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Soldier Lethality and Modernization",
+      "source": "Army Budget Justification FY2025",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Network Modernization and 5G Integration",
+      "source": "Army Network Modernization Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Base Infrastructure and Facilities (via USACE)",
+      "source": "USACE Military Construction Program",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Training and Simulation Systems",
+      "source": "Army Training Modernization Plan"
+    },
+    {
+      "priority": "Supply Chain and Logistics Optimization",
+      "source": "Army Materiel Command Strategy"
+    },
+    {
+      "priority": "Cybersecurity for Tactical Systems",
+      "source": "Army Cybersecurity Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Autonomous Ground Vehicles",
+      "source": "Army Next Generation Combat Vehicle Program"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GAO Defense Acquisitions Reports - https://www.gao.gov/highrisk",
+      "Army Budget Justification FY2025 - https://www.asafm.army.mil",
+      "USACE Military Construction Programs",
+      "Army Network Modernization Strategy"
+    ],
+    "secondary": [
+      "Army Strategic Plans",
+      "DoD Acquisition Forecasts"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541330",
+    "541511",
+    "541512",
+    "541519",
+    "236220",
+    "541611",
+    "334511",
+    "541715",
+    "541712",
+    "336992"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "IDIQ",
+    "Multiple Award Contracts",
+    "MATOC (Multiple Award Task Order Contracts)"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 25%",
+    "WOSB": "Active use - goal of 5%",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference - goal of 3%",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $10M",
+    "medium": "$10M - $100M",
+    "large": "$100M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "USACE MATOC holders",
+      "Past performance with Army",
+      "Security clearances",
+      "Small business partnerships",
+      "Tactical systems expertise"
+    ],
+    "contractingTimeline": "6-18 months average",
+    "competitionLevel": "Highly competitive",
+    "evaluationFactors": [
+      "Technical approach",
+      "Past performance with Army/DoD",
+      "Price/cost",
+      "Small business participation",
+      "Security clearances"
+    ]
+  },
+  "keyCommands": [
+    "U.S. Army Corps of Engineers (USACE)",
+    "Army Contracting Command (ACC)",
+    "Army Materiel Command (AMC)",
+    "Army Installation Management Command (IMCOM)"
+  ],
+  "insights": [
+    "USACE handles most Army construction and civil works",
+    "Army Contracting Command manages procurement across all commands",
+    "Soldier modernization and equipment are ongoing priorities",
+    "Network modernization and 5G are high-priority technology areas",
+    "Strong preference for small businesses in professional services and IT",
+    "Training and simulation systems create significant opportunities"
+  ]
+}
+

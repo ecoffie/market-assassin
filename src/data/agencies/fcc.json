@@ -1,0 +1,136 @@
+{
+  "name": "Federal Communications Commission",
+  "abbreviation": "FCC",
+  "parentAgency": null,
+  "description": "The Federal Communications Commission regulates interstate and international communications by radio, television, wire, satellite, and cable.",
+  "website": "https://www.fcc.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$390 million",
+    "procurementBudget": "$100M+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Spectrum management and licensing system modernization to improve efficiency and support 5G deployment",
+      "source": "FCC Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "IT infrastructure modernization for regulatory data management and public safety communications",
+      "source": "FCC IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity enhancements for communications infrastructure protection",
+      "source": "FCC Cybersecurity Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Universal Service Fund administration system improvements",
+      "source": "FCC Budget Justification FY2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Broadband mapping and data collection system modernization",
+      "source": "FCC Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting spectrum management and regulatory IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Spectrum Management System Modernization",
+      "source": "FCC Strategic Plan",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Broadband Mapping and Data Collection Improvements",
+      "source": "FCC Strategic Plan",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "FCC IT Modernization Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Cybersecurity Enhancement",
+      "source": "FCC Cybersecurity Strategy",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "FCC Budget Justification FY2025 - https://www.fcc.gov/about/overview/budget",
+      "FCC Strategic Plan - https://www.fcc.gov/about/strategic-plan",
+      "FCC Contracting Opportunities - https://www.fcc.gov/general/contracting-opportunities",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on FCC IT Systems"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "541330",
+    "541715",
+    "541712"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 23%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$100K - $3M",
+    "medium": "$3M - $15M",
+    "large": "$15M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Telecommunications system experience",
+      "Spectrum management knowledge",
+      "Cybersecurity capabilities",
+      "Data analytics and reporting",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with telecommunications systems",
+      "Cybersecurity capabilities",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Office of the Managing Director",
+    "Office of Engineering and Technology",
+    "Wireless Telecommunications Bureau",
+    "Public Safety and Homeland Security Bureau"
+  ],
+  "insights": [
+    "Spectrum management modernization is major focus for 5G deployment",
+    "Broadband mapping improvements are high priority",
+    "IT infrastructure modernization across regulatory functions",
+    "Strong emphasis on small business participation",
+    "Cybersecurity is important for communications infrastructure"
+  ]
+}
+

@@ -1,0 +1,162 @@
+{
+  "name": "Department of Education",
+  "abbreviation": "ED",
+  "parentAgency": null,
+  "description": "The Department of Education promotes student achievement and preparation for global competitiveness by fostering educational excellence and ensuring equal access to educational opportunities.",
+  "website": "https://www.ed.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$82.4 billion",
+    "procurementBudget": "$2.5+ billion annually"
+  },
+  "painPoints": [
+    {
+      "point": "Student loan servicing system modernization required to handle increased volume and improve borrower experience, with legacy systems struggling with loan processing and repayment management",
+      "source": "Department of Education Strategic Plan & Budget Justification FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "FAFSA system improvements needed to handle application volume, reduce processing delays, and enhance user experience for students and families applying for financial aid",
+      "source": "Department of Education IT Modernization Initiatives 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Legacy IT infrastructure and systems across Department operations requiring modernization to improve efficiency, security, and user experience",
+      "source": "Department of Education IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity and student data protection challenges ensuring FERPA compliance while maintaining robust cybersecurity measures to protect sensitive student and financial aid data",
+      "source": "Department of Education Cybersecurity Strategy & OIG Reports",
+      "priority": "critical"
+    },
+    {
+      "point": "Financial aid processing and grant management systems requiring modernization to improve accuracy, reduce processing time, and enhance oversight capabilities",
+      "source": "Department of Education Budget Justification FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Data analytics and reporting capabilities improvements needed to support evidence-based decision making, program evaluation, and performance monitoring",
+      "source": "Department of Education Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "System integration and interoperability challenges across multiple disparate systems requiring better integration to enable data sharing and reduce redundancy",
+      "source": "Department of Education IT Modernization Initiatives",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting student aid and education IT systems",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Student Loan System Modernization",
+      "source": "Department of Education Budget FY2025",
+      "funding": "Significant budget allocation",
+      "deadline": "Ongoing multi-year initiative"
+    },
+    {
+      "priority": "FAFSA System Improvements and Simplification",
+      "source": "FAFSA Simplification Act Implementation",
+      "funding": "Budget allocation for FAFSA improvements",
+      "deadline": "Phased implementation ongoing"
+    },
+    {
+      "priority": "Cybersecurity and Data Protection (FERPA Compliance)",
+      "source": "Department of Education Cybersecurity Strategy",
+      "deadline": "Ongoing continuous improvement"
+    },
+    {
+      "priority": "IT Infrastructure Modernization",
+      "source": "Department IT Modernization Strategy",
+      "funding": "IT modernization budget",
+      "deadline": "Multi-year modernization program"
+    },
+    {
+      "priority": "Grant Management System Improvements",
+      "source": "Department of Education Budget Justification",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "Department of Education Budget Justification FY2025 - https://www2.ed.gov/about/overview/budget/index.html",
+      "Department of Education Strategic Plan - https://www2.ed.gov/about/reports/strat/index.html",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast",
+      "Department of Education OIG Reports - https://www2.ed.gov/about/offices/list/oig/index.html"
+    ],
+    "secondary": [
+      "GAO Reports on Department of Education IT Management",
+      "FAFSA Simplification Act Requirements"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "541715",
+    "541712"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts",
+    "BPA"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 25%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $25M",
+    "large": "$25M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Student loan system experience",
+      "Financial aid system knowledge",
+      "FERPA compliance expertise",
+      "Cybersecurity capabilities",
+      "Data analytics and reporting",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-12 months average",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with education or financial systems",
+      "Price/cost",
+      "Small business participation",
+      "FERPA compliance and data security capabilities"
+    ]
+  },
+  "keyOffices": [
+    "Office of Federal Student Aid (FSA)",
+    "Office of the Chief Information Officer (OCIO)",
+    "Office of Inspector General (OIG)",
+    "Office of Planning, Evaluation and Policy Development (OPEPD)"
+  ],
+  "insights": [
+    "Student loan system modernization is a major focus - billions in loan portfolio requires modern systems",
+    "FAFSA system improvements are critical - affects millions of students annually",
+    "Strong need for FERPA-compliant cybersecurity solutions",
+    "Multiple legacy system replacement opportunities across department operations",
+    "Data analytics and reporting capabilities are growing priorities",
+    "Grant management systems (G5, Grants.gov) require ongoing improvements",
+    "Common Origination and Disbursement (COD) system needs modernization"
+  ]
+}
+

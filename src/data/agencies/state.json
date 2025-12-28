@@ -1,0 +1,144 @@
+{
+  "name": "Department of State",
+  "abbreviation": "DOS",
+  "parentAgency": null,
+  "description": "The Department of State leads America's foreign policy through diplomacy, advocacy, and assistance by advancing the interests of the American people, their safety and economic prosperity.",
+  "website": "https://www.state.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$58.8 billion",
+    "procurementBudget": "$5B+ annually"
+  },
+  "painPoints": [
+    {
+      "point": "Diplomatic security and IT systems modernization for embassy and consulate operations worldwide",
+      "source": "Department of State Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Passport and visa processing system improvements to reduce wait times and handle increased demand",
+      "source": "DOS Budget Justification FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity and data protection critical for sensitive diplomatic communications and information",
+      "source": "DOS Cybersecurity Strategy & GAO Reports",
+      "priority": "critical"
+    },
+    {
+      "point": "Global IT infrastructure modernization for worldwide embassy network",
+      "source": "DOS IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Foreign service management and human resources system improvements",
+      "source": "DOS Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting global embassy IT infrastructure",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Global IT Infrastructure Modernization",
+      "source": "DOS IT Modernization Strategy",
+      "deadline": "Ongoing multi-year initiative"
+    },
+    {
+      "priority": "Passport and Visa Processing System Improvements",
+      "source": "DOS Budget Justification FY2025",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Cybersecurity and Diplomatic Security Enhancement",
+      "source": "DOS Cybersecurity Strategy",
+      "deadline": "Ongoing critical priority"
+    },
+    {
+      "priority": "Embassy and Consulate IT Systems Modernization",
+      "source": "DOS Strategic Plan",
+      "deadline": "Ongoing"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "Department of State Budget Justification FY2025 - https://www.state.gov/budget-performance",
+      "DOS Strategic Plan - https://www.state.gov/strategic-plan",
+      "DOS Procurement Forecast - https://www.state.gov/Procurement-Forecast",
+      "GSA Acquisition Gateway Forecast - https://hallway.acquisition.gov/forecast"
+    ],
+    "secondary": [
+      "GAO Reports on Department of State IT Modernization"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "518210",
+    "541611",
+    "541330",
+    "541715",
+    "541712",
+    "236220",
+    "236210"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Time and Materials",
+    "IDIQ",
+    "Multiple Award Contracts"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 25%",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M",
+    "medium": "$5M - $50M",
+    "large": "$50M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "IT modernization expertise",
+      "Global infrastructure experience",
+      "Diplomatic security system knowledge",
+      "Passport/visa processing system experience",
+      "Cybersecurity capabilities",
+      "Construction and facilities management",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "12-24 months average (complex global projects)",
+    "competitionLevel": "Competitive",
+    "evaluationFactors": [
+      "Technical approach and IT expertise",
+      "Past performance with government or international systems",
+      "Global infrastructure experience",
+      "Cybersecurity capabilities",
+      "Price/cost",
+      "Small business participation"
+    ]
+  },
+  "keyOffices": [
+    "Bureau of Information Resource Management (IRM)",
+    "Bureau of Diplomatic Security",
+    "Bureau of Consular Affairs",
+    "Office of Small and Disadvantaged Business Utilization (OSDBU)"
+  ],
+  "insights": [
+    "Global IT infrastructure modernization is major focus for worldwide embassy network",
+    "Passport and visa processing system improvements are high priority",
+    "Cybersecurity is critical due to sensitive diplomatic communications",
+    "Construction and facilities management for embassies is significant",
+    "Large-scale system integration expertise highly valued"
+  ]
+}
+

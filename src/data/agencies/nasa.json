@@ -1,0 +1,197 @@
+{
+  "name": "NASA",
+  "fullName": "National Aeronautics and Space Administration",
+  "abbreviation": "NASA",
+  "parentAgency": null,
+  "description": "NASA conducts research, technology development, and space exploration missions, working with commercial partners and international collaborators.",
+  "website": "https://www.nasa.gov",
+  "budget": {
+    "fiscalYear": "2025",
+    "totalBudget": "$25.4 billion FY2025, proposed $15B FY2026 (24% cut)",
+    "procurementBudget": "$74 billion planned investment in major projects FY2025"
+  },
+  "painPoints": [
+    {
+      "point": "Artemis program cost overruns - $6.8B combined across SLS ($2.7B), Orion ($3.2B), and Exploration Ground Systems ($887M)",
+      "source": "GAO-25-107591 NASA Major Projects Assessment & CAGW Artemis Cost Overruns Report July 2025",
+      "priority": "critical"
+    },
+    {
+      "point": "Artemis mission delays - Artemis II pushed to April 2026, Artemis III to mid-2027 due to heat shield damage and interdependent project challenges",
+      "source": "NASA December 2024 Mission Delay Announcement & GAO-24-106256 Artemis Challenges Report",
+      "priority": "critical"
+    },
+    {
+      "point": "Space Launch System sustainability crisis - GAO described SLS as 'unaffordable' for sustained space exploration, mobile launch tower also plagued by overruns",
+      "source": "GAO September 2023 SLS Assessment & GAO-25-106943 Exploration Ground Systems Report",
+      "priority": "critical"
+    },
+    {
+      "point": "FY2026 budget uncertainty - proposed 24% cut ($6B) eliminates key Artemis architecture and climate research programs",
+      "source": "White House FY2026 Budget Proposal May 2025 & Spaceflight Now Budget Analysis",
+      "priority": "high"
+    },
+    {
+      "point": "SEWP VI procurement delays - strategic pause in Aug 2024 due to 6,700+ industry questions, proposals now due Feb 17, 2025",
+      "source": "NASA SEWP VI Strategic Pause August 2024 & Visible Thread SEWP VI Updates",
+      "priority": "high"
+    },
+    {
+      "point": "Nine new Artemis projects initiated with $20B+ estimated costs creating interdependent delay risks",
+      "source": "GAO-25-107591 NASA Major Projects Assessment FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "SBIR/STTR program authorization expired September 30, 2025 - cannot release new solicitations or fund new awards without reauthorization",
+      "source": "NASA SBIR/STTR Program Homepage & Utah Governor's Office SBIR Update",
+      "priority": "medium"
+    },
+    {
+      "point": "Boeing SLS contract expiration and potential layoffs - Trump Administration may propose canceling SLS after Artemis III",
+      "source": "Boeing Employee Notification February 2025 & FY2026 Budget Proposal",
+      "priority": "medium"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices, with 463 GAO recommendations still unimplemented as of January 2025",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Artemis program execution - Moon to Mars exploration despite delays and budget uncertainty",
+      "source": "NASA Artemis Program & GAO-24-107249 Lunar Landing Plans Report",
+      "funding": "$4.1B for SLS Artemis IV and V in FY2025",
+      "deadline": "Artemis II April 2026, Artemis III mid-2027"
+    },
+    {
+      "priority": "SEWP VI contract awards - $60B ceiling, 10-year ordering period for government-wide IT procurement",
+      "source": "NASA SEWP VI Solicitation & Washington Technology SEWP VI Coverage",
+      "funding": "$60 billion ceiling",
+      "deadline": "Proposals due Feb 17, 2025; SEWP V extended to Oct 31, 2025"
+    },
+    {
+      "priority": "Commercial Human Landing System (HLS) partnerships - SpaceX Starship HLS and Blue Origin lunar landers",
+      "source": "NASA HLS Program & NASA SpaceX Artemis Lunar Lander Mission",
+      "deadline": "Starship propellant transfer tests March-Summer 2025, Artemis V Blue Origin lander",
+      "priority": "critical"
+    },
+    {
+      "priority": "Small Business Innovation Research (SBIR/STTR) - 299 Phase I awards in 2025 totaling $44.85M",
+      "source": "NASA SBIR/STTR 2025 Selections",
+      "funding": "$44.85M for 299 teams ($150K each Phase I), up to $850K Phase II",
+      "deadline": "Program expired Sept 30, 2025 - awaiting Congressional reauthorization"
+    },
+    {
+      "priority": "Earth science and climate monitoring - decision support tools leveraging NASA data",
+      "source": "NASA SBIR Ignite Phase II Awards July 2025",
+      "funding": "7 companies selected for up to $850K each (24 months)",
+      "priority": "high"
+    },
+    {
+      "priority": "Gateway lunar space station for Artemis IV crew transfer",
+      "source": "NASA Artemis Program & FY2026 Budget Proposal",
+      "deadline": "Artemis IV mission (Gateway future uncertain due to proposed budget cuts)",
+      "priority": "high"
+    },
+    {
+      "priority": "Commercial space technology development partnerships",
+      "source": "NASA Space Technology Mission Directorate",
+      "priority": "medium"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GAO-25-107591 NASA Major Projects Assessment - https://www.gao.gov/products/gao-25-107591",
+      "GAO-24-107249 Artemis Lunar Landing Plans - https://www.gao.gov/assets/d24107249.pdf",
+      "GAO-24-106256 Artemis Crewed Moon Landing Challenges - https://www.gao.gov/products/gao-24-106256",
+      "NASA FY2025 Budget CRS Report R43419 - https://www.congress.gov/crs-product/R43419",
+      "NASA FY2026 Budget Request Summary - https://www.nasa.gov/wp-content/uploads/2025/05/fy2026-budget-request-summary-briefing-finalv2-05292025-430pm.pdf"
+    ],
+    "secondary": [
+      "GAO-25-106943 Exploration Ground Systems - https://www.gao.gov/products/gao-25-106943",
+      "CAGW Artemis Cost Overruns Report - https://www.cagw.org/artemis-program-driving-nasa-cost-overrruns/",
+      "NASA SEWP VI - https://www.sewp.nasa.gov/",
+      "NASA SBIR/STTR Program - https://www.nasa.gov/sbir_sttr/",
+      "Spaceflight Now FY2026 Budget Analysis - https://spaceflightnow.com/2025/05/03/proposed-24-percent-cut-to-nasa-budget-eliminates-key-artemis-architecture-climate-research/"
+    ]
+  },
+  "commonNAICSCodes": [
+    "336414",
+    "541330",
+    "541511",
+    "541512",
+    "541519",
+    "541715",
+    "541712",
+    "334511",
+    "541690",
+    "236220"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "Space Act Agreements",
+    "IDIQ (Indefinite Delivery, Indefinite Quantity)",
+    "Multiple Award Contracts",
+    "SEWP GWAC (Government-Wide Acquisition Contract)",
+    "Commercial Crew and HLS Partnerships"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - 83% of SEWP V spending through small businesses, goal of 20%, 32% first-time SBIR recipients",
+    "WOSB": "Active use - SEWP VI Category support",
+    "8a": "Extensive use across programs",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference - veteran-owned prioritized",
+    "VOSB": "Active use",
+    "SmallBusinessOnlySEWP": "SEWP VI Category C restricted to small businesses only"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $5M (SBIR Phase I $150K, Phase II up to $850K, small task orders)",
+    "medium": "$5M - $50M (facility modernization, research contracts)",
+    "large": "$50M - $6.8B+ (Artemis programs, SLS, Orion, commercial partnerships, SEWP VI $60B ceiling)"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "SEWP VI contract holders (no cap on awards - more contractors eligible)",
+      "Aerospace and space technology expertise",
+      "Commercial space partnership experience (SpaceX, Blue Origin model)",
+      "Innovation and cutting-edge technology (SBIR/STTR eligibility)",
+      "Past performance with NASA or aerospace missions",
+      "Earth science and climate monitoring data analytics",
+      "Small business partnerships (83% SEWP spending through small business)",
+      "Lunar lander and deep space exploration capabilities"
+    ],
+    "contractingTimeline": "6-24 months average, multi-year for Artemis programs",
+    "competitionLevel": "Highly competitive for major contracts, moderate for SBIR/STTR and SEWP task orders",
+    "evaluationFactors": [
+      "Technical innovation and aerospace capability",
+      "Past performance in space exploration or aerospace missions",
+      "Price/cost reasonableness",
+      "Small business participation and SBIR/STTR eligibility",
+      "Management approach and risk mitigation",
+      "Commercial space partnership potential"
+    ]
+  },
+  "keyCenters": [
+    "Johnson Space Center (Houston, TX) - Human spaceflight",
+    "Kennedy Space Center (Florida) - Launch operations",
+    "Goddard Space Flight Center (Maryland) - Earth science and astrophysics",
+    "Jet Propulsion Laboratory (California) - Planetary exploration",
+    "Marshall Space Flight Center (Alabama) - Propulsion and SLS",
+    "Glenn Research Center (Ohio) - Aeronautics and propulsion",
+    "Ames Research Center (California) - Aeronautics and supercomputing"
+  ],
+  "insights": [
+    "SEWP VI $60B ceiling with 'no cap on awards' - unprecedented opportunity for small businesses in Category C",
+    "83% of SEWP V spending went through small businesses - strongest small business preference of any GWAC",
+    "Artemis facing $6.8B in cost overruns but still $74B FY2025 investment - massive opportunity despite challenges",
+    "SLS declared 'unaffordable' by GAO - potential for alternative commercial launch vehicle contracts",
+    "SEWP VI proposals due Feb 17, 2025 - immediate opportunity for IT contractors",
+    "299 SBIR Phase I awards in 2025 with 32% first-time recipients - accessible innovation program",
+    "SBIR/STTR expired Sept 30, 2025 - reauthorization critical for continued small business innovation funding",
+    "Commercial partnerships (SpaceX, Blue Origin) increasingly favored over traditional cost-plus programs",
+    "FY2026 proposed 24% budget cut creates uncertainty but shifts focus to commercial partnerships",
+    "Artemis mission delays (Artemis II April 2026, III mid-2027) extend program timeline and contract opportunities"
+  ]
+}

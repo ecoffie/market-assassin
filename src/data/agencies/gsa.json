@@ -1,0 +1,172 @@
+{
+  "name": "General Services Administration",
+  "abbreviation": "GSA",
+  "parentAgency": null,
+  "description": "GSA provides centralized procurement for the federal government, managing real estate, acquisition services, and technology solutions.",
+  "website": "https://www.gsa.gov",
+  "budget": {
+    "fiscalYear": "2024",
+    "totalBudget": "$35.9 billion",
+    "procurementBudget": "$75+ billion (managed spending)"
+  },
+  "painPoints": [
+    {
+      "point": "Federal building portfolio modernization and sustainability retrofitting delays",
+      "source": "GSA Acquisition Forecast FY2025",
+      "priority": "high"
+    },
+    {
+      "point": "IT acquisition consolidation and cloud services migration coordination",
+      "source": "GSA IT Modernization Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Fleet vehicle electrification infrastructure and procurement challenges",
+      "source": "GSA Fleet Management Plan 2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Workplace modernization for hybrid work model support",
+      "source": "GSA Workplace 2030 Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "Small business access and set-aside goal achievement",
+      "source": "GSA Small Business Report 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Contract consolidation impacts on small business competition",
+      "source": "PSC Forecast Scorecard 2025",
+      "priority": "medium"
+    },
+    {
+      "point": "Zero trust cybersecurity implementation across federal buildings",
+      "source": "GSA Cybersecurity Strategy",
+      "priority": "high"
+    },
+    {
+      "point": "IT acquisition and management challenges including project delays, budget overruns, and need for improved oversight and mature acquisition practices affecting government-wide IT investments of over $100 billion annually",
+      "source": "GAO High-Risk List 2025 - Improving IT Acquisitions and Management",
+      "priority": "high"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Federal Building Modernization and Sustainability (Net Zero goals)",
+      "source": "GSA Budget Justification FY2025",
+      "funding": "$10B+",
+      "deadline": "2030"
+    },
+    {
+      "priority": "Cloud Services and IT Modernization via Schedule 70",
+      "source": "GSA IT Schedule Strategy",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Fleet Vehicle Electrification (100% by 2035)",
+      "source": "GSA Fleet Strategy",
+      "deadline": "2035"
+    },
+    {
+      "priority": "Workplace Modernization for Hybrid Work",
+      "source": "GSA Workplace 2030",
+      "funding": "$M+"
+    },
+    {
+      "priority": "Small Business Support and Contracting (25%+ goals)",
+      "source": "GSA Small Business Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "priority": "Zero Trust Cybersecurity Implementation",
+      "source": "GSA Cybersecurity Strategy 2025",
+      "deadline": "FY2027"
+    },
+    {
+      "priority": "Supply Chain Optimization and Resilience",
+      "source": "GSA Supply Chain Strategy",
+      "priority": "medium"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GSA Acquisition Forecast - https://hallway.acquisition.gov/forecast",
+      "GSA Budget Justification FY2025 - https://www.gsa.gov/about-us/overview/budget",
+      "PSC Forecast Scorecard - https://www.pscouncil.org",
+      "GSA Small Business Report - https://www.gsa.gov/smallbusiness"
+    ],
+    "secondary": [
+      "GSA Strategic Plan 2025",
+      "GSA Acquisition Gateway Forecasts"
+    ]
+  },
+  "commonNAICSCodes": [
+    "541511",
+    "541512",
+    "541519",
+    "236220",
+    "237990",
+    "541330",
+    "541611",
+    "541715",
+    "541712",
+    "238220"
+  ],
+  "contractTypes": [
+    "Multiple Award Schedules (MAS)",
+    "Government-Wide Acquisition Contracts (GWAC)",
+    "IDIQ",
+    "BPA",
+    "Fixed-Price",
+    "Time and Materials"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Highest priority - goal of 25%+",
+    "WOSB": "Active use",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$25K - $10M",
+    "medium": "$10M - $100M",
+    "large": "$100M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "GSA Schedule holders",
+      "Alliant 2 and OASIS contract holders",
+      "Small businesses",
+      "Past performance with federal agencies",
+      "Competitive pricing"
+    ],
+    "contractingTimeline": "1-6 months average (faster with schedules)",
+    "competitionLevel": "Moderate to high",
+    "evaluationFactors": [
+      "Price (often most important for schedules)",
+      "Past performance",
+      "Technical capability",
+      "Small business status",
+      "Value-added services"
+    ]
+  },
+  "keyPrograms": [
+    "GSA Multiple Award Schedules (MAS)",
+    "Alliant 2 (IT Services GWAC)",
+    "OASIS (Professional Services GWAC)",
+    "8(a) STARS III (Small Business GWAC)",
+    "HUBZone Contract Program"
+  ],
+  "insights": [
+    "GSA is the largest government contracting vehicle - get on a schedule!",
+    "GSA Schedules allow agencies to buy directly without full competition",
+    "8(a) STARS III and HUBZone contracts provide significant opportunities",
+    "Alliant 2 and OASIS are billion-dollar GWAC programs",
+    "GSA strongly supports small businesses - easier to get contracts",
+    "Federal building modernization is $10B+ annual opportunity",
+    "Cloud services and IT modernization are continuous priorities"
+  ]
+}
+

@@ -1,0 +1,161 @@
+{
+  "name": "Department of the Air Force",
+  "abbreviation": "Air Force",
+  "parentAgency": "Department of Defense",
+  "description": "The Department of the Air Force includes the United States Air Force and United States Space Force, responsible for air and space operations.",
+  "website": "https://www.af.mil",
+  "budget": {
+    "fiscalYear": "2024",
+    "totalBudget": "$194.0 billion",
+    "procurementBudget": "$34.3 billion"
+  },
+  "painPoints": [
+    {
+      "point": "Aircraft modernization and sustainment cost overruns (F-35, B-21 programs)",
+      "source": "GAO Defense Acquisitions Reports 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Space systems and capabilities development for Space Force",
+      "source": "Space Systems Command Strategic Plan",
+      "priority": "high"
+    },
+    {
+      "point": "Cybersecurity and IT modernization for Air Force networks",
+      "source": "Air Force Cyber Strategy 2025",
+      "priority": "high"
+    },
+    {
+      "point": "Base infrastructure and facilities modernization requirements",
+      "source": "Air Force Installation Contracting Agency Plans",
+      "priority": "medium"
+    },
+    {
+      "point": "Advanced training and simulation systems technology refresh",
+      "source": "Air Force Training Command Strategic Plan",
+      "priority": "medium"
+    },
+    {
+      "point": "Joint All-Domain Command and Control (JADC2) integration challenges",
+      "source": "DoD JADC2 Strategy & Air Force ABMS Program",
+      "priority": "high"
+    },
+    {
+      "point": "Autonomous systems and AI deployment for air operations",
+      "source": "Air Force AI Strategy",
+      "priority": "medium"
+    }
+  ],
+  "strategicPriorities": [
+    {
+      "priority": "Aircraft Modernization (F-35, B-21, etc.)",
+      "source": "Air Force Budget Justification FY2025",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Space Systems and Capabilities (Space Force)",
+      "source": "Space Systems Command Strategy",
+      "funding": "$B+"
+    },
+    {
+      "priority": "Cybersecurity and IT Modernization",
+      "source": "Air Force Cyber Strategy",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Base Infrastructure and Facilities",
+      "source": "Air Force Installation Contracting Agency"
+    },
+    {
+      "priority": "Advanced Training and Simulation",
+      "source": "Air Force Training Modernization Plan"
+    },
+    {
+      "priority": "Joint All-Domain Command and Control (JADC2)",
+      "source": "DoD JADC2 Strategy",
+      "funding": "$B+",
+      "deadline": "Ongoing"
+    },
+    {
+      "priority": "Autonomous Systems and AI",
+      "source": "Air Force AI Strategy"
+    }
+  ],
+  "sources": {
+    "primary": [
+      "GAO Defense Acquisitions Reports - https://www.gao.gov/highrisk",
+      "Air Force Budget Justification FY2025",
+      "Space Systems Command Strategic Plan",
+      "DoD JADC2 Strategy"
+    ],
+    "secondary": [
+      "Air Force Strategic Plans",
+      "AFMC and AFSC Acquisition Forecasts"
+    ]
+  },
+  "commonNAICSCodes": [
+    "336411",
+    "541330",
+    "541511",
+    "541512",
+    "541519",
+    "334511",
+    "541715",
+    "541712",
+    "541611",
+    "236220"
+  ],
+  "contractTypes": [
+    "Fixed-Price",
+    "Cost-Plus",
+    "IDIQ",
+    "Multiple Award Contracts",
+    "BPA"
+  ],
+  "setAsidePreferences": {
+    "smallBusiness": "Strong preference - goal of 25%",
+    "WOSB": "Active use - goal of 5%",
+    "8a": "Extensive use",
+    "HUBZone": "Regular use",
+    "SDVOSB": "Strong preference - goal of 3%",
+    "VOSB": "Active use"
+  },
+  "typicalContractSizes": {
+    "small": "$150K - $10M",
+    "medium": "$10M - $100M",
+    "large": "$100M+"
+  },
+  "procurementCharacteristics": {
+    "prefers": [
+      "AFMC and AFSC contract holders",
+      "Past performance with Air Force",
+      "Aerospace and space expertise",
+      "Security clearances",
+      "Small business partnerships"
+    ],
+    "contractingTimeline": "6-18 months average",
+    "competitionLevel": "Highly competitive",
+    "evaluationFactors": [
+      "Technical approach",
+      "Past performance with Air Force/DoD",
+      "Price/cost",
+      "Small business participation",
+      "Security clearances"
+    ]
+  },
+  "keyCommands": [
+    "Air Force Materiel Command (AFMC)",
+    "Air Force Sustainment Center (AFSC)",
+    "Air Force Installation Contracting Agency",
+    "Space Systems Command"
+  ],
+  "insights": [
+    "AFMC handles major acquisition programs",
+    "AFSC focuses on sustainment and maintenance",
+    "Space Systems Command creates growing opportunities",
+    "Aircraft modernization programs are multi-billion dollar efforts",
+    "Strong preference for small businesses in IT and professional services",
+    "Base infrastructure modernization is ongoing priority"
+  ]
+}
+
