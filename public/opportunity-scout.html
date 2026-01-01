@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Opportunity Scout - LinkedIn Deal Magnet</title>
+    <title>Opportunity Scout | GovCon Giants</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .loading {
@@ -17,6 +17,234 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .print-only {
+                display: block !important;
+            }
+
+            .container {
+                max-width: 100% !important;
+                padding: 0 !important;
+            }
+
+            /* Make results visible and styled for print */
+            #results-section {
+                display: block !important;
+            }
+
+            .bg-white {
+                background: white !important;
+                box-shadow: none !important;
+                border: 1px solid #e5e7eb !important;
+            }
+
+            /* Ensure text is black for printing */
+            .text-white, .text-slate-300, .text-slate-400 {
+                color: #1f2937 !important;
+            }
+
+            .text-blue-400, .text-amber-400 {
+                color: #1f2937 !important;
+            }
+
+            /* Print header styling */
+            .print-header {
+                text-align: center;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #3b82f6;
+            }
+
+            .print-header h1 {
+                font-size: 24px;
+                font-weight: bold;
+                color: #1f2937;
+            }
+
+            .print-header p {
+                color: #6b7280;
+                font-size: 12px;
+            }
+
+            /* Table styling for print */
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                font-size: 10px !important;
+            }
+
+            th, td {
+                border: 1px solid #d1d5db !important;
+                padding: 6px !important;
+                text-align: left !important;
+            }
+
+            th {
+                background-color: #f3f4f6 !important;
+                font-weight: bold !important;
+            }
+
+            /* Page breaks */
+            .page-break {
+                page-break-before: always;
+            }
+
+            /* Footer for print */
+            .print-footer {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                text-align: center;
+                font-size: 10px;
+                color: #6b7280;
+                padding: 10px;
+                border-top: 1px solid #e5e7eb;
+            }
+        }
+
+        .print-only {
+            display: none;
+        }
+
+        /* Password Protection Styles */
+        .password-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .password-box {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+
+        .password-box .brand {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .password-box .brand-blue {
+            color: #60a5fa;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .password-box .brand-amber {
+            color: #fbbf24;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .password-box h2 {
+            color: white;
+            text-align: center;
+            margin-bottom: 8px;
+            font-size: 20px;
+        }
+
+        .password-box .subtitle {
+            color: #94a3b8;
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+
+        .password-box input {
+            width: 100%;
+            padding: 14px 16px;
+            background: #334155;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 16px;
+        }
+
+        .password-box input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+
+        .password-box input::placeholder {
+            color: #64748b;
+        }
+
+        .password-box button {
+            width: 100%;
+            padding: 14px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .password-box button:hover {
+            background: #2563eb;
+        }
+
+        .password-box .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .password-box .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .password-box .back-link a {
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .password-box .back-link a:hover {
+            color: #cbd5e1;
+        }
+
+        .main-content {
+            display: none !important;
+        }
+
+        .main-content.authenticated {
+            display: block !important;
         }
     </style>
     <script>
@@ -34,12 +262,37 @@
         }
     </script>
 </head>
-<body class="bg-gradient-to-br from-blue-50 via-white to-gray-50 min-h-screen">
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 min-h-screen">
+
+<!-- Password Protection Overlay -->
+<div id="passwordOverlay" class="password-overlay">
+    <div class="password-box">
+        <div class="brand">
+            <span class="brand-blue">GovCon</span><span class="brand-amber">Giants</span>
+        </div>
+        <h2>Opportunity Scout</h2>
+        <p class="subtitle">This tool is password protected</p>
+        <div id="passwordError" class="error">Incorrect password. Please try again.</div>
+        <form id="passwordForm">
+            <input type="password" id="passwordInput" placeholder="Enter access password" autofocus>
+            <button type="submit">Access Tool</button>
+        </form>
+        <div class="back-link">
+            <a href="/">← Back to Tools</a>
+        </div>
+    </div>
+</div>
+
+<div id="mainContent" class="main-content" style="display: none;">
     <div class="container mx-auto px-4 py-8 max-w-5xl">
         <!-- Header -->
         <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-gray-900 mb-2">Opportunity Scout</h1>
-            <p class="text-gray-600">Discover 50+ agencies awarding contracts to businesses like yours</p>
+            <div class="mb-4">
+                <span class="text-3xl font-bold text-blue-400">GovCon</span>
+                <span class="text-3xl font-bold text-amber-400">Giants</span>
+            </div>
+            <h1 class="text-4xl font-bold text-white mb-2">🔍 Opportunity Scout</h1>
+            <p class="text-slate-300">Discover 50+ agencies awarding contracts to businesses like yours</p>
         </div>
 
         <!-- Priority Filter Banner -->
@@ -154,8 +407,31 @@
             </form>
         </div>
 
+        <!-- Print Header (only shows when printing) -->
+        <div class="print-only print-header">
+            <h1>🔍 Opportunity Scout Results</h1>
+            <p>GovCon Giants - Government Contracting Intelligence</p>
+            <p id="print-date"></p>
+        </div>
+
         <!-- Results -->
         <div id="results" class="hidden space-y-6">
+            <!-- Action Buttons -->
+            <div class="flex justify-end gap-3 no-print">
+                <button onclick="printResults()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    Print Results
+                </button>
+                <button onclick="exportToCSV()" class="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export CSV
+                </button>
+            </div>
+
             <!-- Summary -->
             <div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
                 <h2 class="text-xl font-bold text-blue-900 mb-4">📊 Search Summary</h2>
@@ -184,6 +460,98 @@
     <script>
         // Global variables
         let currentSuggestions = [];
+        let lastSearchResults = null; // Store results for export
+
+        // Print results function
+        function printResults() {
+            // Set the print date
+            const printDateEl = document.getElementById('print-date');
+            if (printDateEl) {
+                printDateEl.textContent = 'Generated: ' + new Date().toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+            window.print();
+        }
+
+        // Helper function to extract agency name from various formats
+        function getAgencyNameForExport(agency) {
+            // Try agencyName first (can be string or object)
+            if (agency.agencyName) {
+                if (typeof agency.agencyName === 'string') {
+                    return agency.agencyName;
+                } else if (typeof agency.agencyName === 'object' && agency.agencyName._) {
+                    return String(agency.agencyName._);
+                } else {
+                    return String(agency.agencyName);
+                }
+            }
+            // Fallback to other name fields
+            return agency.name || agency.parentAgency || agency.contractingOffice || 'Unknown Agency';
+        }
+
+        // Export to CSV function
+        function exportToCSV() {
+            if (!lastSearchResults || !lastSearchResults.agencies || lastSearchResults.agencies.length === 0) {
+                alert('No results to export. Please run a search first.');
+                return;
+            }
+
+            // Debug log to see actual data structure
+            console.log('Exporting agencies:', lastSearchResults.agencies);
+            console.log('First agency:', lastSearchResults.agencies[0]);
+
+            const agencies = lastSearchResults.agencies;
+            const searchCriteria = lastSearchResults.searchCriteria || {};
+
+            // Create CSV header
+            let csv = 'Agency Name,Total Contracts,Total Spending,Average Contract Value,Set-Aside Types\n';
+
+            // Add data rows
+            agencies.forEach(agency => {
+                const name = getAgencyNameForExport(agency).replace(/"/g, '""'); // Escape quotes for CSV
+                const contracts = agency.totalAwards || agency.contractCount || 0;
+                const spending = agency.totalSpending || 0;
+                const avgValue = contracts > 0 ? Math.round(spending / contracts) : 0;
+                const setAsides = (agency.setAsideTypes || []).join('; ');
+
+                // Format spending as plain numbers without $ for proper CSV import
+                csv += `"${name}",${contracts},${spending.toFixed(2)},${avgValue.toFixed(2)},"${setAsides}"\n`;
+            });
+
+            // Add summary at the end
+            csv += '\n';
+            csv += 'Search Summary\n';
+            csv += `Total Contracts,${lastSearchResults.summary?.totalAwards || 0}\n`;
+            csv += `Total Agencies,${lastSearchResults.summary?.totalAgencies || 0}\n`;
+            csv += `Total Spending,${(lastSearchResults.summary?.totalSpending || 0).toFixed(2)}\n`;
+            csv += `Search Date,${new Date().toLocaleDateString()}\n`;
+
+            // Add search criteria
+            if (searchCriteria) {
+                csv += '\n';
+                csv += 'Search Criteria\n';
+                if (searchCriteria.businessType) csv += `Business Type,"${searchCriteria.businessType}"\n`;
+                if (searchCriteria.naicsCode) csv += `NAICS Code,"${searchCriteria.naicsCode}"\n`;
+                if (searchCriteria.state) csv += `State,"${searchCriteria.state}"\n`;
+                if (searchCriteria.veteranStatus) csv += `Veteran Status,"${searchCriteria.veteranStatus}"\n`;
+            }
+
+            // Create and download the file
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `opportunity-scout-results-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
 
         // Check for priority filter from homepage or set from dropdown
         let priorityFilter = sessionStorage.getItem('priorityFilter');
@@ -332,6 +700,9 @@
         });
 
         function displayResults(result) {
+            // Store results for export/print
+            lastSearchResults = result;
+
             // Debug: Log the actual data structure
             console.log('Received result:', result);
             console.log('Has suggestions?', result.suggestions);
@@ -353,6 +724,33 @@
                         <p><strong>Total Contract Value:</strong> $${(result.summary.totalSpending / 1000000).toFixed(2)}M</p>
                         <p><strong>Search Criteria:</strong> ${formatSearchCriteria(result.searchCriteria)}</p>
                 `;
+
+                // Show geographic expansion info if search was expanded
+                if (result.locationTier && result.locationTier > 1 && result.searchedState) {
+                    let locationMessage = '';
+                    let locationIcon = '📍';
+
+                    if (result.locationTier === 2) {
+                        locationMessage = `Search expanded from ${result.searchedState} to include bordering states to find more opportunities.`;
+                        locationIcon = '🗺️';
+                    } else if (result.locationTier === 3) {
+                        locationMessage = `Search expanded from ${result.searchedState} to include the extended region (~200 mile radius) to find more opportunities.`;
+                        locationIcon = '🌎';
+                    } else if (result.locationTier === 4) {
+                        locationMessage = `Search expanded to nationwide to find more opportunities (started from ${result.searchedState}).`;
+                        locationIcon = '🇺🇸';
+                    }
+
+                    if (locationMessage) {
+                        summaryHtml += `
+                            <div class="mt-3 p-3 bg-amber-100 border border-amber-400 rounded-lg">
+                                <p class="text-sm text-amber-900">
+                                    <strong>${locationIcon} Geographic Expansion:</strong> ${locationMessage}
+                                </p>
+                            </div>
+                        `;
+                    }
+                }
 
                 // Show NAICS correction and auto-fallback messages if present
                 if (result.naicsCorrectionMessage) {
@@ -1668,6 +2066,60 @@
             });
         });
     </script>
+
+    <!-- Footer -->
+    <div class="text-center mt-12 pb-8 text-slate-400">
+        <div class="mb-2">
+            <span class="text-lg font-bold text-blue-400">GovCon</span>
+            <span class="text-lg font-bold text-amber-400">Giants</span>
+        </div>
+        <p class="text-sm">
+            Opportunity Scout - Find Your Next Federal Contract
+        </p>
+        <p class="text-xs mt-2 text-slate-500">
+            © 2025 GovCon Giants. All rights reserved.
+        </p>
+        <p class="text-xs mt-2">
+            <a href="/" class="text-blue-400 hover:text-blue-300 transition-colors">← Back to Tools</a>
+        </p>
+    </div>
+</div><!-- End mainContent -->
+
+<!-- Password Protection Script -->
+<script>
+(function() {
+    const TOOL_PASSWORD = 'scout#2026';
+    const STORAGE_KEY = 'os-authenticated';
+
+    const passwordOverlay = document.getElementById('passwordOverlay');
+    const mainContent = document.getElementById('mainContent');
+    const passwordForm = document.getElementById('passwordForm');
+    const passwordInput = document.getElementById('passwordInput');
+    const passwordError = document.getElementById('passwordError');
+
+    // Check if already authenticated
+    if (sessionStorage.getItem(STORAGE_KEY) === 'true') {
+        passwordOverlay.style.display = 'none';
+        mainContent.classList.add('authenticated');
+    }
+
+    passwordForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        if (passwordInput.value === TOOL_PASSWORD) {
+            sessionStorage.setItem(STORAGE_KEY, 'true');
+            passwordOverlay.style.display = 'none';
+            mainContent.classList.add('authenticated');
+            passwordError.style.display = 'none';
+        } else {
+            passwordError.style.display = 'block';
+            passwordInput.value = '';
+            passwordInput.focus();
+        }
+    });
+})();
+</script>
+
 </body>
 </html>
 
