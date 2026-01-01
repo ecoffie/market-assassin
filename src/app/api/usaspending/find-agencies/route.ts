@@ -87,6 +87,15 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // Use the normalized code from validation (e.g., "81000" → "81")
+      if (validation.normalizedCode !== trimmedNaics) {
+        const originalCode = trimmedNaics;
+        trimmedNaics = validation.normalizedCode;
+        const industryName = industryNames[trimmedNaics] || `${trimmedNaics}xx industry`;
+        naicsCorrectionMessage = `NAICS ${originalCode} was automatically normalized to ${trimmedNaics} (${industryName}).`;
+        console.log(`📋 Auto-normalized NAICS: ${originalCode} → ${trimmedNaics}`);
+      }
+
       // Normalize NAICS codes with trailing zeros to their sector/subsector equivalent
       // This handles cases where users enter codes like "81000", "810000", "8100", etc.
 

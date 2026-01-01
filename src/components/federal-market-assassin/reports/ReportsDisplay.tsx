@@ -3,6 +3,11 @@
 import { ComprehensiveReport, CoreInputs } from '@/types/federal-market-assassin';
 import { useState, useEffect, useCallback } from 'react';
 import {
+  AgencySpendingChart,
+  SpendingTrendChart,
+  GeographicDistributionChart,
+} from '../charts';
+import {
   getHitListByCoreInputs,
   getCombinedHitList,
   getDaysUntilDeadline,
@@ -43,6 +48,7 @@ interface PainPointsApiResponse {
 }
 
 type ReportTab =
+  | 'analytics'
   | 'buyers'
   | 'subcontracting'
   | 'idvContracts'
@@ -101,7 +107,7 @@ function formatOfficeId(rawOfficeId: string | undefined, command?: string | null
 }
 
 export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps) {
-  const [activeTab, setActiveTab] = useState<ReportTab>('buyers');
+  const [activeTab, setActiveTab] = useState<ReportTab>('analytics');
   const [showAllForExport, setShowAllForExport] = useState(false);
 
   // Modal state
@@ -276,6 +282,7 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
   };
 
   const tabs = [
+    { id: 'analytics' as ReportTab, label: '📈 Analytics', icon: '📈' },
     { id: 'buyers' as ReportTab, label: '👥 Government Buyers', icon: '👥' },
     { id: 'subcontracting' as ReportTab, label: '🔗 Subcontracting', icon: '🔗' },
     { id: 'idvContracts' as ReportTab, label: '📋 IDV Contracts', icon: '📋' },
@@ -682,6 +689,22 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
         ) : (
           // Normal tabbed view
           <>
+            {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-2">Market Analytics Dashboard</h2>
+                  <p className="text-slate-400">Visual insights into your target agencies and spending patterns</p>
+                </div>
+                <AgencySpendingChart agencies={reports.governmentBuyers.agencies} />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <SpendingTrendChart
+                    forecasts={reports.forecastList?.forecasts}
+                    agencies={reports.governmentBuyers.agencies}
+                  />
+                  <GeographicDistributionChart agencies={reports.governmentBuyers.agencies} />
+                </div>
+              </div>
+            )}
             {activeTab === 'buyers' && <GovernmentBuyersReport data={reports.governmentBuyers} onAgencyClick={openAgencyModal} />}
             {activeTab === 'subcontracting' && <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />}
             {activeTab === 'idvContracts' && <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />}

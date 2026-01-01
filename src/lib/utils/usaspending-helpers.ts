@@ -592,6 +592,10 @@ export function getStatesByTier(state: string): {
 /**
  * Validate a NAICS code and suggest alternatives if invalid
  * Returns validation result with suggested similar codes
+ *
+ * IMPORTANT: This function is LENIENT by design. If a user enters something
+ * like "81000" which isn't a real NAICS code, we normalize it to "81" (the sector)
+ * rather than returning an error. The goal is to help users search, not block them.
  */
 export function validateNaicsCode(naicsCode: string): {
   isValid: boolean;
@@ -634,6 +638,35 @@ export function validateNaicsCode(naicsCode: string): {
     };
   }
 
+  // ============================================
+  // SMART NORMALIZATION: Convert trailing-zero codes to their valid prefix
+  // This handles cases like "81000" → "81", "811000" → "811", etc.
+  // ============================================
+
+  // Normalize codes with trailing zeros to their meaningful prefix
+  // Examples: 81000 → 81, 8100 → 81, 810000 → 81, 811000 → 811, 81100 → 811
+  let normalizedCode = trimmed;
+
+  // Strip trailing zeros and find the meaningful prefix
+  // But keep at least 2 digits (the sector)
+  let strippedCode = trimmed.replace(/0+$/, '');
+  if (strippedCode.length < 2) {
+    strippedCode = sector;
+  }
+
+  // Check if the stripped code is a valid prefix we can expand
+  if (strippedCode.length >= 2 && strippedCode.length <= 3) {
+    // Check if we have an expansion for this prefix
+    if (naicsExpansion[strippedCode]) {
+      // The stripped code is valid - use it
+      return { isValid: true, normalizedCode: strippedCode, suggestedCodes: [] };
+    }
+    // If 3-digit doesn't exist, try 2-digit sector
+    if (strippedCode.length === 3 && naicsExpansion[sector]) {
+      return { isValid: true, normalizedCode: sector, suggestedCodes: [] };
+    }
+  }
+
   // For 2-digit codes, check if we have expansion
   if (trimmed.length === 2) {
     if (naicsExpansion[trimmed]) {
@@ -650,13 +683,12 @@ export function validateNaicsCode(naicsCode: string): {
     const existsInExpansion = Object.values(naicsExpansion).some(codes =>
       codes.some(code => code.startsWith(trimmed))
     );
-    if (!existsInExpansion) {
-      return {
-        isValid: false,
-        normalizedCode: trimmed,
-        errorMessage: `NAICS code "${trimmed}" is not a recognized subsector. This code may not exist.`,
-        suggestedCodes: getSuggestedNaicsCodes(trimmed)
-      };
+    if (existsInExpansion) {
+      return { isValid: true, normalizedCode: trimmed, suggestedCodes: [] };
+    }
+    // 3-digit doesn't exist, but if the sector is valid, normalize to sector
+    if (naicsExpansion[sector]) {
+      return { isValid: true, normalizedCode: sector, suggestedCodes: [] };
     }
   }
 
@@ -666,30 +698,35 @@ export function validateNaicsCode(naicsCode: string): {
       codes.includes(trimmed) || codes.some(code => code.startsWith(trimmed) || trimmed.startsWith(code))
     );
 
-    if (!existsInExpansion) {
-      // Check if the 3-digit prefix is valid
-      const prefix3 = trimmed.substring(0, 3);
-      const prefixValid = naicsExpansion[prefix3] || Object.values(naicsExpansion).some(codes =>
-        codes.some(code => code.startsWith(prefix3))
-      );
-
-      if (!prefixValid) {
-        return {
-          isValid: false,
-          normalizedCode: trimmed,
-          errorMessage: `NAICS code "${trimmed}" does not exist. The subsector "${prefix3}" is not recognized.`,
-          suggestedCodes: getSuggestedNaicsCodes(trimmed)
-        };
-      }
-
-      // The prefix is valid but this specific code doesn't exist
-      return {
-        isValid: false,
-        normalizedCode: trimmed,
-        errorMessage: `NAICS code "${trimmed}" does not exist. Try using the broader category "${prefix3}" (${industryNames[prefix3] || 'Unknown'}) or check for similar codes.`,
-        suggestedCodes: getSuggestedNaicsCodes(trimmed)
-      };
+    if (existsInExpansion) {
+      return { isValid: true, normalizedCode: trimmed, suggestedCodes: [] };
     }
+
+    // Code doesn't exist exactly - try to find best valid prefix
+    // Check 3-digit prefix first
+    const prefix3 = trimmed.substring(0, 3);
+    if (naicsExpansion[prefix3]) {
+      // Normalize to the 3-digit prefix
+      return { isValid: true, normalizedCode: prefix3, suggestedCodes: [] };
+    }
+
+    // Check if any 6-digit codes start with this 3-digit prefix
+    const prefix3HasCodes = Object.values(naicsExpansion).some(codes =>
+      codes.some(code => code.startsWith(prefix3))
+    );
+    if (prefix3HasCodes) {
+      return { isValid: true, normalizedCode: prefix3, suggestedCodes: [] };
+    }
+
+    // Fall back to 2-digit sector if it's valid
+    if (naicsExpansion[sector]) {
+      return { isValid: true, normalizedCode: sector, suggestedCodes: [] };
+    }
+  }
+
+  // If we get here with a valid sector, just use the sector
+  if (naicsExpansion[sector]) {
+    return { isValid: true, normalizedCode: sector, suggestedCodes: [] };
   }
 
   return { isValid: true, normalizedCode: trimmed, suggestedCodes: [] };

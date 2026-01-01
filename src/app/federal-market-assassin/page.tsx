@@ -5,8 +5,9 @@ import { CoreInputs, Agency, ComprehensiveReport, AlternativeSearchOption } from
 import CoreInputForm from '@/components/federal-market-assassin/forms/CoreInputForm';
 import AgencySelectionTable from '@/components/federal-market-assassin/tables/AgencySelectionTable';
 import ReportsDisplay from '@/components/federal-market-assassin/reports/ReportsDisplay';
+import PasswordProtect from '@/components/auth/PasswordProtect';
 
-export default function FederalMarketAssassinPage() {
+function FederalMarketAssassinContent() {
   const [step, setStep] = useState<'inputs' | 'agencies' | 'reports'>('inputs');
   const [coreInputs, setCoreInputs] = useState<CoreInputs | null>(null);
   const [agencies, setAgencies] = useState<Agency[]>([]);
@@ -320,5 +321,16 @@ export default function FederalMarketAssassinPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function FederalMarketAssassinPage() {
+  return (
+    <PasswordProtect
+      toolName="Federal Market Assassin"
+      storageKey="fma-authenticated"
+    >
+      <FederalMarketAssassinContent />
+    </PasswordProtect>
   );
 }
