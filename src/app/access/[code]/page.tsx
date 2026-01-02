@@ -178,8 +178,8 @@ export default function AccessPage() {
           <div className="bg-slate-50 rounded-lg p-4 text-left">
             <p className="text-sm text-slate-600">
               <strong>Need help?</strong> Contact us at{' '}
-              <a href="mailto:service@govcongiants.com" className="text-blue-600 hover:underline">
-                service@govcongiants.com
+              <a href="mailto:hello@govconedu.com" className="text-blue-600 hover:underline">
+                hello@govconedu.com
               </a>
             </p>
           </div>

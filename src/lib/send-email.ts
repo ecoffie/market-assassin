@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.SMTP_USER || 'service@govcongiants.com',
+    user: process.env.SMTP_USER || 'hello@govconedu.com',
     pass: process.env.SMTP_PASSWORD,
   },
 });
@@ -86,7 +86,7 @@ export async function sendAccessCodeEmail({
     </div>
 
     <p style="text-align: center; color: #64748b;">
-      Questions? Reply to this email or contact us at service@govcongiants.com
+      Questions? Reply to this email or contact us at hello@govconedu.com
     </p>
 
     <div class="footer">
@@ -101,7 +101,7 @@ export async function sendAccessCodeEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'service@govcongiants.com'}>`,
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: 'Your Federal Market Assassin Report Access | GovCon Giants',
       html: htmlContent,
