@@ -75,6 +75,8 @@ export async function sendAccessCodeEmail({
         <li>Enter your business information (NAICS code, location, etc.)</li>
         <li>Select the government agencies you want to target</li>
         <li>Generate and download your personalized report</li>
+        <li><strong>Click "Print All (PDF)"</strong> to save a permanent copy of your report</li>
+        <li><strong>Watch the tutorial:</strong> <a href="https://vimeo.com/1150857756?fl=tl&fe=ec" style="color: #1d4ed8;">How to Use Your Report</a></li>
       </ol>
     </div>
 
@@ -98,7 +100,7 @@ export async function sendAccessCodeEmail({
       to,
       subject: 'Your Federal Market Assassin Report Access | GovCon Giants',
       html: htmlContent,
-      text: `Your Federal Market Assassin Report Access\n\nThank you for your purchase!\n\nYour one-time access code: ${accessCode}\n\nAccess your report here: ${accessLink}\n\nIMPORTANT: This link can only be used once. Make sure to download your report before leaving the page.\n\n- GovCon Giants Team`,
+      text: `Your Federal Market Assassin Report Access\n\nThank you for your purchase!\n\nYour one-time access code: ${accessCode}\n\nAccess your report here: ${accessLink}\n\nHow to Get Your Report:\n1. Click the link above\n2. Enter your business information (NAICS code, location, etc.)\n3. Select the government agencies you want to target\n4. Generate and download your personalized report\n5. Click "Print All (PDF)" to save a permanent copy\n6. Watch the tutorial: https://vimeo.com/1150857756?fl=tl&fe=ec\n\nIMPORTANT: This link can only be used once. Make sure to download your report before leaving the page.\n\n- GovCon Giants Team`,
     });
 
     console.log(`✅ Access code email sent to ${to}`);
