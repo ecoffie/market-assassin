@@ -403,22 +403,31 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
   ${(() => {
     const osbpMap = new Map();
     reports.governmentBuyers.agencies.forEach((agency: any) => {
-      if (agency.osbpContact?.email) {
-        const key = agency.osbpContact.email;
+      if (agency.osbp?.email) {
+        const key = agency.osbp.email;
         if (!osbpMap.has(key)) {
-          osbpMap.set(key, { ...agency.osbpContact, agencies: [agency.name] });
+          osbpMap.set(key, {
+            ...agency.osbp,
+            agencies: [agency.contractingOffice || agency.name],
+            subAgency: agency.subAgency || agency.parentAgency
+          });
         } else {
-          osbpMap.get(key).agencies.push(agency.name);
+          osbpMap.get(key).agencies.push(agency.contractingOffice || agency.name);
         }
       }
     });
-    return Array.from(osbpMap.values()).map((contact: any) => `
+    const contacts = Array.from(osbpMap.values());
+    if (contacts.length === 0) {
+      return '<p style="color: #64748b; text-align: center; padding: 20px;">No OSBP contact information available for the selected agencies.</p>';
+    }
+    return contacts.map((contact: any) => `
       <div class="card">
-        <div class="card-title">${contact.name || 'Small Business Office'}</div>
+        <div class="card-title">${contact.subAgency || 'Small Business Office'}</div>
         <p><strong>Director:</strong> ${contact.director || 'Contact office for details'}</p>
-        <p><strong>Email:</strong> ${contact.email}</p>
+        <p><strong>Email:</strong> <a href="mailto:${contact.email}">${contact.email}</a></p>
         <p><strong>Phone:</strong> ${contact.phone || 'N/A'}</p>
-        <p><strong>Covers:</strong> ${contact.agencies.slice(0, 5).join(', ')}${contact.agencies.length > 5 ? ` +${contact.agencies.length - 5} more` : ''}</p>
+        <p><strong>Website:</strong> ${contact.website ? `<a href="${contact.website}" target="_blank">${contact.website}</a>` : 'N/A'}</p>
+        <p><strong>Covers ${contact.agencies.length} office${contact.agencies.length !== 1 ? 's' : ''}:</strong> ${contact.agencies.slice(0, 5).join(', ')}${contact.agencies.length > 5 ? ` +${contact.agencies.length - 5} more` : ''}</p>
       </div>
     `).join('');
   })()}
@@ -431,38 +440,117 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-value">${reports.tier2Subcontracting.summary.totalPrimes}</div>
-      <div class="stat-label">Total Primes</div>
+      <div class="stat-label">Tier 2 Opportunities</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${reports.tier2Subcontracting.summary.opportunityCount}</div>
-      <div class="stat-label">Opportunities</div>
+      <div class="stat-value">${reports.primeContractor.summary.totalPrimes}</div>
+      <div class="stat-label">Prime Opportunities</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${reports.primeContractor.suggestedPrimes?.length || 0}</div>
-      <div class="stat-label">Suggested Primes</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value">${reports.primeContractor.otherAgencies?.length || 0}</div>
+      <div class="stat-value">${reports.primeContractor.summary.totalOtherAgencies}</div>
       <div class="stat-label">Other Agencies</div>
     </div>
   </div>
 
-  <h3>Suggested Prime Contractors</h3>
-  <table>
-    <thead>
-      <tr><th>Prime Contractor</th><th>Reason</th><th>SB Level</th><th>Contract Types</th></tr>
-    </thead>
-    <tbody>
-      ${(reports.primeContractor.suggestedPrimes || []).slice(0, 20).map((prime: any) => `
-        <tr>
-          <td><strong>${prime.name || 'Unknown'}</strong></td>
-          <td>${prime.reason || '-'}</td>
-          <td>${prime.smallBusinessLevel || 'N/A'}</td>
-          <td>${(prime.contractTypes || []).slice(0, 2).join(', ') || '-'}</td>
-        </tr>
-      `).join('')}
-    </tbody>
-  </table>
+  <h3>Tier 2 Subcontracting Opportunities</h3>
+  ${(reports.tier2Subcontracting.suggestedPrimes || []).map((prime: any) => `
+    <div class="card" style="margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div>
+          <div class="card-title" style="font-size: 18px;">${prime.name || 'Unknown'}</div>
+          <div style="margin-top: 8px;">
+            ${prime.phone ? '<span class="badge" style="background: #fef3c7; color: #92400e; margin-right: 5px;">📱 PHONE</span>' : ''}
+            ${prime.email ? '<span class="badge" style="background: #dcfce7; color: #166534; margin-right: 5px;">✉️ EMAIL</span>' : ''}
+            ${prime.hasSubcontractPlan ? '<span class="badge" style="background: #fef3c7; color: #b45309; margin-right: 5px;">📋 SUBCONTRACT PLAN</span>' : ''}
+            ${prime.supplierPortal ? '<span class="badge" style="background: #dbeafe; color: #1e40af;">🌐 PORTAL</span>' : ''}
+          </div>
+        </div>
+        ${prime.totalContractValue ? `<span style="background: #1e293b; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold;">$${(prime.totalContractValue / 1000000).toFixed(2)}M</span>` : ''}
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 12px;">
+        <div>
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">CONTRACTS</p>
+          <p style="font-weight: 500;">${prime.contractCount ? `${prime.contractCount} contracts` : 'N/A'}</p>
+        </div>
+        <div>
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">SBLO CONTACT</p>
+          <p style="font-weight: 500;">${prime.sbloName || 'Contact SBLO'}</p>
+        </div>
+        <div>
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">PHONE</p>
+          <p style="font-weight: 500;">${prime.phone ? `<a href="tel:${prime.phone}" style="color: #059669;">${prime.phone}</a>` : 'N/A'}</p>
+        </div>
+      </div>
+      ${prime.email ? `
+        <div style="margin-bottom: 12px;">
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">EMAIL</p>
+          <a href="mailto:${prime.email}" style="color: #2563eb;">${prime.email}</a>
+        </div>
+      ` : ''}
+      ${prime.relevantAgencies && prime.relevantAgencies.length > 0 ? `
+        <div style="margin-bottom: 12px;">
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">PRIMARY AGENCIES</p>
+          <div>${prime.relevantAgencies.map((agency: string) => `<span class="badge badge-blue" style="margin-right: 5px; margin-bottom: 5px;">${agency}</span>`).join('')}</div>
+        </div>
+      ` : ''}
+      ${prime.naicsCategories && prime.naicsCategories.length > 0 ? `
+        <div>
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">NAICS CODES</p>
+          <div>${prime.naicsCategories.slice(0, 6).map((naics: string) => `<span class="badge badge-purple" style="margin-right: 5px; margin-bottom: 5px;">${naics}</span>`).join('')}${prime.naicsCategories.length > 6 ? `<span class="badge" style="background: #f1f5f9; color: #64748b;">+${prime.naicsCategories.length - 6} more</span>` : ''}</div>
+        </div>
+      ` : ''}
+    </div>
+  `).join('')}
+
+  <h3>Prime Contractor Opportunities</h3>
+  ${(reports.primeContractor.suggestedPrimes || []).map((prime: any) => `
+    <div class="card" style="margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div>
+          <div class="card-title" style="font-size: 18px;">${prime.name || 'Unknown'}</div>
+          <div style="margin-top: 8px;">
+            ${prime.phone ? '<span class="badge" style="background: #fef3c7; color: #92400e; margin-right: 5px;">📱 PHONE</span>' : ''}
+            ${prime.email ? '<span class="badge" style="background: #dcfce7; color: #166534; margin-right: 5px;">✉️ EMAIL</span>' : ''}
+            ${prime.hasSubcontractPlan ? '<span class="badge" style="background: #fef3c7; color: #b45309; margin-right: 5px;">📋 SUBCONTRACT PLAN</span>' : ''}
+            ${prime.supplierPortal ? '<span class="badge" style="background: #dbeafe; color: #1e40af;">🌐 PORTAL</span>' : ''}
+          </div>
+        </div>
+        ${prime.totalContractValue ? `<span style="background: #1e293b; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold;">$${(prime.totalContractValue / 1000000).toFixed(2)}M</span>` : ''}
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 12px;">
+        <div>
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">CONTRACTS</p>
+          <p style="font-weight: 500;">${prime.contractCount ? `${prime.contractCount} contracts` : 'N/A'}</p>
+        </div>
+        <div>
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">SBLO CONTACT</p>
+          <p style="font-weight: 500;">${prime.sbloName || 'Contact SBLO'}</p>
+        </div>
+        <div>
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">PHONE</p>
+          <p style="font-weight: 500;">${prime.phone ? `<a href="tel:${prime.phone}" style="color: #059669;">${prime.phone}</a>` : 'N/A'}</p>
+        </div>
+      </div>
+      ${prime.email ? `
+        <div style="margin-bottom: 12px;">
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">EMAIL</p>
+          <a href="mailto:${prime.email}" style="color: #2563eb;">${prime.email}</a>
+        </div>
+      ` : ''}
+      ${prime.relevantAgencies && prime.relevantAgencies.length > 0 ? `
+        <div style="margin-bottom: 12px;">
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">PRIMARY AGENCIES</p>
+          <div>${prime.relevantAgencies.map((agency: string) => `<span class="badge badge-blue" style="margin-right: 5px; margin-bottom: 5px;">${agency}</span>`).join('')}</div>
+        </div>
+      ` : ''}
+      ${prime.naicsCategories && prime.naicsCategories.length > 0 ? `
+        <div>
+          <p style="font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">NAICS CODES</p>
+          <div>${prime.naicsCategories.slice(0, 6).map((naics: string) => `<span class="badge badge-purple" style="margin-right: 5px; margin-bottom: 5px;">${naics}</span>`).join('')}${prime.naicsCategories.length > 6 ? `<span class="badge" style="background: #f1f5f9; color: #64748b;">+${prime.naicsCategories.length - 6} more</span>` : ''}</div>
+        </div>
+      ` : ''}
+    </div>
+  `).join('')}
 
   <!-- IDV Contracts Report -->
   <h2>📋 IDV Vehicle Contracts</h2>

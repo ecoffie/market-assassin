@@ -120,132 +120,6 @@
             display: none;
         }
 
-        /* Password Protection Styles */
-        .password-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        }
-
-        .password-box {
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 16px;
-            padding: 40px;
-            max-width: 400px;
-            width: 90%;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-        }
-
-        .password-box .brand {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        .password-box .brand-blue {
-            color: #60a5fa;
-            font-size: 28px;
-            font-weight: 700;
-        }
-
-        .password-box .brand-amber {
-            color: #fbbf24;
-            font-size: 28px;
-            font-weight: 700;
-        }
-
-        .password-box h2 {
-            color: white;
-            text-align: center;
-            margin-bottom: 8px;
-            font-size: 20px;
-        }
-
-        .password-box .subtitle {
-            color: #94a3b8;
-            text-align: center;
-            margin-bottom: 24px;
-            font-size: 14px;
-        }
-
-        .password-box input {
-            width: 100%;
-            padding: 14px 16px;
-            background: #334155;
-            border: 1px solid #475569;
-            border-radius: 8px;
-            color: white;
-            font-size: 16px;
-            margin-bottom: 16px;
-        }
-
-        .password-box input:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-        }
-
-        .password-box input::placeholder {
-            color: #64748b;
-        }
-
-        .password-box button {
-            width: 100%;
-            padding: 14px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .password-box button:hover {
-            background: #2563eb;
-        }
-
-        .password-box .error {
-            background: rgba(239, 68, 68, 0.2);
-            border: 1px solid #ef4444;
-            color: #fca5a5;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 14px;
-            display: none;
-        }
-
-        .password-box .back-link {
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .password-box .back-link a {
-            color: #94a3b8;
-            text-decoration: none;
-            font-size: 14px;
-        }
-
-        .password-box .back-link a:hover {
-            color: #cbd5e1;
-        }
-
-        .main-content {
-            display: none !important;
-        }
-
-        .main-content.authenticated {
-            display: block !important;
-        }
     </style>
     <script>
         tailwind.config = {
@@ -264,26 +138,7 @@
 </head>
 <body class="bg-gradient-to-br from-slate-900 to-slate-800 min-h-screen">
 
-<!-- Password Protection Overlay -->
-<div id="passwordOverlay" class="password-overlay">
-    <div class="password-box">
-        <div class="brand">
-            <span class="brand-blue">GovCon</span><span class="brand-amber">Giants</span>
-        </div>
-        <h2>Opportunity Scout</h2>
-        <p class="subtitle">This tool is password protected</p>
-        <div id="passwordError" class="error">Incorrect password. Please try again.</div>
-        <form id="passwordForm">
-            <input type="password" id="passwordInput" placeholder="Enter access password" autofocus>
-            <button type="submit">Access Tool</button>
-        </form>
-        <div class="back-link">
-            <a href="/">← Back to Tools</a>
-        </div>
-    </div>
-</div>
-
-<div id="mainContent" class="main-content" style="display: none;">
+<div id="mainContent">
     <div class="container mx-auto px-4 py-8 max-w-5xl">
         <!-- Header -->
         <div class="text-center mb-8">
@@ -2085,40 +1940,6 @@
     </div>
 </div><!-- End mainContent -->
 
-<!-- Password Protection Script -->
-<script>
-(function() {
-    const TOOL_PASSWORD = 'scout#2026';
-    const STORAGE_KEY = 'os-authenticated';
-
-    const passwordOverlay = document.getElementById('passwordOverlay');
-    const mainContent = document.getElementById('mainContent');
-    const passwordForm = document.getElementById('passwordForm');
-    const passwordInput = document.getElementById('passwordInput');
-    const passwordError = document.getElementById('passwordError');
-
-    // Check if already authenticated
-    if (sessionStorage.getItem(STORAGE_KEY) === 'true') {
-        passwordOverlay.style.display = 'none';
-        mainContent.classList.add('authenticated');
-    }
-
-    passwordForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        if (passwordInput.value === TOOL_PASSWORD) {
-            sessionStorage.setItem(STORAGE_KEY, 'true');
-            passwordOverlay.style.display = 'none';
-            mainContent.classList.add('authenticated');
-            passwordError.style.display = 'none';
-        } else {
-            passwordError.style.display = 'block';
-            passwordInput.value = '';
-            passwordInput.focus();
-        }
-    });
-})();
-</script>
 
 </body>
 </html>
