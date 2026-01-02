@@ -603,20 +603,61 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
   <!-- Tribal Contracting Report -->
   <h2>🏛️ Tribal Contracting Opportunities</h2>
   <div class="section-intro">8(a) and tribal contracting opportunities.</div>
-  <table>
-    <thead>
-      <tr><th>Agency</th><th>Program</th><th>Est. Value</th></tr>
-    </thead>
-    <tbody>
-      ${(reports.tribalContracting?.opportunities || []).slice(0, 15).map((opp: any) => `
-        <tr>
-          <td><strong>${opp.agency || 'N/A'}</strong></td>
-          <td>${opp.tribalProgram || 'Tribal Program'}</td>
-          <td class="amount">${opp.estimatedValue ? '$' + (opp.estimatedValue / 1000000).toFixed(2) + 'M' : 'N/A'}</td>
-        </tr>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">${reports.tribalContracting?.summary?.totalOpportunities || 0}</div>
+      <div class="stat-label">Total Opportunities</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">$${((reports.tribalContracting?.summary?.totalValue || 0) / 1000000).toFixed(1)}M</div>
+      <div class="stat-label">Estimated Value</div>
+    </div>
+  </div>
+
+  <h3>Suggested Tribal Businesses</h3>
+  ${(reports.tribalContracting?.suggestedTribes || []).map((tribe: any) => `
+    <div class="card" style="margin-bottom: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+        <div class="card-title" style="font-size: 16px;">${tribe.name || 'Unknown'}</div>
+        <span style="color: #64748b; font-size: 14px;">${tribe.region || ''}</span>
+      </div>
+      ${tribe.capabilities && tribe.capabilities.length > 0 ? `
+        <p style="margin: 8px 0; font-size: 14px;"><strong>Capabilities:</strong> ${tribe.capabilities.join(', ')}</p>
+      ` : ''}
+      ${tribe.certifications && tribe.certifications.length > 0 ? `
+        <p style="margin: 8px 0; font-size: 14px; color: #166534;"><strong>Certifications:</strong> ${tribe.certifications.join(', ')}</p>
+      ` : ''}
+      ${tribe.naicsCategories && tribe.naicsCategories.length > 0 ? `
+        <p style="margin: 8px 0; font-size: 14px;"><strong>NAICS:</strong> ${tribe.naicsCategories.join(', ')}</p>
+      ` : ''}
+      ${tribe.contactInfo ? `
+        <p style="margin: 8px 0; font-size: 14px; color: #1d4ed8;">
+          <strong>Contact:</strong> ${tribe.contactInfo.name || ''}
+          ${tribe.contactInfo.email ? `- <a href="mailto:${tribe.contactInfo.email}">${tribe.contactInfo.email}</a>` : ''}
+          ${tribe.contactInfo.phone ? ` | ${tribe.contactInfo.phone}` : ''}
+        </p>
+      ` : ''}
+    </div>
+  `).join('')}
+
+  ${reports.tribalContracting?.recommendedAgencies && reports.tribalContracting.recommendedAgencies.length > 0 ? `
+    <h3>Recommended Agencies for Tribal Contracting</h3>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
+      ${reports.tribalContracting.recommendedAgencies.map((agency: string) => `
+        <span class="badge badge-purple">${agency}</span>
       `).join('')}
-    </tbody>
-  </table>
+    </div>
+  ` : ''}
+
+  ${reports.tribalContracting?.recommendations && reports.tribalContracting.recommendations.length > 0 ? `
+    <h3>Recommendations</h3>
+    <ul style="margin: 0; padding-left: 20px;">
+      ${reports.tribalContracting.recommendations.map((rec: string) => `
+        <li style="margin-bottom: 8px; color: #334155;">${rec}</li>
+      `).join('')}
+    </ul>
+  ` : ''}
 
   <hr style="margin-top: 40px;">
   <div style="text-align: center; margin-top: 30px;">
