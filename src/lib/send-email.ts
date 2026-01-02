@@ -76,8 +76,13 @@ export async function sendAccessCodeEmail({
         <li>Select the government agencies you want to target</li>
         <li>Generate and download your personalized report</li>
         <li><strong>Click "Print All (PDF)"</strong> to save a permanent copy of your report</li>
-        <li><strong>Watch the tutorial:</strong> <a href="https://vimeo.com/1150857756?fl=tl&fe=ec" style="color: #1d4ed8;">How to Use Your Report</a></li>
       </ol>
+    </div>
+
+    <div style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+      <h3 style="color: #1e40af; margin: 0 0 10px 0;">🎬 Watch the Tutorial</h3>
+      <p style="color: #334155; margin: 0 0 15px 0;">Learn how to get the most out of your Federal Market Assassin report</p>
+      <a href="https://vimeo.com/1150857756?fl=tl&fe=ec" style="display: inline-block; background: #1e40af; color: white !important; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-weight: 600;">Watch Now</a>
     </div>
 
     <p style="text-align: center; color: #64748b;">
@@ -100,7 +105,7 @@ export async function sendAccessCodeEmail({
       to,
       subject: 'Your Federal Market Assassin Report Access | GovCon Giants',
       html: htmlContent,
-      text: `Your Federal Market Assassin Report Access\n\nThank you for your purchase!\n\nYour one-time access code: ${accessCode}\n\nAccess your report here: ${accessLink}\n\nHow to Get Your Report:\n1. Click the link above\n2. Enter your business information (NAICS code, location, etc.)\n3. Select the government agencies you want to target\n4. Generate and download your personalized report\n5. Click "Print All (PDF)" to save a permanent copy\n6. Watch the tutorial: https://vimeo.com/1150857756?fl=tl&fe=ec\n\nIMPORTANT: This link can only be used once. Make sure to download your report before leaving the page.\n\n- GovCon Giants Team`,
+      text: `Your Federal Market Assassin Report Access\n\nThank you for your purchase!\n\nYour one-time access code: ${accessCode}\n\nAccess your report here: ${accessLink}\n\nHow to Get Your Report:\n1. Click the link above\n2. Enter your business information (NAICS code, location, etc.)\n3. Select the government agencies you want to target\n4. Generate and download your personalized report\n5. Click "Print All (PDF)" to save a permanent copy\n\nWATCH THE TUTORIAL\nLearn how to get the most out of your report:\nhttps://vimeo.com/1150857756?fl=tl&fe=ec\n\nIMPORTANT: This link can only be used once. Make sure to download your report before leaving the page.\n\n- GovCon Giants Team`,
     });
 
     console.log(`✅ Access code email sent to ${to}`);
