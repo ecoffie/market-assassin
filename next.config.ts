@@ -9,6 +9,16 @@ const nextConfig: NextConfig = {
   experimental: {
     // Use React Compiler if available
   },
+  // Redirects for legacy URLs
+  async redirects() {
+    return [
+      {
+        source: '/opportunity-scout.html',
+        destination: '/opportunity-scout',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
