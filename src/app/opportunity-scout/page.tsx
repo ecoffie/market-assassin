@@ -1,0 +1,597 @@
+'use client';
+
+import { useState, FormEvent } from 'react';
+import Link from 'next/link';
+
+interface SearchCriteria {
+  businessFormation: string;
+  naicsCode: string;
+  zipCode: string;
+  goodsOrServices: string;
+  veteranStatus: string;
+}
+
+interface Agency {
+  agencyId: string | { _?: string };
+  agencyName: string | { _?: string };
+  parentAgency?: string;
+  totalSpending: number;
+  setAsideSpending: number;
+  contractCount: number;
+  setAsideContractCount: number;
+  setAsideTypes?: string[];
+  location?: string;
+  searchableOfficeCode?: string;
+  subAgencyCode?: string;
+  agencyCode?: string;
+  primaryPlaceOfPerformance?: {
+    city_name?: string;
+  };
+  noSetAsidesFound?: boolean;
+}
+
+interface SearchSuggestion {
+  type: string;
+  value: string;
+  label: string;
+  description: string;
+  estimatedContracts: number;
+}
+
+interface SearchResult {
+  agencies: Agency[];
+  summary: {
+    totalAwards: number;
+    totalAgencies: number;
+    totalSpending: number;
+  };
+  searchCriteria: SearchCriteria;
+  suggestions?: {
+    message: string;
+    alternatives: SearchSuggestion[];
+  };
+  locationTier?: number;
+  searchedState?: string;
+  naicsCorrectionMessage?: string;
+}
+
+export default function OpportunityScoutPage() {
+  const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [results, setResults] = useState<SearchResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedAgencyIndex, setSelectedAgencyIndex] = useState<number | null>(null);
+
+  const [formData, setFormData] = useState<SearchCriteria>({
+    businessFormation: '',
+    naicsCode: '',
+    zipCode: '',
+    goodsOrServices: '',
+    veteranStatus: '',
+  });
+
+  const loadingMessages = [
+    'Connecting to USAspending API...',
+    'Fetching contract data...',
+    'Analyzing set-aside types...',
+    'Matching NAICS codes...',
+    'Ranking agencies by spending...',
+    'Enhancing agency names...',
+    'Almost done...'
+  ];
+
+  const getAgencyName = (agency: Agency): string => {
+    if (typeof agency.agencyName === 'string') return agency.agencyName;
+    if (typeof agency.agencyName === 'object' && agency.agencyName._) return String(agency.agencyName._);
+    return 'Unknown Office';
+  };
+
+  const getAgencyId = (agency: Agency): string => {
+    if (typeof agency.agencyId === 'string') return agency.agencyId;
+    if (typeof agency.agencyId === 'object' && agency.agencyId._) return String(agency.agencyId._);
+    return 'N/A';
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setResults(null);
+    setProgress(0);
+
+    let messageIndex = 0;
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + Math.random() * 15, 95));
+      if (messageIndex < loadingMessages.length) {
+        setLoadingMessage(loadingMessages[messageIndex]);
+        messageIndex++;
+      }
+    }, 3000);
+
+    try {
+      const response = await fetch('/api/government-contracts/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to search government contracts');
+      }
+
+      const result = await response.json();
+      clearInterval(progressInterval);
+      setProgress(100);
+      setLoadingMessage('Complete!');
+
+      setTimeout(() => {
+        setLoading(false);
+        setResults(result);
+      }, 500);
+
+    } catch (err) {
+      clearInterval(progressInterval);
+      setLoading(false);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    }
+  };
+
+  const applySuggestion = (suggestion: SearchSuggestion) => {
+    const newFormData = { ...formData };
+
+    switch (suggestion.type) {
+      case 'set-aside':
+        newFormData.businessFormation = suggestion.value;
+        break;
+      case 'location':
+      case 'naics-setaside-nationwide':
+        newFormData.zipCode = '';
+        break;
+      case 'naics-prefix':
+        const prefixMatch = suggestion.value.match(/naics-prefix:(\d+)/);
+        if (prefixMatch?.[1]) {
+          newFormData.naicsCode = prefixMatch[1];
+        }
+        break;
+      case 'naics':
+        if (suggestion.value === 'all') {
+          newFormData.naicsCode = '';
+        }
+        break;
+    }
+
+    setFormData(newFormData);
+    setTimeout(() => {
+      document.getElementById('search-form')?.dispatchEvent(
+        new Event('submit', { bubbles: true, cancelable: true })
+      );
+    }, 100);
+  };
+
+  const formatSearchCriteria = (criteria: SearchCriteria): string => {
+    const parts: string[] = [];
+    if (criteria.naicsCode) parts.push(`NAICS ${criteria.naicsCode}`);
+    if (criteria.businessFormation) parts.push(criteria.businessFormation.replace(/-/g, ' '));
+    if (criteria.veteranStatus && criteria.veteranStatus !== 'not-applicable') {
+      parts.push(criteria.veteranStatus.replace(/-/g, ' '));
+    }
+    if (criteria.goodsOrServices) parts.push(criteria.goodsOrServices);
+    if (criteria.zipCode) parts.push(`ZIP ${criteria.zipCode}`);
+    return parts.join(', ') || 'All contracts';
+  };
+
+  const exportToCSV = () => {
+    if (!results?.agencies?.length) return;
+
+    let csv = 'Agency Name,Total Contracts,Total Spending,Average Contract Value,Set-Aside Types\n';
+
+    results.agencies.forEach(agency => {
+      const name = getAgencyName(agency).replace(/"/g, '""');
+      const contracts = agency.contractCount || 0;
+      const spending = agency.totalSpending || 0;
+      const avgValue = contracts > 0 ? Math.round(spending / contracts) : 0;
+      const setAsides = (agency.setAsideTypes || []).join('; ');
+
+      csv += `"${name}",${contracts},${spending.toFixed(2)},${avgValue.toFixed(2)},"${setAsides}"\n`;
+    });
+
+    csv += '\n';
+    csv += 'Search Summary\n';
+    csv += `Total Contracts,${results.summary?.totalAwards || 0}\n`;
+    csv += `Total Agencies,${results.summary?.totalAgencies || 0}\n`;
+    csv += `Total Spending,${(results.summary?.totalSpending || 0).toFixed(2)}\n`;
+    csv += `Search Date,${new Date().toLocaleDateString()}\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `opportunity-scout-results-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="mb-4">
+            <span className="text-3xl font-bold text-blue-400">GovCon</span>
+            <span className="text-3xl font-bold text-amber-400">Giants</span>
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-2">Opportunity Scout</h1>
+          <p className="text-slate-300">Discover 50+ agencies awarding contracts to businesses like yours</p>
+          <div className="mt-4">
+            <Link
+              href="/federal-market-assassin"
+              className="inline-block px-4 py-2 text-sm bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded-lg transition-colors"
+            >
+              Upgrade to Federal Market Assassin (Premium)
+            </Link>
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div className="sticky top-4 z-50 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-2xl p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                <div>
+                  <p className="font-semibold">Scouting Opportunities...</p>
+                  <p className="text-sm opacity-90">{loadingMessage}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold">{Math.floor(progress)}%</p>
+                <p className="text-xs opacity-75">Complete</p>
+              </div>
+            </div>
+            <div className="mt-3 bg-white bg-opacity-20 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-white h-full rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Search Form */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <form id="search-form" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Business Type
+                </label>
+                <select
+                  value={formData.businessFormation}
+                  onChange={(e) => setFormData({ ...formData, businessFormation: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select type</option>
+                  <option value="women-owned">Women Owned</option>
+                  <option value="hubzone">HUBZone</option>
+                  <option value="8a">8(a) Certified</option>
+                  <option value="small-business">Small Business</option>
+                  <option value="dot-certified">DOT Certified</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  NAICS Code
+                </label>
+                <input
+                  type="text"
+                  value={formData.naicsCode}
+                  onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
+                  placeholder="e.g., 541330"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Zip Code
+                </label>
+                <input
+                  type="text"
+                  value={formData.zipCode}
+                  onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                  placeholder="e.g., 10001"
+                  maxLength={5}
+                  pattern="[0-9]{5}"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Goods or Services?
+                </label>
+                <select
+                  value={formData.goodsOrServices}
+                  onChange={(e) => setFormData({ ...formData, goodsOrServices: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select one</option>
+                  <option value="goods">Goods</option>
+                  <option value="services">Services</option>
+                  <option value="both">Both</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Veteran Status
+                </label>
+                <select
+                  value={formData.veteranStatus}
+                  onChange={(e) => setFormData({ ...formData, veteranStatus: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select status</option>
+                  <option value="veteran-owned">Veteran Owned</option>
+                  <option value="service-disabled-veteran">Service Disabled Vet</option>
+                  <option value="not-applicable">Not Applicable</option>
+                </select>
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 text-white px-6 py-2 text-sm rounded-lg font-bold hover:bg-blue-700 transition shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Scout Opportunities
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-bold text-red-900 mb-2">Error</h2>
+            <p className="text-red-800">{error}</p>
+          </div>
+        )}
+
+        {/* Results */}
+        {results && (
+          <div className="space-y-6">
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print Results
+              </button>
+              <button
+                onClick={exportToCSV}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export CSV
+              </button>
+            </div>
+
+            {/* Summary */}
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+              <h2 className="text-xl font-bold text-blue-900 mb-4">Search Summary</h2>
+              <div className="space-y-2 text-blue-800">
+                <p><strong>Total Contracts Found:</strong> {results.summary.totalAwards.toLocaleString()}</p>
+                <p><strong>Agencies Spending in Your Category:</strong> {results.summary.totalAgencies}</p>
+                <p><strong>Total Contract Value:</strong> ${(results.summary.totalSpending / 1000000).toFixed(2)}M</p>
+                <p><strong>Search Criteria:</strong> {formatSearchCriteria(results.searchCriteria)}</p>
+
+                {results.locationTier && results.locationTier > 1 && results.searchedState && (
+                  <div className="mt-3 p-3 bg-amber-100 border border-amber-400 rounded-lg">
+                    <p className="text-sm text-amber-900">
+                      <strong>
+                        {results.locationTier === 2 && 'Geographic Expansion:'}
+                        {results.locationTier === 3 && 'Geographic Expansion:'}
+                        {results.locationTier === 4 && 'Geographic Expansion:'}
+                      </strong>{' '}
+                      {results.locationTier === 2 && `Search expanded from ${results.searchedState} to include bordering states to find more opportunities.`}
+                      {results.locationTier === 3 && `Search expanded from ${results.searchedState} to include the extended region (~200 mile radius) to find more opportunities.`}
+                      {results.locationTier === 4 && `Search expanded to nationwide to find more opportunities (started from ${results.searchedState}).`}
+                    </p>
+                  </div>
+                )}
+
+                {results.naicsCorrectionMessage && (
+                  <div className="mt-3 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                    <p className="text-sm text-blue-900">
+                      <strong>Search Info:</strong> {results.naicsCorrectionMessage}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Search Suggestions */}
+            {results.suggestions?.alternatives && results.suggestions.alternatives.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-blue-900 mb-2">Expand Your Search</h3>
+                <p className="text-sm text-blue-800 mb-4">{results.suggestions.message}</p>
+                <div className="space-y-3">
+                  {results.suggestions.alternatives.map((alt, index) => (
+                    <div
+                      key={index}
+                      onClick={() => applySuggestion(alt)}
+                      className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-400"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 mb-1">{alt.label}</h4>
+                          <p className="text-sm text-gray-600">{alt.description}</p>
+                        </div>
+                        <div className="ml-4 text-right">
+                          <p className="text-2xl font-bold text-green-600">~{alt.estimatedContracts.toLocaleString()}</p>
+                          <p className="text-xs text-gray-500">contracts</p>
+                        </div>
+                      </div>
+                      <button className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+                        Search with this option
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Agencies Table */}
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-4">Top Government Agencies</h2>
+              <p className="text-slate-300 mb-4">These agencies have awarded the most contracts matching your business profile</p>
+
+              {results.agencies && results.agencies.length > 0 ? (
+                <div className="bg-white rounded-xl shadow overflow-hidden">
+                  {results.agencies.some(a => a.noSetAsidesFound) && (
+                    <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400">
+                      <p className="text-sm text-yellow-800 font-semibold mb-2">No set-aside contracts found</p>
+                      <p className="text-sm text-yellow-700">
+                        These offices award contracts in your NAICS category, but no {results.searchCriteria.businessFormation || 'set-aside'} contracts were found in recent data.
+                        They may still award {results.searchCriteria.businessFormation || 'set-aside'} contracts - check SAM.gov for active opportunities.
+                      </p>
+                    </div>
+                  )}
+                  <div className="p-4 text-sm text-gray-700 bg-blue-50">
+                    <strong>Market Research Guide:</strong> Contracting offices below are ranked by set-aside spending.
+                    Use the <strong>Contracting Office</strong> and columns to identify program needs and gaps.
+                    The <strong>Office ID</strong> can be searched on <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">SAM.gov</a> to find active opportunities.
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-100 border-b-2 border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Agency ID</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Contracting Office</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Set-Aside Spending</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Total Spending</th>
+                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Contracts</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {results.agencies.map((agency, index) => {
+                          const agencyIdStr = getAgencyId(agency);
+                          const agencyNameStr = getAgencyName(agency);
+                          const displayAgencyId = agency.searchableOfficeCode || agency.subAgencyCode || agency.agencyCode || agencyIdStr;
+                          const samSearchUrl = `https://sam.gov/search/?index=opp&page=1&pageSize=25&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&q=${encodeURIComponent(agencyNameStr)}`;
+
+                          const cityName = agency.primaryPlaceOfPerformance?.city_name || '';
+                          const locationDisplay = [cityName, agency.location].filter(Boolean).join(', ');
+
+                          return (
+                            <tr
+                              key={index}
+                              className="hover:bg-blue-50 transition cursor-pointer"
+                              onClick={() => setSelectedAgencyIndex(selectedAgencyIndex === index ? null : index)}
+                            >
+                              <td className="px-6 py-4">
+                                <a
+                                  href={samSearchUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-blue-600 hover:underline font-semibold text-sm"
+                                  title={`Search SAM.gov for opportunities from ${agencyNameStr}`}
+                                >
+                                  {displayAgencyId}
+                                </a>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-semibold text-sm text-gray-900">{agencyNameStr}</div>
+                                {locationDisplay && (
+                                  <div className="text-xs text-gray-600 mt-1">{locationDisplay}</div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`text-sm font-bold ${agency.setAsideSpending > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                  ${(agency.setAsideSpending / 1000000).toFixed(2)}M
+                                </span>
+                                {agency.setAsideContractCount > 0 && (
+                                  <span className="block text-xs text-gray-600">{agency.setAsideContractCount} contracts</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-sm font-semibold text-gray-600">
+                                ${(agency.totalSpending / 1000000).toFixed(2)}M
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{agency.contractCount}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-yellow-900 mb-3">No agencies found matching your criteria</h3>
+                  <ul className="list-disc list-inside text-yellow-800 space-y-2">
+                    <li>Try adjusting your NAICS code or removing geographic restrictions</li>
+                    <li>Verify your search criteria are correct</li>
+                    <li>Some NAICS codes have limited contract activity</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Upgrade CTA */}
+            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-2xl p-8 text-white border-2 border-amber-500">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-3xl">🎯</span>
+                    <h3 className="text-2xl font-bold">Want More Intelligence?</h3>
+                  </div>
+                  <p className="text-lg opacity-95 mb-4">
+                    Upgrade to Federal Market Assassin for comprehensive strategic reports including prime contractors, pain points, and actionable recommendations.
+                  </p>
+                  <ul className="space-y-2 text-base opacity-90 mb-6">
+                    <li>8 comprehensive strategic reports</li>
+                    <li>Prime contractor suggestions with contacts</li>
+                    <li>Tribal business partnerships</li>
+                    <li>December spend forecast & Q4 opportunities</li>
+                    <li>Government buyers report with SBLO contacts</li>
+                  </ul>
+                </div>
+              </div>
+              <Link
+                href="/federal-market-assassin"
+                className="inline-block w-full md:w-auto px-8 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors text-center shadow-xl text-lg"
+              >
+                Get Federal Market Assassin
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-12 text-center text-slate-400">
+          <p className="text-sm">
+            &copy; {new Date().getFullYear()} GovCon Giants. All rights reserved.
+          </p>
+          <div className="mt-2">
+            <Link href="/" className="text-sm text-slate-400 hover:text-white transition">
+              Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
