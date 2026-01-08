@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-export default function DatabaseLockedPage() {
+export default function MarketAssassinLockedPage() {
   const [accessCode, setAccessCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -14,7 +14,7 @@ export default function DatabaseLockedPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/verify-db-access', {
+      const response = await fetch('/api/verify-ma-access', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: accessCode }),
@@ -23,8 +23,8 @@ export default function DatabaseLockedPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Redirect to Contractor Database
-        window.location.href = '/contractor-database';
+        // Redirect to Market Assassin
+        window.location.href = '/federal-market-assassin';
       } else {
         setError(data.error || 'Invalid access code');
       }
@@ -36,33 +36,35 @@ export default function DatabaseLockedPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-800 p-5">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-900 to-red-800 p-5">
       <div className="bg-white rounded-2xl p-10 max-w-lg text-center shadow-2xl">
-        <div className="text-6xl mb-5">🔒</div>
-        <h1 className="text-blue-800 mb-3 text-3xl font-bold">
-          Federal Contractor Database
+        <div className="text-6xl mb-5">🎯</div>
+        <h1 className="text-red-800 mb-3 text-3xl font-bold">
+          Federal Market Assassin
         </h1>
         <p className="text-gray-600 mb-8 text-base leading-relaxed">
-          Access to this database requires a purchase. Get lifetime access to 3,500+ federal prime contractors with SBLO contacts and supplier portals.
+          Generate 8 comprehensive strategic reports from just 5 inputs. Market analytics, government buyers, subcontracting opportunities, and more.
         </p>
 
-        <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-8 text-left">
-          <h3 className="text-green-800 mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
-          <ul className="text-green-700 m-0 pl-5 leading-loose text-sm">
-            <li><strong>3,500+</strong> federal prime contractors</li>
-            <li><strong>$430B+</strong> in contract data</li>
-            <li><strong>800+</strong> SBLO contacts with emails</li>
-            <li><strong>115+</strong> supplier portal links</li>
-            <li>Export to CSV for outreach</li>
-            <li>Lifetime access</li>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-8 text-left">
+          <h3 className="text-red-800 mt-0 mb-3 font-semibold">8 Reports Included:</h3>
+          <ul className="text-red-700 m-0 pl-5 leading-loose text-sm">
+            <li>Market Analytics Dashboard</li>
+            <li>Government Buyers Report</li>
+            <li>Subcontracting Opportunities</li>
+            <li>IDV Contracts Analysis</li>
+            <li>Similar Awards Report</li>
+            <li>Tribal Contracting</li>
+            <li>OSBP Contacts Directory</li>
+            <li>Export to HTML/PDF/JSON</li>
           </ul>
         </div>
 
         <a
-          href="https://buy.stripe.com/4gMaEY3wqcjo6h70CsfnO0g"
-          className="inline-block bg-blue-600 hover:bg-blue-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
+          href="https://govcongiants.lemonsqueezy.com/checkout/buy/federal-market-assassin"
+          className="inline-block bg-red-600 hover:bg-red-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
         >
-          Get Access - $297
+          Get Access - $597
         </a>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
@@ -90,7 +92,7 @@ export default function DatabaseLockedPage() {
         </div>
 
         <p className="text-gray-400 text-xs mt-6">
-          <Link href="/" className="text-blue-600 hover:underline">
+          <Link href="/" className="text-red-600 hover:underline">
             ← Back to Home
           </Link>
         </p>
