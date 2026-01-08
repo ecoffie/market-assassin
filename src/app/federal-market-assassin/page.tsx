@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { CoreInputs, Agency, ComprehensiveReport, AlternativeSearchOption } from '@/types/federal-market-assassin';
 import CoreInputForm from '@/components/federal-market-assassin/forms/CoreInputForm';
 import AgencySelectionTable from '@/components/federal-market-assassin/tables/AgencySelectionTable';
 import ReportsDisplay from '@/components/federal-market-assassin/reports/ReportsDisplay';
-import PasswordProtect from '@/components/auth/PasswordProtect';
 
-function FederalMarketAssassinContent() {
+export default function FederalMarketAssassinPage() {
   const [step, setStep] = useState<'inputs' | 'agencies' | 'reports'>('inputs');
   const [coreInputs, setCoreInputs] = useState<CoreInputs | null>(null);
   const [agencies, setAgencies] = useState<Agency[]>([]);
@@ -154,7 +154,7 @@ function FederalMarketAssassinContent() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="mb-4">
+          <div className="mb-4 flex items-center justify-center gap-4">
             <span className="text-3xl font-bold text-blue-700">GovCon</span>
             <span className="text-3xl font-bold text-amber-500">Giants</span>
           </div>
@@ -167,6 +167,14 @@ function FederalMarketAssassinContent() {
           <p className="text-lg text-slate-500 mt-2">
             Generate comprehensive market reports from 5 core inputs → Select target agencies → Get all 8 strategic reports instantly
           </p>
+          <div className="mt-4">
+            <Link
+              href="/opportunity-scout"
+              className="inline-block px-4 py-2 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+            >
+              Try Opportunity Scout (Free) →
+            </Link>
+          </div>
         </div>
 
         {/* Progress Indicator */}
@@ -321,16 +329,5 @@ function FederalMarketAssassinContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function FederalMarketAssassinPage() {
-  return (
-    <PasswordProtect
-      toolName="Federal Market Assassin"
-      storageKey="fma-authenticated"
-    >
-      <FederalMarketAssassinContent />
-    </PasswordProtect>
   );
 }

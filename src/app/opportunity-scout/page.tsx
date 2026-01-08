@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import React, { useState, FormEvent, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 interface SearchCriteria {
@@ -15,12 +15,14 @@ interface Agency {
   agencyId: string | { _?: string };
   agencyName: string | { _?: string };
   parentAgency?: string;
+  contractingOffice?: string;
   totalSpending: number;
   setAsideSpending: number;
   contractCount: number;
   setAsideContractCount: number;
   setAsideTypes?: string[];
   location?: string;
+  city?: string;
   searchableOfficeCode?: string;
   subAgencyCode?: string;
   agencyCode?: string;
@@ -28,6 +30,19 @@ interface Agency {
     city_name?: string;
   };
   noSetAsidesFound?: boolean;
+}
+
+interface PainPoint {
+  point: string;
+  source?: string;
+  priority?: 'critical' | 'high' | 'medium' | 'low';
+}
+
+interface AgencyKnowledge {
+  name: string;
+  abbreviation?: string;
+  description?: string;
+  painPoints: PainPoint[];
 }
 
 interface SearchSuggestion {
@@ -62,6 +77,10 @@ export default function OpportunityScoutPage() {
   const [results, setResults] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedAgencyIndex, setSelectedAgencyIndex] = useState<number | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalAgency, setModalAgency] = useState<Agency | null>(null);
+  const [painPoints, setPainPoints] = useState<PainPoint[]>([]);
+  const [painPointsLoading, setPainPointsLoading] = useState(false);
 
   const [formData, setFormData] = useState<SearchCriteria>({
     businessFormation: '',
@@ -92,6 +111,94 @@ export default function OpportunityScoutPage() {
     if (typeof agency.agencyId === 'object' && agency.agencyId._) return String(agency.agencyId._);
     return 'N/A';
   };
+
+  const loadPainPoints = useCallback(async (agency: Agency) => {
+    const officeName = getAgencyName(agency);
+    const parentAgency = agency.parentAgency || '';
+    const location = agency.location || agency.city || agency.primaryPlaceOfPerformance?.city_name || '';
+
+    setPainPointsLoading(true);
+    setPainPoints([]);
+
+    // Build search strategies
+    const searchStrategies = [
+      officeName,
+      officeName?.match(/NAVFAC|NAVSEA|NAVWAR|NAVAIR|NAVSUP/i)?.[0],
+      officeName?.match(/USACE|Army Corps/i) ? 'USACE' : null,
+      officeName?.match(/Army Contracting Command|ACC-/i) ? 'Army Contracting Command' : null,
+      officeName?.match(/Defense Logistics Agency|DLA/i) ? 'Defense Logistics Agency' : null,
+      officeName?.match(/National Institutes of Health|NIH/i) ? 'NIH' : null,
+      officeName?.match(/Centers for Disease Control|CDC/i) ? 'CDC' : null,
+      officeName?.match(/General Services Administration|GSA/i) ? 'GSA' : null,
+      parentAgency,
+      parentAgency?.replace('Department of the ', '').replace('Department of ', ''),
+    ].filter(Boolean);
+
+    try {
+      // Special handling for USACE
+      if (searchStrategies.includes('USACE')) {
+        const usaceResponse = await fetch(
+          `/api/usace-mission-pain-points?officeName=${encodeURIComponent(officeName)}&location=${encodeURIComponent(location)}`
+        );
+        const usaceData = await usaceResponse.json();
+
+        if (usaceData.success && usaceData.painPoints) {
+          setPainPoints(usaceData.painPoints.map((pp: string) => ({ point: pp, priority: 'high' as const })));
+          setPainPointsLoading(false);
+          return;
+        }
+      }
+
+      // Try standard search strategies
+      for (const name of searchStrategies) {
+        if (!name) continue;
+
+        try {
+          const response = await fetch(`/api/agency-knowledge-base/${encodeURIComponent(name)}`);
+          const data = await response.json();
+
+          if (data.success && data.data?.painPoints) {
+            const points: PainPoint[] = data.data.painPoints.map((item: string | PainPoint) => {
+              if (typeof item === 'string') {
+                return { point: item };
+              }
+              return item;
+            });
+            setPainPoints(points);
+            setPainPointsLoading(false);
+            return;
+          }
+        } catch {
+          // Continue to next strategy
+        }
+      }
+
+      setPainPointsLoading(false);
+    } catch {
+      setPainPointsLoading(false);
+    }
+  }, []);
+
+  const openAgencyModal = useCallback((agency: Agency) => {
+    setModalAgency(agency);
+    setModalOpen(true);
+    loadPainPoints(agency);
+  }, [loadPainPoints]);
+
+  const closeAgencyModal = useCallback(() => {
+    setModalOpen(false);
+    setModalAgency(null);
+    setPainPoints([]);
+  }, []);
+
+  // Close modal on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeAgencyModal();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [closeAgencyModal]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -499,7 +606,7 @@ export default function OpportunityScoutPage() {
                             <tr
                               key={index}
                               className="hover:bg-blue-50 transition cursor-pointer"
-                              onClick={() => setSelectedAgencyIndex(selectedAgencyIndex === index ? null : index)}
+                              onClick={() => openAgencyModal(agency)}
                             >
                               <td className="px-6 py-4">
                                 <a
@@ -592,6 +699,192 @@ export default function OpportunityScoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Agency Details Modal */}
+      {modalOpen && modalAgency && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={closeAgencyModal}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900">{getAgencyName(modalAgency)}</h2>
+              <button
+                onClick={closeAgencyModal}
+                className="text-gray-400 hover:text-gray-600 text-3xl font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Key Statistics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Set-Aside Spending</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    ${(modalAgency.setAsideSpending / 1000000).toFixed(2)}M
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">{modalAgency.setAsideContractCount || 0} contracts</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Total Spending</div>
+                  <div className="text-2xl font-bold text-gray-700">
+                    ${(modalAgency.totalSpending / 1000000).toFixed(2)}M
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">{modalAgency.contractCount || 0} contracts</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Set-Aside %</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {modalAgency.totalSpending > 0
+                      ? ((modalAgency.setAsideSpending / modalAgency.totalSpending) * 100).toFixed(1)
+                      : '0'}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">of total spending</div>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Agency ID</div>
+                  <div className="text-xl font-bold text-purple-600">
+                    {modalAgency.searchableOfficeCode || modalAgency.subAgencyCode || modalAgency.agencyCode || 'N/A'}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Search on SAM.gov</div>
+                </div>
+              </div>
+
+              {/* Office Information */}
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Office Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-gray-600">Contracting Office</div>
+                    <div className="text-base font-semibold text-gray-900">{getAgencyName(modalAgency)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">Parent Agency</div>
+                    <div className="text-base font-semibold text-gray-900">{modalAgency.parentAgency || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">Location</div>
+                    <div className="text-base text-gray-900">
+                      {[modalAgency.primaryPlaceOfPerformance?.city_name, modalAgency.location].filter(Boolean).join(', ') || 'Not specified'}
+                    </div>
+                  </div>
+                  {modalAgency.contractingOffice && modalAgency.contractingOffice !== getAgencyName(modalAgency) && (
+                    <div>
+                      <div className="text-sm text-gray-600">Office Detail</div>
+                      <div className="text-base text-gray-900">{modalAgency.contractingOffice}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Set-Aside Types */}
+              {modalAgency.setAsideTypes && modalAgency.setAsideTypes.length > 0 && (
+                <div className="bg-blue-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Set-Aside Types Used</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {modalAgency.setAsideTypes.map((type, i) => (
+                      <span key={i} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                        {type}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Links */}
+              <div className="bg-blue-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Market Research Links</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <a
+                    href={`https://sam.gov/search/?index=opp&page=1&pageSize=25&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&q=${encodeURIComponent(getAgencyName(modalAgency))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between bg-white rounded-lg p-4 hover:bg-blue-100 transition border border-blue-200"
+                  >
+                    <div>
+                      <div className="font-semibold text-gray-900">SAM.gov Opportunities</div>
+                      <div className="text-sm text-gray-600">Search active contracts</div>
+                    </div>
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                  <a
+                    href={`https://www.usaspending.gov/search/?hash=&filters=%7B%22keyword%22%3A%22${encodeURIComponent(getAgencyName(modalAgency))}%22%7D`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between bg-white rounded-lg p-4 hover:bg-blue-100 transition border border-blue-200"
+                  >
+                    <div>
+                      <div className="font-semibold text-gray-900">USASpending</div>
+                      <div className="text-sm text-gray-600">View spending data</div>
+                    </div>
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+
+              {/* Agency Pain Points */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-500 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-purple-900 mb-3">Agency Priorities & Pain Points</h3>
+                <div className="space-y-2">
+                  {painPointsLoading ? (
+                    <p className="text-sm text-purple-800">Loading agency insights...</p>
+                  ) : painPoints.length > 0 ? (
+                    <ul className="space-y-2 text-sm text-purple-800">
+                      {painPoints.map((item, i) => (
+                        <li key={i} className="flex items-start">
+                          <span className="text-purple-600 mr-2">•</span>
+                          <div className="flex-1">
+                            <span>{item.point}</span>
+                            {item.source && (
+                              <span className="text-purple-600 text-xs ml-2 italic">({item.source})</span>
+                            )}
+                            {item.priority && (
+                              <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
+                                item.priority === 'critical' ? 'bg-red-100 text-red-800' :
+                                item.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {item.priority}
+                              </span>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-purple-700 italic">
+                      Agency priorities data not available for this office yet. Check the office website for current priorities.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Market Research Tips */}
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-yellow-900 mb-3">Market Research Tips</h3>
+                <ul className="space-y-2 text-sm text-yellow-800">
+                  <li>• Check SAM.gov for active opportunities from this office</li>
+                  <li>• Research this office&apos;s typical contract sizes and durations</li>
+                  <li>• Identify past awardees to understand competition</li>
+                  <li>• Look for upcoming solicitations in your NAICS code</li>
+                  <li>• Align your capabilities with the agency priorities shown above</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

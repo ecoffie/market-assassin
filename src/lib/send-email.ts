@@ -15,6 +15,121 @@ interface SendAccessCodeEmailParams {
   accessLink: string;
 }
 
+interface SendDatabaseAccessEmailParams {
+  to: string;
+  customerName?: string;
+  accessLink: string;
+}
+
+// Email for Federal Contractor Database access
+export async function sendDatabaseAccessEmail({
+  to,
+  customerName,
+  accessLink,
+}: SendDatabaseAccessEmailParams): Promise<boolean> {
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">GovCon Giants</h1>
+    <p style="color: #93c5fd; margin: 10px 0 0 0;">Federal Contractor Database</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #1e3a8a; margin-top: 0;">Thank You for Your Purchase!</h2>
+
+    <p>Hi${customerName ? ` ${customerName}` : ''},</p>
+
+    <p>Your payment has been confirmed. You now have <strong>lifetime access</strong> to our Federal Contractor Database featuring:</p>
+
+    <ul style="color: #4b5563;">
+      <li><strong>3,500+</strong> federal prime contractors</li>
+      <li><strong>$430B+</strong> in contract data</li>
+      <li><strong>800+</strong> SBLO contacts with emails</li>
+      <li><strong>115+</strong> supplier portal links</li>
+      <li>Searchable and filterable by NAICS, agency, contract size</li>
+    </ul>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${accessLink}" style="background: #2563eb; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">Access Your Database</a>
+    </div>
+
+    <p style="color: #6b7280; font-size: 14px;">Or copy and paste this link into your browser:</p>
+    <p style="background: #f3f4f6; padding: 12px; border-radius: 6px; word-break: break-all; font-size: 14px;">
+      <a href="${accessLink}" style="color: #2563eb;">${accessLink}</a>
+    </p>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0;">💡 Pro Tips:</h3>
+      <ul style="color: #15803d; margin: 0; padding-left: 20px;">
+        <li>Use filters to find contractors by your NAICS codes</li>
+        <li>Look for companies with "Supplier Portal" badges to register directly</li>
+        <li>Export your filtered results to CSV for outreach</li>
+        <li>Bookmark the database page for easy access</li>
+      </ul>
+    </div>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      Save this email for future access.<br>
+      Questions? Reply to this email for support.
+    </p>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 12px;">
+      &copy; ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      to,
+      subject: 'Your Federal Contractor Database Access | GovCon Giants',
+      html: htmlContent,
+      text: `Thank You for Your Purchase!
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Your payment has been confirmed. You now have lifetime access to our Federal Contractor Database.
+
+Access your database here: ${accessLink}
+
+Features included:
+- 3,500+ federal prime contractors
+- $430B+ in contract data
+- 800+ SBLO contacts with emails
+- 115+ supplier portal links
+- Searchable and filterable by NAICS, agency, contract size
+
+Pro Tips:
+- Use filters to find contractors by your NAICS codes
+- Look for companies with "Supplier Portal" badges to register directly
+- Export your filtered results to CSV for outreach
+- Bookmark the database page for easy access
+
+Save this email for future access.
+Questions? Reply to this email for support.
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ Database access email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send database email:', error);
+    return false;
+  }
+}
+
 export async function sendAccessCodeEmail({
   to,
   companyName,

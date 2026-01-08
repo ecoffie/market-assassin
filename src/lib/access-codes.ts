@@ -100,3 +100,62 @@ export async function deleteAccessCode(code: string): Promise<boolean> {
   }
   return deleted > 0;
 }
+
+// ============================================
+// Database Access Tokens (for Federal Contractor Database)
+// ============================================
+
+export interface DatabaseAccessToken {
+  token: string;
+  email: string;
+  customerName?: string;
+  createdAt: string;
+  expiresAt?: string; // Optional expiry
+}
+
+// Generate a random database access token
+export function generateDatabaseToken(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let token = '';
+  for (let i = 0; i < 24; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+// Create a new database access token for a customer
+export async function createDatabaseToken(email: string, customerName?: string): Promise<DatabaseAccessToken> {
+  const token = generateDatabaseToken();
+  const dbToken: DatabaseAccessToken = {
+    token,
+    email,
+    customerName,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Store in KV with token as key (no expiry - lifetime access)
+  await kv.set(`dbtoken:${token}`, dbToken);
+
+  // Also store by email for lookup
+  await kv.set(`dbaccess:${email.toLowerCase()}`, { token, createdAt: dbToken.createdAt });
+
+  console.log(`✅ Database access token created: ${token} for ${email}`);
+  return dbToken;
+}
+
+// Validate a database access token
+export async function validateDatabaseToken(token: string): Promise<{ valid: boolean; tokenData?: DatabaseAccessToken; error?: string }> {
+  const tokenData = await kv.get<DatabaseAccessToken>(`dbtoken:${token}`);
+
+  if (!tokenData) {
+    return { valid: false, error: 'Invalid access token' };
+  }
+
+  return { valid: true, tokenData };
+}
+
+// Check if an email has database access
+export async function hasEmailDatabaseAccess(email: string): Promise<boolean> {
+  const access = await kv.get(`dbaccess:${email.toLowerCase()}`);
+  return !!access;
+}

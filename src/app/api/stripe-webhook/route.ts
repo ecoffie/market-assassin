@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createAccessCode } from '@/lib/access-codes';
-import { sendAccessCodeEmail } from '@/lib/send-email';
+import { createAccessCode, createDatabaseToken } from '@/lib/access-codes';
+import { sendAccessCodeEmail, sendDatabaseAccessEmail } from '@/lib/send-email';
 
 // Live and test webhook secrets (must be set in environment variables)
 const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -11,6 +11,11 @@ const testWebhookSecret = process.env.STRIPE_TEST_WEBHOOK_SECRET || '';
 const MARKET_ASSASSIN_PRODUCT_IDS = [
   'prod_TiOjPpnyLnO3eb', // Live product
   // Test products will be allowed if event is from test mode
+];
+
+// Product IDs for Federal Contractor Database - direct access link
+const DATABASE_PRODUCT_IDS = [
+  'prod_Tj551jheCp9wdQ', // Live product
 ];
 
 // Lazy-load Stripe to avoid build-time errors
@@ -64,22 +69,16 @@ export async function POST(request: NextRequest) {
 
     // Check if this is a test mode event
 
-    // Check if this purchase includes the Market Assassin product
-    const hasMarketAssassinProduct = lineItems.data.some((item) => {
+    // Check which product was purchased
+    let purchasedProductId: string | null = null;
+    lineItems.data.forEach((item) => {
       const product = item.price?.product;
       const productId = typeof product === 'string' ? product : product?.id;
-      return MARKET_ASSASSIN_PRODUCT_IDS.includes(productId || '');
+      if (productId) purchasedProductId = productId;
     });
 
-    // In test mode, allow any product for testing purposes
-    if (!hasMarketAssassinProduct && !isTestMode) {
-      console.log('📦 Purchase does not include Market Assassin product, skipping access code');
-      return NextResponse.json({ received: true, message: 'Not a Market Assassin purchase' });
-    }
-
-    if (isTestMode) {
-      console.log('🧪 Test mode purchase - allowing access code generation');
-    }
+    const hasMarketAssassinProduct = MARKET_ASSASSIN_PRODUCT_IDS.includes(purchasedProductId || '');
+    const hasDatabaseProduct = DATABASE_PRODUCT_IDS.includes(purchasedProductId || '');
 
     const customerEmail = session.customer_email || session.customer_details?.email;
     const customerName = session.customer_details?.name;
@@ -89,33 +88,74 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No customer email' }, { status: 400 });
     }
 
-    console.log(`💳 Market Assassin purchase completed for: ${customerEmail}`);
+    // Handle Federal Contractor Database purchase
+    if (hasDatabaseProduct) {
+      console.log(`💳 Federal Contractor Database purchase completed for: ${customerEmail}`);
 
-    // Create access code
-    const accessCode = await createAccessCode(customerEmail, customerName || undefined);
-    const accessLink = `https://tools.govcongiants.org/access/${accessCode.code}`;
+      // Create a unique access token for this customer
+      const dbToken = await createDatabaseToken(customerEmail, customerName || undefined);
+      const accessLink = `https://tools.govcongiants.org/api/database-access/${dbToken.token}`;
 
-    console.log(`🔑 Created access code: ${accessCode.code} for ${customerEmail}`);
+      console.log(`🔑 Database access token created: ${dbToken.token} for ${customerEmail}`);
 
-    // Send email with access link
-    const emailSent = await sendAccessCodeEmail({
-      to: customerEmail,
-      companyName: customerName || undefined,
-      accessCode: accessCode.code,
-      accessLink,
-    });
+      const emailSent = await sendDatabaseAccessEmail({
+        to: customerEmail,
+        customerName: customerName || undefined,
+        accessLink,
+      });
 
-    if (emailSent) {
-      console.log(`✅ Access email sent to ${customerEmail}`);
-    } else {
-      console.error(`❌ Failed to send access email to ${customerEmail}`);
+      if (emailSent) {
+        console.log(`✅ Database access email sent to ${customerEmail}`);
+      } else {
+        console.error(`❌ Failed to send database access email to ${customerEmail}`);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Database access email sent',
+        product: 'federal-contractor-database',
+        token: dbToken.token,
+      });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Access code created and email sent',
-      accessCode: accessCode.code,
-    });
+    // Handle Market Assassin purchase
+    if (hasMarketAssassinProduct || isTestMode) {
+      if (isTestMode && !hasMarketAssassinProduct) {
+        console.log('🧪 Test mode purchase - allowing access code generation');
+      }
+
+      console.log(`💳 Market Assassin purchase completed for: ${customerEmail}`);
+
+      // Create access code
+      const accessCode = await createAccessCode(customerEmail, customerName || undefined);
+      const accessLink = `https://tools.govcongiants.org/access/${accessCode.code}`;
+
+      console.log(`🔑 Created access code: ${accessCode.code} for ${customerEmail}`);
+
+      // Send email with access link
+      const emailSent = await sendAccessCodeEmail({
+        to: customerEmail,
+        companyName: customerName || undefined,
+        accessCode: accessCode.code,
+        accessLink,
+      });
+
+      if (emailSent) {
+        console.log(`✅ Access email sent to ${customerEmail}`);
+      } else {
+        console.error(`❌ Failed to send access email to ${customerEmail}`);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Access code created and email sent',
+        accessCode: accessCode.code,
+      });
+    }
+
+    // Unknown product
+    console.log(`📦 Purchase does not match any known product (${purchasedProductId}), skipping`);
+    return NextResponse.json({ received: true, message: 'Product not configured for access' });
   }
 
   // Return 200 for other events
