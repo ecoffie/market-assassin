@@ -1,3 +1,33 @@
+/**
+ * OPPORTUNITY SCOUT PAGE
+ * ======================
+ *
+ * CRITICAL FEATURES - DO NOT REMOVE OR MODIFY WITHOUT TESTING:
+ *
+ * 1. AGENCY MODAL (lines ~700-890):
+ *    - Opens when clicking any agency row in the results table
+ *    - Must display: Key Statistics, Office Information, Set-Aside Types,
+ *      Market Research Links, Pain Points, Market Research Tips
+ *    - Pain points are loaded from /api/agency-knowledge-base/ API
+ *
+ * 2. REQUIRED STATE VARIABLES:
+ *    - modalOpen: controls modal visibility
+ *    - modalAgency: stores the selected agency data
+ *    - painPoints: stores loaded pain points from API
+ *    - painPointsLoading: loading state for pain points
+ *
+ * 3. REQUIRED FUNCTIONS:
+ *    - openAgencyModal(): opens modal and loads pain points
+ *    - closeAgencyModal(): closes modal and clears state
+ *    - loadPainPoints(): fetches pain points from knowledge base API
+ *
+ * 4. TABLE ROW CLICK HANDLER:
+ *    - onClick={() => openAgencyModal(agency)} - DO NOT CHANGE
+ *
+ * Last working version: 2026-01-07
+ * If something breaks, check git history for this file.
+ */
+
 'use client';
 
 import React, { useState, FormEvent, useEffect, useCallback } from 'react';
