@@ -14,7 +14,34 @@ export default function Tier2DirectoryPage() {
       checkoutUrl="/free-resources"
       videoTitle="Tier-2 Supplier Directory"
       videoSubtitle="Direct links to vendor registration portals"
-      thumbnails={['Find', 'Register', 'Connect', 'Win']}
+      screenshots={[
+        '/images/products/tier2-directory/tier 2 main.png',
+        '/images/products/tier2-directory/tier 2 sample names.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/tier2-directory/tier 2 main.png',
+          title: 'Complete Tier-2 Directory',
+          description: 'Access supplier contacts and vendor registration portals at major prime contractors.',
+          bullets: [
+            '50+ prime contractors',
+            'Vendor portal links',
+            'Supplier contacts',
+            'Registration guides',
+          ],
+        },
+        {
+          image: '/images/products/tier2-directory/tier 2 sample names.png',
+          title: 'Prime Contractor Listings',
+          description: 'See which prime contractors are actively looking for small business subcontractors in your industry.',
+          bullets: [
+            'Company names',
+            'Industry focus areas',
+            'Contact information',
+            'Portal access links',
+          ],
+        },
+      ]}
       tldr={[
         'Complete Tier-2 supplier contact directory',
         'Direct vendor registration portal links',

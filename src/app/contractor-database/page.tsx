@@ -3,9 +3,9 @@ import ProductPageAppSumo from '@/components/ProductPageAppSumo';
 export default function ContractorDatabasePage() {
   return (
     <ProductPageAppSumo
-      title="Federal Contractor Database"
-      tagline="Search 200K+ federal contractors for teaming opportunities"
-      description="Stop wasting hours searching for teaming partners. The Federal Contractor Database gives you instant access to over 200,000 verified federal contractors, complete with contact information, contract history, certifications, and subcontracting details. Find the perfect prime or sub in minutes, not days."
+      title="Interactive SBLO & Subcontractor Database"
+      tagline="Search 3,500+ federal contractors for teaming opportunities"
+      description="Stop wasting hours searching for teaming partners. The Federal Contractor Database gives you instant access to over 3,500 verified federal prime contractors, complete with contact information, contract history, SBLO contacts, and supplier portal links. Find the perfect teaming partner in minutes, not days."
       primaryColor="#4f46e5"
       gradientFrom="#4f46e5"
       gradientTo="#7c3aed"
@@ -14,18 +14,58 @@ export default function ContractorDatabasePage() {
       checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database"
       videoTitle="Federal Contractor Database Demo"
       videoSubtitle="See how to find teaming partners in under 2 minutes"
-      thumbnails={['Search', 'Filter', 'Connect', 'Team']}
+      screenshots={[
+        '/images/products/contractor-database/main home page.png',
+        '/images/products/contractor-database/total contacts.png',
+        '/images/products/contractor-database/contacts with email.png',
+        '/images/products/contractor-database/search criteria.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/contractor-database/construction naics code.png',
+          title: 'Filter by NAICS Code',
+          description: 'Narrow down your search to contractors in your specific industry. Find companies that match your exact service offerings.',
+          bullets: [
+            'Search by primary NAICS code',
+            'Filter by multiple industries',
+            'See contract values by category',
+            'Identify top performers',
+          ],
+        },
+        {
+          image: '/images/products/contractor-database/10m to 100m firms.png',
+          title: 'Target by Company Size',
+          description: 'Find primes that match your teaming strategy. Filter by annual revenue to identify companies in your sweet spot.',
+          bullets: [
+            'Filter by revenue range',
+            'Find mid-size primes needing subs',
+            'Target growing companies',
+            'Identify subcontracting opportunities',
+          ],
+        },
+        {
+          image: '/images/products/contractor-database/sample contacts.png',
+          title: 'Direct Contact Information',
+          description: 'Get the contact details you need to reach out directly. No more hunting for email addresses or phone numbers.',
+          bullets: [
+            'SBLO email addresses included',
+            'Phone numbers when available',
+            'Supplier portal links',
+            'Company websites',
+          ],
+        },
+      ]}
       tldr={[
-        '200,000+ verified federal contractors',
-        'Prime contractor contact information',
-        'Contract history and award data',
-        'NAICS and set-aside filtering',
+        '3,500+ verified federal prime contractors',
+        '800+ SBLO contacts with emails',
+        '115+ supplier portal links',
+        '$430B+ in contract data',
         'Export to CSV for your CRM',
       ]}
       glanceItems={[
-        { label: 'Contractors', value: '200,000+ verified' },
-        { label: 'Data Points', value: 'Contact, contracts, certs' },
-        { label: 'Updates', value: 'Monthly refresh' },
+        { label: 'Contractors', value: '3,500+ primes' },
+        { label: 'SBLO Contacts', value: '800+ with emails' },
+        { label: 'Supplier Portals', value: '115+ links' },
         { label: 'Export', value: 'CSV download included' },
       ]}
       categoriesTitle="Search By Set-Aside Type"
@@ -39,30 +79,32 @@ export default function ContractorDatabasePage() {
       ]}
       features={[
         {
-          icon: 'DB',
-          title: '200K+ Verified Contractors',
-          description: 'Our database includes over 200,000 federal contractors with verified contact information, updated monthly from official government sources.',
+          icon: '🏢',
+          title: '3,500+ Prime Contractors',
+          description: 'Our database includes over 3,500 federal prime contractors with verified contact information and subcontracting plans.',
         },
         {
-          icon: 'FLT',
-          title: 'Advanced Filtering',
-          description: 'Filter by NAICS code, set-aside type, agency, contract value, location, and more. Find exactly who you need in seconds.',
+          icon: '📧',
+          title: '800+ SBLO Contacts',
+          description: 'Direct access to Small Business Liaison Officers with email addresses. Skip the gatekeepers and reach decision makers.',
         },
         {
-          icon: 'CTR',
-          title: 'Contract History',
-          description: 'See each contractors recent federal contracts including values, agencies, and performance. Know who is winning before you reach out.',
+          icon: '🔗',
+          title: '115+ Supplier Portals',
+          description: 'Links to supplier registration portals so you can get on vendor lists quickly and efficiently.',
         },
         {
-          icon: 'CSV',
+          icon: '📊',
           title: 'Export to CSV',
-          description: 'Download your search results to CSV for easy import into your CRM, email tool, or spreadsheet. Build targeted outreach lists instantly.',
+          description: 'Download your search results to CSV for easy import into your CRM, email tool, or spreadsheet.',
         },
       ]}
       benefits={[
         'Lifetime access (one-time payment)',
-        '200,000+ federal contractors',
-        'Monthly data updates',
+        '3,500+ federal prime contractors',
+        '800+ SBLO contacts with emails',
+        '115+ supplier portal links',
+        '$430B+ in contract data',
         'Advanced search & filtering',
         'CSV export included',
         'All future updates included',

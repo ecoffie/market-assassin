@@ -14,7 +14,47 @@ export default function DecemberSpendPage() {
       checkoutUrl="/free-resources"
       videoTitle="December Spend Forecast"
       videoSubtitle="Q4 spending predictions and positioning strategies"
-      thumbnails={['Budgets', 'Categories', 'Calendar', 'Strategy']}
+      screenshots={[
+        '/images/products/december-spend/december hit list.png',
+        '/images/products/december-spend/data sources.png',
+        '/images/products/december-spend/10 beginner contracts.png',
+        '/images/products/december-spend/34 low comp contracts.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/december-spend/december hit list.png',
+          title: 'December Hit List',
+          description: 'Identify the hottest year-end spending opportunities with our curated hit list of agencies and categories.',
+          bullets: [
+            'Top spending agencies',
+            'Hot categories identified',
+            'Budget surplus targets',
+            'Quick-win opportunities',
+          ],
+        },
+        {
+          image: '/images/products/december-spend/10 beginner contracts.png',
+          title: 'Beginner-Friendly Contracts',
+          description: 'Perfect entry points for new contractors looking to win their first federal contract.',
+          bullets: [
+            '10 beginner contracts',
+            'Lower competition',
+            'Smaller dollar values',
+            'Quick turnaround',
+          ],
+        },
+        {
+          image: '/images/products/december-spend/example contract.png',
+          title: 'Contract Examples',
+          description: 'See real contract examples with details on how to position yourself for similar opportunities.',
+          bullets: [
+            'Real contract data',
+            'Award details',
+            'Agency information',
+            'Positioning tips',
+          ],
+        },
+      ]}
       tldr={[
         'Agency-by-agency budget forecasts',
         'Hot spending categories identified',

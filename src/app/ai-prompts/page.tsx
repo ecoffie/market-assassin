@@ -14,7 +14,47 @@ export default function AIPromptsPage() {
       checkoutUrl="/free-resources"
       videoTitle="75+ AI Prompts for GovCon"
       videoSubtitle="Copy-paste prompts that actually work"
-      thumbnails={['Copy', 'Paste', 'Customize', 'Done']}
+      screenshots={[
+        '/images/products/ai-prompts/federal prompt library.png',
+        '/images/products/ai-prompts/teaming prompts.png',
+        '/images/products/ai-prompts/top 10 past performance.png',
+        '/images/products/ai-prompts/top 10 quality.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/ai-prompts/federal prompt library.png',
+          title: 'Federal Prompt Library',
+          description: 'Access our complete library of GovCon-specific AI prompts organized by category and use case.',
+          bullets: [
+            '75+ ready-to-use prompts',
+            'Organized by category',
+            'Copy-paste format',
+            'Works with any AI',
+          ],
+        },
+        {
+          image: '/images/products/ai-prompts/teaming prompts.png',
+          title: 'Teaming & BD Prompts',
+          description: 'Prompts specifically designed for finding teaming partners and developing business opportunities.',
+          bullets: [
+            'Teaming outreach templates',
+            'BD strategy prompts',
+            'Partner evaluation',
+            'Capability matching',
+          ],
+        },
+        {
+          image: '/images/products/ai-prompts/top 10 past performance.png',
+          title: 'Past Performance Prompts',
+          description: 'Generate compelling past performance narratives that highlight your relevant experience.',
+          bullets: [
+            'Past performance writing',
+            'Relevance highlighting',
+            'Results quantification',
+            'Story development',
+          ],
+        },
+      ]}
       tldr={[
         '75+ ready-to-use prompts',
         'BD & proposal writing prompts',

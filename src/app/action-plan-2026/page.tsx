@@ -14,7 +14,46 @@ export default function ActionPlan2026Page() {
       checkoutUrl="/free-resources"
       videoTitle="2026 GovCon Action Plan"
       videoSubtitle="12-month roadmap to federal contract wins"
-      thumbnails={['Q1 Plan', 'Q2 Plan', 'Q3 Plan', 'Q4 Plan']}
+      screenshots={[
+        '/images/products/action-plan-2026/action plan home.png',
+        '/images/products/action-plan-2026/phase 3.png',
+        '/images/products/action-plan-2026/phase 5.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/action-plan-2026/action plan home.png',
+          title: 'Complete Action Plan',
+          description: 'Your 12-month roadmap with monthly milestones and actionable tasks to win federal contracts.',
+          bullets: [
+            '12-month roadmap',
+            'Monthly milestones',
+            'Weekly tasks',
+            'Goal tracking',
+          ],
+        },
+        {
+          image: '/images/products/action-plan-2026/phase 3.png',
+          title: 'Phase-by-Phase Breakdown',
+          description: 'Each phase includes detailed instructions, key activities, and success metrics.',
+          bullets: [
+            'Clear objectives',
+            'Specific actions',
+            'Timeline guidance',
+            'Success metrics',
+          ],
+        },
+        {
+          image: '/images/products/action-plan-2026/phase 5.png',
+          title: 'Implementation Details',
+          description: 'Detailed guidance for each phase of your GovCon journey with practical next steps.',
+          bullets: [
+            'Step-by-step guidance',
+            'Resource recommendations',
+            'Common pitfalls',
+            'Best practices',
+          ],
+        },
+      ]}
       tldr={[
         '12-month action plan with monthly milestones',
         'Key federal contracting deadlines for 2026',

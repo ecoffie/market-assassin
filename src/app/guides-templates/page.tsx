@@ -14,13 +14,52 @@ export default function GuidesTemplatesPage() {
       checkoutUrl="/free-resources"
       videoTitle="GovCon Guides & Templates"
       videoSubtitle="Everything you need to get started in federal contracting"
-      thumbnails={['Guides', 'Templates', 'Checklists', 'Download']}
+      screenshots={[
+        '/images/products/guides-templates/agency-pain-points-1.png',
+        '/images/products/guides-templates/agency-pain-points-2.png',
+        '/images/products/guides-templates/agency-pain-points-3.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/guides-templates/agency-pain-points-1.png',
+          title: 'Agency Pain Points Decision Framework',
+          description: 'Match your business capabilities to agency pain points for faster wins. Know which agencies need what you offer.',
+          bullets: [
+            '8 pain point categories',
+            'Agency-specific profiles',
+            'Decision matrix & scoring',
+            'Tailored outreach strategies',
+          ],
+        },
+        {
+          image: '/images/products/guides-templates/agency-pain-points-2.png',
+          title: '2026 NDAA Small Business Provisions',
+          description: 'Stay ahead with the latest FY2026 NDAA changes affecting small business contracting. New sole source thresholds, CMMC support, and more.',
+          bullets: [
+            'Higher sole source thresholds ($8M/$10M)',
+            'Unified application process',
+            'CMMC compliance support',
+            'Cybersecurity harmonization',
+          ],
+        },
+        {
+          image: '/images/products/guides-templates/agency-pain-points-3.png',
+          title: 'General Contractor Guide',
+          description: 'Construction-specific guidance for GCs entering federal contracting. Know where to find the right opportunities.',
+          bullets: [
+            'Key NAICS codes for GCs',
+            'VA, DoD, GSA opportunities',
+            'Bonding requirements',
+            'Site visit preparation',
+          ],
+        },
+      ]}
       tldr={[
-        'Step-by-step guides for every stage of GovCon',
-        'Ready-to-use email templates for SBLO outreach',
-        'Checklists to never miss a step',
-        'Best practices from successful contractors',
-        'Updated with latest FAR regulations',
+        '2026 NDAA Small Business Provisions breakdown',
+        'Agency Pain Points Decision Framework',
+        'General Contractor-specific guidance',
+        'Decision matrices and scoring tools',
+        'Action plans and checklists',
       ]}
       glanceItems={[
         { label: 'Format', value: 'PDF Bundle' },
@@ -30,42 +69,42 @@ export default function GuidesTemplatesPage() {
       ]}
       categoriesTitle="Whats Included"
       categories={[
-        { title: 'SAM Registration Guide', highlight: true },
-        { title: 'Capability Statement Template', highlight: true },
-        { title: 'SBLO Email Templates', highlight: true },
-        { title: 'Teaming Agreement Checklist', highlight: true },
-        { title: 'Proposal Response Checklist', highlight: true },
-        { title: 'BD Pipeline Tracker', highlight: true },
+        { title: '2026 NDAA Summary', highlight: true },
+        { title: 'Agency Pain Points Framework', highlight: true },
+        { title: 'General Contractor Guide', highlight: true },
+        { title: 'Decision Matrix Tools', highlight: true },
+        { title: 'Action Plans & Checklists', highlight: true },
+        { title: 'Agency-Specific Profiles', highlight: true },
       ]}
       features={[
         {
-          icon: '📖',
-          title: 'Step-by-Step Guides',
-          description: 'Detailed guides that walk you through every stage from registration to contract execution.',
-        },
-        {
-          icon: '📧',
-          title: 'Email Templates',
-          description: 'Professional templates for SBLO outreach, teaming introductions, and follow-ups. Just customize and send.',
-        },
-        {
-          icon: '✅',
-          title: 'Checklists',
-          description: 'Never miss a step with our comprehensive checklists for proposals, registrations, and compliance.',
+          icon: '📜',
+          title: '2026 NDAA Small Business Provisions',
+          description: 'Understand the latest FY2026 NDAA changes: higher sole source thresholds ($8M/$10M), unified application process, CMMC support strategy, and cybersecurity harmonization.',
         },
         {
           icon: '🎯',
-          title: 'Best Practices',
-          description: 'Learn from successful contractors strategies and avoid common mistakes that cost new contractors opportunities.',
+          title: 'Agency Pain Points Decision Framework',
+          description: 'Match your capabilities to agency pain points. Includes profiles for DHS, Space Force, DOE, DoD, DOT, and DLA with scoring tools.',
+        },
+        {
+          icon: '🏗️',
+          title: 'General Contractor Guide',
+          description: 'Construction-specific guidance: key NAICS codes (236220, 238210, 238220), VA/DoD/GSA opportunities, bonding requirements, and site visit prep.',
+        },
+        {
+          icon: '📊',
+          title: 'Decision Tools & Action Plans',
+          description: 'Priority matrices, scoring tools, and week-by-week action plans to help you choose and pursue the right agencies.',
         },
       ]}
       benefits={[
         'Instant PDF download',
-        'Step-by-step guides',
-        'Email templates included',
-        'BD checklists',
-        'Best practices guide',
-        'Regular updates',
+        '2026 NDAA provisions summary',
+        'Agency pain points framework',
+        'General contractor guide',
+        'Decision matrices & scoring tools',
+        'Week-by-week action plans',
       ]}
       highlightTitle="Dont Reinvent the Wheel"
       highlightText="Successful contractors dont start from scratch. They use proven templates, follow established processes, and leverage checklists to stay organized. This bundle gives you all the tools that experienced contractors use - so you can skip the learning curve."

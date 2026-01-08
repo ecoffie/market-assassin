@@ -14,7 +14,34 @@ export default function SBLODirectoryPage() {
       checkoutUrl="/free-resources"
       videoTitle="SBLO Contact Directory"
       videoSubtitle="76+ agencies with direct contact information"
-      thumbnails={['Agencies', 'Contacts', 'Emails', 'Download']}
+      screenshots={[
+        '/images/products/sblo-directory/main page prime.png',
+        '/images/products/sblo-directory/prime examples.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/sblo-directory/main page prime.png',
+          title: 'Complete SBLO Directory',
+          description: 'Access direct contact information for Small Business Liaison Officers across federal agencies and prime contractors.',
+          bullets: [
+            'Direct email addresses',
+            'Phone numbers included',
+            '76+ federal agencies',
+            'Prime contractor SBLOs',
+          ],
+        },
+        {
+          image: '/images/products/sblo-directory/prime examples.png',
+          title: 'Prime Contractor Contacts',
+          description: 'Get SBLO contacts at major prime contractors who are actively looking for small business subcontractors.',
+          bullets: [
+            'Major defense primes',
+            'Civilian agency primes',
+            'Supplier diversity contacts',
+            'Vendor registration info',
+          ],
+        },
+      ]}
       tldr={[
         '76+ federal agencies covered',
         'Direct SBLO email addresses',

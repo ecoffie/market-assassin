@@ -145,7 +145,7 @@ export default function ProductPageAppSumo({
                 <img
                   src={screenshots.length > 0 ? screenshots[selectedImage] : mainImage}
                   alt={`${title} screenshot ${selectedImage + 1}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain bg-gray-100"
                 />
               ) : (
                 // Fallback gradient placeholder
@@ -178,7 +178,7 @@ export default function ProductPageAppSumo({
                     <img
                       src={screenshot}
                       alt={`${title} thumbnail ${i + 1}`}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-gray-100"
                     />
                   </div>
                 ))
@@ -266,11 +266,17 @@ export default function ProductPageAppSumo({
                   {/* Image */}
                   <div className="w-full md:w-1/2">
                     <div className="rounded-xl overflow-hidden border border-gray-200 shadow-lg">
-                      <img
-                        src={feature.image}
-                        alt={feature.title}
-                        className="w-full h-auto"
-                      />
+                      {feature.image ? (
+                        <img
+                          src={feature.image}
+                          alt={feature.title}
+                          className="w-full h-auto"
+                        />
+                      ) : (
+                        <div className="w-full h-64 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                          <span className="text-6xl">📄</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

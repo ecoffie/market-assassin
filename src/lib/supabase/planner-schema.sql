@@ -60,3 +60,4 @@ CREATE TRIGGER update_user_plans_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 
+

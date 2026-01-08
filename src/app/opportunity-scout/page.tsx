@@ -362,14 +362,6 @@ export default function OpportunityScoutPage() {
           </div>
           <h1 className="text-4xl font-bold text-white mb-2">Opportunity Scout</h1>
           <p className="text-slate-300">Discover 50+ agencies awarding contracts to businesses like yours</p>
-          <div className="mt-4">
-            <Link
-              href="/federal-market-assassin"
-              className="inline-block px-4 py-2 text-sm bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded-lg transition-colors"
-            >
-              Upgrade to Federal Market Assassin (Premium)
-            </Link>
-          </div>
         </div>
 
         {/* Loading State */}
@@ -687,33 +679,6 @@ export default function OpportunityScoutPage() {
               )}
             </div>
 
-            {/* Upgrade CTA */}
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-2xl p-8 text-white border-2 border-amber-500">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-3xl">🎯</span>
-                    <h3 className="text-2xl font-bold">Want More Intelligence?</h3>
-                  </div>
-                  <p className="text-lg opacity-95 mb-4">
-                    Upgrade to Federal Market Assassin for comprehensive strategic reports including prime contractors, pain points, and actionable recommendations.
-                  </p>
-                  <ul className="space-y-2 text-base opacity-90 mb-6">
-                    <li>8 comprehensive strategic reports</li>
-                    <li>Prime contractor suggestions with contacts</li>
-                    <li>Tribal business partnerships</li>
-                    <li>December spend forecast & Q4 opportunities</li>
-                    <li>Government buyers report with SBLO contacts</li>
-                  </ul>
-                </div>
-              </div>
-              <Link
-                href="/federal-market-assassin"
-                className="inline-block w-full md:w-auto px-8 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors text-center shadow-xl text-lg"
-              >
-                Get Federal Market Assassin
-              </Link>
-            </div>
           </div>
         )}
 

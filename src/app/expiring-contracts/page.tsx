@@ -14,7 +14,47 @@ export default function ExpiringContractsPage() {
       checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/expiring-contracts"
       videoTitle="Expiring Contracts Forecast Demo"
       videoSubtitle="See how to find recompete opportunities 3-6 months early"
-      thumbnails={['Search', 'Filter', 'Contact', 'Win']}
+      screenshots={[
+        '/images/products/expiring-contracts/home page expiring contracts.png',
+        '/images/products/expiring-contracts/filter contacts.png',
+        '/images/products/expiring-contracts/construction filter.png',
+        '/images/products/expiring-contracts/billion dollar filter.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/expiring-contracts/10M to 100M.png',
+          title: 'Filter by Contract Value',
+          description: 'Target contracts in your sweet spot. Filter by value range to find opportunities that match your capabilities.',
+          bullets: [
+            'Filter $10M to $100M contracts',
+            'Target mid-size recompetes',
+            'Find subcontracting opportunities',
+            'Match your past performance',
+          ],
+        },
+        {
+          image: '/images/products/expiring-contracts/1M category.png',
+          title: 'Search by Category',
+          description: 'Find contracts in your industry. Filter by NAICS code, PSC, or service category.',
+          bullets: [
+            'Filter by NAICS code',
+            'Search by PSC category',
+            'Target your industry',
+            'See contract history',
+          ],
+        },
+        {
+          image: '/images/products/expiring-contracts/500k.png',
+          title: 'Small Business Opportunities',
+          description: 'Find smaller contracts perfect for small business set-asides and direct awards.',
+          bullets: [
+            'Contracts under $500K',
+            'Set-aside opportunities',
+            'Direct award potential',
+            'Small business friendly',
+          ],
+        },
+      ]}
       tldr={[
         'Access $221B+ in expiring contract data with monthly updates',
         'Get prime contractor details before they start building teams',

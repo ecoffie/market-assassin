@@ -14,7 +14,47 @@ export default function ExpiringContractsCSVPage() {
       checkoutUrl="/free-resources"
       videoTitle="Expiring Contracts Sample"
       videoSubtitle="Import into Excel or your CRM instantly"
-      thumbnails={['Download', 'Import', 'Filter', 'Outreach']}
+      screenshots={[
+        '/images/products/expiring-contracts-csv/main page.png',
+        '/images/products/expiring-contracts-csv/total contracts.png',
+        '/images/products/expiring-contracts-csv/values.png',
+        '/images/products/expiring-contracts-csv/naics receipient.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/expiring-contracts-csv/main page.png',
+          title: 'Complete Contract Data',
+          description: 'Access comprehensive expiring contract information in an easy-to-use CSV format.',
+          bullets: [
+            'Contract numbers',
+            'Agency information',
+            'Expiration dates',
+            'Prime contractor details',
+          ],
+        },
+        {
+          image: '/images/products/expiring-contracts-csv/start end date.png',
+          title: 'Date Information',
+          description: 'See contract start and end dates to time your outreach perfectly.',
+          bullets: [
+            'Contract start dates',
+            'Expiration dates',
+            'Timeline visibility',
+            'Planning insights',
+          ],
+        },
+        {
+          image: '/images/products/expiring-contracts-csv/values.png',
+          title: 'Contract Values',
+          description: 'Prioritize your outreach based on contract dollar values and opportunity size.',
+          bullets: [
+            'Total contract value',
+            'Award amounts',
+            'Size prioritization',
+            'ROI targeting',
+          ],
+        },
+      ]}
       tldr={[
         'Free sample of expiring contracts data',
         'CSV format - works with Excel, Sheets, any CRM',

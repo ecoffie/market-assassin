@@ -3,7 +3,7 @@ import ProductPageAppSumo from '@/components/ProductPageAppSumo';
 export default function AIContentPage() {
   return (
     <ProductPageAppSumo
-      title="AI Content Generator"
+      title="LinkedIn Content Creator"
       tagline="Create LinkedIn posts that resonate with government buyers"
       description="Stop staring at blank screens wondering what to post. The AI Content Generator creates LinkedIn posts specifically designed to resonate with government buyers and contracting officers. Our custom fine-tuned model was trained on 146 viral GovCon posts, so it writes in the authentic voice of successful GovCon thought leaders."
       primaryColor="#7c3aed"
@@ -12,9 +12,17 @@ export default function AIContentPage() {
       price="$197"
       originalPrice="$588/year"
       checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/ai-content-generator"
-      videoTitle="AI Content Generator Demo"
-      videoSubtitle="See how to generate 10 LinkedIn posts in under 60 seconds"
-      thumbnails={['Select', 'Generate', 'Edit', 'Post']}
+      screenshots={[
+        '/screenshots/linkedin-content-creator/home page .png',
+        '/screenshots/linkedin-content-creator/search options.png',
+        '/screenshots/linkedin-content-creator/target agencies.png',
+        '/screenshots/linkedin-content-creator/sample post type.png',
+        '/screenshots/linkedin-content-creator/your linkedin posts.png',
+        '/screenshots/linkedin-content-creator/case study.png',
+        '/screenshots/linkedin-content-creator/pain point.png',
+        '/screenshots/linkedin-content-creator/quote graphic.png',
+        '/screenshots/linkedin-content-creator/sample graphic.png',
+      ]}
       tldr={[
         'Generate 10 LinkedIn posts with one click',
         '175 federal agencies to target',
