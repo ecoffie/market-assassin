@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 export default function MarketAssassinLockedPage() {
-  const [accessCode, setAccessCode] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -14,22 +14,21 @@ export default function MarketAssassinLockedPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/verify-ma-access', {
+      const response = await fetch('/api/verify-ma-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: accessCode }),
+        body: JSON.stringify({ password }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        // Redirect to Market Assassin
         window.location.href = '/federal-market-assassin';
       } else {
-        setError(data.error || 'Invalid access code');
+        setError(data.error || 'Invalid password');
       }
     } catch {
-      setError('Failed to verify access code');
+      setError('Failed to verify password');
     } finally {
       setLoading(false);
     }
@@ -68,19 +67,18 @@ export default function MarketAssassinLockedPage() {
         </a>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-gray-500 text-sm mb-4">Already purchased? Enter your access code:</p>
+          <p className="text-gray-500 text-sm mb-4">Already have access? Enter your password:</p>
           <form onSubmit={handleSubmit} className="flex gap-2">
             <input
-              type="text"
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-              placeholder="Enter access code"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center font-mono tracking-wider uppercase"
-              maxLength={24}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center"
             />
             <button
               type="submit"
-              disabled={loading || !accessCode}
+              disabled={loading || !password}
               className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? '...' : 'Unlock'}

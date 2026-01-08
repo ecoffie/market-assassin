@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 export default function DatabaseLockedPage() {
-  const [accessCode, setAccessCode] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -14,22 +14,21 @@ export default function DatabaseLockedPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/verify-db-access', {
+      const response = await fetch('/api/verify-db-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: accessCode }),
+        body: JSON.stringify({ password }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        // Redirect to Contractor Database
         window.location.href = '/contractor-database';
       } else {
-        setError(data.error || 'Invalid access code');
+        setError(data.error || 'Invalid password');
       }
     } catch {
-      setError('Failed to verify access code');
+      setError('Failed to verify password');
     } finally {
       setLoading(false);
     }
@@ -43,13 +42,13 @@ export default function DatabaseLockedPage() {
           Federal Contractor Database
         </h1>
         <p className="text-gray-600 mb-8 text-base leading-relaxed">
-          Access to this database requires a purchase. Get lifetime access to 3,500+ federal prime contractors with SBLO contacts and supplier portals.
+          Access to this database requires a password. Get lifetime access to 200K+ federal contractors for teaming opportunities.
         </p>
 
         <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-8 text-left">
           <h3 className="text-green-800 mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
           <ul className="text-green-700 m-0 pl-5 leading-loose text-sm">
-            <li><strong>3,500+</strong> federal prime contractors</li>
+            <li><strong>200K+</strong> federal contractors</li>
             <li><strong>$430B+</strong> in contract data</li>
             <li><strong>800+</strong> SBLO contacts with emails</li>
             <li><strong>115+</strong> supplier portal links</li>
@@ -62,23 +61,22 @@ export default function DatabaseLockedPage() {
           href="https://buy.stripe.com/4gMaEY3wqcjo6h70CsfnO0g"
           className="inline-block bg-blue-600 hover:bg-blue-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
         >
-          Get Access - $297
+          Get Access - $197
         </a>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-gray-500 text-sm mb-4">Already purchased? Enter your access code:</p>
+          <p className="text-gray-500 text-sm mb-4">Already have access? Enter your password:</p>
           <form onSubmit={handleSubmit} className="flex gap-2">
             <input
-              type="text"
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-              placeholder="Enter access code"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center font-mono tracking-wider uppercase"
-              maxLength={24}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center"
             />
             <button
               type="submit"
-              disabled={loading || !accessCode}
+              disabled={loading || !password}
               className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? '...' : 'Unlock'}
