@@ -23,7 +23,7 @@ export default function DatabaseLockedPage() {
       const data = await response.json();
 
       if (data.success) {
-        window.location.href = '/contractor-database';
+        window.location.href = '/database.html';
       } else {
         setError(data.error || 'Invalid password');
       }
