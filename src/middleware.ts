@@ -29,10 +29,14 @@ export function middleware(request: NextRequest) {
   }
 
   // Protect Federal Contractor Database (Next.js page)
+  // If user has access, redirect to actual database. If not, redirect to locked page.
   if (pathname === '/contractor-database') {
     const hasAccess = request.cookies.get('db_access_email')?.value;
 
-    if (!hasAccess) {
+    if (hasAccess) {
+      // User has access - send them to the actual database
+      return NextResponse.redirect(new URL('/database.html', request.url));
+    } else {
       return NextResponse.redirect(new URL('/database-locked', request.url));
     }
   }
