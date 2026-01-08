@@ -1,3 +1,33 @@
+/**
+ * REPORTS DISPLAY COMPONENT
+ * =========================
+ *
+ * CRITICAL: This component displays the 8 strategic reports.
+ * DO NOT REMOVE OR MODIFY WITHOUT TESTING.
+ *
+ * REPORTS DISPLAYED:
+ * 1. Executive Summary (summary tab)
+ * 2. Market Analytics (spending, trends, geographic charts)
+ * 3. Government Buyers (contacts at agencies)
+ * 4. Subcontracting Opportunities (prime contractors)
+ * 5. IDV Contracts (BPAs, IDIQs, GWACs)
+ * 6. Similar Awards (past contracts in NAICS)
+ * 7. Tribal Contracting (tribal partnerships)
+ * 8. OSBP Contacts (small business offices)
+ *
+ * REQUIRED PROPS:
+ * - reports: ComprehensiveReport - all report data
+ * - onReset: () => void - callback to start over
+ *
+ * FEATURES:
+ * - Tab navigation between reports
+ * - Export to PDF/HTML/JSON
+ * - Charts for spending analysis
+ * - Pain points modal for agencies
+ *
+ * Last working version: 2026-01-07
+ */
+
 'use client';
 
 import { ComprehensiveReport, CoreInputs } from '@/types/federal-market-assassin';

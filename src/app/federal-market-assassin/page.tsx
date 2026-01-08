@@ -1,3 +1,40 @@
+/**
+ * FEDERAL MARKET ASSASSIN PAGE
+ * ============================
+ *
+ * CRITICAL FEATURES - DO NOT REMOVE OR MODIFY WITHOUT TESTING:
+ *
+ * 1. THREE-STEP WORKFLOW:
+ *    - Step 1 (inputs): CoreInputForm - collects 5 core inputs
+ *    - Step 2 (agencies): AgencySelectionTable - select target agencies
+ *    - Step 3 (reports): ReportsDisplay - shows 8 strategic reports
+ *
+ * 2. REQUIRED STATE VARIABLES:
+ *    - step: controls which step is shown ('inputs' | 'agencies' | 'reports')
+ *    - coreInputs: stores the 5 core inputs from step 1
+ *    - agencies: list of agencies from API
+ *    - selectedAgencies: agencies selected by user
+ *    - reports: the generated comprehensive report data
+ *    - loading, error: loading and error states
+ *
+ * 3. REQUIRED API CALLS:
+ *    - /api/usaspending/find-agencies - finds agencies based on inputs
+ *    - /api/reports/generate-all - generates all 8 reports
+ *
+ * 4. REQUIRED COMPONENTS (in /components/federal-market-assassin/):
+ *    - forms/CoreInputForm.tsx
+ *    - tables/AgencySelectionTable.tsx
+ *    - reports/ReportsDisplay.tsx
+ *
+ * 5. REQUIRED HANDLERS:
+ *    - handleFindAgencies(): API call to find agencies
+ *    - handleGenerateReports(): API call to generate reports
+ *    - handleBack(): navigation between steps
+ *
+ * Last working version: 2026-01-07
+ * If something breaks, check git history for this file.
+ */
+
 'use client';
 
 import { useState } from 'react';
