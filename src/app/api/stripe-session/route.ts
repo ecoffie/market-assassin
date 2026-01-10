@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { grantOpportunityScoutProAccess, hasOpportunityScoutProAccess } from '@/lib/access-codes';
+import { sendOpportunityScoutProEmail } from '@/lib/send-email';
 
 // Get Stripe instance
 function getStripe() {
@@ -36,6 +37,11 @@ export async function GET(request: NextRequest) {
 
       if (!alreadyHasAccess) {
         await grantOpportunityScoutProAccess(email, session.customer_details?.name || undefined);
+        // Send confirmation email
+        await sendOpportunityScoutProEmail({
+          to: email,
+          customerName: session.customer_details?.name || undefined,
+        });
       }
 
       return NextResponse.json({
