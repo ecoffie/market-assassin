@@ -736,14 +736,6 @@ export default function OpportunityScoutPage() {
                           <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Set-Aside Spending</th>
                           <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Total Spending</th>
                           <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Contracts</th>
-                          {isPro && (
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                              <span className="flex items-center gap-1">
-                                Avg Bidders
-                                <span className="text-xs text-amber-600 font-normal">(Pro)</span>
-                              </span>
-                            </th>
-                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -792,28 +784,6 @@ export default function OpportunityScoutPage() {
                                 ${(agency.totalSpending / 1000000).toFixed(2)}M
                               </td>
                               <td className="px-4 py-4 text-sm text-gray-900">{agency.contractCount}</td>
-                              {isPro && (
-                                <td className="px-4 py-4">
-                                  {agency.bidsPerContractAvg ? (
-                                    <div>
-                                      <span className={`text-sm font-bold ${
-                                        agency.bidsPerContractAvg <= 3 ? 'text-green-600' :
-                                        agency.bidsPerContractAvg <= 6 ? 'text-amber-600' :
-                                        'text-red-600'
-                                      }`}>
-                                        {agency.bidsPerContractAvg}
-                                      </span>
-                                      <span className="block text-xs text-gray-500">
-                                        {agency.bidsPerContractAvg <= 3 ? 'Low competition' :
-                                         agency.bidsPerContractAvg <= 6 ? 'Moderate' :
-                                         'High competition'}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-sm text-gray-400">N/A</span>
-                                  )}
-                                </td>
-                              )}
                             </tr>
                           );
                         })}
@@ -830,7 +800,7 @@ export default function OpportunityScoutPage() {
                             +{results.agencies.length - FREE_AGENCY_LIMIT} more agencies available
                           </p>
                           <p className="text-sm text-amber-700">
-                            Upgrade to Pro to see all {results.agencies.length} agencies plus competition data
+                            Upgrade to Pro to see all {results.agencies.length} agencies plus pain points & export
                           </p>
                         </div>
                         <button
@@ -1134,12 +1104,6 @@ export default function OpportunityScoutPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <strong>All 50+ agencies</strong> (Free shows 20)
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <strong>Competition data</strong> - Avg bidders per contract
                   </li>
                   <li className="flex items-center gap-2">
                     <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
