@@ -2858,7 +2858,7 @@ function UpgradeModal({ isOpen, onClose, currentTier }: { isOpen: boolean; onClo
           {/* CTA Buttons */}
           <div className="space-y-3">
             <a
-              href="https://buy.stripe.com/YOUR_PREMIUM_UPGRADE_LINK"
+              href="https://buy.stripe.com/5kQdRaeb497cfRHdpefnO0f"
               className="block w-full px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg transition text-center text-lg"
             >
               Upgrade Now

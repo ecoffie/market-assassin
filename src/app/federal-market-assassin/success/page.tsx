@@ -162,7 +162,7 @@ function SuccessContent() {
               <strong>Want more?</strong> Upgrade to Premium for IDV Contracts, Similar Awards, Subcontracting, and Tribal Contracting.
             </p>
             <a
-              href="https://buy.stripe.com/YOUR_PREMIUM_UPGRADE_LINK"
+              href="https://buy.stripe.com/5kQdRaeb497cfRHdpefnO0f"
               className="inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold rounded-lg text-sm hover:from-amber-600 hover:to-orange-600 transition"
             >
               Upgrade to Premium - $200

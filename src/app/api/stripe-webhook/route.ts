@@ -7,10 +7,9 @@ import { sendAccessCodeEmail, sendDatabaseAccessEmail, sendOpportunityScoutProEm
 const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 const testWebhookSecret = process.env.STRIPE_TEST_WEBHOOK_SECRET || '';
 
-// Product IDs for Federal Market Assassin - only these products trigger access codes
-const MARKET_ASSASSIN_PRODUCT_IDS = [
-  'prod_TiOjPpnyLnO3eb', // Live product
-  // Test products will be allowed if event is from test mode
+// Product IDs for Federal Market Assassin - legacy access codes (deprecated, use Standard/Premium tiers)
+const MARKET_ASSASSIN_PRODUCT_IDS: string[] = [
+  // Legacy product moved to Premium tier
 ];
 
 // Product IDs for Federal Contractor Database - direct access link
@@ -31,8 +30,7 @@ const MARKET_ASSASSIN_STANDARD_PRODUCT_IDS: string[] = [
 
 // Product IDs for Market Assassin Premium ($497)
 const MARKET_ASSASSIN_PREMIUM_PRODUCT_IDS: string[] = [
-  // Add your Stripe product ID for Premium here
-  // e.g., 'prod_XXXXXXXXXXXX'
+  'prod_TiOjPpnyLnO3eb', // Live product
 ];
 
 // Lazy-load Stripe to avoid build-time errors
