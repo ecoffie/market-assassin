@@ -62,7 +62,12 @@ interface Agency {
     city_name?: string;
   };
   noSetAsidesFound?: boolean;
+  bidsPerContractAvg?: number | null;
+  bidsPerContract5th?: number | null;
+  bidsPerContract95th?: number | null;
 }
+
+const FREE_AGENCY_LIMIT = 20;
 
 interface PainPoint {
   point: string;
@@ -692,8 +697,19 @@ export default function OpportunityScoutPage() {
 
             {/* Agencies Table */}
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Top Government Agencies</h2>
-              <p className="text-slate-300 mb-4">These agencies have awarded the most contracts matching your business profile</p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Top Government Agencies</h2>
+                  <p className="text-slate-300">These agencies have awarded the most contracts matching your business profile</p>
+                </div>
+                {!isPro && results.agencies && results.agencies.length > FREE_AGENCY_LIMIT && (
+                  <div className="text-right">
+                    <span className="text-amber-400 text-sm">
+                      Showing {FREE_AGENCY_LIMIT} of {results.agencies.length} agencies
+                    </span>
+                  </div>
+                )}
+              </div>
 
               {results.agencies && results.agencies.length > 0 ? (
                 <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -715,15 +731,23 @@ export default function OpportunityScoutPage() {
                     <table className="w-full">
                       <thead className="bg-gray-100 border-b-2 border-gray-200">
                         <tr>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Agency ID</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Contracting Office</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Set-Aside Spending</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Total Spending</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Contracts</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Agency ID</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Contracting Office</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Set-Aside Spending</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Total Spending</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Contracts</th>
+                          {isPro && (
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                              <span className="flex items-center gap-1">
+                                Avg Bidders
+                                <span className="text-xs text-amber-600 font-normal">(Pro)</span>
+                              </span>
+                            </th>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {results.agencies.map((agency, index) => {
+                        {(isPro ? results.agencies : results.agencies.slice(0, FREE_AGENCY_LIMIT)).map((agency, index) => {
                           const agencyIdStr = getAgencyId(agency);
                           const agencyNameStr = getAgencyName(agency);
                           const displayAgencyId = agency.searchableOfficeCode || agency.subAgencyCode || agency.agencyCode || agencyIdStr;
@@ -738,7 +762,7 @@ export default function OpportunityScoutPage() {
                               className="hover:bg-blue-50 transition cursor-pointer"
                               onClick={() => openAgencyModal(agency)}
                             >
-                              <td className="px-6 py-4">
+                              <td className="px-4 py-4">
                                 <a
                                   href={samSearchUrl}
                                   target="_blank"
@@ -750,13 +774,13 @@ export default function OpportunityScoutPage() {
                                   {displayAgencyId}
                                 </a>
                               </td>
-                              <td className="px-6 py-4">
+                              <td className="px-4 py-4">
                                 <div className="font-semibold text-sm text-gray-900">{agencyNameStr}</div>
                                 {locationDisplay && (
                                   <div className="text-xs text-gray-600 mt-1">{locationDisplay}</div>
                                 )}
                               </td>
-                              <td className="px-6 py-4">
+                              <td className="px-4 py-4">
                                 <span className={`text-sm font-bold ${agency.setAsideSpending > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                                   ${(agency.setAsideSpending / 1000000).toFixed(2)}M
                                 </span>
@@ -764,16 +788,60 @@ export default function OpportunityScoutPage() {
                                   <span className="block text-xs text-gray-600">{agency.setAsideContractCount} contracts</span>
                                 )}
                               </td>
-                              <td className="px-6 py-4 text-sm font-semibold text-gray-600">
+                              <td className="px-4 py-4 text-sm font-semibold text-gray-600">
                                 ${(agency.totalSpending / 1000000).toFixed(2)}M
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{agency.contractCount}</td>
+                              <td className="px-4 py-4 text-sm text-gray-900">{agency.contractCount}</td>
+                              {isPro && (
+                                <td className="px-4 py-4">
+                                  {agency.bidsPerContractAvg ? (
+                                    <div>
+                                      <span className={`text-sm font-bold ${
+                                        agency.bidsPerContractAvg <= 3 ? 'text-green-600' :
+                                        agency.bidsPerContractAvg <= 6 ? 'text-amber-600' :
+                                        'text-red-600'
+                                      }`}>
+                                        {agency.bidsPerContractAvg}
+                                      </span>
+                                      <span className="block text-xs text-gray-500">
+                                        {agency.bidsPerContractAvg <= 3 ? 'Low competition' :
+                                         agency.bidsPerContractAvg <= 6 ? 'Moderate' :
+                                         'High competition'}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-gray-400">N/A</span>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Upgrade CTA for free users when more agencies available */}
+                  {!isPro && results.agencies.length > FREE_AGENCY_LIMIT && (
+                    <div className="p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-t-2 border-amber-200">
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                          <p className="font-semibold text-amber-900">
+                            +{results.agencies.length - FREE_AGENCY_LIMIT} more agencies available
+                          </p>
+                          <p className="text-sm text-amber-700">
+                            Upgrade to Pro to see all {results.agencies.length} agencies plus competition data
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowUpgradeModal(true)}
+                          className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg transition"
+                        >
+                          Unlock All Agencies
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6">
@@ -1065,6 +1133,18 @@ export default function OpportunityScoutPage() {
                     <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
+                    <strong>All 50+ agencies</strong> (Free shows 20)
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <strong>Competition data</strong> - Avg bidders per contract
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                     Agency Pain Points & Priorities
                   </li>
                   <li className="flex items-center gap-2">
@@ -1078,12 +1158,6 @@ export default function OpportunityScoutPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     CSV Export & Print Results
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Unlimited Searches
                   </li>
                 </ul>
               </div>
