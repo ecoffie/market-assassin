@@ -343,25 +343,6 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
     }, 100);
   };
 
-  const handleExportJSON = () => {
-    // Filter out premium data for standard users
-    const exportData = tier === 'premium' ? reports : {
-      ...reports,
-      idvContracts: { contracts: [], message: 'Upgrade to Premium to access IDV Contracts' },
-      decemberSpend: { opportunities: [], summary: { message: 'Upgrade to Premium to access Similar Awards' } },
-      tribalContracting: { suggestedTribes: [], message: 'Upgrade to Premium to access Tribal Contracting' },
-      tier2Subcontracting: { primes: [], message: 'Upgrade to Premium to access Subcontracting Opportunities' },
-      primeContractor: { suggestedPrimes: [], message: 'Upgrade to Premium to access Subcontracting Opportunities' },
-    };
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `federal-market-assassin-report-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-  };
-
   // Export all reports as a single HTML file that can be saved/printed
   const handleExportHTML = () => {
     const date = new Date().toLocaleDateString();
@@ -775,12 +756,6 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
               className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded-lg transition-colors"
             >
               📄 Print All (PDF)
-            </button>
-            <button
-              onClick={handleExportJSON}
-              className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 font-semibold rounded-lg transition-colors"
-            >
-              💾 Export JSON
             </button>
             <button
               onClick={onReset}
