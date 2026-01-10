@@ -112,7 +112,6 @@ export default function OpportunityScoutPage() {
   const [proCheckComplete, setProCheckComplete] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [accessEmail, setAccessEmail] = useState('');
-  const [accessCode, setAccessCode] = useState('');
   const [verifyingAccess, setVerifyingAccess] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
 
@@ -142,10 +141,10 @@ export default function OpportunityScoutPage() {
     setProCheckComplete(true);
   }, []);
 
-  // Verify Pro access with email or license key
+  // Verify Pro access with email
   const verifyProAccess = async () => {
-    if (!accessEmail && !accessCode) {
-      setAccessError('Please enter your email or access code');
+    if (!accessEmail) {
+      setAccessError('Please enter your email');
       return;
     }
 
@@ -153,13 +152,11 @@ export default function OpportunityScoutPage() {
     setAccessError(null);
 
     try {
-      const response = await fetch('/api/verify-access', {
+      const response = await fetch('/api/verify-ospro-access', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: accessEmail || undefined,
-          licenseKey: accessCode || undefined,
-          productId: OPPORTUNITY_SCOUT_PRO_PRODUCT_ID,
+          email: accessEmail,
         }),
       });
 
@@ -172,10 +169,10 @@ export default function OpportunityScoutPage() {
         localStorage.setItem('opportunityScoutPro', JSON.stringify({
           hasAccess: true,
           expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-          email: accessEmail || data.email,
+          email: data.email,
         }));
       } else {
-        setAccessError('No Pro access found for this email/code. Please purchase to unlock Pro features.');
+        setAccessError('No Pro access found for this email. Please purchase to unlock Pro features.');
       }
     } catch {
       setAccessError('Failed to verify access. Please try again.');
@@ -1100,14 +1097,7 @@ export default function OpportunityScoutPage() {
                     placeholder="Email used for purchase"
                     value={accessEmail}
                     onChange={(e) => setAccessEmail(e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
-                  <div className="text-center text-sm text-gray-500">or</div>
-                  <input
-                    type="text"
-                    placeholder="License key / Access code"
-                    value={accessCode}
-                    onChange={(e) => setAccessCode(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && verifyProAccess()}
                     className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
 

@@ -95,7 +95,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Federal Market Assassin - FLAGSHIP */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/market-assassin" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-red-600 to-red-800 relative overflow-hidden">
                 <Image src="/images/products/market-assassin/home page.png" alt="Market Assassin" fill className="object-cover object-top" />
               </div>
@@ -115,15 +115,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">$597</div>
                     <div className="text-xs text-gray-500">one-time</div>
                   </div>
-                  <Link href="/market-assassin" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
                     View Details
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* LinkedIn Content Creator */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/ai-content" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-purple-600 to-pink-500 relative overflow-hidden">
                 <Image src="/screenshots/linkedin-content-creator/home page .png" alt="LinkedIn Content Creator" fill className="object-cover object-top" />
               </div>
@@ -143,15 +143,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">$197</div>
                     <div className="text-xs text-gray-500">one-time</div>
                   </div>
-                  <Link href="/ai-content" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     View Details
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Interactive SBLO & Subcontractor Database */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/contractor-database" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden">
                 <Image src="/images/products/contractor-database/main home page.png" alt="Interactive SBLO & Subcontractor Database" fill className="object-cover object-top" />
               </div>
@@ -171,15 +171,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">$197</div>
                     <div className="text-xs text-gray-500">one-time</div>
                   </div>
-                  <Link href="/contractor-database" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     View Details
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Recompete Contracts */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/expiring-contracts" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-blue-500 to-cyan-500 relative overflow-hidden">
                 <Image src="/images/products/expiring-contracts/home page expiring contracts.png" alt="Expiring Contracts" fill className="object-cover object-top" />
               </div>
@@ -199,15 +199,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">$397</div>
                     <div className="text-xs text-gray-500">one-time</div>
                   </div>
-                  <Link href="/expiring-contracts" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     View Details
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Opportunity Scout - FREE */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/opportunity-scout" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-blue-600 to-blue-800 relative overflow-hidden">
                 <Image src="/images/products/opportunity-scout/opp scout home page.png" alt="Opportunity Scout" fill className="object-cover object-top" />
               </div>
@@ -227,15 +227,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">No credit card</div>
                   </div>
-                  <Link href="/opportunity-scout" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Start Free
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* SBLO Directory - FREE PDF */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/sblo-directory" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-emerald-500 to-teal-500 relative overflow-hidden">
                 <Image src="/images/products/sblo-directory/main page prime.png" alt="SBLO Directory" fill className="object-cover object-top" />
               </div>
@@ -255,15 +255,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">PDF Download</div>
                   </div>
-                  <Link href="/sblo-directory" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Download PDF
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* December Spend - FREE PDF */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/december-spend" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-red-500 to-orange-500 relative overflow-hidden">
                 <Image src="/images/products/december-spend/december hit list.png" alt="December Spend" fill className="object-cover object-top" />
               </div>
@@ -283,15 +283,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">PDF Download</div>
                   </div>
-                  <Link href="/december-spend" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Download PDF
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* AI Prompts - FREE PDF */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/ai-prompts" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-purple-600 to-pink-500 relative overflow-hidden">
                 <Image src="/images/products/ai-prompts/teaming prompts.png" alt="AI Prompts" fill className="object-cover object-top" />
               </div>
@@ -311,15 +311,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">PDF Download</div>
                   </div>
-                  <Link href="/ai-prompts" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Download PDF
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* 2026 GovCon Action Plan - FREE */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/action-plan-2026" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-blue-600 to-purple-600 relative overflow-hidden">
                 <Image src="/images/products/action-plan-2026/action plan home.png" alt="2026 Action Plan" fill className="object-cover object-top" />
               </div>
@@ -339,15 +339,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">PDF Download</div>
                   </div>
-                  <Link href="/action-plan-2026" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Download PDF
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* GovCon Guides & Templates - FREE */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/guides-templates" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-emerald-600 to-emerald-800 relative overflow-hidden">
                 <Image src="/images/products/guides-templates/agency-pain-points-1.png" alt="GovCon Guides & Templates" fill className="object-cover object-top" />
               </div>
@@ -367,15 +367,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">PDF Bundle</div>
                   </div>
-                  <Link href="/guides-templates" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Download PDF
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Tier-2 Supplier Directory - FREE */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/tier2-directory" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-purple-600 to-violet-600 relative overflow-hidden">
                 <Image src="/images/products/tier2-directory/tier 2 main.png" alt="Tier-2 Directory" fill className="object-cover object-top" />
               </div>
@@ -395,15 +395,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">PDF Directory</div>
                   </div>
-                  <Link href="/tier2-directory" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Download PDF
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Free Expiring Contracts CSV - FREE */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/expiring-contracts-csv" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-cyan-500 to-cyan-700 relative overflow-hidden">
                 <Image src="/images/products/expiring-contracts-csv/main page.png" alt="Expiring Contracts CSV" fill className="object-cover object-top" />
               </div>
@@ -423,15 +423,15 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">CSV Download</div>
                   </div>
-                  <Link href="/expiring-contracts-csv" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Download CSV
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Tribal Contractor List - FREE */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+            <Link href="/tribal-list" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-600 relative overflow-hidden">
                 <Image src="/images/products/tribal-list/tribal main page.png" alt="Tribal Contractor List" fill className="object-cover object-top" />
               </div>
@@ -451,12 +451,12 @@ export default function Home() {
                     <div className="text-2xl font-bold text-blue-800">FREE</div>
                     <div className="text-xs text-gray-500">CSV Download</div>
                   </div>
-                  <Link href="/tribal-list" className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm hover:bg-purple-600 transition-all hover:-translate-y-0.5">
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
                     Download CSV
-                  </Link>
+                  </span>
                 </div>
               </div>
-            </div>
+            </Link>
           </div>
         </div>
       </section>

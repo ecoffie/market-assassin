@@ -159,3 +159,45 @@ export async function hasEmailDatabaseAccess(email: string): Promise<boolean> {
   const access = await kv.get(`dbaccess:${email.toLowerCase()}`);
   return !!access;
 }
+
+// ============================================
+// Opportunity Scout Pro Access
+// ============================================
+
+export interface OpportunityScoutProAccess {
+  email: string;
+  customerName?: string;
+  createdAt: string;
+  productId: string;
+}
+
+// Grant Opportunity Scout Pro access to a customer
+export async function grantOpportunityScoutProAccess(email: string, customerName?: string): Promise<OpportunityScoutProAccess> {
+  const access: OpportunityScoutProAccess = {
+    email: email.toLowerCase(),
+    customerName,
+    createdAt: new Date().toISOString(),
+    productId: 'opportunity-scout-pro',
+  };
+
+  // Store by email (lowercase for consistent lookup)
+  await kv.set(`ospro:${email.toLowerCase()}`, access);
+
+  // Add to list for admin tracking
+  await kv.lpush('ospro:all', email.toLowerCase());
+
+  console.log(`✅ Opportunity Scout Pro access granted to: ${email}`);
+  return access;
+}
+
+// Check if an email has Opportunity Scout Pro access
+export async function hasOpportunityScoutProAccess(email: string): Promise<boolean> {
+  const access = await kv.get(`ospro:${email.toLowerCase()}`);
+  return !!access;
+}
+
+// Get Opportunity Scout Pro access details
+export async function getOpportunityScoutProAccess(email: string): Promise<OpportunityScoutProAccess | null> {
+  const access = await kv.get<OpportunityScoutProAccess>(`ospro:${email.toLowerCase()}`);
+  return access;
+}

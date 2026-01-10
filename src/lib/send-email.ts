@@ -21,6 +21,11 @@ interface SendDatabaseAccessEmailParams {
   accessLink: string;
 }
 
+interface SendOpportunityScoutProEmailParams {
+  to: string;
+  customerName?: string;
+}
+
 // Email for Federal Contractor Database access
 export async function sendDatabaseAccessEmail({
   to,
@@ -227,6 +232,118 @@ export async function sendAccessCodeEmail({
     return true;
   } catch (error) {
     console.error('❌ Failed to send email:', error);
+    return false;
+  }
+}
+
+// Email for Opportunity Scout Pro access
+export async function sendOpportunityScoutProEmail({
+  to,
+  customerName,
+}: SendOpportunityScoutProEmailParams): Promise<boolean> {
+  const accessLink = 'https://tools.govcongiants.org/opportunity-scout';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">GovCon Giants</h1>
+    <p style="color: #fef3c7; margin: 10px 0 0 0;">Opportunity Scout Pro</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #d97706; margin-top: 0;">Welcome to Opportunity Scout Pro!</h2>
+
+    <p>Hi${customerName ? ` ${customerName}` : ''},</p>
+
+    <p>Thank you for your purchase! Your <strong>Opportunity Scout Pro</strong> access is now active.</p>
+
+    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #92400e; margin: 0 0 15px 0;">🎯 Your Pro Features:</h3>
+      <ul style="color: #78350f; margin: 0; padding-left: 20px;">
+        <li><strong>Agency Pain Points & Priorities</strong> - Know what challenges your target agencies face</li>
+        <li><strong>Market Research Tips</strong> - Actionable guidance for each agency</li>
+        <li><strong>CSV Export</strong> - Download results for your BD pipeline</li>
+        <li><strong>Print Results</strong> - Save reports for offline use</li>
+        <li><strong>Unlimited Searches</strong> - Search as many times as you need</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${accessLink}" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">Access Opportunity Scout Pro</a>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0;">💡 How to Access:</h3>
+      <ol style="color: #15803d; margin: 0; padding-left: 20px;">
+        <li>Go to <a href="${accessLink}" style="color: #166534;">${accessLink}</a></li>
+        <li>Click "I Have Access" and enter your email: <strong>${to}</strong></li>
+        <li>Start discovering agencies that buy what you sell!</li>
+      </ol>
+    </div>
+
+    <p style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 15px; color: #1e40af;">
+      <strong>Your registered email:</strong> ${to}<br>
+      <span style="font-size: 14px;">Use this email to verify your Pro access anytime.</span>
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      Save this email for future reference.<br>
+      Questions? Reply to this email for support.
+    </p>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 12px;">
+      &copy; ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      to,
+      subject: 'Your Opportunity Scout Pro Access is Ready! | GovCon Giants',
+      html: htmlContent,
+      text: `Welcome to Opportunity Scout Pro!
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Thank you for your purchase! Your Opportunity Scout Pro access is now active.
+
+Your Pro Features:
+- Agency Pain Points & Priorities - Know what challenges your target agencies face
+- Market Research Tips - Actionable guidance for each agency
+- CSV Export - Download results for your BD pipeline
+- Print Results - Save reports for offline use
+- Unlimited Searches - Search as many times as you need
+
+How to Access:
+1. Go to ${accessLink}
+2. Click "I Have Access" and enter your email: ${to}
+3. Start discovering agencies that buy what you sell!
+
+Your registered email: ${to}
+Use this email to verify your Pro access anytime.
+
+Save this email for future reference.
+Questions? Reply to this email for support.
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ Opportunity Scout Pro email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send Opportunity Scout Pro email:', error);
     return false;
   }
 }

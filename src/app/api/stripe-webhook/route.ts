@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createAccessCode, createDatabaseToken } from '@/lib/access-codes';
-import { sendAccessCodeEmail, sendDatabaseAccessEmail } from '@/lib/send-email';
+import { createAccessCode, createDatabaseToken, grantOpportunityScoutProAccess } from '@/lib/access-codes';
+import { sendAccessCodeEmail, sendDatabaseAccessEmail, sendOpportunityScoutProEmail } from '@/lib/send-email';
 
 // Live and test webhook secrets (must be set in environment variables)
 const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -16,6 +16,11 @@ const MARKET_ASSASSIN_PRODUCT_IDS = [
 // Product IDs for Federal Contractor Database - direct access link
 const DATABASE_PRODUCT_IDS = [
   'prod_Tj551jheCp9wdQ', // Live product
+];
+
+// Product IDs for Opportunity Scout Pro
+const OPPORTUNITY_SCOUT_PRO_PRODUCT_IDS = [
+  'prod_TlVBTsPCtgmKuY', // Live product
 ];
 
 // Lazy-load Stripe to avoid build-time errors
@@ -79,6 +84,7 @@ export async function POST(request: NextRequest) {
 
     const hasMarketAssassinProduct = MARKET_ASSASSIN_PRODUCT_IDS.includes(purchasedProductId || '');
     const hasDatabaseProduct = DATABASE_PRODUCT_IDS.includes(purchasedProductId || '');
+    const hasOpportunityScoutPro = OPPORTUNITY_SCOUT_PRO_PRODUCT_IDS.includes(purchasedProductId || '');
 
     const customerEmail = session.customer_email || session.customer_details?.email;
     const customerName = session.customer_details?.name;
@@ -86,6 +92,32 @@ export async function POST(request: NextRequest) {
     if (!customerEmail) {
       console.error('❌ No customer email found in checkout session');
       return NextResponse.json({ error: 'No customer email' }, { status: 400 });
+    }
+
+    // Handle Opportunity Scout Pro purchase
+    if (hasOpportunityScoutPro) {
+      console.log(`💳 Opportunity Scout Pro purchase completed for: ${customerEmail}`);
+
+      // Grant access
+      await grantOpportunityScoutProAccess(customerEmail, customerName || undefined);
+
+      // Send email with access instructions
+      const emailSent = await sendOpportunityScoutProEmail({
+        to: customerEmail,
+        customerName: customerName || undefined,
+      });
+
+      if (emailSent) {
+        console.log(`✅ Opportunity Scout Pro email sent to ${customerEmail}`);
+      } else {
+        console.error(`❌ Failed to send Opportunity Scout Pro email to ${customerEmail}`);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Opportunity Scout Pro access granted and email sent',
+        product: 'opportunity-scout-pro',
+      });
     }
 
     // Handle Federal Contractor Database purchase
