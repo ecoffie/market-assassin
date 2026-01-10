@@ -212,6 +212,44 @@ export default function FederalMarketAssassinPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto px-4 py-8">
+        {/* Tier Banner */}
+        {userEmail && (
+          <div className={`max-w-4xl mx-auto mb-6 rounded-xl p-4 ${
+            tier === 'premium'
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+              : 'bg-blue-600'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  tier === 'premium' ? 'bg-white/20' : 'bg-white/20'
+                }`}>
+                  {tier === 'premium' ? '👑' : '⭐'}
+                </div>
+                <div>
+                  <p className="text-white font-bold text-lg">
+                    {tier === 'premium' ? 'Premium Plan' : 'Standard Plan'}
+                  </p>
+                  <p className="text-white/80 text-sm">{userEmail}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-white font-semibold">
+                  {tier === 'premium' ? '8 Reports' : '4 Reports'}
+                </p>
+                {tier === 'standard' && (
+                  <a
+                    href="https://buy.stripe.com/5kQdRaeb497cfRHdpefnO0f"
+                    className="text-white/90 text-sm underline hover:text-white"
+                  >
+                    Upgrade to Premium →
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="mb-4 flex items-center justify-center gap-4">
@@ -220,21 +258,12 @@ export default function FederalMarketAssassinPage() {
           </div>
           <h1 className="text-5xl font-bold text-slate-900 mb-4">
             🎯 Federal Market Assassin
-            {userEmail && (
-              <span className={`ml-3 px-3 py-1 text-sm font-bold rounded-full align-middle ${
-                tier === 'premium'
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
-                  : 'bg-blue-100 text-blue-800'
-              }`}>
-                {tier === 'premium' ? 'Premium' : 'Standard'}
-              </span>
-            )}
           </h1>
           <p className="text-xl text-slate-600 max-w-3xl mx-auto">
             The Ultimate Government Contracting Intelligence System
           </p>
           <p className="text-lg text-slate-500 mt-2">
-            Generate comprehensive market reports from 5 core inputs → Select target agencies → Get all 8 strategic reports instantly
+            Generate comprehensive market reports from 5 core inputs → Select target agencies → Get {tier === 'premium' ? 'all 8' : '4'} strategic reports instantly
           </p>
           {!userEmail && (
             <div className="mt-4">
@@ -292,7 +321,7 @@ export default function FederalMarketAssassinPage() {
                 </div>
                 <div className="ml-3">
                   <p className="font-semibold text-slate-900">View Reports</p>
-                  <p className="text-sm text-slate-500">8 comprehensive reports</p>
+                  <p className="text-sm text-slate-500">{tier === 'premium' ? '8' : '4'} comprehensive reports</p>
                 </div>
               </div>
             </div>
