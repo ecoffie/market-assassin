@@ -47,7 +47,13 @@ export const PRODUCTS = {
     variantId: '',
     name: 'Ultimate Giant Bundle',
     price: 1497,
-    includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'prime-lookup'],
+    includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'prime-lookup', 'opportunity-scout-pro'],
+  },
+  OPPORTUNITY_SCOUT_PRO: {
+    id: 'opportunity-scout-pro',
+    variantId: '',
+    name: 'Opportunity Scout Pro',
+    price: 49,
   },
 } as const;
 

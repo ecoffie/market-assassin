@@ -33,6 +33,8 @@
 import React, { useState, FormEvent, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
+const OPPORTUNITY_SCOUT_PRO_PRODUCT_ID = 'opportunity-scout-pro';
+
 interface SearchCriteria {
   businessFormation: string;
   naicsCode: string;
@@ -68,12 +70,6 @@ interface PainPoint {
   priority?: 'critical' | 'high' | 'medium' | 'low';
 }
 
-interface AgencyKnowledge {
-  name: string;
-  abbreviation?: string;
-  description?: string;
-  painPoints: PainPoint[];
-}
 
 interface SearchSuggestion {
   type: string;
@@ -106,11 +102,19 @@ export default function OpportunityScoutPage() {
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedAgencyIndex, setSelectedAgencyIndex] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalAgency, setModalAgency] = useState<Agency | null>(null);
   const [painPoints, setPainPoints] = useState<PainPoint[]>([]);
   const [painPointsLoading, setPainPointsLoading] = useState(false);
+
+  // Pro access state
+  const [isPro, setIsPro] = useState(false);
+  const [proCheckComplete, setProCheckComplete] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [accessEmail, setAccessEmail] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [verifyingAccess, setVerifyingAccess] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<SearchCriteria>({
     businessFormation: '',
@@ -119,6 +123,66 @@ export default function OpportunityScoutPage() {
     goodsOrServices: '',
     veteranStatus: '',
   });
+
+  // Check for Pro access on mount (from localStorage)
+  useEffect(() => {
+    const savedProAccess = localStorage.getItem('opportunityScoutPro');
+    if (savedProAccess) {
+      try {
+        const parsed = JSON.parse(savedProAccess);
+        if (parsed.hasAccess && parsed.expiresAt > Date.now()) {
+          setIsPro(true);
+        } else {
+          localStorage.removeItem('opportunityScoutPro');
+        }
+      } catch {
+        localStorage.removeItem('opportunityScoutPro');
+      }
+    }
+    setProCheckComplete(true);
+  }, []);
+
+  // Verify Pro access with email or license key
+  const verifyProAccess = async () => {
+    if (!accessEmail && !accessCode) {
+      setAccessError('Please enter your email or access code');
+      return;
+    }
+
+    setVerifyingAccess(true);
+    setAccessError(null);
+
+    try {
+      const response = await fetch('/api/verify-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: accessEmail || undefined,
+          licenseKey: accessCode || undefined,
+          productId: OPPORTUNITY_SCOUT_PRO_PRODUCT_ID,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.hasAccess) {
+        setIsPro(true);
+        setShowUpgradeModal(false);
+        // Cache access for 24 hours
+        localStorage.setItem('opportunityScoutPro', JSON.stringify({
+          hasAccess: true,
+          expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+          email: accessEmail || data.email,
+        }));
+      } else {
+        setAccessError('No Pro access found for this email/code. Please purchase to unlock Pro features.');
+      }
+    } catch {
+      setAccessError('Failed to verify access. Please try again.');
+    } finally {
+      setVerifyingAccess(false);
+    }
+  };
 
   const loadingMessages = [
     'Connecting to USAspending API...',
@@ -360,8 +424,41 @@ export default function OpportunityScoutPage() {
             <span className="text-3xl font-bold text-blue-400">GovCon</span>
             <span className="text-3xl font-bold text-amber-400">Giants</span>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">Opportunity Scout</h1>
-          <p className="text-slate-300">Discover 50+ agencies awarding contracts to businesses like yours</p>
+          <div className="flex items-center justify-center gap-3">
+            <h1 className="text-4xl font-bold text-white">Opportunity Scout</h1>
+            {isPro && (
+              <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold rounded-full shadow-lg">
+                PRO
+              </span>
+            )}
+          </div>
+          <p className="text-slate-300 mt-2">Discover 50+ agencies awarding contracts to businesses like yours</p>
+
+          {/* Free user upgrade banner */}
+          {proCheckComplete && !isPro && (
+            <div className="mt-4 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/50 rounded-lg p-4 max-w-2xl mx-auto">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="text-left">
+                  <p className="text-amber-300 font-semibold">Upgrade to Pro</p>
+                  <p className="text-sm text-slate-300">Unlock pain points, market research tips, and CSV export</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-lg transition text-sm"
+                  >
+                    Unlock Pro
+                  </button>
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="px-4 py-2 bg-transparent border border-amber-500 text-amber-400 hover:bg-amber-500/20 font-semibold rounded-lg transition text-sm"
+                  >
+                    I Have Access
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Loading State */}
@@ -497,24 +594,38 @@ export default function OpportunityScoutPage() {
           <div className="space-y-6">
             {/* Action Buttons */}
             <div className="flex justify-end gap-3">
-              <button
-                onClick={() => window.print()}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print Results
-              </button>
-              <button
-                onClick={exportToCSV}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Export CSV
-              </button>
+              {isPro ? (
+                <>
+                  <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    Print Results
+                  </button>
+                  <button
+                    onClick={exportToCSV}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export CSV
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-semibold rounded-lg transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Unlock Export (Pro)
+                </button>
+              )}
             </div>
 
             {/* Summary */}
@@ -828,53 +939,204 @@ export default function OpportunityScoutPage() {
                 </div>
               </div>
 
-              {/* Agency Pain Points */}
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-500 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-purple-900 mb-3">Agency Priorities & Pain Points</h3>
-                <div className="space-y-2">
-                  {painPointsLoading ? (
-                    <p className="text-sm text-purple-800">Loading agency insights...</p>
-                  ) : painPoints.length > 0 ? (
-                    <ul className="space-y-2 text-sm text-purple-800">
-                      {painPoints.map((item, i) => (
-                        <li key={i} className="flex items-start">
-                          <span className="text-purple-600 mr-2">•</span>
-                          <div className="flex-1">
-                            <span>{item.point}</span>
-                            {item.source && (
-                              <span className="text-purple-600 text-xs ml-2 italic">({item.source})</span>
-                            )}
-                            {item.priority && (
-                              <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
-                                item.priority === 'critical' ? 'bg-red-100 text-red-800' :
-                                item.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                                'bg-blue-100 text-blue-800'
-                              }`}>
-                                {item.priority}
-                              </span>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-purple-700 italic">
-                      Agency priorities data not available for this office yet. Check the office website for current priorities.
-                    </p>
+              {/* Agency Pain Points - Pro Only */}
+              {isPro ? (
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-500 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-purple-900 mb-3">Agency Priorities & Pain Points</h3>
+                  <div className="space-y-2">
+                    {painPointsLoading ? (
+                      <p className="text-sm text-purple-800">Loading agency insights...</p>
+                    ) : painPoints.length > 0 ? (
+                      <ul className="space-y-2 text-sm text-purple-800">
+                        {painPoints.map((item, i) => (
+                          <li key={i} className="flex items-start">
+                            <span className="text-purple-600 mr-2">•</span>
+                            <div className="flex-1">
+                              <span>{item.point}</span>
+                              {item.source && (
+                                <span className="text-purple-600 text-xs ml-2 italic">({item.source})</span>
+                              )}
+                              {item.priority && (
+                                <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
+                                  item.priority === 'critical' ? 'bg-red-100 text-red-800' :
+                                  item.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                                  'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {item.priority}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-purple-700 italic">
+                        Agency priorities data not available for this office yet. Check the office website for current priorities.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gradient-to-r from-gray-100 to-gray-200 border-l-4 border-gray-400 rounded-lg p-6 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-10">
+                    <button
+                      onClick={() => {
+                        closeAgencyModal();
+                        setShowUpgradeModal(true);
+                      }}
+                      className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg shadow-lg transition flex items-center gap-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Unlock Pain Points (Pro)
+                    </button>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-500 mb-3">Agency Priorities & Pain Points</h3>
+                  <ul className="space-y-2 text-sm text-gray-400">
+                    <li className="blur-sm">• Critical infrastructure modernization needs...</li>
+                    <li className="blur-sm">• Cybersecurity concerns and compliance gaps...</li>
+                    <li className="blur-sm">• Budget constraints impacting program delivery...</li>
+                    <li className="blur-sm">• Workforce challenges in key technical areas...</li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Market Research Tips - Pro Only */}
+              {isPro ? (
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-yellow-900 mb-3">Market Research Tips</h3>
+                  <ul className="space-y-2 text-sm text-yellow-800">
+                    <li>• Check SAM.gov for active opportunities from this office</li>
+                    <li>• Research this office&apos;s typical contract sizes and durations</li>
+                    <li>• Identify past awardees to understand competition</li>
+                    <li>• Look for upcoming solicitations in your NAICS code</li>
+                    <li>• Align your capabilities with the agency priorities shown above</li>
+                  </ul>
+                </div>
+              ) : (
+                <div className="bg-gray-100 border-l-4 border-gray-300 rounded-lg p-6 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <p className="text-gray-600 font-medium mb-2">Market Research Tips</p>
+                      <p className="text-sm text-gray-500">Available with Pro</p>
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-400 mb-3">Market Research Tips</h3>
+                  <ul className="space-y-2 text-sm text-gray-400 blur-sm">
+                    <li>• Strategic approach to engaging this office...</li>
+                    <li>• Key contacts and decision makers...</li>
+                    <li>• Typical procurement timeline...</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade/Access Modal */}
+      {showUpgradeModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowUpgradeModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-black">Unlock Pro Features</h2>
+                <button
+                  onClick={() => setShowUpgradeModal(false)}
+                  className="text-black/60 hover:text-black text-2xl font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Pro Features List */}
+              <div className="bg-amber-50 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-3">Pro includes:</h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Agency Pain Points & Priorities
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Market Research Tips
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    CSV Export & Print Results
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Unlimited Searches
+                  </li>
+                </ul>
+              </div>
+
+              {/* Already Have Access */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Already have access?</h3>
+                <div className="space-y-3">
+                  <input
+                    type="email"
+                    placeholder="Email used for purchase"
+                    value={accessEmail}
+                    onChange={(e) => setAccessEmail(e.target.value)}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                  <div className="text-center text-sm text-gray-500">or</div>
+                  <input
+                    type="text"
+                    placeholder="License key / Access code"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+
+                  {accessError && (
+                    <p className="text-sm text-red-600">{accessError}</p>
                   )}
+
+                  <button
+                    onClick={verifyProAccess}
+                    disabled={verifyingAccess}
+                    className="w-full py-2 bg-gray-800 hover:bg-gray-900 text-white font-semibold rounded-lg transition disabled:opacity-50"
+                  >
+                    {verifyingAccess ? 'Verifying...' : 'Verify Access'}
+                  </button>
                 </div>
               </div>
 
-              {/* Market Research Tips */}
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-yellow-900 mb-3">Market Research Tips</h3>
-                <ul className="space-y-2 text-sm text-yellow-800">
-                  <li>• Check SAM.gov for active opportunities from this office</li>
-                  <li>• Research this office&apos;s typical contract sizes and durations</li>
-                  <li>• Identify past awardees to understand competition</li>
-                  <li>• Look for upcoming solicitations in your NAICS code</li>
-                  <li>• Align your capabilities with the agency priorities shown above</li>
-                </ul>
+              {/* Divider */}
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="font-semibold text-gray-900 mb-3">New customer?</h3>
+                <a
+                  href="/opportunity-scout-product"
+                  className="block w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg text-center transition"
+                >
+                  Get Pro Access - $49
+                </a>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  One-time payment. Lifetime access.
+                </p>
               </div>
             </div>
           </div>
