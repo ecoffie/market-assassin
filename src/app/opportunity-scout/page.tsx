@@ -67,6 +67,7 @@ interface Agency {
   bidsPerContract95th?: number | null;
 }
 
+const FREE_AGENCY_LIMIT = 10;
 
 interface PainPoint {
   point: string;
@@ -696,9 +697,18 @@ export default function OpportunityScoutPage() {
 
             {/* Agencies Table */}
             <div>
-              <div className="mb-4">
-                <h2 className="text-2xl font-bold text-white">Top Government Agencies</h2>
-                <p className="text-slate-300">These agencies have awarded the most contracts matching your business profile</p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Top Government Agencies</h2>
+                  <p className="text-slate-300">These agencies have awarded the most contracts matching your business profile</p>
+                </div>
+                {!isPro && results.agencies && results.agencies.length > FREE_AGENCY_LIMIT && (
+                  <div className="text-right">
+                    <span className="text-amber-400 text-sm">
+                      Showing {FREE_AGENCY_LIMIT} of {results.agencies.length} agencies
+                    </span>
+                  </div>
+                )}
               </div>
 
               {results.agencies && results.agencies.length > 0 ? (
@@ -729,7 +739,7 @@ export default function OpportunityScoutPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {results.agencies.map((agency, index) => {
+                        {(isPro ? results.agencies : results.agencies.slice(0, FREE_AGENCY_LIMIT)).map((agency, index) => {
                           const agencyIdStr = getAgencyId(agency);
                           const agencyNameStr = getAgencyName(agency);
                           const displayAgencyId = agency.searchableOfficeCode || agency.subAgencyCode || agency.agencyCode || agencyIdStr;
@@ -781,6 +791,27 @@ export default function OpportunityScoutPage() {
                     </table>
                   </div>
 
+                  {/* Upgrade CTA for free users when more agencies available */}
+                  {!isPro && results.agencies.length > FREE_AGENCY_LIMIT && (
+                    <div className="p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-t-2 border-amber-200">
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                          <p className="font-semibold text-amber-900">
+                            +{results.agencies.length - FREE_AGENCY_LIMIT} more agencies available
+                          </p>
+                          <p className="text-sm text-amber-700">
+                            Upgrade to Pro to see all {results.agencies.length} agencies plus pain points & export
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowUpgradeModal(true)}
+                          className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg transition"
+                        >
+                          Unlock All Agencies
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6">
@@ -1068,6 +1099,12 @@ export default function OpportunityScoutPage() {
               <div className="bg-amber-50 rounded-lg p-4">
                 <h3 className="font-semibold text-gray-900 mb-3">Pro includes:</h3>
                 <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <strong>All agencies</strong> (Free shows top 10)
+                  </li>
                   <li className="flex items-center gap-2">
                     <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
