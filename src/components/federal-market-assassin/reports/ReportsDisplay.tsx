@@ -323,11 +323,11 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
   const tabs = [
     { id: 'analytics' as ReportTab, label: '📈 Analytics', icon: '📈' },
     { id: 'buyers' as ReportTab, label: '👥 Government Buyers', icon: '👥' },
+    { id: 'osbpContacts' as ReportTab, label: '📞 OSBP Contacts', icon: '📞' },
     { id: 'subcontracting' as ReportTab, label: '🔗 Subcontracting', icon: '🔗' },
     { id: 'idvContracts' as ReportTab, label: '📋 IDV Contracts', icon: '📋' },
     { id: 'december' as ReportTab, label: '📊 Similar Awards', icon: '📊' },
     { id: 'tribal' as ReportTab, label: '🏛️ Tribal Contracting', icon: '🏛️' },
-    { id: 'osbpContacts' as ReportTab, label: '📞 OSBP Contacts', icon: '📞' },
   ];
 
   const handleExportPDF = () => {
