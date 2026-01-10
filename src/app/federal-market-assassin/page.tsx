@@ -37,12 +37,13 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { CoreInputs, Agency, ComprehensiveReport, AlternativeSearchOption } from '@/types/federal-market-assassin';
 import CoreInputForm from '@/components/federal-market-assassin/forms/CoreInputForm';
 import AgencySelectionTable from '@/components/federal-market-assassin/tables/AgencySelectionTable';
 import ReportsDisplay from '@/components/federal-market-assassin/reports/ReportsDisplay';
+import { MarketAssassinTier } from '@/lib/access-codes';
 
 export default function FederalMarketAssassinPage() {
   const [step, setStep] = useState<'inputs' | 'agencies' | 'reports'>('inputs');
@@ -55,6 +56,28 @@ export default function FederalMarketAssassinPage() {
   const [alternativeSearches, setAlternativeSearches] = useState<AlternativeSearchOption[] | undefined>(undefined);
   const [naicsError, setNaicsError] = useState<string | null>(null);
   const [suggestedNaicsCodes, setSuggestedNaicsCodes] = useState<Array<{ code: string; name: string }>>([]);
+
+  // Tier access state
+  const [tier, setTier] = useState<MarketAssassinTier>('standard');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Check for tier access on mount
+  useEffect(() => {
+    // First check localStorage for cached access
+    const cached = localStorage.getItem('marketAssassinAccess');
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        if (data.hasAccess && data.expiresAt > Date.now()) {
+          setTier(data.tier || 'standard');
+          setUserEmail(data.email);
+          return;
+        }
+      } catch {
+        // Invalid cache, continue to API check
+      }
+    }
+  }, []);
 
   const handleFindAgencies = async (inputs: CoreInputs) => {
     setLoading(true);
@@ -197,6 +220,15 @@ export default function FederalMarketAssassinPage() {
           </div>
           <h1 className="text-5xl font-bold text-slate-900 mb-4">
             🎯 Federal Market Assassin
+            {userEmail && (
+              <span className={`ml-3 px-3 py-1 text-sm font-bold rounded-full align-middle ${
+                tier === 'premium'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {tier === 'premium' ? 'Premium' : 'Standard'}
+              </span>
+            )}
           </h1>
           <p className="text-xl text-slate-600 max-w-3xl mx-auto">
             The Ultimate Government Contracting Intelligence System
@@ -344,6 +376,7 @@ export default function FederalMarketAssassinPage() {
             <ReportsDisplay
               reports={reports}
               onReset={handleReset}
+              tier={tier}
             />
           )}
         </div>
