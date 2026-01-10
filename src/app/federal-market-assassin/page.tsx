@@ -236,14 +236,16 @@ export default function FederalMarketAssassinPage() {
           <p className="text-lg text-slate-500 mt-2">
             Generate comprehensive market reports from 5 core inputs → Select target agencies → Get all 8 strategic reports instantly
           </p>
-          <div className="mt-4">
-            <Link
-              href="/opportunity-scout"
-              className="inline-block px-4 py-2 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
-            >
-              Try Opportunity Scout (Free) →
-            </Link>
-          </div>
+          {!userEmail && (
+            <div className="mt-4">
+              <Link
+                href="/opportunity-scout"
+                className="inline-block px-4 py-2 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+              >
+                Try Opportunity Scout (Free) →
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Progress Indicator */}
