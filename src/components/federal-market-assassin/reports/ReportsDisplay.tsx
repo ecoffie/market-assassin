@@ -344,7 +344,16 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
   };
 
   const handleExportJSON = () => {
-    const dataStr = JSON.stringify(reports, null, 2);
+    // Filter out premium data for standard users
+    const exportData = tier === 'premium' ? reports : {
+      ...reports,
+      idvContracts: { contracts: [], message: 'Upgrade to Premium to access IDV Contracts' },
+      decemberSpend: { opportunities: [], summary: { message: 'Upgrade to Premium to access Similar Awards' } },
+      tribalContracting: { suggestedTribes: [], message: 'Upgrade to Premium to access Tribal Contracting' },
+      tier2Subcontracting: { primes: [], message: 'Upgrade to Premium to access Subcontracting Opportunities' },
+      primeContractor: { suggestedPrimes: [], message: 'Upgrade to Premium to access Subcontracting Opportunities' },
+    };
+    const dataStr = JSON.stringify(exportData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
@@ -471,6 +480,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
     `).join('');
   })()}
 
+  ${tier === 'premium' ? `
   <!-- Subcontracting Report -->
   <h2>🤝 Subcontracting Opportunities</h2>
   <div class="section-intro">Prime contractors and Tier 2 subcontracting opportunities.</div>
@@ -590,7 +600,9 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
       ` : ''}
     </div>
   `).join('')}
+  ` : ''}
 
+  ${tier === 'premium' ? `
   <!-- IDV Contracts Report -->
   <h2>📋 IDV Vehicle Contracts</h2>
   <div class="section-intro">Indefinite Delivery Vehicles (IDVs) and contract vehicles for your NAICS code.</div>
@@ -697,6 +709,20 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
       `).join('')}
     </ul>
   ` : ''}
+  ` : `
+  <!-- Premium Upgrade Notice -->
+  <div style="background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 30px; text-align: center; margin-top: 40px;">
+    <h2 style="color: #92400e; margin-bottom: 15px;">🔒 Unlock 4 More Premium Reports</h2>
+    <p style="color: #78350f; margin-bottom: 20px;">Upgrade to Premium to access:</p>
+    <ul style="list-style: none; padding: 0; color: #92400e; margin-bottom: 20px;">
+      <li style="margin-bottom: 8px;">🤝 Subcontracting Opportunities</li>
+      <li style="margin-bottom: 8px;">📋 IDV Vehicle Contracts</li>
+      <li style="margin-bottom: 8px;">📊 Similar Awards Analysis</li>
+      <li style="margin-bottom: 8px;">🏛️ Tribal Contracting</li>
+    </ul>
+    <p style="color: #78350f; font-weight: bold;">Visit tools.govcongiants.org to upgrade to Premium</p>
+  </div>
+  `}
 
   <hr style="margin-top: 40px;">
   <div style="text-align: center; margin-top: 30px;">
@@ -838,7 +864,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
       {/* Report Content - Show all when exporting, otherwise show active tab */}
       <div className="p-8">
         {showAllForExport ? (
-          // Show ALL reports for printing/exporting
+          // Show reports for printing/exporting - respects tier access
           <div className="space-y-12">
             <div className="print:break-after-page">
               <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">👥 Government Buyers Report</h2>
@@ -850,25 +876,49 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
               <OSBPContactsReport data={reports.governmentBuyers} />
             </div>
 
-            <div className="print:break-after-page">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">🤝 Subcontracting Opportunities</h2>
-              <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />
-            </div>
+            {/* Premium-only sections */}
+            {!isSectionLocked('subcontracting') && (
+              <div className="print:break-after-page">
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">🤝 Subcontracting Opportunities</h2>
+                <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />
+              </div>
+            )}
 
-            <div className="print:break-after-page">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">📋 IDV Vehicle Contracts</h2>
-              <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />
-            </div>
+            {!isSectionLocked('idvContracts') && (
+              <div className="print:break-after-page">
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">📋 IDV Vehicle Contracts</h2>
+                <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />
+              </div>
+            )}
 
-            <div className="print:break-after-page">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">📊 Similar Awards in Your NAICS</h2>
-              <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />
-            </div>
+            {!isSectionLocked('december') && (
+              <div className="print:break-after-page">
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">📊 Similar Awards in Your NAICS</h2>
+                <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />
+              </div>
+            )}
 
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">🏛️ Tribal Contracting</h2>
-              <TribalReport data={reports.tribalContracting} />
-            </div>
+            {!isSectionLocked('tribal') && (
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b-2 border-blue-600 pb-2">🏛️ Tribal Contracting</h2>
+                <TribalReport data={reports.tribalContracting} />
+              </div>
+            )}
+
+            {/* Show upgrade message for Standard users */}
+            {tier === 'standard' && (
+              <div className="print:break-after-page bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-8 text-center">
+                <h2 className="text-2xl font-bold text-amber-900 mb-4">Unlock 4 More Premium Reports</h2>
+                <p className="text-amber-800 mb-4">Upgrade to Premium to access:</p>
+                <ul className="text-amber-700 mb-6 space-y-2">
+                  <li>🤝 Subcontracting Opportunities</li>
+                  <li>📋 IDV Vehicle Contracts</li>
+                  <li>📊 Similar Awards Analysis</li>
+                  <li>🏛️ Tribal Contracting</li>
+                </ul>
+                <p className="text-amber-900 font-bold">Visit tools.govcongiants.org to upgrade</p>
+              </div>
+            )}
           </div>
         ) : (
           // Normal tabbed view
