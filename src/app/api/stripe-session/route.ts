@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { grantOpportunityScoutProAccess, hasOpportunityScoutProAccess } from '@/lib/access-codes';
+import {
+  grantOpportunityScoutProAccess,
+  hasOpportunityScoutProAccess,
+  grantMarketAssassinAccess,
+  getMarketAssassinAccess,
+  MarketAssassinTier,
+} from '@/lib/access-codes';
 import { sendOpportunityScoutProEmail } from '@/lib/send-email';
 
 // Get Stripe instance
@@ -48,6 +54,46 @@ export async function GET(request: NextRequest) {
         success: true,
         email: email.toLowerCase(),
         product: 'opportunity-scout-pro',
+        hasAccess: true,
+        customerName: session.customer_details?.name || null,
+      });
+    }
+
+    // Handle Market Assassin Standard
+    if (product === 'market-assassin-standard') {
+      const existingAccess = await getMarketAssassinAccess(email);
+
+      // Only grant if no existing access, or if upgrading from nothing
+      if (!existingAccess) {
+        await grantMarketAssassinAccess(email, 'standard', session.customer_details?.name || undefined);
+        // TODO: Send confirmation email
+      }
+
+      return NextResponse.json({
+        success: true,
+        email: email.toLowerCase(),
+        product: 'market-assassin-standard',
+        tier: 'standard' as MarketAssassinTier,
+        hasAccess: true,
+        customerName: session.customer_details?.name || null,
+      });
+    }
+
+    // Handle Market Assassin Premium
+    if (product === 'market-assassin-premium') {
+      const existingAccess = await getMarketAssassinAccess(email);
+
+      // Grant premium access (upgrades existing standard if applicable)
+      if (!existingAccess || existingAccess.tier !== 'premium') {
+        await grantMarketAssassinAccess(email, 'premium', session.customer_details?.name || undefined);
+        // TODO: Send confirmation email
+      }
+
+      return NextResponse.json({
+        success: true,
+        email: email.toLowerCase(),
+        product: 'market-assassin-premium',
+        tier: 'premium' as MarketAssassinTier,
         hasAccess: true,
         customerName: session.customer_details?.name || null,
       });

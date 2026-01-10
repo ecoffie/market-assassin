@@ -201,3 +201,140 @@ export async function getOpportunityScoutProAccess(email: string): Promise<Oppor
   const access = await kv.get<OpportunityScoutProAccess>(`ospro:${email.toLowerCase()}`);
   return access;
 }
+
+// ============================================
+// Market Assassin Tiered Access (Standard/Premium)
+// ============================================
+
+export type MarketAssassinTier = 'standard' | 'premium';
+
+export interface MarketAssassinAccess {
+  email: string;
+  customerName?: string;
+  tier: MarketAssassinTier;
+  createdAt: string;
+  upgradedAt?: string; // If upgraded from standard to premium
+}
+
+// Features available per tier
+export const MARKET_ASSASSIN_TIER_FEATURES: Record<MarketAssassinTier, {
+  price: number;
+  features: string[];
+  blockedSections: string[];
+}> = {
+  standard: {
+    price: 297,
+    features: [
+      'Standard Report',
+      'Analytics',
+      'Government Buyers',
+      'OSBP Contacts',
+      'PDF/Print Export',
+    ],
+    blockedSections: ['idvContracts', 'december', 'subcontracting', 'tribal'],
+  },
+  premium: {
+    price: 497,
+    features: [
+      'Standard Report',
+      'Analytics',
+      'Government Buyers',
+      'OSBP Contacts',
+      'PDF/Print Export',
+      'IDV Contracts',
+      'Similar Awards',
+      'Subcontracting Opportunities',
+      'Tribal Contracting',
+    ],
+    blockedSections: [],
+  },
+};
+
+// Grant Market Assassin access to a customer
+export async function grantMarketAssassinAccess(
+  email: string,
+  tier: MarketAssassinTier,
+  customerName?: string
+): Promise<MarketAssassinAccess> {
+  // Check if user already has access (for upgrades)
+  const existingAccess = await getMarketAssassinAccess(email);
+
+  const access: MarketAssassinAccess = {
+    email: email.toLowerCase(),
+    customerName: customerName || existingAccess?.customerName,
+    tier,
+    createdAt: existingAccess?.createdAt || new Date().toISOString(),
+    upgradedAt: existingAccess && tier === 'premium' ? new Date().toISOString() : undefined,
+  };
+
+  // Store by email (lowercase for consistent lookup)
+  await kv.set(`ma:${email.toLowerCase()}`, access);
+
+  // Add to list for admin tracking (only if new)
+  if (!existingAccess) {
+    await kv.lpush('ma:all', email.toLowerCase());
+  }
+
+  console.log(`✅ Market Assassin ${tier} access granted to: ${email}`);
+  return access;
+}
+
+// Check if an email has Market Assassin access
+export async function hasMarketAssassinAccess(email: string): Promise<boolean> {
+  const access = await kv.get(`ma:${email.toLowerCase()}`);
+  return !!access;
+}
+
+// Get Market Assassin access details
+export async function getMarketAssassinAccess(email: string): Promise<MarketAssassinAccess | null> {
+  const access = await kv.get<MarketAssassinAccess>(`ma:${email.toLowerCase()}`);
+  return access;
+}
+
+// Get Market Assassin tier for an email
+export async function getMarketAssassinTier(email: string): Promise<MarketAssassinTier | null> {
+  const access = await getMarketAssassinAccess(email);
+  return access?.tier || null;
+}
+
+// Check if a section is accessible for a given tier
+export function isSectionAccessible(tier: MarketAssassinTier, sectionId: string): boolean {
+  const blockedSections = MARKET_ASSASSIN_TIER_FEATURES[tier].blockedSections;
+  return !blockedSections.includes(sectionId);
+}
+
+// Upgrade from standard to premium
+export async function upgradeToMarketAssassinPremium(email: string): Promise<MarketAssassinAccess | null> {
+  const existingAccess = await getMarketAssassinAccess(email);
+
+  if (!existingAccess) {
+    return null; // No existing access to upgrade
+  }
+
+  if (existingAccess.tier === 'premium') {
+    return existingAccess; // Already premium
+  }
+
+  return grantMarketAssassinAccess(email, 'premium', existingAccess.customerName);
+}
+
+// Get all Market Assassin access records (for admin)
+export async function getAllMarketAssassinAccess(): Promise<MarketAssassinAccess[]> {
+  const allEmails = await kv.lrange('ma:all', 0, -1) as string[];
+
+  if (!allEmails || allEmails.length === 0) {
+    return [];
+  }
+
+  const accessRecords: MarketAssassinAccess[] = [];
+  for (const email of allEmails) {
+    const access = await kv.get<MarketAssassinAccess>(`ma:${email}`);
+    if (access) {
+      accessRecords.push(access);
+    }
+  }
+
+  return accessRecords.sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}

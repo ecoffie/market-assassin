@@ -47,9 +47,13 @@ import {
   HitListOpportunity,
 } from '@/lib/utils/december-hit-list';
 
+import { MarketAssassinTier, MARKET_ASSASSIN_TIER_FEATURES } from '@/lib/access-codes';
+
 interface ReportsDisplayProps {
   reports: ComprehensiveReport;
   onReset: () => void;
+  tier?: MarketAssassinTier;
+  onUpgrade?: () => void;
 }
 
 interface AgencyForModal {
@@ -136,9 +140,10 @@ function formatOfficeId(rawOfficeId: string | undefined, command?: string | null
   return rawOfficeId;
 }
 
-export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps) {
+export default function ReportsDisplay({ reports, onReset, tier = 'premium', onUpgrade }: ReportsDisplayProps) {
   const [activeTab, setActiveTab] = useState<ReportTab>('analytics');
   const [showAllForExport, setShowAllForExport] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Modal state
   const [modalAgency, setModalAgency] = useState<AgencyForModal | null>(null);
@@ -146,6 +151,10 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
   const [loadingPainPoints, setLoadingPainPoints] = useState(false);
   const [matchedCommand, setMatchedCommand] = useState<string | null>(null);
   const [additionalCommands, setAdditionalCommands] = useState<Array<{command: string, painPoints: PainPointsApiResponse}>>([]);
+
+  // Premium sections that are blocked for standard tier
+  const premiumSections: ReportTab[] = ['idvContracts', 'december', 'subcontracting', 'tribal'];
+  const isSectionLocked = (tabId: ReportTab) => tier === 'standard' && premiumSections.includes(tabId);
 
   // Helper to extract DoD command abbreviations from agency names
   // Maps to exact database keys for pain points lookup
@@ -793,19 +802,35 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
       {!showAllForExport && (
         <div className="border-b border-slate-200 overflow-x-auto print:hidden">
           <div className="flex px-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-4 font-semibold text-sm whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map((tab) => {
+              const locked = isSectionLocked(tab.id);
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    if (locked) {
+                      setShowUpgradeModal(true);
+                    } else {
+                      setActiveTab(tab.id);
+                    }
+                  }}
+                  className={`px-4 py-4 font-semibold text-sm whitespace-nowrap transition-colors flex items-center gap-1 ${
+                    activeTab === tab.id && !locked
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : locked
+                      ? 'text-slate-400 cursor-pointer'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {tab.label}
+                  {locked && (
+                    <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -865,11 +890,47 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
               </div>
             )}
             {activeTab === 'buyers' && <GovernmentBuyersReport data={reports.governmentBuyers} onAgencyClick={openAgencyModal} />}
-            {activeTab === 'subcontracting' && <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />}
-            {activeTab === 'idvContracts' && <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />}
+            {activeTab === 'subcontracting' && (
+              isSectionLocked('subcontracting') ? (
+                <LockedSectionOverlay
+                  sectionName="Subcontracting Opportunities"
+                  onUpgrade={() => setShowUpgradeModal(true)}
+                />
+              ) : (
+                <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />
+              )
+            )}
+            {activeTab === 'idvContracts' && (
+              isSectionLocked('idvContracts') ? (
+                <LockedSectionOverlay
+                  sectionName="IDV Contracts"
+                  onUpgrade={() => setShowUpgradeModal(true)}
+                />
+              ) : (
+                <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />
+              )
+            )}
             {activeTab === 'osbpContacts' && <OSBPContactsReport data={reports.governmentBuyers} />}
-            {activeTab === 'december' && <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />}
-            {activeTab === 'tribal' && <TribalReport data={reports.tribalContracting} />}
+            {activeTab === 'december' && (
+              isSectionLocked('december') ? (
+                <LockedSectionOverlay
+                  sectionName="Similar Awards"
+                  onUpgrade={() => setShowUpgradeModal(true)}
+                />
+              ) : (
+                <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />
+              )
+            )}
+            {activeTab === 'tribal' && (
+              isSectionLocked('tribal') ? (
+                <LockedSectionOverlay
+                  sectionName="Tribal Contracting"
+                  onUpgrade={() => setShowUpgradeModal(true)}
+                />
+              ) : (
+                <TribalReport data={reports.tribalContracting} />
+              )
+            )}
           </>
         )}
       </div>
@@ -1088,6 +1149,13 @@ export default function ReportsDisplay({ reports, onReset }: ReportsDisplayProps
           </div>
         </div>
       )}
+
+      {/* Upgrade Modal for Standard tier users */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentTier={tier}
+      />
     </div>
   );
 }
@@ -2677,6 +2745,132 @@ function PrimesReport({ data }: { data: any }) {
             </li>
           ))}
         </ul>
+      </div>
+    </div>
+  );
+}
+
+// Locked Section Overlay Component for Premium-only sections
+function LockedSectionOverlay({ sectionName, onUpgrade }: { sectionName: string; onUpgrade: () => void }) {
+  return (
+    <div className="relative min-h-[400px] bg-slate-800 rounded-xl overflow-hidden">
+      {/* Blurred background preview */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 opacity-50">
+        <div className="p-8 blur-sm">
+          <div className="h-8 w-48 bg-slate-600 rounded mb-4"></div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-16 bg-slate-600 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Lock overlay */}
+      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+        <div className="text-center p-8 max-w-md">
+          <div className="w-20 h-20 bg-amber-500 bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-bold text-white mb-3">
+            {sectionName} - Premium Only
+          </h3>
+          <p className="text-slate-300 mb-6">
+            Upgrade to Premium to unlock {sectionName} and get deeper insights into your target market.
+          </p>
+          <button
+            onClick={onUpgrade}
+            className="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg transition-all transform hover:scale-105"
+          >
+            Upgrade to Premium - $497
+          </button>
+          <p className="text-slate-400 text-sm mt-4">
+            Premium includes: IDV Contracts, Similar Awards, Subcontracting, and Tribal Contracting
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Upgrade Modal Component
+function UpgradeModal({ isOpen, onClose, currentTier }: { isOpen: boolean; onClose: () => void; currentTier: MarketAssassinTier }) {
+  if (!isOpen) return null;
+
+  const premiumFeatures = [
+    { name: 'IDV Contracts', description: 'BPAs, IDIQs, GWACs and contract vehicles you can compete on' },
+    { name: 'Similar Awards', description: 'Past contracts in your NAICS code to identify opportunities' },
+    { name: 'Subcontracting Opportunities', description: 'Prime contractors actively seeking small business partners' },
+    { name: 'Tribal Contracting', description: 'Tribal partnerships and 8(a) teaming opportunities' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-8 text-center">
+          <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Upgrade to Premium</h2>
+          <p className="text-amber-100">Unlock the full power of Federal Market Assassin</p>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div className="mb-6">
+            <h3 className="font-semibold text-slate-900 mb-3">Premium Features Include:</h3>
+            <ul className="space-y-3">
+              {premiumFeatures.map((feature, idx) => (
+                <li key={idx} className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <div>
+                    <span className="font-medium text-slate-900">{feature.name}</span>
+                    <p className="text-sm text-slate-600">{feature.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Pricing */}
+          <div className="bg-slate-50 rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600">Upgrade Price</p>
+                <p className="text-3xl font-bold text-slate-900">$200</p>
+                <p className="text-xs text-slate-500">One-time payment (Premium $497 - Standard $297)</p>
+              </div>
+              <div className="text-right">
+                <span className="inline-block px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                  Save $100 vs buying separately
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA Buttons */}
+          <div className="space-y-3">
+            <a
+              href="https://buy.stripe.com/YOUR_PREMIUM_UPGRADE_LINK"
+              className="block w-full px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg transition text-center text-lg"
+            >
+              Upgrade Now
+            </a>
+            <button
+              onClick={onClose}
+              className="block w-full px-6 py-3 text-slate-600 hover:text-slate-900 font-medium transition text-center"
+            >
+              Maybe Later
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

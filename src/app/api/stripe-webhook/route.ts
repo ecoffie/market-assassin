@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createAccessCode, createDatabaseToken, grantOpportunityScoutProAccess } from '@/lib/access-codes';
+import { createAccessCode, createDatabaseToken, grantOpportunityScoutProAccess, grantMarketAssassinAccess } from '@/lib/access-codes';
 import { sendAccessCodeEmail, sendDatabaseAccessEmail, sendOpportunityScoutProEmail } from '@/lib/send-email';
 
 // Live and test webhook secrets (must be set in environment variables)
@@ -21,6 +21,18 @@ const DATABASE_PRODUCT_IDS = [
 // Product IDs for Opportunity Scout Pro
 const OPPORTUNITY_SCOUT_PRO_PRODUCT_IDS = [
   'prod_TlVBTsPCtgmKuY', // Live product
+];
+
+// Product IDs for Market Assassin Standard ($297)
+const MARKET_ASSASSIN_STANDARD_PRODUCT_IDS: string[] = [
+  // Add your Stripe product ID for Standard here
+  // e.g., 'prod_XXXXXXXXXXXX'
+];
+
+// Product IDs for Market Assassin Premium ($497)
+const MARKET_ASSASSIN_PREMIUM_PRODUCT_IDS: string[] = [
+  // Add your Stripe product ID for Premium here
+  // e.g., 'prod_XXXXXXXXXXXX'
 ];
 
 // Lazy-load Stripe to avoid build-time errors
@@ -85,6 +97,8 @@ export async function POST(request: NextRequest) {
     const hasMarketAssassinProduct = MARKET_ASSASSIN_PRODUCT_IDS.includes(purchasedProductId || '');
     const hasDatabaseProduct = DATABASE_PRODUCT_IDS.includes(purchasedProductId || '');
     const hasOpportunityScoutPro = OPPORTUNITY_SCOUT_PRO_PRODUCT_IDS.includes(purchasedProductId || '');
+    const hasMarketAssassinStandard = MARKET_ASSASSIN_STANDARD_PRODUCT_IDS.includes(purchasedProductId || '');
+    const hasMarketAssassinPremium = MARKET_ASSASSIN_PREMIUM_PRODUCT_IDS.includes(purchasedProductId || '');
 
     const customerEmail = session.customer_email || session.customer_details?.email;
     const customerName = session.customer_details?.name;
@@ -117,6 +131,42 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'Opportunity Scout Pro access granted and email sent',
         product: 'opportunity-scout-pro',
+      });
+    }
+
+    // Handle Market Assassin Standard purchase ($297)
+    if (hasMarketAssassinStandard) {
+      console.log(`💳 Market Assassin Standard purchase completed for: ${customerEmail}`);
+
+      // Grant standard access
+      await grantMarketAssassinAccess(customerEmail, 'standard', customerName || undefined);
+
+      // TODO: Send confirmation email
+      console.log(`✅ Market Assassin Standard access granted to ${customerEmail}`);
+
+      return NextResponse.json({
+        success: true,
+        message: 'Market Assassin Standard access granted',
+        product: 'market-assassin-standard',
+        tier: 'standard',
+      });
+    }
+
+    // Handle Market Assassin Premium purchase ($497)
+    if (hasMarketAssassinPremium) {
+      console.log(`💳 Market Assassin Premium purchase completed for: ${customerEmail}`);
+
+      // Grant premium access (or upgrade from standard)
+      await grantMarketAssassinAccess(customerEmail, 'premium', customerName || undefined);
+
+      // TODO: Send confirmation email
+      console.log(`✅ Market Assassin Premium access granted to ${customerEmail}`);
+
+      return NextResponse.json({
+        success: true,
+        message: 'Market Assassin Premium access granted',
+        product: 'market-assassin-premium',
+        tier: 'premium',
       });
     }
 
