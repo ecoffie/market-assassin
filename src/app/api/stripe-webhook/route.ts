@@ -24,8 +24,7 @@ const OPPORTUNITY_SCOUT_PRO_PRODUCT_IDS = [
 
 // Product IDs for Market Assassin Standard ($297)
 const MARKET_ASSASSIN_STANDARD_PRODUCT_IDS: string[] = [
-  // Add your Stripe product ID for Standard here
-  // e.g., 'prod_XXXXXXXXXXXX'
+  'prod_TlWsJM5a0JEvs7', // Live product
 ];
 
 // Product IDs for Market Assassin Premium ($497)
