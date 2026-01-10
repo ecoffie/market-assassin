@@ -20,6 +20,7 @@ function SuccessContent() {
         'starter-bundle': 'Starter Bundle',
         'pro-bundle': 'Pro Giant Bundle',
         'ultimate-bundle': 'Ultimate Giant Bundle',
+        'opportunity-scout-pro': 'Opportunity Scout Pro',
       };
       setProductName(productNames[product] || product);
     }
@@ -117,6 +118,12 @@ function SuccessContent() {
               className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
             >
               AI Content Generator
+            </Link>
+            <Link
+              href="/opportunity-scout"
+              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+            >
+              Opportunity Scout
             </Link>
           </div>
         </div>
