@@ -40,25 +40,58 @@ export default function AdminDashboard() {
   // Active tab
   const [activeTab, setActiveTab] = useState<'market-assassin' | 'opportunity-scout-pro'>('market-assassin');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Check against environment variable or fallback
-    const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
-    if (password === adminPassword) {
-      setAuthenticated(true);
-      setAuthError('');
-      // Store in sessionStorage for page refreshes
-      sessionStorage.setItem('adminAuth', 'true');
-    } else {
-      setAuthError('Invalid password');
+    setAuthError('');
+
+    try {
+      // Verify password via API
+      const response = await fetch('/api/admin/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      const data = await response.json();
+
+      if (data.valid) {
+        setAuthenticated(true);
+        // Store password in sessionStorage for API calls
+        sessionStorage.setItem('adminAuth', 'true');
+        sessionStorage.setItem('adminPassword', password);
+      } else {
+        setAuthError('Invalid password');
+      }
+    } catch {
+      setAuthError('Failed to verify password');
     }
   };
 
   useEffect(() => {
-    // Check sessionStorage on mount
-    if (sessionStorage.getItem('adminAuth') === 'true') {
-      setAuthenticated(true);
-    }
+    // Check sessionStorage on mount and re-verify password
+    const checkAuth = async () => {
+      const storedPassword = sessionStorage.getItem('adminPassword');
+      if (storedPassword) {
+        try {
+          const response = await fetch('/api/admin/verify-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: storedPassword }),
+          });
+          const data = await response.json();
+          if (data.valid) {
+            setAuthenticated(true);
+            setPassword(storedPassword);
+          } else {
+            sessionStorage.removeItem('adminAuth');
+            sessionStorage.removeItem('adminPassword');
+          }
+        } catch {
+          // Failed to verify, require fresh login
+        }
+      }
+    };
+    checkAuth();
   }, []);
 
   useEffect(() => {
