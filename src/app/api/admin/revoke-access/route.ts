@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!product || !['market-assassin', 'opportunity-scout-pro'].includes(product)) {
+    if (!product || !['market-assassin', 'opportunity-scout-pro', 'content-generator', 'recompete'].includes(product)) {
       return NextResponse.json(
-        { error: 'Valid product required (market-assassin or opportunity-scout-pro)' },
+        { error: 'Valid product required (market-assassin, opportunity-scout-pro, content-generator, or recompete)' },
         { status: 400 }
       );
     }
@@ -39,6 +39,14 @@ export async function POST(request: NextRequest) {
       // Delete Opportunity Scout Pro access
       await kv.del(`ospro:${emailLower}`);
       await kv.lrem('ospro:all', 1, emailLower);
+    } else if (product === 'content-generator') {
+      // Delete Content Generator access
+      await kv.del(`contentgen:${emailLower}`);
+      await kv.lrem('contentgen:all', 1, emailLower);
+    } else if (product === 'recompete') {
+      // Delete Recompete Contracts Tracker access
+      await kv.del(`recompete:${emailLower}`);
+      await kv.lrem('recompete:all', 1, emailLower);
     }
 
     return NextResponse.json({

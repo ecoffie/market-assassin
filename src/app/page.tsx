@@ -26,8 +26,8 @@ export default function Home() {
             </p>
           </div>
 
-          {/* 3 App Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* 4 App Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Federal Market Assassin */}
             <Link
               href="/federal-market-assassin"
@@ -117,6 +117,37 @@ export default function Home() {
                 </li>
               </ul>
               <span className="text-emerald-400 font-semibold text-sm group-hover:text-emerald-300 transition-colors">
+                Launch Tool →
+              </span>
+            </Link>
+
+            {/* Recompete Contracts Tracker */}
+            <Link
+              href="/recompete"
+              className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-amber-500 hover:shadow-xl"
+            >
+              <div className="text-4xl mb-4">📋</div>
+              <h3 className="text-xl font-bold text-white mb-3">
+                Recompete Contracts Tracker
+              </h3>
+              <p className="text-slate-400 text-sm mb-5 leading-relaxed">
+                Track expiring federal contracts and identify recompete opportunities. Filter by agency, NAICS, prime contractor, and contract value to find your next win.
+              </p>
+              <ul className="text-slate-400 text-sm space-y-2 mb-6">
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> 6,900+ expiring contracts
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> $77T+ total value
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> Filter by agency & NAICS
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> Prime contractor lookup
+                </li>
+              </ul>
+              <span className="text-amber-400 font-semibold text-sm group-hover:text-amber-300 transition-colors">
                 Launch Tool →
               </span>
             </Link>

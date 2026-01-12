@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllMarketAssassinAccess } from '@/lib/access-codes';
+import { getAllMarketAssassinAccess, getAllContentGeneratorAccess, getAllRecompeteAccess } from '@/lib/access-codes';
 import { kv } from '@vercel/kv';
 
 // Admin endpoint to list all access records
@@ -21,9 +21,17 @@ export async function GET() {
       }
     }
 
+    // Get Content Generator records
+    const contentGenerator = await getAllContentGeneratorAccess();
+
+    // Get Recompete records
+    const recompete = await getAllRecompeteAccess();
+
     return NextResponse.json({
       marketAssassin,
       opportunityScoutPro,
+      contentGenerator,
+      recompete,
     });
 
   } catch (error) {

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { MarketAssassinTier } from '@/lib/access-codes';
 
+type ContentGeneratorTier = 'content-engine' | 'full-fix';
+
 interface AccessRecord {
   email: string;
   customerName?: string;
@@ -18,6 +20,21 @@ interface OpportunityScoutProRecord {
   productId: string;
 }
 
+interface ContentGeneratorRecord {
+  email: string;
+  customerName?: string;
+  tier?: ContentGeneratorTier;
+  createdAt: string;
+  upgradedAt?: string;
+  productId: string;
+}
+
+interface RecompeteRecord {
+  email: string;
+  customerName?: string;
+  createdAt: string;
+}
+
 export default function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -26,6 +43,8 @@ export default function AdminDashboard() {
   // Market Assassin state
   const [maRecords, setMaRecords] = useState<AccessRecord[]>([]);
   const [osProRecords, setOsProRecords] = useState<OpportunityScoutProRecord[]>([]);
+  const [cgRecords, setCgRecords] = useState<ContentGeneratorRecord[]>([]);
+  const [recompeteRecords, setRecompeteRecords] = useState<RecompeteRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,12 +52,13 @@ export default function AdminDashboard() {
   const [grantEmail, setGrantEmail] = useState('');
   const [grantName, setGrantName] = useState('');
   const [grantTier, setGrantTier] = useState<MarketAssassinTier>('standard');
-  const [grantProduct, setGrantProduct] = useState<'market-assassin' | 'opportunity-scout-pro'>('market-assassin');
+  const [grantCgTier, setGrantCgTier] = useState<ContentGeneratorTier>('content-engine');
+  const [grantProduct, setGrantProduct] = useState<'market-assassin' | 'opportunity-scout-pro' | 'content-generator' | 'recompete'>('market-assassin');
   const [granting, setGranting] = useState(false);
   const [grantMessage, setGrantMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Active tab
-  const [activeTab, setActiveTab] = useState<'market-assassin' | 'opportunity-scout-pro'>('market-assassin');
+  const [activeTab, setActiveTab] = useState<'market-assassin' | 'opportunity-scout-pro' | 'content-generator' | 'recompete'>('market-assassin');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,6 +135,8 @@ export default function AdminDashboard() {
       }
       setMaRecords(data.marketAssassin || []);
       setOsProRecords(data.opportunityScoutPro || []);
+      setCgRecords(data.contentGenerator || []);
+      setRecompeteRecords(data.recompete || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch records');
     } finally {
@@ -128,13 +150,23 @@ export default function AdminDashboard() {
     setGrantMessage(null);
 
     try {
-      const endpoint = grantProduct === 'market-assassin'
-        ? '/api/admin/grant-ma-tier'
-        : '/api/admin/grant-os-pro';
+      let endpoint = '/api/admin/grant-ma-tier';
+      if (grantProduct === 'opportunity-scout-pro') {
+        endpoint = '/api/admin/grant-os-pro';
+      } else if (grantProduct === 'content-generator') {
+        endpoint = '/api/admin/grant-content-generator';
+      } else if (grantProduct === 'recompete') {
+        endpoint = '/api/admin/grant-recompete';
+      }
 
-      const body = grantProduct === 'market-assassin'
-        ? { email: grantEmail, tier: grantTier, customerName: grantName || undefined, adminPassword: password }
-        : { email: grantEmail, customerName: grantName || undefined, adminPassword: password };
+      let body;
+      if (grantProduct === 'market-assassin') {
+        body = { email: grantEmail, tier: grantTier, customerName: grantName || undefined, adminPassword: password };
+      } else if (grantProduct === 'content-generator') {
+        body = { email: grantEmail, tier: grantCgTier, customerName: grantName || undefined, adminPassword: password };
+      } else {
+        body = { email: grantEmail, customerName: grantName || undefined, adminPassword: password };
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -159,7 +191,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleRevokeAccess = async (email: string, product: 'market-assassin' | 'opportunity-scout-pro') => {
+  const handleRevokeAccess = async (email: string, product: 'market-assassin' | 'opportunity-scout-pro' | 'content-generator' | 'recompete') => {
     if (!confirm(`Are you sure you want to revoke access for ${email}?`)) {
       return;
     }
@@ -188,6 +220,25 @@ export default function AdminDashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, tier: 'premium', adminPassword: password }),
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      fetchRecords(); // Refresh the list
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to upgrade');
+    }
+  };
+
+  const handleUpgradeCgToFullFix = async (email: string) => {
+    try {
+      const response = await fetch('/api/admin/grant-content-generator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, tier: 'full-fix', adminPassword: password }),
       });
 
       const data = await response.json();
@@ -267,11 +318,13 @@ export default function AdminDashboard() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Product</label>
                 <select
                   value={grantProduct}
-                  onChange={(e) => setGrantProduct(e.target.value as 'market-assassin' | 'opportunity-scout-pro')}
+                  onChange={(e) => setGrantProduct(e.target.value as 'market-assassin' | 'opportunity-scout-pro' | 'content-generator' | 'recompete')}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="market-assassin">Market Assassin</option>
                   <option value="opportunity-scout-pro">Opportunity Scout Pro</option>
+                  <option value="content-generator">GovCon Content Generator</option>
+                  <option value="recompete">Recompete Contracts Tracker</option>
                 </select>
               </div>
 
@@ -285,6 +338,20 @@ export default function AdminDashboard() {
                   >
                     <option value="standard">Standard ($297)</option>
                     <option value="premium">Premium ($497)</option>
+                  </select>
+                </div>
+              )}
+
+              {grantProduct === 'content-generator' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tier</label>
+                  <select
+                    value={grantCgTier}
+                    onChange={(e) => setGrantCgTier(e.target.value as ContentGeneratorTier)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="content-engine">Content Engine ($197)</option>
+                    <option value="full-fix">Full Fix ($297)</option>
                   </select>
                 </div>
               )}
@@ -355,6 +422,26 @@ export default function AdminDashboard() {
             Opportunity Scout Pro ({osProRecords.length})
           </button>
           <button
+            onClick={() => setActiveTab('content-generator')}
+            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+              activeTab === 'content-generator'
+                ? 'bg-purple-600 text-white'
+                : 'bg-white text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Content Generator ({cgRecords.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('recompete')}
+            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+              activeTab === 'recompete'
+                ? 'bg-amber-600 text-white'
+                : 'bg-white text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Recompete ({recompeteRecords.length})
+          </button>
+          <button
             onClick={fetchRecords}
             disabled={loading}
             className="ml-auto px-4 py-2 text-sm text-slate-600 hover:text-slate-800 border border-slate-300 rounded-lg hover:bg-white transition-colors disabled:opacity-50"
@@ -372,7 +459,7 @@ export default function AdminDashboard() {
 
         {/* Records Table */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {activeTab === 'market-assassin' ? (
+          {activeTab === 'market-assassin' && (
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -430,7 +517,9 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
-          ) : (
+          )}
+
+          {activeTab === 'opportunity-scout-pro' && (
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -469,10 +558,110 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           )}
+
+          {activeTab === 'content-generator' && (
+            <table className="w-full">
+              <thead className="bg-purple-50 border-b border-purple-200">
+                <tr>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Email</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Name</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Tier</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Created</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cgRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                      No GovCon Content Generator access records found
+                    </td>
+                  </tr>
+                ) : (
+                  cgRecords.map((record) => (
+                    <tr key={record.email} className="hover:bg-slate-50">
+                      <td className="px-6 py-4 text-sm text-slate-900">{record.email}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{record.customerName || '-'}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
+                          record.tier === 'full-fix'
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                            : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          {record.tier === 'full-fix' ? 'Full Fix' : 'Content Engine'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {new Date(record.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          {record.tier !== 'full-fix' && (
+                            <button
+                              onClick={() => handleUpgradeCgToFullFix(record.email)}
+                              className="px-3 py-1 text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg transition-colors"
+                            >
+                              Upgrade
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRevokeAccess(record.email, 'content-generator')}
+                            className="px-3 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-800 rounded-lg transition-colors"
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === 'recompete' && (
+            <table className="w-full">
+              <thead className="bg-amber-50 border-b border-amber-200">
+                <tr>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Email</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Name</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Created</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {recompeteRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                      No Recompete Contracts Tracker access records found
+                    </td>
+                  </tr>
+                ) : (
+                  recompeteRecords.map((record) => (
+                    <tr key={record.email} className="hover:bg-slate-50">
+                      <td className="px-6 py-4 text-sm text-slate-900">{record.email}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{record.customerName || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {new Date(record.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => handleRevokeAccess(record.email, 'recompete')}
+                          className="px-3 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-800 rounded-lg transition-colors"
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Summary Stats */}
-        <div className="grid md:grid-cols-4 gap-4 mt-8">
+        <div className="grid md:grid-cols-6 gap-4 mt-8">
           <div className="bg-white rounded-xl shadow p-6">
             <div className="text-3xl font-bold text-blue-600">{maRecords.length}</div>
             <div className="text-sm text-slate-600">Total MA Users</div>
@@ -492,6 +681,14 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl shadow p-6">
             <div className="text-3xl font-bold text-green-600">{osProRecords.length}</div>
             <div className="text-sm text-slate-600">OS Pro Users</div>
+          </div>
+          <div className="bg-white rounded-xl shadow p-6">
+            <div className="text-3xl font-bold text-purple-600">{cgRecords.length}</div>
+            <div className="text-sm text-slate-600">Content Gen Users</div>
+          </div>
+          <div className="bg-white rounded-xl shadow p-6">
+            <div className="text-3xl font-bold text-orange-600">{recompeteRecords.length}</div>
+            <div className="text-sm text-slate-600">Recompete Users</div>
           </div>
         </div>
       </div>

@@ -338,3 +338,313 @@ export async function getAllMarketAssassinAccess(): Promise<MarketAssassinAccess
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }
+
+// ============================================
+// Market Assassin Usage Tracking (Monthly Limits)
+// ============================================
+
+export interface MonthlyUsage {
+  email: string;
+  month: string; // Format: YYYY-MM
+  reportCount: number;
+  lastReportAt: string;
+}
+
+// Monthly report limits per tier
+export const MONTHLY_REPORT_LIMITS: Record<MarketAssassinTier, number> = {
+  standard: 30,
+  premium: Infinity, // Unlimited for premium
+};
+
+// Get the current month key (YYYY-MM format)
+function getCurrentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Get monthly usage for a user
+export async function getMonthlyUsage(email: string): Promise<MonthlyUsage | null> {
+  const monthKey = getCurrentMonthKey();
+  const usage = await kv.get<MonthlyUsage>(`ma:usage:${email.toLowerCase()}:${monthKey}`);
+  return usage;
+}
+
+// Increment report usage for a user
+export async function incrementReportUsage(email: string): Promise<MonthlyUsage> {
+  const monthKey = getCurrentMonthKey();
+  const kvKey = `ma:usage:${email.toLowerCase()}:${monthKey}`;
+
+  const existingUsage = await kv.get<MonthlyUsage>(kvKey);
+
+  const usage: MonthlyUsage = {
+    email: email.toLowerCase(),
+    month: monthKey,
+    reportCount: (existingUsage?.reportCount || 0) + 1,
+    lastReportAt: new Date().toISOString(),
+  };
+
+  // Store with 45-day expiry (so old months clean up automatically)
+  await kv.set(kvKey, usage, { ex: 45 * 24 * 60 * 60 });
+
+  return usage;
+}
+
+// Check if user can generate a report (based on tier limits)
+export async function canGenerateReport(email: string): Promise<{
+  allowed: boolean;
+  currentUsage: number;
+  limit: number;
+  remaining: number;
+  tier: MarketAssassinTier;
+}> {
+  const access = await getMarketAssassinAccess(email);
+
+  if (!access) {
+    return {
+      allowed: false,
+      currentUsage: 0,
+      limit: 0,
+      remaining: 0,
+      tier: 'standard',
+    };
+  }
+
+  const tier = access.tier;
+  const limit = MONTHLY_REPORT_LIMITS[tier];
+
+  // Premium users have unlimited access
+  if (tier === 'premium') {
+    return {
+      allowed: true,
+      currentUsage: 0,
+      limit: Infinity,
+      remaining: Infinity,
+      tier,
+    };
+  }
+
+  // Check standard tier usage
+  const usage = await getMonthlyUsage(email);
+  const currentUsage = usage?.reportCount || 0;
+  const remaining = Math.max(0, limit - currentUsage);
+
+  return {
+    allowed: currentUsage < limit,
+    currentUsage,
+    limit,
+    remaining,
+    tier,
+  };
+}
+
+// Get usage stats for admin
+export async function getUsageStats(email: string): Promise<{
+  currentMonth: MonthlyUsage | null;
+  tier: MarketAssassinTier | null;
+  limit: number;
+}> {
+  const access = await getMarketAssassinAccess(email);
+  const usage = await getMonthlyUsage(email);
+
+  return {
+    currentMonth: usage,
+    tier: access?.tier || null,
+    limit: access ? MONTHLY_REPORT_LIMITS[access.tier] : 0,
+  };
+}
+
+// ============================================
+// GovCon Content Generator Access (Tiered)
+// ============================================
+
+export type ContentGeneratorTier = 'content-engine' | 'full-fix';
+
+export interface ContentGeneratorAccess {
+  email: string;
+  customerName?: string;
+  tier: ContentGeneratorTier;
+  createdAt: string;
+  upgradedAt?: string;
+  productId: string;
+}
+
+// Features available per tier
+export const CONTENT_GENERATOR_TIER_FEATURES: Record<ContentGeneratorTier, {
+  price: number;
+  name: string;
+  features: string[];
+}> = {
+  'content-engine': {
+    price: 197,
+    name: 'Content Engine',
+    features: [
+      'Unlimited LinkedIn post generation',
+      'Real-time agency spending data',
+      '15 content templates & structures',
+      'Company personalization',
+      'Hashtag optimization',
+    ],
+  },
+  'full-fix': {
+    price: 297,
+    name: 'Full Fix',
+    features: [
+      'Everything in Content Engine',
+      'AI Quote Card Graphics',
+      '6 professional visual styles',
+      'Complementary quote generation',
+      'One-click image download',
+      'Company branding on graphics',
+    ],
+  },
+};
+
+// Grant GovCon Content Generator access to a customer
+export async function grantContentGeneratorAccess(
+  email: string,
+  tier: ContentGeneratorTier = 'content-engine',
+  customerName?: string
+): Promise<ContentGeneratorAccess> {
+  // Check if user already has access (for upgrades)
+  const existingAccess = await getContentGeneratorAccess(email);
+
+  const access: ContentGeneratorAccess = {
+    email: email.toLowerCase(),
+    customerName: customerName || existingAccess?.customerName,
+    tier,
+    createdAt: existingAccess?.createdAt || new Date().toISOString(),
+    upgradedAt: existingAccess && tier === 'full-fix' ? new Date().toISOString() : undefined,
+    productId: 'govcon-content-generator',
+  };
+
+  // Store by email (lowercase for consistent lookup)
+  await kv.set(`contentgen:${email.toLowerCase()}`, access);
+
+  // Add to list for admin tracking (only if new)
+  if (!existingAccess) {
+    await kv.lpush('contentgen:all', email.toLowerCase());
+  }
+
+  console.log(`✅ GovCon Content Generator ${tier} access granted to: ${email}`);
+  return access;
+}
+
+// Check if an email has Content Generator access
+export async function hasContentGeneratorAccess(email: string): Promise<boolean> {
+  const access = await kv.get(`contentgen:${email.toLowerCase()}`);
+  return !!access;
+}
+
+// Get Content Generator access details
+export async function getContentGeneratorAccess(email: string): Promise<ContentGeneratorAccess | null> {
+  const access = await kv.get<ContentGeneratorAccess>(`contentgen:${email.toLowerCase()}`);
+  return access;
+}
+
+// Get all Content Generator access records (for admin)
+export async function getAllContentGeneratorAccess(): Promise<ContentGeneratorAccess[]> {
+  const allEmails = await kv.lrange('contentgen:all', 0, -1) as string[];
+
+  if (!allEmails || allEmails.length === 0) {
+    return [];
+  }
+
+  const accessRecords: ContentGeneratorAccess[] = [];
+  for (const email of allEmails) {
+    const access = await kv.get<ContentGeneratorAccess>(`contentgen:${email}`);
+    if (access) {
+      accessRecords.push(access);
+    }
+  }
+
+  return accessRecords.sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+// Revoke Content Generator access
+export async function revokeContentGeneratorAccess(email: string): Promise<boolean> {
+  const deleted = await kv.del(`contentgen:${email.toLowerCase()}`);
+  if (deleted) {
+    await kv.lrem('contentgen:all', 1, email.toLowerCase());
+  }
+  return deleted > 0;
+}
+
+// ============================================
+// Recompete Contracts Tracker Access
+// ============================================
+
+export interface RecompeteAccess {
+  email: string;
+  customerName?: string;
+  createdAt: string;
+}
+
+// Grant Recompete Contracts Tracker access to a customer
+export async function grantRecompeteAccess(
+  email: string,
+  customerName?: string
+): Promise<RecompeteAccess> {
+  // Check for existing access BEFORE setting new access
+  const existingAccess = await kv.get(`recompete:${email.toLowerCase()}`);
+
+  const access: RecompeteAccess = {
+    email: email.toLowerCase(),
+    customerName,
+    createdAt: existingAccess ? (existingAccess as RecompeteAccess).createdAt : new Date().toISOString(),
+  };
+
+  // Store by email (lowercase for consistent lookup)
+  await kv.set(`recompete:${email.toLowerCase()}`, access);
+
+  // Add to list for admin tracking (only if new)
+  if (!existingAccess) {
+    await kv.lpush('recompete:all', email.toLowerCase());
+  }
+
+  console.log(`✅ Recompete Contracts Tracker access granted to: ${email}`);
+  return access;
+}
+
+// Check if an email has Recompete access
+export async function hasRecompeteAccess(email: string): Promise<boolean> {
+  const access = await kv.get(`recompete:${email.toLowerCase()}`);
+  return !!access;
+}
+
+// Get Recompete access details
+export async function getRecompeteAccess(email: string): Promise<RecompeteAccess | null> {
+  const access = await kv.get<RecompeteAccess>(`recompete:${email.toLowerCase()}`);
+  return access;
+}
+
+// Get all Recompete access records (for admin)
+export async function getAllRecompeteAccess(): Promise<RecompeteAccess[]> {
+  const allEmails = await kv.lrange('recompete:all', 0, -1) as string[];
+
+  if (!allEmails || allEmails.length === 0) {
+    return [];
+  }
+
+  const accessRecords: RecompeteAccess[] = [];
+  for (const email of allEmails) {
+    const access = await kv.get<RecompeteAccess>(`recompete:${email}`);
+    if (access) {
+      accessRecords.push(access);
+    }
+  }
+
+  return accessRecords.sort((a, b) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+// Revoke Recompete access
+export async function revokeRecompeteAccess(email: string): Promise<boolean> {
+  const deleted = await kv.del(`recompete:${email.toLowerCase()}`);
+  if (deleted) {
+    await kv.lrem('recompete:all', 1, email.toLowerCase());
+  }
+  return deleted > 0;
+}

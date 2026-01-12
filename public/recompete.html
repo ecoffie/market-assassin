@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expiring Federal Contracts | GovCon Giants</title>
+    <title>Recompete Contracts Tracker | GovCon Giants</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
@@ -322,6 +322,118 @@
             max-width: 250px;
         }
 
+        .prime-name.clickable {
+            cursor: pointer;
+            color: #2563eb;
+            transition: color 0.2s;
+        }
+
+        .prime-name.clickable:hover {
+            color: #dc2626;
+            text-decoration: underline;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: white;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #dc2626 0%, #f59e0b 100%);
+            padding: 25px 30px;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .modal-header h3 {
+            color: white;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .modal-header p {
+            color: rgba(255,255,255,0.9);
+            font-size: 14px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .modal-body {
+            padding: 25px 30px;
+        }
+
+        .detail-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: 120px;
+            flex-shrink: 0;
+        }
+
+        .detail-value {
+            font-size: 14px;
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        .detail-value.highlight {
+            color: #059669;
+            font-weight: 700;
+        }
+
         .agency-name {
             color: #64748b;
             font-size: 13px;
@@ -480,8 +592,8 @@
     <div class="header">
         <div class="header-content">
             <div class="logo">GOVCON GIANTS</div>
-            <h1>Expiring Federal Contracts</h1>
-            <p>December 2025 - Recompete Opportunities</p>
+            <h1>Recompete Contracts Tracker</h1>
+            <p>January - February 2026 - Recompete Opportunities</p>
         </div>
     </div>
 
@@ -604,6 +716,19 @@
         <p>Data from USASpending.gov | Built by <a href="https://govcongiants.org">GovCon Giants</a></p>
     </div>
 
+    <!-- Contract Details Modal -->
+    <div class="modal-overlay" id="contractModal" onclick="closeModal(event)">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <div class="modal-header" style="position:relative;">
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <h3 id="modalTitle">Contract Details</h3>
+                <p id="modalSubtitle"></p>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+        </div>
+    </div>
+
     <!-- Load the shared data file -->
     <script src="contracts-data.js?v=3"></script>
 
@@ -662,6 +787,7 @@
         }
 
         function formatCurrency(value) {
+            if (value >= 1e12) return '$' + (value / 1e12).toFixed(1) + 'T';
             if (value >= 1e9) return '$' + (value / 1e9).toFixed(1) + 'B';
             if (value >= 1e6) return '$' + (value / 1e6).toFixed(1) + 'M';
             if (value >= 1e3) return '$' + (value / 1e3).toFixed(0) + 'K';
@@ -670,6 +796,7 @@
 
         function formatValueDisplay(valueStr) {
             const value = parseValue(valueStr);
+            if (value >= 999.5e9) return '$' + (value / 1e12).toFixed(2) + 'T';
             if (value >= 1e9) return '$' + (value / 1e9).toFixed(2) + 'B';
             if (value >= 1e6) return '$' + (value / 1e6).toFixed(2) + 'M';
             return '$' + value.toLocaleString();
@@ -784,14 +911,15 @@
                 return;
             }
 
-            tbody.innerHTML = pageResults.map(contract => {
+            tbody.innerHTML = pageResults.map((contract, idx) => {
                 const value = parseValue(contract['Total Value']);
                 const valueClass = value >= 100000000 ? 'high' : '';
                 const naicsCode = contract.NAICS?.split(' ')[0] || '';
+                const globalIdx = (currentPage - 1) * perPage + idx;
 
                 return `
                     <tr>
-                        <td class="prime-name">${contract.Recipient || 'Unknown'}</td>
+                        <td class="prime-name clickable" onclick="showContractDetails(${globalIdx})">${contract.Recipient || 'Unknown'}</td>
                         <td class="agency-name">${contract.Agency || 'N/A'}<br><small style="color:#94a3b8">${contract.Office || ''}</small></td>
                         <td class="contract-value ${valueClass}">${formatValueDisplay(contract['Total Value'])}</td>
                         <td><span class="naics-badge">${naicsCode}</span></td>
@@ -851,9 +979,81 @@
             window.scrollTo({ top: document.querySelector('.results-section').offsetTop - 20, behavior: 'smooth' });
         }
 
+        function showContractDetails(idx) {
+            const contract = filteredResults[idx];
+            if (!contract) return;
+
+            document.getElementById('modalTitle').textContent = contract.Recipient || 'Unknown';
+            document.getElementById('modalSubtitle').textContent = contract.Agency || '';
+
+            // Build contracts table
+            let contractsTable = '';
+            if (contract.Contracts && contract.Contracts.length > 0) {
+                contractsTable = `
+                    <div style="margin-top:20px;">
+                        <h4 style="font-size:14px;color:#64748b;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">All Contracts (${contract.Contracts.length})</h4>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                                <thead>
+                                    <tr style="background:#f8fafc;">
+                                        <th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;">Award ID</th>
+                                        <th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;">Start Date</th>
+                                        <th style="padding:10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;">Expires</th>
+                                        <th style="padding:10px;text-align:right;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase;">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${contract.Contracts.map(c => `
+                                        <tr style="border-bottom:1px solid #f1f5f9;">
+                                            <td style="padding:10px;font-family:monospace;color:#1e293b;">${c['Award ID'] || 'N/A'}</td>
+                                            <td style="padding:10px;color:#0369a1;">${c['Start Date'] || 'N/A'}</td>
+                                            <td style="padding:10px;color:#dc2626;font-weight:600;">${c['Expiration'] || 'N/A'}</td>
+                                            <td style="padding:10px;text-align:right;color:#059669;font-weight:600;">${formatValueDisplay(c['Value'])}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('modalBody').innerHTML = `
+                <div class="detail-row">
+                    <div class="detail-label">Agency</div>
+                    <div class="detail-value">${contract.Agency || 'N/A'}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Office</div>
+                    <div class="detail-value">${contract.Office || 'N/A'}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Total Value</div>
+                    <div class="detail-value highlight">${formatValueDisplay(contract['Total Value'])}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">NAICS</div>
+                    <div class="detail-value">${contract.NAICS || 'N/A'}</div>
+                </div>
+                ${contractsTable}
+            `;
+
+            document.getElementById('contractModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('contractModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
         document.addEventListener('DOMContentLoaded', loadData);
         document.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') performSearch();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
         });
     </script>
 </body>
