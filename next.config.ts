@@ -1,5 +1,20 @@
 import type { NextConfig } from "next";
 
+/**
+ * PROXY CONFIGURATION GUIDE
+ * ========================
+ * When adding new proxied apps/pages, ensure you add rewrites for:
+ * 1. The main page(s) - e.g., /library, /calendar
+ * 2. Static assets - e.g., /js/*, /css/*, /images/*
+ * 3. API routes used by those pages
+ *
+ * Current proxied apps:
+ * - GovCon Content Generator (govcon-content-generator.vercel.app)
+ *   - Pages: /content-generator/*, /library, /calendar
+ *   - Assets: /js/*
+ *   - APIs: handled via /content-generator/api/*
+ */
+
 const nextConfig: NextConfig = {
   // Skip type checking during builds (we run tsc separately)
   typescript: {
