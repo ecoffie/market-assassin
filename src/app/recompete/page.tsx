@@ -167,6 +167,7 @@ export default function RecompeteLockedPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
+                style={{ color: '#000000', backgroundColor: '#ffffff' }}
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg"
               />
               <button
@@ -180,10 +181,11 @@ export default function RecompeteLockedPage() {
           ) : (
             <form onSubmit={handlePasswordSubmit} className="flex gap-2">
               <input
-                type="password"
+                type="text"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
+                style={{ color: '#000000', backgroundColor: '#ffffff' }}
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center"
               />
               <button

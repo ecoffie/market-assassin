@@ -16,7 +16,8 @@ export default function GuidesTemplatesPage() {
       videoSubtitle="Everything you need to get started in federal contracting"
       screenshots={[
         '/images/products/guides-templates/agency-pain-points-1.png',
-        '/images/products/guides-templates/agency-pain-points-2.png',
+        '/images/products/guides-templates/ndaa fy2026.png',
+        '/images/products/guides-templates/ndaa provisions.png',
         '/images/products/guides-templates/agency-pain-points-3.png',
       ]}
       screenshotFeatures={[
@@ -32,7 +33,7 @@ export default function GuidesTemplatesPage() {
           ],
         },
         {
-          image: '/images/products/guides-templates/agency-pain-points-2.png',
+          image: '/images/products/guides-templates/ndaa fy2026.png',
           title: '2026 NDAA Small Business Provisions',
           description: 'Stay ahead with the latest FY2026 NDAA changes affecting small business contracting. New sole source thresholds, CMMC support, and more.',
           bullets: [
@@ -43,7 +44,7 @@ export default function GuidesTemplatesPage() {
           ],
         },
         {
-          image: '/images/products/guides-templates/agency-pain-points-3.png',
+          image: '/images/products/guides-templates/ndaa provisions.png',
           title: 'General Contractor Guide',
           description: 'Construction-specific guidance for GCs entering federal contracting. Know where to find the right opportunities.',
           bullets: [

@@ -20,7 +20,7 @@ function SuccessContent() {
         'starter-bundle': 'Starter Bundle',
         'pro-bundle': 'Pro Giant Bundle',
         'ultimate-bundle': 'Ultimate Giant Bundle',
-        'opportunity-scout-pro': 'Opportunity Scout Pro',
+        'opportunity-hunter-pro': 'Opportunity Hunter Pro',
       };
       setProductName(productNames[product] || product);
     }
@@ -120,10 +120,10 @@ function SuccessContent() {
               AI Content Generator
             </Link>
             <Link
-              href="/opportunity-scout"
+              href="/opportunity-hunter"
               className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
             >
-              Opportunity Scout
+              Opportunity Hunter
             </Link>
           </div>
         </div>

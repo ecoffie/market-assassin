@@ -29,7 +29,12 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/opportunity-scout.html',
-        destination: '/opportunity-scout',
+        destination: '/opportunity-hunter',
+        permanent: true,
+      },
+      {
+        source: '/opportunity-scout',
+        destination: '/opportunity-hunter',
         permanent: true,
       },
     ];
@@ -37,6 +42,11 @@ const nextConfig: NextConfig = {
   // Rewrites to proxy content-generator to separate app
   async rewrites() {
     return [
+      // Handle /content-generator without trailing slash
+      {
+        source: '/content-generator',
+        destination: 'https://govcon-content-generator.vercel.app/',
+      },
       {
         source: '/content-generator/',
         destination: 'https://govcon-content-generator.vercel.app/',
@@ -62,6 +72,15 @@ const nextConfig: NextConfig = {
       {
         source: '/js/:path*',
         destination: 'https://govcon-content-generator.vercel.app/js/:path*',
+      },
+      // Proxy API routes for calendar and library pages (using _proxy prefix to avoid Next.js API conflicts)
+      {
+        source: '/_proxy/calendar-events',
+        destination: 'https://govcon-content-generator.vercel.app/api/calendar-events',
+      },
+      {
+        source: '/_proxy/upload-carousel',
+        destination: 'https://govcon-content-generator.vercel.app/api/upload-carousel',
       },
     ];
   },

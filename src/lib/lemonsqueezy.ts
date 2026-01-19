@@ -6,53 +6,62 @@ const LEMONSQUEEZY_API_URL = 'https://api.lemonsqueezy.com/v1';
 export const PRODUCTS = {
   AI_CONTENT_GENERATOR: {
     id: 'ai-content-generator',
-    variantId: '', // Add after creating in Lemon Squeezy
+    variantId: '1227179', // Content Engine variant
+    variantIdFullFix: '1227185', // Full Fix variant
     name: 'AI Content Generator',
-    price: 197,
+    price: 397,
   },
   CONTRACTOR_DATABASE: {
     id: 'contractor-database',
-    variantId: '',
+    variantId: '1227200',
     name: 'Contractor Database',
-    price: 197,
+    price: 497,
   },
   RECOMPETE_CONTRACTS: {
     id: 'recompete-contracts',
-    variantId: '',
+    variantId: '1227279',
     name: 'Recompete Contracts',
     price: 397,
   },
-  PRIME_LOOKUP: {
-    id: 'prime-lookup',
-    variantId: '',
-    name: 'Prime Lookup',
-    price: 247,
+  MARKET_ASSASSIN_STANDARD: {
+    id: 'market-assassin-standard',
+    variantId: '1227284',
+    name: 'Market Assassin Standard',
+    price: 297,
+    reports: 4,
   },
-  STARTER_BUNDLE: {
-    id: 'starter-bundle',
-    variantId: '',
-    name: 'Starter Bundle',
+  MARKET_ASSASSIN_PREMIUM: {
+    id: 'market-assassin-premium',
+    variantId: '1227287',
+    name: 'Market Assassin Premium',
     price: 497,
-    includes: ['ai-content-generator', 'contractor-database'],
+    reports: 8,
   },
-  PRO_GIANT_BUNDLE: {
-    id: 'pro-giant-bundle',
-    variantId: '',
-    name: 'Pro Giant Bundle',
+  GOVCON_STARTER_BUNDLE: {
+    id: 'govcon-starter-bundle',
+    variantId: '1227736',
+    name: 'GovCon Starter Bundle',
+    price: 697,
+    includes: ['recompete-contracts', 'contractor-database', 'opportunity-hunter-pro'],
+  },
+  ULTIMATE_GOVCON_BUNDLE: {
+    id: 'ultimate-govcon-bundle',
+    variantId: '1227743',
+    name: 'Ultimate GovCon Bundle',
     price: 997,
-    includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'prime-lookup'],
+    includes: ['contractor-database', 'recompete-contracts', 'market-assassin-standard', 'ai-content-generator'],
   },
-  ULTIMATE_GIANT_BUNDLE: {
-    id: 'ultimate-giant-bundle',
-    variantId: '',
-    name: 'Ultimate Giant Bundle',
+  COMPLETE_GOVCON_BUNDLE: {
+    id: 'complete-govcon-bundle',
+    variantId: '1227745',
+    name: 'Complete GovCon Bundle',
     price: 1497,
-    includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'prime-lookup', 'opportunity-scout-pro'],
+    includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'market-assassin-premium'],
   },
-  OPPORTUNITY_SCOUT_PRO: {
-    id: 'opportunity-scout-pro',
-    variantId: '',
-    name: 'Opportunity Scout Pro',
+  OPPORTUNITY_HUNTER_PRO: {
+    id: 'opportunity-hunter-pro',
+    variantId: '1227153',
+    name: 'Opportunity Hunter Pro',
     price: 49,
   },
 } as const;

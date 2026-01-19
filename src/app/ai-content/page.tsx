@@ -12,16 +12,79 @@ export default function AIContentPage() {
       price="$197"
       originalPrice="$588/year"
       checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/ai-content-generator"
+      pricingTiers={[
+        {
+          name: 'Content Engine',
+          price: '$197',
+          originalPrice: '$588/year',
+          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/ai-content-generator',
+          description: 'Text-only LinkedIn post generation',
+          features: [
+            'Lifetime access',
+            'Generate 10 posts per click',
+            '175 federal agencies',
+            'GovCon-tuned AI model',
+            'GEO Boost optimization',
+            'All future updates',
+          ],
+        },
+        {
+          name: 'Full Fix',
+          price: '$397',
+          originalPrice: '$1,176/year',
+          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/ai-content-generator-full',
+          description: 'Text + graphics & carousel generation',
+          features: [
+            'Everything in Content Engine, plus:',
+            'AI-generated graphics',
+            'Carousel post templates',
+            'Quote graphics generator',
+            'Visual content library',
+            'Brand customization',
+            'Priority support',
+          ],
+        },
+      ]}
       screenshots={[
-        '/screenshots/linkedin-content-creator/home page .png',
-        '/screenshots/linkedin-content-creator/search options.png',
-        '/screenshots/linkedin-content-creator/target agencies.png',
-        '/screenshots/linkedin-content-creator/sample post type.png',
-        '/screenshots/linkedin-content-creator/your linkedin posts.png',
-        '/screenshots/linkedin-content-creator/case study.png',
-        '/screenshots/linkedin-content-creator/pain point.png',
-        '/screenshots/linkedin-content-creator/quote graphic.png',
-        '/screenshots/linkedin-content-creator/sample graphic.png',
+        '/images/products/ai content generator/ai content generator home page.png',
+        '/images/products/ai content generator/company profile .png',
+        '/images/products/ai content generator/content library.png',
+        '/images/products/ai content generator/carousel.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/ai content generator/linkedin posts.png',
+          title: 'Generate 10 Posts Instantly',
+          description: 'One click generates 10 diverse LinkedIn posts tailored to your target agencies. Get a full week of content in seconds.',
+          bullets: [
+            '10 posts per generation',
+            'Multiple content styles',
+            'Agency-specific messaging',
+            'Copy & paste ready',
+          ],
+        },
+        {
+          image: '/images/products/ai content generator/carousel page.png',
+          title: 'Carousel & Graphics Creator',
+          description: 'Create eye-catching carousel posts and branded graphics that stand out in the feed. Full Fix tier includes visual content generation.',
+          bullets: [
+            'Multi-slide carousels',
+            'Branded quote graphics',
+            'Data visualization posts',
+            'Professional templates',
+          ],
+        },
+        {
+          image: '/images/products/ai content generator/content library.png',
+          title: 'Content Library & Calendar',
+          description: 'Save your best posts to a content library and plan your posting schedule with the built-in calendar.',
+          bullets: [
+            'Save favorite posts',
+            'Content calendar view',
+            'Schedule your content',
+            'Track what performs',
+          ],
+        },
       ]}
       tldr={[
         'Generate 10 LinkedIn posts with one click',

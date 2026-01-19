@@ -9,7 +9,7 @@ export default function ContractorDatabasePage() {
       primaryColor="#4f46e5"
       gradientFrom="#4f46e5"
       gradientTo="#7c3aed"
-      price="$197"
+      price="$497"
       originalPrice="$297/month"
       checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database"
       videoTitle="Federal Contractor Database Demo"

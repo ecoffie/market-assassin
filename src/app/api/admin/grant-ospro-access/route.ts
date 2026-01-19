@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { grantOpportunityScoutProAccess } from '@/lib/access-codes';
+import { grantOpportunityHunterProAccess } from '@/lib/access-codes';
 
-// Admin endpoint to manually grant Opportunity Scout Pro access
+// Admin endpoint to manually grant Opportunity Hunter Pro access
 // Protected by admin password
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Grant access
-    const access = await grantOpportunityScoutProAccess(email, customerName);
+    const access = await grantOpportunityHunterProAccess(email, customerName);
 
     return NextResponse.json({
       success: true,
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error granting Opportunity Scout Pro access:', error);
+    console.error('Error granting Opportunity Hunter Pro access:', error);
     return NextResponse.json(
       { error: 'Failed to grant access' },
       { status: 500 }

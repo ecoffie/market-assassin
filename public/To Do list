@@ -1,0 +1,46 @@
+**Let’s improve Market Assassin** — turning it into the standout premium tool that drives upgrades and justifies the $297/$497 LTD pricing even more.
+
+Right now, Market Assassin is a strong core product (8 reports: Pain Points & Priorities, Government Buyers, Agency Spend Analysis, OSBP Contacts, Subcontracting Opportunities, IDV Contracts, Similar Awards, Tribal Contracting). The goal is to make it feel like an **indispensable intelligence suite** that small/vet/SDVOSB contractors can’t live without — more actionable, personalized, and strategic than the current report list.
+
+### Current Strengths (Keep These)
+- 8 high-value reports
+- Direct Supabase integration
+- Tiered access (Standard 4 reports, Premium all 8 + unlimited)
+- Reliable saves with UUID guards & retries
+
+### Improvement Roadmap (Prioritized – Next 2–6 Weeks)
+Focus on **actionable intelligence** (not just data dumps) — add scoring, recommendations, alerts, and workflow integration.
+
+| Priority | Feature / Improvement                                   | Value Add (Why Users Will Pay More)                                                                 | Build Effort | Timeline | Implementation Notes |
+|----------|---------------------------------------------------------|-----------------------------------------------------------------------------------------------------|--------------|----------|----------------------|
+| 1 (Must-Have) | **Personalized Win Probability Score**                  | AI scores each opportunity (1–100%) based on your NAICS, certs, location, agency goals, incumbent strength. "78% win chance – agency under SDVOSB goals" | Medium       | 1–2 weeks | Use Groq/OpenAI prompt on report data + user profile. Add score column in reports. |
+| 2 (High Impact) | **Teaming & Partner Recommendations**                   | For each report (esp. Subcontracting/Similar Awards), suggest 3–5 primes/subs to approach + draft outreach emails | Medium-High  | 2–3 weeks | Match user profile to prime needs (past subs, goals). Pull from your Contractor Database. |
+| 3 | **Custom Alerts & Watchlists**                          | Users set keywords/NAICS/agencies → get email/Slack alerts when new matches appear in reports | Low-Medium   | 1 week   | Use Supabase realtime + cron (Vercel) to check new data daily. |
+| 4 | **Agency-Specific Gap Analysis**                        | Highlight agencies with unmet small biz goals (e.g., "DoD under 3% SDVOSB – strong opportunity") | Medium       | 1–2 weeks | Pull from OSBP Contacts + Spend Analysis; add "Gap Score" column. |
+| 5 | **Export & Proposal Prep Kit**                          | One-click PDF/Word export per report with: Summary, win score, teaming suggestions, outreach templates | Low          | 3–5 days | Use jsPDF or html2pdf; include branded template. |
+| 6 | **Competitor Tracking Dashboard**                       | Track 3–5 competitors → see their wins/losses in Similar Awards report | Medium       | 1–2 weeks | Add user watchlist table in Supabase; filter Similar Awards. |
+| 7 | **Visual Dashboard**                                    | Overview page with charts: Top agencies, spend trends, your win probability average | Medium       | 2 weeks  | Use Chart.js for simple bar/pie charts from report data. |
+| 8 | **Integration with Other Tools**                        | One-click "Send to AI Proposal Toolkit" or "Generate LinkedIn Post about this report" | Low          | 3–5 days | Deep links between tools (pass report ID). |
+
+### Recommended Launch Plan (Next 2–6 Weeks)
+- **Week 1–2**: Add #1 (Win Probability Score) + #3 (Alerts) — these are the "wow" features that make it feel alive and strategic.
+- **Week 3–4**: Add #2 (Teaming Recommendations) + #5 (Export Kit) — turns data into action.
+- **Week 5–6**: Polish #4, #6, #7 (Gap Analysis, Competitor Tracking, Visual Dashboard) for premium feel.
+
+### Updated Tier Breakdown (After Improvements)
+- **Standard ($297 LTD)**: 4 core reports + basic filters + monthly refreshes
+- **Premium ($497 LTD)**: All 8 reports + unlimited + Win Probability Score + Teaming Recommendations + Alerts + Gap Analysis + Export Kit
+
+This makes Premium feel like a **complete BD intelligence system** — users will upgrade quickly.
+
+### Marketing Angle
+- "Market Assassin doesn’t just give you reports — it tells you which ones you’ll win, who to team with, and how to approach them."
+- "From $20K/year GovWin to $497 lifetime with AI scoring & teaming suggestions."
+
+Want me to:
+- Write the exact AI prompt for Win Probability Score?
+- Give Supabase schema for watchlists/alerts?
+- Update the product writeup for the enhanced version?
+- Or plan the launch sequence for Market Assassin?
+
+Let’s make Market Assassin the flagship that sells itself! 🚀

@@ -1,0 +1,230 @@
+OPPORTUNITY SCOUT EMAIL SEQUENCE - SUBJECT LINES
+=================================================
+
+Optimized for opens and clicks. Each email has a Primary subject line
+plus 2 A/B test alternatives you can split test.
+
+Copy/paste ready for GoHighLevel.
+
+---
+
+EMAIL 01 - WELCOME
+Primary:    Your federal intel is ready, {{first_name}}
+Alt A:      {{first_name}}, start here (60 seconds)
+Alt B:      The search that changes everything
+
+---
+
+EMAIL 02 - ROCK BOTTOM
+Primary:    When your business needs a lifeline
+Alt A:      What contractors do when revenue disappears
+Alt B:      {{first_name}}, there's another way
+
+---
+
+EMAIL 03 - ESCAPE COMMERCIAL
+Primary:    Tired of chasing clients who ghost?
+Alt A:      Net-90 payments are killing your business
+Alt B:      What if you never started from zero again?
+
+---
+
+EMAIL 04 - AGENCY SELECTION MISTAKE
+Primary:    The #1 mistake new GovCon contractors make
+Alt A:      Why most contractors target the wrong agencies
+Alt B:      {{first_name}}, are you chasing the wrong agencies?
+
+---
+
+EMAIL 05 - REVENGE
+Primary:    They said you couldn't do it
+Alt A:      Prove them wrong with federal contracts
+Alt B:      When "no" becomes your motivation
+
+---
+
+EMAIL 06 - SUCCESS STORY
+Primary:    From $0 to $10 million in federal contracts
+Alt A:      How one contractor went from 0 to 34 prime contracts
+Alt B:      {{first_name}}, this could be you
+
+---
+
+EMAIL 07 - IDENTITY
+Primary:    You're not just a contractor
+Alt A:      Federal contractor. That's who you are now.
+Alt B:      Ready to own this identity?
+
+---
+
+EMAIL 08 - PAIN POINT DISCOVERY
+Primary:    The real secret to winning contracts
+Alt A:      It's not price. It's not experience. It's this.
+Alt B:      How to speak the agency's language
+
+---
+
+EMAIL 09 - OSBP CONNECTION
+Primary:    Someone's job is to help you win
+Alt A:      The federal employee waiting to hear from you
+Alt B:      Your inside connection at every agency
+
+---
+
+EMAIL 10 - INTRO MARKET ASSASSIN
+Primary:    What you can see vs. what winners see
+Alt A:      The intel gap between you and top contractors
+Alt B:      Opportunity Hunter was just the start
+
+---
+
+EMAIL 11 - WEEKLY ROUTINE
+Primary:    The 2-hour weekly routine that wins contracts
+Alt A:      What winning contractors do every week
+Alt B:      {{first_name}}, here's your BD schedule
+
+---
+
+EMAIL 12 - SET-ASIDE STRATEGY
+Primary:    Your set-aside is your superpower
+Alt A:      Why 8(a)s win contracts others can't touch
+Alt B:      The certification advantage you're not using
+
+---
+
+EMAIL 13 - TEAMING ADVANTAGE
+Primary:    Win contracts you can't win alone
+Alt A:      The teaming strategy for smaller contractors
+Alt B:      How to ride a prime's past performance
+
+---
+
+EMAIL 14 - IDV CONTRACTS
+Primary:    The $400B contract vehicle opportunity
+Alt A:      IDV contracts: what most contractors miss
+Alt B:      Get on a vehicle, get recurring revenue
+
+---
+
+EMAIL 15 - NO PAST PERFORMANCE
+Primary:    "But I don't have past performance"
+Alt A:      How to win your first contract with zero history
+Alt B:      The past performance problem (solved)
+
+---
+
+EMAIL 16 - TAKES TOO LONG
+Primary:    "GovCon takes too long"
+Alt A:      The truth about GovCon timelines
+Alt B:      6 months to sub, 18 months to prime
+
+---
+
+EMAIL 17 - ACTION PLAN
+Primary:    Your 30-day GovCon action plan
+Alt A:      What to do this week (and next)
+Alt B:      {{first_name}}, here's your next move
+
+---
+
+EMAIL 18 - FISCAL YEAR
+Primary:    The government's buying calendar
+Alt A:      When agencies spend the most money
+Alt B:      Mark these dates: Q4 is coming
+
+---
+
+EMAIL 19 - COST OF DIY
+Primary:    The hidden cost of doing this yourself
+Alt A:      How much is your time worth?
+Alt B:      DIY vs. done-for-you intel
+
+---
+
+EMAIL 20 - INDUSTRY STATS
+Primary:    $759 billion. Here's your share.
+Alt A:      The numbers don't lie, {{first_name}}
+Alt B:      Where did $178B in small biz contracts go?
+
+---
+
+EMAIL 21 - BUYING CYCLES
+Primary:    When agencies actually buy
+Alt A:      The 3 buying windows you need to know
+Alt B:      Timing is everything in GovCon
+
+---
+
+EMAIL 22 - CAPABILITY STATEMENT
+Primary:    Your capability statement is broken
+Alt A:      Why your cap statement isn't working
+Alt B:      The 1-page document that gets you meetings
+
+---
+
+EMAIL 23 - FOLLOW-UP SEQUENCE
+Primary:    They're not ignoring you
+Alt A:      The follow-up sequence that actually works
+Alt B:      Why you should call before you email
+
+---
+
+EMAIL 24 - TRIBAL CONTRACTING
+Primary:    The $100M sole source secret
+Alt A:      Tribal 8(a): the biggest kept secret
+Alt B:      How tribally-owned firms skip the competition
+
+---
+
+EMAIL 25 - PROGRESS CHECK
+Primary:    Quick question, {{first_name}}
+Alt A:      Where are you stuck?
+Alt B:      How's it going with GovCon?
+
+---
+
+EMAIL 26 - WINNERS VS DREAMERS
+Primary:    Winners vs. dreamers
+Alt A:      The difference between talking and doing
+Alt B:      Which one are you, {{first_name}}?
+
+---
+
+EMAIL 27 - ROI VALUE
+Primary:    The math on this is simple
+Alt A:      $150K contract vs. $497 investment
+Alt B:      Even without the discount...
+
+---
+
+EMAIL 28 - WHAT'S NEXT
+Primary:    8 weeks in - here's what comes next
+Alt A:      The 4 phases of GovCon success
+Alt B:      You've learned a lot. Now what?
+
+---
+
+EMAIL 29 - NEW YEARS RESOLUTION
+Primary:    Still chasing that resolution?
+Alt A:      {{first_name}}, we're here to help
+Alt B:      Your GovCon goals are still within reach
+
+---
+
+SUBJECT LINE BEST PRACTICES
+============================
+
+1. Keep under 50 characters (mobile-friendly)
+2. Use {{first_name}} sparingly (1-2x per week max)
+3. Lowercase feels personal, Title Case feels promotional
+4. Questions drive curiosity
+5. Numbers add specificity ($759B, 34 contracts, 60 seconds)
+6. Avoid spam triggers: FREE, URGENT, ACT NOW, !!!
+7. Preview text matters - first line of email shows in inbox
+
+A/B TEST TIPS
+=============
+- Test Primary vs Alt A first
+- Run for 2-4 hours before picking winner
+- Track opens AND clicks (opens alone can mislead)
+- Winning patterns: personalization, curiosity gaps, specific numbers

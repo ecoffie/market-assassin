@@ -1,15 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function MarketAssassinLockedPage() {
-  const [email, setEmail] = useState('');
+  const router = useRouter();
+  const emailRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [redirecting, setRedirecting] = useState(false);
 
-  const handleVerifyAccess = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerifyAccess = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    const email = emailRef.current?.value?.trim() || '';
+
+    if (!email) {
+      setError('Please enter your email');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -23,14 +34,22 @@ export default function MarketAssassinLockedPage() {
       const data = await response.json();
 
       if (data.hasAccess) {
-        // Store in localStorage and redirect
-        localStorage.setItem('marketAssassinAccess', JSON.stringify({
+        // Store in localStorage
+        const accessData = {
           hasAccess: true,
           tier: data.tier,
           expiresAt: Date.now() + 24 * 60 * 60 * 1000,
           email: data.email,
-        }));
-        window.location.href = '/federal-market-assassin';
+        };
+        localStorage.setItem('marketAssassinAccess', JSON.stringify(accessData));
+
+        // Set cookie for middleware (expires in 24 hours)
+        document.cookie = `ma_access_email=${data.email}; path=/; max-age=86400; SameSite=Lax`;
+
+        // Redirect to the app
+        setRedirecting(true);
+        router.push('/federal-market-assassin');
+        return;
       } else {
         setError('No access found for this email. Please purchase below.');
       }
@@ -42,14 +61,17 @@ export default function MarketAssassinLockedPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-5">
-      <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-5">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 max-w-2xl w-full shadow-2xl">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🎯</div>
-          <h1 className="text-slate-900 mb-3 text-3xl font-bold">
+          <div className="mb-4 flex items-center justify-center gap-2">
+            <span className="text-2xl font-bold text-blue-400">GovCon</span>
+            <span className="text-2xl font-bold text-amber-400">Giants</span>
+          </div>
+          <h1 className="text-slate-100 mb-3 text-3xl font-bold">
             Federal Market Assassin
           </h1>
-          <p className="text-gray-600 text-base leading-relaxed">
+          <p className="text-slate-400 text-base leading-relaxed">
             Generate comprehensive strategic reports from just 5 inputs. Choose your plan below.
           </p>
         </div>
@@ -57,57 +79,57 @@ export default function MarketAssassinLockedPage() {
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Standard Plan */}
-          <div className="border-2 border-blue-200 rounded-xl p-6 bg-blue-50">
+          <div className="border border-blue-500/30 rounded-xl p-6 bg-slate-900/50 card-hover">
             <div className="text-center mb-4">
-              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-bold rounded-full">Standard</span>
+              <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-sm font-bold rounded-full border border-blue-500/30">Standard</span>
               <div className="mt-3">
-                <span className="text-4xl font-bold text-slate-900">$297</span>
+                <span className="text-4xl font-bold text-slate-100">$297</span>
               </div>
             </div>
-            <ul className="space-y-2 text-sm text-slate-700 mb-6">
+            <ul className="space-y-2 text-sm text-slate-300 mb-6">
               <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Market Analytics Dashboard
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Government Buyers Report
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 OSBP Contacts Directory
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Export to CSV/HTML/PDF/JSON
               </li>
-              <li className="flex items-center gap-2 text-slate-400">
+              <li className="flex items-center gap-2 text-slate-500">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 <span className="line-through">Subcontracting Opportunities</span>
               </li>
-              <li className="flex items-center gap-2 text-slate-400">
+              <li className="flex items-center gap-2 text-slate-500">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 <span className="line-through">IDV Contracts Analysis</span>
               </li>
-              <li className="flex items-center gap-2 text-slate-400">
+              <li className="flex items-center gap-2 text-slate-500">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 <span className="line-through">Similar Awards Report</span>
               </li>
-              <li className="flex items-center gap-2 text-slate-400">
+              <li className="flex items-center gap-2 text-slate-500">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -116,14 +138,14 @@ export default function MarketAssassinLockedPage() {
             </ul>
             <a
               href="https://buy.stripe.com/3cI3cw9UOdns34V84UfnO0j"
-              className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-bold transition-colors"
+              className="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg font-bold transition-all glow-blue"
             >
               Get Standard
             </a>
           </div>
 
           {/* Premium Plan */}
-          <div className="border-2 border-amber-400 rounded-xl p-6 bg-gradient-to-br from-amber-50 to-orange-50 relative">
+          <div className="border border-amber-500/50 rounded-xl p-6 bg-gradient-to-br from-amber-500/10 to-orange-500/10 relative card-hover">
             <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
               <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full">
                 BEST VALUE
@@ -132,54 +154,54 @@ export default function MarketAssassinLockedPage() {
             <div className="text-center mb-4">
               <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold rounded-full">Premium</span>
               <div className="mt-3">
-                <span className="text-4xl font-bold text-slate-900">$497</span>
+                <span className="text-4xl font-bold text-slate-100">$497</span>
               </div>
             </div>
-            <ul className="space-y-2 text-sm text-slate-700 mb-6">
+            <ul className="space-y-2 text-sm text-slate-300 mb-6">
               <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Market Analytics Dashboard
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Government Buyers Report
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 OSBP Contacts Directory
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Export to CSV/HTML/PDF/JSON
               </li>
-              <li className="flex items-center gap-2 font-medium text-amber-700">
-                <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <li className="flex items-center gap-2 font-medium text-amber-400">
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Subcontracting Opportunities
               </li>
-              <li className="flex items-center gap-2 font-medium text-amber-700">
-                <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <li className="flex items-center gap-2 font-medium text-amber-400">
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 IDV Contracts Analysis
               </li>
-              <li className="flex items-center gap-2 font-medium text-amber-700">
-                <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <li className="flex items-center gap-2 font-medium text-amber-400">
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Similar Awards Report
               </li>
-              <li className="flex items-center gap-2 font-medium text-amber-700">
-                <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <li className="flex items-center gap-2 font-medium text-amber-400">
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Tribal Contracting
@@ -187,7 +209,7 @@ export default function MarketAssassinLockedPage() {
             </ul>
             <a
               href="https://buy.stripe.com/5kQdRaeb497cfRHdpefnO0f"
-              className="block w-full text-center bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black py-3 px-6 rounded-lg font-bold transition-colors"
+              className="block w-full text-center bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black py-3 px-6 rounded-lg font-bold transition-all"
             >
               Get Premium
             </a>
@@ -195,31 +217,30 @@ export default function MarketAssassinLockedPage() {
         </div>
 
         {/* Already have access section */}
-        <div className="border-t border-gray-200 pt-6">
-          <p className="text-gray-500 text-sm mb-4 text-center">Already purchased? Enter your email to access:</p>
+        <div className="border-t border-slate-700 pt-6">
+          <p className="text-slate-400 text-sm mb-4 text-center">Already purchased? Enter your email to access:</p>
           <form onSubmit={handleVerifyAccess} className="flex gap-2">
             <input
+              ref={emailRef}
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your purchase email"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg"
+              className="flex-1 px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <button
               type="submit"
-              disabled={loading || !email}
-              className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={loading}
+              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all glow-blue"
             >
               {loading ? '...' : 'Access'}
             </button>
           </form>
           {error && (
-            <p className="text-red-600 text-sm mt-3 text-center">{error}</p>
+            <p className="text-red-400 text-sm mt-3 text-center">{error}</p>
           )}
         </div>
 
-        <p className="text-gray-400 text-xs mt-6 text-center">
-          <Link href="/" className="text-blue-600 hover:underline">
+        <p className="text-slate-500 text-xs mt-6 text-center">
+          <Link href="/" className="text-blue-400 hover:text-blue-300">
             ← Back to Home
           </Link>
         </p>

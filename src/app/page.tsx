@@ -59,14 +59,14 @@ export default function Home() {
               </span>
             </Link>
 
-            {/* Opportunity Scout */}
+            {/* Opportunity Hunter */}
             <Link
-              href="/opportunity-scout"
+              href="/opportunity-hunter"
               className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-blue-500 hover:shadow-xl"
             >
               <div className="text-4xl mb-4">🔍</div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Opportunity Scout
+                Opportunity Hunter
               </h3>
               <p className="text-slate-400 text-sm mb-5 leading-relaxed">
                 Search and discover active federal contracting opportunities from SAM.gov. Filter by NAICS, agency, set-aside type, and more to find contracts that match your capabilities.
@@ -148,6 +148,37 @@ export default function Home() {
                 </li>
               </ul>
               <span className="text-amber-400 font-semibold text-sm group-hover:text-amber-300 transition-colors">
+                Launch Tool →
+              </span>
+            </Link>
+
+            {/* GovCon Content Generator */}
+            <Link
+              href="/content-generator"
+              className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-purple-500 hover:shadow-xl"
+            >
+              <div className="text-4xl mb-4">✍️</div>
+              <h3 className="text-xl font-bold text-white mb-3">
+                Content Generator
+              </h3>
+              <p className="text-slate-400 text-sm mb-5 leading-relaxed">
+                AI-powered LinkedIn content creation for government contractors. Generate personalized posts that resonate with federal buyers and position you as a thought leader.
+              </p>
+              <ul className="text-slate-400 text-sm space-y-2 mb-6">
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> AI-generated LinkedIn posts
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> Agency-specific content
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> Viral hook templates
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> Content calendar & library
+                </li>
+              </ul>
+              <span className="text-purple-400 font-semibold text-sm group-hover:text-purple-300 transition-colors">
                 Launch Tool →
               </span>
             </Link>

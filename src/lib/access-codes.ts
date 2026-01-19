@@ -133,11 +133,19 @@ export async function createDatabaseToken(email: string, customerName?: string):
     createdAt: new Date().toISOString(),
   };
 
+  // Check if user already has access (for admin tracking list)
+  const existingAccess = await kv.get(`dbaccess:${email.toLowerCase()}`);
+
   // Store in KV with token as key (no expiry - lifetime access)
   await kv.set(`dbtoken:${token}`, dbToken);
 
   // Also store by email for lookup
-  await kv.set(`dbaccess:${email.toLowerCase()}`, { token, createdAt: dbToken.createdAt });
+  await kv.set(`dbaccess:${email.toLowerCase()}`, { token, createdAt: dbToken.createdAt, customerName });
+
+  // Add to list for admin tracking (if not already present)
+  if (!existingAccess) {
+    await kv.lpush('db:all', email.toLowerCase());
+  }
 
   console.log(`✅ Database access token created: ${token} for ${email}`);
   return dbToken;
@@ -160,45 +168,107 @@ export async function hasEmailDatabaseAccess(email: string): Promise<boolean> {
   return !!access;
 }
 
+// Get all database access records for admin
+export interface DatabaseAccessRecord {
+  email: string;
+  customerName?: string;
+  createdAt: string;
+  token: string;
+}
+
+export async function getAllDatabaseAccess(): Promise<DatabaseAccessRecord[]> {
+  const allEmails = await kv.lrange('db:all', 0, -1) as string[];
+
+  if (!allEmails || allEmails.length === 0) {
+    return [];
+  }
+
+  // Deduplicate emails
+  const uniqueEmails = [...new Set(allEmails)];
+
+  const records: DatabaseAccessRecord[] = [];
+
+  for (const email of uniqueEmails) {
+    const access = await kv.get<{ token: string; createdAt: string; customerName?: string }>(`dbaccess:${email}`);
+    if (access) {
+      records.push({
+        email,
+        customerName: access.customerName,
+        createdAt: access.createdAt,
+        token: access.token,
+      });
+    }
+  }
+
+  return records;
+}
+
+// Revoke database access
+export async function revokeDatabaseAccess(email: string): Promise<boolean> {
+  const normalizedEmail = email.toLowerCase();
+
+  // Get the access record to find the token
+  const access = await kv.get<{ token: string }>(`dbaccess:${normalizedEmail}`);
+
+  if (access?.token) {
+    // Delete the token
+    await kv.del(`dbtoken:${access.token}`);
+  }
+
+  // Delete the access record
+  await kv.del(`dbaccess:${normalizedEmail}`);
+
+  // Remove from tracking list
+  await kv.lrem('db:all', 0, normalizedEmail);
+
+  console.log(`🗑️ Database access revoked for: ${email}`);
+  return true;
+}
+
 // ============================================
-// Opportunity Scout Pro Access
+// Opportunity Hunter Pro Access
 // ============================================
 
-export interface OpportunityScoutProAccess {
+export interface OpportunityHunterProAccess {
   email: string;
   customerName?: string;
   createdAt: string;
   productId: string;
 }
 
-// Grant Opportunity Scout Pro access to a customer
-export async function grantOpportunityScoutProAccess(email: string, customerName?: string): Promise<OpportunityScoutProAccess> {
-  const access: OpportunityScoutProAccess = {
+// Grant Opportunity Hunter Pro access to a customer
+export async function grantOpportunityHunterProAccess(email: string, customerName?: string): Promise<OpportunityHunterProAccess> {
+  // Check if user already has access
+  const existingAccess = await kv.get(`ospro:${email.toLowerCase()}`);
+
+  const access: OpportunityHunterProAccess = {
     email: email.toLowerCase(),
-    customerName,
-    createdAt: new Date().toISOString(),
-    productId: 'opportunity-scout-pro',
+    customerName: customerName || (existingAccess as OpportunityHunterProAccess)?.customerName,
+    createdAt: (existingAccess as OpportunityHunterProAccess)?.createdAt || new Date().toISOString(),
+    productId: 'opportunity-hunter-pro',
   };
 
   // Store by email (lowercase for consistent lookup)
   await kv.set(`ospro:${email.toLowerCase()}`, access);
 
-  // Add to list for admin tracking
-  await kv.lpush('ospro:all', email.toLowerCase());
+  // Add to list for admin tracking (only if new)
+  if (!existingAccess) {
+    await kv.lpush('ospro:all', email.toLowerCase());
+  }
 
-  console.log(`✅ Opportunity Scout Pro access granted to: ${email}`);
+  console.log(`✅ Opportunity Hunter Pro access granted to: ${email}`);
   return access;
 }
 
-// Check if an email has Opportunity Scout Pro access
-export async function hasOpportunityScoutProAccess(email: string): Promise<boolean> {
+// Check if an email has Opportunity Hunter Pro access
+export async function hasOpportunityHunterProAccess(email: string): Promise<boolean> {
   const access = await kv.get(`ospro:${email.toLowerCase()}`);
   return !!access;
 }
 
-// Get Opportunity Scout Pro access details
-export async function getOpportunityScoutProAccess(email: string): Promise<OpportunityScoutProAccess | null> {
-  const access = await kv.get<OpportunityScoutProAccess>(`ospro:${email.toLowerCase()}`);
+// Get Opportunity Hunter Pro access details
+export async function getOpportunityHunterProAccess(email: string): Promise<OpportunityHunterProAccess | null> {
+  const access = await kv.get<OpportunityHunterProAccess>(`ospro:${email.toLowerCase()}`);
   return access;
 }
 
@@ -326,8 +396,11 @@ export async function getAllMarketAssassinAccess(): Promise<MarketAssassinAccess
     return [];
   }
 
+  // Deduplicate emails
+  const uniqueEmails = [...new Set(allEmails)];
+
   const accessRecords: MarketAssassinAccess[] = [];
-  for (const email of allEmails) {
+  for (const email of uniqueEmails) {
     const access = await kv.get<MarketAssassinAccess>(`ma:${email}`);
     if (access) {
       accessRecords.push(access);
@@ -549,8 +622,11 @@ export async function getAllContentGeneratorAccess(): Promise<ContentGeneratorAc
     return [];
   }
 
+  // Deduplicate emails
+  const uniqueEmails = [...new Set(allEmails)];
+
   const accessRecords: ContentGeneratorAccess[] = [];
-  for (const email of allEmails) {
+  for (const email of uniqueEmails) {
     const access = await kv.get<ContentGeneratorAccess>(`contentgen:${email}`);
     if (access) {
       accessRecords.push(access);
@@ -584,19 +660,30 @@ export interface RecompeteAccess {
 // Grant Recompete Contracts Tracker access to a customer
 export async function grantRecompeteAccess(
   email: string,
-  customerName?: string
+  customerName?: string | null
 ): Promise<RecompeteAccess> {
   // Check for existing access BEFORE setting new access
   const existingAccess = await kv.get(`recompete:${email.toLowerCase()}`);
 
+  // Ensure customerName is properly set (convert null to undefined for storage)
+  const finalCustomerName = customerName || undefined;
+
+  console.log('grantRecompeteAccess called with:', { email, customerName, finalCustomerName });
+
   const access: RecompeteAccess = {
     email: email.toLowerCase(),
-    customerName,
+    customerName: finalCustomerName,
     createdAt: existingAccess ? (existingAccess as RecompeteAccess).createdAt : new Date().toISOString(),
   };
 
+  console.log('Storing recompete access object:', JSON.stringify(access));
+
   // Store by email (lowercase for consistent lookup)
   await kv.set(`recompete:${email.toLowerCase()}`, access);
+
+  // Verify it was stored correctly
+  const verifyAccess = await kv.get(`recompete:${email.toLowerCase()}`);
+  console.log('Verified stored access:', JSON.stringify(verifyAccess));
 
   // Add to list for admin tracking (only if new)
   if (!existingAccess) {
@@ -627,8 +714,11 @@ export async function getAllRecompeteAccess(): Promise<RecompeteAccess[]> {
     return [];
   }
 
+  // Deduplicate emails
+  const uniqueEmails = [...new Set(allEmails)];
+
   const accessRecords: RecompeteAccess[] = [];
-  for (const email of allEmails) {
+  for (const email of uniqueEmails) {
     const access = await kv.get<RecompeteAccess>(`recompete:${email}`);
     if (access) {
       accessRecords.push(access);

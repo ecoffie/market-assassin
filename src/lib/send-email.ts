@@ -21,7 +21,7 @@ interface SendDatabaseAccessEmailParams {
   accessLink: string;
 }
 
-interface SendOpportunityScoutProEmailParams {
+interface SendOpportunityHunterProEmailParams {
   to: string;
   customerName?: string;
 }
@@ -236,12 +236,12 @@ export async function sendAccessCodeEmail({
   }
 }
 
-// Email for Opportunity Scout Pro access
-export async function sendOpportunityScoutProEmail({
+// Email for Opportunity Hunter Pro access
+export async function sendOpportunityHunterProEmail({
   to,
   customerName,
-}: SendOpportunityScoutProEmailParams): Promise<boolean> {
-  const accessLink = 'https://tools.govcongiants.org/opportunity-scout';
+}: SendOpportunityHunterProEmailParams): Promise<boolean> {
+  const accessLink = 'https://tools.govcongiants.org/opportunity-hunter';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -253,15 +253,15 @@ export async function sendOpportunityScoutProEmail({
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
     <h1 style="color: white; margin: 0; font-size: 28px;">GovCon Giants</h1>
-    <p style="color: #fef3c7; margin: 10px 0 0 0;">Opportunity Scout Pro</p>
+    <p style="color: #fef3c7; margin: 10px 0 0 0;">Opportunity Hunter Pro</p>
   </div>
 
   <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-    <h2 style="color: #d97706; margin-top: 0;">Welcome to Opportunity Scout Pro!</h2>
+    <h2 style="color: #d97706; margin-top: 0;">Welcome to Opportunity Hunter Pro!</h2>
 
     <p>Hi${customerName ? ` ${customerName}` : ''},</p>
 
-    <p>Thank you for your purchase! Your <strong>Opportunity Scout Pro</strong> access is now active.</p>
+    <p>Thank you for your purchase! Your <strong>Opportunity Hunter Pro</strong> access is now active.</p>
 
     <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 25px 0;">
       <h3 style="color: #92400e; margin: 0 0 15px 0;">🎯 Your Pro Features:</h3>
@@ -275,7 +275,7 @@ export async function sendOpportunityScoutProEmail({
     </div>
 
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${accessLink}" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">Access Opportunity Scout Pro</a>
+      <a href="${accessLink}" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">Access Opportunity Hunter Pro</a>
     </div>
 
     <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
@@ -311,13 +311,13 @@ export async function sendOpportunityScoutProEmail({
     await transporter.sendMail({
       from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
-      subject: 'Your Opportunity Scout Pro Access is Ready! | GovCon Giants',
+      subject: 'Your Opportunity Hunter Pro Access is Ready! | GovCon Giants',
       html: htmlContent,
-      text: `Welcome to Opportunity Scout Pro!
+      text: `Welcome to Opportunity Hunter Pro!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
-Thank you for your purchase! Your Opportunity Scout Pro access is now active.
+Thank you for your purchase! Your Opportunity Hunter Pro access is now active.
 
 Your Pro Features:
 - Agency Pain Points & Priorities - Know what challenges your target agencies face
@@ -340,10 +340,10 @@ Questions? Reply to this email for support.
 - GovCon Giants Team`,
     });
 
-    console.log(`✅ Opportunity Scout Pro email sent to ${to}`);
+    console.log(`✅ Opportunity Hunter Pro email sent to ${to}`);
     return true;
   } catch (error) {
-    console.error('❌ Failed to send Opportunity Scout Pro email:', error);
+    console.error('❌ Failed to send Opportunity Hunter Pro email:', error);
     return false;
   }
 }

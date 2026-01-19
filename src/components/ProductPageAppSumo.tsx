@@ -29,6 +29,15 @@ interface ScreenshotFeature {
   bullets?: string[];
 }
 
+interface PricingTier {
+  name: string;
+  price: string;
+  originalPrice: string;
+  checkoutUrl: string;
+  description: string;
+  features: string[];
+}
+
 interface ProductPageProps {
   title: string;
   tagline: string;
@@ -55,6 +64,7 @@ interface ProductPageProps {
   thumbnails?: string[];
   categories?: { title: string; highlight?: boolean }[];
   categoriesTitle?: string;
+  pricingTiers?: PricingTier[];
 }
 
 export default function ProductPageAppSumo({
@@ -83,8 +93,15 @@ export default function ProductPageAppSumo({
   thumbnails = ['Step 1', 'Step 2', 'Step 3', 'Step 4'],
   categories,
   categoriesTitle,
+  pricingTiers,
 }: ProductPageProps) {
   const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedTier, setSelectedTier] = useState(0);
+
+  // Get current pricing (from tier if available, otherwise from props)
+  const currentPrice = pricingTiers ? pricingTiers[selectedTier].price : price;
+  const currentOriginalPrice = pricingTiers ? pricingTiers[selectedTier].originalPrice : originalPrice;
+  const currentCheckoutUrl = pricingTiers ? pricingTiers[selectedTier].checkoutUrl : checkoutUrl;
 
   return (
     <div className="min-h-screen bg-white">
@@ -111,9 +128,15 @@ export default function ProductPageAppSumo({
           <a href="#features" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Features</a>
           <a href="#pricing" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Pricing</a>
           <a href="#reviews" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Reviews</a>
-          <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="ml-auto px-6 py-2 bg-yellow-400 text-gray-900 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all">
-            Get Access
-          </a>
+          {checkoutUrl.startsWith('/') ? (
+            <Link href={checkoutUrl} className="ml-auto px-6 py-2 bg-yellow-400 text-gray-900 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all">
+              Get Access
+            </Link>
+          ) : (
+            <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="ml-auto px-6 py-2 bg-yellow-400 text-gray-900 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all">
+              Get Access
+            </a>
+          )}
         </div>
       </div>
 
@@ -122,7 +145,7 @@ export default function ProductPageAppSumo({
         {/* Left Column */}
         <div id="overview">
           <div className="mb-6">
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-3 leading-tight">{title}</h1>
+            <h1 className="text-4xl md:text-5xl font-extrabold mb-3 leading-tight text-gray-900">{title}</h1>
             <p className="text-xl text-gray-500">{tagline}</p>
           </div>
 
@@ -199,12 +222,12 @@ export default function ProductPageAppSumo({
 
           {/* TL;DR */}
           <div className="bg-gray-50 rounded-lg p-6 mb-8" style={{ borderLeft: `4px solid ${primaryColor}` }}>
-            <div className="text-xl font-bold mb-4">TL;DR</div>
+            <div className="text-xl font-bold mb-4 text-gray-900">TL;DR</div>
             <ul className="space-y-2">
               {tldr.map((item, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <span className="font-bold text-xl" style={{ color: primaryColor }}>&#10003;</span>
-                  <span>{item}</span>
+                  <span className="text-gray-800">{item}</span>
                 </li>
               ))}
             </ul>
@@ -212,7 +235,7 @@ export default function ProductPageAppSumo({
 
           {/* At-a-glance */}
           <div className="bg-gray-50 rounded-xl p-6 mb-8">
-            <div className="text-lg font-bold mb-4">At-a-glance</div>
+            <div className="text-lg font-bold mb-4 text-gray-900">At-a-glance</div>
             {glanceItems.map((item, i) => (
               <div key={i} className="flex justify-between py-3 border-b border-gray-200 last:border-b-0">
                 <span className="font-semibold text-gray-500">{item.label}</span>
@@ -228,11 +251,11 @@ export default function ProductPageAppSumo({
           {/* Categories */}
           {categories && categoriesTitle && (
             <div className="bg-gray-50 rounded-xl p-6 mb-8">
-              <h3 className="text-xl font-bold mb-4">{categoriesTitle}</h3>
+              <h3 className="text-xl font-bold mb-4 text-gray-900">{categoriesTitle}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {categories.map((cat, i) => (
                   <div key={i} className="bg-white p-3 rounded-lg border border-gray-200 text-sm">
-                    <span className={cat.highlight ? 'font-bold' : ''} style={cat.highlight ? { color: primaryColor } : {}}>
+                    <span className={`${cat.highlight ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
                       {cat.title}
                     </span>
                   </div>
@@ -243,12 +266,12 @@ export default function ProductPageAppSumo({
 
           {/* Features Section */}
           <div className="my-16" id="features">
-            <h2 className="text-3xl font-bold mb-8">Key Features</h2>
+            <h2 className="text-3xl font-bold mb-8 text-gray-900">Key Features</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {features.map((feature, i) => (
                 <div key={i} className="p-6 bg-white border border-gray-200 rounded-xl">
                   <div className="text-3xl mb-3">{feature.icon}</div>
-                  <div className="text-lg font-bold mb-2">{feature.title}</div>
+                  <div className="text-lg font-bold mb-2 text-gray-900">{feature.title}</div>
                   <div className="text-gray-500 leading-relaxed">{feature.description}</div>
                 </div>
               ))}
@@ -310,16 +333,16 @@ export default function ProductPageAppSumo({
 
           {/* Reviews Section */}
           <div className="my-16" id="reviews">
-            <h2 className="text-3xl font-bold mb-8">What users are saying</h2>
+            <h2 className="text-3xl font-bold mb-8 text-gray-900">What users are saying</h2>
             <div className="flex items-center gap-4 mb-8">
-              <div className="text-2xl text-yellow-400">*****</div>
-              <div className="text-lg font-semibold">{reviews.length} reviews</div>
+              <div className="text-2xl text-yellow-400">★★★★★</div>
+              <div className="text-lg font-semibold text-gray-700">{reviews.length} reviews</div>
             </div>
             {reviews.map((review, i) => (
               <div key={i} className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <div className="font-bold">{review.name}</div>
+                    <div className="font-bold text-gray-900">{review.name}</div>
                     <div className="text-gray-500 text-sm">{review.date}</div>
                   </div>
                   <div className="text-yellow-400">{'*'.repeat(review.rating)}</div>
@@ -353,26 +376,62 @@ export default function ProductPageAppSumo({
             {/* Tagline */}
             <p className="text-gray-600 text-sm mb-6">{tagline}</p>
 
+            {/* Tier Selector (if tiers available) */}
+            {pricingTiers && pricingTiers.length > 1 && (
+              <div className="mb-6">
+                <div className="grid grid-cols-2 gap-2">
+                  {pricingTiers.map((tier, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedTier(i)}
+                      className={`p-3 rounded-lg border-2 text-left transition-all ${
+                        selectedTier === i
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`font-bold text-sm ${selectedTier === i ? 'text-blue-600' : 'text-gray-700'}`}>{tier.name}</div>
+                      <div className="text-lg font-extrabold" style={{ color: selectedTier === i ? '#2563eb' : '#111' }}>
+                        {tier.price}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {pricingTiers[selectedTier].description && (
+                  <p className="text-xs text-gray-500 mt-2">{pricingTiers[selectedTier].description}</p>
+                )}
+              </div>
+            )}
+
             {/* Price Section */}
             <div className="mb-4">
               <div className="flex items-baseline gap-2">
                 <span className="text-green-600 font-bold text-lg">
-                  {price === 'FREE' ? '' : `-${Math.round((1 - parseInt(price.replace(/\D/g, '')) / parseInt(originalPrice.replace(/\D/g, ''))) * 100)}%`}
+                  {currentPrice === 'FREE' ? '' : `-${Math.round((1 - parseInt(currentPrice.replace(/\D/g, '')) / parseInt(currentOriginalPrice.replace(/\D/g, ''))) * 100)}%`}
                 </span>
-                <span className="text-4xl font-extrabold text-gray-900">{price}</span>
-                <span className="text-gray-400 line-through text-lg">{originalPrice.replace(' value', '')}</span>
+                <span className="text-4xl font-extrabold text-gray-900">{currentPrice}</span>
+                <span className="text-gray-400 line-through text-lg">{currentOriginalPrice.replace(' value', '')}</span>
               </div>
             </div>
 
             {/* Buy Button */}
-            <a
-              href={checkoutUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full text-center py-4 rounded-lg text-lg font-bold text-gray-900 mb-6 hover:opacity-90 transition-all bg-yellow-400 hover:bg-yellow-300"
-            >
-              {price === 'FREE' ? 'Get Free Access' : 'Buy now'}
-            </a>
+            {currentCheckoutUrl.startsWith('/') ? (
+              <Link
+                href={currentCheckoutUrl}
+                className="block w-full text-center py-4 rounded-lg text-lg font-bold text-gray-900 mb-6 hover:opacity-90 transition-all bg-yellow-400 hover:bg-yellow-300"
+              >
+                {currentPrice === 'FREE' ? 'Get Free Access' : 'Buy now'}
+              </Link>
+            ) : (
+              <a
+                href={currentCheckoutUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center py-4 rounded-lg text-lg font-bold text-gray-900 mb-6 hover:opacity-90 transition-all bg-yellow-400 hover:bg-yellow-300"
+              >
+                {currentPrice === 'FREE' ? 'Get Free Access' : 'Buy now'}
+              </a>
+            )}
 
             {/* Trust Badges */}
             <div className="space-y-3 mb-6">
@@ -394,10 +453,10 @@ export default function ProductPageAppSumo({
             <div className="border-t border-gray-200 pt-6">
               <h4 className="font-bold text-gray-900 mb-4">What&apos;s included:</h4>
               <ul className="space-y-3">
-                {benefits.slice(0, 8).map((benefit, i) => (
+                {(pricingTiers ? pricingTiers[selectedTier].features : benefits.slice(0, 8)).map((item, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm">
                     <span className="text-green-500 font-bold">✓</span>
-                    <span className="text-gray-700">{benefit}</span>
+                    <span className="text-gray-700">{item}</span>
                   </li>
                 ))}
               </ul>

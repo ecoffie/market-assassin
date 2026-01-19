@@ -102,12 +102,12 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
 
   return (
     <div className="flex justify-center">
-      <div className="bg-white rounded-xl shadow-lg p-6 max-w-2xl w-full">
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 max-w-2xl w-full card-hover">
         <div className="mb-4">
-          <h2 className="text-2xl font-bold text-slate-900 mb-1">
+          <h2 className="text-2xl font-bold text-slate-100 mb-1">
             Step 1: Enter Your 5 Core Inputs
           </h2>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-400">
             Provide your business information to discover matching government agencies
           </p>
         </div>
@@ -115,13 +115,13 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Business Type - Required */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              1. Business Type <span className="text-red-500">*</span>
+            <label className="block text-sm font-semibold text-slate-300 mb-1">
+              1. Business Type <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.businessType || ''}
               onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
               <option value="">Select your business type...</option>
@@ -137,15 +137,15 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* NAICS Code */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                2. NAICS Code <span className="text-slate-400 text-xs">(or use PSC)</span>
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
+                2. NAICS Code <span className="text-slate-500 text-xs">(or use PSC)</span>
               </label>
               <input
                 type="text"
                 value={formData.naicsCode || ''}
                 onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
                 placeholder="e.g., 541330"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="mt-1 text-xs text-slate-500">
                 Industry code (e.g., 541330 for Engineering)
@@ -154,8 +154,8 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
 
             {/* PSC Code */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                PSC Code <span className="text-slate-400 text-xs">(or use NAICS)</span>
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
+                PSC Code <span className="text-slate-500 text-xs">(or use NAICS)</span>
               </label>
               <input
                 type="text"
@@ -163,7 +163,7 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
                 onChange={(e) => setFormData({ ...formData, pscCode: e.target.value.toUpperCase() })}
                 placeholder="e.g., D310, 7030"
                 maxLength={4}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="mt-1 text-xs text-slate-500">
                 Product/Service Code (4-char)
@@ -175,8 +175,8 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Zip Code - Optional */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                3. Zip Code <span className="text-slate-400 text-xs">(Optional)</span>
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
+                3. Zip Code <span className="text-slate-500 text-xs">(Optional)</span>
               </label>
               <input
                 type="text"
@@ -184,19 +184,19 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
                 onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
                 placeholder="e.g., 20001"
                 maxLength={5}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
 
             {/* Veteran Status - Optional */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                4. Veteran Status <span className="text-slate-400 text-xs">(Optional)</span>
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
+                4. Veteran Status <span className="text-slate-500 text-xs">(Optional)</span>
               </label>
               <select
                 value={formData.veteranStatus || 'Not Applicable'}
                 onChange={(e) => setFormData({ ...formData, veteranStatus: e.target.value as VeteranStatus })}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {veteranStatuses.map((status) => (
                   <option key={status} value={status}>
@@ -211,13 +211,13 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* PSC Category Dropdown - Optional */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                5. PSC Category <span className="text-slate-400 text-xs">(Optional)</span>
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
+                5. PSC Category <span className="text-slate-500 text-xs">(Optional)</span>
               </label>
               <select
                 value={formData.pscCode || ''}
                 onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {pscCategories.map((cat) => (
                   <option key={cat.value} value={cat.value}>
@@ -229,31 +229,31 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
 
             {/* Company Name - Optional */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                Company Name <span className="text-slate-400 text-xs">(Optional)</span>
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
+                Company Name <span className="text-slate-500 text-xs">(Optional)</span>
               </label>
               <input
                 type="text"
                 value={formData.companyName || ''}
                 onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
                 placeholder="Your company name"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
 
           {/* Exclude DOD Checkbox */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
             <label className="flex items-start cursor-pointer">
               <input
                 type="checkbox"
                 checked={formData.excludeDOD || false}
                 onChange={(e) => setFormData({ ...formData, excludeDOD: e.target.checked })}
-                className="mt-0.5 h-4 w-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+                className="mt-0.5 h-4 w-4 text-amber-500 bg-slate-800 border-slate-600 rounded focus:ring-amber-500"
               />
               <div className="ml-3">
-                <span className="text-sm font-semibold text-amber-900">Civilian Agencies Only</span>
-                <p className="text-xs text-amber-700 mt-0.5">
+                <span className="text-sm font-semibold text-amber-400">Civilian Agencies Only</span>
+                <p className="text-xs text-amber-300/70 mt-0.5">
                   Exclude Department of Defense (DOD) agencies. Civilian agencies are often more accessible for startups and small businesses with simpler procurement processes.
                 </p>
               </div>
@@ -262,11 +262,11 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
 
           {/* Validation Error */}
           {validationError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start">
-              <svg className="w-5 h-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start">
+              <svg className="w-5 h-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <span className="text-sm text-red-800">{validationError}</span>
+              <span className="text-sm text-red-300">{validationError}</span>
             </div>
           )}
 
@@ -275,7 +275,7 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center text-sm"
+              className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white font-semibold py-2.5 px-6 rounded-lg transition-all duration-200 flex items-center justify-center text-sm glow-blue"
             >
               {loading ? (
                 <>
@@ -297,15 +297,15 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
           </div>
 
           {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 mt-4">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-cyan-400 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <h3 className="font-semibold text-blue-900 mb-0.5 text-sm">What happens next?</h3>
-                <p className="text-xs text-blue-800">
-                  The system will analyze <strong>5,000+ contracts</strong> from USAspending.gov to find agencies that match your profile.
+                <h3 className="font-semibold text-cyan-300 mb-0.5 text-sm">What happens next?</h3>
+                <p className="text-xs text-slate-400">
+                  The system will analyze <strong className="text-cyan-400">5,000+ contracts</strong> from USAspending.gov to find agencies that match your profile.
                   You&apos;ll then select which agencies to include in your comprehensive reports.
                 </p>
               </div>

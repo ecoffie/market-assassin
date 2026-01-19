@@ -1,0 +1,136 @@
+import ProductPageAppSumo from '@/components/ProductPageAppSumo';
+
+export default function OpportunityHunterProductPage() {
+  return (
+    <ProductPageAppSumo
+      title="Opportunity Hunter"
+      tagline="Find government agencies that buy what you sell"
+      description="Stop guessing which agencies to target. Opportunity Hunter analyzes federal spending data to show you exactly which government buyers are purchasing your products and services. Enter your NAICS code, set-aside type, and location to discover agencies with active spending in your market. Get instant insights on agency budgets, past awards, and key contacts."
+      primaryColor="#2563eb"
+      gradientFrom="#2563eb"
+      gradientTo="#3b82f6"
+      price="FREE"
+      originalPrice="$97/mo value"
+      checkoutUrl="/opportunity-scout"
+      videoTitle="Opportunity Hunter Demo"
+      videoSubtitle="See how to find your ideal government buyers in minutes"
+      screenshots={[
+        '/images/products/opportunity-hunter/opp scout home page.png',
+        '/images/products/opportunity-hunter/scouting opps.png',
+        '/images/products/opportunity-hunter/returns agencies.png',
+        '/images/products/opportunity-hunter/top government agencies.png',
+      ]}
+      screenshotFeatures={[
+        {
+          image: '/images/products/opportunity-hunter/agency card.png',
+          title: 'Detailed Agency Intelligence',
+          description: 'Get comprehensive insights on each government agency including their spending patterns, key contacts, and procurement priorities.',
+          bullets: [
+            'Agency spending breakdown by NAICS',
+            'Key contracting officer contacts',
+            'Historical award data',
+            'Set-aside spending analysis',
+          ],
+        },
+        {
+          image: '/images/products/opportunity-hunter/agency pain points priorities.png',
+          title: 'Agency Pain Points & Priorities',
+          description: 'Understand what challenges your target agencies face so you can position your solution effectively.',
+          bullets: [
+            'Current agency challenges',
+            'Strategic priorities',
+            'Budget focus areas',
+            'Upcoming initiatives',
+          ],
+        },
+        {
+          image: '/images/products/opportunity-hunter/search summary.png',
+          title: 'Comprehensive Search Summary',
+          description: 'Get a complete overview of your market opportunity with detailed spending analysis and agency rankings.',
+          bullets: [
+            'Total market spending',
+            'Top agencies by award value',
+            'Set-aside breakdown',
+            'Competitive landscape',
+          ],
+        },
+      ]}
+      tldr={[
+        'Find agencies spending in your NAICS codes',
+        'Filter by set-aside type (8a, HUBZone, SDVOSB, etc.)',
+        'See agency spending trends and budgets',
+        'Identify key contacts and pain points',
+        'Export results for your BD pipeline',
+      ]}
+      glanceItems={[
+        { label: 'Data Source', value: 'USASpending.gov' },
+        { label: 'Coverage', value: 'All federal agencies' },
+        { label: 'Updates', value: 'Real-time data' },
+        { label: 'Price', value: 'Free forever' },
+      ]}
+      categoriesTitle="Filter By Set-Aside Type"
+      categories={[
+        { title: '8(a) Small Business', highlight: true },
+        { title: 'HUBZone', highlight: true },
+        { title: 'SDVOSB', highlight: true },
+        { title: 'WOSB/EDWOSB', highlight: true },
+        { title: 'Small Disadvantaged', highlight: true },
+        { title: 'Total Small Business', highlight: true },
+      ]}
+      features={[
+        {
+          icon: '🔍',
+          title: 'Smart Agency Search',
+          description: 'Enter your NAICS code and instantly see which agencies are spending money in your market. Filter by set-aside type, location, and spending thresholds.',
+        },
+        {
+          icon: '📊',
+          title: 'Spending Analysis',
+          description: 'View detailed spending breakdowns by agency, including historical trends, average contract values, and procurement patterns.',
+        },
+        {
+          icon: '🎯',
+          title: 'Pain Point Intelligence',
+          description: 'Discover agency challenges and priorities to position your solution effectively. Understand what problems they need solved.',
+        },
+        {
+          icon: '📋',
+          title: 'Contact Directory',
+          description: 'Access key contacts including Small Business Specialists, Contracting Officers, and Program Managers at your target agencies.',
+        },
+      ]}
+      benefits={[
+        'Free forever - no credit card required',
+        'Real-time federal spending data',
+        'Filter by NAICS, set-aside, location',
+        'Agency spending trends & analysis',
+        'Pain point identification',
+        'Key contact information',
+        'Export to CSV',
+        'Unlimited searches',
+      ]}
+      highlightTitle="Stop Wasting Time on the Wrong Agencies"
+      highlightText="Most contractors spend months chasing agencies that dont buy what they sell. Opportunity Hunter shows you exactly where the money is flowing so you can focus your BD efforts on agencies with proven spending in your market."
+      reviews={[
+        {
+          name: 'Marcus T.',
+          date: '1 week ago',
+          rating: 5,
+          text: 'Finally a tool that shows me which agencies actually buy IT services in my NAICS. Found 3 new target agencies in my first search.',
+        },
+        {
+          name: 'Sarah K.',
+          date: '2 weeks ago',
+          rating: 5,
+          text: 'The pain points feature is incredible. I now understand what challenges my target agencies face and can tailor my pitch accordingly.',
+        },
+        {
+          name: 'James R.',
+          date: '3 weeks ago',
+          rating: 5,
+          text: 'As a HUBZone company, I needed to find agencies with set-aside spending. This tool made it easy to identify my best opportunities.',
+        },
+      ]}
+    />
+  );
+}

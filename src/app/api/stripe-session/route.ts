@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import {
-  grantOpportunityScoutProAccess,
-  hasOpportunityScoutProAccess,
+  grantOpportunityHunterProAccess,
+  hasOpportunityHunterProAccess,
   grantMarketAssassinAccess,
   getMarketAssassinAccess,
   MarketAssassinTier,
+  grantContentGeneratorAccess,
+  getContentGeneratorAccess,
+  ContentGeneratorTier,
 } from '@/lib/access-codes';
-import { sendOpportunityScoutProEmail } from '@/lib/send-email';
+import { sendOpportunityHunterProEmail } from '@/lib/send-email';
 
 // Get Stripe instance
 function getStripe() {
@@ -37,14 +40,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No email found in session' }, { status: 400 });
     }
 
-    // If this is Opportunity Scout Pro, grant access immediately
+    // If this is Opportunity Hunter Pro, grant access immediately
     if (product === 'opportunity-scout-pro') {
-      const alreadyHasAccess = await hasOpportunityScoutProAccess(email);
+      const alreadyHasAccess = await hasOpportunityHunterProAccess(email);
 
       if (!alreadyHasAccess) {
-        await grantOpportunityScoutProAccess(email, session.customer_details?.name || undefined);
+        await grantOpportunityHunterProAccess(email, session.customer_details?.name || undefined);
         // Send confirmation email
-        await sendOpportunityScoutProEmail({
+        await sendOpportunityHunterProEmail({
           to: email,
           customerName: session.customer_details?.name || undefined,
         });
@@ -96,6 +99,48 @@ export async function GET(request: NextRequest) {
         tier: 'premium' as MarketAssassinTier,
         hasAccess: true,
         customerName: session.customer_details?.name || null,
+      });
+    }
+
+    // Handle Content Generator - Content Engine ($197)
+    if (product === 'content-engine') {
+      const existingAccess = await getContentGeneratorAccess(email);
+
+      // Only grant if no existing access
+      if (!existingAccess) {
+        await grantContentGeneratorAccess(email, 'content-engine', session.customer_details?.name || undefined);
+        // TODO: Send confirmation email
+      }
+
+      return NextResponse.json({
+        success: true,
+        email: email.toLowerCase(),
+        product: 'content-engine',
+        tier: 'content-engine' as ContentGeneratorTier,
+        hasAccess: true,
+        customerName: session.customer_details?.name || null,
+        redirectUrl: '/content-generator',
+      });
+    }
+
+    // Handle Content Generator - Full Fix ($297)
+    if (product === 'full-fix') {
+      const existingAccess = await getContentGeneratorAccess(email);
+
+      // Grant full-fix access (upgrades existing content-engine if applicable)
+      if (!existingAccess || existingAccess.tier !== 'full-fix') {
+        await grantContentGeneratorAccess(email, 'full-fix', session.customer_details?.name || undefined);
+        // TODO: Send confirmation email
+      }
+
+      return NextResponse.json({
+        success: true,
+        email: email.toLowerCase(),
+        product: 'full-fix',
+        tier: 'full-fix' as ContentGeneratorTier,
+        hasAccess: true,
+        customerName: session.customer_details?.name || null,
+        redirectUrl: '/content-generator',
       });
     }
 

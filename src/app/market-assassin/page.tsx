@@ -9,21 +9,56 @@ export default function MarketAssassinProductPage() {
       primaryColor="#dc2626"
       gradientFrom="#dc2626"
       gradientTo="#991b1b"
-      price="$597"
-      originalPrice="$1,997 value"
-      checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/federal-market-assassin"
+      price="$297"
+      originalPrice="$997 value"
+      checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/market-assassin-standard"
+      pricingTiers={[
+        {
+          name: 'Standard',
+          price: '$297',
+          originalPrice: '$997 value',
+          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/market-assassin-standard',
+          description: 'Core 4 reports for essential market intelligence',
+          features: [
+            'Lifetime access',
+            'Pain Points & Priorities Report',
+            'Government Buyers Report',
+            'Agency Spend Analysis',
+            'OSBP Contacts Directory',
+            'Export to HTML/PDF',
+            'All future updates',
+          ],
+        },
+        {
+          name: 'Premium',
+          price: '$497',
+          originalPrice: '$1,997 value',
+          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/market-assassin-premium',
+          description: 'Full 8 reports + unlimited generations & enhanced depth',
+          features: [
+            'Everything in Standard, plus:',
+            'Subcontracting Opportunities Report',
+            'IDV Contracts Analysis',
+            'Similar Awards Report',
+            'Tribal Contracting Report',
+            'Unlimited report generations',
+            'Enhanced report depth',
+            'Priority support',
+          ],
+        },
+      ]}
       videoTitle="Federal Market Assassin Demo"
       videoSubtitle="See 8 strategic reports generated in under 2 minutes"
-      mainImage="/images/products/home page.png"
+      mainImage="/images/products/market-assassin/home page.png"
       screenshots={[
-        '/images/products/home page.png',
-        '/images/products/target agencies.png',
-        '/images/products/executive summary.png',
-        '/images/products/agency spend analysis.png',
+        '/images/products/market-assassin/home page.png',
+        '/images/products/market-assassin/target agencies.png',
+        '/images/products/market-assassin/executive summary.png',
+        '/images/products/market-assassin/agency spend analysis.png',
       ]}
       screenshotFeatures={[
         {
-          image: '/images/products/spending trends.png',
+          image: '/images/products/market-assassin/spending trends.png',
           title: 'Spending Trends & Forecasts',
           description: 'Visualize agency spending patterns over time. Identify peak spending periods, seasonal trends, and forecast future opportunities based on historical data.',
           bullets: [
@@ -34,7 +69,7 @@ export default function MarketAssassinProductPage() {
           ],
         },
         {
-          image: '/images/products/comprehensive report.png',
+          image: '/images/products/market-assassin/comprehensive report.png',
           title: 'Comprehensive Market Report',
           description: 'Get a complete picture of your target market with detailed analysis of contract awards, competition, and opportunities in your NAICS codes.',
           bullets: [
@@ -45,7 +80,7 @@ export default function MarketAssassinProductPage() {
           ],
         },
         {
-          image: '/images/products/similar awards.png',
+          image: '/images/products/market-assassin/similar awards.png',
           title: 'Similar Awards Analysis',
           description: 'Discover contracts similar to your capabilities. Find teaming opportunities and understand what agencies are buying in your space.',
           bullets: [
@@ -56,7 +91,7 @@ export default function MarketAssassinProductPage() {
           ],
         },
         {
-          image: '/images/products/osbp contacts by agency.png',
+          image: '/images/products/market-assassin/osbp contacts by agency.png',
           title: 'OSBP Contacts Directory',
           description: 'Direct access to Office of Small Business Programs contacts at every agency. Build relationships with the people who advocate for small businesses.',
           bullets: [

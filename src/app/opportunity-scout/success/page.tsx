@@ -73,7 +73,7 @@ function SuccessContent() {
             href="/opportunity-scout"
             className="block w-full px-6 py-3 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-lg transition text-center"
           >
-            Go to Opportunity Scout
+            Go to Opportunity Hunter
           </Link>
           <p className="text-sm text-gray-500 mt-4">
             Click &quot;I Have Access&quot; and enter your purchase email
@@ -93,7 +93,7 @@ function SuccessContent() {
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">You&apos;re In!</h1>
-        <p className="text-lg text-gray-600 mb-2">Welcome to Opportunity Scout Pro</p>
+        <p className="text-lg text-gray-600 mb-2">Welcome to Opportunity Hunter Pro</p>
 
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 mb-6">
           <p className="text-sm text-amber-800">

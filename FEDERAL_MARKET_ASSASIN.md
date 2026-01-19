@@ -56,7 +56,7 @@ The system analyzes **5,000+ contracts** from USAspending.gov and displays agenc
 - **Contract Count** - Number of contracts awarded
 - **Location** - Geographic information
 
-**Displayed in a sortable table format** - just like Opportunity Scout.
+**Displayed in a sortable table format** - just like Opportunity Hunter.
 
 ---
 
@@ -569,7 +569,7 @@ Pain Points:
 
 ## 🔄 Integration Points
 
-### With Opportunity Scout
+### With Opportunity Hunter
 - Uses same data source (USAspending API)
 - Same agency matching logic
 - Consistent results
@@ -705,7 +705,7 @@ Users who leverage Federal Market Assassin report:
 
 ## 🔗 Related Systems
 
-- **Opportunity Scout** - Agency discovery
+- **Opportunity Hunter** - Agency discovery
 - **Pain Points Database** - Agency challenges
 - **Component Agency Rules** - Agency identification
 - **FY2026 NDAA Updates** - Latest requirements
@@ -725,7 +725,7 @@ Users who leverage Federal Market Assassin report:
 - **Processing:** Parallel report generation
 
 ### Data Flow
-1. User inputs → Opportunity Scout API
+1. User inputs → Opportunity Hunter API
 2. Agency data → Pain Points matching
 3. Selected agencies → All 8 report generators
 4. Reports → HTML generation

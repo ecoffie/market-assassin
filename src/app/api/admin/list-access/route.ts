@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllMarketAssassinAccess, getAllContentGeneratorAccess, getAllRecompeteAccess } from '@/lib/access-codes';
+import { getAllMarketAssassinAccess, getAllContentGeneratorAccess, getAllRecompeteAccess, getAllDatabaseAccess } from '@/lib/access-codes';
 import { kv } from '@vercel/kv';
 
 // Admin endpoint to list all access records
@@ -8,7 +8,7 @@ export async function GET() {
     // Get Market Assassin records
     const marketAssassin = await getAllMarketAssassinAccess();
 
-    // Get Opportunity Scout Pro records
+    // Get Opportunity Hunter Pro records
     const osProEmails = await kv.lrange('ospro:all', 0, -1) as string[];
     const opportunityScoutPro = [];
 
@@ -27,11 +27,15 @@ export async function GET() {
     // Get Recompete records
     const recompete = await getAllRecompeteAccess();
 
+    // Get Database records
+    const database = await getAllDatabaseAccess();
+
     return NextResponse.json({
       marketAssassin,
       opportunityScoutPro,
       contentGenerator,
       recompete,
+      database,
     });
 
   } catch (error) {

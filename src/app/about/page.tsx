@@ -55,7 +55,7 @@ export default function AboutPage() {
             <div className="flex items-start gap-3">
               <span className="text-2xl">🔍</span>
               <div>
-                <h3 className="font-bold text-gray-900">Opportunity Scout</h3>
+                <h3 className="font-bold text-gray-900">Opportunity Hunter</h3>
                 <p className="text-sm text-gray-600">Free agency discovery tool to find your best-fit agencies</p>
               </div>
             </div>

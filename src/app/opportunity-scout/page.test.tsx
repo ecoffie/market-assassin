@@ -1,5 +1,5 @@
 /**
- * Opportunity Scout Page Tests
+ * Opportunity Hunter Page Tests
  *
  * CRITICAL FEATURES - DO NOT REMOVE:
  * 1. Agency modal must open when clicking table rows
@@ -21,7 +21,7 @@ describe('OpportunityScoutPage', () => {
 
   it('renders the search form', () => {
     render(<OpportunityScoutPage />);
-    expect(screen.getByText('Opportunity Scout')).toBeInTheDocument();
+    expect(screen.getByText('Opportunity Hunter')).toBeInTheDocument();
     expect(screen.getByText('Scout Opportunities')).toBeInTheDocument();
   });
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { hasOpportunityScoutProAccess, getOpportunityScoutProAccess } from '@/lib/access-codes';
+import { hasOpportunityHunterProAccess, getOpportunityHunterProAccess } from '@/lib/access-codes';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,10 +12,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const hasAccess = await hasOpportunityScoutProAccess(email);
+    const hasAccess = await hasOpportunityHunterProAccess(email);
 
     if (hasAccess) {
-      const accessData = await getOpportunityScoutProAccess(email);
+      const accessData = await getOpportunityHunterProAccess(email);
       return NextResponse.json({
         hasAccess: true,
         email: email.toLowerCase(),
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error verifying Opportunity Scout Pro access:', error);
+    console.error('Error verifying Opportunity Hunter Pro access:', error);
     return NextResponse.json(
       { error: 'Verification failed' },
       { status: 500 }

@@ -4,13 +4,13 @@ export default function ExpiringContractsPage() {
   return (
     <ProductPageAppSumo
       title="Expiring Contracts Forecast"
-      tagline="Track $221B+ in expiring federal contracts and get ahead of recompete opportunities"
+      tagline="Track $77.1T+ in expiring federal contracts and get ahead of recompete opportunities"
       description="When contracts expire, they get recompeted—and thats your window of opportunity. The Expiring Contracts Forecast shows you exactly which contracts are ending, when primes are building their teams, and where to focus your BD efforts. Stop chasing dead ends and start targeting real opportunities."
       primaryColor="#0891b2"
       gradientFrom="#0891b2"
       gradientTo="#06b6d4"
-      price="$297"
-      originalPrice="$597/month"
+      price="$397"
+      originalPrice="$997/month"
       checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/expiring-contracts"
       videoTitle="Expiring Contracts Forecast Demo"
       videoSubtitle="See how to find recompete opportunities 3-6 months early"
@@ -56,14 +56,14 @@ export default function ExpiringContractsPage() {
         },
       ]}
       tldr={[
-        'Access $221B+ in expiring contract data with monthly updates',
+        'Access $77.1T+ in expiring contract data with monthly updates',
         'Get prime contractor details before they start building teams',
         'Filter by NAICS code, agency, and contract value',
         'Identify recompete opportunities 3-6 months in advance',
         'Export to CSV for your CRM',
       ]}
       glanceItems={[
-        { label: 'Contract Value', value: '$221B+ tracked' },
+        { label: 'Contract Value', value: '$77.1T+ tracked' },
         { label: 'Updates', value: 'Monthly refresh' },
         { label: 'Best for', value: 'BD professionals, Small businesses' },
         { label: 'Export', value: 'CSV download included' },
@@ -85,8 +85,8 @@ export default function ExpiringContractsPage() {
         },
         {
           icon: '💰',
-          title: '$221B+ Tracked',
-          description: 'Monitor billions in contract value across all agencies.',
+          title: '$77.1T+ Tracked',
+          description: 'Monitor trillions in contract value across all agencies.',
         },
         {
           icon: '📋',
@@ -101,7 +101,7 @@ export default function ExpiringContractsPage() {
       ]}
       benefits={[
         'Lifetime access to database',
-        '$221B+ contract data',
+        '$77.1T+ contract data',
         'Historical data included',
         'NAICS code filtering',
         'Export to CSV',

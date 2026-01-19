@@ -23,11 +23,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Grant access
+    console.log('Grant Recompete - received customerName:', customerName, 'for email:', email);
     const access = await grantRecompeteAccess(email, customerName);
+    console.log('Grant Recompete - saved access:', JSON.stringify(access));
 
     return NextResponse.json({
       success: true,
-      message: `Recompete Contracts Tracker access granted to ${email}`,
+      message: `Recompete access granted to ${email}${access.customerName ? ` (${access.customerName})` : ''}`,
       access,
     });
 

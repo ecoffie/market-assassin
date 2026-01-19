@@ -543,9 +543,17 @@
 <body>
 
 <div class="container">
-    <div class="govcon-banner">
-        Free Tool for <a href="https://govcongiants.org" target="_blank">GovCon Giants</a> Community | Find Prime Contractors Seeking Small Business Partners
+    <div class="govcon-banner" style="display: flex; justify-content: space-between; align-items: center;">
+        <span></span>
+        <span>Free Tool for <a href="https://govcongiants.org" target="_blank">GovCon Giants</a> Community | Find Prime Contractors Seeking Small Business Partners</span>
+        <button onclick="logout()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); color: white; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600;">Logout</button>
     </div>
+    <script>
+        function logout() {
+            document.cookie = 'db_access_email=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            window.location.href = '/database-locked';
+        }
+    </script>
 
     <div class="header">
         <h1>Federal Contractor Database</h1>
@@ -615,6 +623,16 @@
                     <option value="medium">$100M-$1B (Mid-Tier)</option>
                     <option value="small">$10M-$100M</option>
                     <option value="micro">Under $10M</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Company Tier</label>
+                <select id="tierFilter">
+                    <option value="all">All Tiers</option>
+                    <option value="tier1">Tier 1 (Large Primes $1B+)</option>
+                    <option value="tier2">Tier 2 (Mid-Market $100M-$1B)</option>
+                    <option value="tier3">Tier 3 (Emerging &lt;$100M)</option>
                 </select>
             </div>
 
@@ -74257,6 +74275,7 @@ function filterCompanies() {
     const portalFilter = document.getElementById('portalFilter').value;
     const subcontractFilter = document.getElementById('subcontractFilter').value;
     const sizeFilter = document.getElementById('sizeFilter').value;
+    const tierFilter = document.getElementById('tierFilter').value;
 
     filteredCompanies = companies.filter(company => {
         if (search) {
@@ -74284,6 +74303,11 @@ function filterCompanies() {
         if (sizeFilter === 'medium' && (value < 100e6 || value >= 1e9)) return false;
         if (sizeFilter === 'small' && (value < 10e6 || value >= 100e6)) return false;
         if (sizeFilter === 'micro' && value >= 10e6) return false;
+
+        // Tier filter: Tier 1 = $1B+, Tier 2 = $100M-$1B, Tier 3 = <$100M
+        if (tierFilter === 'tier1' && value < 1e9) return false;
+        if (tierFilter === 'tier2' && (value < 100e6 || value >= 1e9)) return false;
+        if (tierFilter === 'tier3' && value >= 100e6) return false;
 
         return true;
     });
@@ -74462,6 +74486,7 @@ document.getElementById('contactFilter').addEventListener('change', filterCompan
 document.getElementById('portalFilter').addEventListener('change', filterCompanies);
 document.getElementById('subcontractFilter').addEventListener('change', filterCompanies);
 document.getElementById('sizeFilter').addEventListener('change', filterCompanies);
+document.getElementById('tierFilter').addEventListener('change', filterCompanies);
 
 filterCompanies();
 </script>

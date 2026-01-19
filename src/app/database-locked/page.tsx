@@ -61,17 +61,18 @@ export default function DatabaseLockedPage() {
           href="https://buy.stripe.com/4gMaEY3wqcjo6h70CsfnO0g"
           className="inline-block bg-blue-600 hover:bg-blue-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
         >
-          Get Access - $197
+          Get Access - $497
         </a>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-gray-500 text-sm mb-4">Already have access? Enter your password:</p>
+          <p className="text-gray-500 text-sm mb-4">Already have access? Enter your email:</p>
           <form onSubmit={handleSubmit} className="flex gap-2">
             <input
-              type="password"
+              type="email"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
+              placeholder="your@email.com"
+              style={{ color: '#000000', backgroundColor: '#ffffff' }}
               className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center"
             />
             <button
