@@ -30,7 +30,7 @@ export default function SBLODirectoryPage() {
         },
         {
           name: 'Full Database',
-          price: '$197',
+          price: '$497',
           originalPrice: '$997 value',
           checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database',
           description: 'Complete contractor database with 10,000+ contacts',
@@ -49,7 +49,7 @@ export default function SBLODirectoryPage() {
       upgradeProduct={{
         title: 'Full Contractor Database',
         description: 'Get access to 10,000+ prime contractors with contract history, NAICS codes, and direct contact information.',
-        price: '$197',
+        price: '$497',
         originalPrice: '$997',
         checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database',
         linkUrl: '/contractor-database-product',
