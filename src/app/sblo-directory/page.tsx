@@ -33,9 +33,9 @@ export default function SBLODirectoryPage() {
           price: '$497',
           originalPrice: '$997 value',
           checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database',
-          description: '200K+ contractors vs 225 in free list',
+          description: '3,500+ contractors vs 225 in free list',
           features: [
-            '200K+ prime contractors',
+            '3,500+ prime contractors',
             'Contract history & values',
             'NAICS code filtering',
             'Agency-specific searches',
@@ -47,7 +47,7 @@ export default function SBLODirectoryPage() {
       ]}
       upgradeProduct={{
         title: 'Full Contractor Database',
-        description: 'Go from 225 contacts to 200K+ prime contractors with contract history, NAICS codes, and direct contact information.',
+        description: 'Go from 225 contacts to 3,500+ prime contractors with contract history, NAICS codes, and direct contact information.',
         price: '$497',
         originalPrice: '$997',
         checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database',
