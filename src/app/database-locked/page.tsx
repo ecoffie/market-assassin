@@ -42,13 +42,13 @@ export default function DatabaseLockedPage() {
           Federal Contractor Database
         </h1>
         <p className="text-gray-600 mb-8 text-base leading-relaxed">
-          Access to this database requires a password. Get lifetime access to 200K+ federal contractors for teaming opportunities.
+          Access to this database requires a password. Get lifetime access to 3,500+ federal contractors for teaming opportunities.
         </p>
 
         <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-8 text-left">
           <h3 className="text-green-800 mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
           <ul className="text-green-700 m-0 pl-5 leading-loose text-sm">
-            <li><strong>200K+</strong> federal contractors</li>
+            <li><strong>3,500+</strong> federal contractors</li>
             <li><strong>$430B+</strong> in contract data</li>
             <li><strong>800+</strong> SBLO contacts with emails</li>
             <li><strong>115+</strong> supplier portal links</li>

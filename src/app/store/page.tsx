@@ -151,7 +151,7 @@ export default function Home() {
             </Link>
 
             {/* Interactive SBLO & Subcontractor Database */}
-            <Link href="/contractor-database" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
+            <Link href="/contractor-database-product" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden">
                 <Image src="/images/products/contractor-database/main home page.png" alt="Interactive SBLO & Subcontractor Database" fill className="object-cover object-top" />
               </div>
