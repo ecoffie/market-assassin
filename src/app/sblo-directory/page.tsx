@@ -3,9 +3,9 @@ import ProductPageAppSumo from '@/components/ProductPageAppSumo';
 export default function SBLODirectoryPage() {
   return (
     <ProductPageAppSumo
-      title="SBLO Contact Directory"
+      title="SBLO Contact List"
       tagline="Direct contacts to Small Business Liaison Officers at federal agencies and prime contractors"
-      description="Stop wasting time hunting for SBLO contacts. This comprehensive directory gives you direct access to Small Business Liaison Officers across 76+ federal agencies and major prime contractors. Get names, emails, phone numbers, and office locations so you can start building relationships today."
+      description="Stop wasting time hunting for SBLO contacts. This list gives you direct access to 225 Small Business Liaison Officers across 76+ federal agencies and major prime contractors. Get names, emails, phone numbers, and office locations so you can start building relationships today."
       primaryColor="#059669"
       gradientFrom="#059669"
       gradientTo="#10b981"
@@ -14,18 +14,18 @@ export default function SBLODirectoryPage() {
       checkoutUrl="/free-resources"
       pricingTiers={[
         {
-          name: 'Free',
+          name: 'Free List',
           price: 'FREE',
           originalPrice: '$997 value',
           checkoutUrl: '/free-resources',
-          description: 'SBLO contacts for 76+ federal agencies',
+          description: '225 SBLO contacts for 76+ federal agencies',
           features: [
+            '225 SBLO contacts',
             'Instant PDF download',
             '76+ federal agencies',
             'Direct email addresses',
             'Phone numbers included',
             'Prime contractor contacts',
-            'Quarterly updates available',
           ],
         },
         {
@@ -33,9 +33,8 @@ export default function SBLODirectoryPage() {
           price: '$497',
           originalPrice: '$997 value',
           checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database',
-          description: 'Complete contractor database with 10,000+ contacts',
+          description: '10,000+ contractors vs 225 in free list',
           features: [
-            'Everything in Free, plus:',
             '10,000+ prime contractors',
             'Contract history & values',
             'NAICS code filtering',
@@ -48,14 +47,14 @@ export default function SBLODirectoryPage() {
       ]}
       upgradeProduct={{
         title: 'Full Contractor Database',
-        description: 'Get access to 10,000+ prime contractors with contract history, NAICS codes, and direct contact information.',
+        description: 'Go from 225 contacts to 10,000+ prime contractors with contract history, NAICS codes, and direct contact information.',
         price: '$497',
         originalPrice: '$997',
         checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database',
         linkUrl: '/contractor-database-product',
       }}
-      videoTitle="SBLO Contact Directory"
-      videoSubtitle="76+ agencies with direct contact information"
+      videoTitle="SBLO Contact List"
+      videoSubtitle="225 contacts across 76+ agencies"
       screenshots={[
         '/images/products/sblo-directory/main page prime.png',
         '/images/products/sblo-directory/prime examples.png',
@@ -63,13 +62,13 @@ export default function SBLODirectoryPage() {
       screenshotFeatures={[
         {
           image: '/images/products/sblo-directory/main page prime.png',
-          title: 'Complete SBLO Directory',
-          description: 'Access direct contact information for Small Business Liaison Officers across federal agencies and prime contractors.',
+          title: 'Complete SBLO List',
+          description: 'Access 225 direct contacts for Small Business Liaison Officers across federal agencies and prime contractors.',
           bullets: [
+            '225 SBLO contacts',
             'Direct email addresses',
             'Phone numbers included',
             '76+ federal agencies',
-            'Prime contractor SBLOs',
           ],
         },
         {
@@ -85,16 +84,16 @@ export default function SBLODirectoryPage() {
         },
       ]}
       tldr={[
+        '225 SBLO contacts included',
         '76+ federal agencies covered',
-        'Direct SBLO email addresses',
-        'Phone numbers and office locations',
+        'Direct email addresses and phone numbers',
         'Prime contractor SBLO contacts included',
         'Instant PDF download',
       ]}
       glanceItems={[
+        { label: 'Contacts', value: '225 SBLOs' },
         { label: 'Agencies', value: '76+ federal agencies' },
         { label: 'Format', value: 'PDF download' },
-        { label: 'Updates', value: 'Quarterly refresh' },
         { label: 'Price', value: 'FREE (email required)' },
       ]}
       categoriesTitle="Agencies Included"
@@ -129,12 +128,12 @@ export default function SBLODirectoryPage() {
         },
       ]}
       benefits={[
+        '225 SBLO contacts',
         'Instant PDF download',
         '76+ federal agencies',
         'Direct email addresses',
         'Phone numbers included',
         'Prime contractor contacts',
-        'Quarterly updates available',
       ]}
       highlightTitle="SBLOs Want to Hear From You"
       highlightText="Small Business Liaison Officers are literally paid to help small businesses connect with contracting opportunities. They want your capability statement, they want to know what you do, and they can point you to the right opportunities. This directory removes the barrier of finding them."
