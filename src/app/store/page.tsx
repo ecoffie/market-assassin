@@ -234,13 +234,13 @@ export default function Home() {
               </div>
             </Link>
 
-            {/* SBLO Contact List - FREE PDF */}
+            {/* SBLO Contact List - FREE SAMPLE */}
             <Link href="/sblo-directory" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-emerald-500 to-teal-500 relative overflow-hidden">
                 <Image src="/images/products/sblo-directory/main page prime.png" alt="SBLO Contact List" fill className="object-cover object-top" />
               </div>
               <div className="p-6">
-                <span className="inline-block bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">FREE PDF</span>
+                <span className="inline-block bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">FREE SAMPLE</span>
                 <h3 className="text-xl font-bold mb-2 text-gray-900">SBLO Contact List</h3>
                 <p className="text-gray-500 text-sm mb-4">Small Business Liaison Officers (SBLO) at federal agencies and prime contractors.</p>
                 <ul className="text-sm mb-5 space-y-1">
@@ -374,13 +374,13 @@ export default function Home() {
               </div>
             </Link>
 
-            {/* Tier-2 Supplier List - FREE */}
+            {/* Tier-2 Supplier List - FREE SAMPLE */}
             <Link href="/tier2-directory" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-purple-600 to-violet-600 relative overflow-hidden">
                 <Image src="/images/products/tier2-directory/tier 2 main.png" alt="Tier-2 Supplier List" fill className="object-cover object-top" />
               </div>
               <div className="p-6">
-                <span className="inline-block bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">FREE PDF</span>
+                <span className="inline-block bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">FREE SAMPLE</span>
                 <h3 className="text-xl font-bold mb-2 text-gray-900">Tier-2 Supplier List</h3>
                 <p className="text-gray-500 text-sm mb-4">Access Tier-2 supplier contacts and vendor registration portals at major prime contractors.</p>
                 <ul className="text-sm mb-5 space-y-1">

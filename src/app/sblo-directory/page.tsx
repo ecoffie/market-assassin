@@ -14,7 +14,7 @@ export default function SBLODirectoryPage() {
       checkoutUrl="/free-resources"
       pricingTiers={[
         {
-          name: 'Free List',
+          name: 'Free Sample',
           price: 'FREE',
           originalPrice: '$997 value',
           checkoutUrl: '/free-resources',
