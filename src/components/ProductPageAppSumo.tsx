@@ -38,6 +38,15 @@ interface PricingTier {
   features: string[];
 }
 
+interface UpgradeProduct {
+  title: string;
+  description: string;
+  price: string;
+  originalPrice: string;
+  checkoutUrl: string;
+  linkUrl: string;
+}
+
 interface ProductPageProps {
   title: string;
   tagline: string;
@@ -65,6 +74,7 @@ interface ProductPageProps {
   categories?: { title: string; highlight?: boolean }[];
   categoriesTitle?: string;
   pricingTiers?: PricingTier[];
+  upgradeProduct?: UpgradeProduct;
 }
 
 export default function ProductPageAppSumo({
@@ -94,6 +104,7 @@ export default function ProductPageAppSumo({
   categories,
   categoriesTitle,
   pricingTiers,
+  upgradeProduct,
 }: ProductPageProps) {
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedTier, setSelectedTier] = useState(0);
@@ -461,6 +472,34 @@ export default function ProductPageAppSumo({
                 ))}
               </ul>
             </div>
+
+            {/* Upgrade Product Section */}
+            {upgradeProduct && (
+              <div className="border-t border-gray-200 pt-6 mt-6">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4">
+                  <h4 className="font-bold text-blue-900 mb-2">Want More?</h4>
+                  <p className="text-sm text-blue-800 mb-3">{upgradeProduct.description}</p>
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="text-2xl font-extrabold text-blue-900">{upgradeProduct.price}</span>
+                    <span className="text-gray-400 line-through text-sm">{upgradeProduct.originalPrice}</span>
+                  </div>
+                  <a
+                    href={upgradeProduct.checkoutUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center py-3 rounded-lg text-sm font-bold text-white mb-2 hover:opacity-90 transition-all bg-blue-600 hover:bg-blue-700"
+                  >
+                    Upgrade to {upgradeProduct.title}
+                  </a>
+                  <Link
+                    href={upgradeProduct.linkUrl}
+                    className="block w-full text-center py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-all"
+                  >
+                    Learn more →
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

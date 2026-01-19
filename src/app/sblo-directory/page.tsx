@@ -12,6 +12,48 @@ export default function SBLODirectoryPage() {
       price="FREE"
       originalPrice="$997 value"
       checkoutUrl="/free-resources"
+      pricingTiers={[
+        {
+          name: 'Free',
+          price: 'FREE',
+          originalPrice: '$997 value',
+          checkoutUrl: '/free-resources',
+          description: 'SBLO contacts for 76+ federal agencies',
+          features: [
+            'Instant PDF download',
+            '76+ federal agencies',
+            'Direct email addresses',
+            'Phone numbers included',
+            'Prime contractor contacts',
+            'Quarterly updates available',
+          ],
+        },
+        {
+          name: 'Full Database',
+          price: '$197',
+          originalPrice: '$997 value',
+          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database',
+          description: 'Complete contractor database with 10,000+ contacts',
+          features: [
+            'Everything in Free, plus:',
+            '10,000+ prime contractors',
+            'Contract history & values',
+            'NAICS code filtering',
+            'Agency-specific searches',
+            'Export to CSV',
+            'Teaming partner search',
+            'All future updates',
+          ],
+        },
+      ]}
+      upgradeProduct={{
+        title: 'Full Contractor Database',
+        description: 'Get access to 10,000+ prime contractors with contract history, NAICS codes, and direct contact information.',
+        price: '$197',
+        originalPrice: '$997',
+        checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database',
+        linkUrl: '/contractor-database-product',
+      }}
       videoTitle="SBLO Contact Directory"
       videoSubtitle="76+ agencies with direct contact information"
       screenshots={[
