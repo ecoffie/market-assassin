@@ -12,6 +12,46 @@ export default function ExpiringContractsCSVPage() {
       price="FREE"
       originalPrice="$697 value"
       checkoutUrl="/free-resources"
+      pricingTiers={[
+        {
+          name: 'Free Sample',
+          price: 'FREE',
+          originalPrice: '$697 value',
+          checkoutUrl: '/free-resources',
+          description: 'Sample expiring contracts data to test your process',
+          features: [
+            'Sample contract data',
+            'CSV format download',
+            'Contract values & dates',
+            'Prime contractor info',
+            'Works with any CRM',
+          ],
+        },
+        {
+          name: 'Full Database',
+          price: '$397',
+          originalPrice: '$997 value',
+          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/expiring-contracts',
+          description: '$77.1T+ in contracts vs sample data',
+          features: [
+            '$77.1T+ in expiring contracts',
+            'Monthly data updates',
+            'NAICS code filtering',
+            'Agency-specific searches',
+            'Export to CSV',
+            'Prime contractor details',
+            'All future updates',
+          ],
+        },
+      ]}
+      upgradeProduct={{
+        title: 'Expiring Contracts Forecast',
+        description: 'Go from sample data to $77.1T+ in expiring federal contracts with monthly updates and advanced filtering.',
+        price: '$397',
+        originalPrice: '$997',
+        checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/expiring-contracts',
+        linkUrl: '/expiring-contracts',
+      }}
       videoTitle="Expiring Contracts Sample"
       videoSubtitle="Import into Excel or your CRM instantly"
       screenshots={[
