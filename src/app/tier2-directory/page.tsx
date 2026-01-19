@@ -97,11 +97,11 @@ export default function Tier2DirectoryPage() {
       ]}
       categoriesTitle="Prime Contractors Included"
       categories={[
-        { title: 'Lockheed Martin', highlight: true },
-        { title: 'Raytheon', highlight: true },
-        { title: 'Northrop Grumman', highlight: true },
-        { title: 'General Dynamics', highlight: true },
-        { title: 'Booz Allen Hamilton', highlight: true },
+        { title: 'Mid-Size Defense Primes', highlight: true },
+        { title: 'IT Services Contractors', highlight: true },
+        { title: 'Engineering Firms', highlight: true },
+        { title: 'Construction Primes', highlight: true },
+        { title: 'Professional Services', highlight: true },
         { title: '50+ More Primes', highlight: true },
       ]}
       features={[
