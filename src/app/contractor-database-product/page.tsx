@@ -4,8 +4,8 @@ export default function ContractorDatabasePage() {
   return (
     <ProductPageAppSumo
       title="Federal Contractor Database"
-      tagline="Search 3,500+ federal contractors for teaming opportunities"
-      description="Stop wasting hours searching for teaming partners. The Federal Contractor Database gives you instant access to over 3,500 verified federal prime contractors, complete with contact information, contract history, SBLO contacts, and supplier portal links. Find the perfect teaming partner in minutes, not days."
+      tagline="Search 200K+ federal contractors for teaming opportunities"
+      description="Stop wasting hours searching for teaming partners. The Federal Contractor Database gives you instant access to over 200,000 verified federal prime contractors, complete with contact information, contract history, SBLO contacts, and supplier portal links. Find the perfect teaming partner in minutes, not days."
       primaryColor="#4f46e5"
       gradientFrom="#4f46e5"
       gradientTo="#7c3aed"
@@ -56,14 +56,14 @@ export default function ContractorDatabasePage() {
         },
       ]}
       tldr={[
-        '3,500+ verified federal prime contractors',
+        '200K+ verified federal prime contractors',
         '800+ SBLO contacts with emails',
         '115+ supplier portal links',
         '$430B+ in contract data',
         'Export to CSV for your CRM',
       ]}
       glanceItems={[
-        { label: 'Contractors', value: '3,500+ primes' },
+        { label: 'Contractors', value: '200K+ primes' },
         { label: 'SBLO Contacts', value: '800+ with emails' },
         { label: 'Supplier Portals', value: '115+ links' },
         { label: 'Export', value: 'CSV download included' },
@@ -80,8 +80,8 @@ export default function ContractorDatabasePage() {
       features={[
         {
           icon: '🏢',
-          title: '3,500+ Prime Contractors',
-          description: 'Our database includes over 3,500 federal prime contractors with verified contact information and subcontracting plans.',
+          title: '200K+ Prime Contractors',
+          description: 'Our database includes over 200,000 federal prime contractors with verified contact information and subcontracting plans.',
         },
         {
           icon: '📧',
@@ -101,7 +101,7 @@ export default function ContractorDatabasePage() {
       ]}
       benefits={[
         'Lifetime access (one-time payment)',
-        '3,500+ federal prime contractors',
+        '200K+ federal prime contractors',
         '800+ SBLO contacts with emails',
         '115+ supplier portal links',
         '$430B+ in contract data',
