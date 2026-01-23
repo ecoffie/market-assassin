@@ -154,7 +154,7 @@ export default function Home() {
 
             {/* GovCon Content Generator */}
             <Link
-              href="/ai-content"
+              href="/content-generator"
               className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-purple-500 hover:shadow-xl"
             >
               <div className="text-4xl mb-4">✍️</div>
