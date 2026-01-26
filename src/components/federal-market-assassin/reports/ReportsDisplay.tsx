@@ -677,6 +677,26 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
       letter-spacing: 1px;
       margin-top: 30px;
     }
+    .tier-badge {
+      display: inline-block;
+      padding: 6px 20px;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: 15px;
+    }
+    .tier-badge.premium {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #1e3a8a;
+      box-shadow: 0 2px 10px rgba(251, 191, 36, 0.3);
+    }
+    .tier-badge.standard {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
     .cover-footer {
       margin-top: 60px;
       opacity: 0.7;
@@ -885,6 +905,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
     <div class="cover-badge">Strategic Intelligence Report</div>
     <h1 class="cover-title">Federal Market Assassin</h1>
     <p class="cover-subtitle">Comprehensive Market Analysis & Opportunity Report</p>
+    <div class="tier-badge ${tier}">${tier === 'premium' ? '⭐ Premium Report' : 'Standard Report'}</div>
 
     <div class="cover-meta">
       <div class="cover-meta-item">
