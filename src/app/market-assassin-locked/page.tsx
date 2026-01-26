@@ -31,7 +31,14 @@ export default function MarketAssassinLockedPage() {
         body: JSON.stringify({ email }),
       });
 
+      if (!response.ok) {
+        console.error('API response not ok:', response.status, response.statusText);
+        setError(`Server error: ${response.status}`);
+        return;
+      }
+
       const data = await response.json();
+      console.log('Verify response:', data);
 
       if (data.hasAccess) {
         // Store in localStorage
@@ -53,8 +60,9 @@ export default function MarketAssassinLockedPage() {
       } else {
         setError('No access found for this email. Please purchase below.');
       }
-    } catch {
-      setError('Failed to verify access');
+    } catch (err) {
+      console.error('Verification error:', err);
+      setError('Failed to verify access. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -74,6 +82,32 @@ export default function MarketAssassinLockedPage() {
           <p className="text-slate-400 text-base leading-relaxed">
             Generate comprehensive strategic reports from just 5 inputs. Choose your plan below.
           </p>
+        </div>
+
+        {/* Already have access section */}
+        <div className="border border-slate-700 rounded-xl p-4 mb-8 bg-slate-900/50">
+          <p className="text-slate-400 text-sm mb-3 text-center">Already purchased? Enter your email to access:</p>
+          <form onSubmit={handleVerifyAccess} className="flex gap-2">
+            <input
+              ref={emailRef}
+              type="email"
+              placeholder="Enter your purchase email"
+              className="flex-1 px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all glow-blue"
+            >
+              {loading ? '...' : 'Access'}
+            </button>
+          </form>
+          {error && (
+            <p className="text-red-400 text-sm mt-3 text-center">{error}</p>
+          )}
+          {redirecting && (
+            <p className="text-green-400 text-sm mt-3 text-center">Access verified! Redirecting...</p>
+          )}
         </div>
 
         {/* Pricing Cards */}
@@ -214,29 +248,6 @@ export default function MarketAssassinLockedPage() {
               Get Premium
             </a>
           </div>
-        </div>
-
-        {/* Already have access section */}
-        <div className="border-t border-slate-700 pt-6">
-          <p className="text-slate-400 text-sm mb-4 text-center">Already purchased? Enter your email to access:</p>
-          <form onSubmit={handleVerifyAccess} className="flex gap-2">
-            <input
-              ref={emailRef}
-              type="email"
-              placeholder="Enter your purchase email"
-              className="flex-1 px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all glow-blue"
-            >
-              {loading ? '...' : 'Access'}
-            </button>
-          </form>
-          {error && (
-            <p className="text-red-400 text-sm mt-3 text-center">{error}</p>
-          )}
         </div>
 
         <p className="text-slate-500 text-xs mt-6 text-center">

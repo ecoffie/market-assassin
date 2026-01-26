@@ -42,7 +42,14 @@ export const PRODUCTS = {
     variantId: '1227736',
     name: 'GovCon Starter Bundle',
     price: 697,
-    includes: ['recompete-contracts', 'contractor-database', 'opportunity-hunter-pro'],
+    // Individual prices: Hunter Pro $49 + Recompete $397 + Contractor DB $497 = $943
+    individualTotal: 943,
+    includes: ['opportunity-hunter-pro', 'recompete-contracts', 'contractor-database'],
+    includesDisplay: [
+      { name: 'Opportunity Hunter Pro', price: 49 },
+      { name: 'Recompete Contracts Tracker', price: 397 },
+      { name: 'Federal Contractor Database', price: 497 },
+    ],
   },
   ULTIMATE_GOVCON_BUNDLE: {
     id: 'ultimate-govcon-bundle',

@@ -122,14 +122,14 @@ export default function Home() {
               </div>
             </Link>
 
-            {/* LinkedIn Content Creator */}
-            <Link href="/ai-content" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
+            {/* GovCon Content Generator */}
+            <Link href="/content-generator-product" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-purple-600 to-pink-500 relative overflow-hidden">
-                <Image src="/images/products/ai content generator/ai content generator home page.png" alt="LinkedIn Content Creator" fill className="object-cover object-top" />
+                <Image src="/images/products/ai content generator/ai content generator home page.png" alt="GovCon Content Generator" fill className="object-cover object-top" />
               </div>
               <div className="p-6">
                 <span className="inline-block bg-purple-600 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">PREMIUM</span>
-                <h3 className="text-xl font-bold mb-2 text-gray-900">LinkedIn Content Creator</h3>
+                <h3 className="text-xl font-bold mb-2 text-gray-900">GovCon Content Generator</h3>
                 <p className="text-gray-500 text-sm mb-4">Create LinkedIn posts that resonate with government buyers. GovCon-tuned AI trained on 146 viral posts.</p>
                 <ul className="text-sm mb-5 space-y-1">
                   <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> Generate 10 Posts Per Click</li>
@@ -461,84 +461,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Bundle Section */}
-      <section className="py-20 px-6 bg-gray-50" id="bundles">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-4 text-gray-900">Bundle & Save</h2>
-          <p className="text-gray-500 text-center mb-12">Get everything you need at one unbeatable price</p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Starter Bundle */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 transition-all hover:-translate-y-1 hover:shadow-lg hover:border-blue-500">
-              <div className="text-center mb-6">
-                <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold mb-3">STARTER</span>
-                <h3 className="text-2xl font-bold text-gray-900">Starter Bundle</h3>
-              </div>
-              <div className="text-center mb-6">
-                <div className="text-4xl font-bold text-gray-900">$497</div>
-                <div className="text-sm text-emerald-600 font-medium">One-Time Payment</div>
-              </div>
-              <ul className="space-y-3 mb-6 text-sm">
-                <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Opportunity Hunter (FREE)</li>
-                <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Contractor Database</li>
-                <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> AI Content Generator</li>
-              </ul>
-              <div className="text-center text-sm text-gray-400 mb-4 line-through">$494 if bought separately</div>
-              <a href="https://govcongiants.lemonsqueezy.com/checkout/buy/starter-bundle" target="_blank" rel="noopener noreferrer" className="block w-full py-3 bg-blue-800 text-white text-center rounded-lg font-semibold hover:bg-blue-700 transition-all">
-                Get Starter Bundle
-              </a>
-            </div>
-
-            {/* Pro Giant Bundle - Featured */}
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-500 p-6 relative transition-all hover:-translate-y-1 hover:shadow-xl">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-amber-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">MOST POPULAR</span>
-              </div>
-              <div className="text-center mb-6 pt-2">
-                <span className="inline-block bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-semibold mb-3">PRO GIANT</span>
-                <h3 className="text-2xl font-bold text-gray-900">Pro Giant Bundle</h3>
-              </div>
-              <div className="text-center mb-6">
-                <div className="text-4xl font-bold text-gray-900">$997</div>
-                <div className="text-sm text-emerald-600 font-medium">One-Time Payment</div>
-              </div>
-              <ul className="space-y-3 mb-6 text-sm">
-                <li className="flex items-center gap-2"><span className="text-emerald-600">✓</span> <strong>Everything in Starter, plus:</strong></li>
-                <li className="flex items-center gap-2"><span className="text-emerald-600">✓</span> Recompete Contracts</li>
-                <li className="flex items-center gap-2"><span className="text-emerald-600">✓</span> Prime Lookup</li>
-                <li className="flex items-center gap-2"><span className="text-emerald-600">✓</span> Federal Market Assassin</li>
-              </ul>
-              <div className="text-center text-sm text-gray-400 mb-4 line-through">$1,138 if bought separately</div>
-              <a href="https://govcongiants.lemonsqueezy.com/checkout/buy/pro-giant-bundle" target="_blank" rel="noopener noreferrer" className="block w-full py-3 bg-amber-500 text-white text-center rounded-lg font-semibold hover:bg-amber-400 transition-all">
-                Get Pro Giant Bundle
-              </a>
-            </div>
-
-            {/* Ultimate Giant Bundle */}
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 p-6 text-white transition-all hover:-translate-y-1 hover:shadow-xl">
-              <div className="text-center mb-6">
-                <span className="inline-block bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 px-3 py-1 rounded-full text-sm font-semibold mb-3">ULTIMATE</span>
-                <h3 className="text-2xl font-bold text-white">Ultimate Giant</h3>
-              </div>
-              <div className="text-center mb-6">
-                <div className="text-4xl font-bold text-amber-400">$1,497</div>
-                <div className="text-sm text-emerald-400 font-medium">One-Time Payment</div>
-              </div>
-              <ul className="space-y-3 mb-6 text-sm opacity-90">
-                <li className="flex items-center gap-2"><span className="text-amber-400">✓</span> <strong>Everything in Pro Giant, plus:</strong></li>
-                <li className="flex items-center gap-2"><span className="text-amber-400">✓</span> 1-on-1 Strategy Session</li>
-                <li className="flex items-center gap-2"><span className="text-amber-400">✓</span> Priority Support</li>
-                <li className="flex items-center gap-2"><span className="text-amber-400">✓</span> Future Tools Access</li>
-              </ul>
-              <div className="text-center text-sm opacity-50 mb-4 line-through">$2,000+ value</div>
-              <a href="https://govcongiants.lemonsqueezy.com/checkout/buy/ultimate-giant-bundle" target="_blank" rel="noopener noreferrer" className="block w-full py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 text-center rounded-lg font-bold hover:from-amber-300 hover:to-amber-400 transition-all">
-                Get Ultimate Giant
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-16 px-6">
         <div className="max-w-7xl mx-auto">
@@ -548,8 +470,7 @@ export default function Home() {
               <ul className="space-y-3 text-sm">
                 <li><a href="#tools" className="text-gray-400 hover:text-white">All Tools</a></li>
                 <li><a href="#databases" className="text-gray-400 hover:text-white">Databases</a></li>
-                <li><a href="#bundles" className="text-gray-400 hover:text-white">Bundles</a></li>
-                <li><Link href="/free-resources" className="text-gray-400 hover:text-white">Free Resources</Link></li>
+                                <li><Link href="/free-resources" className="text-gray-400 hover:text-white">Free Resources</Link></li>
               </ul>
             </div>
             <div>

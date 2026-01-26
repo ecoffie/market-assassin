@@ -499,9 +499,9 @@ export default function OpportunityScoutPage() {
                 <select
                   value={formData.businessFormation}
                   onChange={(e) => setFormData({ ...formData, businessFormation: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
-                  <option value="">Select type</option>
+                  <option value="" className="text-gray-500">Select type</option>
                   <option value="women-owned">Women Owned</option>
                   <option value="hubzone">HUBZone</option>
                   <option value="8a">8(a) Certified</option>
@@ -519,7 +519,7 @@ export default function OpportunityScoutPage() {
                   value={formData.naicsCode}
                   onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
                   placeholder="e.g., 541330"
-                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-500"
                 />
               </div>
 
@@ -534,7 +534,7 @@ export default function OpportunityScoutPage() {
                   placeholder="e.g., 10001"
                   maxLength={5}
                   pattern="[0-9]{5}"
-                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-500"
                 />
               </div>
 
@@ -545,9 +545,9 @@ export default function OpportunityScoutPage() {
                 <select
                   value={formData.goodsOrServices}
                   onChange={(e) => setFormData({ ...formData, goodsOrServices: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
-                  <option value="">Select one</option>
+                  <option value="" className="text-gray-500">Select one</option>
                   <option value="goods">Goods</option>
                   <option value="services">Services</option>
                   <option value="both">Both</option>
@@ -561,9 +561,9 @@ export default function OpportunityScoutPage() {
                 <select
                   value={formData.veteranStatus}
                   onChange={(e) => setFormData({ ...formData, veteranStatus: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 >
-                  <option value="">Select status</option>
+                  <option value="" className="text-gray-500">Select status</option>
                   <option value="veteran-owned">Veteran Owned</option>
                   <option value="service-disabled-veteran">Service Disabled Vet</option>
                   <option value="not-applicable">Not Applicable</option>

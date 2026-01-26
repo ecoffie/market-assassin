@@ -1,23 +1,23 @@
 import ProductPageAppSumo from '@/components/ProductPageAppSumo';
 
-export default function AIContentPage() {
+export default function ContentGeneratorProductPage() {
   return (
     <ProductPageAppSumo
-      title="LinkedIn Content Creator"
+      title="GovCon Content Generator"
       tagline="Create LinkedIn posts that resonate with government buyers"
-      description="Stop staring at blank screens wondering what to post. The AI Content Generator creates LinkedIn posts specifically designed to resonate with government buyers and contracting officers. Our custom fine-tuned model was trained on 146 viral GovCon posts, so it writes in the authentic voice of successful GovCon thought leaders."
+      description="Stop staring at blank screens wondering what to post. The GovCon Content Generator creates LinkedIn posts specifically designed to resonate with government buyers and contracting officers. Our custom fine-tuned model was trained on 146 viral GovCon posts, so it writes in the authentic voice of successful GovCon thought leaders."
       primaryColor="#7c3aed"
       gradientFrom="#7c3aed"
       gradientTo="#a855f7"
       price="$197"
       originalPrice="$588/year"
-      checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/ai-content-generator"
+      checkoutUrl="https://buy.stripe.com/dRmcN64Au6Z4axn84UfnO0m"
       pricingTiers={[
         {
           name: 'Content Engine',
           price: '$197',
           originalPrice: '$588/year',
-          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/ai-content-generator',
+          checkoutUrl: 'https://buy.stripe.com/dRmcN64Au6Z4axn84UfnO0m',
           description: 'Text-only LinkedIn post generation',
           features: [
             'Lifetime access',
@@ -32,7 +32,7 @@ export default function AIContentPage() {
           name: 'Full Fix',
           price: '$397',
           originalPrice: '$1,176/year',
-          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/ai-content-generator-full',
+          checkoutUrl: 'https://buy.stripe.com/aFa9AU4Au1EKaxn5WMfnO0n',
           description: 'Text + graphics & carousel generation',
           features: [
             'Everything in Content Engine, plus:',

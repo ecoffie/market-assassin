@@ -1505,11 +1505,11 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                     <p className="text-slate-200 text-sm font-semibold truncate">
                       4 reports locked
                     </p>
-                    <p className="text-amber-400 text-xs font-bold">$497 lifetime</p>
+                    <p className="text-amber-400 text-xs font-bold">Upgrade $200</p>
                   </div>
                 </div>
                 <a
-                  href="https://buy.stripe.com/5kQdRaeb497cfRHdpefnO0f"
+                  href="https://buy.stripe.com/5kQ8wQ9UObfk34V3OEfnO0p"
                   className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-black text-sm font-bold rounded-lg"
                 >
                   Upgrade
@@ -1539,11 +1539,11 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   {/* Right: CTA */}
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <p className="text-amber-400 font-bold text-xl">$497</p>
-                      <p className="text-slate-500 text-xs">lifetime access</p>
+                      <p className="text-amber-400 font-bold text-xl">$200</p>
+                      <p className="text-slate-500 text-xs">upgrade price</p>
                     </div>
                     <a
-                      href="https://buy.stripe.com/5kQdRaeb497cfRHdpefnO0f"
+                      href="https://buy.stripe.com/5kQ8wQ9UObfk34V3OEfnO0p"
                       className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold rounded-lg transition-all glow-amber whitespace-nowrap"
                     >
                       Upgrade to Premium
@@ -3394,10 +3394,10 @@ function UpgradeModal({ isOpen, onClose, currentTier }: { isOpen: boolean; onClo
           {/* CTA Buttons */}
           <div className="space-y-3">
             <a
-              href="https://buy.stripe.com/5kQdRaeb497cfRHdpefnO0f"
+              href="https://buy.stripe.com/5kQ8wQ9UObfk34V3OEfnO0p"
               className="block w-full px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold rounded-xl transition-all text-center text-lg glow-amber hover:scale-[1.02]"
             >
-              Upgrade to Premium →
+              Upgrade to Premium - $200 →
             </a>
             <button
               onClick={onClose}

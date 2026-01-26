@@ -11,7 +11,7 @@ export default function ExpiringContractsPage() {
       gradientTo="#06b6d4"
       price="$397"
       originalPrice="$997/month"
-      checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/expiring-contracts"
+      checkoutUrl="/recompete"
       videoTitle="Expiring Contracts Forecast Demo"
       videoSubtitle="See how to find recompete opportunities 3-6 months early"
       screenshots={[

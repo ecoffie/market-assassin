@@ -31,7 +31,7 @@ export default function ExpiringContractsCSVPage() {
           name: 'Full Database',
           price: '$397',
           originalPrice: '$997 value',
-          checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/expiring-contracts',
+          checkoutUrl: '/expiring-contracts',
           description: '$77.1T+ in contracts vs sample data',
           features: [
             '$77.1T+ in expiring contracts',
@@ -49,7 +49,7 @@ export default function ExpiringContractsCSVPage() {
         description: 'Go from sample data to $77.1T+ in expiring federal contracts with monthly updates and advanced filtering.',
         price: '$397',
         originalPrice: '$997',
-        checkoutUrl: 'https://govcongiants.lemonsqueezy.com/checkout/buy/expiring-contracts',
+        checkoutUrl: '/expiring-contracts',
         linkUrl: '/expiring-contracts',
       }}
       videoTitle="Expiring Contracts Sample"

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful - GovCon Content Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 60px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.4);
+        }
+
+        .success-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .success-icon svg {
+            width: 50px;
+            height: 50px;
+            stroke: white;
+            stroke-width: 3;
+        }
+
+        h1 {
+            color: #1a1a2e;
+            font-size: 2rem;
+            margin-bottom: 15px;
+        }
+
+        .tier-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #1a1a2e;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 25px;
+        }
+
+        .tier-badge.full-fix {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+        }
+
+        p {
+            color: #4a5568;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .access-key-box {
+            background: #f7fafc;
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .access-key-box label {
+            display: block;
+            font-size: 0.85rem;
+            color: #718096;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .access-key {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.75rem;
+            color: #2d3748;
+            word-break: break-all;
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .copy-btn {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: #2d3748;
+        }
+
+        .copy-btn.copied {
+            background: #10b981;
+        }
+
+        .warning {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            color: #92400e;
+        }
+
+        .cta-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 18px 40px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4);
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #dc2626;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Verifying your payment...</p>
+        </div>
+
+        <!-- Success State -->
+        <div id="success" class="hidden">
+            <div class="success-icon">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+            <h1>Payment Successful!</h1>
+
+            <div id="tier-badge" class="tier-badge">Content Engine</div>
+
+            <p>Thank you for your purchase! Your lifetime access is now active.</p>
+
+            <div class="access-key-box">
+                <label>Your Access Key (save this!)</label>
+                <div id="access-key" class="access-key">Loading...</div>
+                <button class="copy-btn" onclick="copyKey()">Copy to Clipboard</button>
+            </div>
+
+            <div class="warning">
+                <strong>Important:</strong> Save your access key! You'll need it to log back in if you clear your browser data.
+            </div>
+
+            <a href="/app" class="cta-btn" id="start-btn">Start Creating Content</a>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="hidden error">
+            <h2>Something went wrong</h2>
+            <p id="error-message">Unable to verify payment. Please contact support.</p>
+            <a href="/content-generator/#pricing" class="cta-btn" style="margin-top: 20px;">Back to Pricing</a>
+        </div>
+    </div>
+
+    <script>
+        async function verifyPayment() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session_id');
+            const tier = urlParams.get('tier');
+
+            if (!sessionId) {
+                showError('No payment session found.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/verify-payment?session_id=${sessionId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store access key in localStorage
+                    localStorage.setItem('gcg_access_key', data.accessKey);
+                    localStorage.setItem('gcg_tier', data.tier);
+                    localStorage.setItem('gcg_email', data.email || '');
+
+                    // Update UI
+                    document.getElementById('access-key').textContent = data.accessKey;
+
+                    const tierBadge = document.getElementById('tier-badge');
+                    if (data.tier === 'full_fix') {
+                        tierBadge.textContent = 'Full Fix (Text + Graphics)';
+                        tierBadge.classList.add('full-fix');
+                    } else {
+                        tierBadge.textContent = 'Content Engine (Text Only)';
+                    }
+
+                    showSuccess();
+                } else {
+                    showError(data.error || 'Payment verification failed.');
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                showError('Unable to connect to server. Please try again.');
+            }
+        }
+
+        function showSuccess() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('success').classList.remove('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error').classList.remove('hidden');
+            document.getElementById('error-message').textContent = message;
+        }
+
+        function copyKey() {
+            const key = document.getElementById('access-key').textContent;
+            navigator.clipboard.writeText(key).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy to Clipboard';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        // Start verification on page load
+        verifyPayment();
+    </script>
+</body>
+</html>

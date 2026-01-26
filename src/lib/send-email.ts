@@ -347,3 +347,122 @@ Questions? Reply to this email for support.
     return false;
   }
 }
+
+// Interface for license key email
+interface SendLicenseKeyEmailParams {
+  to: string;
+  customerName?: string;
+  licenseKey: string;
+  productName: string;
+  accessLink?: string;
+}
+
+// Generic email for sending license key after purchase
+export async function sendLicenseKeyEmail({
+  to,
+  customerName,
+  licenseKey,
+  productName,
+  accessLink,
+}: SendLicenseKeyEmailParams): Promise<boolean> {
+  const activateUrl = 'https://shop.govcongiants.org/activate';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">GovCon Giants</h1>
+    <p style="color: #c4b5fd; margin: 10px 0 0 0;">Purchase Confirmation</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #1e3a8a; margin-top: 0;">Thank You for Your Purchase!</h2>
+
+    <p>Hi${customerName ? ` ${customerName}` : ''},</p>
+
+    <p>Your payment for <strong>${productName}</strong> has been confirmed.</p>
+
+    <div style="background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%); border: 2px solid #3b82f6; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center;">
+      <p style="margin: 0 0 10px 0; color: #1e40af; font-weight: 600; font-size: 14px;">Your License Key:</p>
+      <div style="font-family: monospace; font-size: 24px; font-weight: bold; color: #1e40af; background: white; padding: 15px 25px; border-radius: 8px; display: inline-block; letter-spacing: 2px; border: 2px dashed #3b82f6;">
+        ${licenseKey}
+      </div>
+      <p style="margin: 15px 0 0 0; color: #64748b; font-size: 13px;">Save this key - you'll need it to activate your access</p>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${activateUrl}" style="background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">Activate Your License</a>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0;">How to Activate:</h3>
+      <ol style="color: #15803d; margin: 0; padding-left: 20px;">
+        <li>Go to <a href="${activateUrl}" style="color: #166534;">${activateUrl}</a></li>
+        <li>Enter your email: <strong>${to}</strong></li>
+        <li>Enter your license key (optional - email alone works too)</li>
+        <li>Click "Activate License" to unlock your tools</li>
+      </ol>
+    </div>
+
+    ${accessLink ? `
+    <p style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; color: #92400e;">
+      <strong>Direct Access Link:</strong><br>
+      <a href="${accessLink}" style="color: #92400e; word-break: break-all;">${accessLink}</a>
+    </p>
+    ` : ''}
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      <strong>Keep this email safe!</strong> Your license key is your proof of purchase.<br>
+      Questions? Reply to this email or contact support@govcongiants.com
+    </p>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 12px;">
+      &copy; ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      to,
+      subject: `Your ${productName} License Key | GovCon Giants`,
+      html: htmlContent,
+      text: `Thank You for Your Purchase!
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Your payment for ${productName} has been confirmed.
+
+Your License Key: ${licenseKey}
+
+How to Activate:
+1. Go to ${activateUrl}
+2. Enter your email: ${to}
+3. Enter your license key (optional - email alone works too)
+4. Click "Activate License" to unlock your tools
+
+${accessLink ? `Direct Access Link: ${accessLink}` : ''}
+
+Keep this email safe! Your license key is your proof of purchase.
+Questions? Reply to this email or contact support@govcongiants.com
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ License key email sent to ${to} for ${productName}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send license key email:', error);
+    return false;
+  }
+}

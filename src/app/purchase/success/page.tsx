@@ -114,10 +114,10 @@ function SuccessContent() {
               Prime Lookup
             </Link>
             <Link
-              href="/ai-content"
+              href="/content-generator-product"
               className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
             >
-              AI Content Generator
+              Content Generator
             </Link>
             <Link
               href="/opportunity-hunter"

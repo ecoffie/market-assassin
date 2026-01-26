@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Content Library | GovCon Content Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Market Assassin brand colors
+                        ma: {
+                            bg: '#0f172a',
+                            bgDark: '#020617',
+                            card: '#1e293b',
+                            border: '#334155',
+                            accent: '#3b82f6',
+                            cyan: '#22d3ee',
+                            text: '#f1f5f9',
+                            textSec: '#94a3b8',
+                        },
+                        govcon: {
+                            blue: '#3b82f6',
+                            gold: '#c5a028',
+                            light: '#f1f5f9'
+                        },
+                        linkedin: {
+                            blue: '#0077B5',
+                            dark: '#004182',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Market Assassin brand gradient */
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        }
+        /* Dark theme base */
+        body {
+            background-color: #0f172a;
+            color: #f1f5f9;
+        }
+        /* Dark theme overrides */
+        .bg-white { background-color: #1e293b !important; }
+        .bg-gray-50 { background-color: #0f172a !important; }
+        .bg-gray-100 { background-color: #1e293b !important; }
+        .bg-gray-200 { background-color: #334155 !important; }
+        .text-gray-900 { color: #f1f5f9 !important; }
+        .text-gray-800 { color: #f1f5f9 !important; }
+        .text-gray-700 { color: #e2e8f0 !important; }
+        .text-gray-600 { color: #cbd5e1 !important; }
+        .text-gray-500 { color: #94a3b8 !important; }
+        .text-gray-400 { color: #64748b !important; }
+        .border-gray-200 { border-color: #334155 !important; }
+        .border-gray-300 { border-color: #475569 !important; }
+        .divide-gray-200 > * + * { border-color: #334155 !important; }
+        input, select, textarea {
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        input::placeholder, textarea::placeholder { color: #64748b !important; }
+        input:focus, select:focus, textarea:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+        }
+        .hover\:bg-gray-50:hover { background-color: #334155 !important; }
+        .hover\:bg-gray-100:hover { background-color: #334155 !important; }
+        footer { background-color: #1e293b !important; }
+        label { color: #e2e8f0 !important; }
+        .bg-govcon-blue { background-color: #3b82f6 !important; }
+        .text-govcon-blue { color: #3b82f6 !important; }
+        .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2) !important;
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        /* Custom checkbox styling - dark theme */
+        .custom-checkbox {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #475569;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            background-color: #0f172a;
+        }
+        .custom-checkbox:checked {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+        .custom-checkbox:checked::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 2px;
+            width: 5px;
+            height: 9px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        .custom-checkbox:hover {
+            border-color: #3b82f6;
+        }
+        /* Toast animation */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        .toast-enter {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        .toast-exit {
+            animation: slideOut 0.3s ease-out forwards;
+        }
+    </style>
+    <!-- Supabase Auth -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/content-generator/js/supabase-auth.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- Header -->
+    <header class="gradient-bg text-white py-4 shadow-lg">
+        <div class="container mx-auto px-4 max-w-6xl">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold">My Content Library</h1>
+                    <p class="text-blue-200 text-sm">Saved posts and drafts</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="tier-badge" class="px-3 py-1 rounded-full text-sm font-semibold"></span>
+                    <a id="nav-generator" href="/content-generator/" class="bg-white text-govcon-blue font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm hover:bg-blue-50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path></svg>
+                        Generator
+                    </a>
+                    <a id="nav-calendar" href="/content-generator/calendar.html" class="bg-white/20 hover:bg-white/30 text-white font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Calendar
+                    </a>
+                    <button onclick="logout()" class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <!-- Main Layout with Sidebar -->
+        <div class="flex gap-6">
+            <!-- Main Content Area -->
+            <div class="flex-1 min-w-0">
+                <!-- Filters Section -->
+                <div class="bg-white rounded-xl shadow-md p-4 mb-6">
+                    <!-- Row 1: Search + Main Filters -->
+                    <div class="flex flex-col lg:flex-row gap-4 mb-4">
+                        <!-- Search -->
+                        <div class="flex-1">
+                            <div class="relative">
+                                <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                <input type="text" id="search-input" placeholder="Search title or content..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-govcon-blue focus:border-govcon-blue">
+                            </div>
+                        </div>
+
+                        <!-- Goal Filter -->
+                        <div class="w-full lg:w-40">
+                            <select id="goal-filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-govcon-blue focus:border-govcon-blue text-sm">
+                                <option value="">All Goals</option>
+                                <option value="awareness">Brand Awareness</option>
+                                <option value="leads">Lead Generation</option>
+                                <option value="thought-leadership">Thought Leadership</option>
+                                <option value="engagement">Engagement</option>
+                                <option value="recruitment">Recruitment</option>
+                                <option value="teaming">Teaming</option>
+                            </select>
+                        </div>
+
+                        <!-- Post Type Filter -->
+                        <div class="w-full lg:w-40">
+                            <select id="type-filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-govcon-blue focus:border-govcon-blue text-sm">
+                                <option value="">All Types</option>
+                                <option value="carousel">Carousels</option>
+                                <option value="linkedin">LinkedIn Posts</option>
+                                <option value="actionable">Actionable</option>
+                                <option value="story-driven">Story-Driven</option>
+                                <option value="stat-heavy">Data-Driven</option>
+                                <option value="question-based">Question-Based</option>
+                                <option value="contrarian">Contrarian</option>
+                                <option value="thought-leadership">Thought Leadership</option>
+                            </select>
+                        </div>
+
+                        <!-- Date Range Filter -->
+                        <div class="w-full lg:w-40">
+                            <select id="date-filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-govcon-blue focus:border-govcon-blue text-sm">
+                                <option value="">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="7days">Last 7 Days</option>
+                                <option value="30days">Last 30 Days</option>
+                                <option value="90days">Last 90 Days</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Sort, View, Favorites, Clear -->
+                    <div class="flex flex-wrap items-center gap-3">
+                        <!-- Sort -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-500">Sort:</span>
+                            <select id="sort-filter" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-govcon-blue focus:border-govcon-blue">
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="a-z">A-Z</option>
+                                <option value="z-a">Z-A</option>
+                                <option value="favorites">Favorites First</option>
+                            </select>
+                        </div>
+
+                        <!-- View Toggle -->
+                        <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                            <button id="view-grid-btn" onclick="setViewMode('grid')" class="p-1.5 rounded bg-white shadow text-govcon-blue" title="Grid View">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                            </button>
+                            <button id="view-list-btn" onclick="setViewMode('list')" class="p-1.5 rounded text-gray-400 hover:text-gray-600" title="List View">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                            </button>
+                        </div>
+
+                        <!-- Group By Date Toggle -->
+                        <button id="group-toggle" onclick="toggleGroupByDate()" class="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                            <span class="text-gray-600">Group by Date</span>
+                        </button>
+
+                        <!-- Favorites Toggle -->
+                        <button id="favorites-toggle" onclick="toggleFavoritesFilter()" class="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
+                            <svg id="star-icon" class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                            <span class="text-gray-600">Favorites</span>
+                        </button>
+
+                        <!-- Clear Filters -->
+                        <button id="clear-filters-btn" onclick="clearFilters()" class="hidden flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 text-red-600 rounded-lg hover:bg-red-100 transition text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            <span>Clear Filters</span>
+                        </button>
+                    </div>
+
+                    <!-- Tags -->
+                    <div id="tags-container" class="mt-4 flex flex-wrap gap-2 hidden">
+                        <!-- Tags will be populated dynamically -->
+                    </div>
+                </div>
+
+        <!-- Bulk Actions Bar -->
+        <div id="bulk-actions-bar" class="hidden bg-govcon-blue text-white rounded-xl shadow-md p-4 mb-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <input type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll()" class="custom-checkbox">
+                <span id="selected-count" class="font-medium">0 selected</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="exportSelected()" class="bg-white/20 hover:bg-white/30 text-white font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Export Selected
+                </button>
+                <button onclick="deleteSelected()" class="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    Delete Selected
+                </button>
+                <button onclick="clearSelection()" class="text-white/80 hover:text-white px-3 py-2 text-sm">
+                    Cancel
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-4">
+                <p id="results-count" class="text-sm text-gray-600">Loading...</p>
+                <button id="enable-select-btn" onclick="enableSelectionMode()" class="text-sm text-govcon-blue hover:underline flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    Select Multiple
+                </button>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="exportLibrary('csv')" class="text-sm text-govcon-blue hover:underline flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Export All
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-govcon-blue mx-auto mb-4"></div>
+            <p class="text-gray-600">Loading your library...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-16">
+            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">No saved content yet</h3>
+            <p class="text-gray-600 mb-6">Generate some posts and save them to build your library!</p>
+            <a id="empty-state-link" href="/content-generator/" class="inline-flex items-center gap-2 bg-govcon-blue hover:bg-govcon-blue/90 text-white font-bold px-6 py-3 rounded-lg transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Generate Your First Post
+            </a>
+        </div>
+
+        <!-- Content Grid -->
+        <div id="content-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Cards will be populated dynamically -->
+        </div>
+
+        <!-- Grouped Content (when grouping is enabled) -->
+        <div id="grouped-content" class="hidden space-y-6">
+            <!-- Date groups will be populated dynamically -->
+        </div>
+
+            </div>
+            <!-- End Main Content Area -->
+
+            <!-- Right Sidebar - Stats -->
+            <div id="stats-sidebar" class="hidden lg:block w-72 flex-shrink-0">
+                <div class="bg-white rounded-xl shadow-md p-5 sticky top-6">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-govcon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        Quick Stats
+                    </h3>
+
+                    <!-- Stats Cards -->
+                    <div class="space-y-3">
+                        <div class="bg-gradient-to-r from-govcon-blue to-blue-600 rounded-lg p-4 text-white">
+                            <div class="text-2xl font-bold" id="stat-total">0</div>
+                            <div class="text-blue-100 text-sm">Total Posts</div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <div class="flex-1 bg-yellow-50 rounded-lg p-3 text-center">
+                                <div class="text-xl font-bold text-yellow-600" id="stat-favorites">0</div>
+                                <div class="text-yellow-700 text-xs">Favorites</div>
+                            </div>
+                            <div class="flex-1 bg-purple-50 rounded-lg p-3 text-center">
+                                <div class="text-xl font-bold text-purple-600" id="stat-carousels">0</div>
+                                <div class="text-purple-700 text-xs">Carousels</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-green-700 text-sm">This Week</span>
+                                <span class="text-lg font-bold text-green-600" id="stat-week">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Tags -->
+                    <div class="mt-5 pt-5 border-t border-gray-100">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">Popular Tags</h4>
+                        <div id="popular-tags" class="flex flex-wrap gap-2">
+                            <!-- Tags will be populated -->
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="mt-5 pt-5 border-t border-gray-100">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h4>
+                        <div class="space-y-2">
+                            <a id="sidebar-new-post-link" href="/content-generator/" class="flex items-center gap-2 px-3 py-2 bg-govcon-blue text-white rounded-lg hover:bg-govcon-blue/90 transition text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                Create New Post
+                            </a>
+                            <button onclick="exportLibrary('csv')" class="w-full flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm text-gray-700">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                Export Library
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- End Flex Container -->
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
+            <div class="bg-red-500 px-6 py-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white">Delete Post</h3>
+                </div>
+            </div>
+            <div class="p-6">
+                <p id="confirm-message" class="text-gray-700 text-center mb-6">Are you sure you want to delete this post? This action cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button onclick="resolveConfirm(false)" class="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition">
+                        Cancel
+                    </button>
+                    <button onclick="resolveConfirm(true)" class="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View/Edit Modal -->
+    <div id="view-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div class="gradient-bg px-6 py-4 flex items-center justify-between">
+                <h3 id="modal-title" class="text-xl font-bold text-white">View Post</h3>
+                <button onclick="closeModal()" class="text-white/80 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <span id="modal-type-badge" class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"></span>
+                    <span id="modal-goal-badge" class="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full"></span>
+                </div>
+                <div id="modal-content" class="bg-gray-50 rounded-lg p-4 mb-4">
+                    <pre class="whitespace-pre-wrap font-sans text-gray-800 leading-relaxed text-sm"></pre>
+                </div>
+                <div id="modal-tags" class="flex flex-wrap gap-2 mb-4">
+                    <!-- Tags -->
+                </div>
+                <div class="text-xs text-gray-500">
+                    <span id="modal-date"></span>
+                </div>
+            </div>
+            <div class="border-t px-6 py-4 flex justify-between">
+                <button onclick="deleteCurrentItem()" class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                <div class="flex gap-3">
+                    <button onclick="copyModalContent()" class="bg-linkedin-blue hover:bg-linkedin-dark text-white font-semibold px-4 py-2 rounded-lg transition text-sm">
+                        Copy to Clipboard
+                    </button>
+                    <button onclick="closeModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition text-sm">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-govcon-blue text-white py-4 mt-12">
+        <div class="container mx-auto px-4 max-w-6xl text-center">
+            <p class="text-blue-200 text-sm">GovCon Content Generator - Your Saved Posts</p>
+        </div>
+    </footer>
+
+    <script>
+        // State
+        let libraryItems = [];
+        let filteredItems = [];
+        let currentItemId = null;
+        let showFavoritesOnly = false;
+        let allTags = new Set();
+        let selectionMode = false;
+        let selectedItems = new Set();
+        let viewMode = 'grid'; // 'grid' or 'list'
+        let groupByDate = false;
+        let tagCounts = {};
+
+        // API base for Content Generator backend
+        const API_BASE = 'https://govcon-content-generator.vercel.app';
+
+        // Base path is always /content-generator since files are in that folder
+        function getBasePath() {
+            return '/content-generator';
+        }
+
+        // Get app URL helper
+        function getAppUrl(page) {
+            const basePath = getBasePath();
+            if (page === 'auth') return basePath + '/auth.html';
+            if (page === 'library') return basePath + '/library.html';
+            if (page === 'calendar') return basePath + '/calendar.html';
+            return basePath + '/';
+        }
+
+        // Initialize with Supabase Auth
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Update navigation links for proxy support
+            const basePath = getBasePath();
+            document.getElementById('nav-generator').href = basePath + '/';
+            document.getElementById('nav-calendar').href = basePath + '/calendar.html';
+            document.getElementById('empty-state-link').href = basePath + '/';
+            document.getElementById('sidebar-new-post-link').href = basePath + '/';
+
+            // All users now have Supabase sessions via magic links
+            // Check if we just came from auth
+            const urlParams = new URLSearchParams(window.location.search);
+            const justSignedIn = urlParams.get('auth') === 'success' || sessionStorage.getItem('gcg_just_signed_in');
+
+            // Initialize auth with retry for fresh logins
+            let session = await SupabaseAuth.initAuth();
+
+            if (!session && justSignedIn) {
+                console.log('Just signed in, waiting for session...');
+                for (let i = 0; i < 5; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    session = await SupabaseAuth.initAuth();
+                    if (session) break;
+                }
+                sessionStorage.removeItem('gcg_just_signed_in');
+                if (urlParams.get('auth')) {
+                    window.history.replaceState({}, '', window.location.pathname);
+                }
+            }
+
+            if (!session) {
+                console.log('[Library] No session and no email access, redirecting to auth');
+                window.location.href = getAppUrl('auth');
+                return;
+            }
+
+            console.log('[Library] Session found, user:', session.user?.id);
+
+            displayUserInfo();
+            console.log('[Library] Calling loadLibrary...');
+            await loadLibrary();
+            console.log('[Library] loadLibrary complete, setting up filters');
+            setupFilters();
+        });
+
+        // Logout function
+        function logout() {
+            // Clear any legacy localStorage (can be removed later)
+            localStorage.removeItem('gcg_access');
+            localStorage.removeItem('gcg_email');
+            localStorage.removeItem('gcg_tier');
+            localStorage.removeItem('gcg_tier_name');
+            // Sign out of Supabase
+            SupabaseAuth.signOut();
+        }
+
+        // Toast notification system
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            const icon = type === 'success'
+                ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
+                : type === 'error'
+                ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
+                : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+
+            toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 toast-enter min-w-[280px]`;
+            toast.innerHTML = `${icon}<span class="flex-1">${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Confirm modal system
+        let confirmResolve = null;
+
+        function showConfirmModal(message = 'Are you sure you want to delete this post? This action cannot be undone.') {
+            return new Promise((resolve) => {
+                confirmResolve = resolve;
+                document.getElementById('confirm-message').textContent = message;
+                document.getElementById('confirm-modal').classList.remove('hidden');
+            });
+        }
+
+        function resolveConfirm(result) {
+            document.getElementById('confirm-modal').classList.add('hidden');
+            if (confirmResolve) {
+                confirmResolve(result);
+                confirmResolve = null;
+            }
+        }
+
+        // Display user info and tier
+        function displayUserInfo() {
+            const profile = SupabaseAuth.profile;
+            const tier = profile?.tier;
+
+            const tierBadge = document.getElementById('tier-badge');
+            if (tierBadge) {
+                if (tier === 'full-fix') {
+                    tierBadge.textContent = 'Full Fix';
+                    tierBadge.className = 'px-3 py-1 rounded-full text-sm font-semibold bg-purple-500 text-white';
+                    tierBadge.classList.remove('hidden');
+                } else if (tier === 'content-engine') {
+                    tierBadge.textContent = 'Content Engine';
+                    tierBadge.className = 'px-3 py-1 rounded-full text-sm font-semibold bg-yellow-500 text-white';
+                    tierBadge.classList.remove('hidden');
+                } else {
+                    // No valid tier - hide the badge (no free tier exists)
+                    tierBadge.classList.add('hidden');
+                }
+            }
+        }
+
+        // Load library from Supabase
+        async function loadLibrary() {
+            console.log('[Library] loadLibrary called');
+            const user = SupabaseAuth.user;
+
+            if (!user) {
+                console.log('[Library] No user, showing empty state');
+                showEmptyState();
+                return;
+            }
+
+            try {
+                // All users now have Supabase sessions - use direct query
+                console.log('[Library] Fetching content_library for user:', user.id);
+                const result = await SupabaseAuth.client
+                    .from('content_library')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false });
+                const { data, error } = result;
+
+                console.log('[Library] Query result:', { data: data?.length || 0, error });
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    libraryItems = data;
+                    filteredItems = [...libraryItems];
+
+                    // Collect all tags and count them
+                    tagCounts = {};
+                    libraryItems.forEach(item => {
+                        if (item.tags) {
+                            item.tags.forEach(tag => {
+                                allTags.add(tag);
+                                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                            });
+                        }
+                    });
+
+                    renderTags();
+                    updateStats();
+                    renderGrid();
+                } else {
+                    console.log('[Library] No items found, showing empty state');
+                    showEmptyState();
+                }
+            } catch (error) {
+                console.error('[Library] Error loading library:', error);
+                showEmptyState();
+            }
+        }
+
+        // Show empty state
+        function showEmptyState() {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('empty-state').classList.remove('hidden');
+            document.getElementById('content-grid').classList.add('hidden');
+            document.getElementById('results-count').textContent = '0 posts';
+            document.getElementById('enable-select-btn').classList.add('hidden');
+        }
+
+        // Render tags filter
+        function renderTags() {
+            if (allTags.size === 0) return;
+
+            const container = document.getElementById('tags-container');
+            container.innerHTML = Array.from(allTags).map(tag => `
+                <button onclick="toggleTagFilter('${tag}')" data-tag="${tag}" class="tag-btn px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-govcon-blue hover:text-white transition">
+                    ${tag}
+                </button>
+            `).join('');
+            container.classList.remove('hidden');
+        }
+
+        // Enable selection mode
+        function enableSelectionMode() {
+            selectionMode = true;
+            selectedItems.clear();
+            document.getElementById('bulk-actions-bar').classList.remove('hidden');
+            document.getElementById('enable-select-btn').classList.add('hidden');
+            renderGrid();
+            updateSelectedCount();
+        }
+
+        // Clear selection and exit selection mode
+        function clearSelection() {
+            selectionMode = false;
+            selectedItems.clear();
+            document.getElementById('bulk-actions-bar').classList.add('hidden');
+            document.getElementById('enable-select-btn').classList.remove('hidden');
+            document.getElementById('select-all-checkbox').checked = false;
+            renderGrid();
+        }
+
+        // Toggle item selection
+        function toggleItemSelection(itemId, event) {
+            event.stopPropagation();
+            if (selectedItems.has(itemId)) {
+                selectedItems.delete(itemId);
+            } else {
+                selectedItems.add(itemId);
+            }
+            updateSelectedCount();
+            updateSelectAllCheckbox();
+        }
+
+        // Toggle select all
+        function toggleSelectAll() {
+            const selectAllChecked = document.getElementById('select-all-checkbox').checked;
+            if (selectAllChecked) {
+                filteredItems.forEach(item => selectedItems.add(item.id));
+            } else {
+                selectedItems.clear();
+            }
+            updateSelectedCount();
+            renderGrid();
+        }
+
+        // Update select all checkbox state
+        function updateSelectAllCheckbox() {
+            const allSelected = filteredItems.length > 0 && filteredItems.every(item => selectedItems.has(item.id));
+            document.getElementById('select-all-checkbox').checked = allSelected;
+        }
+
+        // Update selected count display
+        function updateSelectedCount() {
+            document.getElementById('selected-count').textContent = `${selectedItems.size} selected`;
+        }
+
+        // Export selected items
+        function exportSelected() {
+            if (selectedItems.size === 0) {
+                showToast('No items selected', 'error');
+                return;
+            }
+
+            const selectedData = libraryItems.filter(item => selectedItems.has(item.id));
+            const headers = ['Title', 'Content', 'Post Type', 'Goal', 'Tags', 'Favorite', 'Created'];
+            const rows = selectedData.map(item => [
+                `"${(item.title || '').replace(/"/g, '""')}"`,
+                `"${(item.content || '').replace(/"/g, '""')}"`,
+                item.post_type || '',
+                item.goal || '',
+                (item.tags || []).join('; '),
+                item.is_favorite ? 'Yes' : 'No',
+                formatDate(item.created_at)
+            ]);
+
+            const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            downloadFile(csv, `content-library-selected-${selectedItems.size}.csv`, 'text/csv');
+            showToast(`Exported ${selectedItems.size} posts to CSV`, 'success');
+        }
+
+        // Delete selected items
+        async function deleteSelected() {
+            if (selectedItems.size === 0) {
+                showToast('No items selected', 'error');
+                return;
+            }
+
+            const confirmed = await showConfirmModal(`Are you sure you want to delete ${selectedItems.size} post(s)? This action cannot be undone.`);
+            if (!confirmed) return;
+
+            let deleted = 0;
+            let errors = 0;
+
+            for (const itemId of selectedItems) {
+                try {
+                    // Use safeDelete - bulletproof user_id validation
+                    const { error } = await SupabaseAuth.safeDelete('content_library', itemId);
+
+                    if (!error) {
+                        deleted++;
+                        libraryItems = libraryItems.filter(i => i.id !== itemId);
+                    } else {
+                        errors++;
+                    }
+                } catch (error) {
+                    console.error('Error deleting item:', error);
+                    errors++;
+                }
+            }
+
+            filteredItems = filteredItems.filter(i => !selectedItems.has(i.id));
+            selectedItems.clear();
+
+            if (libraryItems.length === 0) {
+                clearSelection();
+                showEmptyState();
+            } else {
+                renderGrid();
+                updateSelectedCount();
+            }
+
+            if (errors > 0) {
+                showToast(`Deleted ${deleted} posts, ${errors} failed`, 'error');
+            } else {
+                showToast(`Deleted ${deleted} posts`, 'success');
+            }
+        }
+
+        // Render content grid
+        function renderGrid() {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('empty-state').classList.add('hidden');
+
+            const grid = document.getElementById('content-grid');
+            const groupedContainer = document.getElementById('grouped-content');
+
+            if (filteredItems.length === 0) {
+                grid.classList.remove('hidden');
+                groupedContainer.classList.add('hidden');
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <p class="text-gray-500">No posts match your filters</p>
+                        <button onclick="clearFilters()" class="text-govcon-blue hover:underline mt-2">Clear filters</button>
+                    </div>
+                `;
+                document.getElementById('results-count').textContent = '0 posts';
+                document.getElementById('enable-select-btn').classList.add('hidden');
+                return;
+            }
+
+            document.getElementById('results-count').textContent = `${filteredItems.length} post${filteredItems.length !== 1 ? 's' : ''}`;
+            document.getElementById('enable-select-btn').classList.remove('hidden');
+
+            // Update grid classes based on view mode
+            if (viewMode === 'list') {
+                grid.className = 'grid grid-cols-1 gap-3';
+            } else {
+                grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+            }
+
+            // Grouped view
+            if (groupByDate) {
+                grid.classList.add('hidden');
+                groupedContainer.classList.remove('hidden');
+                renderGroupedContent();
+                return;
+            }
+
+            // Normal view
+            groupedContainer.classList.add('hidden');
+            grid.classList.remove('hidden');
+
+            grid.innerHTML = filteredItems.map(item => renderCardHtml(item)).join('');
+        }
+
+        // Render grouped content by date
+        function renderGroupedContent() {
+            const groupedContainer = document.getElementById('grouped-content');
+
+            // Group items by date
+            const groups = {};
+            filteredItems.forEach(item => {
+                const date = new Date(item.created_at);
+                const dateKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                if (!groups[dateKey]) {
+                    groups[dateKey] = [];
+                }
+                groups[dateKey].push(item);
+            });
+
+            const gridClass = viewMode === 'list'
+                ? 'grid grid-cols-1 gap-3'
+                : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+
+            groupedContainer.innerHTML = Object.entries(groups).map(([dateKey, items]) => `
+                <div class="date-group">
+                    <button onclick="toggleDateGroup(this)" class="w-full flex items-center justify-between bg-gradient-to-r from-govcon-blue to-blue-600 text-white px-4 py-3 rounded-t-xl font-semibold hover:from-govcon-blue/90 hover:to-blue-500 transition">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            <span>${dateKey}</span>
+                            <span class="bg-white/20 px-2 py-0.5 rounded-full text-sm">${items.length} post${items.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        <svg class="w-5 h-5 transform transition-transform group-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div class="group-content bg-gray-50 p-4 rounded-b-xl border border-t-0 border-gray-200">
+                        <div class="${gridClass}">
+                            ${items.map(item => renderCardHtml(item)).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Toggle date group collapse
+        function toggleDateGroup(btn) {
+            const content = btn.nextElementSibling;
+            const chevron = btn.querySelector('.group-chevron');
+            content.classList.toggle('hidden');
+            chevron.classList.toggle('rotate-180');
+        }
+
+        // Render single card HTML (shared between grid and grouped view)
+        function renderCardHtml(item) {
+            const isCarousel = item.post_type === 'carousel';
+            let carouselData = null;
+            if (isCarousel && item.carousel_data) {
+                try {
+                    carouselData = typeof item.carousel_data === 'string' ? JSON.parse(item.carousel_data) : item.carousel_data;
+                } catch (e) { console.warn('Failed to parse carousel_data'); }
+            }
+
+            // List view - compact horizontal card
+            if (viewMode === 'list') {
+                return `
+                <div class="bg-white rounded-lg shadow border ${selectedItems.has(item.id) ? 'border-govcon-blue bg-blue-50' : 'border-gray-200'} hover:border-govcon-blue hover:shadow-md transition p-3 flex items-center gap-4">
+                    ${selectionMode ? `
+                    <input type="checkbox" class="custom-checkbox flex-shrink-0" ${selectedItems.has(item.id) ? 'checked' : ''} onclick="toggleItemSelection('${item.id}', event)">
+                    ` : ''}
+                    ${isCarousel && carouselData?.imageUrls?.length > 0 ? `
+                    <img src="${carouselData.imageUrls[0]}" alt="Carousel" class="w-12 h-12 object-cover rounded flex-shrink-0">
+                    ` : `
+                    <div class="w-12 h-12 bg-govcon-blue/10 rounded flex items-center justify-center flex-shrink-0">
+                        <svg class="w-6 h-6 text-govcon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    `}
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-semibold text-gray-900 truncate cursor-pointer hover:text-govcon-blue" onclick="openModal('${item.id}')">${item.title || 'Untitled Post'}</h3>
+                        <p class="text-sm text-gray-500 truncate">${item.content?.substring(0, 80) || ''}...</p>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        ${isCarousel ? `<span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">Carousel</span>` :
+                            item.post_type ? `<span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">${item.post_type}</span>` : ''}
+                        <span class="text-xs text-gray-400">${formatDate(item.created_at)}</span>
+                        <button onclick="toggleFavorite('${item.id}', ${!item.is_favorite}, event)" class="p-1">
+                            <svg class="w-4 h-4 ${item.is_favorite ? 'text-yellow-500' : 'text-gray-300'}" fill="${item.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                        </button>
+                        ${isCarousel ? `<button onclick="downloadCarousel('${item.id}')" class="text-purple-600 hover:text-purple-800 text-xs font-medium">Download</button>` :
+                            `<button onclick="copyContent('${item.id}')" class="text-govcon-blue hover:text-govcon-blue/80 text-xs font-medium">Copy</button>`}
+                        <button onclick="deleteItem('${item.id}')" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                    </div>
+                </div>
+                `;
+            }
+
+            // Grid view - full card
+            return `
+            <div class="bg-white rounded-xl shadow-md border-2 ${selectedItems.has(item.id) ? 'border-govcon-blue bg-blue-50' : 'border-gray-200'} hover:border-govcon-blue hover:shadow-lg transition overflow-hidden">
+                ${isCarousel && carouselData?.imageUrls?.length > 0 ? `
+                <div class="relative bg-gradient-to-r from-purple-500 to-pink-500 p-3">
+                    <div class="flex gap-2 overflow-x-auto pb-1">
+                        ${carouselData.imageUrls.slice(0, 4).map((url, i) => `
+                            <img src="${url}" alt="Slide ${i+1}" class="w-16 h-20 object-cover rounded-lg border-2 border-white/50 flex-shrink-0">
+                        `).join('')}
+                        ${carouselData.imageUrls.length > 4 ? `<div class="w-16 h-20 bg-black/30 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0">+${carouselData.imageUrls.length - 4}</div>` : ''}
+                    </div>
+                    <div class="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">${carouselData.slideCount} slides</div>
+                </div>
+                ` : ''}
+                <div class="p-4">
+                    <div class="flex items-start gap-3 mb-3">
+                        ${selectionMode ? `
+                        <input type="checkbox" class="custom-checkbox mt-1" ${selectedItems.has(item.id) ? 'checked' : ''} onclick="toggleItemSelection('${item.id}', event)">
+                        ` : ''}
+                        <h3 class="font-bold text-gray-900 line-clamp-2 flex-1 cursor-pointer hover:text-govcon-blue" onclick="openModal('${item.id}')">
+                            ${item.title || 'Untitled Post'}
+                        </h3>
+                        <button onclick="toggleFavorite('${item.id}', ${!item.is_favorite}, event)" class="flex-shrink-0 p-1 rounded-full hover:bg-yellow-50 transition" title="${item.is_favorite ? 'Remove from favorites' : 'Add to favorites'}">
+                            <svg class="w-5 h-5 ${item.is_favorite ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-500'}" fill="${item.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        ${isCarousel ? `
+                            <span class="px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium rounded-full flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                Carousel
+                            </span>
+                        ` : item.post_type ? `<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">${item.post_type}</span>` : ''}
+                        ${item.goal && !isCarousel ? `<span class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">${item.goal}</span>` : ''}
+                    </div>
+                    <p class="text-gray-600 text-sm line-clamp-3 mb-3">${item.content?.substring(0, 150) || ''}...</p>
+                    ${item.tags && item.tags.length > 0 ? `
+                    <div class="flex flex-wrap gap-1 mb-3">
+                        ${item.tags.slice(0, 3).map(tag => `<span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">${tag}</span>`).join('')}
+                        ${item.tags.length > 3 ? `<span class="text-xs text-gray-400">+${item.tags.length - 3}</span>` : ''}
+                    </div>
+                    ` : ''}
+                    <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                        <span class="text-xs text-gray-400 flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            ${formatDate(item.created_at)}
+                        </span>
+                        <div class="flex gap-2">
+                            ${isCarousel ? `<button onclick="downloadCarousel('${item.id}')" class="text-purple-600 hover:text-purple-800 text-xs font-medium">Download</button>` :
+                                `<button onclick="copyContent('${item.id}')" class="text-govcon-blue hover:text-govcon-blue/80 text-xs font-medium">Copy</button>`}
+                            <button onclick="openModal('${item.id}')" class="text-govcon-blue hover:text-govcon-blue/80 text-xs font-medium">View</button>
+                            <button onclick="deleteItem('${item.id}')" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        // Setup filter listeners
+        function setupFilters() {
+            document.getElementById('search-input').addEventListener('input', applyFilters);
+            document.getElementById('goal-filter').addEventListener('change', applyFilters);
+            document.getElementById('type-filter').addEventListener('change', applyFilters);
+            document.getElementById('date-filter').addEventListener('change', applyFilters);
+            document.getElementById('sort-filter').addEventListener('change', applyFilters);
+        }
+
+        // Set view mode (grid/list)
+        function setViewMode(mode) {
+            viewMode = mode;
+            const gridBtn = document.getElementById('view-grid-btn');
+            const listBtn = document.getElementById('view-list-btn');
+
+            if (mode === 'grid') {
+                gridBtn.className = 'p-1.5 rounded bg-white shadow text-govcon-blue';
+                listBtn.className = 'p-1.5 rounded text-gray-400 hover:text-gray-600';
+            } else {
+                listBtn.className = 'p-1.5 rounded bg-white shadow text-govcon-blue';
+                gridBtn.className = 'p-1.5 rounded text-gray-400 hover:text-gray-600';
+            }
+
+            renderGrid();
+        }
+
+        // Toggle group by date
+        function toggleGroupByDate() {
+            groupByDate = !groupByDate;
+            const btn = document.getElementById('group-toggle');
+
+            if (groupByDate) {
+                btn.classList.add('bg-govcon-blue', 'text-white', 'border-govcon-blue');
+                btn.classList.remove('border-gray-300');
+                btn.querySelector('svg').classList.remove('text-gray-500');
+                btn.querySelector('svg').classList.add('text-white');
+                btn.querySelector('span').classList.remove('text-gray-600');
+                btn.querySelector('span').classList.add('text-white');
+            } else {
+                btn.classList.remove('bg-govcon-blue', 'text-white', 'border-govcon-blue');
+                btn.classList.add('border-gray-300');
+                btn.querySelector('svg').classList.add('text-gray-500');
+                btn.querySelector('svg').classList.remove('text-white');
+                btn.querySelector('span').classList.add('text-gray-600');
+                btn.querySelector('span').classList.remove('text-white');
+            }
+
+            renderGrid();
+        }
+
+        // Update stats sidebar
+        function updateStats() {
+            const total = libraryItems.length;
+            const favorites = libraryItems.filter(i => i.is_favorite).length;
+            const carousels = libraryItems.filter(i => i.post_type === 'carousel').length;
+
+            // This week count
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            const thisWeek = libraryItems.filter(i => new Date(i.created_at) >= oneWeekAgo).length;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-favorites').textContent = favorites;
+            document.getElementById('stat-carousels').textContent = carousels;
+            document.getElementById('stat-week').textContent = thisWeek;
+
+            // Show sidebar if we have posts
+            if (total > 0) {
+                document.getElementById('stats-sidebar').classList.remove('hidden');
+            }
+
+            // Popular tags
+            const tagContainer = document.getElementById('popular-tags');
+            const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+            tagContainer.innerHTML = sortedTags.map(([tag, count]) =>
+                `<span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full cursor-pointer hover:bg-govcon-blue hover:text-white transition" onclick="quickFilterTag('${tag}')">${tag} (${count})</span>`
+            ).join('');
+        }
+
+        // Quick filter by tag from sidebar
+        function quickFilterTag(tag) {
+            const tagBtn = document.querySelector(`.tag-btn[data-tag="${tag}"]`);
+            if (tagBtn) {
+                toggleTagFilter(tag);
+            } else {
+                // If tag container isn't visible, just filter directly
+                document.getElementById('search-input').value = tag;
+                applyFilters();
+            }
+        }
+
+        // Check if any filters are active
+        function checkFiltersActive() {
+            const search = document.getElementById('search-input').value;
+            const goal = document.getElementById('goal-filter').value;
+            const type = document.getElementById('type-filter').value;
+            const date = document.getElementById('date-filter').value;
+            const sort = document.getElementById('sort-filter').value;
+            const activeTags = document.querySelectorAll('.tag-btn.active').length;
+
+            const hasFilters = search || goal || type || date || sort !== 'newest' || showFavoritesOnly || activeTags > 0;
+
+            const clearBtn = document.getElementById('clear-filters-btn');
+            if (hasFilters) {
+                clearBtn.classList.remove('hidden');
+                clearBtn.classList.add('flex');
+            } else {
+                clearBtn.classList.add('hidden');
+                clearBtn.classList.remove('flex');
+            }
+        }
+
+        // Apply all filters
+        function applyFilters() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const goal = document.getElementById('goal-filter').value;
+            const type = document.getElementById('type-filter').value;
+            const dateFilter = document.getElementById('date-filter').value;
+            const sortBy = document.getElementById('sort-filter').value;
+            const activeTags = Array.from(document.querySelectorAll('.tag-btn.active')).map(btn => btn.dataset.tag);
+
+            // Calculate date threshold
+            let dateThreshold = null;
+            if (dateFilter) {
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                switch (dateFilter) {
+                    case 'today':
+                        dateThreshold = now;
+                        break;
+                    case '7days':
+                        dateThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        break;
+                    case '30days':
+                        dateThreshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                        break;
+                    case '90days':
+                        dateThreshold = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                        break;
+                }
+            }
+
+            filteredItems = libraryItems.filter(item => {
+                // Search filter
+                if (search && !item.title?.toLowerCase().includes(search) && !item.content?.toLowerCase().includes(search)) {
+                    return false;
+                }
+
+                // Goal filter
+                if (goal && item.goal !== goal) {
+                    return false;
+                }
+
+                // Type filter
+                if (type && item.post_type !== type) {
+                    return false;
+                }
+
+                // Date filter
+                if (dateThreshold && new Date(item.created_at) < dateThreshold) {
+                    return false;
+                }
+
+                // Favorites filter
+                if (showFavoritesOnly && !item.is_favorite) {
+                    return false;
+                }
+
+                // Tags filter
+                if (activeTags.length > 0 && (!item.tags || !activeTags.some(tag => item.tags.includes(tag)))) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            // Apply sorting
+            filteredItems.sort((a, b) => {
+                switch (sortBy) {
+                    case 'oldest':
+                        return new Date(a.created_at) - new Date(b.created_at);
+                    case 'a-z':
+                        return (a.title || '').localeCompare(b.title || '');
+                    case 'z-a':
+                        return (b.title || '').localeCompare(a.title || '');
+                    case 'favorites':
+                        if (a.is_favorite === b.is_favorite) {
+                            return new Date(b.created_at) - new Date(a.created_at);
+                        }
+                        return a.is_favorite ? -1 : 1;
+                    case 'newest':
+                    default:
+                        return new Date(b.created_at) - new Date(a.created_at);
+                }
+            });
+
+            checkFiltersActive();
+            renderGrid();
+        }
+
+        // Toggle favorites filter
+        function toggleFavoritesFilter() {
+            showFavoritesOnly = !showFavoritesOnly;
+            const btn = document.getElementById('favorites-toggle');
+            const icon = document.getElementById('star-icon');
+
+            if (showFavoritesOnly) {
+                btn.classList.add('bg-yellow-50', 'border-yellow-300');
+                icon.classList.remove('text-gray-400');
+                icon.classList.add('text-yellow-500', 'fill-yellow-500');
+                icon.setAttribute('fill', 'currentColor');
+            } else {
+                btn.classList.remove('bg-yellow-50', 'border-yellow-300');
+                icon.classList.add('text-gray-400');
+                icon.classList.remove('text-yellow-500', 'fill-yellow-500');
+                icon.setAttribute('fill', 'none');
+            }
+
+            applyFilters();
+        }
+
+        // Toggle tag filter
+        function toggleTagFilter(tag) {
+            const btn = document.querySelector(`.tag-btn[data-tag="${tag}"]`);
+            btn.classList.toggle('active');
+            btn.classList.toggle('bg-govcon-blue');
+            btn.classList.toggle('text-white');
+            btn.classList.toggle('bg-gray-100');
+            btn.classList.toggle('text-gray-700');
+            applyFilters();
+        }
+
+        // Clear all filters
+        function clearFilters() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('goal-filter').value = '';
+            document.getElementById('type-filter').value = '';
+            document.getElementById('date-filter').value = '';
+            document.getElementById('sort-filter').value = 'newest';
+            showFavoritesOnly = false;
+
+            document.querySelectorAll('.tag-btn.active').forEach(btn => {
+                btn.classList.remove('active', 'bg-govcon-blue', 'text-white');
+                btn.classList.add('bg-gray-100', 'text-gray-700');
+            });
+
+            const favBtn = document.getElementById('favorites-toggle');
+            favBtn.classList.remove('bg-yellow-50', 'border-yellow-300');
+            document.getElementById('star-icon').classList.add('text-gray-400');
+            document.getElementById('star-icon').classList.remove('text-yellow-500', 'fill-yellow-500');
+            document.getElementById('star-icon').setAttribute('fill', 'none');
+
+            // Hide clear filters button
+            const clearBtn = document.getElementById('clear-filters-btn');
+            clearBtn.classList.add('hidden');
+            clearBtn.classList.remove('flex');
+
+            filteredItems = [...libraryItems];
+            renderGrid();
+        }
+
+        // Toggle favorite
+        async function toggleFavorite(itemId, isFavorite, event) {
+            if (event) event.stopPropagation();
+
+            try {
+                // Use safeUpdate - bulletproof user_id validation
+                const { error } = await SupabaseAuth.safeUpdate('content_library', itemId, { is_favorite: isFavorite });
+
+                if (!error) {
+                    const item = libraryItems.find(i => i.id === itemId);
+                    if (item) {
+                        item.is_favorite = isFavorite;
+                    }
+                    applyFilters();
+                    showToast(isFavorite ? 'Added to favorites' : 'Removed from favorites', 'success');
+                }
+            } catch (error) {
+                console.error('Error toggling favorite:', error);
+                showToast('Failed to update favorite', 'error');
+            }
+        }
+
+        // Open modal
+        function openModal(itemId) {
+            const item = libraryItems.find(i => i.id === itemId);
+            if (!item) return;
+
+            currentItemId = itemId;
+
+            document.getElementById('modal-title').textContent = item.title || 'Untitled Post';
+            document.getElementById('modal-type-badge').textContent = item.post_type || 'Post';
+            document.getElementById('modal-goal-badge').textContent = item.goal || 'General';
+            document.getElementById('modal-content').querySelector('pre').textContent = item.content;
+            document.getElementById('modal-date').textContent = `Saved on ${formatDate(item.created_at)}`;
+
+            const tagsContainer = document.getElementById('modal-tags');
+            if (item.tags && item.tags.length > 0) {
+                tagsContainer.innerHTML = item.tags.map(tag => `<span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">${tag}</span>`).join('');
+            } else {
+                tagsContainer.innerHTML = '';
+            }
+
+            document.getElementById('view-modal').classList.remove('hidden');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('view-modal').classList.add('hidden');
+            currentItemId = null;
+        }
+
+        // Copy modal content
+        function copyModalContent() {
+            const content = document.getElementById('modal-content').querySelector('pre').textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                showToast('Copied to clipboard!', 'success');
+            });
+        }
+
+        // Copy content by ID
+        function copyContent(itemId) {
+            const item = libraryItems.find(i => i.id === itemId);
+            if (item) {
+                navigator.clipboard.writeText(item.content).then(() => {
+                    showToast('Copied to clipboard!', 'success');
+                });
+            }
+        }
+
+        // Download carousel images
+        async function downloadCarousel(itemId) {
+            const item = libraryItems.find(i => i.id === itemId);
+            if (!item || item.post_type !== 'carousel') {
+                showToast('Carousel not found', 'error');
+                return;
+            }
+
+            try {
+                let carouselData = item.carousel_data;
+                if (typeof carouselData === 'string') {
+                    carouselData = JSON.parse(carouselData);
+                }
+
+                if (!carouselData?.imageUrls?.length) {
+                    showToast('No carousel images found', 'error');
+                    return;
+                }
+
+                showToast(`Downloading ${carouselData.imageUrls.length} slides...`, 'info');
+
+                // Download each slide
+                for (let i = 0; i < carouselData.imageUrls.length; i++) {
+                    const url = carouselData.imageUrls[i];
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `carousel-slide-${i + 1}.png`;
+                    link.target = '_blank';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Small delay between downloads
+                    if (i < carouselData.imageUrls.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                }
+
+                showToast(`Downloaded ${carouselData.imageUrls.length} slides!`, 'success');
+            } catch (error) {
+                console.error('Download carousel error:', error);
+                showToast('Failed to download carousel', 'error');
+            }
+        }
+
+        // Delete current item from modal
+        async function deleteCurrentItem() {
+            if (!currentItemId) return;
+            const confirmed = await showConfirmModal('Are you sure you want to delete this post? This action cannot be undone.');
+            if (confirmed) {
+                await deleteItemDirect(currentItemId);
+                closeModal();
+            }
+        }
+
+        // Delete item with confirmation
+        async function deleteItem(itemId) {
+            const confirmed = await showConfirmModal('Are you sure you want to delete this post? This action cannot be undone.');
+            if (!confirmed) return;
+            await deleteItemDirect(itemId);
+        }
+
+        // Delete item directly (no confirmation)
+        async function deleteItemDirect(itemId) {
+            try {
+                // Use safeDelete - bulletproof user_id validation
+                const { error } = await SupabaseAuth.safeDelete('content_library', itemId);
+
+                if (error) throw error;
+
+                libraryItems = libraryItems.filter(i => i.id !== itemId);
+                filteredItems = filteredItems.filter(i => i.id !== itemId);
+                selectedItems.delete(itemId);
+
+                if (libraryItems.length === 0) {
+                    clearSelection();
+                    showEmptyState();
+                } else {
+                    renderGrid();
+                }
+                showToast('Post deleted', 'success');
+            } catch (error) {
+                console.error('Error deleting item:', error);
+                showToast('Failed to delete post', 'error');
+            }
+        }
+
+        // Export library
+        function exportLibrary(format) {
+            if (filteredItems.length === 0) {
+                showToast('No posts to export', 'error');
+                return;
+            }
+
+            if (format === 'csv') {
+                const headers = ['Title', 'Content', 'Post Type', 'Goal', 'Tags', 'Favorite', 'Created'];
+                const rows = filteredItems.map(item => [
+                    `"${(item.title || '').replace(/"/g, '""')}"`,
+                    `"${(item.content || '').replace(/"/g, '""')}"`,
+                    item.post_type || '',
+                    item.goal || '',
+                    (item.tags || []).join('; '),
+                    item.is_favorite ? 'Yes' : 'No',
+                    formatDate(item.created_at)
+                ]);
+
+                const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+                downloadFile(csv, 'content-library.csv', 'text/csv');
+                showToast(`Exported ${filteredItems.length} posts to CSV`, 'success');
+            }
+        }
+
+        // Download file helper
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            if (!dateString) return 'Unknown';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        // NOTE: logout() is defined earlier using SupabaseAuth.signOut()
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Close modal on background click
+        document.getElementById('view-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+    </script>
+</body>
+</html>

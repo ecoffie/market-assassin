@@ -11,7 +11,7 @@ export default function ContractorDatabasePage() {
       gradientTo="#7c3aed"
       price="$497"
       originalPrice="$997/month"
-      checkoutUrl="https://govcongiants.lemonsqueezy.com/checkout/buy/contractor-database"
+      checkoutUrl="/database-locked"
       videoTitle="Federal Contractor Database Demo"
       videoSubtitle="See how to find teaming partners in under 2 minutes"
       screenshots={[
