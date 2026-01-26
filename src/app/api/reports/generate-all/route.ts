@@ -11,7 +11,7 @@ import { ComprehensiveReport, CoreInputs, Agency } from '@/types/federal-market-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inputs, selectedAgencies, selectedAgencyData }: { inputs: CoreInputs; selectedAgencies: string[]; selectedAgencyData?: Agency[] } = body;
+    const { inputs, selectedAgencies, selectedAgencyData, userEmail }: { inputs: CoreInputs; selectedAgencies: string[]; selectedAgencyData?: Agency[]; userEmail?: string } = body;
 
     if (!inputs || !selectedAgencies || selectedAgencies.length === 0) {
       return NextResponse.json(
@@ -537,6 +537,7 @@ export async function POST(request: NextRequest) {
         inputs,
         selectedAgencies,
         totalAgencies: selectedAgencies.length,
+        userEmail: userEmail || undefined,
       },
     };
 

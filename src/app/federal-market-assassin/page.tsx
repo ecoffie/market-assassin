@@ -233,6 +233,7 @@ export default function FederalMarketAssassinPage() {
           inputs: coreInputs,
           selectedAgencies,
           selectedAgencyData: selectedAgencyObjects,
+          userEmail: userEmail || undefined,
         }),
       });
 

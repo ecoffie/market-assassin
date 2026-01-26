@@ -572,51 +572,357 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
   // Export all reports as a single HTML file that can be saved/printed
   const handleExportHTML = () => {
     const date = new Date().toLocaleDateString();
+    const dateISO = new Date().toISOString().split('T')[0];
     const inputs = reports.metadata.inputs;
+    const userEmail = reports.metadata.userEmail || 'Authorized User';
+    const companyName = inputs.companyName || 'Your Company';
 
-    // Build HTML content for all reports
+    // Build HTML content for all reports with cover page and watermarks
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Federal Market Assassin - Comprehensive Report - ${date} | GovCon Giants</title>
+  <title>Federal Market Assassin - Strategic Report - ${date} | GovCon Giants</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 1200px; margin: 0 auto; padding: 20px; }
-    .brand { text-align: center; margin-bottom: 20px; }
-    .brand-govcon { font-size: 28px; font-weight: 700; color: #1d4ed8; }
-    .brand-giants { font-size: 28px; font-weight: 700; color: #f59e0b; }
-    h1 { color: #1e40af; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
-    h2 { color: #1e3a8a; margin-top: 40px; border-bottom: 2px solid #93c5fd; padding-bottom: 8px; page-break-before: always; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+      position: relative;
+    }
+
+    /* Watermark */
+    body::before {
+      content: 'CONFIDENTIAL - ${userEmail}';
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 60px;
+      font-weight: 700;
+      color: rgba(30, 64, 175, 0.04);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Cover Page */
+    .cover-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3b82f6 100%);
+      color: white;
+      margin: -20px -20px 40px -20px;
+      padding: 60px 40px;
+      page-break-after: always;
+    }
+    .cover-logo {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+    .cover-logo .govcon { color: #60a5fa; }
+    .cover-logo .giants { color: #fbbf24; }
+    .cover-title {
+      font-size: 42px;
+      font-weight: 800;
+      margin: 30px 0 15px;
+      letter-spacing: -1px;
+    }
+    .cover-subtitle {
+      font-size: 22px;
+      opacity: 0.9;
+      margin-bottom: 50px;
+    }
+    .cover-meta {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 30px 50px;
+      margin-top: 40px;
+    }
+    .cover-meta-item {
+      margin: 12px 0;
+      font-size: 16px;
+    }
+    .cover-meta-label {
+      opacity: 0.7;
+      font-weight: 500;
+    }
+    .cover-meta-value {
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .cover-badge {
+      display: inline-block;
+      background: #fbbf24;
+      color: #1e3a8a;
+      padding: 8px 24px;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 30px;
+    }
+    .cover-footer {
+      margin-top: 60px;
+      opacity: 0.7;
+      font-size: 12px;
+    }
+
+    /* Page Header/Footer */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 30px;
+    }
+    .page-header-brand {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .page-header-brand .govcon { color: #1d4ed8; }
+    .page-header-brand .giants { color: #f59e0b; }
+    .page-header-meta {
+      font-size: 11px;
+      color: #64748b;
+      text-align: right;
+    }
+
+    /* Typography */
+    h1 {
+      color: #1e40af;
+      font-size: 32px;
+      font-weight: 800;
+      border-bottom: 3px solid #3b82f6;
+      padding-bottom: 12px;
+      margin-bottom: 25px;
+    }
+    h2 {
+      color: #1e3a8a;
+      font-size: 26px;
+      font-weight: 700;
+      margin-top: 50px;
+      border-bottom: 2px solid #93c5fd;
+      padding-bottom: 10px;
+      page-break-before: always;
+    }
     h2:first-of-type { page-break-before: avoid; }
-    h3 { color: #1e40af; margin-top: 20px; }
-    .meta { background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
-    .meta-item { display: inline-block; background: #e2e8f0; padding: 5px 12px; border-radius: 20px; margin: 3px; font-size: 14px; }
-    table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-    th { background: #f1f5f9; font-weight: 600; }
-    tr:hover { background: #f8fafc; }
-    .amount { font-weight: 600; color: #059669; }
-    .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 10px 0; }
-    .card-title { font-weight: 600; color: #1e3a8a; margin-bottom: 8px; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    h3 {
+      color: #1e40af;
+      font-size: 20px;
+      font-weight: 600;
+      margin-top: 25px;
+      margin-bottom: 15px;
+    }
+
+    /* Section intro box */
+    .section-intro {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      padding: 16px 20px;
+      border-radius: 10px;
+      margin-bottom: 25px;
+      border-left: 5px solid #3b82f6;
+      font-size: 15px;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin: 25px 0;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border: 1px solid #e2e8f0;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: #1e40af;
+      line-height: 1.2;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 6px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th {
+      background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+      color: white;
+      padding: 12px 10px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    tr:nth-child(even) { background: #f8fafc; }
+    tr:hover { background: #eff6ff; }
+    .amount { font-weight: 700; color: #059669; }
+
+    /* Cards */
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 15px 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card-title {
+      font-weight: 700;
+      font-size: 18px;
+      color: #1e3a8a;
+      margin-bottom: 12px;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 50px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
     .badge-blue { background: #dbeafe; color: #1e40af; }
     .badge-green { background: #dcfce7; color: #166534; }
     .badge-purple { background: #f3e8ff; color: #7c3aed; }
-    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
-    .stat-card { background: #f1f5f9; padding: 15px; border-radius: 8px; text-align: center; }
-    .stat-value { font-size: 24px; font-weight: 700; color: #1e40af; }
-    .stat-label { font-size: 12px; color: #64748b; margin-top: 5px; }
-    @media print { h2 { page-break-before: always; } h2:first-of-type { page-break-before: avoid; } .no-print { display: none; } }
-    .section-intro { background: #eff6ff; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3b82f6; }
+    .badge-amber { background: #fef3c7; color: #92400e; }
+
+    /* Footer */
+    .report-footer {
+      margin-top: 60px;
+      padding-top: 30px;
+      border-top: 2px solid #e2e8f0;
+      text-align: center;
+    }
+    .report-footer-brand {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 15px;
+    }
+    .report-footer-brand .govcon { color: #1d4ed8; }
+    .report-footer-brand .giants { color: #f59e0b; }
+    .report-footer-text {
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .report-footer-confidential {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 20px;
+      display: inline-block;
+    }
+
+    /* Print styles */
+    @media print {
+      body::before { display: none; }
+      .cover-page {
+        background: #1e3a8a !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      h2 { page-break-before: always; }
+      h2:first-of-type { page-break-before: avoid; }
+      .no-print { display: none; }
+      table { page-break-inside: avoid; }
+      .card { page-break-inside: avoid; }
+      @page { margin: 0.75in; }
+    }
   </style>
 </head>
 <body>
-  <div class="brand">
-    <span class="brand-govcon">GovCon</span><span class="brand-giants">Giants</span>
+  <!-- Cover Page -->
+  <div class="cover-page">
+    <div class="cover-logo">
+      <span class="govcon">GovCon</span><span class="giants">Giants</span>
+    </div>
+    <div class="cover-badge">Strategic Intelligence Report</div>
+    <h1 class="cover-title">Federal Market Assassin</h1>
+    <p class="cover-subtitle">Comprehensive Market Analysis & Opportunity Report</p>
+
+    <div class="cover-meta">
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Prepared For:</span>
+        <span class="cover-meta-value">${companyName}</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Licensed To:</span>
+        <span class="cover-meta-value">${userEmail}</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Generated:</span>
+        <span class="cover-meta-value">${date}</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Agencies Analyzed:</span>
+        <span class="cover-meta-value">${reports.metadata.selectedAgencies.length}</span>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      This report is confidential and intended solely for the authorized recipient.<br>
+      © ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </div>
   </div>
-  <h1>🎯 Federal Market Assassin - Comprehensive Report</h1>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header-brand">
+      <span class="govcon">GovCon</span><span class="giants">Giants</span>
+    </div>
+    <div class="page-header-meta">
+      Report ID: FMA-${dateISO}<br>
+      Licensed to: ${userEmail}
+    </div>
+  </div>
+
+  <h1>📊 Executive Summary</h1>
 
   <div class="meta">
     <p><strong>Generated:</strong> ${date}</p>
@@ -931,15 +1237,21 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
   </div>
   `}
 
-  <hr style="margin-top: 40px;">
-  <div style="text-align: center; margin-top: 30px;">
-    <span class="brand-govcon">GovCon</span><span class="brand-giants">Giants</span>
-    <p style="color: #64748b; font-size: 12px; margin-top: 10px;">
-      Generated by Federal Market Assassin | ${new Date().toISOString()}
+  <!-- Report Footer -->
+  <div class="report-footer">
+    <div class="report-footer-brand">
+      <span class="govcon">GovCon</span><span class="giants">Giants</span>
+    </div>
+    <p class="report-footer-text">
+      Generated by Federal Market Assassin | Report ID: FMA-${dateISO}<br>
+      ${new Date().toISOString()}<br><br>
+      © ${new Date().getFullYear()} GovCon Giants. All rights reserved.<br>
+      <a href="https://tools.govcongiants.org" style="color: #3b82f6;">tools.govcongiants.org</a> |
+      <a href="https://govcongiants.org" style="color: #3b82f6;">govcongiants.org</a>
     </p>
-    <p style="color: #94a3b8; font-size: 11px;">
-      © ${new Date().getFullYear()} GovCon Giants. All rights reserved. | govcongiants.org
-    </p>
+    <div class="report-footer-confidential">
+      🔒 CONFIDENTIAL - Licensed to ${userEmail} - Do not redistribute
+    </div>
   </div>
 </body>
 </html>`;

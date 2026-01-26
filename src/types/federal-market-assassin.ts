@@ -335,6 +335,7 @@ export interface ComprehensiveReport {
     inputs: CoreInputs;
     selectedAgencies: string[];
     totalAgencies: number;
+    userEmail?: string;
   };
 }
 
