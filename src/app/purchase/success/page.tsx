@@ -9,7 +9,7 @@ function SuccessContent() {
   const [productName, setProductName] = useState('your purchase');
 
   useEffect(() => {
-    // Get product info from URL params (set by Lemon Squeezy redirect)
+    // Get product info from URL params (set by Stripe redirect)
     const product = searchParams.get('product');
     if (product) {
       const productNames: Record<string, string> = {
@@ -17,10 +17,16 @@ function SuccessContent() {
         'recompete-contracts': 'Recompete Contracts',
         'prime-lookup': 'Prime Lookup',
         'ai-content-generator': 'AI Content Generator',
-        'starter-bundle': 'Starter Bundle',
-        'pro-bundle': 'Pro Giant Bundle',
-        'ultimate-bundle': 'Ultimate Giant Bundle',
+        'govcon-starter-bundle': 'GovCon Starter Bundle',
+        'pro-giant-bundle': 'Pro Giant Bundle',
+        'ultimate-govcon-bundle': 'Ultimate GovCon Bundle',
         'opportunity-hunter-pro': 'Opportunity Hunter Pro',
+        'market-assassin-standard': 'Market Assassin Standard',
+        'market-assassin-premium': 'Market Assassin Premium',
+        'market-assassin-premium-upgrade': 'Market Assassin Premium Upgrade',
+        'content-engine': 'Content Generator',
+        'full-fix': 'Content Generator Full Fix',
+        'content-full-fix-upgrade': 'Content Generator Full Fix Upgrade',
       };
       setProductName(productNames[product] || product);
     }

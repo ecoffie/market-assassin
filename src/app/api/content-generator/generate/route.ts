@@ -84,15 +84,28 @@ const POST_TEMPLATES: Record<string, { name: string; description: string; prompt
     name: 'List/Tips',
     description: 'Numbered insights or actionable recommendations',
     prompt: `Write a list-based LinkedIn post that:
-- Opens with context for why this matters
+- Opens with context for why this matters (1-2 lines)
 - Provides 3-5 numbered tips or insights
-- Each point is actionable and specific
+- CRITICAL MOBILE FORMATTING: Each numbered item must be ONE single line only (no sub-bullets, no multi-line items)
+- Keep each tip to 10-15 words max
 - Relates to agency pain points and priorities
-- Includes mini-statistics within tips
-- Easy to scan and share
+- Easy to scan and share on mobile
 - Ends with "Which resonates with you?" or similar
 - Clear, helpful tone
-- 200-250 words`
+- 150-200 words
+
+FORMATTING EXAMPLE:
+[Hook statement about the topic]
+
+[Brief context - 1 sentence]
+
+1. [Tip in one line]
+2. [Tip in one line]
+3. [Tip in one line]
+4. [Tip in one line]
+5. [Tip in one line]
+
+[Closing question or call-to-action]`
   },
   'contrarian': {
     name: 'Contrarian Take',
@@ -112,15 +125,31 @@ const POST_TEMPLATES: Record<string, { name: string; description: string; prompt
     name: 'Actionable How-To',
     description: 'Step-by-step guide showing how to do something specific',
     prompt: `Write an actionable how-to LinkedIn post that:
-- Opens with the problem or goal ("Want to win more government contracts?")
-- Provides 3-5 clear, numbered steps
-- Each step is concrete and implementable
-- Relates steps to agency pain points and opportunities
-- Includes mini-tips or warnings within steps
-- Uses action verbs (Start, Create, Build, Submit, etc.)
-- Ends with encouragement to take action
+- Opens with a compelling hook statistic or statement
+- Follow with "Here's how to [solve it]:" on its own line
+- Provides 3-5 numbered steps
+- CRITICAL MOBILE FORMATTING: Each numbered item must be ONE single line only (no sub-bullets or multiple lines per step)
+- Keep each step to 10-15 words max
+- Use action verbs (Choose, Implement, Leverage, Plan, Focus, etc.)
+- After all steps, add a blank line then a short conclusion (1-2 sentences)
+- End with a question or call-to-action
 - Helpful, empowering tone
-- 200-300 words`
+- 150-200 words
+
+FORMATTING EXAMPLE (follow this exactly):
+70% of [X] contracts face [problem].
+
+Here's how to avoid them.
+
+1. [Action verb] [brief tip] - [why it works]
+2. [Action verb] [brief tip] - [why it works]
+3. [Action verb] [brief tip] - [why it works]
+4. [Action verb] [brief tip] - [why it works]
+5. [Action verb] [brief tip] - [why it works]
+
+The result? [Benefit]. [Benefit]. [Benefit].
+
+Want to learn more about our approach?`
   },
   'observation': {
     name: 'Observation & Insight',
@@ -394,14 +423,31 @@ ${geoBoost && templateKey !== 'question-based' ? '- Optimize for AI search with 
 - DO NOT be generic - every post should feel personalized
 - Include 3-5 relevant hashtags at the end
 
-Output ONLY the post text, followed by hashtags on separate lines.`;
+CRITICAL MOBILE FORMATTING RULES (LinkedIn mobile breaks multi-line list items):
+- For numbered lists: Each number must be on ONE LINE ONLY (no sub-points under numbers)
+- NO indented text under numbered items
+- Keep list items short (under 15 words each)
+- Use blank lines between sections, not within list items
+- Separate hashtags with spaces, not commas
+
+Output ONLY the post text, followed by hashtags on separate lines (separated by spaces not commas).`;
 
       const postContent = await callGrokAPI(step3Prompt, null);
 
-      // Extract hashtags
+      // Extract hashtags (handles both comma and space separated)
       const hashtagMatch = postContent.match(/#[\w]+/g);
       const hashtags = hashtagMatch || [];
-      const postText = postContent.replace(/#[\w]+/g, '').trim();
+      // Remove hashtags, markdown formatting, and clean up whitespace
+      const postText = postContent
+        .replace(/#[\w]+/g, '')
+        .replace(/\*\*/g, '')           // Remove bold markdown **
+        .replace(/\*/g, '')             // Remove italic markdown *
+        .replace(/__/g, '')             // Remove bold markdown __
+        .replace(/_([^_]+)_/g, '$1')    // Remove italic markdown _text_
+        .replace(/,\s*,/g, '')
+        .replace(/[ \t]+/g, ' ')        // Collapse multiple spaces (not newlines)
+        .replace(/\n\s*\n\s*\n/g, '\n\n')
+        .trim();
 
       posts.push({
         angle: angle.angle,

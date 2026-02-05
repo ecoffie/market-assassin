@@ -41,21 +41,24 @@ export default function MarketAssassinLockedPage() {
       console.log('Verify response:', data);
 
       if (data.hasAccess) {
-        // Store in localStorage
+        // Store in localStorage with 1 year expiry (matches server cookie)
         const accessData = {
           hasAccess: true,
           tier: data.tier,
-          expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+          expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year
           email: data.email,
         };
         localStorage.setItem('marketAssassinAccess', JSON.stringify(accessData));
 
-        // Set cookie for middleware (expires in 24 hours)
-        document.cookie = `ma_access_email=${data.email}; path=/; max-age=86400; SameSite=Lax`;
+        // Cookie is now set server-side in the API response
+        // This ensures it's available before the redirect
 
-        // Redirect to the app
+        // Small delay to ensure cookie is processed by browser
         setRedirecting(true);
-        router.push('/federal-market-assassin');
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Use window.location for full page reload to ensure cookie is sent
+        window.location.href = '/federal-market-assassin';
         return;
       } else {
         setError('No access found for this email. Please purchase below.');

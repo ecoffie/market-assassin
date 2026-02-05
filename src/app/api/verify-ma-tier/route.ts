@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    // Create response with access data
+    const response = NextResponse.json({
       hasAccess: true,
       tier: access.tier,
       email: access.email,
@@ -31,6 +32,17 @@ export async function POST(request: NextRequest) {
       createdAt: access.createdAt,
       upgradedAt: access.upgradedAt,
     });
+
+    // Set cookie server-side so middleware can read it on next request
+    response.cookies.set('ma_access_email', access.email, {
+      httpOnly: false, // Allow client-side access for logout
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365, // 1 year (was 24 hours - too short!)
+    });
+
+    return response;
 
   } catch (error) {
     console.error('Error verifying Market Assassin tier:', error);

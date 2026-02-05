@@ -56,7 +56,10 @@ export type ProductTier =
   | 'assassin_standard'
   | 'assassin_premium'
   | 'recompete'
-  | 'contractor_db';
+  | 'contractor_db'
+  // Upgrade tiers
+  | 'assassin_premium_upgrade'
+  | 'content_full_fix_upgrade';
 
 /**
  * Generate a license key in format XXXX-XXXX-XXXX-XXXX
@@ -183,6 +186,9 @@ export function tierToAccessFlag(tier: ProductTier): ProductAccessFlag {
     'assassin_premium': 'access_assassin_premium',
     'recompete': 'access_recompete',
     'contractor_db': 'access_contractor_db',
+    // Upgrade tiers map to their premium access flags
+    'assassin_premium_upgrade': 'access_assassin_premium',
+    'content_full_fix_upgrade': 'access_content_full_fix',
   };
   return mapping[tier];
 }
@@ -268,21 +274,29 @@ export async function updateAccessFlags(
   const normalizedEmail = email.toLowerCase().trim();
   const updates: Record<string, boolean> = {};
 
-  // Bundle access grants
+  // Bundle access grants (supports both short names and full product IDs)
   if (bundle) {
-    if (bundle === 'starter') {
+    // GovCon Starter Bundle ($697): Hunter Pro + Recompete + Contractor DB
+    if (bundle === 'starter' || bundle === 'govcon-starter-bundle') {
       updates.access_hunter_pro = true;
       updates.access_recompete = true;
       updates.access_contractor_db = true;
-    } else if (bundle === 'ultimate') {
+    }
+    // Pro Giant Bundle ($997): Contractor DB + Recompete + MA Standard + Content Generator
+    else if (bundle === 'pro' || bundle === 'pro-giant-bundle') {
       updates.access_contractor_db = true;
       updates.access_recompete = true;
       updates.access_assassin_standard = true;
       updates.access_content_standard = true;
-    } else if (bundle === 'complete') {
+    }
+    // Ultimate GovCon Bundle ($1497): All products + MA Premium + Content Full Fix
+    else if (bundle === 'ultimate' || bundle === 'ultimate-govcon-bundle' || bundle === 'complete') {
+      updates.access_hunter_pro = true;
+      updates.access_content_standard = true;
       updates.access_content_full_fix = true;
       updates.access_contractor_db = true;
       updates.access_recompete = true;
+      updates.access_assassin_standard = true;
       updates.access_assassin_premium = true;
     }
   } else if (tier) {
@@ -294,6 +308,16 @@ export async function updateAccessFlags(
     if (tier === 'assassin_premium') updates.access_assassin_premium = true;
     if (tier === 'recompete') updates.access_recompete = true;
     if (tier === 'contractor_db') updates.access_contractor_db = true;
+
+    // Upgrade tiers - grant the higher tier (user already has standard)
+    if (tier === 'assassin_premium_upgrade') {
+      updates.access_assassin_premium = true;
+      updates.access_assassin_standard = true; // Ensure standard is also set
+    }
+    if (tier === 'content_full_fix_upgrade') {
+      updates.access_content_full_fix = true;
+      updates.access_content_standard = true; // Ensure standard is also set
+    }
   }
 
   if (Object.keys(updates).length === 0) return {};
@@ -321,7 +345,7 @@ export async function updateAccessFlags(
  */
 export async function grantBundleAccess(
   email: string,
-  bundle: 'starter' | 'ultimate' | 'complete',
+  bundle: 'starter' | 'govcon-starter-bundle' | 'pro' | 'pro-giant-bundle' | 'ultimate' | 'ultimate-govcon-bundle' | 'complete',
   options?: {
     name?: string;
     stripeCustomerId?: string;
@@ -338,25 +362,55 @@ export async function grantBundleAccess(
 
   // Define what each bundle includes
   const bundleProducts: Record<string, Record<string, unknown>> = {
-    starter: {
-      access_assassin_standard: true,
+    // GovCon Starter Bundle ($697)
+    'starter': {
+      access_hunter_pro: true,
+      access_recompete: true,
       access_contractor_db: true,
     },
-    ultimate: {
+    'govcon-starter-bundle': {
+      access_hunter_pro: true,
+      access_recompete: true,
+      access_contractor_db: true,
+    },
+    // Pro Giant Bundle ($997)
+    'pro': {
+      access_contractor_db: true,
+      access_recompete: true,
+      access_assassin_standard: true,
+      access_content_standard: true,
+    },
+    'pro-giant-bundle': {
+      access_contractor_db: true,
+      access_recompete: true,
+      access_assassin_standard: true,
+      access_content_standard: true,
+    },
+    // Ultimate GovCon Bundle ($1497)
+    'ultimate': {
+      access_hunter_pro: true,
       access_assassin_standard: true,
       access_assassin_premium: true,
       access_content_standard: true,
       access_content_full_fix: true,
-      access_hunter_pro: true,
       access_contractor_db: true,
       access_recompete: true,
     },
-    complete: {
+    'ultimate-govcon-bundle': {
+      access_hunter_pro: true,
       access_assassin_standard: true,
       access_assassin_premium: true,
       access_content_standard: true,
       access_content_full_fix: true,
+      access_contractor_db: true,
+      access_recompete: true,
+    },
+    'complete': {
       access_hunter_pro: true,
+      access_assassin_standard: true,
+      access_assassin_premium: true,
+      access_content_standard: true,
+      access_content_full_fix: true,
       access_contractor_db: true,
       access_recompete: true,
     },

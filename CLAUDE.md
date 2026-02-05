@@ -1,5 +1,20 @@
 # Market Assassin - Claude Project Context
 
+## IMPORTANT: No Framer
+**This project does NOT use Framer.** Do not use any Framer MCP tools (mcp__framer-mcp__*) for this project. This is a pure Next.js/React codebase.
+
+---
+
+## Related GovCon Projects (Quick Reference)
+
+| Project | Location | Identifier | Purpose |
+|---------|----------|------------|---------|
+| **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | "$82B hero page" | Marketing funnel (govcongiants.org) |
+| **Market Assassin** | This project | "tools", "market assassin" | Dev/staging tools |
+| **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | "live shop", "production" | Live shop (shop.govcongiants.org) |
+
+---
+
 ## Project Overview
 **Name:** Market Assassin (GovCon Tools Platform)
 **Purpose:** Development/staging environment for GovCon Giants tools

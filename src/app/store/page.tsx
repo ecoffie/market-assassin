@@ -13,7 +13,7 @@ export default function Home() {
             </Link>
             <ul className="hidden md:flex items-center gap-8">
               <li><a href="#tools" className="text-gray-800 hover:text-blue-800 font-medium text-sm">Tools</a></li>
-              <li><a href="#databases" className="text-gray-800 hover:text-blue-800 font-medium text-sm">Databases</a></li>
+              <li><a href="#bundles" className="text-gray-800 hover:text-blue-800 font-medium text-sm">Bundles</a></li>
               <li><a href="#resources" className="text-gray-800 hover:text-blue-800 font-medium text-sm">Resources</a></li>
               <li><Link href="/about" className="text-gray-800 hover:text-blue-800 font-medium text-sm">About</Link></li>
             </ul>
@@ -461,6 +461,207 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Bundles Section */}
+      <section className="py-20 px-6 bg-gradient-to-b from-gray-50 to-white" id="bundles">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="inline-block bg-gradient-to-r from-blue-800 to-purple-600 text-white px-4 py-1 rounded-full text-sm font-semibold mb-4">SAVE BIG</span>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Bundle & Save</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">Get everything you need to dominate federal contracting. Our bundles offer the best value with savings up to $391.</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* GovCon Starter Bundle */}
+            <div className="bg-white border-2 border-gray-200 rounded-2xl overflow-hidden transition-all hover:shadow-xl hover:border-blue-500">
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">STARTER</span>
+                  <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">Save $246</span>
+                </div>
+                <h3 className="text-2xl font-bold">GovCon Starter Bundle</h3>
+                <p className="text-emerald-100 mt-2">Perfect for new contractors</p>
+              </div>
+              <div className="p-6">
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-4xl font-bold text-gray-900">$697</span>
+                    <span className="text-lg text-gray-400 line-through">$943</span>
+                  </div>
+                  <span className="text-sm text-gray-500">one-time payment</span>
+                </div>
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span className="text-emerald-500 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Opportunity Hunter Pro</div>
+                      <div className="text-sm text-gray-500">$49 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span className="text-emerald-500 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Recompete Contracts Tracker</div>
+                      <div className="text-sm text-gray-500">$397 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span className="text-emerald-500 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Federal Contractor Database</div>
+                      <div className="text-sm text-gray-500">$497 value</div>
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href="https://buy.stripe.com/6oU9AUeb46Z46h70CsfnO0s"
+                  className="block w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-center rounded-lg font-bold text-lg hover:shadow-lg transition-all hover:-translate-y-0.5 mb-3"
+                >
+                  Get Starter Bundle
+                </a>
+                <Link href="/bundles/starter" className="block w-full py-3 border-2 border-gray-200 text-gray-700 text-center rounded-lg font-semibold hover:border-emerald-500 hover:text-emerald-600 transition-all">
+                  View Details
+                </Link>
+              </div>
+            </div>
+
+            {/* Pro Giant Bundle - MOST POPULAR */}
+            <div className="bg-white border-2 border-blue-500 rounded-2xl overflow-hidden transition-all hover:shadow-xl relative">
+              <div className="absolute -top-0 left-1/2 -translate-x-1/2 bg-blue-800 text-white px-6 py-1 rounded-b-lg text-sm font-bold">
+                MOST POPULAR
+              </div>
+              <div className="bg-gradient-to-r from-blue-800 to-purple-600 p-6 text-white pt-8">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">PRO</span>
+                  <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">Save $391</span>
+                </div>
+                <h3 className="text-2xl font-bold">Pro Giant Bundle</h3>
+                <p className="text-blue-100 mt-2">Best value for serious contractors</p>
+              </div>
+              <div className="p-6">
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-4xl font-bold text-gray-900">$997</span>
+                    <span className="text-lg text-gray-400 line-through">$1,388</span>
+                  </div>
+                  <span className="text-sm text-gray-500">one-time payment</span>
+                </div>
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                    <span className="text-blue-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Federal Contractor Database</div>
+                      <div className="text-sm text-gray-500">$497 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                    <span className="text-blue-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Recompete Contracts Tracker</div>
+                      <div className="text-sm text-gray-500">$397 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                    <span className="text-blue-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Market Assassin Standard</div>
+                      <div className="text-sm text-gray-500">$297 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                    <span className="text-blue-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">AI Content Generator</div>
+                      <div className="text-sm text-gray-500">$197 value</div>
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href="https://buy.stripe.com/dRm7sMaYS0AG0WN5WMfnO0q"
+                  className="block w-full py-4 bg-gradient-to-r from-blue-800 to-purple-600 text-white text-center rounded-lg font-bold text-lg hover:shadow-lg transition-all hover:-translate-y-0.5 mb-3"
+                >
+                  Get Pro Bundle
+                </a>
+                <Link href="/bundles/pro" className="block w-full py-3 border-2 border-gray-200 text-gray-700 text-center rounded-lg font-semibold hover:border-blue-500 hover:text-blue-600 transition-all">
+                  View Details
+                </Link>
+              </div>
+            </div>
+
+            {/* Ultimate GovCon Bundle */}
+            <div className="bg-white border-2 border-gray-200 rounded-2xl overflow-hidden transition-all hover:shadow-xl hover:border-amber-500">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-white">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">ULTIMATE</span>
+                  <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">Save $340</span>
+                </div>
+                <h3 className="text-2xl font-bold">Ultimate GovCon Bundle</h3>
+                <p className="text-amber-100 mt-2">Everything you need to win</p>
+              </div>
+              <div className="p-6">
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-4xl font-bold text-gray-900">$1,497</span>
+                    <span className="text-lg text-gray-400 line-through">$1,837</span>
+                  </div>
+                  <span className="text-sm text-gray-500">one-time payment</span>
+                </div>
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+                    <span className="text-amber-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">AI Content Generator (Full Fix)</div>
+                      <div className="text-sm text-gray-500">$397 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+                    <span className="text-amber-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Federal Contractor Database</div>
+                      <div className="text-sm text-gray-500">$497 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+                    <span className="text-amber-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Recompete Contracts Tracker</div>
+                      <div className="text-sm text-gray-500">$397 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+                    <span className="text-amber-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Market Assassin Premium</div>
+                      <div className="text-sm text-gray-500">$497 value</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+                    <span className="text-amber-600 font-bold text-lg">✓</span>
+                    <div>
+                      <div className="font-medium text-gray-900">Opportunity Hunter Pro</div>
+                      <div className="text-sm text-gray-500">$49 value</div>
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href="https://buy.stripe.com/aFacN6d700AGfRHfxmfnO0r"
+                  className="block w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-center rounded-lg font-bold text-lg hover:shadow-lg transition-all hover:-translate-y-0.5 mb-3"
+                >
+                  Get Ultimate Bundle
+                </a>
+                <Link href="/bundles/ultimate" className="block w-full py-3 border-2 border-gray-200 text-gray-700 text-center rounded-lg font-semibold hover:border-amber-500 hover:text-amber-600 transition-all">
+                  View Details
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Bundle Comparison Note */}
+          <div className="mt-12 text-center">
+            <p className="text-gray-500 text-sm">All bundles include lifetime access. One-time payment, no subscriptions.</p>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-16 px-6">
         <div className="max-w-7xl mx-auto">
@@ -469,8 +670,8 @@ export default function Home() {
               <h4 className="font-bold mb-4 text-white">Products</h4>
               <ul className="space-y-3 text-sm">
                 <li><a href="#tools" className="text-gray-400 hover:text-white">All Tools</a></li>
-                <li><a href="#databases" className="text-gray-400 hover:text-white">Databases</a></li>
-                                <li><Link href="/free-resources" className="text-gray-400 hover:text-white">Free Resources</Link></li>
+                <li><a href="#bundles" className="text-gray-400 hover:text-white">Bundles</a></li>
+                <li><Link href="/free-resources" className="text-gray-400 hover:text-white">Free Resources</Link></li>
               </ul>
             </div>
             <div>

@@ -358,6 +358,130 @@ interface SendLicenseKeyEmailParams {
 }
 
 // Generic email for sending license key after purchase
+// Interface for free resource confirmation email
+interface SendFreeResourceEmailParams {
+  to: string;
+  name?: string;
+  resourceName: string;
+  resourceDescription: string;
+  downloadUrl: string;
+}
+
+// Email for free resource download confirmation
+export async function sendFreeResourceEmail({
+  to,
+  name,
+  resourceName,
+  resourceDescription,
+  downloadUrl,
+}: SendFreeResourceEmailParams): Promise<boolean> {
+  const fullDownloadUrl = `https://shop.govcongiants.org${downloadUrl}`;
+  const freeResourcesUrl = 'https://shop.govcongiants.org/free-resources';
+  const storeUrl = 'https://shop.govcongiants.org/store';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">GovCon Giants</h1>
+    <p style="color: #d1fae5; margin: 10px 0 0 0;">Free Resource Download</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #059669; margin-top: 0;">Your Free Resource is Ready!</h2>
+
+    <p>Hi${name ? ` ${name}` : ''},</p>
+
+    <p>Thank you for downloading <strong>${resourceName}</strong> from GovCon Giants!</p>
+
+    <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px solid #10b981; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center;">
+      <p style="margin: 0 0 5px 0; color: #065f46; font-weight: 600;">${resourceName}</p>
+      <p style="margin: 0 0 20px 0; color: #047857; font-size: 14px;">${resourceDescription}</p>
+      <a href="${fullDownloadUrl}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px;">Download Now</a>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0;">More Free Resources Available:</h3>
+      <ul style="color: #15803d; margin: 0; padding-left: 20px;">
+        <li>SBLO Contact List - Direct contacts for small business outreach</li>
+        <li>December Spend Forecast - Year-end spending predictions</li>
+        <li>Capability Statement Template - Professional template to customize</li>
+        <li>SBLO Email Scripts - Ready-to-use outreach templates</li>
+        <li>Proposal Response Checklist - Comprehensive compliance checklist</li>
+      </ul>
+      <p style="margin: 15px 0 0 0;">
+        <a href="${freeResourcesUrl}" style="color: #059669; font-weight: 600;">View All Free Resources →</a>
+      </p>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); border-radius: 8px; padding: 25px; margin: 25px 0; text-align: center;">
+      <h3 style="color: white; margin: 0 0 10px 0;">Ready to Level Up?</h3>
+      <p style="color: #93c5fd; margin: 0 0 20px 0;">Check out our premium GovCon tools for serious contractors.</p>
+      <a href="${storeUrl}" style="background: #f59e0b; color: #1e3a8a; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">View Premium Tools</a>
+    </div>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      You received this email because you downloaded a free resource from GovCon Giants.<br>
+      <a href="${freeResourcesUrl}" style="color: #6b7280;">Access your resources anytime</a> using this email: ${to}
+    </p>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 12px;">
+      &copy; ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      to,
+      subject: `Your Free Download: ${resourceName} | GovCon Giants`,
+      html: htmlContent,
+      text: `Your Free Resource is Ready!
+
+Hi${name ? ` ${name}` : ''},
+
+Thank you for downloading ${resourceName} from GovCon Giants!
+
+${resourceDescription}
+
+Download your resource here: ${fullDownloadUrl}
+
+More Free Resources Available:
+- SBLO Contact List - Direct contacts for small business outreach
+- December Spend Forecast - Year-end spending predictions
+- Capability Statement Template - Professional template to customize
+- SBLO Email Scripts - Ready-to-use outreach templates
+- Proposal Response Checklist - Comprehensive compliance checklist
+
+View all free resources: ${freeResourcesUrl}
+
+Ready to Level Up?
+Check out our premium GovCon tools: ${storeUrl}
+
+You received this email because you downloaded a free resource from GovCon Giants.
+Access your resources anytime using this email: ${to}
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ Free resource email sent to ${to} for ${resourceName}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send free resource email:', error);
+    return false;
+  }
+}
+
 export async function sendLicenseKeyEmail({
   to,
   customerName,

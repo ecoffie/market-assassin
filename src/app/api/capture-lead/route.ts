@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase/client';
+import { sendFreeResourceEmail } from '@/lib/send-email';
 
 // Free resources that require email capture
 export const FREE_RESOURCES = {
@@ -88,10 +89,13 @@ export async function POST(request: NextRequest) {
       console.error('Error checking lead:', fetchError);
     }
 
+    let isNewResource = false;
+
     if (existingLead) {
       // Update existing lead with new resource access
       const existingResources = existingLead.resources_accessed || [];
       if (!existingResources.includes(resourceId)) {
+        isNewResource = true;
         const { error: updateError } = await supabase
           .from('leads')
           .update({
@@ -107,6 +111,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Create new lead
+      isNewResource = true;
       const { error: insertError } = await supabase.from('leads').insert({
         email: email.toLowerCase(),
         name: name || null,
@@ -118,6 +123,22 @@ export async function POST(request: NextRequest) {
       if (insertError) {
         console.error('Error creating lead:', insertError);
         // Don't fail - still grant access even if DB insert fails
+      }
+    }
+
+    // Send confirmation email for new resource access
+    if (isNewResource) {
+      try {
+        await sendFreeResourceEmail({
+          to: email.toLowerCase(),
+          name: name || undefined,
+          resourceName: resource.name,
+          resourceDescription: resource.description,
+          downloadUrl: resource.file,
+        });
+      } catch (emailError) {
+        console.error('Error sending free resource email:', emailError);
+        // Don't fail the request if email fails
       }
     }
 

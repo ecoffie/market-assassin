@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 interface Resource {
@@ -63,12 +63,42 @@ export default function FreeResourcesPage() {
   const [error, setError] = useState('');
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [accessedResources, setAccessedResources] = useState<string[]>([]);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
-  const handleResourceClick = (resource: Resource) => {
-    // Check if user already has access (stored in localStorage)
-    const accessedResources = JSON.parse(localStorage.getItem('accessed_resources') || '[]');
-    if (accessedResources.includes(resource.id)) {
-      // Already has access, allow download
+  // Check for existing access on mount
+  useEffect(() => {
+    const checkExistingAccess = async () => {
+      // First check localStorage for cached email
+      const cachedEmail = localStorage.getItem('lead_email');
+
+      if (cachedEmail) {
+        setUserEmail(cachedEmail);
+        setEmail(cachedEmail);
+
+        // Verify access from database
+        try {
+          const response = await fetch(`/api/capture-lead?email=${encodeURIComponent(cachedEmail)}`);
+          const data = await response.json();
+
+          if (data.hasAccess && data.accessedResources) {
+            setAccessedResources(data.accessedResources);
+          }
+        } catch (err) {
+          console.error('Error checking access:', err);
+        }
+      }
+
+      setIsCheckingAccess(false);
+    };
+
+    checkExistingAccess();
+  }, []);
+
+  const handleResourceClick = async (resource: Resource) => {
+    // If user has email and has accessed this resource, allow direct download
+    if (userEmail && accessedResources.includes(resource.id)) {
       setDownloadUrl(resource.file);
       setSelectedResource(resource);
       setShowSuccess(true);
@@ -107,13 +137,17 @@ export default function FreeResourcesPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Store access in localStorage
-        const accessedResources = JSON.parse(localStorage.getItem('accessed_resources') || '[]');
+        // Update state with new access
+        const newEmail = email.trim().toLowerCase();
+        setUserEmail(newEmail);
+
+        // Update accessed resources list
         if (!accessedResources.includes(selectedResource.id)) {
-          accessedResources.push(selectedResource.id);
-          localStorage.setItem('accessed_resources', JSON.stringify(accessedResources));
+          setAccessedResources([...accessedResources, selectedResource.id]);
         }
-        localStorage.setItem('lead_email', email.trim().toLowerCase());
+
+        // Cache email in localStorage for convenience (but access is verified from DB)
+        localStorage.setItem('lead_email', newEmail);
 
         setDownloadUrl(data.resource.file);
         setShowSuccess(true);
@@ -125,6 +159,13 @@ export default function FreeResourcesPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('lead_email');
+    setUserEmail(null);
+    setEmail('');
+    setAccessedResources([]);
   };
 
   const closeModal = () => {
@@ -144,6 +185,17 @@ export default function FreeResourcesPage() {
               <span className="text-xl font-bold text-blue-700">GovCon</span>
               <span className="text-xl font-bold text-amber-500">Giants</span>
             </Link>
+            {userEmail && (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600 hidden sm:inline">{userEmail}</span>
+                <button
+                  onClick={handleSignOut}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </nav>
@@ -159,46 +211,56 @@ export default function FreeResourcesPage() {
             Download free templates, checklists, and guides to accelerate your government contracting journey.
             Just enter your email to access.
           </p>
+          {userEmail && (
+            <div className="mt-4 flex items-center gap-2 bg-white/20 rounded-lg px-4 py-2 w-fit">
+              <span className="text-green-100">Signed in as:</span>
+              <span className="font-medium">{userEmail}</span>
+            </div>
+          )}
         </div>
 
-        {/* Resources Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {FREE_RESOURCES.map((resource) => {
-            const accessedResources = typeof window !== 'undefined'
-              ? JSON.parse(localStorage.getItem('accessed_resources') || '[]')
-              : [];
-            const hasAccess = accessedResources.includes(resource.id);
+        {/* Loading State */}
+        {isCheckingAccess ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-gray-500">Loading resources...</div>
+          </div>
+        ) : (
+          /* Resources Grid */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {FREE_RESOURCES.map((resource) => {
+              const hasAccess = accessedResources.includes(resource.id);
 
-            return (
-              <div
-                key={resource.id}
-                className="bg-white rounded-xl shadow-lg p-6 border-2 border-slate-200 hover:border-green-400 hover:shadow-xl transition-all cursor-pointer"
-                onClick={() => handleResourceClick(resource)}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{resource.icon}</span>
-                    <h3 className="text-lg font-bold text-gray-900">{resource.name}</h3>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm text-gray-400 line-through">{resource.price}</span>
-                    <span className="block text-green-600 font-bold">FREE</span>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 mb-4">{resource.description}</p>
-                <button
-                  className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
-                    hasAccess
-                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                      : 'bg-green-500 text-white hover:bg-green-600'
-                  }`}
+              return (
+                <div
+                  key={resource.id}
+                  className="bg-white rounded-xl shadow-lg p-6 border-2 border-slate-200 hover:border-green-400 hover:shadow-xl transition-all cursor-pointer"
+                  onClick={() => handleResourceClick(resource)}
                 >
-                  {hasAccess ? '✓ Download Again' : 'Get Free Access'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">{resource.icon}</span>
+                      <h3 className="text-lg font-bold text-gray-900">{resource.name}</h3>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm text-gray-400 line-through">{resource.price}</span>
+                      <span className="block text-green-600 font-bold">FREE</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">{resource.description}</p>
+                  <button
+                    className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+                      hasAccess
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                  >
+                    {hasAccess ? '✓ Download Again' : 'Get Free Access'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Upgrade CTA */}
         <div className="mt-12 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-xl p-8 text-white">
@@ -210,7 +272,7 @@ export default function FreeResourcesPage() {
               </p>
             </div>
             <Link
-              href="/"
+              href="/store"
               className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors whitespace-nowrap"
             >
               View Premium Tools

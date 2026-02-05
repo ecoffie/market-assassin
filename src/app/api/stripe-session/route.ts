@@ -102,6 +102,26 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Handle Market Assassin Premium Upgrade (from Standard to Premium)
+    if (product === 'market-assassin-premium-upgrade') {
+      const existingAccess = await getMarketAssassinAccess(email);
+
+      // Grant premium access (user should already have standard)
+      if (!existingAccess || existingAccess.tier !== 'premium') {
+        await grantMarketAssassinAccess(email, 'premium', session.customer_details?.name || undefined);
+      }
+
+      return NextResponse.json({
+        success: true,
+        email: email.toLowerCase(),
+        product: 'market-assassin-premium-upgrade',
+        tier: 'premium' as MarketAssassinTier,
+        hasAccess: true,
+        upgraded: true,
+        customerName: session.customer_details?.name || null,
+      });
+    }
+
     // Handle Content Generator - Content Engine ($197)
     if (product === 'content-engine') {
       const existingAccess = await getContentGeneratorAccess(email);
@@ -139,6 +159,27 @@ export async function GET(request: NextRequest) {
         product: 'full-fix',
         tier: 'full-fix' as ContentGeneratorTier,
         hasAccess: true,
+        customerName: session.customer_details?.name || null,
+        redirectUrl: '/content-generator',
+      });
+    }
+
+    // Handle Content Generator - Full Fix Upgrade (from Content Engine to Full Fix)
+    if (product === 'content-full-fix-upgrade') {
+      const existingAccess = await getContentGeneratorAccess(email);
+
+      // Grant full-fix access (user should already have content-engine)
+      if (!existingAccess || existingAccess.tier !== 'full-fix') {
+        await grantContentGeneratorAccess(email, 'full-fix', session.customer_details?.name || undefined);
+      }
+
+      return NextResponse.json({
+        success: true,
+        email: email.toLowerCase(),
+        product: 'content-full-fix-upgrade',
+        tier: 'full-fix' as ContentGeneratorTier,
+        hasAccess: true,
+        upgraded: true,
         customerName: session.customer_details?.name || null,
         redirectUrl: '/content-generator',
       });

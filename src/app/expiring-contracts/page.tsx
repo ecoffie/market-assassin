@@ -11,7 +11,7 @@ export default function ExpiringContractsPage() {
       gradientTo="#06b6d4"
       price="$397"
       originalPrice="$997/month"
-      checkoutUrl="/recompete"
+      checkoutUrl="https://buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k"
       videoTitle="Expiring Contracts Forecast Demo"
       videoSubtitle="See how to find recompete opportunities 3-6 months early"
       screenshots={[

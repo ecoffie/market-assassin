@@ -1,4 +1,4 @@
--- Purchases table for paid products (Lemon Squeezy orders)
+-- Purchases table for paid products (Stripe orders)
 CREATE TABLE IF NOT EXISTS purchases (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_email TEXT NOT NULL,

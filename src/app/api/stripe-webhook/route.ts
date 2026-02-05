@@ -30,6 +30,10 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get('stripe-signature');
 
+  console.log('Webhook received, signature present:', !!signature);
+  console.log('Live secret configured:', !!liveWebhookSecret, liveWebhookSecret ? `(starts with ${liveWebhookSecret.substring(0, 10)}...)` : '(empty)');
+  console.log('Test secret configured:', !!testWebhookSecret, testWebhookSecret ? `(starts with ${testWebhookSecret.substring(0, 10)}...)` : '(empty)');
+
   if (!signature) {
     return NextResponse.json({ error: 'No signature' }, { status: 400 });
   }
@@ -41,12 +45,16 @@ export async function POST(request: NextRequest) {
   try {
     const stripe = getStripe(false);
     event = stripe.webhooks.constructEvent(rawBody, signature, liveWebhookSecret);
-  } catch {
+    console.log('Live signature verified successfully');
+  } catch (liveError) {
+    console.log('Live signature failed:', liveError instanceof Error ? liveError.message : 'unknown error');
     try {
       const stripeTest = getStripe(true);
       event = stripeTest.webhooks.constructEvent(rawBody, signature, testWebhookSecret);
       isTestMode = true;
-    } catch {
+      console.log('Test signature verified successfully');
+    } catch (testError) {
+      console.log('Test signature also failed:', testError instanceof Error ? testError.message : 'unknown error');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
   }
@@ -116,10 +124,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Auto-update access flags
-    if (userId) {
-      await updateAccessFlags(email, tier, bundle);
-    }
+    // Auto-update access flags (always update, user_id is optional)
+    await updateAccessFlags(email, tier, bundle);
 
     // Get/create profile and send license key email
     const profile = await getOrCreateProfile(email);

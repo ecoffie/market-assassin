@@ -11,7 +11,7 @@ export default function ContractorDatabasePage() {
       gradientTo="#7c3aed"
       price="$497"
       originalPrice="$297/month"
-      checkoutUrl="/database-locked"
+      checkoutUrl="https://buy.stripe.com/4gMaEY3wqcjo6h70CsfnO0g"
       videoTitle="Federal Contractor Database Demo"
       videoSubtitle="See how to find teaming partners in under 2 minutes"
       screenshots={[

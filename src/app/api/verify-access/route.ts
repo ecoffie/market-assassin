@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase/client';
-import { PRODUCTS } from '@/lib/lemonsqueezy';
+import { PRODUCTS } from '@/lib/products';
 
 // Check if a user has access to a product
 export async function POST(request: NextRequest) {

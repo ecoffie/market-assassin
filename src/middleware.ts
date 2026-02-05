@@ -11,7 +11,7 @@ import type { NextRequest } from 'next/server';
  * 3. /federal-market-assassin - Market Assassin tool (requires ma_access_email cookie)
  *
  * Access is granted via:
- * - Purchase through Stripe/LemonSqueezy (sets cookie automatically)
+ * - Purchase through Stripe (sets cookie automatically)
  * - Access code validation (sets cookie)
  * - Direct cookie set by admin
  */
