@@ -55,18 +55,18 @@ export default function Home() {
           <h2 className="text-3xl font-bold text-center mb-10 text-gray-900">Browse by Category</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5">
             {[
-              { icon: "📊", title: "Databases", desc: "Searchable contractor databases" },
-              { icon: "📝", title: "Guides", desc: "Step-by-step tutorials" },
-              { icon: "🔍", title: "Research Tools", desc: "Find opportunities faster" },
-              { icon: "📅", title: "Forecasts", desc: "Contract expiring dates" },
-              { icon: "📋", title: "Templates", desc: "Ready-to-use documents" },
-              { icon: "🎯", title: "Hit Lists", desc: "Targeted company lists" },
+              { icon: "📊", title: "Databases", desc: "Searchable contractor databases", href: "/contractor-database" },
+              { icon: "📝", title: "Guides", desc: "Step-by-step tutorials", href: "/guides-templates" },
+              { icon: "🔍", title: "Research Tools", desc: "Find opportunities faster", href: "/opportunity-hunter" },
+              { icon: "📅", title: "Forecasts", desc: "Contract expiring dates", href: "/expiring-contracts" },
+              { icon: "📋", title: "Templates", desc: "Ready-to-use documents", href: "/guides-templates" },
+              { icon: "🎯", title: "Hit Lists", desc: "Targeted company lists", href: "/december-spend" },
             ].map((cat, i) => (
-              <div key={i} className="bg-white p-6 rounded-xl border border-gray-200 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
+              <Link key={i} href={cat.href} className="block bg-white p-6 rounded-xl border border-gray-200 text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500">
                 <div className="text-4xl mb-3">{cat.icon}</div>
                 <h3 className="text-lg font-semibold mb-2 text-gray-900">{cat.title}</h3>
                 <p className="text-sm text-gray-500">{cat.desc}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -75,23 +75,7 @@ export default function Home() {
       {/* Products/Tools */}
       <section className="py-20 px-6" id="tools">
         <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-10 flex-wrap gap-5">
-            <h2 className="text-3xl font-bold text-gray-900">Featured Tools</h2>
-            <div className="flex gap-3 flex-wrap">
-              {["All", "Free", "Premium", "New"].map((tab, i) => (
-                <button
-                  key={tab}
-                  className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                    i === 0
-                      ? "bg-blue-800 text-white border-blue-800"
-                      : "bg-gray-50 text-gray-800 border-gray-200 hover:border-blue-800"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-10">Featured Tools</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Federal Market Assassin - FLAGSHIP */}
