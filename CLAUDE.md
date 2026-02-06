@@ -339,6 +339,69 @@ npm run build
 
 ---
 
+## Content Generator (Critical Details)
+
+**Frontend:** Static HTML files in `public/content-generator/`
+- `index.html` — Main content generator UI (~6000+ lines)
+- `library.html` — Saved posts library
+- `calendar.html` — Content calendar (FullCalendar)
+
+**API Routes (Next.js):**
+| Route | Purpose |
+|-------|---------|
+| `/api/agencies/lookup` | NAICS-based agency matching (USASpending API) |
+| `/api/templates` | List content templates |
+| `/api/generate` | Generate LinkedIn posts |
+| `/api/generate-quote` | Generate quote card graphics |
+| `/api/convert-post-to-carousel` | Convert post to carousel slides |
+| `/api/usage` | Track daily post usage |
+| `/api/usage/check` | Check usage limits |
+| `/api/usage/increment` | Increment usage counter |
+| `/api/verify-content-generator` | Verify user access by email |
+| `/api/content-generator/generate` | Alternative generation endpoint |
+
+**CRITICAL:** `API_BASE` in all three HTML files MUST be `''` (empty string) for same-origin API calls. NEVER set it to an external URL like `govcon-content-generator.vercel.app` — that deployment is dead.
+
+---
+
+## Dual Access Control System
+
+Access is managed in TWO places (both must be considered):
+
+### 1. Vercel KV (`@vercel/kv`) — Primary for individual tools
+- **Content Generator:** `contentgen:{email}` key → checked by `hasContentGeneratorAccess()`
+- **Market Assassin:** `ma:{email}` key → checked by `hasMarketAssassinAccess()`
+- **Opportunity Hunter Pro:** `ospro:{email}` key
+- **Contractor Database:** `dbtoken:{token}` + `dbaccess:{email}` keys
+- **Recompete:** `recompete:{email}` key
+- **Code:** `src/lib/access-codes.ts`
+
+### 2. Supabase (`user_profiles` table) — Unified profile with boolean flags
+- `access_content_standard`, `access_content_full_fix`
+- `access_assassin_standard`, `access_assassin_premium`
+- `access_hunter_pro`, `access_recompete`, `access_contractor_db`
+- **Code:** `src/lib/supabase/user-profiles.ts`
+
+### Checking user access (e.g., for support):
+```bash
+curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+```
+
+---
+
+## Related Projects
+
+| Project | Location | Deploys To | Purpose |
+|---------|----------|------------|---------|
+| **Market Assassin** | This project | `tools.govcongiants.org` | All GovCon tools (active) |
+| **LinkedIn Deal Magnet** | `/Users/ericcoffie/Projects/linkedin-deal-magnet` | Dead Vercel deployment | Original Express backend (reference only) |
+| **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | `govcongiants.org` | Marketing funnel |
+| **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | `shop.govcongiants.org` | Live shop (production) |
+
+---
+
 ## Notes for Claude
 
 1. **This is the DEVELOPMENT project** - For live shop.govcongiants.org changes, use `/Users/ericcoffie/govcon-shop`
@@ -353,9 +416,22 @@ npm run build
 
 6. **Test locally first** - Always run `npm run build` before considering deployment
 
+7. **Content Generator HTML uses same-origin API** - Never hardcode external API URLs in `public/content-generator/*.html`
+
+8. **No Node.js on dev machine** - `npm`, `node`, `vercel` CLI are not available locally
+
+9. **Two access systems** - Vercel KV (access-codes.ts) AND Supabase (user-profiles.ts). Check both when debugging access issues.
+
+10. **linkedin-deal-magnet repo** - Contains agency knowledge base (31 agencies), viral hooks, and content templates. Reference only — don't deploy from there.
+
 ---
 
 ## Recent Work History
+
+### February 5, 2026
+- Fixed Content Generator API URLs — replaced all hardcoded `govcon-content-generator.vercel.app` with relative paths (same-origin)
+- Affected files: `public/content-generator/index.html`, `library.html`, `calendar.html`
+- Verified Olga's (olga@olaexecutiveconsulting.com) Full Fix access is intact via API
 
 ### February 2, 2026
 - Created bundle landing pages (`/bundles/starter`, `/bundles/pro`, `/bundles/ultimate`)
@@ -370,4 +446,4 @@ npm run build
 
 ---
 
-*Last Updated: February 2, 2026*
+*Last Updated: February 5, 2026*
