@@ -429,9 +429,13 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 ## Recent Work History
 
 ### February 5, 2026
+- Removed PDF carousel download — LinkedIn no longer supports PDF carousels
+- Made PNG slide images the primary/only download option in carousel preview modal
+- Updated help text from "Upload PDF to LinkedIn" to "Upload images to LinkedIn"
 - Fixed Content Generator API URLs — replaced all hardcoded `govcon-content-generator.vercel.app` with relative paths (same-origin)
 - Affected files: `public/content-generator/index.html`, `library.html`, `calendar.html`
 - Verified Olga's (olga@olaexecutiveconsulting.com) Full Fix access is intact via API
+- **Note:** Missing API endpoints: `/api/generate-carousel` (standalone builder) and `/api/upload-carousel` (save to library) — not yet implemented
 
 ### February 2, 2026
 - Created bundle landing pages (`/bundles/starter`, `/bundles/pro`, `/bundles/ultimate`)
