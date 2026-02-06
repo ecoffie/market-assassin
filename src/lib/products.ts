@@ -94,7 +94,7 @@ export const PRODUCTS = {
     id: 'ultimate-govcon-bundle',
     name: 'Ultimate GovCon Bundle',
     price: 1497,
-    stripeUrl: 'https://buy.stripe.com/aFacN6d700AGfRHfxmfnO0r',
+    stripeUrl: 'https://buy.stripe.com/6oU3cwff897ceND84UfnO0t',
     includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'market-assassin-premium'],
     includesDisplay: [
       { name: 'AI Content Generator (Full Fix)', price: 397 },
