@@ -428,6 +428,12 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 6, 2026
+- Fixed all Stripe checkout links in **govcon-shop** (live production) — 5 old/dead payment links from pre-Stripe-migration era were returning 404s
+- Updated 13 files across govcon-shop: ai-content, contractor-database (x2), database-locked, expiring-contracts, opportunity-hunter, opportunity-scout, recompete, sblo-directory, tier2-directory, all-free-resources, tribal HTML, next.config.ts
+- **Source of truth for Stripe links:** `products.ts` in market-assassin — always sync govcon-shop links from here
+- LemonSqueezy fully canceled — all payments now through Stripe directly
+
 ### February 5, 2026
 - Removed PDF carousel download — LinkedIn no longer supports PDF carousels
 - Made PNG slide images the primary/only download option in carousel preview modal
@@ -450,4 +456,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 5, 2026*
+*Last Updated: February 6, 2026*
