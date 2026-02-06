@@ -592,7 +592,7 @@ export default function Home() {
               <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-white">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">ULTIMATE</span>
-                  <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">Save $340</span>
+                  <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">Save $291</span>
                 </div>
                 <h3 className="text-2xl font-bold">Ultimate GovCon Bundle</h3>
                 <p className="text-amber-100 mt-2">Everything you need to win</p>
@@ -601,7 +601,7 @@ export default function Home() {
                 <div className="mb-6">
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-4xl font-bold text-gray-900">$1,497</span>
-                    <span className="text-lg text-gray-400 line-through">$1,837</span>
+                    <span className="text-lg text-gray-400 line-through">$1,788</span>
                   </div>
                   <span className="text-sm text-gray-500">one-time payment</span>
                 </div>
@@ -632,13 +632,6 @@ export default function Home() {
                     <div>
                       <div className="font-medium text-gray-900">Market Assassin Premium</div>
                       <div className="text-sm text-gray-500">$497 value</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
-                    <span className="text-amber-600 font-bold text-lg">✓</span>
-                    <div>
-                      <div className="font-medium text-gray-900">Opportunity Hunter Pro</div>
-                      <div className="text-sm text-gray-500">$49 value</div>
                     </div>
                   </div>
                 </div>
