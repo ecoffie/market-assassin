@@ -4124,21 +4124,14 @@
 
                         <!-- Export Actions -->
                         <div style="padding: 20px; flex: 1;">
-                            <!-- Primary Downloads -->
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                                <button onclick="downloadCarouselFromPostPDF()" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px 16px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 14px; transition: all 0.2s; box-shadow: 0 8px 20px -5px rgba(249,115,22,0.4);">
-                                    <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                    </svg>
-                                    <span>Download PDF</span>
-                                    <span style="font-size: 10px; font-weight: 400; opacity: 0.9;">Best for LinkedIn</span>
-                                </button>
-                                <button onclick="downloadCarouselFromPostPNGs()" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px 16px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 14px; transition: all 0.2s; box-shadow: 0 8px 20px -5px rgba(139,92,246,0.4);">
+                            <!-- Primary Download -->
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px;">
+                                <button onclick="downloadCarouselFromPostPNGs()" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px 16px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 14px; transition: all 0.2s; box-shadow: 0 8px 20px -5px rgba(249,115,22,0.4);">
                                     <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                     </svg>
-                                    <span>Download ${slides.length} PNGs</span>
-                                    <span style="font-size: 10px; font-weight: 400; opacity: 0.9;">Individual slides</span>
+                                    <span>Download ${slides.length} Slide Images</span>
+                                    <span style="font-size: 10px; font-weight: 400; opacity: 0.9;">PNG files for LinkedIn carousel post</span>
                                 </button>
                             </div>
 
@@ -4156,7 +4149,7 @@
                                 <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: inline; vertical-align: middle; margin-right: 4px;">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                Upload PDF to LinkedIn → Select "Document"
+                                Upload images to LinkedIn → Select all slides when creating your post
                             </p>
                         </div>
                     </div>
@@ -4455,7 +4448,7 @@
                 link.href = imgUrl;
                 link.click();
             });
-            showSuccessToast(`Downloaded ${carouselSlideImages.length} slides as PNGs`);
+            showSuccessToast(`Downloaded ${carouselSlideImages.length} slides! Upload all images to LinkedIn to create your carousel.`);
         }
 
         // Compress image to reduce payload size
