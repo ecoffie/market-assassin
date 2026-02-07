@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
 import {
   createDatabaseToken,
   grantOpportunityHunterProAccess,
@@ -8,14 +8,69 @@ import {
   grantRecompeteAccess,
 } from '@/lib/access-codes';
 
-// Read user_profiles from Supabase, grant KV access based on flags
-// Run this from market-assassin (tools.govcongiants.org) where KV is connected
+// Pull all completed Stripe checkout sessions and grant KV access
+// based on tier/bundle metadata. Run from market-assassin where KV is connected.
 
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false } });
+// Map tier metadata → KV grants
+async function grantByTier(tier: string, email: string, name?: string): Promise<string[]> {
+  const grants: string[] = [];
+
+  if (tier === 'hunter_pro') {
+    await grantOpportunityHunterProAccess(email, name);
+    grants.push('ospro');
+  }
+  if (tier === 'content_standard') {
+    await grantContentGeneratorAccess(email, 'content-engine', name);
+    grants.push('contentgen');
+  }
+  if (tier === 'content_full_fix' || tier === 'content_full_fix_upgrade') {
+    await grantContentGeneratorAccess(email, 'full-fix', name);
+    grants.push('contentgen:full-fix');
+  }
+  if (tier === 'assassin_standard') {
+    await grantMarketAssassinAccess(email, 'standard', name);
+    grants.push('ma:standard');
+  }
+  if (tier === 'assassin_premium' || tier === 'assassin_premium_upgrade') {
+    await grantMarketAssassinAccess(email, 'premium', name);
+    grants.push('ma:premium');
+  }
+  if (tier === 'recompete') {
+    await grantRecompeteAccess(email, name);
+    grants.push('recompete');
+  }
+  if (tier === 'contractor_db') {
+    await createDatabaseToken(email, name);
+    grants.push('database');
+  }
+
+  return grants;
+}
+
+// Map bundle metadata → KV grants (grant all included products)
+async function grantByBundle(bundle: string, email: string, name?: string): Promise<string[]> {
+  const grants: string[] = [];
+
+  if (bundle === 'starter' || bundle === 'govcon-starter-bundle') {
+    await grantOpportunityHunterProAccess(email, name);
+    await grantRecompeteAccess(email, name);
+    await createDatabaseToken(email, name);
+    grants.push('ospro', 'recompete', 'database');
+  } else if (bundle === 'pro' || bundle === 'pro-giant-bundle') {
+    await createDatabaseToken(email, name);
+    await grantRecompeteAccess(email, name);
+    await grantMarketAssassinAccess(email, 'standard', name);
+    await grantContentGeneratorAccess(email, 'content-engine', name);
+    grants.push('database', 'recompete', 'ma:standard', 'contentgen');
+  } else if (bundle === 'ultimate' || bundle === 'ultimate-govcon-bundle' || bundle === 'complete') {
+    await grantContentGeneratorAccess(email, 'full-fix', name);
+    await createDatabaseToken(email, name);
+    await grantRecompeteAccess(email, name);
+    await grantMarketAssassinAccess(email, 'premium', name);
+    grants.push('contentgen:full-fix', 'database', 'recompete', 'ma:premium');
+  }
+
+  return grants;
 }
 
 export async function POST(request: NextRequest) {
@@ -27,75 +82,74 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
+    // Use the same Stripe key as govcon-shop (shared account)
+    const liveKey = process.env.STRIPE_SECRET_KEY || '';
+    if (!liveKey) {
+      return NextResponse.json({ error: 'STRIPE_SECRET_KEY not configured' }, { status: 500 });
     }
 
-    // Get all user_profiles that have at least one access flag set
-    const { data: profiles, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .or('access_hunter_pro.eq.true,access_content_standard.eq.true,access_content_full_fix.eq.true,access_assassin_standard.eq.true,access_assassin_premium.eq.true,access_recompete.eq.true,access_contractor_db.eq.true');
-
-    if (error) {
-      return NextResponse.json({ error: `Supabase query failed: ${error.message}` }, { status: 500 });
-    }
-
-    if (!profiles || profiles.length === 0) {
-      return NextResponse.json({ success: true, message: 'No profiles with access flags found', total: 0 });
-    }
+    const stripe = new Stripe(liveKey);
 
     const results: Array<{
       email: string;
+      tier: string | null;
+      bundle: string | null;
       grants: string[];
       status: string;
     }> = [];
 
-    for (const profile of profiles) {
-      const email = profile.email;
-      const name = profile.name || undefined;
-      const grants: string[] = [];
+    // Paginate through all completed checkout sessions
+    let hasMore = true;
+    let startingAfter: string | undefined;
 
-      try {
-        if (profile.access_hunter_pro) {
-          await grantOpportunityHunterProAccess(email, name);
-          grants.push('ospro');
+    while (hasMore) {
+      const params: Stripe.Checkout.SessionListParams = {
+        limit: 100,
+        status: 'complete',
+      };
+      if (startingAfter) params.starting_after = startingAfter;
+
+      const sessions = await stripe.checkout.sessions.list(params);
+
+      for (const session of sessions.data) {
+        const email = session.customer_email || session.customer_details?.email;
+        const name = session.customer_details?.name || undefined;
+        const tier = session.metadata?.tier;
+        const bundle = session.metadata?.bundle;
+
+        if (!email) continue;
+        if (!tier && !bundle) continue; // No metadata = can't determine product
+
+        try {
+          let grants: string[] = [];
+
+          if (bundle) {
+            grants = await grantByBundle(bundle, email, name);
+          } else if (tier) {
+            grants = await grantByTier(tier, email, name);
+          }
+
+          results.push({
+            email,
+            tier: tier || null,
+            bundle: bundle || null,
+            grants,
+            status: grants.length > 0 ? 'granted' : 'no-grants',
+          });
+        } catch (err) {
+          results.push({
+            email,
+            tier: tier || null,
+            bundle: bundle || null,
+            grants: [],
+            status: `error: ${err instanceof Error ? err.message : 'unknown'}`,
+          });
         }
+      }
 
-        if (profile.access_assassin_premium) {
-          await grantMarketAssassinAccess(email, 'premium', name);
-          grants.push('ma:premium');
-        } else if (profile.access_assassin_standard) {
-          await grantMarketAssassinAccess(email, 'standard', name);
-          grants.push('ma:standard');
-        }
-
-        if (profile.access_content_full_fix) {
-          await grantContentGeneratorAccess(email, 'full-fix', name);
-          grants.push('contentgen:full-fix');
-        } else if (profile.access_content_standard) {
-          await grantContentGeneratorAccess(email, 'content-engine', name);
-          grants.push('contentgen:content-engine');
-        }
-
-        if (profile.access_recompete) {
-          await grantRecompeteAccess(email, name);
-          grants.push('recompete');
-        }
-
-        if (profile.access_contractor_db) {
-          await createDatabaseToken(email, name);
-          grants.push('database');
-        }
-
-        results.push({ email, grants, status: 'granted' });
-      } catch (err) {
-        results.push({
-          email,
-          grants,
-          status: `error: ${err instanceof Error ? err.message : 'unknown'}`,
-        });
+      hasMore = sessions.has_more;
+      if (sessions.data.length > 0) {
+        startingAfter = sessions.data[sessions.data.length - 1].id;
       }
     }
 
