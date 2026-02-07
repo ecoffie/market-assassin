@@ -410,11 +410,11 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 3. **Two Market Assassin pages** - `/market-assassin/` and `/federal-market-assassin/` (legacy)
 
-4. **Access is token-based** - Users get license keys via email, activate at `/activate`
+4. **Access is email-based** - Users enter purchase email at `/activate` to see unlocked tools (no license key required)
 
-5. **Webhook handles everything** - Stripe webhook grants access, sends emails, creates profiles
+5. **Webhook handles everything** - Stripe webhook does triple-write: Supabase purchases + user_profiles flags + Vercel KV
 
-6. **Test locally first** - Always run `npm run build` before considering deployment
+6. **No Node.js on dev machine** - Can't run `npm run build` locally. Vercel handles builds on push
 
 7. **Content Generator HTML uses same-origin API** - Never hardcode external API URLs in `public/content-generator/*.html`
 
@@ -424,14 +424,32 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 10. **linkedin-deal-magnet repo** - Contains agency knowledge base (31 agencies), viral hooks, and content templates. Reference only — don't deploy from there.
 
+11. **Different Supabase databases** - market-assassin and govcon-shop have SEPARATE Supabase instances. They do NOT share `user_profiles` or `purchases` tables.
+
+12. **KV store lives HERE (market-assassin)** - Vercel KV is connected to this project via Vercel Storage integration. govcon-shop does NOT have KV write access. KV backfills and admin grants must run from tools.govcongiants.org.
+
+13. **Admin backfill endpoints** - `/api/admin/backfill-kv` reads Stripe checkout sessions and grants KV access based on tier/bundle metadata. Use for new customer onboarding issues.
+
 ---
 
 ## Recent Work History
 
-### February 6, 2026
-- Fixed all Stripe checkout links in **govcon-shop** (live production) — 5 old/dead payment links from pre-Stripe-migration era were returning 404s
-- Updated 13 files across govcon-shop: ai-content, contractor-database (x2), database-locked, expiring-contracts, opportunity-hunter, opportunity-scout, recompete, sblo-directory, tier2-directory, all-free-resources, tribal HTML, next.config.ts
-- **Source of truth for Stripe links:** `products.ts` in market-assassin — always sync govcon-shop links from here
+### February 6, 2026 (Session 3)
+- **Created `/api/admin/backfill-kv`** — pulls Stripe checkout sessions, grants KV access from tier/bundle metadata
+- **Backfilled 32 customers** — 22 auto-granted via Stripe metadata, 10 Opp Hunter Pro manually granted via admin endpoint
+- **Discovered govcon-shop and market-assassin use DIFFERENT Supabase databases**
+- KV store is only connected to market-assassin (Vercel Storage integration) — govcon-shop can't write to KV
+
+### February 6, 2026 (Sessions 1-2)
+- **govcon-shop: Removed all LemonSqueezy code** — deleted `lemonsqueezy.ts`, both webhook routes
+- **govcon-shop: Created `products.ts`** — Stripe product IDs, bundle config, reverse lookup map
+- **govcon-shop: Created `user-profiles.ts`** — ported from market-assassin for access flag management
+- **govcon-shop: Rewrote Stripe webhook** — triple-write: Supabase purchases + user_profiles flags + Vercel KV
+- **govcon-shop: Rewrote activate-license** — reads user_profiles access flags, email-only (no license key input)
+- **govcon-shop: Added universal purchase confirmation email** — covers 9/12 products that were missing emails
+- **govcon-shop: Verified all 12 Stripe payment link metadata** — all `tier`/`bundle` values correct
+- Fixed all Stripe checkout links in govcon-shop — 5 old/dead payment links replaced
+- Updated 13 files across govcon-shop
 - LemonSqueezy fully canceled — all payments now through Stripe directly
 
 ### February 5, 2026
