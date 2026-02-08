@@ -7203,14 +7203,15 @@
             const padding = 80;
             const avatarR = 56;
             const headerH = avatarR * 2 + 10; // avatar + name/handle block
-            const gapAfterHeader = 60;
+            const gapAfterHeader = 80;
 
             // Pre-calculate text to know total content height
             const quoteText = '\u201C' + quote + '\u201D';
-            let fontSize = 72;
-            if (quoteText.length > 80) fontSize = 62;
-            if (quoteText.length > 120) fontSize = 52;
-            if (quoteText.length > 180) fontSize = 44;
+            let fontSize = 120;
+            if (quoteText.length > 60) fontSize = 100;
+            if (quoteText.length > 100) fontSize = 84;
+            if (quoteText.length > 150) fontSize = 72;
+            if (quoteText.length > 220) fontSize = 60;
 
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
             const maxWidth = canvas.width - (padding * 2);
@@ -7241,25 +7242,38 @@
                 drawInitialsCircle(ctx, avatarCX, avatarCY, avatarR, companyName, theme);
             }
 
-            // Name — doubled
+            // Name
             ctx.textAlign = 'left';
-            ctx.font = `bold 52px 'Segoe UI', system-ui, sans-serif`;
+            ctx.font = `bold 64px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.text;
-            ctx.fillText(companyName || 'Your Name', padding + avatarR * 2 + 24, avatarCY - 10);
+            ctx.fillText(companyName || 'Your Name', padding + avatarR * 2 + 28, avatarCY - 8);
 
-            // Handle — doubled
+            // Handle
             const handle = '@' + (companyName || 'user').toLowerCase().replace(/[^a-z0-9]/g, '');
-            ctx.font = `36px 'Segoe UI', system-ui, sans-serif`;
+            ctx.font = `44px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
-            ctx.fillText(handle, padding + avatarR * 2 + 24, avatarCY + 32);
+            ctx.fillText(handle, padding + avatarR * 2 + 28, avatarCY + 42);
 
-            // Three dots — HORIZONTAL (•••)
-            ctx.fillStyle = theme.secondary;
-            for (let i = 0; i < 3; i++) {
-                ctx.beginPath();
-                ctx.arc(canvas.width - padding + (i * 18) - 36, avatarCY - 5, 5, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            // Blue checkmark next to name
+            ctx.font = `bold 64px 'Segoe UI', system-ui, sans-serif`;
+            const nameWidth = ctx.measureText(companyName || 'Your Name').width;
+            const checkX = padding + avatarR * 2 + 28 + nameWidth + 16;
+            const checkY = avatarCY - 8;
+            // Draw blue circle
+            ctx.beginPath();
+            ctx.arc(checkX, checkY - 18, 18, 0, Math.PI * 2);
+            ctx.fillStyle = '#1d9bf0';
+            ctx.fill();
+            // Draw white checkmark
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(checkX - 8, checkY - 19);
+            ctx.lineTo(checkX - 2, checkY - 12);
+            ctx.lineTo(checkX + 9, checkY - 26);
+            ctx.stroke();
 
             // Quote text — vertically centered below header
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
