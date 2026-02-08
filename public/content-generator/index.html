@@ -7213,7 +7213,7 @@
             if (quoteText.length > 150) fontSize = 72;
             if (quoteText.length > 220) fontSize = 60;
 
-            ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            ctx.font = `${fontSize}px Georgia, 'Times New Roman', serif`;
             const maxWidth = canvas.width - (padding * 2);
             const lines = wrapText(ctx, quoteText, maxWidth);
             const lineHeight = fontSize * 1.4;
@@ -7254,29 +7254,30 @@
             ctx.fillStyle = theme.secondary;
             ctx.fillText(handle, padding + avatarR * 2 + 28, avatarCY + 42);
 
-            // Blue checkmark next to name
+            // Blue checkmark next to name — with gap
             ctx.font = `bold 64px 'Segoe UI', system-ui, sans-serif`;
             const nameWidth = ctx.measureText(companyName || 'Your Name').width;
-            const checkX = padding + avatarR * 2 + 28 + nameWidth + 16;
-            const checkY = avatarCY - 8;
-            // Draw blue circle
+            const checkX = padding + avatarR * 2 + 28 + nameWidth + 28;
+            const checkCY = avatarCY - 22;
+            const checkR = 16;
+            // Blue circle
             ctx.beginPath();
-            ctx.arc(checkX, checkY - 18, 18, 0, Math.PI * 2);
+            ctx.arc(checkX, checkCY, checkR, 0, Math.PI * 2);
             ctx.fillStyle = '#1d9bf0';
             ctx.fill();
-            // Draw white checkmark
+            // White checkmark inside
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 3.5;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
-            ctx.moveTo(checkX - 8, checkY - 19);
-            ctx.lineTo(checkX - 2, checkY - 12);
-            ctx.lineTo(checkX + 9, checkY - 26);
+            ctx.moveTo(checkX - 6, checkCY);
+            ctx.lineTo(checkX - 1, checkCY + 5);
+            ctx.lineTo(checkX + 7, checkCY - 5);
             ctx.stroke();
 
-            // Quote text — vertically centered below header
-            ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            // Quote text — Georgia serif for elegant quote feel
+            ctx.font = `${fontSize}px Georgia, 'Times New Roman', serif`;
             ctx.fillStyle = theme.text;
             ctx.textAlign = 'left';
 
