@@ -7608,47 +7608,28 @@
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Pre-calculate text layout FIRST so we know where the photo/gradient needs to end
             const quote = data.quote || '';
             const highlights = (data.highlights || []).map(h => h.toLowerCase());
-            const padding = 55;
+            const padding = 50;
             const tagline = document.getElementById('profile-tagline')?.value?.trim() || '';
 
-            // Larger font sizes — fill the space
-            let fontSize = 80;
-            if (quote.length > 40) fontSize = 72;
-            if (quote.length > 70) fontSize = 64;
-            if (quote.length > 100) fontSize = 56;
-            if (quote.length > 150) fontSize = 48;
+            // Even larger font sizes
+            let fontSize = 88;
+            if (quote.length > 40) fontSize = 80;
+            if (quote.length > 70) fontSize = 70;
+            if (quote.length > 100) fontSize = 60;
+            if (quote.length > 150) fontSize = 52;
+            if (quote.length > 200) fontSize = 44;
 
-            ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
-            const maxWidth = canvas.width - (padding * 2);
-            const lines = wrapText(ctx, quote, maxWidth);
-            const lineHeight = fontSize * 1.25;
-            const textBlockHeight = lines.length * lineHeight;
+            // Text starts at 45% from top — overlaps mid-body
+            const textStartY = canvas.height * 0.45;
 
-            // Layout from bottom up: accent line → attribution → text → quote marks
-            const accentH = 8;
-            const bottomPad = 30;
-            const attrHeight = tagline ? 65 : 45;
-            const attrGap = 20;
-            const quoteMarksH = 65;
-            const quoteMarkGap = 10;
-
-            const attrBottom = canvas.height - accentH - bottomPad;
-            const textBottom = attrBottom - attrHeight - attrGap;
-            const textTop = textBottom - textBlockHeight;
-            const quoteMarkY = textTop - quoteMarkGap;
-            const contentTop = quoteMarkY - quoteMarksH;
-
-            // Photo fills from top down to where text starts (overlap into gradient)
-            const photoBottom = textTop + lineHeight * 1.5; // photo extends PAST text start
-
+            // Photo fills entire canvas
             if (backgroundPhotoUrl) {
                 try {
                     const img = await loadImage(backgroundPhotoUrl);
                     const imgRatio = img.width / img.height;
-                    const canvasRatio = canvas.width / photoBottom;
+                    const canvasRatio = canvas.width / canvas.height;
 
                     let sx = 0, sy = 0, sw = img.width, sh = img.height;
                     if (imgRatio > canvasRatio) {
@@ -7658,44 +7639,47 @@
                         sh = img.width / canvasRatio;
                         sy = 0;
                     }
-                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, photoBottom);
+                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
                 } catch (e) {
                     console.error('Failed to load photo for Photo Quote:', e);
                 }
             }
 
-            // Subtle overall darkening
-            ctx.fillStyle = 'rgba(0,0,0,0.1)';
-            ctx.fillRect(0, 0, canvas.width, photoBottom);
-
-            // Gradient: fades photo into dark right where text begins
-            const gradTop = contentTop - 60;
-            const gradBottom = textTop + lineHeight;
-            const grad = ctx.createLinearGradient(0, gradTop, 0, gradBottom);
-            grad.addColorStop(0, 'rgba(10,10,10,0)');
-            grad.addColorStop(0.5, 'rgba(10,10,10,0.7)');
-            grad.addColorStop(1, 'rgba(10,10,10,1)');
+            // Gradient overlay: visible photo at top, fading to dark where text starts
+            const gradStart = textStartY - canvas.height * 0.2;
+            const gradEnd = textStartY + canvas.height * 0.08;
+            const grad = ctx.createLinearGradient(0, gradStart, 0, gradEnd);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.4, 'rgba(0,0,0,0.4)');
+            grad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.95)');
             ctx.fillStyle = grad;
-            ctx.fillRect(0, gradTop, canvas.width, gradBottom - gradTop);
+            ctx.fillRect(0, gradStart, canvas.width, gradEnd - gradStart);
 
-            // Solid dark from gradient end to bottom
-            ctx.fillStyle = '#0a0a0a';
-            ctx.fillRect(0, gradBottom, canvas.width, canvas.height - gradBottom);
+            // Dark from gradient end to bottom
+            ctx.fillStyle = 'rgba(0,0,0,0.95)';
+            ctx.fillRect(0, gradEnd, canvas.width, canvas.height - gradEnd);
 
             // Accent line at very bottom
             ctx.fillStyle = theme.accent;
-            ctx.fillRect(0, canvas.height - accentH, canvas.width, accentH);
+            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
 
-            // Curly quote mark
+            // Quote mark — right above text
             ctx.font = `bold 100px Georgia, 'Times New Roman', serif`;
             ctx.fillStyle = theme.accent;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
-            ctx.fillText('\u201C', padding - 8, quoteMarkY + 10);
+            ctx.fillText('\u201C', padding - 8, textStartY - 15);
 
-            // Quote text — word by word with highlights
+            // Quote text
+            ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            const maxWidth = canvas.width - (padding * 2);
+            const lines = wrapText(ctx, quote, maxWidth);
+            const lineHeight = fontSize * 1.25;
+
+            let curY = textStartY + fontSize * 0.6;
             lines.forEach((line, lineIdx) => {
-                const y = textTop + (lineIdx * lineHeight) + fontSize;
+                const y = curY + (lineIdx * lineHeight);
                 const words = line.split(' ');
                 let x = padding;
 
@@ -7717,9 +7701,10 @@
                 });
             });
 
-            // Attribution — tight below text
-            const attrY = attrBottom - attrHeight / 2;
-            const avatarR = 26;
+            // Attribution — below last line of text
+            const lastTextY = curY + (lines.length - 1) * lineHeight;
+            const attrY = lastTextY + lineHeight * 0.8 + 30;
+            const avatarR = 30;
             const attrX = padding;
 
             if (profilePhotoUrl) {
@@ -7744,20 +7729,17 @@
                 drawInitialsCircle(ctx, attrX + avatarR, attrY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
             }
 
-            const nameX = attrX + avatarR * 2 + 14;
+            // Name + tagline — larger and always visible
+            const nameX = attrX + avatarR * 2 + 16;
             ctx.textBaseline = 'alphabetic';
             ctx.textAlign = 'left';
+            ctx.font = `bold 34px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(companyName || 'Your Name', nameX, attrY - 2);
             if (tagline) {
-                ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
-                ctx.fillStyle = '#ffffff';
-                ctx.fillText(companyName || 'Your Name', nameX, attrY - 4);
-                ctx.font = `21px 'Segoe UI', system-ui, sans-serif`;
-                ctx.fillStyle = 'rgba(255,255,255,0.6)';
-                ctx.fillText(tagline, nameX, attrY + 22);
-            } else {
-                ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
-                ctx.fillStyle = '#ffffff';
-                ctx.fillText(companyName || 'Your Name', nameX, attrY + 8);
+                ctx.font = `24px 'Segoe UI', system-ui, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.65)';
+                ctx.fillText(tagline, nameX, attrY + 28);
             }
 
             return canvas.toDataURL('image/png');
