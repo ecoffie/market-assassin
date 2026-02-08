@@ -7222,17 +7222,25 @@
                 drawInitialsCircle(ctx, avatarCX, avatarCY, avatarR, companyName, theme);
             }
 
-            // Company name
+            // Name
             ctx.textAlign = 'left';
             ctx.font = `bold 32px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.text;
-            ctx.fillText(companyName || 'Your Company', padding + 100, 132);
+            ctx.fillText(companyName || 'Your Name', padding + 100, 132);
 
             // Handle
-            const handle = '@' + (companyName || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const handle = '@' + (companyName || 'user').toLowerCase().replace(/[^a-z0-9]/g, '');
             ctx.font = `24px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
             ctx.fillText(handle, padding + 100, 165);
+
+            // Three dots — HORIZONTAL (•••)
+            ctx.fillStyle = theme.secondary;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(canvas.width - padding - 10 + (i * 16) - 16, 135, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             // Large curly-quoted text
             const quoteText = '\u201C' + quote + '\u201D';
@@ -7286,9 +7294,10 @@
             const headerHeight = 70;
             const headerGap = 55;
 
-            let fontSize = 40;
-            if (quote.length > 120) fontSize = 34;
-            if (quote.length > 180) fontSize = 30;
+            let fontSize = 52;
+            if (quote.length > 100) fontSize = 44;
+            if (quote.length > 150) fontSize = 38;
+            if (quote.length > 220) fontSize = 32;
 
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
             const textMaxWidth = cardW - (innerPad * 2);
@@ -7528,7 +7537,7 @@
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 1200;
-            canvas.height = 1200;
+            canvas.height = 1500;  // Taller for vertical text flow
 
             // Background
             ctx.fillStyle = theme.bg;
@@ -7551,30 +7560,35 @@
             const highlights = (data.highlights || []).map(h => h.toLowerCase());
             const padding = 120;
 
-            // Calculate font size
-            let fontSize = 64;
-            if (quote.length > 80) fontSize = 56;
-            if (quote.length > 120) fontSize = 48;
-            if (quote.length > 180) fontSize = 40;
+            // Narrower max width = fewer words per line = taller vertical flow
+            const narrowWidth = canvas.width * 0.55;
 
-            ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
+            // Dynamic font size — start big, shrink to fit
+            let fontSize = 80;
+            const minFont = 44;
+            let lines, lineHeight, totalHeight;
+            const attrSpace = 120; // space for attribution at bottom
+            const availableH = canvas.height - padding * 2 - attrSpace;
 
-            // Word-wrap the quote into lines
-            const maxWidth = canvas.width - (padding * 2);
-            const lines = wrapText(ctx, quote, maxWidth);
-            const lineHeight = fontSize * 1.6;
-            const totalHeight = lines.length * lineHeight;
-            const startY = (canvas.height - totalHeight) / 2 + fontSize / 2 - 20;
+            while (fontSize >= minFont) {
+                ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
+                lines = wrapText(ctx, quote, narrowWidth);
+                lineHeight = fontSize * 1.6;
+                totalHeight = lines.length * lineHeight;
+                if (totalHeight <= availableH) break;
+                fontSize -= 4;
+            }
 
-            // Draw each line centered, word by word with highlights
+            // Center text block vertically
+            const startY = (canvas.height - attrSpace - totalHeight) / 2 + fontSize / 2;
+
+            // Draw each line LEFT-ALIGNED, word by word with highlights
             lines.forEach((line, lineIdx) => {
                 const y = startY + (lineIdx * lineHeight);
                 const words = line.split(' ');
 
-                // Measure full line width to center it
-                ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
-                const lineWidth = ctx.measureText(line).width;
-                let x = (canvas.width - lineWidth) / 2;
+                // Left-aligned with padding (like reference image)
+                let x = padding;
 
                 words.forEach((word) => {
                     ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
@@ -7590,7 +7604,7 @@
                     if (isHighlighted) {
                         const highlightPad = 8;
                         ctx.fillStyle = theme.highlight;
-                        ctx.globalAlpha = 0.75;
+                        ctx.globalAlpha = 0.85;
                         ctx.fillRect(
                             x - highlightPad,
                             y - fontSize * 0.75,
@@ -7608,13 +7622,13 @@
                 });
             });
 
-            // Attribution centered at bottom
+            // Attribution at bottom-left
             if (companyName) {
-                ctx.font = `italic 30px Georgia, 'Times New Roman', serif`;
+                ctx.font = `italic 34px Georgia, 'Times New Roman', serif`;
                 ctx.fillStyle = theme.text;
                 ctx.globalAlpha = 0.5;
-                ctx.textAlign = 'center';
-                ctx.fillText('\u2014 ' + companyName, canvas.width / 2, canvas.height - 100);
+                ctx.textAlign = 'left';
+                ctx.fillText('\u2014 ' + companyName, padding, canvas.height - 80);
                 ctx.globalAlpha = 1;
             }
 
