@@ -7200,17 +7200,17 @@
             ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const padding = 100;
-            const avatarR = 40;
+            const padding = 80;
+            const avatarR = 44;
             const headerH = avatarR * 2 + 10; // avatar + name/handle block
             const gapAfterHeader = 40;
 
             // Pre-calculate text to know total content height
             const quoteText = '\u201C' + quote + '\u201D';
-            let fontSize = 56;
-            if (quoteText.length > 100) fontSize = 48;
-            if (quoteText.length > 150) fontSize = 40;
-            if (quoteText.length > 200) fontSize = 34;
+            let fontSize = 64;
+            if (quoteText.length > 80) fontSize = 56;
+            if (quoteText.length > 120) fontSize = 48;
+            if (quoteText.length > 180) fontSize = 40;
 
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
             const maxWidth = canvas.width - (padding * 2);
@@ -7285,7 +7285,7 @@
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 1200;
-            canvas.height = 1200;
+            canvas.height = 1500;  // Rectangular
 
             // Outer background
             ctx.fillStyle = theme.bg;
@@ -7303,10 +7303,10 @@
             const headerHeight = 70;
             const headerGap = 55;
 
-            let fontSize = 52;
-            if (quote.length > 100) fontSize = 44;
-            if (quote.length > 150) fontSize = 38;
-            if (quote.length > 220) fontSize = 32;
+            let fontSize = 72;
+            if (quote.length > 80) fontSize = 62;
+            if (quote.length > 120) fontSize = 52;
+            if (quote.length > 180) fontSize = 44;
 
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
             const textMaxWidth = cardW - (innerPad * 2);
@@ -7343,8 +7343,8 @@
             ctx.stroke();
 
             // Avatar
-            const avatarY = cardY + innerPad + 28;
-            const avatarR = 28;
+            const avatarY = cardY + innerPad + 36;
+            const avatarR = 36;
             if (profilePhotoUrl) {
                 try {
                     const img = await loadImage(profilePhotoUrl);
@@ -7363,20 +7363,20 @@
 
             // Name + handle
             ctx.textAlign = 'left';
-            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
+            ctx.font = `bold 38px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.text;
-            ctx.fillText(companyName || 'Your Company', innerX + 74, avatarY - 5);
+            ctx.fillText(companyName || 'Your Company', innerX + 90, avatarY - 4);
 
             const handle = '@' + (companyName || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
-            ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+            ctx.font = `28px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
-            ctx.fillText(handle, innerX + 74, avatarY + 25);
+            ctx.fillText(handle, innerX + 90, avatarY + 32);
 
-            // Three dots menu (vertical)
+            // Three dots menu (horizontal •••)
             ctx.fillStyle = theme.secondary;
             for (let i = 0; i < 3; i++) {
                 ctx.beginPath();
-                ctx.arc(cardX + cardW - innerPad - 10, avatarY - 12 + (i * 14), 3, 0, Math.PI * 2);
+                ctx.arc(cardX + cardW - innerPad - 30 + (i * 18), avatarY - 5, 4, 0, Math.PI * 2);
                 ctx.fill();
             }
 
@@ -7391,15 +7391,15 @@
             });
 
             // Hashtag line
-            const hashY = textStartY + textBlockHeight + 16;
-            ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+            const hashY = textStartY + textBlockHeight + 24;
+            ctx.font = `28px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
             ctx.fillText('#govcon #quoteoftheday #leadership', innerX, hashY);
 
-            // Divider line
+            // Divider line — visible
             const dividerY = hashY + dividerGap;
             ctx.strokeStyle = theme.border;
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(innerX, dividerY);
             ctx.lineTo(cardX + cardW - innerPad, dividerY);
@@ -7417,8 +7417,8 @@
             const iconS = 20;  // icon size
             ctx.fillStyle = theme.secondary;
             ctx.strokeStyle = theme.secondary;
-            ctx.lineWidth = 1.8;
-            ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+            ctx.lineWidth = 2;
+            ctx.font = `30px 'Segoe UI', system-ui, sans-serif`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
 
@@ -7564,7 +7564,8 @@
             }
             ctx.globalAlpha = 1;
 
-            const quote = data.quote || '';
+            const rawQuote = data.quote || '';
+            const quote = '\u201C' + rawQuote + '\u201D';  // Wrap in curly quotes
             const highlights = (data.highlights || []).map(h => h.toLowerCase());
             const padding = 120;
 
@@ -7575,7 +7576,7 @@
             let fontSize = 80;
             const minFont = 44;
             let lines, lineHeight, totalHeight;
-            const attrSpace = 120; // space for attribution at bottom
+            const attrSpace = 100; // space for attribution below text
             const availableH = canvas.height - padding * 2 - attrSpace;
 
             while (fontSize >= minFont) {
@@ -7587,8 +7588,9 @@
                 fontSize -= 4;
             }
 
-            // Center text block vertically
-            const startY = (canvas.height - attrSpace - totalHeight) / 2 + fontSize / 2;
+            // Center text block + attribution as one unit
+            const totalBlockH = totalHeight + attrSpace;
+            const startY = (canvas.height - totalBlockH) / 2 + fontSize / 2;
 
             // Draw each line LEFT-ALIGNED, word by word with highlights
             lines.forEach((line, lineIdx) => {
@@ -7630,13 +7632,14 @@
                 });
             });
 
-            // Attribution at bottom-left
+            // Attribution right below the last line of text
             if (companyName) {
+                const lastLineY = startY + ((lines.length - 1) * lineHeight);
                 ctx.font = `italic 34px Georgia, 'Times New Roman', serif`;
                 ctx.fillStyle = theme.text;
                 ctx.globalAlpha = 0.5;
                 ctx.textAlign = 'left';
-                ctx.fillText('\u2014 ' + companyName, padding, canvas.height - 80);
+                ctx.fillText('\u2014 ' + companyName, padding, lastLineY + lineHeight + 30);
                 ctx.globalAlpha = 1;
             }
 
