@@ -900,7 +900,7 @@
                                             </svg>
                                         </button>
                                     </div>
-                                    <p class="text-xs text-gray-500 mt-2">Headshot appears on Tweet Quote, Social Card, and Photo Quote graphics. Max 2MB.</p>
+                                    <p class="text-xs text-gray-500 mt-2">Small headshot for avatar circles on Tweet Quote and Social Card. Max 2MB.</p>
                                     <input type="hidden" id="profile-photo-data" value="">
                                 </div>
 
@@ -910,6 +910,34 @@
                                     <input type="text" id="profile-tagline" placeholder="e.g., Entrepreneur | Business Development Leader"
                                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-govcon-blue focus:border-govcon-blue">
                                     <p class="text-xs text-gray-500 mt-1">Appears on Photo Quote graphics below your name.</p>
+                                </div>
+
+                                <!-- Background Photo Upload (for Photo Quote) -->
+                                <div class="mt-4 pt-4 border-t border-purple-200">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Background Photo <span class="text-xs text-amber-600 font-normal">(Photo Quote)</span></label>
+                                    <div class="flex items-center gap-4">
+                                        <label class="flex-1 cursor-pointer">
+                                            <div id="bg-photo-upload-area" class="border-2 border-dashed border-amber-300 rounded-lg p-3 text-center hover:border-amber-500 hover:bg-amber-50/50 transition">
+                                                <input type="file" id="bg-photo-upload" accept="image/*" class="hidden" onchange="handleBgPhotoUpload(event)">
+                                                <div class="flex items-center justify-center gap-2">
+                                                    <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                    </svg>
+                                                    <span id="bg-photo-text" class="text-sm text-amber-600">Click to upload hero photo</span>
+                                                </div>
+                                            </div>
+                                        </label>
+                                        <div id="bg-photo-preview" class="hidden w-16 h-20 rounded-lg border-2 border-amber-200 overflow-hidden bg-white shadow-sm">
+                                            <img id="bg-photo-preview-img" src="" class="w-full h-full object-cover">
+                                        </div>
+                                        <button id="remove-bg-photo-btn" onclick="removeBgPhoto()" class="hidden p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Remove photo">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2">Large professional photo used as the full background on Photo Quote. Max 5MB recommended.</p>
+                                    <input type="hidden" id="bg-photo-data" value="">
                                 </div>
 
                                 <!-- Company Logo Upload -->
@@ -1906,6 +1934,11 @@
                     // Load profile photo if saved
                     if (colors.photo_url) {
                         loadProfilePhoto(colors.photo_url);
+                    }
+
+                    // Load background photo if saved
+                    if (colors.background_photo_url) {
+                        loadBgPhoto(colors.background_photo_url);
                     }
 
                     // Load tagline if saved
@@ -3158,9 +3191,9 @@
             const theme = themes[themeIdx] || themes[0];
             const apiType = graphicLayouts[layout]?.apiType || 'quote';
 
-            // Photo Quote requires a profile photo
-            if (layout === 'photoquote' && !profilePhotoUrl) {
-                showErrorToast('Photo Quote requires a profile photo. Upload one in your Profile settings.');
+            // Photo Quote requires a background photo
+            if (layout === 'photoquote' && !backgroundPhotoUrl) {
+                showErrorToast('Photo Quote requires a Background Photo. Upload one in your Profile settings.');
                 return;
             }
 
@@ -3616,6 +3649,115 @@
                     photoText.textContent = 'Photo uploaded!';
                     photoText.classList.add('text-green-600');
                     photoText.classList.remove('text-purple-600');
+                }
+            }
+        }
+
+        // Background photo for Photo Quote layout
+        let backgroundPhotoUrl = null;
+
+        async function handleBgPhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showErrorToast('Please upload an image file');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showErrorToast('Background photo must be under 5MB');
+                return;
+            }
+
+            const user = SupabaseAuth.user;
+            if (!user) {
+                showErrorToast('Please sign in to upload a photo');
+                return;
+            }
+
+            const bgText = document.getElementById('bg-photo-text');
+            if (bgText) {
+                bgText.textContent = 'Uploading...';
+                bgText.classList.remove('text-amber-600', 'text-green-600');
+                bgText.classList.add('text-blue-600');
+            }
+
+            try {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${user.id}/background.${fileExt}`;
+
+                const { data, error } = await SupabaseAuth.client.storage
+                    .from('company-logos')
+                    .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+                if (error) throw new Error(error.message || 'Upload failed');
+
+                const { data: urlData } = SupabaseAuth.client.storage
+                    .from('company-logos')
+                    .getPublicUrl(fileName);
+
+                backgroundPhotoUrl = urlData.publicUrl;
+                document.getElementById('bg-photo-data').value = backgroundPhotoUrl;
+
+                const preview = document.getElementById('bg-photo-preview');
+                const previewImg = document.getElementById('bg-photo-preview-img');
+                const removeBtn = document.getElementById('remove-bg-photo-btn');
+
+                previewImg.src = backgroundPhotoUrl;
+                preview.classList.remove('hidden');
+                removeBtn.classList.remove('hidden');
+                bgText.textContent = 'Photo uploaded!';
+                bgText.classList.remove('text-blue-600');
+                bgText.classList.add('text-green-600');
+
+                showSuccessToast('Background photo uploaded! Click Save Profile to save.');
+            } catch (error) {
+                console.error('Background photo upload error:', error);
+                if (bgText) {
+                    bgText.textContent = 'Click to upload hero photo';
+                    bgText.classList.remove('text-blue-600');
+                    bgText.classList.add('text-amber-600');
+                }
+                showErrorToast('Failed to upload photo: ' + error.message);
+            }
+        }
+
+        function removeBgPhoto() {
+            const preview = document.getElementById('bg-photo-preview');
+            const removeBtn = document.getElementById('remove-bg-photo-btn');
+            const bgText = document.getElementById('bg-photo-text');
+            const input = document.getElementById('bg-photo-upload');
+
+            preview.classList.add('hidden');
+            removeBtn.classList.add('hidden');
+            bgText.textContent = 'Click to upload hero photo';
+            bgText.classList.remove('text-green-600');
+            bgText.classList.add('text-amber-600');
+            if (input) input.value = '';
+
+            backgroundPhotoUrl = null;
+            document.getElementById('bg-photo-data').value = '';
+        }
+
+        function loadBgPhoto(photoUrl) {
+            if (!photoUrl) return;
+
+            backgroundPhotoUrl = photoUrl;
+            document.getElementById('bg-photo-data').value = photoUrl;
+
+            const preview = document.getElementById('bg-photo-preview');
+            const previewImg = document.getElementById('bg-photo-preview-img');
+            const removeBtn = document.getElementById('remove-bg-photo-btn');
+            const bgText = document.getElementById('bg-photo-text');
+
+            if (preview && previewImg) {
+                previewImg.src = photoUrl;
+                preview.classList.remove('hidden');
+                if (removeBtn) removeBtn.classList.remove('hidden');
+                if (bgText) {
+                    bgText.textContent = 'Photo uploaded!';
+                    bgText.classList.add('text-green-600');
+                    bgText.classList.remove('text-amber-600');
                 }
             }
         }
@@ -5550,7 +5692,8 @@
                 background: document.getElementById('brand-bg-color')?.value || '#0d1f33',
                 enabled: document.getElementById('use-brand-colors')?.checked || false,
                 logo_url: profileLogoUrl || null,  // Store URL from Supabase Storage
-                photo_url: profilePhotoUrl || null,  // Profile photo for graphics
+                photo_url: profilePhotoUrl || null,  // Profile photo for avatar circles
+                background_photo_url: backgroundPhotoUrl || null,  // Hero photo for Photo Quote background
                 tagline: document.getElementById('profile-tagline')?.value?.trim() || null  // Tagline for Photo Quote
             };
 
@@ -7465,10 +7608,10 @@
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw profile photo in the TOP portion only (head/shoulders area)
-            if (profilePhotoUrl) {
+            // Draw background photo in the TOP portion (hero image)
+            if (backgroundPhotoUrl) {
                 try {
-                    const img = await loadImage(profilePhotoUrl);
+                    const img = await loadImage(backgroundPhotoUrl);
                     // Photo fills the top ~65% of canvas
                     const photoAreaH = canvas.height * 0.65;
                     const imgRatio = img.width / img.height;
