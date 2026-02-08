@@ -2536,32 +2536,14 @@
                                 Try Again
                             </button>
                             ${hasGraphicsAccess ? `
-                            <div class="flex items-center gap-1">
-                                <select id="quick-graphic-type-${index}" class="text-xs bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-lg px-1.5 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                    <option value="quote">Quote</option>
-                                    <option value="stat">Stat</option>
-                                    <option value="tips">Tips</option>
-                                    <option value="hottake">Hot Take</option>
-                                    <option value="beforeafter">Before/After</option>
-                                </select>
-                                <button onclick="generateQuickImage(${index})" class="flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                    Go
-                                </button>
-                            </div>
-                            <button onclick="openCarouselModal(${index})" class="flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white text-sm rounded-lg transition">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                                Carousel
+                            <button onclick="openVisualModal(${index})" class="flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm rounded-lg transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                Create Visual
                             </button>
                             ` : `
-                            <button onclick="showGraphicsUpgradeModal()" class="relative flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-purple-400 to-purple-500 text-white text-sm rounded-lg transition hover:from-purple-500 hover:to-purple-600">
+                            <button onclick="showGraphicsUpgradeModal()" class="relative flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-sm rounded-lg transition hover:from-purple-500 hover:to-indigo-500">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                Graphic
-                                <span class="absolute -top-2 -right-2 bg-yellow-400 text-xs text-gray-900 px-1.5 py-0.5 rounded-full font-bold">PRO</span>
-                            </button>
-                            <button onclick="showGraphicsUpgradeModal()" class="relative flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-orange-400 to-pink-400 text-white text-sm rounded-lg transition hover:from-orange-500 hover:to-pink-500">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                Carousel
+                                Create Visual
                                 <span class="absolute -top-2 -right-2 bg-yellow-400 text-xs text-gray-900 px-1.5 py-0.5 rounded-full font-bold">PRO</span>
                             </button>
                             `}
@@ -2580,7 +2562,7 @@
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                         Download
                                     </a>
-                                    <button onclick="generateQuickImage(${index})" class="flex items-center gap-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition">
+                                    <button onclick="cycleGraphicStyle(${index})" class="flex items-center gap-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                         New Style
                                     </button>
@@ -2621,94 +2603,19 @@
         // Track style index for each quick post
         const quickStyleIndex = {};
 
-        // Generate graphic for quick posts (supports all graphic types)
+        // Generate graphic for quick posts (default classic quote, used as fallback)
         async function generateQuickImage(index) {
             const post = generatedPosts[index];
             if (!post) return;
 
-            const imageArea = document.getElementById(`image-area-${index}`);
-            const loadingEl = document.getElementById(`image-loading-${index}`);
-            const resultEl = document.getElementById(`image-result-${index}`);
-            const imgEl = document.getElementById(`generated-img-${index}`);
-            const downloadLink = document.getElementById(`download-link-${index}`);
-
-            // Read the selected graphic type
-            const typeSelect = document.getElementById(`quick-graphic-type-${index}`);
-            const graphicType = typeSelect ? typeSelect.value : 'quote';
-
-            // Show the image area and loading
-            imageArea.classList.remove('hidden');
-            loadingEl.classList.remove('hidden');
-            resultEl.classList.add('hidden');
-
-            try {
-                // Clean the post content (remove ** markdown)
-                const cleanContent = post.content.replace(/\*\*/g, '');
-
-                // Call unified graphic API
-                let graphicData;
-                try {
-                    const response = await fetch('/api/generate-graphic', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ postContent: cleanContent, type: graphicType })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        graphicData = result.data;
-                    }
-                } catch (e) {
-                    console.log('API graphic generation failed, using fallback');
-                }
-
-                // Fallback: create a default for quote type
-                if (!graphicData) {
-                    const templates = [
-                        'Excellence is not a destination, it\'s a continuous journey.',
-                        'Success in government contracting starts with trust.',
-                        'Innovation drives mission success.',
-                        'The right partner makes all the difference.',
-                        'Results speak louder than proposals.',
-                        'Building partnerships that deliver.'
-                    ];
-                    graphicData = { quote: templates[Math.floor(Math.random() * templates.length)] };
-                }
-
-                // Check if user has brand colors enabled (Full Fix only)
-                let style = getBrandStyle();
-
-                if (!style) {
-                    // Cycle through default styles
-                    if (quickStyleIndex[index] === undefined) {
-                        quickStyleIndex[index] = Math.floor(Math.random() * quoteCardStyles.length);
-                    } else {
-                        quickStyleIndex[index] = (quickStyleIndex[index] + 1) % quoteCardStyles.length;
-                    }
-                    style = quoteCardStyles[quickStyleIndex[index]];
-                }
-
-                // Get company name from profile
-                const companyName = SupabaseAuth.profile?.company_name || 'Your Company';
-
-                // Generate the graphic using the correct renderer
-                const imageDataUrl = await renderGraphic(graphicType, graphicData, companyName, style);
-
-                // Display the result
-                imgEl.src = imageDataUrl;
-                downloadLink.href = imageDataUrl;
-                downloadLink.download = `linkedin-${graphicType}-graphic.png`;
-
-                loadingEl.classList.add('hidden');
-                resultEl.classList.remove('hidden');
-
-                const typeLabel = graphicTypeLabels[graphicType] || 'Quote Card';
-                showSuccessToast(`${typeLabel} created (${style.name})`);
-            } catch (error) {
-                console.error('Error generating quick image:', error);
-                loadingEl.classList.add('hidden');
-                imageArea.classList.add('hidden');
-                showErrorToast('Failed to generate graphic: ' + error.message);
+            // If no layout stored yet, open the visual modal instead
+            if (!post.graphicLayout) {
+                openVisualModal(index);
+                return;
             }
+
+            // Otherwise cycle style (same as New Style)
+            cycleGraphicStyle(index);
         }
 
         // Save post to library with retry logic
@@ -2938,118 +2845,434 @@
             }
         };
 
-        // Open carousel configuration modal
-        function openCarouselModal(index) {
+        // Store visual modal state
+        let visualSourcePost = null;
+        let visualActiveTab = 'graphic';
+        let visualSelectedLayout = 'classic';
+        let visualSelectedThemeIndex = 0;
+
+        // Open unified visual modal (replaces openCarouselModal)
+        function openVisualModal(index, defaultTab) {
             const post = generatedPosts[index];
             if (!post) return;
 
-            // Store the post
+            visualSourcePost = { ...post, index };
             carouselSourcePost = { ...post, index };
+            visualActiveTab = defaultTab || 'graphic';
+            visualSelectedLayout = 'classic';
+            visualSelectedThemeIndex = 0;
 
-            // Remove existing modal if any
-            const existing = document.getElementById('carousel-config-modal');
+            const existing = document.getElementById('visual-modal');
             if (existing) existing.remove();
 
             const modal = document.createElement('div');
-            modal.id = 'carousel-config-modal';
+            modal.id = 'visual-modal';
             modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center overflow-y-auto py-8';
+
+            const excerpt = (post.title || post.content.substring(0, 80) + '...').replace(/"/g, '&quot;');
+
             modal.innerHTML = `
-                <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xl font-bold text-gray-900">Create Carousel from Post</h3>
-                        <button onclick="closeCarouselConfigModal()" class="text-gray-400 hover:text-gray-600">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6" style="max-height: 90vh; overflow-y: auto;">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xl font-bold text-gray-900">Create Visual from Post</h3>
+                        <button onclick="closeVisualModal()" class="text-gray-400 hover:text-gray-600">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
                         </button>
                     </div>
 
-                    <p class="text-sm text-gray-600 mb-4 bg-gray-50 p-3 rounded-lg italic">"${(post.title || post.content.substring(0, 80) + '...')}"</p>
+                    <p class="text-sm text-gray-600 mb-4 bg-gray-50 p-3 rounded-lg italic">"${excerpt}"</p>
 
-                    <!-- Number of Slides -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Number of Slides</label>
-                        <div class="grid grid-cols-4 gap-2">
-                            ${[3, 4, 5, 6].map(num => `
-                                <button onclick="selectSlideCount(${num})" id="slide-count-${num}" class="p-3 rounded-lg border-2 transition ${num === 4 ? 'border-govcon-blue bg-govcon-light' : 'border-gray-200 hover:border-gray-300'}">
-                                    <span class="text-xl font-bold ${num === 4 ? 'text-govcon-blue' : 'text-gray-700'}">${num}</span>
-                                    <span class="block text-xs text-gray-500">slides</span>
-                                </button>
-                            `).join('')}
-                        </div>
-                        <input type="hidden" id="carousel-slide-count" value="4">
+                    <!-- Tab Toggle -->
+                    <div class="flex bg-gray-100 rounded-lg p-1 mb-5">
+                        <button id="visual-tab-graphic" onclick="switchVisualTab('graphic')" class="flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition ${visualActiveTab === 'graphic' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">
+                            Single Graphic
+                        </button>
+                        <button id="visual-tab-carousel" onclick="switchVisualTab('carousel')" class="flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition ${visualActiveTab === 'carousel' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}">
+                            Carousel
+                        </button>
                     </div>
 
-                    <!-- Theme Selection -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Visual Theme</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            ${Object.entries(carouselThemes).map(([key, theme], i) => {
-                                const brandPrimary = document.getElementById("brand-primary-color")?.value || "#1e3a5f";
-                                const brandAccent = document.getElementById("brand-accent-color")?.value || "#c5a028";
-                                const brandBg = document.getElementById("brand-bg-color")?.value || "#0d1f33";
-                                const bgStyle = key === "mybrand" ? brandBg : theme.bg;
-                                const accentStyle = key === "mybrand" ? brandAccent : theme.accent;
-                                const isSelected = key === "mybrand";
-                                return "<button onclick=\"selectCarouselTheme('" + key + "')\" id=\"theme-" + key + "\" class=\"p-3 rounded-lg border-2 transition text-left " + (isSelected ? "border-govcon-blue bg-govcon-light" : "border-gray-200 hover:border-gray-300") + "\">" +
-                                    "<div class=\"flex items-center gap-2\">" +
-                                        "<div class=\"w-6 h-6 rounded-full flex items-center justify-center text-xs\" style=\"background: " + bgStyle + "; border: 2px solid " + accentStyle + "\">" + (theme.icon || "") + "</div>" +
-                                        "<span class=\"text-sm font-medium " + (isSelected ? "text-govcon-blue" : "text-gray-700") + "\">" + theme.name + "</span>" +
-                                    "</div>" +
-                                "</button>";
-                            }).join("")}
+                    <!-- SINGLE GRAPHIC TAB -->
+                    <div id="visual-graphic-tab" class="${visualActiveTab === 'graphic' ? '' : 'hidden'}">
+                        <!-- Layout Picker (2x2 grid) -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Layout</label>
+                            <div class="grid grid-cols-2 gap-2" id="layout-picker">
+                                ${Object.entries(graphicLayouts).map(([key, layout]) => `
+                                    <button onclick="selectGraphicLayout('${key}')" id="layout-${key}" class="p-3 rounded-lg border-2 transition text-left ${key === 'classic' ? 'border-govcon-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="text-lg">${layout.icon}</span>
+                                            <span class="text-sm font-semibold ${key === 'classic' ? 'text-govcon-blue' : 'text-gray-800'}">${layout.label}</span>
+                                        </div>
+                                        <p class="text-xs text-gray-500">${layout.description}</p>
+                                    </button>
+                                `).join('')}
+                            </div>
                         </div>
-                        <input type="hidden" id="carousel-theme" value="mybrand">
+
+                        <!-- Color Theme Picker (dynamic per layout) -->
+                        <div class="mb-5">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Color Theme</label>
+                            <div id="theme-picker" class="flex gap-2 flex-wrap">
+                                ${buildThemePicker('classic', 0)}
+                            </div>
+                        </div>
+
+                        <input type="hidden" id="visual-layout" value="classic">
+                        <input type="hidden" id="visual-theme-index" value="0">
                     </div>
 
-                    <!-- Slide Focus Options -->
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Slide Focus (optional)</label>
-                        <div class="space-y-2">
-                            <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
-                                <input type="checkbox" id="focus-hook" class="w-4 h-4 text-govcon-blue rounded" checked>
-                                <span class="text-sm text-gray-700">Hook + Problem Statement</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
-                                <input type="checkbox" id="focus-solution" class="w-4 h-4 text-govcon-blue rounded" checked>
-                                <span class="text-sm text-gray-700">Your Solution / Approach</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
-                                <input type="checkbox" id="focus-proof" class="w-4 h-4 text-govcon-blue rounded">
-                                <span class="text-sm text-gray-700">Proof / Case Study / Stats</span>
-                            </label>
-                            <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
-                                <input type="checkbox" id="focus-cta" class="w-4 h-4 text-govcon-blue rounded" checked>
-                                <span class="text-sm text-gray-700">Call-to-Action Slide</span>
-                            </label>
+                    <!-- CAROUSEL TAB -->
+                    <div id="visual-carousel-tab" class="${visualActiveTab === 'carousel' ? '' : 'hidden'}">
+                        <!-- Number of Slides -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Number of Slides</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                ${[3, 4, 5, 6].map(num => `
+                                    <button onclick="selectSlideCount(${num})" id="slide-count-${num}" class="p-3 rounded-lg border-2 transition ${num === 4 ? 'border-govcon-blue bg-govcon-light' : 'border-gray-200 hover:border-gray-300'}">
+                                        <span class="text-xl font-bold ${num === 4 ? 'text-govcon-blue' : 'text-gray-700'}">${num}</span>
+                                        <span class="block text-xs text-gray-500">slides</span>
+                                    </button>
+                                `).join('')}
+                            </div>
+                            <input type="hidden" id="carousel-slide-count" value="4">
+                        </div>
+
+                        <!-- Theme Selection -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Visual Theme</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                ${Object.entries(carouselThemes).map(([key, theme], i) => {
+                                    const brandBg = document.getElementById("brand-bg-color")?.value || "#0d1f33";
+                                    const brandAccent = document.getElementById("brand-accent-color")?.value || "#c5a028";
+                                    const bgStyle = key === "mybrand" ? brandBg : theme.bg;
+                                    const accentStyle = key === "mybrand" ? brandAccent : theme.accent;
+                                    const isSelected = key === "mybrand";
+                                    return "<button onclick=\"selectCarouselTheme('" + key + "')\" id=\"theme-" + key + "\" class=\"p-3 rounded-lg border-2 transition text-left " + (isSelected ? "border-govcon-blue bg-govcon-light" : "border-gray-200 hover:border-gray-300") + "\">" +
+                                        "<div class=\"flex items-center gap-2\">" +
+                                            "<div class=\"w-6 h-6 rounded-full flex items-center justify-center text-xs\" style=\"background: " + bgStyle + "; border: 2px solid " + accentStyle + "\">" + (theme.icon || "") + "</div>" +
+                                            "<span class=\"text-sm font-medium " + (isSelected ? "text-govcon-blue" : "text-gray-700") + "\">" + theme.name + "</span>" +
+                                        "</div>" +
+                                    "</button>";
+                                }).join("")}
+                            </div>
+                            <input type="hidden" id="carousel-theme" value="mybrand">
+                        </div>
+
+                        <!-- Slide Focus Options -->
+                        <div class="mb-5">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Slide Focus (optional)</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                                    <input type="checkbox" id="focus-hook" class="w-4 h-4 text-govcon-blue rounded" checked>
+                                    <span class="text-sm text-gray-700">Hook + Problem Statement</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                                    <input type="checkbox" id="focus-solution" class="w-4 h-4 text-govcon-blue rounded" checked>
+                                    <span class="text-sm text-gray-700">Your Solution / Approach</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                                    <input type="checkbox" id="focus-proof" class="w-4 h-4 text-govcon-blue rounded">
+                                    <span class="text-sm text-gray-700">Proof / Case Study / Stats</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                                    <input type="checkbox" id="focus-cta" class="w-4 h-4 text-govcon-blue rounded" checked>
+                                    <span class="text-sm text-gray-700">Call-to-Action Slide</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Action Buttons -->
                     <div class="flex gap-3">
-                        <button onclick="closeCarouselConfigModal()" class="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition font-medium">
+                        <button onclick="closeVisualModal()" class="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition font-medium">
                             Cancel
                         </button>
-                        <button onclick="generateCarouselFromPost()" id="generate-carousel-btn" class="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white rounded-lg transition font-medium flex items-center justify-center gap-2">
+                        <button onclick="generateVisualFromModal()" id="generate-visual-btn" class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition font-medium flex items-center justify-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                             </svg>
-                            Generate Carousel
+                            Generate
                         </button>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
 
-            // Close on backdrop click
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) closeCarouselConfigModal();
+                if (e.target === modal) closeVisualModal();
             });
         }
 
-        function closeCarouselConfigModal() {
-            const modal = document.getElementById('carousel-config-modal');
+        // Backward compat alias
+        function openCarouselModal(index) {
+            openVisualModal(index, 'carousel');
+        }
+
+        function closeVisualModal() {
+            const modal = document.getElementById('visual-modal');
             if (modal) modal.remove();
+        }
+
+        function closeCarouselConfigModal() {
+            closeVisualModal();
+        }
+
+        // Build theme picker circles for a given layout
+        function buildThemePicker(layout, selectedIdx) {
+            const themes = graphicLayouts[layout]?.themes || quoteCardStyles;
+            return themes.map((theme, i) => {
+                const bgColor = theme.bg || theme.bgGradient?.[0] || '#333';
+                const isSelected = i === selectedIdx;
+                const ring = isSelected ? 'ring-2 ring-offset-2 ring-blue-500' : '';
+                return `<button onclick="selectGraphicTheme(${i})" class="w-9 h-9 rounded-full border-2 border-gray-300 transition hover:scale-110 ${ring}" style="background: ${bgColor};" title="${theme.name}"></button>`;
+            }).join('');
+        }
+
+        // Switch tabs in visual modal
+        function switchVisualTab(tab) {
+            visualActiveTab = tab;
+            const graphicTab = document.getElementById('visual-graphic-tab');
+            const carouselTab = document.getElementById('visual-carousel-tab');
+            const graphicBtn = document.getElementById('visual-tab-graphic');
+            const carouselBtn = document.getElementById('visual-tab-carousel');
+
+            if (tab === 'graphic') {
+                graphicTab.classList.remove('hidden');
+                carouselTab.classList.add('hidden');
+                graphicBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                graphicBtn.classList.remove('text-gray-500');
+                carouselBtn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                carouselBtn.classList.add('text-gray-500');
+            } else {
+                graphicTab.classList.add('hidden');
+                carouselTab.classList.remove('hidden');
+                carouselBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                carouselBtn.classList.remove('text-gray-500');
+                graphicBtn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                graphicBtn.classList.add('text-gray-500');
+            }
+        }
+
+        // Select a graphic layout in the modal
+        function selectGraphicLayout(layout) {
+            visualSelectedLayout = layout;
+            visualSelectedThemeIndex = 0;
+
+            // Update layout picker highlight
+            Object.keys(graphicLayouts).forEach(key => {
+                const btn = document.getElementById('layout-' + key);
+                if (!btn) return;
+                if (key === layout) {
+                    btn.classList.add('border-govcon-blue', 'bg-blue-50');
+                    btn.classList.remove('border-gray-200');
+                    btn.querySelector('.text-sm.font-semibold')?.classList.add('text-govcon-blue');
+                    btn.querySelector('.text-sm.font-semibold')?.classList.remove('text-gray-800');
+                } else {
+                    btn.classList.remove('border-govcon-blue', 'bg-blue-50');
+                    btn.classList.add('border-gray-200');
+                    btn.querySelector('.text-sm.font-semibold')?.classList.remove('text-govcon-blue');
+                    btn.querySelector('.text-sm.font-semibold')?.classList.add('text-gray-800');
+                }
+            });
+
+            // Update theme picker
+            document.getElementById('theme-picker').innerHTML = buildThemePicker(layout, 0);
+            document.getElementById('visual-layout').value = layout;
+            document.getElementById('visual-theme-index').value = '0';
+        }
+
+        // Select a theme in the modal
+        function selectGraphicTheme(idx) {
+            visualSelectedThemeIndex = idx;
+            document.getElementById('visual-theme-index').value = String(idx);
+            document.getElementById('theme-picker').innerHTML = buildThemePicker(visualSelectedLayout, idx);
+        }
+
+        // Dispatch generation from modal
+        function generateVisualFromModal() {
+            if (visualActiveTab === 'graphic') {
+                generateGraphicFromModal();
+            } else {
+                generateCarouselFromPost();
+            }
+        }
+
+        // Generate a single graphic from the modal config
+        async function generateGraphicFromModal() {
+            if (!visualSourcePost) return;
+
+            const index = visualSourcePost.index;
+            const layout = document.getElementById('visual-layout').value;
+            const themeIdx = parseInt(document.getElementById('visual-theme-index').value) || 0;
+            const themes = graphicLayouts[layout]?.themes || quoteCardStyles;
+            const theme = themes[themeIdx] || themes[0];
+            const apiType = graphicLayouts[layout]?.apiType || 'quote';
+
+            // Close modal
+            closeVisualModal();
+
+            // Show loading in the image area
+            const imageArea = document.getElementById(`image-area-${index}`);
+            const loadingEl = document.getElementById(`image-loading-${index}`);
+            const resultEl = document.getElementById(`image-result-${index}`);
+
+            if (imageArea) imageArea.classList.remove('hidden');
+            if (loadingEl) loadingEl.classList.remove('hidden');
+            if (resultEl) resultEl.classList.add('hidden');
+
+            // Also handle expanded view loading
+            const expLoadingEl = document.getElementById(`image-loading-${index}`);
+            const expContainerEl = document.getElementById(`image-container-${index}`);
+            if (expLoadingEl) expLoadingEl.classList.remove('hidden');
+            if (expContainerEl) expContainerEl.classList.add('hidden');
+
+            try {
+                const post = visualSourcePost;
+                const cleanContent = post.content.replace(/\*\*/g, '');
+                const companyName = SupabaseAuth.profile?.company_name || document.getElementById('company-name')?.value || 'Your Company';
+
+                // Call API
+                let graphicData;
+                try {
+                    const response = await fetch('/api/generate-graphic', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ postContent: cleanContent, type: apiType })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        graphicData = result.data;
+                    }
+                } catch (e) {
+                    console.log('API graphic generation failed, using fallback');
+                }
+
+                if (!graphicData) {
+                    graphicData = { quote: getFirstLine(post.content) };
+                }
+
+                // Render
+                const imageDataUrl = await renderGraphic(layout, graphicData, companyName, theme);
+
+                // Display in quick view
+                const imgEl = document.getElementById(`generated-img-${index}`);
+                const downloadLink = document.getElementById(`download-link-${index}`);
+                if (imgEl) imgEl.src = imageDataUrl;
+                if (downloadLink) {
+                    downloadLink.href = imageDataUrl;
+                    downloadLink.download = `linkedin-${layout}-graphic.png`;
+                }
+
+                // Display in expanded view
+                const expImageEl = document.getElementById(`generated-image-${index}`);
+                const expDownloadBtn = document.getElementById(`download-btn-${index}`);
+                const styleEl = document.getElementById(`image-style-${index}`);
+                const quoteDisplayEl = document.getElementById(`quote-display-${index}`);
+
+                if (expImageEl) expImageEl.src = imageDataUrl;
+                if (expDownloadBtn) {
+                    expDownloadBtn.href = imageDataUrl;
+                    expDownloadBtn.download = `linkedin-${layout}-graphic.png`;
+                }
+                if (styleEl) styleEl.textContent = `${graphicTypeLabels[layout] || 'Classic Quote'} \u00B7 ${theme.name}`;
+                if (quoteDisplayEl) {
+                    const displayP = quoteDisplayEl.querySelector('p');
+                    if (displayP) displayP.textContent = graphicData.quote || graphicData;
+                }
+
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (resultEl) resultEl.classList.remove('hidden');
+                if (expLoadingEl) expLoadingEl.classList.add('hidden');
+                if (expContainerEl) expContainerEl.classList.remove('hidden');
+
+                // Store state for New Style
+                generatedPosts[index].imageUrl = imageDataUrl;
+                generatedPosts[index].extractedQuote = graphicData.quote || graphicData;
+                generatedPosts[index].imageStyle = theme.name;
+                generatedPosts[index].graphicLayout = layout;
+                generatedPosts[index].graphicThemeIndex = themeIdx;
+                generatedPosts[index].graphicData = graphicData;
+
+                showSuccessToast(`${graphicTypeLabels[layout] || 'Graphic'} created (${theme.name})`);
+            } catch (error) {
+                console.error('Error generating graphic from modal:', error);
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (imageArea) imageArea.classList.add('hidden');
+                if (expLoadingEl) expLoadingEl.classList.add('hidden');
+                showErrorToast('Failed to generate graphic: ' + error.message);
+            }
+        }
+
+        // Cycle to next theme within the same layout (New Style button)
+        async function cycleGraphicStyle(index) {
+            const post = generatedPosts[index];
+            if (!post) return;
+
+            const layout = post.graphicLayout || 'classic';
+            const themes = graphicLayouts[layout]?.themes || quoteCardStyles;
+            const currentIdx = post.graphicThemeIndex !== undefined ? post.graphicThemeIndex : -1;
+            const nextIdx = (currentIdx + 1) % themes.length;
+            const theme = themes[nextIdx];
+            const graphicData = post.graphicData || { quote: post.extractedQuote || getFirstLine(post.content) };
+
+            const companyName = SupabaseAuth.profile?.company_name || document.getElementById('company-name')?.value || 'Your Company';
+
+            // Show loading
+            const imageArea = document.getElementById(`image-area-${index}`);
+            const loadingEl = document.getElementById(`image-loading-${index}`);
+            const resultEl = document.getElementById(`image-result-${index}`);
+            if (imageArea) imageArea.classList.remove('hidden');
+            if (loadingEl) loadingEl.classList.remove('hidden');
+            if (resultEl) resultEl.classList.add('hidden');
+
+            const expLoadingEl = document.getElementById(`image-loading-${index}`);
+            const expContainerEl = document.getElementById(`image-container-${index}`);
+            if (expLoadingEl) expLoadingEl.classList.remove('hidden');
+            if (expContainerEl) expContainerEl.classList.add('hidden');
+
+            try {
+                const imageDataUrl = await renderGraphic(layout, graphicData, companyName, theme);
+
+                // Quick view
+                const imgEl = document.getElementById(`generated-img-${index}`);
+                const downloadLink = document.getElementById(`download-link-${index}`);
+                if (imgEl) imgEl.src = imageDataUrl;
+                if (downloadLink) {
+                    downloadLink.href = imageDataUrl;
+                    downloadLink.download = `linkedin-${layout}-graphic.png`;
+                }
+
+                // Expanded view
+                const expImageEl = document.getElementById(`generated-image-${index}`);
+                const expDownloadBtn = document.getElementById(`download-btn-${index}`);
+                const styleEl = document.getElementById(`image-style-${index}`);
+                if (expImageEl) expImageEl.src = imageDataUrl;
+                if (expDownloadBtn) {
+                    expDownloadBtn.href = imageDataUrl;
+                    expDownloadBtn.download = `linkedin-${layout}-graphic.png`;
+                }
+                if (styleEl) styleEl.textContent = `${graphicTypeLabels[layout] || 'Classic Quote'} \u00B7 ${theme.name}`;
+
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (resultEl) resultEl.classList.remove('hidden');
+                if (expLoadingEl) expLoadingEl.classList.add('hidden');
+                if (expContainerEl) expContainerEl.classList.remove('hidden');
+
+                // Update stored state
+                post.imageUrl = imageDataUrl;
+                post.imageStyle = theme.name;
+                post.graphicThemeIndex = nextIdx;
+
+                showSuccessToast(`${graphicTypeLabels[layout] || 'Graphic'} (${theme.name})`);
+            } catch (error) {
+                console.error('Error cycling style:', error);
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (expLoadingEl) expLoadingEl.classList.add('hidden');
+                showErrorToast('Failed to generate graphic');
+            }
         }
 
         function selectSlideCount(count) {
@@ -3350,16 +3573,18 @@
         async function generateCarouselFromPost() {
             if (!carouselSourcePost) return;
 
-            const btn = document.getElementById('generate-carousel-btn');
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = `
-                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Generating...
-            `;
+            const btn = document.getElementById('generate-visual-btn') || document.getElementById('generate-carousel-btn');
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `
+                    <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Generating...
+                `;
+            }
 
             // IMPORTANT: Read all form values BEFORE closing the modal
             const slideCount = parseInt(document.getElementById('carousel-slide-count').value);
@@ -3445,8 +3670,10 @@
                 console.error('Carousel generation error:', error);
                 closeCarouselProgressModal();
                 showErrorToast(error.message || 'Failed to generate carousel');
-                btn.disabled = false;
-                btn.innerHTML = originalText;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
             }
         }
 
@@ -5782,7 +6009,7 @@
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                                 Download
                                             </a>
-                                            <button onclick="generateImage(${index})" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1 text-xs">
+                                            <button onclick="cycleGraphicStyle(${index})" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1 text-xs">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                                 New Style
                                             </button>
@@ -5813,23 +6040,14 @@
                                 Schedule
                             </button>
                             ${hasGraphicsAccess ? `
-                            <div class="flex items-center gap-1">
-                                <select id="graphic-type-${index}" class="text-xs bg-purple-100 text-purple-800 border border-purple-300 rounded-lg px-2 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-purple-400">
-                                    <option value="quote">Quote Card</option>
-                                    <option value="stat">Stat Card</option>
-                                    <option value="tips">Tip Card</option>
-                                    <option value="hottake">Hot Take</option>
-                                    <option value="beforeafter">Before / After</option>
-                                </select>
-                                <button id="image-btn-${index}" onclick="togglePost(${index}); setTimeout(() => generateImage(${index}), 100);" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1 text-sm">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                    Go
-                                </button>
-                            </div>
+                            <button onclick="openVisualModal(${index})" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold px-4 py-2 rounded-lg transition flex items-center justify-center gap-2 text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                Create Visual
+                            </button>
                             ` : `
-                            <button onclick="showGraphicsUpgradeModal()" class="relative bg-gradient-to-r from-purple-400 to-purple-500 text-white font-bold px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:from-purple-500 hover:to-purple-600 transition group" title="Full Fix feature - Click to upgrade">
+                            <button onclick="showGraphicsUpgradeModal()" class="relative bg-gradient-to-r from-purple-400 to-indigo-400 text-white font-bold px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:from-purple-500 hover:to-indigo-500 transition group" title="Full Fix feature - Click to upgrade">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                                Graphic
+                                Create Visual
                                 <span class="absolute -top-2 -right-2 bg-yellow-400 text-xs text-gray-900 px-1.5 py-0.5 rounded-full font-bold">PRO</span>
                             </button>
                             `}
@@ -5849,7 +6067,7 @@
                                 <svg class="w-10 h-10 text-white mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                                 </svg>
-                                <p class="text-white font-bold text-sm">Graphics (5 Types)</p>
+                                <p class="text-white font-bold text-sm">4 Layouts + Carousel</p>
                                 <p class="text-amber-400 text-xs mt-1">Upgrade to Full Fix $200</p>
                             </div>
                         </div>
@@ -5902,8 +6120,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                             </svg>
                         </div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Unlock Quote Graphics</h3>
-                        <p class="text-gray-600">Make your LinkedIn posts stand out with professional AI-generated quote cards</p>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Unlock Visual Graphics</h3>
+                        <p class="text-gray-600">Make your LinkedIn posts stand out with professional AI-generated visuals</p>
                     </div>
 
                     <div class="bg-purple-50 rounded-xl p-4 mb-6">
@@ -5911,11 +6129,11 @@
                         <ul class="space-y-2 text-sm text-purple-800">
                             <li class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                                <span>AI-generated quote card graphics</span>
+                                <span>4 graphic layout styles (Classic, Tweet, Social, Highlighter)</span>
                             </li>
                             <li class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                                <span>6 professional visual styles</span>
+                                <span>LinkedIn carousel slides</span>
                             </li>
                             <li class="flex items-center gap-2">
                                 <svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
@@ -6458,22 +6676,52 @@
 
         let currentStyleIndex = {};
 
+        // Graphic layout configurations
+        const graphicLayouts = {
+            classic: {
+                label: 'Classic Quote',
+                icon: '\u201C',
+                description: 'Centered quote with gradient background',
+                apiType: 'quote',
+                themes: null // uses quoteCardStyles (set below)
+            },
+            tweet: {
+                label: 'Tweet Quote',
+                icon: '\uD83D\uDCAC',
+                description: 'Profile header + quoted text',
+                apiType: 'quote',
+                themes: null // uses tweetQuoteThemes (set below)
+            },
+            social: {
+                label: 'Social Card',
+                icon: '\uD83D\uDCF1',
+                description: 'Post mockup with engagement stats',
+                apiType: 'quote',
+                themes: null // uses socialCardThemes (set below)
+            },
+            highlighter: {
+                label: 'Highlighter',
+                icon: '\uD83D\uDD8D',
+                description: 'Bold text with highlighted key words',
+                apiType: 'highlight',
+                themes: null // uses highlighterThemes (set below)
+            }
+        };
         // Graphic type labels for display
         const graphicTypeLabels = {
-            quote: 'Quote Card',
-            stat: 'Stat Card',
-            tips: 'Tip Card',
-            hottake: 'Hot Take',
-            beforeafter: 'Before / After'
+            classic: 'Classic Quote',
+            tweet: 'Tweet Quote',
+            social: 'Social Card',
+            highlighter: 'Highlighter'
         };
 
-        // Route to correct render function based on graphic type
+        // Route to correct render function based on graphic layout
         async function renderGraphic(type, data, companyName, style) {
             switch (type) {
-                case 'stat': return await renderStatCard(data, companyName, style);
-                case 'tips': return await renderTipCard(data, companyName, style);
-                case 'hottake': return await renderHotTakeCard(data, companyName, style);
-                case 'beforeafter': return await renderBeforeAfterCard(data, companyName, style);
+                case 'tweet': return await renderTweetQuote(data.quote || data, companyName, style);
+                case 'social': return await renderSocialCard(data.quote || data, companyName, style);
+                case 'highlighter': return await renderHighlighterQuote(data, companyName, style);
+                case 'classic':
                 case 'quote':
                 default: return await renderQuoteCard(data.quote || data, companyName, style);
             }
@@ -6481,108 +6729,22 @@
 
         // Get a display string for the generated graphic content
         function getGraphicDisplayText(type, data) {
-            switch (type) {
-                case 'stat': return `${data.number} — ${data.label}`;
-                case 'tips': return `${data.title}: ${data.tips?.length || 0} tips`;
-                case 'hottake': return data.statement;
-                case 'beforeafter': return `${data.before} → ${data.after}`;
-                case 'quote':
-                default: return data.quote || data;
-            }
+            return data.quote || data;
         }
 
-        // Generate graphic using Canvas (expanded post view)
+        // Generate graphic using Canvas (expanded post view) — now routes through visual modal
         async function generateImage(index) {
             const post = generatedPosts[index];
             if (!post) return;
 
-            const companyProfile = getCompanyProfile();
-            const loadingEl = document.getElementById(`image-loading-${index}`);
-            const containerEl = document.getElementById(`image-container-${index}`);
-            const imageBtn = document.getElementById(`image-btn-${index}`);
-
-            // Read the selected graphic type
-            const typeSelect = document.getElementById(`graphic-type-${index}`);
-            const graphicType = typeSelect ? typeSelect.value : 'quote';
-
-            // Show loading state
-            loadingEl.classList.remove('hidden');
-            containerEl.classList.add('hidden');
-            if (imageBtn) {
-                imageBtn.disabled = true;
-                imageBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            // If no layout stored yet, open the visual modal
+            if (!post.graphicLayout) {
+                openVisualModal(index);
+                return;
             }
 
-            try {
-                // Call unified graphic API
-                const response = await fetch('/api/generate-graphic', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ postContent: post.content, type: graphicType })
-                });
-
-                const result = await response.json();
-                let graphicData;
-
-                if (result.success) {
-                    graphicData = result.data;
-                } else {
-                    // Fallback for quote type
-                    graphicData = { quote: getFirstLine(post.content) };
-                }
-
-                // Check if user has brand colors enabled (Full Fix only)
-                let style = getBrandStyle();
-
-                if (!style) {
-                    // Select style (cycle through or random)
-                    if (currentStyleIndex[index] === undefined) {
-                        currentStyleIndex[index] = Math.floor(Math.random() * quoteCardStyles.length);
-                    } else {
-                        currentStyleIndex[index] = (currentStyleIndex[index] + 1) % quoteCardStyles.length;
-                    }
-                    style = quoteCardStyles[currentStyleIndex[index]];
-                }
-
-                // Generate the canvas image using the correct renderer
-                const imageDataUrl = await renderGraphic(graphicType, graphicData, companyProfile.companyName, style);
-
-                // Display the generated image
-                const imageEl = document.getElementById(`generated-image-${index}`);
-                const downloadBtn = document.getElementById(`download-btn-${index}`);
-                const styleEl = document.getElementById(`image-style-${index}`);
-                const quoteDisplayEl = document.getElementById(`quote-display-${index}`);
-
-                imageEl.src = imageDataUrl;
-                downloadBtn.href = imageDataUrl;
-                downloadBtn.download = `linkedin-${graphicType}-graphic.png`;
-
-                // Show the style and type info
-                styleEl.textContent = `${graphicTypeLabels[graphicType] || 'Quote Card'} · ${style.name}`;
-                const displayText = getGraphicDisplayText(graphicType, graphicData);
-                quoteDisplayEl.querySelector('p').textContent = displayText;
-
-                loadingEl.classList.add('hidden');
-                containerEl.classList.remove('hidden');
-
-                // Store image info
-                generatedPosts[index].imageUrl = imageDataUrl;
-                generatedPosts[index].extractedQuote = displayText;
-                generatedPosts[index].imageStyle = style.name;
-                generatedPosts[index].graphicType = graphicType;
-
-                console.log(`${graphicTypeLabels[graphicType]} generated:`, style.name, '-', displayText);
-
-            } catch (error) {
-                console.error('Error generating graphic:', error);
-                showErrorToast('Failed to generate graphic: ' + error.message);
-                loadingEl.classList.add('hidden');
-            } finally {
-                if (imageBtn) {
-                    imageBtn.disabled = false;
-                    imageBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                }
-            }
+            // Otherwise cycle style
+            cycleGraphicStyle(index);
         }
 
         function getFirstLine(content) {
@@ -6686,404 +6848,316 @@
             return canvas.toDataURL('image/png');
         }
 
-        // ========== STAT CARD RENDERER ==========
-        async function renderStatCard(data, companyName, style) {
+        // ========== TWEET QUOTE RENDERER ==========
+        const tweetQuoteThemes = [
+            { name: 'Dark', bg: '#000000', text: '#ffffff', secondary: '#888888' },
+            { name: 'Light', bg: '#d4d4d4', text: '#000000', secondary: '#666666' },
+            { name: 'Clean', bg: '#ffffff', text: '#000000', secondary: '#888888' }
+        ];
+
+        async function renderTweetQuote(quote, companyName, theme) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 1200;
             canvas.height = 1200;
 
-            // Draw gradient background
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, style.bgGradient[0]);
-            gradient.addColorStop(1, style.bgGradient[1]);
-            ctx.fillStyle = gradient;
+            // Background
+            ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Subtle grid pattern
-            ctx.globalAlpha = 0.04;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            for (let x = 0; x < canvas.width; x += 60) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y < canvas.height; y += 60) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
+            const padding = 100;
+
+            // Avatar circle with initials
+            const initials = (companyName || 'GC').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+            ctx.beginPath();
+            ctx.arc(padding + 40, 140, 40, 0, Math.PI * 2);
+            ctx.fillStyle = theme.secondary;
+            ctx.globalAlpha = 0.3;
+            ctx.fill();
             ctx.globalAlpha = 1;
 
-            // Top accent bar
-            ctx.fillStyle = style.accentColor;
-            ctx.fillRect(0, 0, canvas.width, 8);
-
-            // Big number — centered
+            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.text;
             ctx.textAlign = 'center';
-            const number = data.number || '0';
-            let numFontSize = 160;
-            if (number.length > 6) numFontSize = 120;
-            if (number.length > 10) numFontSize = 96;
-            ctx.font = `bold ${numFontSize}px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.accentColor;
-            ctx.fillText(number, canvas.width / 2, 480);
+            ctx.fillText(initials, padding + 40, 150);
 
-            // Label below number
-            const label = data.label || '';
-            ctx.font = `36px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.quoteColor || '#ffffff';
-            ctx.globalAlpha = 0.9;
-            const labelLines = wrapText(ctx, label, canvas.width - 200);
-            labelLines.forEach((line, i) => {
-                ctx.fillText(line, canvas.width / 2, 560 + (i * 50));
+            // Company name
+            ctx.textAlign = 'left';
+            ctx.font = `bold 32px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.text;
+            ctx.fillText(companyName || 'Your Company', padding + 100, 132);
+
+            // Handle
+            const handle = '@' + (companyName || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
+            ctx.font = `24px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.secondary;
+            ctx.fillText(handle, padding + 100, 165);
+
+            // Large curly-quoted text
+            const quoteText = '\u201C' + quote + '\u201D';
+            let fontSize = 56;
+            if (quoteText.length > 100) fontSize = 48;
+            if (quoteText.length > 150) fontSize = 40;
+            if (quoteText.length > 200) fontSize = 34;
+
+            ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.text;
+            ctx.textAlign = 'left';
+
+            const maxWidth = canvas.width - (padding * 2);
+            const lines = wrapText(ctx, quoteText, maxWidth);
+            const lineHeight = fontSize * 1.4;
+            const textStartY = 260;
+
+            lines.forEach((line, i) => {
+                ctx.fillText(line, padding, textStartY + (i * lineHeight));
             });
-            ctx.globalAlpha = 1;
-
-            // Divider
-            ctx.fillStyle = style.accentColor;
-            ctx.globalAlpha = 0.4;
-            ctx.fillRect(canvas.width / 2 - 80, 560 + labelLines.length * 50 + 30, 160, 3);
-            ctx.globalAlpha = 1;
-
-            // Context text
-            const context = data.context || '';
-            ctx.font = `28px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.quoteColor || '#ffffff';
-            ctx.globalAlpha = 0.7;
-            const ctxLines = wrapText(ctx, context, canvas.width - 200);
-            const ctxStartY = 560 + labelLines.length * 50 + 80;
-            ctxLines.forEach((line, i) => {
-                ctx.fillText(line, canvas.width / 2, ctxStartY + (i * 40));
-            });
-            ctx.globalAlpha = 1;
-
-            // Company name at bottom
-            if (companyName) {
-                ctx.font = '28px "Segoe UI", system-ui, sans-serif';
-                ctx.fillStyle = style.textColor || '#ffffff';
-                ctx.globalAlpha = 0.7;
-                ctx.fillText(companyName, canvas.width / 2, canvas.height - 80);
-                ctx.globalAlpha = 1;
-            }
-
-            // Bottom accent bar
-            ctx.fillStyle = style.accentColor;
-            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
 
             return canvas.toDataURL('image/png');
         }
 
-        // ========== TIP CARD RENDERER ==========
-        async function renderTipCard(data, companyName, style) {
+        // ========== SOCIAL POST CARD RENDERER ==========
+        const socialCardThemes = [
+            { name: 'Dark', bg: '#1a1a1a', cardBg: '#2a2a2a', text: '#ffffff', secondary: '#888888', border: '#3a3a3a' },
+            { name: 'Light', bg: '#e5e5e5', cardBg: '#f5f5f5', text: '#1a1a1a', secondary: '#666666', border: '#d0d0d0' },
+            { name: 'Blue', bg: '#f0f7ff', cardBg: '#ffffff', text: '#1a1a1a', secondary: '#666666', border: '#3b82f6' }
+        ];
+
+        async function renderSocialCard(quote, companyName, theme) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 1200;
             canvas.height = 1200;
 
-            // Draw gradient background
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, style.bgGradient[0]);
-            gradient.addColorStop(1, style.bgGradient[1]);
-            ctx.fillStyle = gradient;
+            // Outer background
+            ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Subtle dot pattern
+            // Centered rounded card
+            const cardX = 100;
+            const cardY = 160;
+            const cardW = canvas.width - 200;
+            const cardH = canvas.height - 320;
+            const radius = 24;
+
+            // Card shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            roundedRect(ctx, cardX + 4, cardY + 4, cardW, cardH, radius);
+            ctx.fill();
+
+            // Card background
+            ctx.fillStyle = theme.cardBg;
+            roundedRect(ctx, cardX, cardY, cardW, cardH, radius);
+            ctx.fill();
+
+            // Card border
+            ctx.strokeStyle = theme.border;
+            ctx.lineWidth = 2;
+            roundedRect(ctx, cardX, cardY, cardW, cardH, radius);
+            ctx.stroke();
+
+            const innerPad = 50;
+            const innerX = cardX + innerPad;
+
+            // Avatar inside card
+            const initials = (companyName || 'GC').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+            ctx.beginPath();
+            ctx.arc(innerX + 30, cardY + innerPad + 30, 30, 0, Math.PI * 2);
+            ctx.fillStyle = theme.border;
+            ctx.globalAlpha = 0.4;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            ctx.font = `bold 22px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.text;
+            ctx.textAlign = 'center';
+            ctx.fillText(initials, innerX + 30, cardY + innerPad + 38);
+
+            // Name + handle
+            ctx.textAlign = 'left';
+            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.text;
+            ctx.fillText(companyName || 'Your Company', innerX + 80, cardY + innerPad + 25);
+
+            const handle = '@' + (companyName || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
+            ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.secondary;
+            ctx.fillText(handle, innerX + 80, cardY + innerPad + 55);
+
+            // Three dots menu
+            ctx.fillStyle = theme.secondary;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(cardX + cardW - innerPad - 10 + (i * 14), cardY + innerPad + 30, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Post text body
+            let fontSize = 36;
+            if (quote.length > 120) fontSize = 30;
+            if (quote.length > 180) fontSize = 26;
+
+            ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.text;
+            ctx.textAlign = 'left';
+
+            const textMaxWidth = cardW - (innerPad * 2);
+            const textLines = wrapText(ctx, quote, textMaxWidth);
+            const lineHeight = fontSize * 1.45;
+            const textStartY = cardY + innerPad + 110;
+
+            textLines.forEach((line, i) => {
+                ctx.fillText(line, innerX, textStartY + (i * lineHeight));
+            });
+
+            // Hashtag line
+            const hashY = textStartY + textLines.length * lineHeight + 20;
+            ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.secondary;
+            ctx.fillText('#govcon #quoteoftheday #leadership', innerX, hashY);
+
+            // Engagement stats row (bottom of card)
+            const statsY = cardY + cardH - innerPad - 10;
+
+            // Divider line above stats
+            ctx.strokeStyle = theme.border;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(innerX, statsY - 30);
+            ctx.lineTo(cardX + cardW - innerPad, statsY - 30);
+            ctx.stroke();
+
+            ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.secondary;
+
+            // Comment icon + count
+            ctx.fillText('\uD83D\uDCAC 250', innerX, statsY);
+            // Heart icon + count
+            ctx.fillText('\u2764\uFE0F 17K', innerX + 160, statsY);
+            // Share icon + count
+            ctx.fillText('\uD83D\uDD01 75', innerX + 340, statsY);
+
+            return canvas.toDataURL('image/png');
+        }
+
+        // Rounded rectangle helper
+        function roundedRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        // ========== HIGHLIGHTER QUOTE RENDERER ==========
+        const highlighterThemes = [
+            { name: 'Lime', bg: '#f0ece0', text: '#000000', highlight: '#c8f542' },
+            { name: 'Peach', bg: '#f0ece0', text: '#000000', highlight: '#e8b88a' },
+            { name: 'Blue', bg: '#f0ece0', text: '#000000', highlight: '#5bb5f0' },
+            { name: 'Dark Blue', bg: '#1a1a1a', text: '#ffffff', highlight: '#5bb5f0' }
+        ];
+
+        // Assign themes to layouts now that all arrays are defined
+        graphicLayouts.classic.themes = quoteCardStyles;
+        graphicLayouts.tweet.themes = tweetQuoteThemes;
+        graphicLayouts.social.themes = socialCardThemes;
+        graphicLayouts.highlighter.themes = highlighterThemes;
+
+        async function renderHighlighterQuote(data, companyName, theme) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 1200;
+            canvas.height = 1200;
+
+            // Background
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle paper texture
             ctx.globalAlpha = 0.03;
-            ctx.fillStyle = '#ffffff';
-            for (let x = 30; x < canvas.width; x += 40) {
-                for (let y = 30; y < canvas.height; y += 40) {
-                    ctx.beginPath();
-                    ctx.arc(x, y, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+            for (let i = 0; i < 200; i++) {
+                ctx.fillStyle = theme.text;
+                ctx.fillRect(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height,
+                    Math.random() * 3 + 1,
+                    Math.random() * 3 + 1
+                );
             }
             ctx.globalAlpha = 1;
 
-            // Top accent bar
-            ctx.fillStyle = style.accentColor;
-            ctx.fillRect(0, 0, canvas.width, 8);
+            const quote = data.quote || '';
+            const highlights = (data.highlights || []).map(h => h.toLowerCase());
+            const padding = 100;
 
-            // Left accent stripe
-            ctx.fillStyle = style.accentColor;
-            ctx.globalAlpha = 0.15;
-            ctx.fillRect(0, 0, 6, canvas.height);
-            ctx.globalAlpha = 1;
+            // Calculate font size
+            let fontSize = 64;
+            if (quote.length > 80) fontSize = 56;
+            if (quote.length > 120) fontSize = 48;
+            if (quote.length > 180) fontSize = 40;
 
-            // Title
-            const title = data.title || 'Key Takeaways';
-            ctx.textAlign = 'left';
-            ctx.font = `bold 56px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.accentColor;
-            const titleLines = wrapText(ctx, title, canvas.width - 200);
-            titleLines.forEach((line, i) => {
-                ctx.fillText(line, 100, 140 + (i * 70));
-            });
+            ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
 
-            // Underline below title
-            const titleBottomY = 140 + titleLines.length * 70 + 10;
-            ctx.fillStyle = style.accentColor;
-            ctx.globalAlpha = 0.3;
-            ctx.fillRect(100, titleBottomY, 200, 3);
-            ctx.globalAlpha = 1;
+            // Word-wrap the quote into lines
+            const maxWidth = canvas.width - (padding * 2);
+            const lines = wrapText(ctx, quote, maxWidth);
+            const lineHeight = fontSize * 1.5;
+            const totalHeight = lines.length * lineHeight;
+            const startY = (canvas.height - totalHeight) / 2 + fontSize / 2 - 40;
 
-            // Tips list
-            const tips = data.tips || [];
-            const tipStartY = titleBottomY + 60;
-            const tipSpacing = Math.min(140, (canvas.height - tipStartY - 160) / Math.max(tips.length, 1));
+            // Draw each line word by word, highlighting matched words
+            lines.forEach((line, lineIdx) => {
+                const y = startY + (lineIdx * lineHeight);
+                const words = line.split(' ');
+                let x = padding;
 
-            tips.forEach((tip, i) => {
-                const y = tipStartY + (i * tipSpacing);
+                words.forEach((word) => {
+                    ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
+                    const wordWidth = ctx.measureText(word + ' ').width;
+                    const cleanWord = word.replace(/[.,!?;:'"]/g, '').toLowerCase();
 
-                // Numbered circle
-                ctx.beginPath();
-                ctx.arc(130, y - 8, 24, 0, Math.PI * 2);
-                ctx.fillStyle = style.accentColor;
-                ctx.fill();
+                    // Check if this word matches any highlight
+                    const isHighlighted = highlights.some(h => {
+                        return cleanWord === h || cleanWord.includes(h) || h.includes(cleanWord);
+                    });
 
-                // Number
-                ctx.textAlign = 'center';
-                ctx.font = `bold 24px 'Segoe UI', system-ui, sans-serif`;
-                ctx.fillStyle = '#ffffff';
-                ctx.fillText(String(i + 1), 130, y + 1);
+                    if (isHighlighted) {
+                        // Draw highlight rectangle behind word
+                        const highlightPad = 6;
+                        ctx.fillStyle = theme.highlight;
+                        ctx.globalAlpha = 0.7;
+                        ctx.fillRect(
+                            x - highlightPad,
+                            y - fontSize * 0.75,
+                            ctx.measureText(word).width + highlightPad * 2,
+                            fontSize * 1.05
+                        );
+                        ctx.globalAlpha = 1;
+                    }
 
-                // Tip text
-                ctx.textAlign = 'left';
-                ctx.font = `32px 'Segoe UI', system-ui, sans-serif`;
-                ctx.fillStyle = style.quoteColor || '#ffffff';
-                const tipLines = wrapText(ctx, tip, canvas.width - 280);
-                tipLines.forEach((line, j) => {
-                    ctx.fillText(line, 180, y + (j * 42));
+                    // Draw the word
+                    ctx.fillStyle = theme.text;
+                    ctx.textAlign = 'left';
+                    ctx.fillText(word, x, y);
+                    x += wordWidth;
                 });
             });
 
-            // Company name at bottom
+            // Attribution at bottom-left
             if (companyName) {
-                ctx.textAlign = 'center';
-                ctx.font = '28px "Segoe UI", system-ui, sans-serif';
-                ctx.fillStyle = style.textColor || '#ffffff';
-                ctx.globalAlpha = 0.7;
-                ctx.fillText(companyName, canvas.width / 2, canvas.height - 80);
+                ctx.font = `italic 28px Georgia, 'Times New Roman', serif`;
+                ctx.fillStyle = theme.text;
+                ctx.globalAlpha = 0.6;
+                ctx.textAlign = 'left';
+                ctx.fillText('- ' + companyName, padding, canvas.height - 100);
                 ctx.globalAlpha = 1;
             }
-
-            return canvas.toDataURL('image/png');
-        }
-
-        // ========== HOT TAKE CARD RENDERER ==========
-        async function renderHotTakeCard(data, companyName, style) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 1200;
-            canvas.height = 1200;
-
-            // Draw gradient background (slightly more dramatic)
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, style.bgGradient[0]);
-            gradient.addColorStop(0.5, style.bgGradient[1]);
-            gradient.addColorStop(1, style.bgGradient[0]);
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Radial glow behind text
-            const glow = ctx.createRadialGradient(
-                canvas.width / 2, canvas.height / 2, 100,
-                canvas.width / 2, canvas.height / 2, 500
-            );
-            glow.addColorStop(0, style.accentColor + '15');
-            glow.addColorStop(1, 'transparent');
-            ctx.fillStyle = glow;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Thick top accent bar
-            ctx.fillStyle = style.accentColor;
-            ctx.fillRect(0, 0, canvas.width, 12);
-
-            // Thick bottom accent bar
-            ctx.fillRect(0, canvas.height - 12, canvas.width, 12);
-
-            // Lightning bolt / flame icon decoration (top area)
-            ctx.textAlign = 'center';
-            ctx.font = '80px serif';
-            ctx.globalAlpha = 0.2;
-            ctx.fillStyle = style.accentColor;
-            ctx.fillText('\u26A1', canvas.width / 2, 160);
-            ctx.globalAlpha = 1;
-
-            // "HOT TAKE" label
-            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.accentColor;
-            ctx.letterSpacing = '8px';
-            ctx.fillText('H O T   T A K E', canvas.width / 2, 230);
-
-            // Statement text — big and bold
-            const statement = data.statement || '';
-            let fontSize = 64;
-            if (statement.length > 60) fontSize = 56;
-            if (statement.length > 100) fontSize = 48;
-            if (statement.length > 150) fontSize = 40;
-
-            ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.quoteColor || '#ffffff';
-            ctx.textAlign = 'center';
-
-            const maxWidth = canvas.width - 160;
-            const lines = wrapText(ctx, statement, maxWidth);
-            const lineHeight = fontSize * 1.35;
-            const totalTextHeight = lines.length * lineHeight;
-            const startY = (canvas.height - totalTextHeight) / 2 + fontSize / 2 + 40;
-
-            lines.forEach((line, i) => {
-                ctx.fillText(line, canvas.width / 2, startY + (i * lineHeight));
-            });
-
-            // Decorative accent dots on either side
-            ctx.fillStyle = style.accentColor;
-            ctx.globalAlpha = 0.4;
-            ctx.beginPath();
-            ctx.arc(80, canvas.height / 2, 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(canvas.width - 80, canvas.height / 2, 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.globalAlpha = 1;
-
-            // Company name at bottom
-            if (companyName) {
-                ctx.font = '28px "Segoe UI", system-ui, sans-serif';
-                ctx.fillStyle = style.textColor || '#ffffff';
-                ctx.globalAlpha = 0.7;
-                ctx.textAlign = 'center';
-                ctx.fillText(companyName, canvas.width / 2, canvas.height - 70);
-                ctx.globalAlpha = 1;
-            }
-
-            return canvas.toDataURL('image/png');
-        }
-
-        // ========== BEFORE/AFTER CARD RENDERER ==========
-        async function renderBeforeAfterCard(data, companyName, style) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 1200;
-            canvas.height = 1200;
-
-            // Full background
-            const bgGrad = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            bgGrad.addColorStop(0, style.bgGradient[1]);
-            bgGrad.addColorStop(1, style.bgGradient[0]);
-            ctx.fillStyle = bgGrad;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Top accent bar
-            ctx.fillStyle = style.accentColor;
-            ctx.fillRect(0, 0, canvas.width, 8);
-
-            // Label at top center
-            const label = data.label || 'The Transformation';
-            ctx.textAlign = 'center';
-            ctx.font = `bold 36px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.accentColor;
-            ctx.fillText(label.toUpperCase(), canvas.width / 2, 100);
-
-            // Divider line under label
-            ctx.fillStyle = style.accentColor;
-            ctx.globalAlpha = 0.3;
-            ctx.fillRect(canvas.width / 2 - 100, 120, 200, 2);
-            ctx.globalAlpha = 1;
-
-            const halfW = canvas.width / 2;
-            const contentY = 220;
-            const contentH = canvas.height - 340;
-
-            // BEFORE side — left, darker/muted tint
-            ctx.fillStyle = 'rgba(180, 50, 50, 0.08)';
-            ctx.fillRect(0, contentY, halfW - 2, contentH);
-
-            // AFTER side — right, green/vibrant tint
-            ctx.fillStyle = 'rgba(50, 180, 80, 0.08)';
-            ctx.fillRect(halfW + 2, contentY, halfW, contentH);
-
-            // Diagonal divider
-            ctx.strokeStyle = style.accentColor;
-            ctx.lineWidth = 3;
-            ctx.globalAlpha = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(halfW, contentY);
-            ctx.lineTo(halfW, contentY + contentH);
-            ctx.stroke();
-            ctx.globalAlpha = 1;
-
-            // "BEFORE" label
-            ctx.textAlign = 'center';
-            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = '#e74c3c';
-            ctx.globalAlpha = 0.8;
-            ctx.fillText('BEFORE', halfW / 2, contentY + 60);
-            ctx.globalAlpha = 1;
-
-            // Before icon (X mark)
-            ctx.font = '60px serif';
-            ctx.fillStyle = '#e74c3c';
-            ctx.globalAlpha = 0.25;
-            ctx.fillText('\u2717', halfW / 2, contentY + 140);
-            ctx.globalAlpha = 1;
-
-            // Before text
-            const beforeText = data.before || '';
-            ctx.font = `36px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.quoteColor || '#ffffff';
-            const beforeLines = wrapText(ctx, beforeText, halfW - 120);
-            const beforeStartY = contentY + contentH / 2 + 40;
-            beforeLines.forEach((line, i) => {
-                ctx.fillText(line, halfW / 2, beforeStartY + (i * 48));
-            });
-
-            // "AFTER" label
-            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = '#2ecc71';
-            ctx.globalAlpha = 0.8;
-            ctx.fillText('AFTER', halfW + halfW / 2, contentY + 60);
-            ctx.globalAlpha = 1;
-
-            // After icon (checkmark)
-            ctx.font = '60px serif';
-            ctx.fillStyle = '#2ecc71';
-            ctx.globalAlpha = 0.25;
-            ctx.fillText('\u2713', halfW + halfW / 2, contentY + 140);
-            ctx.globalAlpha = 1;
-
-            // After text
-            const afterText = data.after || '';
-            ctx.font = `36px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = style.quoteColor || '#ffffff';
-            const afterLines = wrapText(ctx, afterText, halfW - 120);
-            afterLines.forEach((line, i) => {
-                ctx.fillText(line, halfW + halfW / 2, beforeStartY + (i * 48));
-            });
-
-            // Arrow between sides
-            ctx.fillStyle = style.accentColor;
-            ctx.globalAlpha = 0.6;
-            ctx.font = '48px serif';
-            ctx.fillText('\u2192', halfW, contentY + contentH / 2 + 40);
-            ctx.globalAlpha = 1;
-
-            // Company name at bottom
-            if (companyName) {
-                ctx.font = '28px "Segoe UI", system-ui, sans-serif';
-                ctx.fillStyle = style.textColor || '#ffffff';
-                ctx.globalAlpha = 0.7;
-                ctx.fillText(companyName, canvas.width / 2, canvas.height - 70);
-                ctx.globalAlpha = 1;
-            }
-
-            // Bottom accent bar
-            ctx.fillStyle = style.accentColor;
-            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
 
             return canvas.toDataURL('image/png');
         }
