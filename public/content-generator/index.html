@@ -7201,11 +7201,30 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const padding = 100;
-
-            // Avatar circle with photo or initials
-            const avatarCX = padding + 40;
-            const avatarCY = 140;
             const avatarR = 40;
+            const headerH = avatarR * 2 + 10; // avatar + name/handle block
+            const gapAfterHeader = 40;
+
+            // Pre-calculate text to know total content height
+            const quoteText = '\u201C' + quote + '\u201D';
+            let fontSize = 56;
+            if (quoteText.length > 100) fontSize = 48;
+            if (quoteText.length > 150) fontSize = 40;
+            if (quoteText.length > 200) fontSize = 34;
+
+            ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            const maxWidth = canvas.width - (padding * 2);
+            const lines = wrapText(ctx, quoteText, maxWidth);
+            const lineHeight = fontSize * 1.4;
+            const textBlockH = lines.length * lineHeight;
+
+            // Center entire block vertically
+            const totalH = headerH + gapAfterHeader + textBlockH;
+            const topY = (canvas.height - totalH) / 2;
+
+            // Avatar
+            const avatarCX = padding + avatarR;
+            const avatarCY = topY + avatarR;
             if (profilePhotoUrl) {
                 try {
                     const img = await loadImage(profilePhotoUrl);
@@ -7226,38 +7245,28 @@
             ctx.textAlign = 'left';
             ctx.font = `bold 32px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.text;
-            ctx.fillText(companyName || 'Your Name', padding + 100, 132);
+            ctx.fillText(companyName || 'Your Name', padding + avatarR * 2 + 20, avatarCY - 8);
 
             // Handle
             const handle = '@' + (companyName || 'user').toLowerCase().replace(/[^a-z0-9]/g, '');
             ctx.font = `24px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
-            ctx.fillText(handle, padding + 100, 165);
+            ctx.fillText(handle, padding + avatarR * 2 + 20, avatarCY + 24);
 
             // Three dots — HORIZONTAL (•••)
             ctx.fillStyle = theme.secondary;
             for (let i = 0; i < 3; i++) {
                 ctx.beginPath();
-                ctx.arc(canvas.width - padding - 10 + (i * 16) - 16, 135, 4, 0, Math.PI * 2);
+                ctx.arc(canvas.width - padding + (i * 16) - 32, avatarCY - 5, 4, 0, Math.PI * 2);
                 ctx.fill();
             }
 
-            // Large curly-quoted text
-            const quoteText = '\u201C' + quote + '\u201D';
-            let fontSize = 56;
-            if (quoteText.length > 100) fontSize = 48;
-            if (quoteText.length > 150) fontSize = 40;
-            if (quoteText.length > 200) fontSize = 34;
-
+            // Quote text — vertically centered below header
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.text;
             ctx.textAlign = 'left';
 
-            const maxWidth = canvas.width - (padding * 2);
-            const lines = wrapText(ctx, quoteText, maxWidth);
-            const lineHeight = fontSize * 1.4;
-            const textStartY = 260;
-
+            const textStartY = topY + headerH + gapAfterHeader + fontSize;
             lines.forEach((line, i) => {
                 ctx.fillText(line, padding, textStartY + (i * lineHeight));
             });
@@ -7311,9 +7320,8 @@
             const bottomPad = 30;
 
             const contentHeight = innerPad + headerHeight + headerGap + textBlockHeight + hashHeight + dividerGap + statsHeight + bottomPad + innerPad;
-            // Card fills at least 85% of canvas height
-            const minCardH = canvas.height - (outerMargin * 2);
-            const cardH = Math.max(contentHeight, minCardH);
+            // Card sizes to content — no empty space
+            const cardH = Math.max(contentHeight, 500);
 
             // Center card vertically
             const cardY = (canvas.height - cardH) / 2;
@@ -7561,7 +7569,7 @@
             const padding = 120;
 
             // Narrower max width = fewer words per line = taller vertical flow
-            const narrowWidth = canvas.width * 0.55;
+            const narrowWidth = canvas.width * 0.70;
 
             // Dynamic font size — start big, shrink to fit
             let fontSize = 80;
