@@ -426,7 +426,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 11. **Different Supabase databases** - market-assassin and govcon-shop have SEPARATE Supabase instances. They do NOT share `user_profiles` or `purchases` tables.
 
-12. **KV store lives HERE (market-assassin)** - Vercel KV is connected to this project via Vercel Storage integration. govcon-shop does NOT have KV write access. KV backfills and admin grants must run from tools.govcongiants.org.
+12. **KV store connected to BOTH projects** - Vercel KV `market-assassin-codes` is connected to both market-assassin and govcon-shop via Vercel Storage integration. KV backfills can run from either project now.
 
 13. **Admin backfill endpoints** - `/api/admin/backfill-kv` reads Stripe checkout sessions and grants KV access based on tier/bundle metadata. Use for new customer onboarding issues.
 
@@ -434,11 +434,19 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 6, 2026 (Session 4)
+- **govcon-shop: Cleaned up purchases table** — 74 → 35 records (removed 39 non-tool purchases)
+- **govcon-shop: Fixed 4 legacy Stripe product IDs** in purchases table
+- **govcon-shop: Rewrote activate-license** — KV fallback when no Supabase profile exists
+- **govcon-shop: Discovered `user_profiles` FK constraint** — `user_id` references `auth.users`, can't create profiles without auth accounts
+- **KV is primary access system** — all 33 tool customers verified via KV, activate page reads from KV
+- **Revenue: $18,574** across 33 tool sales
+
 ### February 6, 2026 (Session 3)
 - **Created `/api/admin/backfill-kv`** — pulls Stripe checkout sessions, grants KV access from tier/bundle metadata
 - **Backfilled 32 customers** — 22 auto-granted via Stripe metadata, 10 Opp Hunter Pro manually granted via admin endpoint
 - **Discovered govcon-shop and market-assassin use DIFFERENT Supabase databases**
-- KV store is only connected to market-assassin (Vercel Storage integration) — govcon-shop can't write to KV
+- KV store connected to both projects now (was only market-assassin)
 
 ### February 6, 2026 (Sessions 1-2)
 - **govcon-shop: Removed all LemonSqueezy code** — deleted `lemonsqueezy.ts`, both webhook routes
@@ -474,4 +482,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 6, 2026*
+*Last Updated: February 6, 2026 (Session 4)*
