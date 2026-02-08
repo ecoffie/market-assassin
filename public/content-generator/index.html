@@ -7610,21 +7610,47 @@
 
             const quote = data.quote || '';
             const highlights = (data.highlights || []).map(h => h.toLowerCase());
-            const padding = 50;
+            const padding = 60;
             const tagline = document.getElementById('profile-tagline')?.value?.trim() || '';
 
-            // Even larger font sizes
-            let fontSize = 88;
-            if (quote.length > 40) fontSize = 80;
-            if (quote.length > 70) fontSize = 70;
-            if (quote.length > 100) fontSize = 60;
-            if (quote.length > 150) fontSize = 52;
-            if (quote.length > 200) fontSize = 44;
+            // === LAYOUT CONSTANTS ===
+            const accentBarH = 8;
+            const avatarR = 44;                  // Bigger avatar
+            const attrPaddingBottom = 30;        // Space below attribution to accent bar
+            const attrHeight = avatarR * 2 + 10; // Attribution block height
+            const attrTopY = canvas.height - accentBarH - attrPaddingBottom - attrHeight;
+            const quoteMarkH = 90;               // Space for opening quote mark
+            const textPaddingBottom = 30;         // Gap between last text line and attribution
 
-            // Text starts at 50% from top — overlaps mid-body
-            const textStartY = canvas.height * 0.50;
+            // Text zone: from 45% of canvas down to just above attribution
+            const textStartY = canvas.height * 0.45;
+            const textZoneTop = textStartY + quoteMarkH;
+            const textZoneBottom = attrTopY - textPaddingBottom;
+            const availableTextHeight = textZoneBottom - textZoneTop;
+            const maxWidth = canvas.width - (padding * 2);
 
-            // Photo fills entire canvas
+            // === DYNAMIC FONT SIZING ===
+            // Try progressively smaller sizes until text fits the available area
+            let fontSize = 120; // Start large
+            const minFontSize = 40;
+            let lines, lineHeight, totalTextHeight;
+
+            while (fontSize >= minFontSize) {
+                ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+                lines = wrapText(ctx, quote, maxWidth);
+                lineHeight = fontSize * 1.25;
+                totalTextHeight = lines.length * lineHeight;
+
+                if (totalTextHeight <= availableTextHeight) {
+                    break;
+                }
+                fontSize -= 4;
+            }
+
+            // Center the text block vertically within the text zone
+            const textBlockStartY = textZoneTop + (availableTextHeight - totalTextHeight) / 2 + fontSize;
+
+            // === DRAW PHOTO ===
             if (backgroundPhotoUrl) {
                 try {
                     const img = await loadImage(backgroundPhotoUrl);
@@ -7645,47 +7671,43 @@
                 }
             }
 
-            // Gradient overlay: visible photo at top, fading to dark where text starts
-            const gradStart = textStartY - canvas.height * 0.2;
-            const gradEnd = textStartY + canvas.height * 0.08;
+            // === GRADIENT OVERLAY ===
+            // Fade from clear photo to dark where text begins
+            const gradStart = textStartY - canvas.height * 0.18;
+            const gradEnd = textStartY + canvas.height * 0.06;
             const grad = ctx.createLinearGradient(0, gradStart, 0, gradEnd);
             grad.addColorStop(0, 'rgba(0,0,0,0)');
-            grad.addColorStop(0.4, 'rgba(0,0,0,0.4)');
-            grad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
-            grad.addColorStop(1, 'rgba(0,0,0,0.95)');
+            grad.addColorStop(0.35, 'rgba(0,0,0,0.35)');
+            grad.addColorStop(0.65, 'rgba(0,0,0,0.75)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.93)');
             ctx.fillStyle = grad;
             ctx.fillRect(0, gradStart, canvas.width, gradEnd - gradStart);
 
-            // Dark from gradient end to bottom
-            ctx.fillStyle = 'rgba(0,0,0,0.95)';
+            // Solid dark from gradient end to bottom
+            ctx.fillStyle = 'rgba(0,0,0,0.93)';
             ctx.fillRect(0, gradEnd, canvas.width, canvas.height - gradEnd);
 
-            // Accent line at very bottom
+            // === ACCENT BAR at bottom ===
             ctx.fillStyle = theme.accent;
-            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
+            ctx.fillRect(0, canvas.height - accentBarH, canvas.width, accentBarH);
 
-            // Quote mark — right above text
-            ctx.font = `bold 100px Georgia, 'Times New Roman', serif`;
+            // === OPENING QUOTE MARK ===
+            ctx.font = `bold 120px Georgia, 'Times New Roman', serif`;
             ctx.fillStyle = theme.accent;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
-            ctx.fillText('\u201C', padding - 8, textStartY - 15);
+            ctx.fillText('\u201C', padding - 10, textStartY + quoteMarkH - 10);
 
-            // Quote text
-            ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
-            const maxWidth = canvas.width - (padding * 2);
-            const lines = wrapText(ctx, quote, maxWidth);
-            const lineHeight = fontSize * 1.25;
-
-            let curY = textStartY + fontSize * 0.6;
+            // === QUOTE TEXT (word-by-word with highlights) ===
             lines.forEach((line, lineIdx) => {
-                const y = curY + (lineIdx * lineHeight);
+                const y = textBlockStartY + (lineIdx * lineHeight);
                 const words = line.split(' ');
                 let x = padding;
 
                 words.forEach((word) => {
                     ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
                     ctx.textBaseline = 'alphabetic';
+                    ctx.textAlign = 'left';
                     const wordWidth = ctx.measureText(word).width;
                     const spaceWidth = ctx.measureText(' ').width;
                     const cleanWord = word.replace(/[.,!?;:\u201C\u201D'"]/g, '').toLowerCase();
@@ -7695,15 +7717,13 @@
                     });
 
                     ctx.fillStyle = isHighlighted ? theme.accent : '#ffffff';
-                    ctx.textAlign = 'left';
                     ctx.fillText(word, x, y);
                     x += wordWidth + spaceWidth;
                 });
             });
 
-            // Attribution — pinned near bottom, no empty space
-            const attrY = canvas.height - 8 - 70;
-            const avatarR = 32;
+            // === ATTRIBUTION — larger avatar, name, tagline ===
+            const attrCenterY = attrTopY + avatarR; // Vertical center of avatar
             const attrX = padding;
 
             if (profilePhotoUrl) {
@@ -7711,34 +7731,41 @@
                     const img = await loadImage(profilePhotoUrl);
                     ctx.save();
                     ctx.beginPath();
-                    ctx.arc(attrX + avatarR, attrY, avatarR, 0, Math.PI * 2);
+                    ctx.arc(attrX + avatarR, attrCenterY, avatarR, 0, Math.PI * 2);
                     ctx.clip();
-                    ctx.drawImage(img, attrX, attrY - avatarR, avatarR * 2, avatarR * 2);
+                    ctx.drawImage(img, attrX, attrCenterY - avatarR, avatarR * 2, avatarR * 2);
                     ctx.restore();
 
                     ctx.strokeStyle = theme.accent;
-                    ctx.lineWidth = 2.5;
+                    ctx.lineWidth = 3;
                     ctx.beginPath();
-                    ctx.arc(attrX + avatarR, attrY, avatarR, 0, Math.PI * 2);
+                    ctx.arc(attrX + avatarR, attrCenterY, avatarR, 0, Math.PI * 2);
                     ctx.stroke();
                 } catch (e) {
-                    drawInitialsCircle(ctx, attrX + avatarR, attrY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
+                    drawInitialsCircle(ctx, attrX + avatarR, attrCenterY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
                 }
             } else {
-                drawInitialsCircle(ctx, attrX + avatarR, attrY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
+                drawInitialsCircle(ctx, attrX + avatarR, attrCenterY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
             }
 
-            // Name + tagline — large and prominent
-            const nameX = attrX + avatarR * 2 + 18;
+            // Name + tagline next to avatar
+            const nameX = attrX + avatarR * 2 + 22;
             ctx.textBaseline = 'alphabetic';
             ctx.textAlign = 'left';
-            ctx.font = `bold 42px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(companyName || 'Your Name', nameX, attrY + 2);
+
             if (tagline) {
-                ctx.font = `28px 'Segoe UI', system-ui, sans-serif`;
-                ctx.fillStyle = 'rgba(255,255,255,0.65)';
-                ctx.fillText(tagline, nameX, attrY + 38);
+                // Two lines: name + tagline, vertically centered on avatar
+                ctx.font = `bold 52px 'Segoe UI', system-ui, sans-serif`;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(companyName || 'Your Name', nameX, attrCenterY - 4);
+                ctx.font = `36px 'Segoe UI', system-ui, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillText(tagline, nameX, attrCenterY + 40);
+            } else {
+                // Single line: name centered on avatar
+                ctx.font = `bold 52px 'Segoe UI', system-ui, sans-serif`;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(companyName || 'Your Name', nameX, attrCenterY + 16);
             }
 
             return canvas.toDataURL('image/png');
