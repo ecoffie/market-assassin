@@ -7082,19 +7082,20 @@
             ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const cardX = 100;
-            const cardW = canvas.width - 200;
+            // Wider card for a squarer look
+            const cardX = 60;
+            const cardW = canvas.width - 120;
             const innerPad = 50;
             const innerX = cardX + innerPad;
             const radius = 24;
 
             // Pre-calculate content height to size card dynamically
-            const headerHeight = 80; // avatar + name + handle
+            const headerHeight = 70;
             const headerGap = 30;
 
-            let fontSize = 36;
-            if (quote.length > 120) fontSize = 30;
-            if (quote.length > 180) fontSize = 26;
+            let fontSize = 38;
+            if (quote.length > 120) fontSize = 32;
+            if (quote.length > 180) fontSize = 28;
 
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
             const textMaxWidth = cardW - (innerPad * 2);
@@ -7102,10 +7103,10 @@
             const lineHeight = fontSize * 1.45;
             const textBlockHeight = textLines.length * lineHeight;
 
-            const hashHeight = 40;
-            const dividerGap = 40;
-            const statsHeight = 40;
-            const bottomPad = 30;
+            const hashHeight = 36;
+            const dividerGap = 36;
+            const statsHeight = 36;
+            const bottomPad = 24;
 
             const contentHeight = innerPad + headerHeight + headerGap + textBlockHeight + hashHeight + dividerGap + statsHeight + bottomPad + innerPad;
             const cardH = Math.max(contentHeight, 400);
@@ -7130,8 +7131,8 @@
             ctx.stroke();
 
             // Avatar
-            const avatarY = cardY + innerPad + 30;
-            const avatarR = 30;
+            const avatarY = cardY + innerPad + 28;
+            const avatarR = 28;
             if (profilePhotoUrl) {
                 try {
                     const img = await loadImage(profilePhotoUrl);
@@ -7152,18 +7153,18 @@
             ctx.textAlign = 'left';
             ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.text;
-            ctx.fillText(companyName || 'Your Company', innerX + 80, avatarY - 5);
+            ctx.fillText(companyName || 'Your Company', innerX + 74, avatarY - 5);
 
             const handle = '@' + (companyName || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
             ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
-            ctx.fillText(handle, innerX + 80, avatarY + 25);
+            ctx.fillText(handle, innerX + 74, avatarY + 25);
 
-            // Three dots menu
+            // Three dots menu (vertical)
             ctx.fillStyle = theme.secondary;
             for (let i = 0; i < 3; i++) {
                 ctx.beginPath();
-                ctx.arc(cardX + cardW - innerPad - 10 + (i * 14), avatarY, 3, 0, Math.PI * 2);
+                ctx.arc(cardX + cardW - innerPad - 10, avatarY - 12 + (i * 14), 3, 0, Math.PI * 2);
                 ctx.fill();
             }
 
@@ -7178,7 +7179,7 @@
             });
 
             // Hashtag line
-            const hashY = textStartY + textBlockHeight + 20;
+            const hashY = textStartY + textBlockHeight + 16;
             ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
             ctx.fillText('#govcon #quoteoftheday #leadership', innerX, hashY);
@@ -7192,13 +7193,70 @@
             ctx.lineTo(cardX + cardW - innerPad, dividerY);
             ctx.stroke();
 
-            // Engagement stats
-            const statsY = dividerY + 35;
-            ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+            // Randomized engagement numbers
+            const commentCount = Math.floor(Math.random() * 400) + 50;
+            const likeCount = (Math.random() < 0.5)
+                ? (Math.floor(Math.random() * 25) + 5) + 'K'
+                : Math.floor(Math.random() * 900) + 100;
+            const shareCount = Math.floor(Math.random() * 200) + 20;
+
+            const statsY = dividerY + 32;
+            const iconSize = 18;
             ctx.fillStyle = theme.secondary;
-            ctx.fillText('\uD83D\uDCAC 250', innerX, statsY);
-            ctx.fillText('\u2764\uFE0F 17K', innerX + 160, statsY);
-            ctx.fillText('\uD83D\uDD01 75', innerX + 340, statsY);
+            ctx.strokeStyle = theme.secondary;
+            ctx.lineWidth = 1.8;
+
+            // Comment icon (speech bubble outline)
+            const cX = innerX;
+            const cY = statsY - iconSize + 2;
+            ctx.beginPath();
+            ctx.moveTo(cX + 3, cY + iconSize);
+            ctx.lineTo(cX + 7, cY + iconSize - 5);
+            ctx.lineTo(cX + iconSize - 2, cY + iconSize - 5);
+            ctx.quadraticCurveTo(cX + iconSize + 2, cY + iconSize - 5, cX + iconSize + 2, cY + iconSize - 10);
+            ctx.lineTo(cX + iconSize + 2, cY + 4);
+            ctx.quadraticCurveTo(cX + iconSize + 2, cY, cX + iconSize - 2, cY);
+            ctx.lineTo(cX + 4, cY);
+            ctx.quadraticCurveTo(cX, cY, cX, cY + 4);
+            ctx.lineTo(cX, cY + iconSize - 10);
+            ctx.quadraticCurveTo(cX, cY + iconSize - 5, cX + 3, cY + iconSize - 5);
+            ctx.closePath();
+            ctx.stroke();
+
+            ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+            ctx.textAlign = 'left';
+            ctx.fillText(String(commentCount), cX + iconSize + 10, statsY);
+
+            // Heart icon (outline)
+            const hX = innerX + 160;
+            const hY = statsY - 6;
+            ctx.beginPath();
+            ctx.moveTo(hX + 10, hY + 16);
+            ctx.bezierCurveTo(hX + 10, hY + 14, hX + 10, hY + 8, hX + 4, hY + 8);
+            ctx.bezierCurveTo(hX - 1, hY + 8, hX - 1, hY + 14, hX - 1, hY + 14);
+            ctx.bezierCurveTo(hX - 1, hY + 14, hX - 1, hY + 18, hX + 10, hY + 24);
+            ctx.bezierCurveTo(hX + 21, hY + 18, hX + 21, hY + 14, hX + 21, hY + 14);
+            ctx.bezierCurveTo(hX + 21, hY + 14, hX + 21, hY + 8, hX + 16, hY + 8);
+            ctx.bezierCurveTo(hX + 12, hY + 8, hX + 10, hY + 14, hX + 10, hY + 14);
+            ctx.stroke();
+
+            ctx.fillText(String(likeCount), hX + 30, statsY);
+
+            // Share icon (arrow outline)
+            const sX = innerX + 340;
+            const sY = statsY - 10;
+            ctx.beginPath();
+            ctx.moveTo(sX + 8, sY);
+            ctx.lineTo(sX + 20, sY + 10);
+            ctx.lineTo(sX + 8, sY + 20);
+            ctx.lineTo(sX + 8, sY + 14);
+            ctx.quadraticCurveTo(sX, sY + 14, sX, sY + 22);
+            ctx.lineTo(sX, sY + 22);
+            ctx.quadraticCurveTo(sX - 2, sY + 10, sX + 8, sY + 6);
+            ctx.closePath();
+            ctx.stroke();
+
+            ctx.fillText(String(shareCount), sX + 28, statsY);
 
             return canvas.toDataURL('image/png');
         }
