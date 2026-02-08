@@ -900,8 +900,16 @@
                                             </svg>
                                         </button>
                                     </div>
-                                    <p class="text-xs text-gray-500 mt-2">Headshot appears on Tweet Quote and Social Card graphics. Max 2MB.</p>
+                                    <p class="text-xs text-gray-500 mt-2">Headshot appears on Tweet Quote, Social Card, and Photo Quote graphics. Max 2MB.</p>
                                     <input type="hidden" id="profile-photo-data" value="">
+                                </div>
+
+                                <!-- Profile Tagline for Photo Quote -->
+                                <div class="mt-4 pt-4 border-t border-purple-200">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Profile Tagline</label>
+                                    <input type="text" id="profile-tagline" placeholder="e.g., Entrepreneur | Business Development Leader"
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-govcon-blue focus:border-govcon-blue">
+                                    <p class="text-xs text-gray-500 mt-1">Appears on Photo Quote graphics below your name.</p>
                                 </div>
 
                                 <!-- Company Logo Upload -->
@@ -1898,6 +1906,11 @@
                     // Load profile photo if saved
                     if (colors.photo_url) {
                         loadProfilePhoto(colors.photo_url);
+                    }
+
+                    // Load tagline if saved
+                    if (colors.tagline) {
+                        document.getElementById('profile-tagline').value = colors.tagline;
                     }
                 }
 
@@ -2934,10 +2947,11 @@
                             <label class="block text-sm font-medium text-gray-700 mb-2">Layout</label>
                             <div class="grid grid-cols-2 gap-2" id="layout-picker">
                                 ${Object.entries(graphicLayouts).map(([key, layout]) => `
-                                    <button onclick="selectGraphicLayout('${key}')" id="layout-${key}" class="p-3 rounded-lg border-2 transition text-left ${key === 'classic' ? 'border-govcon-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
+                                    <button onclick="selectGraphicLayout('${key}')" id="layout-${key}" class="p-3 rounded-lg border-2 transition text-left ${key === 'classic' ? 'border-govcon-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'} ${key === 'photoquote' ? 'col-span-2' : ''}">
                                         <div class="flex items-center gap-2 mb-1">
                                             <span class="text-lg">${layout.icon}</span>
                                             <span class="text-sm font-semibold ${key === 'classic' ? 'text-govcon-blue' : 'text-gray-800'}">${layout.label}</span>
+                                            ${key === 'photoquote' ? '<span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-auto">Requires photo</span>' : ''}
                                         </div>
                                         <p class="text-xs text-gray-500">${layout.description}</p>
                                     </button>
@@ -3057,7 +3071,7 @@
         function buildThemePicker(layout, selectedIdx) {
             const themes = graphicLayouts[layout]?.themes || quoteCardStyles;
             return themes.map((theme, i) => {
-                const bgColor = theme.bg || theme.bgGradient?.[0] || '#333';
+                const bgColor = theme.accent || theme.bg || theme.bgGradient?.[0] || '#333';
                 const isSelected = i === selectedIdx;
                 const ring = isSelected ? 'ring-2 ring-offset-2 ring-blue-500' : '';
                 return `<button onclick="selectGraphicTheme(${i})" class="w-9 h-9 rounded-full border-2 border-gray-300 transition hover:scale-110 ${ring}" style="background: ${bgColor};" title="${theme.name}"></button>`;
@@ -3143,6 +3157,12 @@
             const themes = graphicLayouts[layout]?.themes || quoteCardStyles;
             const theme = themes[themeIdx] || themes[0];
             const apiType = graphicLayouts[layout]?.apiType || 'quote';
+
+            // Photo Quote requires a profile photo
+            if (layout === 'photoquote' && !profilePhotoUrl) {
+                showErrorToast('Photo Quote requires a profile photo. Upload one in your Profile settings.');
+                return;
+            }
 
             // Close modal
             closeVisualModal();
@@ -5530,7 +5550,8 @@
                 background: document.getElementById('brand-bg-color')?.value || '#0d1f33',
                 enabled: document.getElementById('use-brand-colors')?.checked || false,
                 logo_url: profileLogoUrl || null,  // Store URL from Supabase Storage
-                photo_url: profilePhotoUrl || null  // Profile photo for graphics
+                photo_url: profilePhotoUrl || null,  // Profile photo for graphics
+                tagline: document.getElementById('profile-tagline')?.value?.trim() || null  // Tagline for Photo Quote
             };
 
             const profileData = {
@@ -6848,6 +6869,13 @@
                 description: 'Bold text with highlighted key words',
                 apiType: 'highlight',
                 themes: null // uses highlighterThemes (set below)
+            },
+            photoquote: {
+                label: 'Photo Quote',
+                icon: '\uD83D\uDCF8',
+                description: 'Your photo background + highlighted quote',
+                apiType: 'highlight',
+                themes: null // uses photoQuoteThemes (set below)
             }
         };
         // Graphic type labels for display
@@ -6864,6 +6892,7 @@
                 case 'tweet': return await renderTweetQuote(data.quote || data, companyName, style);
                 case 'social': return await renderSocialCard(data.quote || data, companyName, style);
                 case 'highlighter': return await renderHighlighterQuote(data, companyName, style);
+                case 'photoquote': return await renderPhotoQuote(data, companyName, style);
                 case 'classic':
                 case 'quote':
                 default: return await renderQuoteCard(data.quote || data, companyName, style);
@@ -7319,6 +7348,15 @@
         graphicLayouts.social.themes = socialCardThemes;
         graphicLayouts.highlighter.themes = highlighterThemes;
 
+        // ========== PHOTO QUOTE RENDERER ==========
+        const photoQuoteThemes = [
+            { name: 'Gold', accent: '#c5a028', gradientStart: 'rgba(0,0,0,0)', gradientEnd: 'rgba(0,0,0,0.92)' },
+            { name: 'Blue', accent: '#4a9eff', gradientStart: 'rgba(0,0,0,0)', gradientEnd: 'rgba(0,0,0,0.92)' },
+            { name: 'Green', accent: '#34d399', gradientStart: 'rgba(0,0,0,0)', gradientEnd: 'rgba(0,0,0,0.92)' },
+            { name: 'Red', accent: '#f87171', gradientStart: 'rgba(0,0,0,0)', gradientEnd: 'rgba(0,0,0,0.92)' }
+        ];
+        graphicLayouts.photoquote.themes = photoQuoteThemes;
+
         async function renderHighlighterQuote(data, companyName, theme) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -7411,6 +7449,147 @@
                 ctx.textAlign = 'center';
                 ctx.fillText('\u2014 ' + companyName, canvas.width / 2, canvas.height - 100);
                 ctx.globalAlpha = 1;
+            }
+
+            return canvas.toDataURL('image/png');
+        }
+
+        // ========== PHOTO QUOTE RENDERER ==========
+        async function renderPhotoQuote(data, companyName, theme) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 1200;
+            canvas.height = 1200;
+
+            // Dark base background
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw profile photo as background (cover-crop)
+            if (profilePhotoUrl) {
+                try {
+                    const img = await loadImage(profilePhotoUrl);
+                    const imgRatio = img.width / img.height;
+                    let sx = 0, sy = 0, sw = img.width, sh = img.height;
+                    if (imgRatio > 1) {
+                        // Wider than tall — crop sides
+                        sw = img.height;
+                        sx = (img.width - sw) / 2;
+                    } else {
+                        // Taller than wide — crop bottom
+                        sh = img.width;
+                        sy = 0;
+                    }
+                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+                } catch (e) {
+                    console.error('Failed to load photo for Photo Quote:', e);
+                }
+            }
+
+            // Gradient overlay — transparent at top, dark at bottom
+            const grad = ctx.createLinearGradient(0, canvas.height * 0.25, 0, canvas.height * 0.65);
+            grad.addColorStop(0, theme.gradientStart);
+            grad.addColorStop(1, theme.gradientEnd);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Extra dark block for bottom half to ensure text readability
+            ctx.fillStyle = 'rgba(0,0,0,0.88)';
+            ctx.fillRect(0, canvas.height * 0.65, canvas.width, canvas.height * 0.35);
+
+            // Accent line at very bottom
+            ctx.fillStyle = theme.accent;
+            ctx.fillRect(0, canvas.height - 6, canvas.width, 6);
+
+            // Large curly quote marks
+            ctx.font = `bold 140px Georgia, 'Times New Roman', serif`;
+            ctx.fillStyle = theme.accent;
+            ctx.textAlign = 'left';
+            ctx.fillText('\u201C', 50, canvas.height * 0.48);
+
+            // Quote text — bold, white, left-aligned, highlighted words in accent color
+            const quote = data.quote || '';
+            const highlights = (data.highlights || []).map(h => h.toLowerCase());
+            const padding = 60;
+
+            let fontSize = 64;
+            if (quote.length > 60) fontSize = 56;
+            if (quote.length > 100) fontSize = 48;
+            if (quote.length > 150) fontSize = 42;
+            if (quote.length > 200) fontSize = 36;
+
+            ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            const maxWidth = canvas.width - (padding * 2);
+            const lines = wrapText(ctx, quote, maxWidth);
+            const lineHeight = fontSize * 1.35;
+            const textBlockHeight = lines.length * lineHeight;
+            const textStartY = canvas.height * 0.52;
+
+            lines.forEach((line, lineIdx) => {
+                const y = textStartY + (lineIdx * lineHeight);
+                const words = line.split(' ');
+                let x = padding;
+
+                words.forEach((word) => {
+                    ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+                    const wordWidth = ctx.measureText(word).width;
+                    const spaceWidth = ctx.measureText(' ').width;
+                    const cleanWord = word.replace(/[.,!?;:\u201C\u201D'"]/g, '').toLowerCase();
+
+                    const isHighlighted = highlights.some(h => {
+                        return cleanWord === h || cleanWord.includes(h) || h.includes(cleanWord);
+                    });
+
+                    ctx.fillStyle = isHighlighted ? theme.accent : '#ffffff';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(word, x, y);
+                    x += wordWidth + spaceWidth;
+                });
+            });
+
+            // Bottom attribution bar
+            const attrY = canvas.height - 80;
+            const avatarR = 30;
+            const attrX = padding;
+
+            // Small avatar circle at bottom
+            if (profilePhotoUrl) {
+                try {
+                    const img = await loadImage(profilePhotoUrl);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(attrX + avatarR, attrY, avatarR, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(img, attrX, attrY - avatarR, avatarR * 2, avatarR * 2);
+                    ctx.restore();
+
+                    // Circle border
+                    ctx.strokeStyle = theme.accent;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(attrX + avatarR, attrY, avatarR, 0, Math.PI * 2);
+                    ctx.stroke();
+                } catch (e) {
+                    drawInitialsCircle(ctx, attrX + avatarR, attrY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
+                }
+            } else {
+                drawInitialsCircle(ctx, attrX + avatarR, attrY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
+            }
+
+            // Name
+            const nameX = attrX + avatarR * 2 + 16;
+            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            const tagline = document.getElementById('profile-tagline')?.value?.trim() || '';
+            if (tagline) {
+                ctx.fillText(companyName || 'Your Name', nameX, attrY - 6);
+                ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillText(tagline, nameX, attrY + 22);
+            } else {
+                ctx.fillText(companyName || 'Your Name', nameX, attrY + 8);
             }
 
             return canvas.toDataURL('image/png');
