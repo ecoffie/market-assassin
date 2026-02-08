@@ -7010,16 +7010,16 @@
             tweet: {
                 label: 'Tweet Quote',
                 icon: '\uD83D\uDCAC',
-                description: 'Profile header + quoted text',
+                description: 'Post with hashtags + engagement stats',
                 apiType: 'quote',
-                themes: null // uses tweetQuoteThemes (set below)
+                themes: null // uses socialCardThemes (set below)
             },
             social: {
                 label: 'Social Card',
                 icon: '\uD83D\uDCF1',
-                description: 'Post mockup with engagement stats',
+                description: 'Clean profile header + quoted text',
                 apiType: 'quote',
-                themes: null // uses socialCardThemes (set below)
+                themes: null // uses tweetQuoteThemes (set below)
             },
             highlighter: {
                 label: 'Highlighter',
@@ -7052,8 +7052,8 @@
             const brandName = companyName;   // For classic quote, social card
 
             switch (type) {
-                case 'tweet': return await renderTweetQuote(data.quote || data, personName, style);
-                case 'social': return await renderSocialCard(data.quote || data, personName, style);
+                case 'tweet': return await renderSocialCard(data.quote || data, personName, style);
+                case 'social': return await renderTweetQuote(data.quote || data, personName, style);
                 case 'highlighter': return await renderHighlighterQuote(data, personName, style);
                 case 'photoquote': return await renderPhotoQuote(data, personName, style);
                 case 'classic':
@@ -7528,8 +7528,8 @@
 
         // Assign themes to layouts now that all arrays are defined
         graphicLayouts.classic.themes = quoteCardStyles;
-        graphicLayouts.tweet.themes = tweetQuoteThemes;
-        graphicLayouts.social.themes = socialCardThemes;
+        graphicLayouts.tweet.themes = socialCardThemes;
+        graphicLayouts.social.themes = tweetQuoteThemes;
         graphicLayouts.highlighter.themes = highlighterThemes;
 
         // ========== PHOTO QUOTE RENDERER ==========
