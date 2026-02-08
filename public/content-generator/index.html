@@ -746,6 +746,14 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Your Name (for quote graphics) -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                            <input type="text" id="display-name" placeholder="e.g., Eric Coffie"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-govcon-blue focus:border-govcon-blue">
+                            <p class="text-xs text-gray-500 mt-1">Used on quote graphics (Photo Quote, Tweet, Highlighter, Classic)</p>
+                        </div>
+
                         <!-- Company Name -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Company Name <span class="text-red-500">*</span></label>
@@ -1944,6 +1952,11 @@
                     // Load tagline if saved
                     if (colors.tagline) {
                         document.getElementById('profile-tagline').value = colors.tagline;
+                    }
+
+                    // Load display name if saved
+                    if (colors.display_name) {
+                        document.getElementById('display-name').value = colors.display_name;
                     }
                 }
 
@@ -5694,7 +5707,8 @@
                 logo_url: profileLogoUrl || null,  // Store URL from Supabase Storage
                 photo_url: profilePhotoUrl || null,  // Profile photo for avatar circles
                 background_photo_url: backgroundPhotoUrl || null,  // Hero photo for Photo Quote background
-                tagline: document.getElementById('profile-tagline')?.value?.trim() || null  // Tagline for Photo Quote
+                tagline: document.getElementById('profile-tagline')?.value?.trim() || null,  // Tagline for Photo Quote
+                display_name: document.getElementById('display-name')?.value?.trim() || null  // Person's name for quote graphics
             };
 
             const profileData = {
@@ -5779,6 +5793,7 @@
             }
 
             // Clear all form fields
+            document.getElementById('display-name').value = '';
             document.getElementById('company-name').value = '';
             document.getElementById('user-role').value = '';
             document.getElementById('phone-number').value = '';
@@ -7031,14 +7046,19 @@
 
         // Route to correct render function based on graphic layout
         async function renderGraphic(type, data, companyName, style) {
+            // Quote-based graphics use person's name; Social Card uses company name
+            const displayName = document.getElementById('display-name')?.value?.trim() || companyName;
+            const quoteName = displayName;  // Person's name for quote attribution
+            const brandName = companyName;  // Company name for social/brand contexts
+
             switch (type) {
-                case 'tweet': return await renderTweetQuote(data.quote || data, companyName, style);
-                case 'social': return await renderSocialCard(data.quote || data, companyName, style);
-                case 'highlighter': return await renderHighlighterQuote(data, companyName, style);
-                case 'photoquote': return await renderPhotoQuote(data, companyName, style);
+                case 'tweet': return await renderTweetQuote(data.quote || data, quoteName, style);
+                case 'social': return await renderSocialCard(data.quote || data, brandName, style);
+                case 'highlighter': return await renderHighlighterQuote(data, quoteName, style);
+                case 'photoquote': return await renderPhotoQuote(data, quoteName, style);
                 case 'classic':
                 case 'quote':
-                default: return await renderQuoteCard(data.quote || data, companyName, style);
+                default: return await renderQuoteCard(data.quote || data, quoteName, style);
             }
         }
 
