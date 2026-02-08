@@ -434,6 +434,13 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 8, 2026 (Session 5)
+- **govcon-shop: Fixed fix-access-flags** — `continue` after Supabase FK error was skipping KV updates (only 2/33 fixed). Removed Supabase insert, KV granting now unconditional
+- **Fixed Content Generator tier** — Ultimate Bundle customers now show "Full Fix" (was "Content Engine") in KV
+- **Fixed Market Assassin tier** — Ultimate Bundle customers confirmed "Premium" in KV
+- **All 33 customers KV-verified** — 33/33 kv_fixed, 0 errors
+- **MA Standard entries are students** — $99/month subscription users, correctly showing Standard tier
+
 ### February 6, 2026 (Session 4)
 - **govcon-shop: Cleaned up purchases table** — 74 → 35 records (removed 39 non-tool purchases)
 - **govcon-shop: Fixed 4 legacy Stripe product IDs** in purchases table
@@ -482,4 +489,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 6, 2026 (Session 4)*
+*Last Updated: February 8, 2026 (Session 5)*
