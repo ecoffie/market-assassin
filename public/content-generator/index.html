@@ -7301,7 +7301,7 @@
 
             // Pre-calculate content height to size card dynamically
             const headerHeight = 70;
-            const headerGap = 55;
+            const headerGap = 80;
 
             let fontSize = 72;
             if (quote.length > 80) fontSize = 62;
@@ -7391,7 +7391,7 @@
             });
 
             // Hashtag line
-            const hashY = textStartY + textBlockHeight + 24;
+            const hashY = textStartY + textBlockHeight + 50;
             ctx.font = `28px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
             ctx.fillText('#govcon #quoteoftheday #leadership', innerX, hashY);
