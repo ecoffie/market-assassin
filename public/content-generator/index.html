@@ -7053,7 +7053,7 @@
 
             switch (type) {
                 case 'tweet': return await renderTweetQuote(data.quote || data, personName, style);
-                case 'social': return await renderSocialCard(data.quote || data, brandName, style);
+                case 'social': return await renderSocialCard(data.quote || data, personName, style);
                 case 'highlighter': return await renderHighlighterQuote(data, personName, style);
                 case 'photoquote': return await renderPhotoQuote(data, personName, style);
                 case 'classic':
@@ -7284,7 +7284,7 @@
 
             // Pre-calculate content height to size card dynamically
             const headerHeight = 70;
-            const headerGap = 35;
+            const headerGap = 55;
 
             let fontSize = 40;
             if (quote.length > 120) fontSize = 34;
@@ -7395,63 +7395,64 @@
                 : Math.floor(Math.random() * 900) + 100;
             const shareCount = Math.floor(Math.random() * 200) + 20;
 
-            const statsY = dividerY + 32;
-            const iconSize = 18;
+            // Engagement stats — icons vertically centered with numbers
+            const statsY = dividerY + 36;
+            const iconS = 20;  // icon size
             ctx.fillStyle = theme.secondary;
             ctx.strokeStyle = theme.secondary;
             ctx.lineWidth = 1.8;
-
-            // Comment icon (speech bubble outline)
-            const cX = innerX;
-            const cY = statsY - iconSize + 2;
-            ctx.beginPath();
-            ctx.moveTo(cX + 3, cY + iconSize);
-            ctx.lineTo(cX + 7, cY + iconSize - 5);
-            ctx.lineTo(cX + iconSize - 2, cY + iconSize - 5);
-            ctx.quadraticCurveTo(cX + iconSize + 2, cY + iconSize - 5, cX + iconSize + 2, cY + iconSize - 10);
-            ctx.lineTo(cX + iconSize + 2, cY + 4);
-            ctx.quadraticCurveTo(cX + iconSize + 2, cY, cX + iconSize - 2, cY);
-            ctx.lineTo(cX + 4, cY);
-            ctx.quadraticCurveTo(cX, cY, cX, cY + 4);
-            ctx.lineTo(cX, cY + iconSize - 10);
-            ctx.quadraticCurveTo(cX, cY + iconSize - 5, cX + 3, cY + iconSize - 5);
-            ctx.closePath();
-            ctx.stroke();
-
             ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
             ctx.textAlign = 'left';
-            ctx.fillText(String(commentCount), cX + iconSize + 10, statsY);
+            ctx.textBaseline = 'middle';
 
-            // Heart icon (outline)
-            const hX = innerX + 160;
-            const hY = statsY - 6;
+            // Comment icon (speech bubble outline) — centered on statsY
+            const cX = innerX;
+            const cTop = statsY - iconS / 2;
             ctx.beginPath();
-            ctx.moveTo(hX + 10, hY + 16);
-            ctx.bezierCurveTo(hX + 10, hY + 14, hX + 10, hY + 8, hX + 4, hY + 8);
-            ctx.bezierCurveTo(hX - 1, hY + 8, hX - 1, hY + 14, hX - 1, hY + 14);
-            ctx.bezierCurveTo(hX - 1, hY + 14, hX - 1, hY + 18, hX + 10, hY + 24);
-            ctx.bezierCurveTo(hX + 21, hY + 18, hX + 21, hY + 14, hX + 21, hY + 14);
-            ctx.bezierCurveTo(hX + 21, hY + 14, hX + 21, hY + 8, hX + 16, hY + 8);
-            ctx.bezierCurveTo(hX + 12, hY + 8, hX + 10, hY + 14, hX + 10, hY + 14);
-            ctx.stroke();
-
-            ctx.fillText(String(likeCount), hX + 30, statsY);
-
-            // Share icon (arrow outline)
-            const sX = innerX + 340;
-            const sY = statsY - 10;
-            ctx.beginPath();
-            ctx.moveTo(sX + 8, sY);
-            ctx.lineTo(sX + 20, sY + 10);
-            ctx.lineTo(sX + 8, sY + 20);
-            ctx.lineTo(sX + 8, sY + 14);
-            ctx.quadraticCurveTo(sX, sY + 14, sX, sY + 22);
-            ctx.lineTo(sX, sY + 22);
-            ctx.quadraticCurveTo(sX - 2, sY + 10, sX + 8, sY + 6);
+            ctx.moveTo(cX + 3, cTop + iconS);
+            ctx.lineTo(cX + 6, cTop + iconS - 5);
+            ctx.lineTo(cX + iconS - 2, cTop + iconS - 5);
+            ctx.quadraticCurveTo(cX + iconS + 2, cTop + iconS - 5, cX + iconS + 2, cTop + iconS - 10);
+            ctx.lineTo(cX + iconS + 2, cTop + 4);
+            ctx.quadraticCurveTo(cX + iconS + 2, cTop, cX + iconS - 2, cTop);
+            ctx.lineTo(cX + 4, cTop);
+            ctx.quadraticCurveTo(cX, cTop, cX, cTop + 4);
+            ctx.lineTo(cX, cTop + iconS - 10);
+            ctx.quadraticCurveTo(cX, cTop + iconS - 5, cX + 3, cTop + iconS - 5);
             ctx.closePath();
             ctx.stroke();
+            ctx.fillText(String(commentCount), cX + iconS + 12, statsY);
 
-            ctx.fillText(String(shareCount), sX + 28, statsY);
+            // Heart icon (FILLED) — centered on statsY
+            const hX = innerX + 170;
+            const hCY = statsY;
+            const hs = 11;  // half-size of heart
+            ctx.beginPath();
+            ctx.moveTo(hX, hCY + hs * 0.7);
+            ctx.bezierCurveTo(hX - hs * 1.1, hCY - hs * 0.3, hX - hs * 1.1, hCY - hs, hX - hs * 0.55, hCY - hs);
+            ctx.bezierCurveTo(hX - hs * 0.1, hCY - hs, hX, hCY - hs * 0.4, hX, hCY - hs * 0.4);
+            ctx.bezierCurveTo(hX, hCY - hs * 0.4, hX + hs * 0.1, hCY - hs, hX + hs * 0.55, hCY - hs);
+            ctx.bezierCurveTo(hX + hs * 1.1, hCY - hs, hX + hs * 1.1, hCY - hs * 0.3, hX, hCY + hs * 0.7);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillText(String(likeCount), hX + hs + 10, statsY);
+
+            // Share icon (arrow outline) — centered on statsY
+            const sX = innerX + 360;
+            const sTop = statsY - iconS / 2;
+            ctx.beginPath();
+            ctx.moveTo(sX + 10, sTop);
+            ctx.lineTo(sX + 22, sTop + iconS / 2);
+            ctx.lineTo(sX + 10, sTop + iconS);
+            ctx.lineTo(sX + 10, sTop + iconS * 0.65);
+            ctx.quadraticCurveTo(sX, sTop + iconS * 0.65, sX, sTop + iconS);
+            ctx.lineTo(sX, sTop + iconS);
+            ctx.quadraticCurveTo(sX - 2, sTop + iconS * 0.4, sX + 10, sTop + iconS * 0.35);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fillText(String(shareCount), sX + 30, statsY);
+
+            ctx.textBaseline = 'alphabetic';
 
             return canvas.toDataURL('image/png');
         }
