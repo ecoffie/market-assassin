@@ -7490,17 +7490,22 @@
                 }
             }
 
-            // Smooth gradient: transparent at top → fully dark at ~55%
-            const grad = ctx.createLinearGradient(0, canvas.height * 0.2, 0, canvas.height * 0.58);
+            // Subtle overall darkening on the photo (tones down bright backgrounds)
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height * 0.65);
+
+            // Smooth gradient: transparent at top → fully dark
+            const grad = ctx.createLinearGradient(0, canvas.height * 0.15, 0, canvas.height * 0.55);
             grad.addColorStop(0, 'rgba(0,0,0,0)');
-            grad.addColorStop(0.5, 'rgba(0,0,0,0.6)');
-            grad.addColorStop(1, 'rgba(0,0,0,0.95)');
+            grad.addColorStop(0.4, 'rgba(0,0,0,0.3)');
+            grad.addColorStop(0.7, 'rgba(0,0,0,0.75)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.98)');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Solid dark for bottom 45% (text area)
-            ctx.fillStyle = 'rgba(0,0,0,0.95)';
-            ctx.fillRect(0, canvas.height * 0.58, canvas.width, canvas.height * 0.42);
+            // Solid dark for bottom 42% (text area)
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, canvas.height * 0.56, canvas.width, canvas.height * 0.44);
 
             // Accent line at very bottom
             ctx.fillStyle = theme.accent;
@@ -7542,7 +7547,7 @@
             ctx.fillStyle = theme.accent;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
-            ctx.fillText('\u201C\u201C', padding - 10, contentTop + 70);
+            ctx.fillText('\u201C', padding - 10, contentTop + 70);
 
             // Quote text — starts after quote marks
             const textStartY = contentTop + quoteMarksH + fontSize;
