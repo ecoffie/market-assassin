@@ -3458,7 +3458,7 @@
                     .from('company-logos')
                     .getPublicUrl(fileName);
 
-                profileLogoUrl = urlData.publicUrl;
+                profileLogoUrl = urlData.publicUrl + '?t=' + Date.now();
                 document.getElementById('profile-logo-data').value = profileLogoUrl;
 
                 // Update UI with preview
@@ -3579,7 +3579,7 @@
 
                 const { data, error } = await SupabaseAuth.client.storage
                     .from('company-logos')
-                    .upload(fileName, file, { cacheControl: '3600', upsert: true });
+                    .upload(fileName, file, { cacheControl: '0', upsert: true });
 
                 if (error) throw new Error(error.message || 'Upload failed');
 
@@ -3587,7 +3587,7 @@
                     .from('company-logos')
                     .getPublicUrl(fileName);
 
-                profilePhotoUrl = urlData.publicUrl;
+                profilePhotoUrl = urlData.publicUrl + '?t=' + Date.now();
                 document.getElementById('profile-photo-data').value = profilePhotoUrl;
 
                 const preview = document.getElementById('profile-photo-preview');
@@ -3688,7 +3688,7 @@
 
                 const { data, error } = await SupabaseAuth.client.storage
                     .from('company-logos')
-                    .upload(fileName, file, { cacheControl: '3600', upsert: true });
+                    .upload(fileName, file, { cacheControl: '0', upsert: true });
 
                 if (error) throw new Error(error.message || 'Upload failed');
 
@@ -3696,7 +3696,7 @@
                     .from('company-logos')
                     .getPublicUrl(fileName);
 
-                backgroundPhotoUrl = urlData.publicUrl;
+                backgroundPhotoUrl = urlData.publicUrl + '?t=' + Date.now();
                 document.getElementById('bg-photo-data').value = backgroundPhotoUrl;
 
                 const preview = document.getElementById('bg-photo-preview');
