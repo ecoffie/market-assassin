@@ -7046,19 +7046,19 @@
 
         // Route to correct render function based on graphic layout
         async function renderGraphic(type, data, companyName, style) {
-            // Quote-based graphics use person's name; Social Card uses company name
+            // Person's name for personal quote attribution; company name for brand contexts
             const displayName = document.getElementById('display-name')?.value?.trim() || companyName;
-            const quoteName = displayName;  // Person's name for quote attribution
-            const brandName = companyName;  // Company name for social/brand contexts
+            const personName = displayName;  // For tweet, highlighter, photo quote
+            const brandName = companyName;   // For classic quote, social card
 
             switch (type) {
-                case 'tweet': return await renderTweetQuote(data.quote || data, quoteName, style);
+                case 'tweet': return await renderTweetQuote(data.quote || data, personName, style);
                 case 'social': return await renderSocialCard(data.quote || data, brandName, style);
-                case 'highlighter': return await renderHighlighterQuote(data, quoteName, style);
-                case 'photoquote': return await renderPhotoQuote(data, quoteName, style);
+                case 'highlighter': return await renderHighlighterQuote(data, personName, style);
+                case 'photoquote': return await renderPhotoQuote(data, personName, style);
                 case 'classic':
                 case 'quote':
-                default: return await renderQuoteCard(data.quote || data, quoteName, style);
+                default: return await renderQuoteCard(data.quote || data, brandName, style);
             }
         }
 
@@ -7274,34 +7274,37 @@
             ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Wider card for a squarer look
-            const cardX = 60;
-            const cardW = canvas.width - 120;
-            const innerPad = 50;
+            // Card fills most of canvas — minimal outer margin
+            const outerMargin = 40;
+            const cardX = outerMargin;
+            const cardW = canvas.width - (outerMargin * 2);
+            const innerPad = 55;
             const innerX = cardX + innerPad;
             const radius = 24;
 
             // Pre-calculate content height to size card dynamically
             const headerHeight = 70;
-            const headerGap = 30;
+            const headerGap = 35;
 
-            let fontSize = 38;
-            if (quote.length > 120) fontSize = 32;
-            if (quote.length > 180) fontSize = 28;
+            let fontSize = 40;
+            if (quote.length > 120) fontSize = 34;
+            if (quote.length > 180) fontSize = 30;
 
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
             const textMaxWidth = cardW - (innerPad * 2);
             const textLines = wrapText(ctx, quote, textMaxWidth);
-            const lineHeight = fontSize * 1.45;
+            const lineHeight = fontSize * 1.5;
             const textBlockHeight = textLines.length * lineHeight;
 
-            const hashHeight = 36;
-            const dividerGap = 36;
-            const statsHeight = 36;
-            const bottomPad = 24;
+            const hashHeight = 40;
+            const dividerGap = 40;
+            const statsHeight = 40;
+            const bottomPad = 30;
 
             const contentHeight = innerPad + headerHeight + headerGap + textBlockHeight + hashHeight + dividerGap + statsHeight + bottomPad + innerPad;
-            const cardH = Math.max(contentHeight, 400);
+            // Card fills at least 85% of canvas height
+            const minCardH = canvas.height - (outerMargin * 2);
+            const cardH = Math.max(contentHeight, minCardH);
 
             // Center card vertically
             const cardY = (canvas.height - cardH) / 2;
