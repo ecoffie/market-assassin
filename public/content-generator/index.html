@@ -7602,101 +7602,100 @@
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 1200;
-            canvas.height = 1500; // Taller portrait format like the reference
+            canvas.height = 1500;
 
-            // Dark base background
+            // Dark base
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw background photo in the TOP portion (hero image)
+            // Pre-calculate text layout FIRST so we know where the photo/gradient needs to end
+            const quote = data.quote || '';
+            const highlights = (data.highlights || []).map(h => h.toLowerCase());
+            const padding = 55;
+            const tagline = document.getElementById('profile-tagline')?.value?.trim() || '';
+
+            // Larger font sizes — fill the space
+            let fontSize = 80;
+            if (quote.length > 40) fontSize = 72;
+            if (quote.length > 70) fontSize = 64;
+            if (quote.length > 100) fontSize = 56;
+            if (quote.length > 150) fontSize = 48;
+
+            ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            const maxWidth = canvas.width - (padding * 2);
+            const lines = wrapText(ctx, quote, maxWidth);
+            const lineHeight = fontSize * 1.25;
+            const textBlockHeight = lines.length * lineHeight;
+
+            // Layout from bottom up: accent line → attribution → text → quote marks
+            const accentH = 8;
+            const bottomPad = 30;
+            const attrHeight = tagline ? 65 : 45;
+            const attrGap = 20;
+            const quoteMarksH = 65;
+            const quoteMarkGap = 10;
+
+            const attrBottom = canvas.height - accentH - bottomPad;
+            const textBottom = attrBottom - attrHeight - attrGap;
+            const textTop = textBottom - textBlockHeight;
+            const quoteMarkY = textTop - quoteMarkGap;
+            const contentTop = quoteMarkY - quoteMarksH;
+
+            // Photo fills from top down to where text starts (overlap into gradient)
+            const photoBottom = textTop + lineHeight * 1.5; // photo extends PAST text start
+
             if (backgroundPhotoUrl) {
                 try {
                     const img = await loadImage(backgroundPhotoUrl);
-                    // Photo fills the top ~65% of canvas
-                    const photoAreaH = canvas.height * 0.65;
                     const imgRatio = img.width / img.height;
-                    const canvasRatio = canvas.width / photoAreaH;
+                    const canvasRatio = canvas.width / photoBottom;
 
                     let sx = 0, sy = 0, sw = img.width, sh = img.height;
                     if (imgRatio > canvasRatio) {
-                        // Image wider than needed — crop sides, keep center
                         sw = img.height * canvasRatio;
                         sx = (img.width - sw) / 2;
                     } else {
-                        // Image taller than needed — show from top (head first)
                         sh = img.width / canvasRatio;
                         sy = 0;
                     }
-                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, photoAreaH);
+                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, photoBottom);
                 } catch (e) {
                     console.error('Failed to load photo for Photo Quote:', e);
                 }
             }
 
-            // Subtle overall darkening on the photo (tones down bright backgrounds)
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height * 0.65);
+            // Subtle overall darkening
+            ctx.fillStyle = 'rgba(0,0,0,0.1)';
+            ctx.fillRect(0, 0, canvas.width, photoBottom);
 
-            // Smooth gradient: transparent at top → fully dark
-            const grad = ctx.createLinearGradient(0, canvas.height * 0.15, 0, canvas.height * 0.55);
-            grad.addColorStop(0, 'rgba(0,0,0,0)');
-            grad.addColorStop(0.4, 'rgba(0,0,0,0.3)');
-            grad.addColorStop(0.7, 'rgba(0,0,0,0.75)');
-            grad.addColorStop(1, 'rgba(0,0,0,0.98)');
+            // Gradient: fades photo into dark right where text begins
+            const gradTop = contentTop - 60;
+            const gradBottom = textTop + lineHeight;
+            const grad = ctx.createLinearGradient(0, gradTop, 0, gradBottom);
+            grad.addColorStop(0, 'rgba(10,10,10,0)');
+            grad.addColorStop(0.5, 'rgba(10,10,10,0.7)');
+            grad.addColorStop(1, 'rgba(10,10,10,1)');
             ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, gradTop, canvas.width, gradBottom - gradTop);
 
-            // Solid dark for bottom 42% (text area)
+            // Solid dark from gradient end to bottom
             ctx.fillStyle = '#0a0a0a';
-            ctx.fillRect(0, canvas.height * 0.56, canvas.width, canvas.height * 0.44);
+            ctx.fillRect(0, gradBottom, canvas.width, canvas.height - gradBottom);
 
             // Accent line at very bottom
             ctx.fillStyle = theme.accent;
-            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
+            ctx.fillRect(0, canvas.height - accentH, canvas.width, accentH);
 
-            // Pre-calculate quote layout to position everything tightly
-            const quote = data.quote || '';
-            const highlights = (data.highlights || []).map(h => h.toLowerCase());
-            const padding = 60;
-
-            let fontSize = 72;
-            if (quote.length > 50) fontSize = 64;
-            if (quote.length > 80) fontSize = 56;
-            if (quote.length > 120) fontSize = 48;
-            if (quote.length > 180) fontSize = 42;
-
-            ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
-            const maxWidth = canvas.width - (padding * 2);
-            const lines = wrapText(ctx, quote, maxWidth);
-            const lineHeight = fontSize * 1.3;
-            const textBlockHeight = lines.length * lineHeight;
-
-            // Attribution height
-            const tagline = document.getElementById('profile-tagline')?.value?.trim() || '';
-            const attrHeight = tagline ? 70 : 50;
-            const attrGap = 30;
-
-            // Total content: quote marks + text + gap + attribution
-            const quoteMarksH = 80;
-            const totalContentH = quoteMarksH + textBlockHeight + attrGap + attrHeight;
-
-            // Position everything from bottom up, with bottom padding above accent line
-            const bottomPad = 50;
-            const contentBottom = canvas.height - 8 - bottomPad;
-            const contentTop = contentBottom - totalContentH;
-
-            // Curly quote marks — accent colored, positioned at content top
-            ctx.font = `bold 120px Georgia, 'Times New Roman', serif`;
+            // Curly quote mark
+            ctx.font = `bold 100px Georgia, 'Times New Roman', serif`;
             ctx.fillStyle = theme.accent;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
-            ctx.fillText('\u201C', padding - 10, contentTop + 70);
+            ctx.fillText('\u201C', padding - 8, quoteMarkY + 10);
 
-            // Quote text — starts after quote marks
-            const textStartY = contentTop + quoteMarksH + fontSize;
-
+            // Quote text — word by word with highlights
             lines.forEach((line, lineIdx) => {
-                const y = textStartY + (lineIdx * lineHeight);
+                const y = textTop + (lineIdx * lineHeight) + fontSize;
                 const words = line.split(' ');
                 let x = padding;
 
@@ -7718,12 +7717,11 @@
                 });
             });
 
-            // Attribution — tight below quote text
-            const attrY = contentBottom - attrHeight / 2;
-            const avatarR = 28;
+            // Attribution — tight below text
+            const attrY = attrBottom - attrHeight / 2;
+            const avatarR = 26;
             const attrX = padding;
 
-            // Small avatar circle
             if (profilePhotoUrl) {
                 try {
                     const img = await loadImage(profilePhotoUrl);
@@ -7746,19 +7744,18 @@
                 drawInitialsCircle(ctx, attrX + avatarR, attrY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
             }
 
-            // Name + tagline
-            const nameX = attrX + avatarR * 2 + 16;
+            const nameX = attrX + avatarR * 2 + 14;
             ctx.textBaseline = 'alphabetic';
             ctx.textAlign = 'left';
             if (tagline) {
-                ctx.font = `bold 30px 'Segoe UI', system-ui, sans-serif`;
+                ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
                 ctx.fillStyle = '#ffffff';
                 ctx.fillText(companyName || 'Your Name', nameX, attrY - 4);
-                ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
-                ctx.fillStyle = 'rgba(255,255,255,0.65)';
-                ctx.fillText(tagline, nameX, attrY + 24);
+                ctx.font = `21px 'Segoe UI', system-ui, sans-serif`;
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.fillText(tagline, nameX, attrY + 22);
             } else {
-                ctx.font = `bold 30px 'Segoe UI', system-ui, sans-serif`;
+                ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
                 ctx.fillStyle = '#ffffff';
                 ctx.fillText(companyName || 'Your Name', nameX, attrY + 8);
             }
