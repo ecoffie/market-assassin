@@ -7621,8 +7621,8 @@
             if (quote.length > 150) fontSize = 52;
             if (quote.length > 200) fontSize = 44;
 
-            // Text starts at 45% from top — overlaps mid-body
-            const textStartY = canvas.height * 0.45;
+            // Text starts at 50% from top — overlaps mid-body
+            const textStartY = canvas.height * 0.50;
 
             // Photo fills entire canvas
             if (backgroundPhotoUrl) {
@@ -7701,10 +7701,9 @@
                 });
             });
 
-            // Attribution — below last line of text
-            const lastTextY = curY + (lines.length - 1) * lineHeight;
-            const attrY = lastTextY + lineHeight * 0.8 + 30;
-            const avatarR = 30;
+            // Attribution — pinned near bottom, no empty space
+            const attrY = canvas.height - 8 - 70;
+            const avatarR = 32;
             const attrX = padding;
 
             if (profilePhotoUrl) {
@@ -7729,17 +7728,17 @@
                 drawInitialsCircle(ctx, attrX + avatarR, attrY, avatarR, companyName, { text: '#ffffff', secondary: theme.accent });
             }
 
-            // Name + tagline — larger and always visible
-            const nameX = attrX + avatarR * 2 + 16;
+            // Name + tagline — large and prominent
+            const nameX = attrX + avatarR * 2 + 18;
             ctx.textBaseline = 'alphabetic';
             ctx.textAlign = 'left';
-            ctx.font = `bold 34px 'Segoe UI', system-ui, sans-serif`;
+            ctx.font = `bold 42px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = '#ffffff';
-            ctx.fillText(companyName || 'Your Name', nameX, attrY - 2);
+            ctx.fillText(companyName || 'Your Name', nameX, attrY + 2);
             if (tagline) {
-                ctx.font = `24px 'Segoe UI', system-ui, sans-serif`;
+                ctx.font = `28px 'Segoe UI', system-ui, sans-serif`;
                 ctx.fillStyle = 'rgba(255,255,255,0.65)';
-                ctx.fillText(tagline, nameX, attrY + 28);
+                ctx.fillText(tagline, nameX, attrY + 38);
             }
 
             return canvas.toDataURL('image/png');
