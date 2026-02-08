@@ -876,6 +876,34 @@
                                     <label for="use-brand-colors" class="text-sm text-gray-600">Use my brand colors for graphics</label>
                                 </div>
 
+                                <!-- Profile Photo Upload -->
+                                <div class="mt-4 pt-4 border-t border-purple-200">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Profile Photo</label>
+                                    <div class="flex items-center gap-4">
+                                        <label class="flex-1 cursor-pointer">
+                                            <div id="profile-photo-upload-area" class="border-2 border-dashed border-purple-300 rounded-lg p-3 text-center hover:border-purple-500 hover:bg-purple-50/50 transition">
+                                                <input type="file" id="profile-photo-upload" accept="image/*" class="hidden" onchange="handleProfilePhotoUpload(event)">
+                                                <div class="flex items-center justify-center gap-2">
+                                                    <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                                    </svg>
+                                                    <span id="profile-photo-text" class="text-sm text-purple-600">Click to upload headshot</span>
+                                                </div>
+                                            </div>
+                                        </label>
+                                        <div id="profile-photo-preview" class="hidden w-16 h-16 rounded-full border-2 border-purple-200 overflow-hidden bg-white shadow-sm">
+                                            <img id="profile-photo-preview-img" src="" class="w-full h-full object-cover">
+                                        </div>
+                                        <button id="remove-profile-photo-btn" onclick="removeProfilePhoto()" class="hidden p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Remove photo">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2">Headshot appears on Tweet Quote and Social Card graphics. Max 2MB.</p>
+                                    <input type="hidden" id="profile-photo-data" value="">
+                                </div>
+
                                 <!-- Company Logo Upload -->
                                 <div class="mt-4 pt-4 border-t border-purple-200">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
@@ -1865,6 +1893,11 @@
                     // Load company logo URL if saved
                     if (colors.logo_url) {
                         loadProfileLogo(colors.logo_url);
+                    }
+
+                    // Load profile photo if saved
+                    if (colors.photo_url) {
+                        loadProfilePhoto(colors.photo_url);
                     }
                 }
 
@@ -3454,6 +3487,115 @@
                     logoText.textContent = 'Logo uploaded!';
                     logoText.classList.add('text-green-600');
                     logoText.classList.remove('text-purple-600');
+                }
+            }
+        }
+
+        // ========== PROFILE PHOTO UPLOAD ==========
+        let profilePhotoUrl = null;
+
+        async function handleProfilePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showErrorToast('Please upload an image file');
+                return;
+            }
+            if (file.size > 2 * 1024 * 1024) {
+                showErrorToast('Photo must be under 2MB');
+                return;
+            }
+
+            const user = SupabaseAuth.user;
+            if (!user) {
+                showErrorToast('Please sign in to upload a photo');
+                return;
+            }
+
+            const photoText = document.getElementById('profile-photo-text');
+            if (photoText) {
+                photoText.textContent = 'Uploading...';
+                photoText.classList.remove('text-purple-600', 'text-green-600');
+                photoText.classList.add('text-blue-600');
+            }
+
+            try {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${user.id}/photo.${fileExt}`;
+
+                const { data, error } = await SupabaseAuth.client.storage
+                    .from('company-logos')
+                    .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+                if (error) throw new Error(error.message || 'Upload failed');
+
+                const { data: urlData } = SupabaseAuth.client.storage
+                    .from('company-logos')
+                    .getPublicUrl(fileName);
+
+                profilePhotoUrl = urlData.publicUrl;
+                document.getElementById('profile-photo-data').value = profilePhotoUrl;
+
+                const preview = document.getElementById('profile-photo-preview');
+                const previewImg = document.getElementById('profile-photo-preview-img');
+                const removeBtn = document.getElementById('remove-profile-photo-btn');
+
+                previewImg.src = profilePhotoUrl;
+                preview.classList.remove('hidden');
+                removeBtn.classList.remove('hidden');
+                photoText.textContent = 'Photo uploaded!';
+                photoText.classList.remove('text-blue-600');
+                photoText.classList.add('text-green-600');
+
+                showSuccessToast('Photo uploaded! Click Save Profile to save.');
+            } catch (error) {
+                console.error('Photo upload error:', error);
+                if (photoText) {
+                    photoText.textContent = 'Click to upload headshot';
+                    photoText.classList.remove('text-blue-600');
+                    photoText.classList.add('text-purple-600');
+                }
+                showErrorToast('Failed to upload photo: ' + error.message);
+            }
+        }
+
+        function removeProfilePhoto() {
+            const preview = document.getElementById('profile-photo-preview');
+            const removeBtn = document.getElementById('remove-profile-photo-btn');
+            const photoText = document.getElementById('profile-photo-text');
+            const input = document.getElementById('profile-photo-upload');
+
+            preview.classList.add('hidden');
+            removeBtn.classList.add('hidden');
+            photoText.textContent = 'Click to upload headshot';
+            photoText.classList.remove('text-green-600');
+            photoText.classList.add('text-purple-600');
+            if (input) input.value = '';
+
+            profilePhotoUrl = null;
+            document.getElementById('profile-photo-data').value = '';
+        }
+
+        function loadProfilePhoto(photoUrl) {
+            if (!photoUrl) return;
+
+            profilePhotoUrl = photoUrl;
+            document.getElementById('profile-photo-data').value = photoUrl;
+
+            const preview = document.getElementById('profile-photo-preview');
+            const previewImg = document.getElementById('profile-photo-preview-img');
+            const removeBtn = document.getElementById('remove-profile-photo-btn');
+            const photoText = document.getElementById('profile-photo-text');
+
+            if (preview && previewImg) {
+                previewImg.src = photoUrl;
+                preview.classList.remove('hidden');
+                if (removeBtn) removeBtn.classList.remove('hidden');
+                if (photoText) {
+                    photoText.textContent = 'Photo uploaded!';
+                    photoText.classList.add('text-green-600');
+                    photoText.classList.remove('text-purple-600');
                 }
             }
         }
@@ -5387,7 +5529,8 @@
                 accent: document.getElementById('brand-accent-color')?.value || '#c5a028',
                 background: document.getElementById('brand-bg-color')?.value || '#0d1f33',
                 enabled: document.getElementById('use-brand-colors')?.checked || false,
-                logo_url: profileLogoUrl || null  // Store URL from Supabase Storage
+                logo_url: profileLogoUrl || null,  // Store URL from Supabase Storage
+                photo_url: profilePhotoUrl || null  // Profile photo for graphics
             };
 
             const profileData = {
@@ -6867,19 +7010,25 @@
 
             const padding = 100;
 
-            // Avatar circle with initials
-            const initials = (companyName || 'GC').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-            ctx.beginPath();
-            ctx.arc(padding + 40, 140, 40, 0, Math.PI * 2);
-            ctx.fillStyle = theme.secondary;
-            ctx.globalAlpha = 0.3;
-            ctx.fill();
-            ctx.globalAlpha = 1;
-
-            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = theme.text;
-            ctx.textAlign = 'center';
-            ctx.fillText(initials, padding + 40, 150);
+            // Avatar circle with photo or initials
+            const avatarCX = padding + 40;
+            const avatarCY = 140;
+            const avatarR = 40;
+            if (profilePhotoUrl) {
+                try {
+                    const img = await loadImage(profilePhotoUrl);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(avatarCX, avatarCY, avatarR, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(img, avatarCX - avatarR, avatarCY - avatarR, avatarR * 2, avatarR * 2);
+                    ctx.restore();
+                } catch (e) {
+                    drawInitialsCircle(ctx, avatarCX, avatarCY, avatarR, companyName, theme);
+                }
+            } else {
+                drawInitialsCircle(ctx, avatarCX, avatarCY, avatarR, companyName, theme);
+            }
 
             // Company name
             ctx.textAlign = 'left';
@@ -6933,16 +7082,40 @@
             ctx.fillStyle = theme.bg;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Centered rounded card
             const cardX = 100;
-            const cardY = 160;
             const cardW = canvas.width - 200;
-            const cardH = canvas.height - 320;
+            const innerPad = 50;
+            const innerX = cardX + innerPad;
             const radius = 24;
 
+            // Pre-calculate content height to size card dynamically
+            const headerHeight = 80; // avatar + name + handle
+            const headerGap = 30;
+
+            let fontSize = 36;
+            if (quote.length > 120) fontSize = 30;
+            if (quote.length > 180) fontSize = 26;
+
+            ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            const textMaxWidth = cardW - (innerPad * 2);
+            const textLines = wrapText(ctx, quote, textMaxWidth);
+            const lineHeight = fontSize * 1.45;
+            const textBlockHeight = textLines.length * lineHeight;
+
+            const hashHeight = 40;
+            const dividerGap = 40;
+            const statsHeight = 40;
+            const bottomPad = 30;
+
+            const contentHeight = innerPad + headerHeight + headerGap + textBlockHeight + hashHeight + dividerGap + statsHeight + bottomPad + innerPad;
+            const cardH = Math.max(contentHeight, 400);
+
+            // Center card vertically
+            const cardY = (canvas.height - cardH) / 2;
+
             // Card shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
-            roundedRect(ctx, cardX + 4, cardY + 4, cardW, cardH, radius);
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            roundedRect(ctx, cardX + 4, cardY + 6, cardW, cardH, radius);
             ctx.fill();
 
             // Card background
@@ -6956,88 +7129,107 @@
             roundedRect(ctx, cardX, cardY, cardW, cardH, radius);
             ctx.stroke();
 
-            const innerPad = 50;
-            const innerX = cardX + innerPad;
-
-            // Avatar inside card
-            const initials = (companyName || 'GC').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-            ctx.beginPath();
-            ctx.arc(innerX + 30, cardY + innerPad + 30, 30, 0, Math.PI * 2);
-            ctx.fillStyle = theme.border;
-            ctx.globalAlpha = 0.4;
-            ctx.fill();
-            ctx.globalAlpha = 1;
-
-            ctx.font = `bold 22px 'Segoe UI', system-ui, sans-serif`;
-            ctx.fillStyle = theme.text;
-            ctx.textAlign = 'center';
-            ctx.fillText(initials, innerX + 30, cardY + innerPad + 38);
+            // Avatar
+            const avatarY = cardY + innerPad + 30;
+            const avatarR = 30;
+            if (profilePhotoUrl) {
+                try {
+                    const img = await loadImage(profilePhotoUrl);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(innerX + avatarR, avatarY, avatarR, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(img, innerX, avatarY - avatarR, avatarR * 2, avatarR * 2);
+                    ctx.restore();
+                } catch (e) {
+                    drawInitialsCircle(ctx, innerX + avatarR, avatarY, avatarR, companyName, theme);
+                }
+            } else {
+                drawInitialsCircle(ctx, innerX + avatarR, avatarY, avatarR, companyName, theme);
+            }
 
             // Name + handle
             ctx.textAlign = 'left';
             ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.text;
-            ctx.fillText(companyName || 'Your Company', innerX + 80, cardY + innerPad + 25);
+            ctx.fillText(companyName || 'Your Company', innerX + 80, avatarY - 5);
 
             const handle = '@' + (companyName || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
             ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
-            ctx.fillText(handle, innerX + 80, cardY + innerPad + 55);
+            ctx.fillText(handle, innerX + 80, avatarY + 25);
 
             // Three dots menu
             ctx.fillStyle = theme.secondary;
             for (let i = 0; i < 3; i++) {
                 ctx.beginPath();
-                ctx.arc(cardX + cardW - innerPad - 10 + (i * 14), cardY + innerPad + 30, 3, 0, Math.PI * 2);
+                ctx.arc(cardX + cardW - innerPad - 10 + (i * 14), avatarY, 3, 0, Math.PI * 2);
                 ctx.fill();
             }
 
             // Post text body
-            let fontSize = 36;
-            if (quote.length > 120) fontSize = 30;
-            if (quote.length > 180) fontSize = 26;
-
             ctx.font = `${fontSize}px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.text;
             ctx.textAlign = 'left';
 
-            const textMaxWidth = cardW - (innerPad * 2);
-            const textLines = wrapText(ctx, quote, textMaxWidth);
-            const lineHeight = fontSize * 1.45;
-            const textStartY = cardY + innerPad + 110;
-
+            const textStartY = avatarY + avatarR + headerGap;
             textLines.forEach((line, i) => {
                 ctx.fillText(line, innerX, textStartY + (i * lineHeight));
             });
 
             // Hashtag line
-            const hashY = textStartY + textLines.length * lineHeight + 20;
+            const hashY = textStartY + textBlockHeight + 20;
             ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
             ctx.fillText('#govcon #quoteoftheday #leadership', innerX, hashY);
 
-            // Engagement stats row (bottom of card)
-            const statsY = cardY + cardH - innerPad - 10;
-
-            // Divider line above stats
+            // Divider line
+            const dividerY = hashY + dividerGap;
             ctx.strokeStyle = theme.border;
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(innerX, statsY - 30);
-            ctx.lineTo(cardX + cardW - innerPad, statsY - 30);
+            ctx.moveTo(innerX, dividerY);
+            ctx.lineTo(cardX + cardW - innerPad, dividerY);
             ctx.stroke();
 
+            // Engagement stats
+            const statsY = dividerY + 35;
             ctx.font = `22px 'Segoe UI', system-ui, sans-serif`;
             ctx.fillStyle = theme.secondary;
-
-            // Comment icon + count
             ctx.fillText('\uD83D\uDCAC 250', innerX, statsY);
-            // Heart icon + count
             ctx.fillText('\u2764\uFE0F 17K', innerX + 160, statsY);
-            // Share icon + count
             ctx.fillText('\uD83D\uDD01 75', innerX + 340, statsY);
 
             return canvas.toDataURL('image/png');
+        }
+
+        // Load image helper (returns Promise<HTMLImageElement>)
+        function loadImage(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Failed to load image'));
+                img.src = url;
+            });
+        }
+
+        // Draw initials circle helper
+        function drawInitialsCircle(ctx, cx, cy, r, companyName, theme) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = theme.secondary;
+            ctx.globalAlpha = 0.3;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            const initials = (companyName || 'GC').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+            ctx.font = `bold ${Math.round(r * 0.9)}px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = theme.text;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(initials, cx, cy);
+            ctx.textBaseline = 'alphabetic';
         }
 
         // Rounded rectangle helper
@@ -7094,7 +7286,7 @@
 
             const quote = data.quote || '';
             const highlights = (data.highlights || []).map(h => h.toLowerCase());
-            const padding = 100;
+            const padding = 120;
 
             // Calculate font size
             let fontSize = 64;
@@ -7107,20 +7299,25 @@
             // Word-wrap the quote into lines
             const maxWidth = canvas.width - (padding * 2);
             const lines = wrapText(ctx, quote, maxWidth);
-            const lineHeight = fontSize * 1.5;
+            const lineHeight = fontSize * 1.6;
             const totalHeight = lines.length * lineHeight;
-            const startY = (canvas.height - totalHeight) / 2 + fontSize / 2 - 40;
+            const startY = (canvas.height - totalHeight) / 2 + fontSize / 2 - 20;
 
-            // Draw each line word by word, highlighting matched words
+            // Draw each line centered, word by word with highlights
             lines.forEach((line, lineIdx) => {
                 const y = startY + (lineIdx * lineHeight);
                 const words = line.split(' ');
-                let x = padding;
+
+                // Measure full line width to center it
+                ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
+                const lineWidth = ctx.measureText(line).width;
+                let x = (canvas.width - lineWidth) / 2;
 
                 words.forEach((word) => {
                     ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
-                    const wordWidth = ctx.measureText(word + ' ').width;
-                    const cleanWord = word.replace(/[.,!?;:'"]/g, '').toLowerCase();
+                    const wordOnlyWidth = ctx.measureText(word).width;
+                    const spaceWidth = ctx.measureText(' ').width;
+                    const cleanWord = word.replace(/[.,!?;:\u201C\u201D'"]/g, '').toLowerCase();
 
                     // Check if this word matches any highlight
                     const isHighlighted = highlights.some(h => {
@@ -7128,15 +7325,14 @@
                     });
 
                     if (isHighlighted) {
-                        // Draw highlight rectangle behind word
-                        const highlightPad = 6;
+                        const highlightPad = 8;
                         ctx.fillStyle = theme.highlight;
-                        ctx.globalAlpha = 0.7;
+                        ctx.globalAlpha = 0.75;
                         ctx.fillRect(
                             x - highlightPad,
                             y - fontSize * 0.75,
-                            ctx.measureText(word).width + highlightPad * 2,
-                            fontSize * 1.05
+                            wordOnlyWidth + highlightPad * 2,
+                            fontSize * 1.1
                         );
                         ctx.globalAlpha = 1;
                     }
@@ -7145,17 +7341,17 @@
                     ctx.fillStyle = theme.text;
                     ctx.textAlign = 'left';
                     ctx.fillText(word, x, y);
-                    x += wordWidth;
+                    x += wordOnlyWidth + spaceWidth;
                 });
             });
 
-            // Attribution at bottom-left
+            // Attribution centered at bottom
             if (companyName) {
-                ctx.font = `italic 28px Georgia, 'Times New Roman', serif`;
+                ctx.font = `italic 30px Georgia, 'Times New Roman', serif`;
                 ctx.fillStyle = theme.text;
-                ctx.globalAlpha = 0.6;
-                ctx.textAlign = 'left';
-                ctx.fillText('- ' + companyName, padding, canvas.height - 100);
+                ctx.globalAlpha = 0.5;
+                ctx.textAlign = 'center';
+                ctx.fillText('\u2014 ' + companyName, canvas.width / 2, canvas.height - 100);
                 ctx.globalAlpha = 1;
             }
 
