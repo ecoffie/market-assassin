@@ -2536,10 +2536,19 @@
                                 Try Again
                             </button>
                             ${hasGraphicsAccess ? `
-                            <button onclick="generateQuickImage(${index})" class="flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                Graphic
-                            </button>
+                            <div class="flex items-center gap-1">
+                                <select id="quick-graphic-type-${index}" class="text-xs bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-lg px-1.5 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                    <option value="quote">Quote</option>
+                                    <option value="stat">Stat</option>
+                                    <option value="tips">Tips</option>
+                                    <option value="hottake">Hot Take</option>
+                                    <option value="beforeafter">Before/After</option>
+                                </select>
+                                <button onclick="generateQuickImage(${index})" class="flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    Go
+                                </button>
+                            </div>
                             <button onclick="openCarouselModal(${index})" class="flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white text-sm rounded-lg transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                 Carousel
@@ -2562,7 +2571,7 @@
                         <div id="image-area-${index}" class="hidden mt-4 pt-4 border-t border-gray-200">
                             <div id="image-loading-${index}" class="hidden text-center py-4">
                                 <div class="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                                <p class="text-sm text-gray-600">Creating quote graphic...</p>
+                                <p class="text-sm text-gray-600">Creating graphic...</p>
                             </div>
                             <div id="image-result-${index}" class="hidden">
                                 <img id="generated-img-${index}" class="w-full max-w-lg mx-auto rounded-lg shadow-lg mb-3" />
@@ -2612,7 +2621,7 @@
         // Track style index for each quick post
         const quickStyleIndex = {};
 
-        // Generate quote graphic for quick posts
+        // Generate graphic for quick posts (supports all graphic types)
         async function generateQuickImage(index) {
             const post = generatedPosts[index];
             if (!post) return;
@@ -2623,6 +2632,10 @@
             const imgEl = document.getElementById(`generated-img-${index}`);
             const downloadLink = document.getElementById(`download-link-${index}`);
 
+            // Read the selected graphic type
+            const typeSelect = document.getElementById(`quick-graphic-type-${index}`);
+            const graphicType = typeSelect ? typeSelect.value : 'quote';
+
             // Show the image area and loading
             imageArea.classList.remove('hidden');
             loadingEl.classList.remove('hidden');
@@ -2632,25 +2645,24 @@
                 // Clean the post content (remove ** markdown)
                 const cleanContent = post.content.replace(/\*\*/g, '');
 
-                // Call API to generate a complementary quote
-                let quote;
+                // Call unified graphic API
+                let graphicData;
                 try {
-                    const response = await fetch('/api/generate-quote', {
+                    const response = await fetch('/api/generate-graphic', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ postContent: cleanContent })
+                        body: JSON.stringify({ postContent: cleanContent, type: graphicType })
                     });
                     const result = await response.json();
-                    if (result.success && result.quote) {
-                        quote = result.quote.replace(/\*\*/g, '').replace(/["]/g, '');
+                    if (result.success) {
+                        graphicData = result.data;
                     }
                 } catch (e) {
-                    console.log('API quote generation failed, using fallback');
+                    console.log('API graphic generation failed, using fallback');
                 }
 
-                // Fallback: create a short inspirational statement from the topic
-                if (!quote) {
-                    const topics = ['Success', 'Excellence', 'Innovation', 'Trust', 'Results', 'Partnership'];
+                // Fallback: create a default for quote type
+                if (!graphicData) {
                     const templates = [
                         'Excellence is not a destination, it\'s a continuous journey.',
                         'Success in government contracting starts with trust.',
@@ -2659,7 +2671,7 @@
                         'Results speak louder than proposals.',
                         'Building partnerships that deliver.'
                     ];
-                    quote = templates[Math.floor(Math.random() * templates.length)];
+                    graphicData = { quote: templates[Math.floor(Math.random() * templates.length)] };
                 }
 
                 // Check if user has brand colors enabled (Full Fix only)
@@ -2678,17 +2690,19 @@
                 // Get company name from profile
                 const companyName = SupabaseAuth.profile?.company_name || 'Your Company';
 
-                // Generate the quote card
-                const imageDataUrl = await renderQuoteCard(quote, companyName, style);
+                // Generate the graphic using the correct renderer
+                const imageDataUrl = await renderGraphic(graphicType, graphicData, companyName, style);
 
                 // Display the result
                 imgEl.src = imageDataUrl;
                 downloadLink.href = imageDataUrl;
+                downloadLink.download = `linkedin-${graphicType}-graphic.png`;
 
                 loadingEl.classList.add('hidden');
                 resultEl.classList.remove('hidden');
 
-                showSuccessToast(`Quote card created (${style.name})`);
+                const typeLabel = graphicTypeLabels[graphicType] || 'Quote Card';
+                showSuccessToast(`${typeLabel} created (${style.name})`);
             } catch (error) {
                 console.error('Error generating quick image:', error);
                 loadingEl.classList.add('hidden');
@@ -5756,10 +5770,10 @@
                                 <div id="image-container-${index}" class="hidden mb-3">
                                     <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
                                         <div class="flex items-center justify-between mb-2">
-                                            <p class="text-xs font-medium text-gray-700">Quote Graphic:</p>
+                                            <p class="text-xs font-medium text-gray-700">Generated Graphic:</p>
                                             <span id="image-style-${index}" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full"></span>
                                         </div>
-                                        <img id="generated-image-${index}" src="" alt="Generated quote graphic" class="w-full max-w-md mx-auto rounded-lg shadow-lg">
+                                        <img id="generated-image-${index}" src="" alt="Generated LinkedIn graphic" class="w-full max-w-md mx-auto rounded-lg shadow-lg">
                                         <div id="quote-display-${index}" class="mt-2 bg-white/70 rounded-lg p-2 text-center">
                                             <p class="text-xs text-gray-600 italic"></p>
                                         </div>
@@ -5778,7 +5792,7 @@
                                 <div id="image-loading-${index}" class="hidden mb-3">
                                     <div class="bg-purple-50 rounded-lg p-4 text-center border border-purple-200">
                                         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
-                                        <p class="text-purple-800 font-medium text-sm">Creating quote card...</p>
+                                        <p class="text-purple-800 font-medium text-sm">Creating graphic...</p>
                                     </div>
                                 </div>
                             </div>
@@ -5799,10 +5813,19 @@
                                 Schedule
                             </button>
                             ${hasGraphicsAccess ? `
-                            <button id="image-btn-${index}" onclick="togglePost(${index}); setTimeout(() => generateImage(${index}), 100);" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-lg transition flex items-center justify-center gap-2 text-sm">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                Graphic
-                            </button>
+                            <div class="flex items-center gap-1">
+                                <select id="graphic-type-${index}" class="text-xs bg-purple-100 text-purple-800 border border-purple-300 rounded-lg px-2 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                    <option value="quote">Quote Card</option>
+                                    <option value="stat">Stat Card</option>
+                                    <option value="tips">Tip Card</option>
+                                    <option value="hottake">Hot Take</option>
+                                    <option value="beforeafter">Before / After</option>
+                                </select>
+                                <button id="image-btn-${index}" onclick="togglePost(${index}); setTimeout(() => generateImage(${index}), 100);" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 rounded-lg transition flex items-center justify-center gap-1 text-sm">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    Go
+                                </button>
+                            </div>
                             ` : `
                             <button onclick="showGraphicsUpgradeModal()" class="relative bg-gradient-to-r from-purple-400 to-purple-500 text-white font-bold px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm hover:from-purple-500 hover:to-purple-600 transition group" title="Full Fix feature - Click to upgrade">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
@@ -5826,7 +5849,7 @@
                                 <svg class="w-10 h-10 text-white mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                                 </svg>
-                                <p class="text-white font-bold text-sm">Quote Graphic</p>
+                                <p class="text-white font-bold text-sm">Graphics (5 Types)</p>
                                 <p class="text-amber-400 text-xs mt-1">Upgrade to Full Fix $200</p>
                             </div>
                         </div>
@@ -6435,7 +6458,40 @@
 
         let currentStyleIndex = {};
 
-        // Generate quote card using Canvas
+        // Graphic type labels for display
+        const graphicTypeLabels = {
+            quote: 'Quote Card',
+            stat: 'Stat Card',
+            tips: 'Tip Card',
+            hottake: 'Hot Take',
+            beforeafter: 'Before / After'
+        };
+
+        // Route to correct render function based on graphic type
+        async function renderGraphic(type, data, companyName, style) {
+            switch (type) {
+                case 'stat': return await renderStatCard(data, companyName, style);
+                case 'tips': return await renderTipCard(data, companyName, style);
+                case 'hottake': return await renderHotTakeCard(data, companyName, style);
+                case 'beforeafter': return await renderBeforeAfterCard(data, companyName, style);
+                case 'quote':
+                default: return await renderQuoteCard(data.quote || data, companyName, style);
+            }
+        }
+
+        // Get a display string for the generated graphic content
+        function getGraphicDisplayText(type, data) {
+            switch (type) {
+                case 'stat': return `${data.number} — ${data.label}`;
+                case 'tips': return `${data.title}: ${data.tips?.length || 0} tips`;
+                case 'hottake': return data.statement;
+                case 'beforeafter': return `${data.before} → ${data.after}`;
+                case 'quote':
+                default: return data.quote || data;
+            }
+        }
+
+        // Generate graphic using Canvas (expanded post view)
         async function generateImage(index) {
             const post = generatedPosts[index];
             if (!post) return;
@@ -6445,22 +6501,35 @@
             const containerEl = document.getElementById(`image-container-${index}`);
             const imageBtn = document.getElementById(`image-btn-${index}`);
 
-            // Show loading state (brief for canvas - it's fast!)
+            // Read the selected graphic type
+            const typeSelect = document.getElementById(`graphic-type-${index}`);
+            const graphicType = typeSelect ? typeSelect.value : 'quote';
+
+            // Show loading state
             loadingEl.classList.remove('hidden');
             containerEl.classList.add('hidden');
-            imageBtn.disabled = true;
-            imageBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            if (imageBtn) {
+                imageBtn.disabled = true;
+                imageBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
 
             try {
-                // Get complementary quote from API
-                const response = await fetch('/api/generate-quote', {
+                // Call unified graphic API
+                const response = await fetch('/api/generate-graphic', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ postContent: post.content })
+                    body: JSON.stringify({ postContent: post.content, type: graphicType })
                 });
 
                 const result = await response.json();
-                const quote = result.success ? result.quote : getFirstLine(post.content);
+                let graphicData;
+
+                if (result.success) {
+                    graphicData = result.data;
+                } else {
+                    // Fallback for quote type
+                    graphicData = { quote: getFirstLine(post.content) };
+                }
 
                 // Check if user has brand colors enabled (Full Fix only)
                 let style = getBrandStyle();
@@ -6475,8 +6544,8 @@
                     style = quoteCardStyles[currentStyleIndex[index]];
                 }
 
-                // Generate the canvas image
-                const imageDataUrl = await renderQuoteCard(quote, companyProfile.companyName, style);
+                // Generate the canvas image using the correct renderer
+                const imageDataUrl = await renderGraphic(graphicType, graphicData, companyProfile.companyName, style);
 
                 // Display the generated image
                 const imageEl = document.getElementById(`generated-image-${index}`);
@@ -6486,28 +6555,33 @@
 
                 imageEl.src = imageDataUrl;
                 downloadBtn.href = imageDataUrl;
+                downloadBtn.download = `linkedin-${graphicType}-graphic.png`;
 
-                // Show the style and quote info
-                styleEl.textContent = style.name;
-                quoteDisplayEl.querySelector('p').textContent = `"${quote}"`;
+                // Show the style and type info
+                styleEl.textContent = `${graphicTypeLabels[graphicType] || 'Quote Card'} · ${style.name}`;
+                const displayText = getGraphicDisplayText(graphicType, graphicData);
+                quoteDisplayEl.querySelector('p').textContent = displayText;
 
                 loadingEl.classList.add('hidden');
                 containerEl.classList.remove('hidden');
 
                 // Store image info
                 generatedPosts[index].imageUrl = imageDataUrl;
-                generatedPosts[index].extractedQuote = quote;
+                generatedPosts[index].extractedQuote = displayText;
                 generatedPosts[index].imageStyle = style.name;
+                generatedPosts[index].graphicType = graphicType;
 
-                console.log('Quote card generated:', style.name, '-', quote);
+                console.log(`${graphicTypeLabels[graphicType]} generated:`, style.name, '-', displayText);
 
             } catch (error) {
-                console.error('Error generating quote card:', error);
-                showErrorToast('Failed to generate quote card: ' + error.message);
+                console.error('Error generating graphic:', error);
+                showErrorToast('Failed to generate graphic: ' + error.message);
                 loadingEl.classList.add('hidden');
             } finally {
-                imageBtn.disabled = false;
-                imageBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                if (imageBtn) {
+                    imageBtn.disabled = false;
+                    imageBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
             }
         }
 
@@ -6608,6 +6682,408 @@
             ctx.lineTo(40, canvas.height - 80);
             ctx.stroke();
             ctx.globalAlpha = 1;
+
+            return canvas.toDataURL('image/png');
+        }
+
+        // ========== STAT CARD RENDERER ==========
+        async function renderStatCard(data, companyName, style) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 1200;
+            canvas.height = 1200;
+
+            // Draw gradient background
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, style.bgGradient[0]);
+            gradient.addColorStop(1, style.bgGradient[1]);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle grid pattern
+            ctx.globalAlpha = 0.04;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 60) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 60) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+
+            // Top accent bar
+            ctx.fillStyle = style.accentColor;
+            ctx.fillRect(0, 0, canvas.width, 8);
+
+            // Big number — centered
+            ctx.textAlign = 'center';
+            const number = data.number || '0';
+            let numFontSize = 160;
+            if (number.length > 6) numFontSize = 120;
+            if (number.length > 10) numFontSize = 96;
+            ctx.font = `bold ${numFontSize}px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.accentColor;
+            ctx.fillText(number, canvas.width / 2, 480);
+
+            // Label below number
+            const label = data.label || '';
+            ctx.font = `36px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.quoteColor || '#ffffff';
+            ctx.globalAlpha = 0.9;
+            const labelLines = wrapText(ctx, label, canvas.width - 200);
+            labelLines.forEach((line, i) => {
+                ctx.fillText(line, canvas.width / 2, 560 + (i * 50));
+            });
+            ctx.globalAlpha = 1;
+
+            // Divider
+            ctx.fillStyle = style.accentColor;
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(canvas.width / 2 - 80, 560 + labelLines.length * 50 + 30, 160, 3);
+            ctx.globalAlpha = 1;
+
+            // Context text
+            const context = data.context || '';
+            ctx.font = `28px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.quoteColor || '#ffffff';
+            ctx.globalAlpha = 0.7;
+            const ctxLines = wrapText(ctx, context, canvas.width - 200);
+            const ctxStartY = 560 + labelLines.length * 50 + 80;
+            ctxLines.forEach((line, i) => {
+                ctx.fillText(line, canvas.width / 2, ctxStartY + (i * 40));
+            });
+            ctx.globalAlpha = 1;
+
+            // Company name at bottom
+            if (companyName) {
+                ctx.font = '28px "Segoe UI", system-ui, sans-serif';
+                ctx.fillStyle = style.textColor || '#ffffff';
+                ctx.globalAlpha = 0.7;
+                ctx.fillText(companyName, canvas.width / 2, canvas.height - 80);
+                ctx.globalAlpha = 1;
+            }
+
+            // Bottom accent bar
+            ctx.fillStyle = style.accentColor;
+            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
+
+            return canvas.toDataURL('image/png');
+        }
+
+        // ========== TIP CARD RENDERER ==========
+        async function renderTipCard(data, companyName, style) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 1200;
+            canvas.height = 1200;
+
+            // Draw gradient background
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, style.bgGradient[0]);
+            gradient.addColorStop(1, style.bgGradient[1]);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle dot pattern
+            ctx.globalAlpha = 0.03;
+            ctx.fillStyle = '#ffffff';
+            for (let x = 30; x < canvas.width; x += 40) {
+                for (let y = 30; y < canvas.height; y += 40) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.globalAlpha = 1;
+
+            // Top accent bar
+            ctx.fillStyle = style.accentColor;
+            ctx.fillRect(0, 0, canvas.width, 8);
+
+            // Left accent stripe
+            ctx.fillStyle = style.accentColor;
+            ctx.globalAlpha = 0.15;
+            ctx.fillRect(0, 0, 6, canvas.height);
+            ctx.globalAlpha = 1;
+
+            // Title
+            const title = data.title || 'Key Takeaways';
+            ctx.textAlign = 'left';
+            ctx.font = `bold 56px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.accentColor;
+            const titleLines = wrapText(ctx, title, canvas.width - 200);
+            titleLines.forEach((line, i) => {
+                ctx.fillText(line, 100, 140 + (i * 70));
+            });
+
+            // Underline below title
+            const titleBottomY = 140 + titleLines.length * 70 + 10;
+            ctx.fillStyle = style.accentColor;
+            ctx.globalAlpha = 0.3;
+            ctx.fillRect(100, titleBottomY, 200, 3);
+            ctx.globalAlpha = 1;
+
+            // Tips list
+            const tips = data.tips || [];
+            const tipStartY = titleBottomY + 60;
+            const tipSpacing = Math.min(140, (canvas.height - tipStartY - 160) / Math.max(tips.length, 1));
+
+            tips.forEach((tip, i) => {
+                const y = tipStartY + (i * tipSpacing);
+
+                // Numbered circle
+                ctx.beginPath();
+                ctx.arc(130, y - 8, 24, 0, Math.PI * 2);
+                ctx.fillStyle = style.accentColor;
+                ctx.fill();
+
+                // Number
+                ctx.textAlign = 'center';
+                ctx.font = `bold 24px 'Segoe UI', system-ui, sans-serif`;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(String(i + 1), 130, y + 1);
+
+                // Tip text
+                ctx.textAlign = 'left';
+                ctx.font = `32px 'Segoe UI', system-ui, sans-serif`;
+                ctx.fillStyle = style.quoteColor || '#ffffff';
+                const tipLines = wrapText(ctx, tip, canvas.width - 280);
+                tipLines.forEach((line, j) => {
+                    ctx.fillText(line, 180, y + (j * 42));
+                });
+            });
+
+            // Company name at bottom
+            if (companyName) {
+                ctx.textAlign = 'center';
+                ctx.font = '28px "Segoe UI", system-ui, sans-serif';
+                ctx.fillStyle = style.textColor || '#ffffff';
+                ctx.globalAlpha = 0.7;
+                ctx.fillText(companyName, canvas.width / 2, canvas.height - 80);
+                ctx.globalAlpha = 1;
+            }
+
+            return canvas.toDataURL('image/png');
+        }
+
+        // ========== HOT TAKE CARD RENDERER ==========
+        async function renderHotTakeCard(data, companyName, style) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 1200;
+            canvas.height = 1200;
+
+            // Draw gradient background (slightly more dramatic)
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, style.bgGradient[0]);
+            gradient.addColorStop(0.5, style.bgGradient[1]);
+            gradient.addColorStop(1, style.bgGradient[0]);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Radial glow behind text
+            const glow = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 100,
+                canvas.width / 2, canvas.height / 2, 500
+            );
+            glow.addColorStop(0, style.accentColor + '15');
+            glow.addColorStop(1, 'transparent');
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Thick top accent bar
+            ctx.fillStyle = style.accentColor;
+            ctx.fillRect(0, 0, canvas.width, 12);
+
+            // Thick bottom accent bar
+            ctx.fillRect(0, canvas.height - 12, canvas.width, 12);
+
+            // Lightning bolt / flame icon decoration (top area)
+            ctx.textAlign = 'center';
+            ctx.font = '80px serif';
+            ctx.globalAlpha = 0.2;
+            ctx.fillStyle = style.accentColor;
+            ctx.fillText('\u26A1', canvas.width / 2, 160);
+            ctx.globalAlpha = 1;
+
+            // "HOT TAKE" label
+            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.accentColor;
+            ctx.letterSpacing = '8px';
+            ctx.fillText('H O T   T A K E', canvas.width / 2, 230);
+
+            // Statement text — big and bold
+            const statement = data.statement || '';
+            let fontSize = 64;
+            if (statement.length > 60) fontSize = 56;
+            if (statement.length > 100) fontSize = 48;
+            if (statement.length > 150) fontSize = 40;
+
+            ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.quoteColor || '#ffffff';
+            ctx.textAlign = 'center';
+
+            const maxWidth = canvas.width - 160;
+            const lines = wrapText(ctx, statement, maxWidth);
+            const lineHeight = fontSize * 1.35;
+            const totalTextHeight = lines.length * lineHeight;
+            const startY = (canvas.height - totalTextHeight) / 2 + fontSize / 2 + 40;
+
+            lines.forEach((line, i) => {
+                ctx.fillText(line, canvas.width / 2, startY + (i * lineHeight));
+            });
+
+            // Decorative accent dots on either side
+            ctx.fillStyle = style.accentColor;
+            ctx.globalAlpha = 0.4;
+            ctx.beginPath();
+            ctx.arc(80, canvas.height / 2, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(canvas.width - 80, canvas.height / 2, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            // Company name at bottom
+            if (companyName) {
+                ctx.font = '28px "Segoe UI", system-ui, sans-serif';
+                ctx.fillStyle = style.textColor || '#ffffff';
+                ctx.globalAlpha = 0.7;
+                ctx.textAlign = 'center';
+                ctx.fillText(companyName, canvas.width / 2, canvas.height - 70);
+                ctx.globalAlpha = 1;
+            }
+
+            return canvas.toDataURL('image/png');
+        }
+
+        // ========== BEFORE/AFTER CARD RENDERER ==========
+        async function renderBeforeAfterCard(data, companyName, style) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 1200;
+            canvas.height = 1200;
+
+            // Full background
+            const bgGrad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            bgGrad.addColorStop(0, style.bgGradient[1]);
+            bgGrad.addColorStop(1, style.bgGradient[0]);
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Top accent bar
+            ctx.fillStyle = style.accentColor;
+            ctx.fillRect(0, 0, canvas.width, 8);
+
+            // Label at top center
+            const label = data.label || 'The Transformation';
+            ctx.textAlign = 'center';
+            ctx.font = `bold 36px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.accentColor;
+            ctx.fillText(label.toUpperCase(), canvas.width / 2, 100);
+
+            // Divider line under label
+            ctx.fillStyle = style.accentColor;
+            ctx.globalAlpha = 0.3;
+            ctx.fillRect(canvas.width / 2 - 100, 120, 200, 2);
+            ctx.globalAlpha = 1;
+
+            const halfW = canvas.width / 2;
+            const contentY = 220;
+            const contentH = canvas.height - 340;
+
+            // BEFORE side — left, darker/muted tint
+            ctx.fillStyle = 'rgba(180, 50, 50, 0.08)';
+            ctx.fillRect(0, contentY, halfW - 2, contentH);
+
+            // AFTER side — right, green/vibrant tint
+            ctx.fillStyle = 'rgba(50, 180, 80, 0.08)';
+            ctx.fillRect(halfW + 2, contentY, halfW, contentH);
+
+            // Diagonal divider
+            ctx.strokeStyle = style.accentColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(halfW, contentY);
+            ctx.lineTo(halfW, contentY + contentH);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            // "BEFORE" label
+            ctx.textAlign = 'center';
+            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = '#e74c3c';
+            ctx.globalAlpha = 0.8;
+            ctx.fillText('BEFORE', halfW / 2, contentY + 60);
+            ctx.globalAlpha = 1;
+
+            // Before icon (X mark)
+            ctx.font = '60px serif';
+            ctx.fillStyle = '#e74c3c';
+            ctx.globalAlpha = 0.25;
+            ctx.fillText('\u2717', halfW / 2, contentY + 140);
+            ctx.globalAlpha = 1;
+
+            // Before text
+            const beforeText = data.before || '';
+            ctx.font = `36px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.quoteColor || '#ffffff';
+            const beforeLines = wrapText(ctx, beforeText, halfW - 120);
+            const beforeStartY = contentY + contentH / 2 + 40;
+            beforeLines.forEach((line, i) => {
+                ctx.fillText(line, halfW / 2, beforeStartY + (i * 48));
+            });
+
+            // "AFTER" label
+            ctx.font = `bold 28px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = '#2ecc71';
+            ctx.globalAlpha = 0.8;
+            ctx.fillText('AFTER', halfW + halfW / 2, contentY + 60);
+            ctx.globalAlpha = 1;
+
+            // After icon (checkmark)
+            ctx.font = '60px serif';
+            ctx.fillStyle = '#2ecc71';
+            ctx.globalAlpha = 0.25;
+            ctx.fillText('\u2713', halfW + halfW / 2, contentY + 140);
+            ctx.globalAlpha = 1;
+
+            // After text
+            const afterText = data.after || '';
+            ctx.font = `36px 'Segoe UI', system-ui, sans-serif`;
+            ctx.fillStyle = style.quoteColor || '#ffffff';
+            const afterLines = wrapText(ctx, afterText, halfW - 120);
+            afterLines.forEach((line, i) => {
+                ctx.fillText(line, halfW + halfW / 2, beforeStartY + (i * 48));
+            });
+
+            // Arrow between sides
+            ctx.fillStyle = style.accentColor;
+            ctx.globalAlpha = 0.6;
+            ctx.font = '48px serif';
+            ctx.fillText('\u2192', halfW, contentY + contentH / 2 + 40);
+            ctx.globalAlpha = 1;
+
+            // Company name at bottom
+            if (companyName) {
+                ctx.font = '28px "Segoe UI", system-ui, sans-serif';
+                ctx.fillStyle = style.textColor || '#ffffff';
+                ctx.globalAlpha = 0.7;
+                ctx.fillText(companyName, canvas.width / 2, canvas.height - 70);
+                ctx.globalAlpha = 1;
+            }
+
+            // Bottom accent bar
+            ctx.fillStyle = style.accentColor;
+            ctx.fillRect(0, canvas.height - 8, canvas.width, 8);
 
             return canvas.toDataURL('image/png');
         }
