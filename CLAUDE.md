@@ -15,6 +15,12 @@
 
 ---
 
+## Tool Development Roadmap
+
+**See:** [`TOOL-BUILD.md`](./TOOL-BUILD.md) for comprehensive feature list and development priorities for all tools.
+
+---
+
 ## Project Overview
 **Name:** Market Assassin (GovCon Tools Platform)
 **Purpose:** Development/staging environment for GovCon Giants tools
