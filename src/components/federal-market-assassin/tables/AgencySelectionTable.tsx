@@ -22,9 +22,11 @@ interface PainPointsApiResponse {
   success: boolean;
   agency: string;
   painPoints: string[];
+  priorities: string[];
   categorized: CategorizedPainPoints;
   ndaaPainPoints: string[];
   count: number;
+  priorityCount: number;
 }
 
 type SortField = 'name' | 'spending' | 'contractCount';
@@ -627,7 +629,7 @@ export default function AgencySelectionTable({
                           {matchedCommand}
                         </span>
                         <span className="text-xs text-purple-400">
-                          {painPointsData.painPoints.length} priorities identified
+                          {painPointsData.painPoints.length} pain points identified
                         </span>
                       </div>
                     )}
@@ -651,7 +653,7 @@ export default function AgencySelectionTable({
                     ) : (
                       /* Fallback: show raw pain points if categorized is empty */
                       <div>
-                        <h4 className="font-semibold text-purple-300 mb-2">Key Priorities</h4>
+                        <h4 className="font-semibold text-purple-300 mb-2">Key Pain Points</h4>
                         <ul className="space-y-2 text-sm text-slate-300">
                           {painPointsData.painPoints.map((painPoint, index) => (
                             <li key={index} className="flex items-start">
@@ -678,6 +680,26 @@ export default function AgencySelectionTable({
                       </div>
                     )}
 
+                    {/* Spending Priorities */}
+                    {painPointsData.priorities && painPointsData.priorities.length > 0 && (
+                      <div className="pt-4 border-t border-purple-500/30">
+                        <div className="flex items-center gap-2 mb-3">
+                          <h4 className="font-semibold text-emerald-300">Spending Priorities</h4>
+                          <span className="text-xs text-emerald-400/70">
+                            {painPointsData.priorities.length} budget areas
+                          </span>
+                        </div>
+                        <ul className="space-y-2 text-sm text-slate-300">
+                          {painPointsData.priorities.map((priority, index) => (
+                            <li key={index} className="flex items-start">
+                              <span className="text-emerald-400 mr-2">$</span>
+                              <span className="flex-1">{priority}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     {/* Show additional commands if found */}
                     {additionalCommands.length > 0 && (
                       <div className="pt-4 border-t border-purple-500/30 space-y-4">
@@ -689,7 +711,7 @@ export default function AgencySelectionTable({
                                 {cmd.command}
                               </span>
                               <span className="text-xs text-indigo-400">
-                                {cmd.painPoints.painPoints.length} priorities
+                                {cmd.painPoints.painPoints.length} pain points
                               </span>
                             </div>
                             <ul className="space-y-1 text-sm text-slate-300">
@@ -701,7 +723,7 @@ export default function AgencySelectionTable({
                               ))}
                               {cmd.painPoints.painPoints.length > 3 && (
                                 <li className="text-xs text-indigo-400 italic">
-                                  +{cmd.painPoints.painPoints.length - 3} more priorities...
+                                  +{cmd.painPoints.painPoints.length - 3} more pain points...
                                 </li>
                               )}
                             </ul>
