@@ -7,7 +7,6 @@ export const setAsideMap: Record<string, string[]> = {
   'HUBZone': ['HZBZ', 'HUBZ'],
   '8(a) Certified': ['8A', '8AN', '8A COMPETED', '8A SOLE SOURCE'],
   'Small Business': ['SBA', 'SBP', 'SMALL BUSINESS SET-ASIDE', 'TOTAL SMALL BUSINESS SET-ASIDE (FAR 19.5)'],
-  'DOT Certified': ['SBP'],
   'Native American/Tribal': ['IND']
 };
 

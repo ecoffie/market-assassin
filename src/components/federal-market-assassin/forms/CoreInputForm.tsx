@@ -47,7 +47,6 @@ export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps)
     'HUBZone',
     '8(a) Certified',
     'Small Business',
-    'DOT Certified',
     'Native American/Tribal',
   ];
 

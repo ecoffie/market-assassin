@@ -506,7 +506,6 @@ export default function OpportunityScoutPage() {
                   <option value="hubzone">HUBZone</option>
                   <option value="8a">8(a) Certified</option>
                   <option value="small-business">Small Business</option>
-                  <option value="dot-certified">DOT Certified</option>
                 </select>
               </div>
 

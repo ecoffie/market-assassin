@@ -5,7 +5,6 @@ export type BusinessType =
   | 'HUBZone'
   | '8(a) Certified'
   | 'Small Business'
-  | 'DOT Certified'
   | 'Native American/Tribal';
 
 export type VeteranStatus =

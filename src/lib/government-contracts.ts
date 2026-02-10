@@ -121,8 +121,7 @@ export const setAsideMap: Record<string, string[]> = {
   'women-owned': ['WOSB', 'EDWOSB'],
   'hubzone': ['HZBZ', 'HUBZ'],
   '8a': ['8A', '8AN', '8A COMPETED', '8A SOLE SOURCE'],
-  'small-business': ['SBA', 'SBP', 'SMALL BUSINESS SET-ASIDE', 'TOTAL SMALL BUSINESS SET-ASIDE (FAR 19.5)'],
-  'dot-certified': ['SBP']
+  'small-business': ['SBA', 'SBP', 'SMALL BUSINESS SET-ASIDE', 'TOTAL SMALL BUSINESS SET-ASIDE (FAR 19.5)']
 };
 
 export const veteranMap: Record<string, string[]> = {
