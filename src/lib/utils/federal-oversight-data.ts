@@ -21,6 +21,161 @@ export interface AgencyOversightContext {
   recentFindings: string[];
 }
 
+// Known agency budget/spending priorities — sourced from CJ documents, strategic plans,
+// and recent large contract awards. These supplement Grok's knowledge.
+const AGENCY_SPENDING_PRIORITIES: Record<string, string[]> = {
+  'Department of Defense': [
+    'FY2026 budget request: $849.8B — largest items: military personnel ($178B), O&M ($316B), procurement ($170B)',
+    'Pacific Deterrence Initiative (PDI): $9.1B for Indo-Pacific posture and infrastructure',
+    'JADC2 and network-centric warfare: $3.7B across services for joint connectivity',
+    'Hypersonic weapons development: $6.2B for offensive and defensive hypersonics',
+    'CMMC 2.0 rollout: mandatory contractor cybersecurity certification in new contracts',
+    'Microelectronics and semiconductor supply chain: CHIPS Act funding for domestic fab capacity',
+    'Space Force growth: $30B for resilient space architectures and proliferated LEO constellations',
+    'Autonomous systems and AI: $1.8B for Replicator Initiative — fielding attritable autonomous systems at scale',
+  ],
+  'Department of Veterans Affairs': [
+    'Electronic Health Record Modernization (EHRM): $5.1B Oracle/Cerner system rollout',
+    'VA MISSION Act community care: $22B for veterans receiving care from private providers',
+    'Suicide prevention: $583M for mental health outreach, crisis line, and clinical programs',
+    'Infrastructure modernization: $2.7B PACT Act toxic exposure facilities and clinic expansions',
+    'Claims processing automation: investing in AI to reduce 300K+ pending disability claims backlog',
+    'Cybersecurity and zero trust: $1B IT security modernization across 1,200 facilities',
+  ],
+  'Department of Homeland Security': [
+    'Border technology: $2.1B for surveillance towers, sensors, and detection systems (CBP)',
+    'FEMA disaster relief: $20B+ Disaster Relief Fund for natural disaster response',
+    'Cybersecurity (CISA): $3.1B for federal network defense, critical infrastructure protection',
+    'TSA checkpoint technology: $800M for CT scanners and credential authentication',
+    'Coast Guard fleet recapitalization: $2.8B for Offshore Patrol Cutters and icebreakers',
+    'Immigration processing technology: $1.5B for case management and biometric systems',
+  ],
+  'Department of Health and Human Services': [
+    'Pandemic preparedness: $20B BARDA and SNS medical countermeasure stockpiling',
+    'AI in healthcare: FDA AI/ML regulatory framework for clinical decision tools',
+    'Substance abuse treatment: $10.7B SAMHSA grants for opioid crisis response',
+    'Health IT interoperability: TEFCA framework mandating health data exchange',
+    'Medicare fraud prevention: $1.4B Program Integrity budget for improper payment reduction',
+    'NIH research modernization: $48B research portfolio with emphasis on AI, climate health, and health equity',
+  ],
+  'Department of Energy': [
+    'Nuclear weapons modernization: $23B NNSA for W93 warhead, pit production at Los Alamos/Savannah River',
+    'Environmental cleanup: $8.4B for Hanford, Savannah River, and other legacy sites',
+    'Grid modernization: $10.5B Grid Deployment Office for transmission, storage, and resilience',
+    'Clean hydrogen: $7B Regional Clean Hydrogen Hubs program',
+    'Advanced nuclear: $2.5B for SMR demonstrations and HALEU fuel supply chain',
+    'Cybersecurity for energy sector: CESER $200M for grid and pipeline security',
+  ],
+  'Department of the Interior': [
+    'Wildfire management: $6.2B for suppression, prescribed burns, and forest thinning',
+    'Water infrastructure: $3.2B Bureau of Reclamation for drought resilience, dam safety',
+    'National Park deferred maintenance: $1.9B Great American Outdoors Act for facility repairs',
+    'Tribal programs: $4.8B BIA and Indian Affairs for trust responsibilities and infrastructure',
+    'Clean energy on public lands: $500M for renewable energy permitting and leasing',
+    'Abandoned mine land reclamation: $11.3B Bipartisan Infrastructure Law funding',
+  ],
+  'Department of Justice': [
+    'Cybercrime and ransomware: $800M FBI and CJIS for cyber investigative tools',
+    'Prison infrastructure: $3.8B BOP for facility construction and rehabilitation',
+    'Grant programs: $4.3B OJP for state/local law enforcement, victims, and reentry',
+    'Forensic science modernization: $500M for crime lab equipment and DNA analysis',
+    'Counter-drone technology: $250M for detection and mitigation systems at federal facilities',
+    'IT modernization: $1.2B for case management systems, biometrics, and evidence tracking',
+  ],
+  'Department of Transportation': [
+    'Bipartisan Infrastructure Law: $110B remaining for highways, bridges, and transit (FHWA/FTA)',
+    'NextGen air traffic control: $2.8B FAA modernization for satellite-based navigation',
+    'EV charging network: $7.5B NEVI formula program for interstate charging stations',
+    'Rail modernization: $66B Amtrak and passenger rail improvements',
+    'Bridge replacement: $12.5B Bridge Investment Program for structurally deficient bridges',
+    'Pipeline safety: $1.2B PHMSA for inspection technology and leak detection systems',
+  ],
+  'General Services Administration': [
+    'Federal building electrification: $3.4B for HVAC modernization and net-zero buildings',
+    'IT modernization and cloud: $2.1B Technology Modernization Fund and shared services',
+    'Fleet electrification: converting 680K federal vehicles to zero-emission by 2035',
+    'Procurement modernization: e-commerce portals and simplified acquisition platforms',
+    'Federal marketplace: expanding GSA Advantage and government-wide contract vehicles',
+  ],
+  'National Aeronautics and Space Administration': [
+    'Artemis lunar program: $7.8B for SLS, Orion, and Human Landing System',
+    'Mars Sample Return: $949M (restructured) for sample retrieval architecture',
+    'Earth observation: $2.5B for climate monitoring satellite constellation',
+    'Commercial LEO destinations: $570M for private space station development',
+    'Space technology: $1.4B for nuclear thermal propulsion and in-space manufacturing',
+  ],
+  'Small Business Administration': [
+    'Government contracting goal: 23% of federal contracts to small businesses ($178B+)',
+    'IT modernization: $200M for loan processing systems and online portal upgrades',
+    '8(a), HUBZone, WOSB certification reform: streamlining application processing',
+    'Disaster loan modernization: $50M for automated processing and fraud detection',
+    'SBIR/STTR program: $4B+ annual set-aside for small business R&D innovation',
+  ],
+};
+
+/**
+ * Get known spending priorities for an agency
+ */
+export function getSpendingPrioritiesForAgency(agencyName: string): string[] {
+  // Direct match
+  if (AGENCY_SPENDING_PRIORITIES[agencyName]) {
+    return AGENCY_SPENDING_PRIORITIES[agencyName];
+  }
+
+  // Partial match
+  const agencyLower = agencyName.toLowerCase();
+  for (const [key, priorities] of Object.entries(AGENCY_SPENDING_PRIORITIES)) {
+    if (agencyLower.includes(key.toLowerCase()) || key.toLowerCase().includes(agencyLower)) {
+      return priorities;
+    }
+  }
+
+  // Sub-agency to parent mapping for priorities
+  const parentMappings: Record<string, string> = {
+    'navy': 'Department of Defense',
+    'army': 'Department of Defense',
+    'air force': 'Department of Defense',
+    'marine': 'Department of Defense',
+    'navfac': 'Department of Defense',
+    'navsea': 'Department of Defense',
+    'usace': 'Department of Defense',
+    'dla': 'Department of Defense',
+    'disa': 'Department of Defense',
+    'darpa': 'Department of Defense',
+    'fema': 'Department of Homeland Security',
+    'cbp': 'Department of Homeland Security',
+    'tsa': 'Department of Homeland Security',
+    'ice': 'Department of Homeland Security',
+    'coast guard': 'Department of Homeland Security',
+    'cisa': 'Department of Homeland Security',
+    'irs': 'Department of the Treasury',
+    'fda': 'Department of Health and Human Services',
+    'cdc': 'Department of Health and Human Services',
+    'nih': 'Department of Health and Human Services',
+    'cms': 'Department of Health and Human Services',
+    'faa': 'Department of Transportation',
+    'fhwa': 'Department of Transportation',
+    'forest service': 'Department of Agriculture',
+    'noaa': 'Department of Commerce',
+    'nist': 'Department of Commerce',
+    'nnsa': 'Department of Energy',
+    'bureau of reclamation': 'Department of the Interior',
+    'national park': 'Department of the Interior',
+    'blm': 'Department of the Interior',
+    'fbi': 'Department of Justice',
+    'bop': 'Department of Justice',
+    'bureau of prisons': 'Department of Justice',
+  };
+
+  for (const [keyword, parent] of Object.entries(parentMappings)) {
+    if (agencyLower.includes(keyword)) {
+      return AGENCY_SPENDING_PRIORITIES[parent] || [];
+    }
+  }
+
+  return [];
+}
+
 // GAO High Risk List — 38 areas mapped to relevant agencies
 // Source: gao.gov/high-risk-list (updated biennially)
 // Hardcoded because the GAO page is not a clean API — this is the authoritative list
@@ -514,6 +669,11 @@ export function getOversightContextForAgency(
   const igChallenges = getIGChallengesForAgency(agencyName);
 
   const budgetPriorities: string[] = [];
+
+  // Add known spending priorities
+  const spendingPriorities = getSpendingPrioritiesForAgency(agencyName);
+  budgetPriorities.push(...spendingPriorities);
+
   if (budget && budget > 0) {
     if (budget > 100_000_000_000) {
       budgetPriorities.push(`Major federal agency with $${(budget / 1_000_000_000).toFixed(1)}B annual budget`);

@@ -15,6 +15,12 @@ export interface PainPointGenerationResult {
   oversightContext: string[];
 }
 
+export interface PriorityGenerationResult {
+  agency: string;
+  priorities: string[];
+  source: 'existing' | 'generated' | 'merged';
+}
+
 /**
  * Call Grok API for pain point generation
  */
@@ -134,6 +140,103 @@ Example format:
       oversightContext: [],
     };
   }
+}
+
+/**
+ * Generate spending/funding priorities for a single agency
+ * Priorities = where the agency is actively spending money (vs pain points = what hurts)
+ *
+ * @param agencyName - The agency name
+ * @param context - Oversight context (GAO, IG, budget data)
+ * @param existingPriorities - Already-written priorities to preserve
+ * @param targetCount - How many total priorities to aim for
+ */
+export async function generatePrioritiesForAgency(
+  agencyName: string,
+  context: AgencyOversightContext,
+  existingPriorities: string[] = [],
+  targetCount: number = 10
+): Promise<PriorityGenerationResult> {
+  // If we already have enough, skip generation
+  if (existingPriorities.length >= targetCount) {
+    return {
+      agency: agencyName,
+      priorities: existingPriorities,
+      source: 'existing',
+    };
+  }
+
+  const oversightText = formatOversightContextForPrompt(context);
+  const neededCount = targetCount - existingPriorities.length;
+
+  const existingSection = existingPriorities.length > 0
+    ? `\n\nEXISTING PRIORITIES (already written — do NOT repeat these):\n${existingPriorities.map((p, i) => `${i + 1}. ${p}`).join('\n')}`
+    : '';
+
+  const systemPrompt = `You are a federal budget and procurement analyst specializing in GovCon market intelligence. You identify where federal agencies are ACTIVELY SPENDING MONEY — current programs, funded initiatives, and procurement priorities.
+
+Unlike pain points (problems), priorities are about WHERE THE MONEY IS FLOWING:
+- Active programs with allocated budgets
+- Recently awarded large contracts or contract vehicles
+- Budget line items from Congressional Justifications
+- Strategic plan initiatives with funding commitments
+- Bipartisan Infrastructure Law / IRA / CHIPS Act funded programs
+- Upcoming recompetes and new procurements
+
+Each priority must:
+- Reference a SPECIFIC program, initiative, or budget line item
+- Include dollar amounts, timelines, or contract vehicles when possible
+- Describe something a contractor could bid on or support
+- Be 1-2 sentences maximum
+- Focus on FY2025-2027 spending (current and near-term)
+
+Do NOT list generic goals like "improve cybersecurity" — instead say "CISA allocated $500M for Continuous Diagnostics and Mitigation (CDM) program to deploy endpoint detection across .gov networks."`;
+
+  const prompt = `Generate exactly ${neededCount} specific SPENDING PRIORITIES for "${agencyName}" — where they are actively putting money and what contractors can pursue.
+
+${oversightText}
+${existingSection}
+
+Return ONLY a JSON array of strings. No numbering, no explanations, just the array.
+Example format:
+["$2.1B allocated for NextGen air traffic control modernization, with RFPs expected Q2 FY2026", "FHWA distributing $12.5B Bridge Investment Program grants — engineering and construction firms can bid through state DOTs"]`;
+
+  try {
+    const response = await callGrokForPainPoints(prompt, systemPrompt);
+    const priorities = parseJSONArrayResponse(response);
+
+    if (priorities.length === 0) {
+      console.warn(`[PriorityGenerator] No priorities generated for ${agencyName}`);
+      return {
+        agency: agencyName,
+        priorities: existingPriorities,
+        source: 'existing',
+      };
+    }
+
+    const merged = [...existingPriorities, ...priorities.slice(0, neededCount)];
+
+    return {
+      agency: agencyName,
+      priorities: merged,
+      source: existingPriorities.length > 0 ? 'merged' : 'generated',
+    };
+  } catch (error) {
+    console.error(`[PriorityGenerator] Error generating for ${agencyName}:`, error);
+    return {
+      agency: agencyName,
+      priorities: existingPriorities,
+      source: 'existing',
+    };
+  }
+}
+
+/**
+ * Parse the AI response into an array of strings
+ * Handles various response formats (pure JSON, markdown-wrapped, etc.)
+ */
+function parseJSONArrayResponse(response: string): string[] {
+  return parsePainPointsResponse(response);
 }
 
 /**

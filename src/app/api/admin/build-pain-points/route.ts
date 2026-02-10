@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildComprehensiveAgencyList, KNOWN_SUB_AGENCIES, AgencyListEntry } from '@/lib/utils/agency-list-builder';
 import { getOversightContextForAgency } from '@/lib/utils/federal-oversight-data';
-import { generatePainPointsForAgency } from '@/lib/utils/pain-point-generator';
+import { generatePainPointsForAgency, generatePrioritiesForAgency } from '@/lib/utils/pain-point-generator';
 import agencyPainPointsData from '@/data/agency-pain-points.json';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
+interface AgencyData {
+  painPoints: string[];
+  priorities?: string[];
+}
+
 interface PainPointsDatabase {
-  agencies: Record<string, { painPoints: string[] }>;
+  agencies: Record<string, AgencyData>;
 }
 
 const existingDB = agencyPainPointsData as PainPointsDatabase;
@@ -140,11 +145,12 @@ export async function POST(request: NextRequest) {
   const singleAgency = searchParams.get('agency');
   const limit = parseInt(searchParams.get('limit') || '0') || 0;
   const force = searchParams.get('force') === 'true';
-  const targetCount = parseInt(searchParams.get('target') || '12') || 12;
+  const buildType = searchParams.get('type') || 'painpoints'; // 'painpoints' or 'priorities'
+  const targetCount = parseInt(searchParams.get('target') || (buildType === 'priorities' ? '10' : '12')) || 12;
 
   try {
     // Start with existing data
-    const outputDB: Record<string, { painPoints: string[] }> = {
+    const outputDB: Record<string, AgencyData> = {
       ...JSON.parse(JSON.stringify(existingDB.agencies)),
     };
 
@@ -177,7 +183,11 @@ export async function POST(request: NextRequest) {
         .filter(agency => {
           if (force) return true;
           const match = findExistingMatch(agency.name, existingDB.agencies);
-          return !match || match.painPoints.length < targetCount;
+          if (!match) return true;
+          if (buildType === 'priorities') {
+            return !match.priorities || match.priorities.length < targetCount;
+          }
+          return match.painPoints.length < targetCount;
         })
         .map(a => ({ name: a.name, budget: a.budget }));
 
@@ -187,13 +197,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[build-pain-points] Processing ${agenciesToProcess.length} agencies (target: ${targetCount} pain points each)`);
+    console.log(`[build-pain-points] Processing ${agenciesToProcess.length} agencies (type: ${buildType}, target: ${targetCount} each)`);
 
     const results: Array<{
       agency: string;
-      painPointCount: number;
+      count: number;
       source: string;
-      newPainPoints: string[];
+      newItems: string[];
     }> = [];
 
     let generated = 0;
@@ -203,81 +213,100 @@ export async function POST(request: NextRequest) {
     for (const agency of agenciesToProcess) {
       try {
         const existing = findExistingMatch(agency.name, outputDB);
-        const existingPainPoints = existing?.painPoints || [];
-
-        // Skip if already at target and not forcing
-        if (!force && existingPainPoints.length >= targetCount) {
-          skipped++;
-          results.push({
-            agency: agency.name,
-            painPointCount: existingPainPoints.length,
-            source: 'skipped',
-            newPainPoints: [],
-          });
-          continue;
-        }
-
         const context = getOversightContextForAgency(agency.name, agency.budget);
 
-        const result = await generatePainPointsForAgency(
-          agency.name,
-          context,
-          existingPainPoints,
-          targetCount
-        );
+        if (buildType === 'priorities') {
+          const existingPriorities = existing?.priorities || [];
 
-        // Update the output database
-        outputDB[agency.name] = { painPoints: result.painPoints };
+          if (!force && existingPriorities.length >= targetCount) {
+            skipped++;
+            results.push({ agency: agency.name, count: existingPriorities.length, source: 'skipped', newItems: [] });
+            continue;
+          }
 
-        const newCount = result.painPoints.length - existingPainPoints.length;
-        generated++;
+          const result = await generatePrioritiesForAgency(agency.name, context, existingPriorities, targetCount);
 
-        results.push({
-          agency: agency.name,
-          painPointCount: result.painPoints.length,
-          source: result.source,
-          newPainPoints: result.painPoints.slice(existingPainPoints.length),
-        });
+          // Preserve existing pain points, add/update priorities
+          if (!outputDB[agency.name]) {
+            outputDB[agency.name] = { painPoints: [], priorities: result.priorities };
+          } else {
+            outputDB[agency.name] = { ...outputDB[agency.name], priorities: result.priorities };
+          }
 
-        console.log(`[build-pain-points] ${agency.name}: ${existingPainPoints.length} existing + ${newCount} new = ${result.painPoints.length} total`);
+          const newCount = result.priorities.length - existingPriorities.length;
+          generated++;
+          results.push({
+            agency: agency.name,
+            count: result.priorities.length,
+            source: result.source,
+            newItems: result.priorities.slice(existingPriorities.length),
+          });
+
+          console.log(`[build-priorities] ${agency.name}: ${existingPriorities.length} existing + ${newCount} new = ${result.priorities.length} total`);
+        } else {
+          // Pain points (original behavior)
+          const existingPainPoints = existing?.painPoints || [];
+
+          if (!force && existingPainPoints.length >= targetCount) {
+            skipped++;
+            results.push({ agency: agency.name, count: existingPainPoints.length, source: 'skipped', newItems: [] });
+            continue;
+          }
+
+          const result = await generatePainPointsForAgency(agency.name, context, existingPainPoints, targetCount);
+
+          if (!outputDB[agency.name]) {
+            outputDB[agency.name] = { painPoints: result.painPoints };
+          } else {
+            outputDB[agency.name] = { ...outputDB[agency.name], painPoints: result.painPoints };
+          }
+
+          const newCount = result.painPoints.length - existingPainPoints.length;
+          generated++;
+          results.push({
+            agency: agency.name,
+            count: result.painPoints.length,
+            source: result.source,
+            newItems: result.painPoints.slice(existingPainPoints.length),
+          });
+
+          console.log(`[build-pain-points] ${agency.name}: ${existingPainPoints.length} existing + ${newCount} new = ${result.painPoints.length} total`);
+        }
 
         // Rate limit between Grok API calls (2 seconds)
-        if (result.source !== 'existing' && agenciesToProcess.indexOf(agency) < agenciesToProcess.length - 1) {
+        if (agenciesToProcess.indexOf(agency) < agenciesToProcess.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       } catch (error: any) {
         errors++;
-        console.error(`[build-pain-points] Error for ${agency.name}:`, error.message);
-        results.push({
-          agency: agency.name,
-          painPointCount: 0,
-          source: 'error',
-          newPainPoints: [],
-        });
+        console.error(`[build-${buildType}] Error for ${agency.name}:`, error.message);
+        results.push({ agency: agency.name, count: 0, source: 'error', newItems: [] });
       }
     }
 
     // Build the final output JSON structure
-    const finalOutput = {
-      agencies: outputDB,
-    };
+    const finalOutput = { agencies: outputDB };
 
     // Count totals
     const totalAgencies = Object.keys(outputDB).length;
     const totalPainPoints = Object.values(outputDB).reduce((sum, a) => sum + a.painPoints.length, 0);
+    const totalPriorities = Object.values(outputDB).reduce((sum, a) => sum + (a.priorities?.length || 0), 0);
 
     return NextResponse.json({
       summary: {
+        type: buildType,
         agenciesProcessed: agenciesToProcess.length,
         generated,
         skipped,
         errors,
         totalAgenciesInDatabase: totalAgencies,
         totalPainPoints,
-        averagePainPointsPerAgency: (totalPainPoints / totalAgencies).toFixed(1),
+        totalPriorities,
+        averagePerAgency: buildType === 'priorities'
+          ? (totalPriorities / totalAgencies).toFixed(1)
+          : (totalPainPoints / totalAgencies).toFixed(1),
       },
       results,
-      // The complete updated database — copy this to agency-pain-points.json
       database: finalOutput,
     });
   } catch (error: any) {
@@ -295,8 +324,8 @@ export async function POST(request: NextRequest) {
  */
 function findExistingMatch(
   agencyName: string,
-  db: Record<string, { painPoints: string[] }>
-): { painPoints: string[] } | null {
+  db: Record<string, AgencyData>
+): AgencyData | null {
   // Exact match
   if (db[agencyName]) {
     return db[agencyName];
