@@ -12,6 +12,10 @@
     <!-- Swiper.js for carousel preview -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <!-- Export: .docx generation, zip bundling, file download -->
+    <script src="https://cdn.jsdelivr.net/npm/docx@9.0.2/build/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -1128,6 +1132,24 @@
             <div class="text-center mb-6">
                 <h2 class="text-3xl font-bold text-gray-900 mb-2">Your LinkedIn Posts</h2>
                 <p class="text-gray-600">Click to copy and paste into LinkedIn</p>
+            </div>
+
+            <!-- Export buttons -->
+            <div id="export-buttons" class="flex flex-wrap justify-center gap-3 mb-6">
+                <button onclick="exportAllPostsToDocx()" class="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition shadow-md">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Export All as .docx
+                </button>
+                <button onclick="downloadAllVisuals()" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition shadow-md">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Download All Visuals (.zip)
+                </button>
+            </div>
+            <div id="export-progress" class="hidden text-center mb-4">
+                <div class="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 border border-purple-200 rounded-lg text-purple-700 text-sm font-medium">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span id="export-progress-text">Generating visuals...</span>
+                </div>
             </div>
 
             <div id="posts-container" class="space-y-6"></div>
@@ -2690,6 +2712,172 @@
                 }
                 showSuccessToast('Post copied to clipboard!');
             });
+        }
+
+        // ========== BULK EXPORT FUNCTIONS ==========
+
+        // Export all generated posts to a Word (.docx) file
+        function exportAllPostsToDocx() {
+            if (!generatedPosts || generatedPosts.length === 0) {
+                showErrorToast('No posts to export. Generate posts first.');
+                return;
+            }
+
+            try {
+                const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle, PageBreak } = docx;
+
+                const children = [];
+
+                generatedPosts.forEach((post, i) => {
+                    // Post header
+                    children.push(new Paragraph({
+                        heading: HeadingLevel.HEADING_2,
+                        children: [
+                            new TextRun({
+                                text: `Post ${i + 1}`,
+                                bold: true,
+                                size: 28,
+                                color: '333333'
+                            }),
+                            new TextRun({
+                                text: post.style ? ` — ${post.style}` : '',
+                                size: 28,
+                                color: '666666',
+                                italics: true
+                            })
+                        ]
+                    }));
+
+                    // Separator line
+                    children.push(new Paragraph({
+                        border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' } },
+                        spacing: { after: 200 }
+                    }));
+
+                    // Post content — split by newline to preserve LinkedIn formatting
+                    const contentLines = (post.content || '').split('\n');
+                    contentLines.forEach(line => {
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: line,
+                                    size: 24,
+                                    font: 'Calibri'
+                                })
+                            ],
+                            spacing: { after: 80 }
+                        }));
+                    });
+
+                    // Hashtags in LinkedIn blue
+                    if (post.hashtags) {
+                        children.push(new Paragraph({ spacing: { before: 120 } }));
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: post.hashtags,
+                                    size: 22,
+                                    color: '0077B5',
+                                    font: 'Calibri'
+                                })
+                            ]
+                        }));
+                    }
+
+                    // Page break between posts (not after last)
+                    if (i < generatedPosts.length - 1) {
+                        children.push(new Paragraph({
+                            children: [new PageBreak()]
+                        }));
+                    }
+                });
+
+                const doc = new Document({
+                    sections: [{
+                        properties: {},
+                        children: children
+                    }]
+                });
+
+                const today = new Date().toISOString().slice(0, 10);
+                Packer.toBlob(doc).then(blob => {
+                    saveAs(blob, `linkedin-posts-${today}.docx`);
+                    showSuccessToast(`Exported ${generatedPosts.length} posts to .docx`);
+                });
+            } catch (err) {
+                console.error('[Export DOCX]', err);
+                showErrorToast('Failed to export posts. Please try again.');
+            }
+        }
+
+        // Download all posts as visual quote cards in a .zip
+        async function downloadAllVisuals() {
+            if (!generatedPosts || generatedPosts.length === 0) {
+                showErrorToast('No posts to export. Generate posts first.');
+                return;
+            }
+
+            if (!hasGraphicsAccess) {
+                showGraphicsUpgradeModal();
+                return;
+            }
+
+            const progressEl = document.getElementById('export-progress');
+            const progressText = document.getElementById('export-progress-text');
+            progressEl.classList.remove('hidden');
+
+            try {
+                const zip = new JSZip();
+                const companyName = SupabaseAuth?.profile?.company_name || document.getElementById('company-name')?.value || 'Your Company';
+                const total = generatedPosts.length;
+
+                for (let i = 0; i < total; i++) {
+                    const post = generatedPosts[i];
+                    progressText.textContent = `Generating visual ${i + 1} of ${total}...`;
+
+                    // Extract a quote for the card
+                    let quote = '';
+                    try {
+                        const res = await fetch('/api/generate-graphic', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content: post.content })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            quote = data.quote || data.text || '';
+                        }
+                    } catch (e) {
+                        // Fallback silently
+                    }
+                    if (!quote) {
+                        quote = getFirstLine(post.content || '');
+                    }
+
+                    // Cycle through the 6 quote card themes
+                    const theme = quoteCardStyles[i % quoteCardStyles.length];
+
+                    // Render the card
+                    const dataUrl = await renderQuoteCard(quote, companyName, theme);
+
+                    // Convert data URL to binary for zip
+                    const base64 = dataUrl.split(',')[1];
+                    const styleName = (post.style || theme.name || 'post').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                    zip.file(`post-${String(i + 1).padStart(2, '0')}-${styleName}.png`, base64, { base64: true });
+                }
+
+                progressText.textContent = 'Bundling zip file...';
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const today = new Date().toISOString().slice(0, 10);
+                saveAs(blob, `linkedin-visuals-${today}.zip`);
+
+                progressEl.classList.add('hidden');
+                showSuccessToast(`Downloaded ${total} visual cards as .zip`);
+            } catch (err) {
+                console.error('[Download Visuals]', err);
+                progressEl.classList.add('hidden');
+                showErrorToast('Failed to generate visuals. Please try again.');
+            }
         }
 
         // Track style index for each quick post
@@ -7890,6 +8078,10 @@
                     `;
                 }
             });
+
+            // Reset post count dropdown to 10 so users don't accidentally re-run 30
+            const numPostsEl = document.getElementById('quick-num-posts');
+            if (numPostsEl) numPostsEl.value = '10';
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
