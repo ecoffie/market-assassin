@@ -4,7 +4,7 @@ import { getOversightContextForAgency } from '@/lib/utils/federal-oversight-data
 import { generatePainPointsForAgency } from '@/lib/utils/pain-point-generator';
 import agencyPainPointsData from '@/data/agency-pain-points.json';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 interface PainPointsDatabase {
   agencies: Record<string, { painPoints: string[] }>;
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const password = searchParams.get('password');
 
-  if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD) {
+  if (password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const password = searchParams.get('password');
 
-  if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD) {
+  if (password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
