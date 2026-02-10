@@ -3,10 +3,13 @@ import agencyPainPointsData from '@/data/agency-pain-points.json';
 import componentAgencyRulesData from '@/data/component-agency-rules.json';
 import usaceOfficePainPointsData from '@/data/usace-office-specific-pain-points.json';
 
+interface AgencyData {
+  painPoints: string[];
+  priorities?: string[];
+}
+
 interface PainPointsDatabase {
-  agencies: Record<string, {
-    painPoints: string[];
-  }>;
+  agencies: Record<string, AgencyData>;
 }
 
 interface ComponentAgencyRules {
@@ -102,6 +105,46 @@ export function getPainPointsForAgency(agencyName: string, command?: string | nu
     const usacePainPoints = usaceOfficePainPoints.offices?.[agencyName];
     if (usacePainPoints) {
       return usacePainPoints.painPoints || [];
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Get spending priorities for a specific agency
+ * Priorities = where the agency is actively spending money
+ * @param agencyName - The agency name
+ * @param command - Optional command name for more specific matching
+ */
+export function getPrioritiesForAgency(agencyName: string, command?: string | null): string[] {
+  // If a specific command is provided, try that first
+  if (command) {
+    if (painPointsDB.agencies[command]?.priorities) {
+      return painPointsDB.agencies[command].priorities;
+    }
+    for (const [dbAgencyName, data] of Object.entries(painPointsDB.agencies)) {
+      if ((command.includes(dbAgencyName) || dbAgencyName.includes(command)) && data.priorities) {
+        return data.priorities;
+      }
+    }
+  }
+
+  // Direct agency name match
+  if (painPointsDB.agencies[agencyName]?.priorities) {
+    return painPointsDB.agencies[agencyName].priorities;
+  }
+
+  // Try to find parent agency if this is a component agency
+  const componentInfo = (componentAgencyRules as any)?.componentAgencies?.[agencyName];
+  if (componentInfo?.parentAgency && painPointsDB.agencies[componentInfo.parentAgency]?.priorities) {
+    return painPointsDB.agencies[componentInfo.parentAgency].priorities;
+  }
+
+  // Check for partial matches
+  for (const [dbAgencyName, data] of Object.entries(painPointsDB.agencies)) {
+    if ((agencyName.includes(dbAgencyName) || dbAgencyName.includes(agencyName)) && data.priorities) {
+      return data.priorities;
     }
   }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { suggestPrimesForAgencies, getPrimesByNAICS, suggestTier2ForAgencies } from '@/lib/utils/prime-contractors';
 import { suggestTribesForAgencies, getTribesByNAICS } from '@/lib/utils/tribal-businesses';
-import { getPainPointsForAgency, getSimilarAgencies, generateAgencyNeeds, generateAgencyNeedsWithCommands, getPainPointsForCommand } from '@/lib/utils/pain-points';
+import { getPainPointsForAgency, getPrioritiesForAgency, getSimilarAgencies, generateAgencyNeeds, generateAgencyNeedsWithCommands, getPainPointsForCommand } from '@/lib/utils/pain-points';
 import { getOpportunitiesByCoreInputs, getUrgencyLevel, getQuickWinStrategy } from '@/lib/utils/december-spend';
 import { getForecastsForSelectedAgencies, getUpcomingForecasts, getForecastStatistics } from '@/lib/utils/agency-forecasts';
 import { searchIDVContracts } from '@/lib/idv-search';
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
         return {
           name: agencyName,
           painPoints,
+          priorities: getPrioritiesForAgency(agencyName, agencyData.command),
           painPointSource: source,
           command: agencyData.command,
         };
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
       return {
         name: agencyName,
         painPoints: getPainPointsForAgency(agencyName),
+        priorities: getPrioritiesForAgency(agencyName),
       };
     });
 
@@ -185,9 +187,13 @@ export async function POST(request: NextRequest) {
       ],
     };
 
-    // Generate Agency Pain Points Report
+    // Generate Agency Pain Points & Spending Priorities Report
     const allPainPoints = agenciesWithPainPoints.flatMap(a =>
       a.painPoints.map(pp => ({ agency: a.name, painPoint: pp }))
+    );
+
+    const allPriorities = agenciesWithPainPoints.flatMap(a =>
+      (a.priorities || []).map(pr => ({ agency: a.name, priority: pr }))
     );
 
     const agencyPainPoints = {
@@ -200,16 +206,27 @@ export async function POST(request: NextRequest) {
           ? 'high'
           : 'medium',
       })),
+      spendingPriorities: allPriorities.slice(0, 15).map(({ agency, priority }) => ({
+        agency,
+        priority,
+        fundingStatus: priority.match(/\$[\d.]+[BMK]/i) ? 'funded' : 'planned',
+        actionItem: `Pursue opportunities related to: ${priority}`,
+      })),
       summary: {
         totalPainPoints: allPainPoints.length,
+        totalSpendingPriorities: allPriorities.length,
         highPriority: allPainPoints.filter(pp =>
           pp.painPoint.toLowerCase().includes('ndaa') ||
           pp.painPoint.toLowerCase().includes('critical')
+        ).length,
+        fundedPriorities: allPriorities.filter(pr =>
+          /\$[\d.]+[BMK]/i.test(pr.priority)
         ).length,
       },
       recommendations: [
         'Position your solutions to address agency challenges',
         'Reference pain points in capability statements',
+        'Target spending priorities with specific dollar amounts — these have allocated budgets',
         'Address pain points in SBLO conversations',
         'Highlight NDAA-related pain points for strategic positioning',
       ],

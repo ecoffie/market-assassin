@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPainPointsForAgency, categorizePainPoints } from '@/lib/utils/pain-points';
+import { getPainPointsForAgency, getPrioritiesForAgency, categorizePainPoints } from '@/lib/utils/pain-points';
 
 // Fisher-Yates shuffle — returns a new array in random order
 function shuffleArray<T>(arr: T[]): T[] {
@@ -318,15 +318,17 @@ export async function POST(request: NextRequest) {
       naicsCodes: companyProfile.naicsCodes || []
     };
 
-    // STEP 1: Get agency pain points
-    console.log('[Step 1] Identifying agency pain points...');
-    const agencyPainPoints: { agency: string; painPoints: string[]; categorized: ReturnType<typeof categorizePainPoints> }[] = [];
+    // STEP 1: Get agency pain points and spending priorities
+    console.log('[Step 1] Identifying agency pain points and priorities...');
+    const agencyPainPoints: { agency: string; painPoints: string[]; priorities: string[]; categorized: ReturnType<typeof categorizePainPoints> }[] = [];
 
     for (const agencyName of targetAgencies) {
       const painPoints = getPainPointsForAgency(agencyName);
+      const priorities = getPrioritiesForAgency(agencyName);
       agencyPainPoints.push({
         agency: agencyName,
         painPoints: painPoints,
+        priorities: priorities,
         categorized: categorizePainPoints(painPoints)
       });
     }
@@ -353,12 +355,17 @@ ${enhancedCompanyData.pastPerformance ? `- Past Performance: ${enhancedCompanyDa
 
 ${companyProfileSection}
 
-AGENCY PAIN POINTS & PRIORITIES:
+AGENCY PAIN POINTS (problems the agency struggles with):
 ${agencyPainPoints.map(ap => `
 ${ap.agency}:
-Pain Points:
 ${shuffleArray(ap.painPoints).slice(0, 7).map(p => `- ${p}`).join('\n')}
 `).join('\n---\n')}
+
+AGENCY SPENDING PRIORITIES (where the money is actively flowing):
+${agencyPainPoints.map(ap => ap.priorities.length > 0 ? `
+${ap.agency}:
+${shuffleArray(ap.priorities).slice(0, 5).map(p => `- ${p}`).join('\n')}
+` : '').filter(Boolean).join('\n---\n')}
 
 CONTENT VARIETY DIRECTIONS (use these creative lenses to make each post unique):
 - ${selectedLenses[0]}
@@ -368,11 +375,11 @@ CONTENT VARIETY DIRECTIONS (use these creative lenses to make each post unique):
 CRITICAL: Each angle MUST use a completely different hook style, different pain point, and different narrative approach. Do NOT reuse similar openings, structures, or talking points across angles. Vary between personal stories, data-driven insights, provocative questions, and actionable tips.
 
 TASK: Create PERSONALIZED content angles that:
-1. DIRECTLY connect the company's specific services to agency pain points
+1. DIRECTLY connect the company's specific services to agency pain points AND spending priorities
 2. Highlight the company's differentiators
 3. Reference certifications when addressing small business opportunities
-4. Include relevant context from the pain points
-5. Use authoritative language ("According to GAO...", "DoD reports...", etc.)
+4. Mix pain point angles (problems to solve) with spending priority angles (where money flows) — aim for roughly half of each
+5. Use authoritative language with specific numbers ("$9.1B allocated for...", "According to GAO...", "DoD's FY2026 budget...")
 ${geoBoost ? `6. Optimize for AI/search with clear questions and answers (GEO technique)` : ''}
 
 Generate ${numPosts} distinct content angles. For each angle, provide:
