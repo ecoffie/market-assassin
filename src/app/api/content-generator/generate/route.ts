@@ -1,6 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPainPointsForAgency, categorizePainPoints } from '@/lib/utils/pain-points';
 
+// Fisher-Yates shuffle — returns a new array in random order
+function shuffleArray<T>(arr: T[]): T[] {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Content lenses — sampled randomly each generation to force creative variety
+const CONTENT_LENSES = [
+  // Seasonal hooks
+  'fiscal year-end urgency and use-it-or-lose-it spending',
+  'Q1 planning and new budget priorities',
+  'spring contract surge and pre-summer deadlines',
+  'end-of-year spending push and continuing resolution impacts',
+  // Perspective shifts
+  'advice for a first-time GovCon bidder breaking in',
+  'what primes wish their subcontractors knew',
+  'from a contracting officer\'s perspective',
+  'lessons from a 10-year GovCon veteran',
+  // Frameworks
+  'myth-busting a common GovCon misconception',
+  'old way vs. new way comparison in federal contracting',
+  'behind-the-scenes of a real contract win',
+  'the hidden opportunity nobody talks about',
+  // Trending topics
+  'AI executive order implications for contractors',
+  'CMMC 2.0 readiness and compliance opportunities',
+  'supply chain reshoring and Buy American opportunities',
+  'small business goal shortfalls by agency',
+  // Emotional hooks
+  'the biggest mistake small businesses make in GovCon',
+  'why 80% of proposals get eliminated before evaluation',
+  'the one change that transformed our win rate',
+  'what I wish I knew before my first government bid',
+];
+
 // CORS headers for cross-origin requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -195,7 +234,7 @@ Want to learn more about our approach?`
 };
 
 // Call Grok API
-async function callGrokAPI(prompt: string, systemPrompt: string | null = null, maxTokens: number = 2000): Promise<string> {
+async function callGrokAPI(prompt: string, systemPrompt: string | null = null, maxTokens: number = 2000, temperature: number = 0.7): Promise<string> {
   if (!GROK_API_KEY) {
     throw new Error('GROK_API_KEY not configured');
   }
@@ -217,7 +256,7 @@ async function callGrokAPI(prompt: string, systemPrompt: string | null = null, m
     body: JSON.stringify({
       model: GROK_MODEL,
       messages: messages,
-      temperature: 0.7,
+      temperature,
       max_tokens: maxTokens
     })
   });
@@ -306,6 +345,10 @@ ${enhancedCompanyData.pastPerformance ? `- Past Performance: ${enhancedCompanyDa
 
     // STEP 2: Generate content angles
     console.log('[Step 2] Generating content angles...');
+
+    // Pick 3 random content lenses to inject variety each generation
+    const selectedLenses = shuffleArray(CONTENT_LENSES).slice(0, 3);
+
     const step2Prompt = `You are a government contracting expert creating LinkedIn content for a SPECIFIC COMPANY.
 
 ${companyProfileSection}
@@ -314,8 +357,15 @@ AGENCY PAIN POINTS & PRIORITIES:
 ${agencyPainPoints.map(ap => `
 ${ap.agency}:
 Pain Points:
-${ap.painPoints.slice(0, 5).map(p => `- ${p}`).join('\n')}
+${shuffleArray(ap.painPoints).slice(0, 7).map(p => `- ${p}`).join('\n')}
 `).join('\n---\n')}
+
+CONTENT VARIETY DIRECTIONS (use these creative lenses to make each post unique):
+- ${selectedLenses[0]}
+- ${selectedLenses[1]}
+- ${selectedLenses[2]}
+
+CRITICAL: Each angle MUST use a completely different hook style, different pain point, and different narrative approach. Do NOT reuse similar openings, structures, or talking points across angles. Vary between personal stories, data-driven insights, provocative questions, and actionable tips.
 
 TASK: Create PERSONALIZED content angles that:
 1. DIRECTLY connect the company's specific services to agency pain points
@@ -345,9 +395,9 @@ Output as JSON array with this structure:
 
     // Scale max_tokens for angles based on post count (~200 tokens per angle)
     const anglesMaxTokens = Math.max(2000, numPosts * 250);
-    console.log(`[Step 2] Using ${anglesMaxTokens} max_tokens for ${numPosts} angles`);
+    console.log(`[Step 2] Using ${anglesMaxTokens} max_tokens for ${numPosts} angles, lenses: ${selectedLenses.join(' | ')}`);
 
-    const contentAnglesResponse = await callGrokAPI(step2Prompt, null, anglesMaxTokens);
+    const contentAnglesResponse = await callGrokAPI(step2Prompt, null, anglesMaxTokens, 0.85);
     let angles: { angle: string; painPoint: string; talkingPoints: string[]; solution: string; structure: string }[];
 
     try {

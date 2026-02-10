@@ -50,6 +50,7 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 | Historical Trends Graphs | LOW | Pending | Agency spend charts, win rate visuals. Chart.js integration. |
 | User Notes & Sharing | LOW | Pending | Private notes per report + shareable team links. Supabase notes table. |
 | Tool Integrations | LOW | Pending | Link to Opportunity Scout, Content Generator, CRM export (Salesforce/HubSpot). |
+| Expand Agency Pain Points Database | MEDIUM | Pending | Add more pain points per agency in `src/data/agency-pain-points.json`. Cross-tool priority — feeds Market Assassin, Content Generator, and Opportunity Hunter. |
 
 ---
 
@@ -100,6 +101,7 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 | Feature | Priority | Status | Notes |
 |---------|----------|--------|-------|
 | Pain Points Feature | HIGH | Pending | Add agency pain points analysis. |
+| Expand Agency Pain Points Database | MEDIUM | Pending | More pain points per agency in `src/data/agency-pain-points.json`. Shared data source with Market Assassin and Content Generator. |
 | CSV Export/Print | HIGH | Pending | Print results to CSV for offline use. |
 | Enhanced Pro Features | MEDIUM | Pending | Differentiate Pro tier with advanced filters and data. |
 | Agency Spending Analysis | MEDIUM | Pending | Deeper spending breakdown by NAICS. |
@@ -115,6 +117,8 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 
 | Feature | Priority | Status | Notes |
 |---------|----------|--------|-------|
+| Post Originality & Variety | HIGH | Done | Shuffle pain points, inject random content lenses, anti-repetition instructions, higher temperature for angle generation. |
+| Expand Agency Pain Points Database | MEDIUM | Pending | More pain points per agency in `src/data/agency-pain-points.json`. Shared data source with Market Assassin and Opportunity Hunter. |
 | Advanced AI Templates | MEDIUM | Pending | More content styles and formats. |
 | Scheduling Integration | LOW | Pending | Direct LinkedIn scheduling. |
 | Analytics Dashboard | LOW | Pending | Track post performance. |
