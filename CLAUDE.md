@@ -73,11 +73,12 @@
 **Purpose:** AI-powered LinkedIn post generator for GovCon
 
 **Features:**
-- Generate 10 LinkedIn posts per click
+- Generate up to 30 LinkedIn posts per click
 - 175 federal agencies supported
 - GovCon-tuned AI model
 - GEO Boost optimization
 - Multiple content styles
+- Bulk export: Export All as .docx (all tiers), Download All Visuals as .zip (Full Fix only)
 
 **Tiers:**
 - Content Engine ($197): Standard generation
@@ -366,6 +367,15 @@ npm run build
 | `/api/verify-content-generator` | Verify user access by email |
 | `/api/content-generator/generate` | Alternative generation endpoint |
 
+**CDN Libraries (loaded in index.html `<head>`):**
+- `docx@9.0.2` — .docx file generation for bulk post export
+- `jszip@3.10.1` — zip bundling for bulk visual export
+- `file-saver@2.0.5` — `saveAs()` for reliable blob downloads
+
+**Bulk Export Functions (index.html):**
+- `exportAllPostsToDocx()` — exports all `generatedPosts` to Word doc, one post per page, hashtags in LinkedIn blue
+- `downloadAllVisuals()` — generates quote card PNGs for each post (cycles 6 `quoteCardStyles` themes), bundles into .zip. Gated on `hasGraphicsAccess` (Full Fix tier only)
+
 **CRITICAL:** `API_BASE` in all three HTML files MUST be `''` (empty string) for same-origin API calls. NEVER set it to an external URL like `govcon-content-generator.vercel.app` — that deployment is dead.
 
 ---
@@ -440,6 +450,13 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 9, 2026 (Session 6)
+- **Content Generator: Bulk export feature** — "Export All as .docx" button (all tiers) and "Download All Visuals (.zip)" button (Full Fix only)
+- .docx export: one post per page, LinkedIn formatting preserved, hashtags in blue (#0077B5)
+- Visuals .zip: generates quote card PNG for each post via `renderQuoteCard()`, cycles 6 themes, progress indicator
+- Added CDN libs: docx@9.0.2, jszip@3.10.1, file-saver@2.0.5
+- "Generate More Posts" now resets dropdown to 10 (was keeping previous selection like 30)
+
 ### February 8, 2026 (Session 5)
 - **govcon-shop: Fixed fix-access-flags** — `continue` after Supabase FK error was skipping KV updates (only 2/33 fixed). Removed Supabase insert, KV granting now unconditional
 - **Fixed Content Generator tier** — Ultimate Bundle customers now show "Full Fix" (was "Content Engine") in KV
@@ -495,4 +512,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 8, 2026 (Session 5)*
+*Last Updated: February 9, 2026 (Session 6)*

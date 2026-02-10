@@ -2716,6 +2716,62 @@
 
         // ========== BULK EXPORT FUNCTIONS ==========
 
+        // Parse a line into TextRun segments: **bold**, *italic*, and plain text
+        // LinkedIn doesn't support markdown, so we render bold/italic in Word and strip the asterisks
+        function parseMarkdownLine(line) {
+            const { TextRun } = docx;
+            const runs = [];
+            // Match **bold** first, then *italic*, then plain text between them
+            const regex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+            let lastIndex = 0;
+            let match;
+
+            while ((match = regex.exec(line)) !== null) {
+                // Plain text before this match
+                if (match.index > lastIndex) {
+                    runs.push(new TextRun({
+                        text: line.slice(lastIndex, match.index),
+                        size: 24,
+                        font: 'Calibri'
+                    }));
+                }
+                if (match[2]) {
+                    // **bold**
+                    runs.push(new TextRun({
+                        text: match[2],
+                        bold: true,
+                        size: 24,
+                        font: 'Calibri'
+                    }));
+                } else if (match[3]) {
+                    // *italic*
+                    runs.push(new TextRun({
+                        text: match[3],
+                        italics: true,
+                        size: 24,
+                        font: 'Calibri'
+                    }));
+                }
+                lastIndex = match.index + match[0].length;
+            }
+
+            // Remaining plain text after last match
+            if (lastIndex < line.length) {
+                runs.push(new TextRun({
+                    text: line.slice(lastIndex),
+                    size: 24,
+                    font: 'Calibri'
+                }));
+            }
+
+            // If the line was empty or had no text, push an empty run
+            if (runs.length === 0) {
+                runs.push(new TextRun({ text: '', size: 24, font: 'Calibri' }));
+            }
+
+            return runs;
+        }
+
         // Export all generated posts to a Word (.docx) file
         function exportAllPostsToDocx() {
             if (!generatedPosts || generatedPosts.length === 0) {
@@ -2754,17 +2810,11 @@
                         spacing: { after: 200 }
                     }));
 
-                    // Post content — split by newline to preserve LinkedIn formatting
+                    // Post content — split by newline, parse markdown bold/italic into Word formatting
                     const contentLines = (post.content || '').split('\n');
                     contentLines.forEach(line => {
                         children.push(new Paragraph({
-                            children: [
-                                new TextRun({
-                                    text: line,
-                                    size: 24,
-                                    font: 'Calibri'
-                                })
-                            ],
+                            children: parseMarkdownLine(line),
                             spacing: { after: 80 }
                         }));
                     });
@@ -2810,7 +2860,7 @@
             }
         }
 
-        // Download all posts as visual quote cards in a .zip
+        // Download all posts as mixed visual cards in a .zip
         async function downloadAllVisuals() {
             if (!generatedPosts || generatedPosts.length === 0) {
                 showErrorToast('No posts to export. Generate posts first.');
@@ -2830,6 +2880,9 @@
                 const zip = new JSZip();
                 const companyName = SupabaseAuth?.profile?.company_name || document.getElementById('company-name')?.value || 'Your Company';
                 const total = generatedPosts.length;
+
+                // Cycle through 4 layout types (skip photoquote — needs uploaded photo)
+                const layoutKeys = ['classic', 'tweet', 'social', 'highlighter'];
 
                 for (let i = 0; i < total; i++) {
                     const post = generatedPosts[i];
@@ -2854,16 +2907,18 @@
                         quote = getFirstLine(post.content || '');
                     }
 
-                    // Cycle through the 6 quote card themes
-                    const theme = quoteCardStyles[i % quoteCardStyles.length];
+                    // Pick layout and theme — cycle through all 4 layouts and their themes
+                    const layoutKey = layoutKeys[i % layoutKeys.length];
+                    const themes = graphicLayouts[layoutKey]?.themes || quoteCardStyles;
+                    const theme = themes[Math.floor(i / layoutKeys.length) % themes.length];
 
-                    // Render the card
-                    const dataUrl = await renderQuoteCard(quote, companyName, theme);
+                    // Render using the unified renderGraphic router
+                    const dataUrl = await renderGraphic(layoutKey, quote, companyName, theme);
 
                     // Convert data URL to binary for zip
                     const base64 = dataUrl.split(',')[1];
-                    const styleName = (post.style || theme.name || 'post').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-                    zip.file(`post-${String(i + 1).padStart(2, '0')}-${styleName}.png`, base64, { base64: true });
+                    const layoutLabel = (graphicLayouts[layoutKey]?.label || 'post').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                    zip.file(`post-${String(i + 1).padStart(2, '0')}-${layoutLabel}.png`, base64, { base64: true });
                 }
 
                 progressText.textContent = 'Bundling zip file...';
