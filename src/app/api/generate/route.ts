@@ -166,7 +166,7 @@ const POST_TEMPLATES: Record<string, { name: string; description: string; prompt
 };
 
 // Call Grok API
-async function callGrokAPI(prompt: string, systemPrompt: string | null = null): Promise<string> {
+async function callGrokAPI(prompt: string, systemPrompt: string | null = null, maxTokens: number = 2000): Promise<string> {
   if (!GROK_API_KEY) {
     throw new Error('GROK_API_KEY not configured');
   }
@@ -189,7 +189,7 @@ async function callGrokAPI(prompt: string, systemPrompt: string | null = null): 
       model: GROK_MODEL,
       messages: messages,
       temperature: 0.7,
-      max_tokens: 2000
+      max_tokens: maxTokens
     })
   });
 
@@ -314,7 +314,11 @@ Output as JSON array with this structure:
   }
 ]`;
 
-    const contentAnglesResponse = await callGrokAPI(step2Prompt, null);
+    // Scale max_tokens for angles based on post count (~200 tokens per angle)
+    const anglesMaxTokens = Math.max(2000, numPosts * 250);
+    console.log(`[Step 2] Using ${anglesMaxTokens} max_tokens for ${numPosts} angles`);
+
+    const contentAnglesResponse = await callGrokAPI(step2Prompt, null, anglesMaxTokens);
     let angles: { angle: string; painPoint: string; talkingPoints: string[]; solution: string; structure: string }[];
 
     try {
@@ -322,6 +326,7 @@ Output as JSON array with this structure:
       angles = JSON.parse(jsonMatch ? jsonMatch[0] : contentAnglesResponse);
     } catch {
       console.error('Failed to parse angles JSON, using fallback');
+      console.error('Raw response length:', contentAnglesResponse.length);
       angles = [{
         angle: "Agency modernization challenges",
         painPoint: agencyPainPoints[0]?.painPoints[0] || "General agency pain point",
@@ -331,7 +336,9 @@ Output as JSON array with this structure:
       }];
     }
 
-    // STEP 3: Write posts with templates
+    console.log(`[Step 2] Got ${angles.length} angles for ${numPosts} requested posts`);
+
+    // STEP 3: Write posts with templates (parallelized in batches)
     console.log('[Step 3] Writing posts with templates...');
 
     // Determine which templates to use
@@ -346,17 +353,10 @@ Output as JSON array with this structure:
     }
     templatesToUse = templatesToUse.slice(0, numPosts);
 
-    const posts: {
-      angle: string;
-      template: string;
-      templateKey: string;
-      content: string;
-      hashtags: string[];
-      painPointAddressed: string;
-      talkingPoints: string[];
-    }[] = [];
+    const postCount = Math.min(angles.length, numPosts);
 
-    for (let i = 0; i < Math.min(angles.length, numPosts); i++) {
+    // Build all post generation tasks
+    const generatePost = async (i: number) => {
       const angle = angles[i];
       const templateKey = templatesToUse[i] || 'question-based';
       const template = POST_TEMPLATES[templateKey] || POST_TEMPLATES['question-based'];
@@ -403,7 +403,7 @@ Output ONLY the post text, followed by hashtags on separate lines.`;
       const hashtags = hashtagMatch || [];
       const postText = postContent.replace(/#[\w]+/g, '').trim();
 
-      posts.push({
+      return {
         angle: angle.angle,
         template: template.name,
         templateKey: templateKey,
@@ -411,7 +411,27 @@ Output ONLY the post text, followed by hashtags on separate lines.`;
         hashtags: hashtags,
         painPointAddressed: angle.painPoint,
         talkingPoints: angle.talkingPoints
-      });
+      };
+    };
+
+    // Generate posts in parallel batches of 5
+    const BATCH_SIZE = 5;
+    const posts: {
+      angle: string;
+      template: string;
+      templateKey: string;
+      content: string;
+      hashtags: string[];
+      painPointAddressed: string;
+      talkingPoints: string[];
+    }[] = [];
+
+    for (let batchStart = 0; batchStart < postCount; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, postCount);
+      const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, j) => batchStart + j);
+      console.log(`[Step 3] Generating batch ${Math.floor(batchStart / BATCH_SIZE) + 1}: posts ${batchStart + 1}-${batchEnd}`);
+      const batchResults = await Promise.all(batchIndices.map(i => generatePost(i)));
+      posts.push(...batchResults);
     }
 
     console.log(`[Content Generator] Generated ${posts.length} posts`);
