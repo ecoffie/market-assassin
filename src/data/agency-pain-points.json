@@ -3665,6 +3665,625 @@
         "NCD allocating $900K in FY2025 for legal and regulatory analysis of disability rights enforcement, with opportunities for legal research and compliance firms.",
         "NCD committing $550K through FY2026 for educational equity studies, seeking contractors to assess IDEA implementation and provide actionable recommendations."
       ]
+    },
+    "U.S. Special Operations Command (SOCOM)": {
+      "painPoints": [
+        "Armed Overwatch (OA-1K) program under GAO scrutiny — GAO-24-107556 found SOCOM decided fleet size before conducting required analyses, with 85% of procurement funding planned before completing operational testing",
+        "14% reduction in purchasing power since 2019 flat budgets — equating to ~$1B loss in capability acquisition, forcing cuts to Armed Overwatch buy from 75 to 62 aircraft and further halved to 6 in FY2026",
+        "$2.8B SITEC III (Special Operations Forces IT Enterprise Contract) re-compete — SAIC awarded contract for SOF-wide network, cloud, and cybersecurity services requiring complex transition",
+        "Aging SOF aviation fleet — CV-22 Osprey fleet groundings for clutch issues, AC-130J sustainment costs rising, MC-130J modernization backlog creating close-air-support and infiltration capability gaps",
+        "Zero Trust architecture implementation mandate — Enterprise Information Systems directorate struggling to implement DOD-wide zero trust across classified SOF networks with 2027 target deadline",
+        "AI integration into legacy SOF systems — existing command-and-control and ISR platforms cannot easily incorporate AI/ML, requiring costly middleware solutions and vendor support",
+        "SOF operator digital footprint management — adversaries exploiting open-source intelligence to identify and track special operators, requiring security technology investments",
+        "Workforce retention crisis — 5,000-person force reduction across the command since 2019, competing with private sector for cyber, AI, and intelligence talent at significantly lower pay scales",
+        "Dry Combat Submersible (S351 Nemesis) limited production — only 3 units built under $166M Lockheed Martin contract; insufficient inventory for undersea SOF missions in contested Indo-Pacific",
+        "Supply chain risk management gaps — all SOCOM solicitations now require SCRM and cyber hygiene compliance, but small SOF-unique vendors struggle to meet CMMC and NIST 800-171 requirements",
+        "Hyper-Enabled Operator program delays — effort to give individual SOF operators AI-driven situational awareness tools has not scaled beyond prototyping due to bandwidth and integration challenges"
+      ],
+      "priorities": [
+        "$10.3B total Operations & Maintenance request for FY2026, including $2.3B for Combat Development Activities — opportunities in logistics, training simulation, and SOF-peculiar equipment maintenance",
+        "$2B+ planned investment in Armed Overwatch (OA-1K Skyraider II) through FY2029 — contracts for aircraft production, mission systems integration, ISR sensors, and sustainment support",
+        "$2.8B SITEC III enterprise IT contract awarded to SAIC — subcontracting opportunities for cloud migration, zero trust implementation, cybersecurity operations, and network modernization across SOF",
+        "$166M+ Dry Combat Submersible program with Lockheed Martin — follow-on contracts expected for additional units, undersea autonomous systems, and maritime SOF equipment",
+        "RDT&E investments in autonomous systems and counter-UAS — SOCOM seeking AI-integrated drones, loitering munitions, and C-UAS solutions for austere SOF operating environments",
+        "Broad Agency Announcement (BAA) for advanced AI capabilities — SOCOM actively soliciting industry proposals for machine learning, predictive analytics, and autonomous decision-support tools",
+        "SOF-specific cyber operations tools and platforms — procurement of offensive and defensive cyber capabilities tailored for special operations missions in denied environments",
+        "Next-generation SOF communications — encrypted SATCOM, mesh networking, and beyond-line-of-sight systems for small-unit operations in GPS-denied and EW-contested environments",
+        "Personnel and training technology — virtual reality combat simulation, AI-powered language training, and biometric performance monitoring systems for SOF selection and sustainment",
+        "Expanding SOF industry ecosystem — USSOCOM actively seeking new small business and non-traditional defense contractors for rapid prototyping under Other Transaction Authority (OTA) agreements"
+      ]
+    },
+    "U.S. Transportation Command (TRANSCOM)": {
+      "painPoints": [
+        "Sealift fleet critically aged — average age of 44 roll-on/roll-off surge ships is 44 years, with 17 ships over 50 years old; TRANSCOM commander called the fleet 'a generation late' in recapitalization",
+        "Ready Reserve Force (RRF) recapitalization gap — 48-vessel fleet with average age exceeding 45 years, requiring 5-day activation readiness that aging ships increasingly cannot meet",
+        "KC-46 Pegasus tanker deficiencies — 6 Category 1 deficiencies as of Jan 2024; Remote Vision System camera failures; Boeing discovered aileron hinge cracks halting deliveries in March 2025",
+        "Aerial refueling capacity shortfall — TRANSCOM identified tanker availability as a 'major shortfall,' forcing retention of aging KC-135s and consideration of private contractor refueling",
+        "C-17 fleet sustainment — no replacement planned for the aging C-17 strategic airlift fleet, with rising maintenance costs and decreasing mission-capable rates threatening global deployment capability",
+        "Contested logistics preparedness gap — proposed NDAA provision would mandate TRANSCOM gap assessment on Joint Deployment and Distribution Enterprise ability to sustain forces under adversary disruption",
+        "Cyber vulnerabilities in transportation networks — commercial shipping and airlift partners present cyber attack surfaces that threaten global logistics chains; digital modernization urgently needed",
+        "DOD household goods moving contract performance failures — DOD raised formal performance concerns in January 2025 on multi-billion dollar Global Household Goods Contract for military family relocations",
+        "Integrated Data Environment/Global Transportation Network (IGC) modernization — legacy logistics IT systems require convergence for end-to-end visibility across air, sea, rail, and ground",
+        "American shipyard industrial base decline — TRANSCOM commander testified that domestic shipyards need revitalization to support Military Sealift Command modernization",
+        "Commercial sealift workforce shortage — U.S.-flagged commercial vessel operators face mariner shortages that could cripple surge sealift in a major conflict scenario"
+      ],
+      "priorities": [
+        "$974M requested from DOD budgetary authority for MARAD in FY2025 to acquire, upgrade, and maintain National Defense Reserve Fleet and Ready Reserve Force vessels",
+        "$859.7M MARAD budget request for FY2025 to recapitalize the Ready Reserve Force and support commercial sealift programs for U.S.-flagged vessels in foreign trade",
+        "$1.6B CACI contract for TRANSCOM enterprise software — awarded August 2025 for transportation management system modernization, logistics data analytics, and IT services",
+        "KC-135 tanker retention and bridge tanker solutions — multi-billion dollar opportunity for extending aging tanker fleet life while KC-46 deficiencies are resolved",
+        "Contested logistics technology development — contracts for resilient communications, autonomous logistics vehicles, and AI-powered supply chain management",
+        "Commercial shipping integration software — TRANSCOM seeking solutions supporting asset-based, third-party logistics, freight forwarding, and multi-modal transportation operations",
+        "Cyber resilience for transportation networks — procurement of cybersecurity solutions to protect commercial transportation providers and DOD logistics IT infrastructure",
+        "Joint Deployment and Distribution Enterprise (JDDE) modernization — contracts for process standardization, data integration, and contested-environment logistics planning tools",
+        "Next-generation sealift vessel procurement — upcoming contracts for new construction to replace aging surge sealift ships, with opportunities for shipbuilders and marine systems integrators",
+        "Military family relocation services — potential re-compete of Global Household Goods Contract following DOD performance concerns, representing billions in moving and storage services"
+      ]
+    },
+    "U.S. Cyber Command (CYBERCOM)": {
+      "painPoints": [
+        "Cyber Mission Force (CMF) readiness degradation — GAO found many of the 133 CMF teams that achieved full operational capability no longer had full trained personnel complements",
+        "Personnel tracking mismatch — military services track cyber staff by career fields while CYBERCOM uses work role designations, making it impossible to identify specific staffing gaps (GAO finding)",
+        "Workforce shortage across federal cyber enterprise — at least 63,934 federal and 4,151 contractor cyber staff at annual costs of $9.3B and $5.2B respectively, with persistent recruitment gaps",
+        "Army and Air Force CMF training validation delays — neither service has timelines for required validation of foundational cyber courses to CYBERCOM standards (GAO finding)",
+        "Joint Cyber Warfighting Architecture (JCWA) integration complexity — consolidating six elements across service software factories into unified platform",
+        "AI integration nascent — only $5M proposed for new FY2026 AI project for data standards and pilot technologies; significant gap between AI ambitions and funded capabilities",
+        "Zero trust implementation for operational technology — DOD published 84 capability outcomes for target-level and 21 for advanced-level zero trust, all required by FY2032",
+        "Chinese and Russian malware pre-positioned in allied networks — CYBERCOM discovered Chinese malware in South American partner nations indicating infrastructure penetration",
+        "Hunt Forward Operations (HFO) scale limitations — conducting ~24 deployments per year to allied nations, but demand far exceeds capacity as nation-state threats expand",
+        "Contractor workforce visibility gap — GAO-25-107405 found agencies lack data on the size and cost of their cybersecurity contractor workforce",
+        "Force generation model inadequacy — CYBERCOM 2.0 initiative acknowledged current model needs significant rework across force generation, training, and talent management"
+      ],
+      "priorities": [
+        "$5.4B total FY2026 budget request for cyberspace operations, with $2.6B specifically designated for CYBERCOM resources including headquarters and Cyber Mission Force operations",
+        "$1.3B allocated for Cyber Mission Force operational arm in FY2026 — contracts for cyber tools, training platforms, and mission support services",
+        "$314M for CYBERCOM headquarters operations in FY2026 — IT infrastructure, facility support, and administrative services contracts",
+        "$1.0B+ for RDT&E in FY2025 — research and development contracts for next-generation cyber weapons, defensive tools, and automated threat detection systems",
+        "Joint Cyber Warfighting Architecture (JCWA) integration contracts — opportunities to consolidate Unified Platform, Joint Cyber C2, and Persistent Cyber Training Environment",
+        "$5M AI initiative for FY2026 as seed funding — expected to scale with contracts for data standards development, threat detection automation, and decision-support ML models",
+        "Hunt Forward Operations support services — logistics, intelligence analysis, and technical support for ~24 annual deployments to allied nations",
+        "INDOPACOM cyber defense modernization — significant funding increase for network sensing, defense, data feeds, and analytic resources supporting Indo-Pacific theater",
+        "Persistent Cyber Training Environment expansion — contracts for realistic virtual training ranges, adversary simulation, and skills assessment platforms",
+        "Zero trust implementation across DOD — consulting, engineering, and technology contracts to meet 84 target-level and 61 advanced-level capability outcomes by FY2032"
+      ]
+    },
+    "U.S. Strategic Command (STRATCOM)": {
+      "painPoints": [
+        "Sentinel ICBM program Nunn-McCurdy breach — 37% cost overrun triggered critical breach in January 2025; $117B acquisition cost; restructuring may delay deployment to 2050",
+        "Columbia-class submarine construction 12-16 months behind schedule — first boat delivery pushed from 2027 to 2029 at $16.1B cost; 12 planned submarines at $12B each ($348B total)",
+        "Nuclear Command, Control, and Communications (NC3) modernization cost — CBO estimated $154B from 2025-2034 for NC3 sustainment and modernization",
+        "Nuclear triad modernization total cost approaching $1 trillion — CBO 2025 estimate of $946B over next decade for operating and modernizing all nuclear forces",
+        "B-21 Raider procurement rate reduction — Air Force lowered annual procurement request from $3.9B to $2.7B in FY2025; 100 bombers planned at $203B total with schedule uncertainty",
+        "Evolved Strategic SATCOM (ESS) transition risk — replacing AEHF constellation with next-generation satellites while maintaining assured nuclear communications continuity",
+        "Next-Gen OPIR missile warning satellite delays — first launch pushed from 2025 to March 2026 due to crowded launch manifest",
+        "Minuteman III life extension strain — aging ICBMs requiring continued testing and maintenance while Sentinel program faces restructuring delays",
+        "New START Treaty expired February 2026 without replacement — requiring new verification and monitoring capabilities",
+        "Workforce for simultaneous nuclear recapitalization — shortage of nuclear-qualified engineers, physicists, and program managers to oversee parallel modernization of all three triad legs",
+        "Space-based nuclear detonation detection system aging — current NUDET sensors approaching end of life with replacement systems still in development"
+      ],
+      "priorities": [
+        "~$60B across the nuclear enterprise in FY2026 budget request to sustain nuclear forces and fund recapitalization across all three legs of the nuclear triad",
+        "$593.5M for STRATCOM headquarters operations in FY2026 (up from $524.1M in FY2025) — IT, communications, and facility support contracts",
+        "$1.8B for Survivable Airborne Operations Center (SAOC) in FY2026 — Sierra Nevada Corp contract for nuclear C2 aircraft replacement with subcontracting opportunities",
+        "$1.3B for Evolved Strategic SATCOM (ESS) in FY2026 — replacing AEHF satellite constellation with next-generation nuclear-hardened communications satellites",
+        "$117B+ Sentinel ICBM program (LGM-35A) — major construction, silo modification, missile production, and integration contracts despite restructuring",
+        "$203B B-21 Raider stealth bomber program for 100 aircraft — production, avionics, electronic warfare, and sustainment contracts through Northrop Grumman ecosystem",
+        "$348B Columbia-class SSBN program for 12 submarines — Navy awarded $2.3B contract in November 2025; opportunities for submarine component manufacturers",
+        "NC3 modernization contracts — command post terminals, nuclear-hardened communications equipment, and survivable relay systems",
+        "Next-Gen OPIR missile warning satellites — Lockheed Martin prime contract with subcontracting opportunities for infrared sensors, ground systems, and data processing",
+        "Nuclear weapons complex sustainment — NNSA contracts for warhead life extension programs, plutonium pit production, and manufacturing at national laboratories"
+      ]
+    },
+    "U.S. Africa Command (AFRICOM)": {
+      "painPoints": [
+        "Counter-UAS capability gap — AFRICOM placed C-UAS and integrated air defenses at top of $500M unfunded priorities list, citing growing hostile surveillance and active targeting by drone-equipped groups",
+        "Loss of Niger drone bases — U.S. closed Air Base 101 (Niamey) and Air Base 201 (Agadez) in September 2024 after coup, losing $110M investment and critical ISR coverage",
+        "Terrorist groups gaining drone capability — JNIM conducted first recorded FPV drone strikes in Burkina Faso in February 2025; militant groups exploiting affordable UAVs",
+        "ISR capability gap in West Africa — AFRICOM scrambling to sustain intelligence operations after Niger withdrawal, seeking alternative basing with significantly degraded coverage",
+        "Camp Lemonnier Houthi threat exposure — only permanent U.S. base in Africa lies within Houthi UAV and missile strike range from Yemen, requiring urgent base defense upgrades",
+        "Partner capacity building planning deficiencies — GAO-23-105842 found 42 of 46 Section 333 project proposals lacked full documentation for sustainment plans or measurable objectives",
+        "State Department involvement gaps in security cooperation — GAO found inconsistent State participation in Section 333 planning due to lack of joint planning process",
+        "Smallest combatant command budget — AFRICOM's limited resources ($413M for Africa operations) constrain ability to address continent-wide terrorism and strategic competitor influence",
+        "Strategic competitor encroachment — Russia (Wagner Group/Africa Corps) and China expanding military and economic influence across Africa as U.S. scales back presence",
+        "Operational contract support weaknesses — GAO-16-105 found DOD needs to better manage, account for, and vet defense contractors operating in the African theater",
+        "Somalia counterterrorism operational tempo — increased air operations in 2025 against al-Shabaab and ISIS nodes with approximately 400 troops, straining limited resources"
+      ],
+      "priorities": [
+        "$219M requested for layered base defense including NASAMS, interceptors, radars, and short-range air defense equipment to counter UAS threats across African installations",
+        "$228M for high-risk intelligence, surveillance and reconnaissance to address unacceptable risk to U.S. interests in Africa — drone ISR platforms, sensors, and intelligence analysis",
+        "$413M FY2026 operations funding for AFRICOM Africa activities — logistics, security cooperation, and operational support contracts across the continent",
+        "Alternative ISR basing infrastructure — construction and upgrade contracts for new surveillance sites including Benin airbase to replace lost Niger capabilities",
+        "Camp Lemonnier, Djibouti force protection upgrades — base defense systems, C-UAS technology, and infrastructure hardening against Houthi missile/drone threats",
+        "Maritime security in Gulf of Guinea — contracts for patrol vessel support, maritime domain awareness systems, and training programs for West and Central African naval partners",
+        "Section 333 train-and-equip programs — equipment procurement, training services, and sustainment support contracts for building African partner military capacity",
+        "Counter-terrorism logistics and support — operational support contracts for Combined Joint Task Force-Horn of Africa operations in Somalia, Kenya, and Djibouti",
+        "Exercise Obangame Express and other multinational exercises — event planning, logistics, communications, and simulation support contracts for annual partner engagement",
+        "Strategic communications and information operations — contracts for countering violent extremist messaging and Russian/Chinese disinformation campaigns across Africa"
+      ]
+    },
+    "U.S. Central Command (CENTCOM)": {
+      "painPoints": [
+        "Counter-drone cost asymmetry crisis — using $2M cruise missiles and interceptors against $50K-$100K Houthi drones; only APKWS ($25K/round) provides cost-effective intercepts",
+        "MQ-9 Reaper losses to Houthis — at least 7 Reapers ($30M each, $210M total) downed since Operation Rough Rider began in March 2025",
+        "Operation Rough Rider costs exceeding $1B — campaign involving USS Harry S. Truman strike group, B-2 bombers, and armed drones against Houthi targets since March 2025",
+        "Navy munitions expenditure in Red Sea — USS Eisenhower fired 155 Standard missiles and 135 Tomahawks ($270M+ in Tomahawks alone) defending against ~400 attacks",
+        "ISR shortfall in Yemen and broader AOR — AFCENT needs more ISR in certain areas with current platforms insufficient for the volume of threats and targets",
+        "Rapid technology fielding gap — stood up Rapid Employment Joint Task Force (REJTF) in September 2025 because existing acquisition processes too slow for 60-day delivery",
+        "CentGPT AI infrastructure scaling — building AI compute infrastructure from scratch to support combatant command adoption across classified and unclassified networks",
+        "Aging base infrastructure across 20+ countries — force protection upgrades needed following October 2023 attacks that killed 3 U.S. soldiers at Tower 22",
+        "Partner force interoperability gaps — equipment and training disparities with Jordan, Iraq, Saudi Arabia, and UAE partners limiting combined operations effectiveness",
+        "Task Force 99 drone innovation scaling — evaluating lower-cost 3D-printed drones and long-endurance ISR platforms, but prototyping-to-production pipeline remains too slow",
+        "Counter-UAS doctrine still developing — CENTCOM commander pressing lawmakers for dedicated counter-drone funds, calling current capabilities inadequate"
+      ],
+      "priorities": [
+        "$732M requested for Penetrating Platforms — non-traditional find, fix, track, and targeting capability using software-defined ISR solutions",
+        "$1B+ for Operation Rough Rider and Red Sea security operations — naval aviation, precision munitions, ISR platforms, and force protection contracts",
+        "Counter-UAS technology procurement — CENTCOM expanding arsenal with APKWS laser-guided rockets, directed energy weapons, electronic warfare systems, and layered base defense",
+        "Rapid Employment Joint Task Force (REJTF) technology contracts — fast-track procurement of drones, AI/ML systems, 3D printing, and counter-drone solutions deliverable within 60 days",
+        "Task Force 99 unmanned aerial systems — procurement of low-cost ISR drones, autonomous surveillance platforms, and 3D-printed aerial vehicles",
+        "Task Force 59 maritime autonomous systems — AI-powered unmanned surface vessels, underwater sensors, and integrated maritime surveillance mesh networks",
+        "CentGPT and AI infrastructure — computing hardware, classified cloud services, and AI/ML platform contracts to support theater-wide artificial intelligence adoption",
+        "Theater security cooperation with Jordan, Iraq, Saudi Arabia, and UAE — military sales, training programs, joint exercise support, and interoperability equipment contracts",
+        "Base force protection upgrades — C-RAM systems, counter-drone technology, hardened infrastructure, and perimeter security systems across the CENTCOM AOR",
+        "Precision munitions replenishment — restocking Tomahawk, Standard Missile, APKWS, and air-to-ground weapons expended during Red Sea and Yemen operations"
+      ]
+    },
+    "U.S. Indo-Pacific Command (INDOPACOM)": {
+      "painPoints": [
+        "Guam Defense System schedule slippage — 2026 target for INDOPACOM's No. 1 priority appears to be slipping; AN/TPY-6 radar sites and interceptors not expected until 2029",
+        "$11B unfunded priorities gap — INDOPACOM's FY2025 wish list included 44 priority areas totaling $11B above the budget request, the largest of any combatant command",
+        "Precision munitions stockpile critically low — entire global LRASM inventory estimated at fewer than 450 missiles against requirement of 1,000-1,200; wargaming shows depletion in one week",
+        "GAO-26-107698 on PDI budget visibility — GAO found DOD needs clearer guidance to improve visibility into Pacific Deterrence Initiative spending",
+        "AUKUS submarine deal uncertainty — Pentagon reviewing AUKUS agreement under 'America First' agenda, potentially disrupting nuclear submarine technology sharing",
+        "Pacific island infrastructure inadequacy — military construction in Guam, Palau, CNMI, and Philippines proceeding slower than needed; airfield rehabilitation years behind schedule",
+        "Munitions industrial base production gap — despite $4.3B JASSM/LRASM contract, production rates cannot close the stockpile gap before 2030",
+        "Philippines EDCA site construction delays — $128M invested across 9 sites, but construction timelines slipping in remote locations",
+        "Distributed force posture logistics challenge — sustaining forces across thousands of miles of Pacific island chains under potential Chinese A2/AD threat",
+        "Theater missile defense architecture gaps — current systems insufficient against Chinese ballistic, cruise, and hypersonic missile threats to bases in Japan, Guam, Philippines",
+        "Undersea warfare cable and communications vulnerability — Chinese capability to disrupt or sever undersea communications cables threatens theater-wide command and control"
+      ],
+      "priorities": [
+        "$10.0B Pacific Deterrence Initiative (PDI) in FY2026 across 70+ line items — infrastructure, weapons, ISR, logistics, and force posture investments",
+        "$3.3B for regional military construction — base construction, airfield upgrades, fuel storage, and logistics facilities across Pacific island locations",
+        "$2.7B for advanced weapons procurement — Maritime Strike Tomahawk, precision strike missiles, and anti-ship weapons for distributed maritime operations",
+        "$4.3B Lockheed Martin contract for JASSM/LRASM production plus $3.5B for AMRAAM — subcontracting opportunities in propulsion, guidance, and warhead components",
+        "$430M+ for Guam missile defense development, procurement, and military construction — NASAMS, radar systems, and command-and-control integration contracts",
+        "$1B for offensive cyber operations — CYBERCOM and INDOPACOM joint cyber capabilities to contest Chinese network operations in the theater",
+        "$1B+ for infrastructure improvements and equipment pre-positioning — warehouse construction, ammunition storage, and fuel facilities across the First and Second Island Chains",
+        "$128M+ for Philippines EDCA infrastructure — construction, engineering, and logistics contracts at 9 Enhanced Defense Cooperation Agreement sites",
+        "AUKUS Pillar II advanced capabilities development — contracts for hypersonic weapons, undersea capabilities, electronic warfare, AI, quantum technologies, and autonomous systems",
+        "Theater integrated air and missile defense — procurement of Patriot, THAAD, Aegis upgrades, and next-generation interceptors to protect forward-deployed forces"
+      ]
+    },
+    "Health Resources and Services Administration (HRSA)": {
+      "painPoints": [
+        "HHS OIG estimated $159.4M in potential overpayments to providers under Phase 2 General Distribution of the Provider Relief Fund — HRSA lacked procedures requiring documentation to support revenue claims",
+        "340B Drug Pricing Program audit failures: 46% of FY2024 audits resulted in adverse findings — most common issues include incorrect OPAIS records (62%), duplicate discounts (17%), and drug diversion",
+        "Projected shortage of 350,540 full-time equivalent registered nurses by 2026 and 358,170 by 2031 — HRSA workforce projections show shortages vary wildly by state",
+        "OPTN organ transplant system operated by a single vendor for 40 years with outdated IT — GAO flagged oversight failures; HRSA awarded first-ever multi-vendor modernization contracts September 2024",
+        "Community Health Center funding cliff: FY2026 budget proposes $1.73B reduction to HRSA — threatens 1,400+ federally qualified health centers serving 30M+ patients",
+        "Health Professional Shortage Areas (HPSAs) continue to expand — over 62 million Americans live in rural communities lacking adequate primary care, mental health, and dental providers",
+        "GAO found HRSA did not assess Early Hearing Detection and Intervention program plans for addressing access disparities — pediatric audiologist shortages pose barriers to timely diagnosis",
+        "Maternal mortality crisis in rural America — HRSA-designated maternity care deserts expanding as rural OB units close",
+        "Ryan White HIV/AIDS Program compliance monitoring gaps — program serves 500,000+ people but faces proposed cuts to prevention efforts",
+        "98.5% of health centers now use telehealth but reimbursement and licensure barriers persist — rural broadband gaps limit reach to highest-need communities",
+        "Health center site visit compliance findings persistent — operational site visits continue to identify governance, financial management, and clinical quality deficiencies"
+      ],
+      "priorities": [
+        "$8.2B for Health Center Program in FY2025 including $6.3B in proposed mandatory resources — contracting opportunities for health IT and clinical support",
+        "$916M for National Health Service Corps in FY2025 — scholarships and loan repayment to improve access in underserved areas",
+        "$385M total HIV/AIDS investment including $165M for Ryan White Program — contracts for care coordination, data systems, and treatment support",
+        "OPTN Modernization: multi-vendor contracts awarded September 2024 to General Dynamics IT, Maximus Federal, Deloitte Consulting, and Guidehouse Digital — ongoing through FY2027+",
+        "Unified OPTN data system development — opportunities for data engineering, cloud infrastructure, and cybersecurity contractors",
+        "Telehealth expansion investment for remote care delivery — grants for opioid use disorders and rural health provider development",
+        "Health Workforce Shortage Area designation modernization — data analytics and health workforce planning contractor opportunities",
+        "340B Drug Pricing Program integrity enforcement expansion — 111 audits in FY2024 across 40 states creating demand for compliance consulting and IT audit trail solutions",
+        "Maternal and Child Health Block Grant investments — contracts for mobile health units, workforce recruitment technology, and prenatal care coordination",
+        "Rural Health IT and infrastructure support — health center capital improvements, EHR optimization, and UDS+ data reporting modernization"
+      ]
+    },
+    "Substance Abuse and Mental Health Services Administration (SAMHSA)": {
+      "painPoints": [
+        "988 Suicide & Crisis Lifeline funding expiration risk: $10.8M State and Territory Improvement Award expires September 29, 2026 — total federal 988 funding set to expire with no guaranteed renewal",
+        "GAO-25-106944 found SAMHSA has not completed or implemented a plan for collecting 'ultimate recipients' data on opioid response grants as required by statute",
+        "Workforce crisis: SAMHSA projects a shortage of 31,000 full-time equivalent mental health practitioners by 2025 — 6 in 10 psychologists not accepting new patients",
+        "Nearly two-thirds of SAMHSA workforce laid off since January 2025 — agency announced for consolidation, threatening institutional knowledge and grant administration capacity",
+        "Proposed FY2026 budget combines Mental Health, Substance Use, and State Opioid Response block grants — cutting approximately $500M from what states currently receive",
+        "GAO-25-106944 found tribal opioid response grant recipients report administrative burdens that prevent participation",
+        "988 Lifeline evaluation delayed: final findings not expected until FY2028, meaning 6+ years without comprehensive program effectiveness data",
+        "State Opioid Response grant data sharing failures: grant recipients report challenges obtaining data from other recipients (GAO-25-106944)",
+        "CCBHC expansion constrained by complex certification requirements — planning grants limited to 10 new states every 2 years",
+        "Mental Health Block Grant crisis services 10% set-aside insufficient — demand for crisis response far exceeds available resources",
+        "62 million U.S. adults (23%) had a mental illness in 2024 with nearly half not receiving treatment — behavioral health integration into primary care remains fragmented"
+      ],
+      "priorities": [
+        "$1.575B for State Opioid Response (SOR) grants in FY2025 — funding prevention, harm reduction, treatment including FDA-approved medications, and recovery support services",
+        "$231M funding opportunity announced January 2026 to administer the 988 Suicide & Crisis Lifeline — contracts for contact center operations and technology infrastructure",
+        "$1.3B+ awarded through 10 programs in FY2021-2024 for crisis response services including 988 contact centers, mobile crisis teams, and stabilization facilities",
+        "$2.3B awarded through 3 programs for general behavioral health services — opportunities for treatment providers, data systems, and program evaluation contractors",
+        "CCBHC Expansion Grant Program: up to $1M per year per clinic for 4-year grants — behavioral health IT systems, EHR integration, and workforce training platforms",
+        "Mental Health Block Grant distribution to all 50 states and territories — 10% crisis services set-aside creating demand for mobile crisis unit infrastructure and telehealth",
+        "$307.5M in Tribal Opioid Response grants since FY2018 — culturally competent treatment technology and telehealth for remote tribal communities",
+        "Behavioral Health Innovation Block Grant (proposed FY2026 consolidation) — if enacted, creates demand for integrated data systems",
+        "988 Lifeline technology modernization — system handles 8M+ contacts annually requiring routing technology, AI-assisted triage, and multilingual support",
+        "National Guidelines for Behavioral Health Crisis Systems implementation — contracting for crisis system design, workforce training, and data infrastructure"
+      ]
+    },
+    "Administration for Children and Families (ACF)": {
+      "painPoints": [
+        "GAO-25-107235: enhanced reporting needed for TANF oversight — HHS issued only 8% of 279 management decisions within required 6-month timeframe, with 186 decisions still pending",
+        "Head Start funding disruption: states received $1.67B from Jan-Apr 2025 vs $2.55B same period 2024 — 34% decline caused by closure of 5 regional offices serving 22 states",
+        "HHS OIG found ACF did not monitor states' compliance with ARPA Child Care Stabilization Grant provisions — multi-billion dollar pandemic relief distributed without adequate oversight",
+        "TANF spending drift: only 21.8% of $37.5B in combined federal and state expenditures went to basic assistance in FY2024, down from 70.9% in FY1997",
+        "Single audit TANF findings repeat for 2+ years with some unresolved for over a decade — systemic state-level compliance failures go unaddressed",
+        "OIG found gaps in ORR sponsor screening for unaccompanied children: 16% of case files lacked required safety checks, 22% had untimely follow-up calls",
+        "Child welfare information systems (CCWIS) modernization stalled in many states — legacy systems unable to support case management or interoperability; projects costing $100M+ per state",
+        "GAO-25-107154: HHS should help states fully use federal Title IV-E funds for foster care programs — states leaving significant federal funding on the table",
+        "Child Care and Development Fund uncertainty: most states have not implemented required grants or contracts for child care services per CCDF regulations",
+        "ORR capacity issues during influx periods: initial placements not consistently made within 24 hours due to insufficient bed space and intake specialist staff",
+        "Child support enforcement systems running on decades-old technology — most states still operating mainframe-based systems requiring complete replacement"
+      ],
+      "priorities": [
+        "$12.27B for Head Start program (level-funded FY2024-2025) — contracts for early childhood education services, facilities management, and program evaluation across 1,600+ grantees",
+        "$37.5B in combined federal TANF and state maintenance-of-effort spending — contracting for workforce development, case management systems, and program integrity monitoring",
+        "CCWIS modernization across states — projects at $50-100M+ per state with 50% federal cost sharing; system integration, cloud migration, and data analytics contracts",
+        "Child support enforcement system modernization — IT modernization for legacy mainframe replacement and API-based architectures",
+        "ORR care provider network — contracts for unaccompanied children shelter operations, case management, legal services, and medical/mental health care",
+        "Child Care and Development Fund state plan implementation — technology platforms for provider management, eligibility determination, and quality rating systems",
+        "Foster care and adoption services technology — Title IV-E funding for case management, placement matching, and outcome tracking systems",
+        "ACF public dashboard development (launched January 2026) — data visualization, reporting infrastructure, and analytics tools contracts",
+        "Refugee resettlement program support services — employment assistance, English language training, case management, and cultural orientation contracts",
+        "TANF program integrity and reporting modernization — state reporting systems, financial monitoring tools, and data collection platforms"
+      ]
+    },
+    "Administration for Community Living (ACL)": {
+      "painPoints": [
+        "Older Americans Act reauthorization failed: Senate unanimously passed but House did not act — programs operating at stale FY2024 levels with no updated authorization through FY2029",
+        "Growing waitlists for senior nutrition programs — advocacy groups requested $200M in emergency funding; home-delivered meals programs turning away eligible seniors",
+        "FY2026 budget proposes consolidation or elimination of aging and disability programs housed within ACL — threatens organizational structure coordinating OAA services",
+        "1 in 10 Americans aged 60+ experience elder abuse (CDC estimate) — 90% perpetrated by family members, yet Adult Protective Services systems remain fragmented across states",
+        "State LTSS delivery systems not aligned with enabling technology — 2024 report found most states lack laws, policies, financing, and quality measures for assistive technology",
+        "Rapidly aging population creating unsustainable demand — adults 65+ projected to outnumber children under 18 by 2034, with community-based services unable to scale",
+        "Direct care workforce crisis — home health aides and personal care attendants face low wages, high turnover (60%+ annually), and insufficient training pipelines",
+        "Caregiver support programs overwhelmed: National Family Caregiver Support Program serves fraction of 53M+ unpaid caregivers",
+        "NIDILRR disability research grant timeline misalignment — 5-year research grants produce innovations that lack pathways to scaled implementation",
+        "Area Agencies on Aging technology infrastructure outdated — many of 622 AAAs nationwide rely on paper-based or legacy systems for client intake and service tracking",
+        "Tribal aging services severely underfunded — Title VI grants cover fraction of need for elder nutrition, caregiver support, and disease prevention in Indian Country"
+      ],
+      "priorities": [
+        "$1.1B+ in Older Americans Act grant funding released May 2025 for home-delivered meals, caregiver support, transportation, and independent living services",
+        "$2.76B authorized (if reauthorization passes) for all seven OAA titles — proposed 20% increase creating significant new contracting opportunities",
+        "Senior nutrition program modernization — innovation grants for hybrid meal models, grab-and-go programs, and technology-enabled wellness checks",
+        "Assistive technology research through NIDILRR — 19 five-year grants (2023-2028) at up to $925K/year focused on technologies for community living and aging-in-place",
+        "Home and Community-Based Services technology — care coordination platforms, remote monitoring systems, and integrated data systems connecting aging networks with Medicaid HCBS",
+        "Elder justice and Adult Protective Services enhancement — national data collection systems, APS worker training platforms, and financial exploitation detection technology",
+        "National Aging Network technology modernization — 622 Area Agencies on Aging need updated intake, assessment, service tracking, and reporting systems",
+        "Caregiver support technology — platforms for respite care matching, caregiver training, support group facilitation, and care planning tools",
+        "Disability and rehabilitation research commercialization — NIDILRR investments in smart home technology, mobility devices, and telehealth for people with disabilities",
+        "Tribal aging services expansion — culturally appropriate technology platforms, telehealth infrastructure for remote tribal communities, and nutrition service delivery systems"
+      ]
+    },
+    "Agency for Healthcare Research and Quality (AHRQ)": {
+      "painPoints": [
+        "Agency facing existential threat: Trump administration slashed AHRQ on April 1, 2025, firing roughly half of remaining employees — announced merger with ASPE",
+        "Staff cuts of 80-90% reported — loss of institutional knowledge in patient safety, healthcare quality measurement, and health services research built over decades",
+        "FY2026 budget proposes elimination of AHRQ as independent agency — $487M program at risk with proposed consolidation threatening continuity of critical research",
+        "Patient safety research brain drain — dissolution dislodging experienced experts in preventable hospitalizations, healthcare-associated infections, and medication errors",
+        "Medical Expenditure Panel Survey (MEPS) — the ONLY national data source measuring how Americans use and pay for medical care — at risk of disruption",
+        "National Healthcare Quality and Disparities Report (21 consecutive years) threatened — annual report tracking quality trends has no clear future under reorganization",
+        "Patient Safety Network (PSNet) and event reporting infrastructure uncertain — voluntary reporting systems may lose federal hosting and expert curation",
+        "Healthcare IT and interoperability research gaps — digital health equity framework and health IT safety research face defunding despite growing need",
+        "Evidence-based practice center program at risk — systematic reviews informing clinical guidelines and coverage decisions may be discontinued",
+        "Health disparities research portfolio disrupted: 15 grants focused primarily on disparities plus 31 with partial focus at risk of early termination",
+        "Primary care research investment uncertainty: grants spanning practice improvement, behavioral health integration, and substance use disorders face disruption"
+      ],
+      "priorities": [
+        "$513M requested for AHRQ total program level in FY2025 — 76% discretionary and 24% from Patient-Centered Outcomes Research Trust Fund for mandatory research",
+        "MEPS enhancement — new self-administered questionnaire fielded Spring 2025 with Social Determinants of Health database linkage creating survey operations contracts",
+        "Patient Safety and Quality Improvement programs — contractors to support event reporting, analysis, and dissemination through PSNet and Common Formats",
+        "National Healthcare Quality and Disparities Report data infrastructure — data analytics contractors for annual quality and disparities measures",
+        "Digital health equity and interoperability research — projects in EHR safety, health data infrastructure, public health informatics, and digital health equity",
+        "Health Costs, Quality, and Outcomes (HCQO) research portfolio — evidence generation on reducing costs, improving quality, and eliminating disparities",
+        "Evidence-based Practice Center (EPC) program — systematic evidence reviews contracted to academic institutions and research organizations",
+        "Primary care research grants spanning 46+ active projects — practice improvement, behavioral health integration, patient safety, and digital healthcare",
+        "Patient-Centered Outcomes Research Trust Fund dissemination — mandatory funding for translation of comparative effectiveness research into clinical practice",
+        "Healthcare AI safety and clinical decision support research — evidence generation on safe implementation of AI in clinical settings and diagnostics"
+      ]
+    },
+    "U.S. Citizenship and Immigration Services (USCIS)": {
+      "painPoints": [
+        "Historic 11.3 million pending applications — largest case inventory ever recorded, touching work permits, family petitions, green cards, employment-based visas, and naturalization",
+        "Over 34,000 unopened cases — applications received but not yet entered into the processing system, representing a fundamental intake bottleneck",
+        "Form I-765 (Work Permits) backlog explosion: pending initial applications surged 87% quarter-over-quarter with total pending exceeding 2 million",
+        "Form I-90 (Green Card Renewal) processing times increased 938% — from less than one month to over 8 months",
+        "Fee-funded agency model creates structural instability — USCIS relies primarily on application fees rather than congressional appropriations, causing budget shortfalls",
+        "E-Verify system modernization mandated but unfunded — Congress directed briefing on quality/accuracy improvements and appeal process but lack of discretionary funding delays upgrades",
+        "Immigration court backlog of 3.4 million cases indirectly increases USCIS workload — sustained humanitarian filings require repeated updates, renewals, and status changes",
+        "Fraud Detection and National Security (FDNS) capacity strained — enhanced vetting procedures slow processing without proportional staffing increases",
+        "Legacy IT systems (ELIS/myUSCIS) unable to support end-to-end electronic processing — expanded premium processing found IT modernization prerequisites unfulfilled",
+        "Asylum processing backlog persists despite FY2024 allocation of $62M for staffing and overtime — enhanced screening adds steps without corresponding officer hiring",
+        "Refugee and asylee green card processing suspended in March 2025 pending additional screening — creating secondary backlog for protection status holders"
+      ],
+      "priorities": [
+        "$265.2M total appropriation requested for FY2025 — $110.2M for E-Verify, $10M for citizenship grants, and $145M for additional operations",
+        "E-Verify system modernization — $110.2M for employment eligibility verification platform serving 1M+ employers with mandate to implement appeal process",
+        "SAVE (Systematic Alien Verification for Entitlements) system upgrades — real-time immigration status checks used by federal, state, and local benefit agencies",
+        "IT modernization for end-to-end electronic processing — new case management platforms, document digitization, and workflow automation",
+        "Fraud Detection and National Security technology — social media screening tools, AI-assisted fraud detection, biometric verification, and security vetting automation",
+        "Backlog reduction technology — case triage algorithms, automated pre-adjudication screening, and digital intake systems",
+        "Premium processing expansion — IT infrastructure to support guaranteed processing timelines for additional benefit categories",
+        "Asylum Division modernization — interview scheduling, decision support, case management, and secure video conferencing technology",
+        "Digital filing and customer experience — myUSCIS portal improvements for online filing, case status tracking, and appointment scheduling",
+        "Citizenship and Integration Grant Program — $10M for naturalization preparation, English language, and civics education curriculum development"
+      ]
+    },
+    "Animal and Plant Health Inspection Service (APHIS)": {
+      "painPoints": [
+        "Highly Pathogenic Avian Influenza (HPAI) crisis: $1.811B in emergency funding since 2022, spread to dairy cattle in 16+ states, detected in commercial pigs — first mammal-to-mammal transmission confirmed",
+        "GAO-25-107613: USDA still has not implemented 2014 GAO recommendations on FSIS-APHIS coordination for food safety oversight, creating gaps in pre-harvest food contamination prevention",
+        "USDA OIG found APHIS cattle health program audits revealed compliance gaps in brucellosis and tuberculosis testing, disease traceability, and interstate movement documentation",
+        "SECURE Rule for biotechnology regulation vacated by court in December 2024, forcing APHIS back to 1987 regulatory framework for genetically engineered organisms",
+        "Chronic Wasting Disease (CWD) spreading across 33+ states in deer/elk populations with no effective containment strategy, threatening $25.6B hunting industry",
+        "Spotted Lanternfly (SLF) invasion: quarantine zones expanded to 17 states, but eradication deemed unlikely; pest threatens $38B in agricultural commodities annually",
+        "Wildlife damage management budget constraints: $235M USDA WS budget insufficient for expanding human-wildlife conflicts, invasive species management, and airport wildlife strikes",
+        "Veterinary workforce shortage: only 3,000 accredited veterinarians available for federal regulatory work, insufficient for disease surveillance across $1.7T agriculture sector",
+        "Animal disease traceability system limitations: ADT database lacks real-time interstate movement tracking, hampering response to HPAI and other transboundary diseases",
+        "International agricultural inspection gaps: USDA OIG found smuggled food products bypassing APHIS border inspection at mail facilities and ports of entry",
+        "Plant pest and disease surveillance network underfunded: Cooperative Agricultural Pest Survey covers only fraction of needed surveillance for emerging crop threats"
+      ],
+      "priorities": [
+        "$1.811B total emergency HPAI funding since 2022 — contracts for diagnostics, depopulation, biosecurity enhancement, vaccine development, and indemnification services",
+        "$235M Wildlife Services budget for FY2025 — wildlife damage management, invasive species control, airport wildlife hazard mitigation contracts",
+        "Animal disease traceability modernization — IT contracts for real-time interstate animal movement tracking, electronic ID systems, and database integration",
+        "Biotechnology regulatory framework rebuild after SECURE Rule vacatur — rulemaking support, environmental assessment, and compliance monitoring contracts",
+        "Chronic Wasting Disease monitoring and research — surveillance technology, diagnostic testing, and wildlife management contractor support across 33+ states",
+        "Spotted Lanternfly control program — biological control agents, treatment services, and quarantine enforcement across 17-state affected area",
+        "Plant Protection and Quarantine program — border inspection technology, pest identification systems, and phytosanitary certification contractor support",
+        "Veterinary biologics testing and licensing — laboratory modernization, vaccine evaluation, and diagnostic reagent production contracts",
+        "International Services trade facilitation — pre-clearance inspections, export certification systems, and trade agreement compliance monitoring",
+        "Cooperative pest and disease surveys — contractor-supported field surveillance, sample collection, and laboratory analysis for emerging agricultural threats"
+      ]
+    },
+    "USDA Rural Development": {
+      "painPoints": [
+        "GAO-25-107207: federal broadband coordination failures — NTIA, USDA, FCC, and Treasury funding potentially duplicative areas with no agreed-upon timeline for submitting project data to FCC maps",
+        "GAO-23-105265: RUS did not incorporate leading practices in developing performance goals for the ReConnect broadband program, limiting program outcome measurement",
+        "FY2026 budget proposes 64% cut to Rural Utilities Service programs — devastating rural water, electric, and telecom infrastructure funding",
+        "USDA OIG found Rural Housing Service has compliance gaps in rental housing portfolio — fraud schemes involving property managers billing for nonexistent tenants or inflated repairs",
+        "ReConnect Program broadband deployment delays: construction timelines slipping due to supply chain issues, labor shortages, BABA material requirements, and permitting bottlenecks",
+        "Rural water system aging crisis: thousands of small rural water and wastewater systems facing compliance failures with Safe Drinking Water Act and Clean Water Act standards",
+        "Single Family Housing Direct Loan program facing proposed 32% cut in FY2026, threatening rural homeownership access for very-low-income borrowers",
+        "Persistent poverty counties (85% rural) receiving inadequate targeted investment despite statutory set-asides in multiple Rural Development programs",
+        "Community Facilities program backlog: applications for rural healthcare facilities, public safety buildings, and educational institutions exceeding available funding",
+        "Rural electric cooperative infrastructure aging: distribution lines, substations, and generation facilities requiring modernization for reliability and renewable energy integration",
+        "Broadband workforce shortage: 41 states report insufficient fiber technicians, tower climbers, and network engineers needed for rural deployment projects"
+      ],
+      "priorities": [
+        "$7.7B obligated for Rural Housing Service in FY2024 — Single Family direct loans, Multifamily housing, and Rural Rental Housing program administration contracts",
+        "$4.25B+ ReConnect Program broadband grants and loans across multiple funding rounds — fiber construction, network engineering, and program management contracts",
+        "$2B+ annual Rural Utilities Service lending authority for rural water, wastewater, and electric infrastructure — engineering, construction, and system modernization contracts",
+        "Rural broadband workforce development — training programs for fiber technicians, tower climbers, and network engineers needed for BEAD and ReConnect deployment",
+        "Rural water and wastewater system modernization — engineering assessments, construction management, and compliance monitoring for thousands of small systems",
+        "Community Facilities Program — direct loans and grants for rural healthcare facilities, public safety buildings, educational institutions, and community centers",
+        "Rural Business-Cooperative Service programs — business incubators, value-added producer grants, and rural innovation stronger economy (RISE) grants",
+        "Rural electric cooperative infrastructure modernization — smart grid technology, renewable energy integration, and distribution system upgrade contracts",
+        "USDA Distance Learning and Telemedicine grants — broadband-dependent healthcare and education technology deployment in rural areas",
+        "Rural Housing multi-family portfolio management — property inspection, compliance monitoring, and renovation contractor oversight services"
+      ]
+    },
+    "Farm Service Agency (FSA)": {
+      "painPoints": [
+        "MIDAS (Modernize and Innovate the Delivery of Agricultural Systems) IT failure: $423M system delivered years late and over budget, still not fully functional per GAO-15-506",
+        "GAO-21-512: FSA oversight of Farmers.gov development needs improvement — web modernization suffered from inadequate planning and user testing",
+        "County office staffing crisis: 1,200+ employees lost since January 2025; federal and state FSA staff declined 43% since FY2005; county staff declined 22% over same period",
+        "Starting salary of $34,000-$37,000 for county office technicians creates critical recruitment and retention challenges; FSA has no authority to change compensation",
+        "Nationwide county staff levels around 6,000 — many offices critically understaffed per NAFEC, threatening ability to administer farm safety net programs",
+        "Supplemental and ad hoc Disaster Relief Programs (SDRP) overwhelming county offices — $16.09B distributed but processing capacity strained by volume",
+        "Conservation Reserve Program (CRP) enrollment declining due to high commodity prices making participation less attractive, undermining environmental conservation goals",
+        "Farm loan portfolio risk: FSA administering $30B+ in outstanding farm ownership and operating loans with aging servicing technology",
+        "Commodity program payment accuracy concerns: GAO and OIG findings on improper payments in ARC and PLC farm safety net programs",
+        "Emergency Assistance Program delivery delays: ELAP, LIP, and TAP applications backlogged at understaffed county offices during disaster events",
+        "Crop acreage reporting modernization incomplete: transition from paper-based reporting to digital systems hampered by connectivity issues in rural areas"
+      ],
+      "priorities": [
+        "$16.09B in Supplemental and ad hoc Disaster Relief Programs — IT systems, payment processing, and program administration contractor support",
+        "$30B+ farm loan portfolio servicing — loan origination technology, risk assessment tools, and portfolio management system modernization",
+        "MIDAS system remediation and enhancement — continuing IT modernization for crop acreage reporting, conservation program management, and farm records",
+        "Farmers.gov portal development — web platform modernization for online applications, account management, and document submission",
+        "Conservation Reserve Program technology — enrollment processing, compliance monitoring, and GIS-based acreage reporting systems",
+        "Farm safety net program administration (ARC/PLC) — payment calculation systems, eligibility verification, and program integrity monitoring technology",
+        "County office technology modernization — hardware, connectivity, and digital tools to replace paper-based processes across 2,100+ offices",
+        "Commodity program data analytics — yield data management, county-level payment estimates, and program participation tracking systems",
+        "Emergency program rapid deployment technology — mobile intake systems, satellite damage assessment, and expedited payment processing for disaster events",
+        "Farm records and producer identity management — system integration across FSA, NRCS, and RMA for unified producer profiles and cross-program eligibility"
+      ]
+    },
+    "National Telecommunications and Information Administration (NTIA)": {
+      "painPoints": [
+        "BEAD Program: $42.45B largest broadband investment in history — but 13 states/territories still awaiting Final Proposal approval as of January 2026, creating uneven deployment",
+        "Spectrum IT systems dating back decades require modernization — two contracts totaling $110M awarded December 2024, but as of March 2025 no task orders issued",
+        "GAO-25-107509: NTIA cloud access management policies do not fully define user privilege levels; system security plans not always current during spectrum IT modernization",
+        "Permitting bottlenecks: patchwork of local/state/federal permitting processes threatening BEAD deployment timelines; federal agencies lack staffing to process permits",
+        "GAO-24-106634: NTIA spectrum IT modernization planning did not fully incorporate leading practices, with gaps in cost estimation and schedule management",
+        "No agreed-upon timeline among federal agencies for submitting broadband project data to FCC maps, causing coordination failures across NTIA, USDA, FCC, and Treasury",
+        "States requesting guidance on BEAD non-deployment funds for workforce development and barrier removal — NTIA guidance not expected until early 2026",
+        "Digital Equity Act implementation alongside BEAD creating parallel administrative burden on state broadband offices with limited capacity",
+        "National Spectrum Strategy implementation behind schedule — long-term planning process not expected until September 2026",
+        "Broadband workforce shortage affecting 41 states — insufficient fiber technicians, tower climbers, and network engineers for BEAD deployment",
+        "Build America Buy America (BABA) compliance creating supply chain delays and inflationary construction costs for broadband projects"
+      ],
+      "priorities": [
+        "$42.45B BEAD Program — the largest broadband infrastructure investment in U.S. history, with 43 of 56 state/territory Final Proposals approved as of January 2026",
+        "$110M in spectrum IT systems modernization contracts awarded December 2024 for cloud migration, cybersecurity upgrades, and interoperability improvements",
+        "$2.75B Digital Equity Act programs funding digital inclusion activities across all 50 states through FY2027",
+        "National Spectrum Strategy implementation — contractor support for spectrum analysis, interference modeling, and technology assessment",
+        "$1B+ Tribal Broadband Connectivity Program grants for broadband deployment on tribal lands — construction and equipment procurement contracts",
+        "Middle Mile Broadband Infrastructure Program ($980M) — fiber construction and network engineering contracts for open-access networks",
+        "Broadband workforce development initiatives addressing 41-state shortage of fiber technicians and network engineers",
+        "BEAD subgrantee monitoring and compliance — program management, financial oversight, and technical assistance across 56 jurisdictions",
+        "State Digital Equity Capacity Grant Program ($1.44B) — implementation and evaluation contracts through FY2027",
+        "Spectrum sharing technology development and testing — expanded commercial and government access to radio frequency spectrum"
+      ]
+    },
+    "Economic Development Administration (EDA)": {
+      "painPoints": [
+        "Tech Hubs Program received only $541M of the $10B authorized by CHIPS and Science Act — Congress appropriated just $41M in FY2024 despite $2B/year authorization",
+        "OIG found EDA does not always comply with its own disaster relief award policies — applications lacked documentation of nexus between projects and disaster impact",
+        "Staffing declined from 323 employees in 2023 to approximately 244 in September 2024, creating capacity constraints for oversight of $3B+ in active grants",
+        "First reauthorization in 20 years (December 2024) requires implementation of new programmatic requirements with limited staff capacity",
+        "FY2025 budget received historic $1.98B (323% increase from FY2024) creating massive grant management scaling challenges with reduced workforce",
+        "Build Back Better Regional Challenge ($1B) portfolio monitoring reveals implementation delays across 21 regional coalitions",
+        "Revolving Loan Fund program historically flagged by OIG for compliance issues — recommendations for changes to prevent fraud, waste, and abuse",
+        "Grants management system modernization needed to handle surge in applications and awards under reauthorized programs",
+        "Economic Adjustment Assistance program processing delays for disaster-impacted communities requiring clearer applicant guidance per OIG",
+        "Regional Innovation Strategies program requiring enhanced outcome tracking to demonstrate return on federal investment"
+      ],
+      "priorities": [
+        "$1.98B in FY2025 funding (323% increase) for economic development programs — immediate procurement and program management needs",
+        "$220M in FY2025 Tech Hubs funding for 19 designated hubs in semiconductors, biotech, AI, and clean energy — awards expected spring 2026",
+        "$500M from NDAA spectrum auction proceeds for Tech Hubs Program with up to $280M in future contingent funding",
+        "$1B Build Back Better Regional Challenge supporting 21 regional coalitions — implementation and monitoring contracts through FY2027",
+        "Public Works Program providing construction grants ($120M+ annually) for water systems, industrial parks, and technology centers",
+        "Economic Adjustment Assistance Program disaster grants for communities impacted by natural disasters, trade disruption, or economic dislocation",
+        "Good Jobs Challenge grants supporting workforce development partnerships between employers, training providers, and community organizations",
+        "Recompete Pilot Program ($200M) targeting persistently distressed communities for comprehensive economic development strategies",
+        "STEM Talent Challenge funding for regional STEM workforce development and innovation ecosystem building",
+        "EDA reauthorization implementation through FY2029 — guidance and rulemaking contracts for new programmatic requirements"
+      ]
+    },
+    "International Trade Administration (ITA)": {
+      "painPoints": [
+        "GAO-24-106747: 54% of Global Markets staff rated human capital management as 'poor' or 'unsatisfactory' — vacancies in HR leave Foreign Commercial Service employees without support",
+        "GAO-23-105369: Global Markets has limited funding increases, decreasing workforce, undocumented staffing procedures, and no comprehensive workforce plan",
+        "Proposed FY2026 budget cuts ITA by 31.3% ($191M reduction) — Global Markets facing $194.2M cut and loss of 365 FTEs",
+        "ITA's share of federal budget has declined over four decades despite strategic importance of global trade and supply chain security reaching historic highs",
+        "Divided organizational purpose and weak brand identity in Global Markets unit per GAO findings on organizational structure",
+        "Over 700 active antidumping and countervailing duty (AD/CVD) orders requiring administration amid expanding unfair trade practices",
+        "Foreign Commercial Service staffing gaps in key overseas markets creating delays in commercial advocacy and export promotion",
+        "Trade data systems requiring modernization — Steel and Aluminum Import Monitoring systems need upgrades for evolving enforcement",
+        "Growing complexity of trade enforcement against circumvention of AD/CVD orders through transshipment and third-country assembly",
+        "SelectUSA program managing increased demand for foreign direct investment facilitation without proportional staffing increases",
+        "Enforcement and Compliance workload expansion: new trade remedy petitions growing faster than staffing capacity"
+      ],
+      "priorities": [
+        "$611M in FY2025 direct appropriations plus $12M in user fees — maintaining trade promotion and enforcement operations",
+        "$16.4M for China AD/CVD enforcement and compliance activities in FY2026 — trade enforcement contractor support",
+        "Enforcement and Compliance unit receiving $6M increase and 57 additional FTEs in FY2026 for trade remedy and anti-circumvention investigations",
+        "Senate committee proposing $795M for trade-related agencies — $146M above President's request signaling congressional support",
+        "Global Scrap Monitor program for supply chain transparency of steel and aluminum imports — data analytics and monitoring technology",
+        "SelectUSA program facilitating foreign direct investment — annual Summit and year-round services with event management and economic analysis contracts",
+        "Industry & Analysis unit trade data and industry assessments supporting trade policy — research and analytical services contracts",
+        "Global Markets commercial diplomacy across 80+ international offices — local staff support and facility management contracts",
+        "Trade enforcement technology modernization — import monitoring systems and AD/CVD case management platform upgrades",
+        "Interagency Trade Enforcement Center coordination — legal and analytical support services for investigating unfair trade practices"
+      ]
+    },
+    "Bureau of Industry and Security (BIS)": {
+      "painPoints": [
+        "GAO-25-107431: BIS has not assessed long-term workforce needs despite 250%+ increase in export license applications (14,966 in 2006 to 38,398 in 2023)",
+        "GAO-25-107386: Semiconductor fabricators face significant compliance challenges with advanced computing IC export controls",
+        "Export license application backlog as BIS paused processing of all new applications during policy review, creating industry uncertainty",
+        "BIS does not provide interagency review partners ready access to all relevant export license information across multiple systems",
+        "Workforce doubled from 403 to 585 positions (FY2013-FY2024) but 60% of funding increase came from unsustainable Ukraine supplemental appropriation",
+        "Entity List management complexity growing exponentially with China, Russia, and emerging technology restrictions requiring continuous updates",
+        "Escalating export enforcement cases contributing to longer license processing times affecting legitimate commercial transactions",
+        "AI and emerging technology export controls creating novel classification challenges existing ECCN categories were not designed to address",
+        "Limited Export Control Officer presence globally — insufficient footprint for end-use checks in high-risk jurisdictions",
+        "SNAP-R and IMS-R IT systems not designed for current application volumes — legacy platforms limiting efficiency of license processing",
+        "Rapid evolution of semiconductor and AI technology outpacing regulatory update cycles creating exploitation gaps"
+      ],
+      "priorities": [
+        "$303M requested in FY2026 discretionary appropriation plus $239.2M in defense-related activities — $121.8M increase from FY2025",
+        "$106M and 226 new positions to increase Export Enforcement Agents domestically and more than double Export Control Officer presence globally",
+        "$6M and 19 positions for specialized engineers focused on controlling sensitive technologies and supporting semiconductor/AI export controls",
+        "Advanced semiconductor export control implementation — compliance infrastructure, training, and due diligence frameworks for foundries and equipment manufacturers",
+        "Entity List enforcement and compliance monitoring for 600+ listed entities — investigation and forensic technology contracts",
+        "SNAP-R and IMS-R export licensing IT system modernization to handle 38,000+ annual applications and improve interagency information sharing",
+        "AI diffusion rule implementation establishing tiered access framework for advanced computing exports — compliance monitoring and technology assessment contracts",
+        "Deemed export enforcement for universities and research institutions — outreach and compliance support for controlled technology access",
+        "End-use monitoring and post-shipment verification programs in key diversion risk countries",
+        "Chemical weapons, biological weapons, and missile technology export control enforcement alongside expanded semiconductor/AI controls"
+      ]
+    },
+    "Commodity Futures Trading Commission": {
+      "painPoints": [
+        "Legacy market surveillance system dating back to the 1990s required complete replacement — CFTC adopting Nasdaq Market Surveillance for first-ever automated alerts and cross-market analytics",
+        "FISMA audit findings: OIG completed FY2023 and FY2024 audits identifying cybersecurity compliance gaps in information security programs",
+        "Budget constraints: $410M and 650 FTE requested for FY2026 (12.3% increase) still insufficient for expanding jurisdiction into digital assets and crypto spot markets",
+        "Cryptocurrency regulatory gap: CFTC and SEC launched Joint 'Project Crypto' initiative (January 2026) but lack statutory authority for comprehensive digital asset oversight",
+        "Market data surveillance technology lagging innovation — swap data reporting unable to keep pace with DeFi, tokenized assets, and algorithmic trading",
+        "Workforce expertise gap in blockchain, AI/ML, and digital asset technology needed for rapidly evolving crypto and fintech derivatives markets",
+        "Bespoke batch-and-send regulatory reporting creating inefficiencies compared to potential real-time DLT-based reporting capabilities",
+        "Cross-market manipulation detection challenges as crypto markets operate 24/7 globally while CFTC surveillance capabilities remain limited",
+        "LabCFTC innovation initiatives insufficiently resourced to evaluate emerging RegTech solutions",
+        "Outdated databases for trade data storage and analysis hindering detection of sophisticated cross-market manipulation schemes"
+      ],
+      "priorities": [
+        "$410M total budget requested for FY2026 with 650 FTE for oversight of futures, swaps, options, and emerging digital asset markets",
+        "Nasdaq Market Surveillance technology deployment providing automated alerts and cross-market analytics across all CFTC operating divisions",
+        "Project Crypto joint SEC-CFTC initiative — technology infrastructure, rulemaking support, and market analysis contracts for digital asset regulation",
+        "Enterprise analytics and AI/ML capabilities development — technology development and data science contractor support",
+        "Tokenized collateral framework rulemaking — blockchain-based collateral and novel derivatives products including perpetual contracts",
+        "LabCFTC fintech innovation engagement — RegTech evaluation for improved market oversight efficiency",
+        "Swap data repository oversight and standardization — technology modernization for trade reporting, position monitoring, and systemic risk detection",
+        "Cybersecurity and physical security infrastructure upgrades aligned with FISMA requirements",
+        "Market integrity enforcement technology — fraud, manipulation, and spoofing detection across derivatives and digital asset markets",
+        "International regulatory coordination technology — information sharing with foreign regulators on cross-border trading and manipulation"
+      ]
+    },
+    "National Archives and Records Administration": {
+      "painPoints": [
+        "FY2026 budget cut to $414.7M — nearly $60M less than FY2025 projected spending and $93M less than FY2024, with 136 FTE positions eliminated",
+        "Electronic Records Initiative (ERI) budget cut by 33% in FY2026, receiving 56% less than 2007 funding levels despite exponential growth in federal electronic records",
+        "FOIA declassification backlog: 183M pages at Bush Library and 128M at Obama Library — capacity to declassify only 500,000 pages/year means 622 years to clear backlog",
+        "National Declassification Center has only 58 employees with just 8 FOIA/MDR staff — more presidential libraries than declassifiers",
+        "ERA 2.0 (Electronic Records Archives) deployment plagued by bugs — roughly 2,000 of 104,000 migrated forms affected, with deployment delayed per OIG audit",
+        "Digitization goal of 500M pages by September 2026 only 40% complete (200M pages as of August 2025), requiring massive acceleration",
+        "29% of federal agencies did NOT meet July 2024 deadline for managing permanent records electronically",
+        "OIG Audit Report 25-AUD-05 examining Research Room Activities — physical security and access management concerns across NARA locations",
+        "Former Archivist raising red flags over cuts threatening mission failure — inability to properly collect, store, process, and provide public access to records",
+        "Federal Records Centers storing 30M cubic feet (87 billion pages) face physical capacity constraints while managing electronic transition",
+        "Legacy ERA system maintenance costs continuing as ERA 2.0 deployment delays create dual-system operational burden"
+      ],
+      "priorities": [
+        "$20M Digitization Center at Archives II with text-scanning equipment and sensitive cameras, targeting 500M pages by September 2026",
+        "ERA 2.0 cloud-based electronic records system handling 900+ terabytes — development and migration contracts for records from White House, Congress, and agencies",
+        "Enterprise IAM solution, Cloud Access Security Broker, and Login.gov phishing-resistant MFA implementation for NARA applications",
+        "2026 Annual Move transferring 9,000+ Transfer Requests from Federal Records Centers to archival custodial units — logistics and processing contracts",
+        "Federal Records Centers Program managing 30M cubic feet across 18 facilities — storage, retrieval, and disposition services",
+        "Presidential libraries (15 locations) — facility management, public access services, and FOIA processing support",
+        "Electronic records processing infrastructure for 2,000+ series comprising 800M+ unique files and 400+ terabytes from 100+ agencies",
+        "NHPRC grants supporting documentary heritage preservation at state and local archives — $8M+ annual grant program",
+        "Cybersecurity infrastructure including zero trust architecture, endpoint detection, and cloud security for classified and unclassified systems",
+        "Records management guidance and training for federal agencies transitioning to fully electronic records under M-19-21 and M-23-07"
+      ]
+    },
+    "Court Services and Offender Supervision Agency": {
+      "painPoints": [
+        "Offender Case Management System (OCMS) aging — requires modernization for predictive analytics, AI/ML risk modeling, and real-time supervision compliance tracking",
+        "FY2024 caseload: Pretrial Services Agency served 27,188 arrestees and supervised 15,676 defendants on pretrial release with limited technology automation",
+        "GPS monitoring infrastructure requires continuous technology refresh as tracking hardware evolves faster than procurement cycles",
+        "AI compliance requirements under OMB M-25-21 mandate CSOSA develop AI governance plans despite being a small independent agency with limited IT staff",
+        "Community supervision officer recruitment and retention challenges competing with higher-paying federal law enforcement in DC metro area",
+        "Drug testing laboratory operations requiring continuous accreditation maintenance and technology updates for evolving substance detection protocols",
+        "Reentry program coordination gaps between CSOSA supervision, BOP release planning, and DC community-based service providers",
+        "Budget uncertainty as a DC-specific federal agency vulnerable to both DC home rule politics and federal appropriations cycles",
+        "Substance abuse and mental health treatment capacity constraints — waitlists for cognitive-behavioral interventions",
+        "Data sharing limitations between CSOSA, Metropolitan Police, DC Superior Court, and U.S. Parole Commission creating incomplete risk profiles",
+        "Physical office infrastructure at multiple DC locations requiring security upgrades and ADA compliance modernization"
+      ],
+      "priorities": [
+        "Community Supervision Program and Pretrial Services Agency combined budget supporting supervision of DC offender and defendant populations",
+        "GPS and electronic monitoring technology — ankle bracelet hardware, cellular-based tracking, and real-time alert systems for high-risk supervisees",
+        "OCMS modernization with AI, machine learning, and predictive analytics for evidence-based supervision strategies",
+        "Drug testing and substance abuse monitoring — laboratory operations, rapid testing supplies, and chain-of-custody management technology",
+        "Reentry and Sanctions Center (Karrick Hall) operations — residential treatment, cognitive behavioral programs, and transitional services",
+        "AI governance and compliance implementation under OMB M-25-21 — technology assessment, policy development, and training contracts",
+        "Community-based treatment partnerships — substance abuse, mental health, sex offender treatment, and employment assistance contracts",
+        "IT infrastructure modernization — cybersecurity upgrades, cloud migration, mobile workforce technology, and data analytics platforms",
+        "Risk assessment instrument development and validation research for evidence-based pretrial release and supervision decisions",
+        "Training and professional development for Community Supervision Officers and Pretrial Services Officers in specialized techniques"
+      ]
     }
   }
 }
