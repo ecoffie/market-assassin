@@ -608,14 +608,21 @@ export async function POST(request: NextRequest) {
               getUrgencyLevel(opp) === 'high'
             ).length,
           },
-          recommendations: [
-            'Contact SBLOs immediately - December is "use it or lose it" month',
-            'Focus on opportunities with high unobligated balances',
-            'Prepare quick-turnaround capability statements',
-            'Emphasize your set-aside certifications for fast-track opportunities',
-            'Request 15-minute intro calls this week',
-            'Monitor SAM.gov daily for new postings',
-          ],
+          recommendations: (() => {
+            const month = new Date().toLocaleString('default', { month: 'long' });
+            const isQ4 = [7, 8, 9].includes(new Date().getMonth()); // Jul-Sep = fiscal Q4
+            const urgencyNote = isQ4
+              ? `Contact SBLOs immediately - ${month} is "use it or lose it" season for unspent funds`
+              : `Contact SBLOs now - agencies are planning ${month} acquisitions`;
+            return [
+              urgencyNote,
+              'Focus on opportunities with high unobligated balances',
+              'Prepare quick-turnaround capability statements',
+              'Emphasize your set-aside certifications for fast-track opportunities',
+              'Request 15-minute intro calls this week',
+              'Monitor SAM.gov daily for new postings',
+            ];
+          })(),
         };
       })(),
       tribalContracting,

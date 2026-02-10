@@ -3203,6 +3203,12 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
   const [loadingHitList, setLoadingHitList] = useState(true);
   const hitListStats = getHitListStats();
 
+  // Dynamic month/quarter labels
+  const now = new Date();
+  const currentMonth = now.toLocaleString('default', { month: 'long' });
+  const fiscalQuarter = now.getMonth() >= 9 ? 'Q1' : now.getMonth() >= 6 ? 'Q4' : now.getMonth() >= 3 ? 'Q3' : 'Q2';
+  const spendLabel = `${fiscalQuarter} Spend`;
+
   // Fetch combined hit list on mount
   useEffect(() => {
     async function loadHitList() {
@@ -3229,7 +3235,7 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
         </h3>
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-slate-800/50 rounded-lg p-3">
-            <p className="text-sm text-amber-400">Total Q4 Spend</p>
+            <p className="text-sm text-amber-400">Total {spendLabel}</p>
             <p className="text-2xl font-bold text-amber-300">
               {formatCurrency(data.summary.totalQ4Spend)}
             </p>
@@ -3245,10 +3251,10 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
         </div>
       </div>
 
-      {/* December Hit List - Low Competition Contracts */}
+      {/* Monthly Hit List - Low Competition Contracts */}
       <div className="bg-emerald-500/10 border-2 border-emerald-500/50 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-emerald-300">🎯 December Hit List - Low Competition Contracts</h3>
+          <h3 className="text-xl font-bold text-emerald-300">🎯 {currentMonth} Hit List - Low Competition Contracts</h3>
           <span className="px-3 py-1 bg-emerald-500 text-white text-sm font-bold rounded-full">
             {hitListOpps.length} TOTAL
           </span>
