@@ -10,7 +10,9 @@
         "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) - model tampering, prompt injection, lifecycle security",
         "FY2026 NDAA: Procurement security framework (NIST/CMMC alignment) - contractor cybersecurity compliance",
         "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - domestic manufacturing capacity",
-        "FY2026 NDAA: Outbound investment controls - hypersonic technology and expanded country restrictions"
+        "FY2026 NDAA: Outbound investment controls - hypersonic technology and expanded country restrictions",
+        "JADC2 (Joint All-Domain Command and Control) - connecting sensors and shooters across all military domains",
+        "Workforce recruitment and retention - competing with private sector for cyber, AI, and engineering talent"
       ]
     },
     "Department of the Navy": {
@@ -19,7 +21,12 @@
         "Undersea warfare technology development",
         "Cybersecurity for naval systems",
         "Autonomous systems and unmanned vehicles",
-        "Port infrastructure resilience"
+        "Port infrastructure resilience",
+        "Workforce recruitment and retention - critical shortage of skilled shipbuilders and technicians",
+        "Shipbuilding industrial base capacity - inability to meet fleet size targets with current production rates",
+        "Contested logistics in Pacific theater - sustaining distributed maritime operations under threat",
+        "JADC2 naval integration - connecting Navy C2 systems with joint all-domain command and control",
+        "Energy resilience for installations - shore power modernization and fuel diversification"
       ]
     },
     "NAVFAC": {
@@ -31,7 +38,9 @@
         "Emergency response and disaster recovery",
         "FY2026 NDAA: Progressive design-build contract implementation - complex facility projects",
         "FY2026 NDAA: Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and smart water grids",
-        "FY2026 NDAA: Renewable energy integration - solar, wind, battery storage for installations"
+        "FY2026 NDAA: Renewable energy integration - solar, wind, battery storage for installations",
+        "Facility condition assessment technology - inspecting and prioritizing repairs across 70,000+ facilities",
+        "Cybersecurity for building control systems - protecting HVAC, utilities, and physical access networks"
       ]
     },
     "NAVSEA": {
@@ -40,7 +49,12 @@
         "Maintenance and repair optimization",
         "Digital transformation of shipyard operations",
         "Submarine and surface ship modernization",
-        "Supply chain management for ship components"
+        "Supply chain management for ship components",
+        "Workforce shortage - recruiting and retaining 50,000+ civilian employees across four public shipyards",
+        "Nuclear propulsion sustainment - maintaining reactor systems for carrier and submarine fleets",
+        "Combat systems cybersecurity - protecting weapon and sensor systems from nation-state threats",
+        "Acquisition reform and speed - accelerating contract timelines for urgent fleet readiness needs",
+        "Industrial base capacity constraints - private shipyard throughput limits delaying new construction and repairs"
       ]
     },
     "NAVWAR": {
@@ -49,7 +63,12 @@
         "Network modernization and 5G integration",
         "Command and control systems",
         "Electronic warfare systems",
-        "Data analytics and AI for naval operations"
+        "Data analytics and AI for naval operations",
+        "Zero-trust implementation for naval networks - transitioning fleet-wide to ZTA under DoD mandate",
+        "Spectrum management - contested electromagnetic environment and spectrum sharing challenges",
+        "Cloud infrastructure for fleet operations - delivering secure cloud at the tactical edge",
+        "Software factory and DevSecOps - accelerating software delivery for warfighter systems",
+        "Workforce digital skills gaps - recruiting cyber and software talent in competition with private sector"
       ]
     },
     "NAVAIR": {
@@ -60,7 +79,10 @@
         "Training systems and simulators",
         "Aircraft carrier integration",
         "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - maritime UAS capabilities",
-        "FY2026 NDAA: Counter-UAS (C-UAS) systems for base and ship defense"
+        "FY2026 NDAA: Counter-UAS (C-UAS) systems for base and ship defense",
+        "Propulsion system sustainment - maintaining legacy and advanced engine programs across fleet",
+        "Digital engineering and model-based systems - accelerating design-to-production timelines",
+        "Workforce technical skills pipeline - recruiting engineers and technicians for aviation depot work"
       ]
     },
     "USACE": {
@@ -72,7 +94,10 @@
         "Military construction and base support (MILCON offices only)",
         "Emergency response and disaster recovery (All offices)",
         "FY2026 NDAA: Progressive design-build contract implementation - complex infrastructure projects",
-        "FY2026 NDAA: Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and water resilience (MILCON offices)"
+        "FY2026 NDAA: Energy Resilience and Conservation Investment Program (ERCIP) - microgrids and water resilience (MILCON offices)",
+        "Dam safety and rehabilitation - inspecting and repairing aging flood control infrastructure",
+        "Digital project management - BIM, GIS integration, and digital twin technology for construction",
+        "Permitting and regulatory compliance - streamlining Section 404 and NEPA environmental reviews"
       ],
       "see_also": "bootcamp/usace-office-specific-pain-points.json"
     },
@@ -84,7 +109,10 @@
         "Training and simulation systems",
         "Supply chain and logistics optimization",
         "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - ground force UAS capabilities",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) for tactical systems"
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) for tactical systems",
+        "Contested logistics in Indo-Pacific - pre-positioning and sustainment under anti-access/area denial threats",
+        "Workforce recruitment and retention - filling critical civilian and uniformed technical positions",
+        "Autonomous systems integration - deploying robotic combat vehicles and unmanned ground systems"
       ]
     },
     "Army Materiel Command": {
@@ -94,7 +122,11 @@
         "Portfolio Acquisition Executive (PAE) transition - implementing 6 new capability area leaders by Jan 2026",
         "Sustainment enterprise consolidation - restructuring Joint Munitions Command and Army Sustainment Command",
         "Long-range precision fires and air defense modernization",
-        "Industry investment disincentives - broken procurement behaviors limiting growth"
+        "Industry investment disincentives - broken procurement behaviors limiting growth",
+        "Supply chain resilience - securing critical munitions and parts supply lines against disruption",
+        "Cybersecurity for logistics systems - protecting enterprise resource planning and supply chain networks",
+        "Depot maintenance modernization - recapitalizing aging equipment and tooling at Army depots",
+        "Technology insertion for legacy systems - integrating modern sensors and electronics into fielded platforms"
       ]
     },
     "Army Contracting Command": {
@@ -116,7 +148,10 @@
         "Base infrastructure and facilities",
         "Advanced training and simulation",
         "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - air force UAS capabilities",
-        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) for air and space systems"
+        "FY2026 NDAA: AI/ML security policy implementation (180-day mandate) for air and space systems",
+        "Pilot and maintainer shortage - addressing critical workforce gaps in aviation and technical fields",
+        "Collaborative Combat Aircraft (CCA) integration - autonomous wingman drone fleet development",
+        "Aging infrastructure at legacy bases - $33B+ backlog in facility recapitalization"
       ]
     },
     "Air Force Materiel Command": {
@@ -127,7 +162,10 @@
         "Advanced nuclear modernization - B-21, Sentinel, Long-Range Standoff programs",
         "Next-Generation Air Dominance and Collaborative Combat Aircraft investment",
         "Digital Materiel Management transformation",
-        "Program management flexibility and accountability reforms"
+        "Program management flexibility and accountability reforms",
+        "Software-defined capabilities - transitioning from hardware-centric to software-driven weapon systems",
+        "Depot-level maintenance surge capacity - meeting increased aircraft readiness demands",
+        "Contested logistics planning - sustaining air operations under denied and degraded conditions"
       ]
     },
     "Air Force Sustainment Center": {
@@ -137,7 +175,11 @@
         "Workforce development and training - attracting high-caliber talent",
         "Facility modernization at Tinker, Hill, and Robins AFBs",
         "Process improvement and lean manufacturing",
-        "Aging aircraft fleet sustainment challenges"
+        "Aging aircraft fleet sustainment challenges",
+        "Digital twin technology for aircraft - predictive maintenance and lifecycle modeling",
+        "Cybersecurity for maintenance systems - protecting depot IT/OT networks from intrusion",
+        "Supply chain visibility - real-time parts tracking and demand forecasting across global network",
+        "Additive manufacturing and 3D printing - reducing lead times for obsolete and hard-to-source parts"
       ]
     },
     "Marine Corps Systems Command": {
@@ -147,7 +189,11 @@
         "Tactical communications and electromagnetic warfare systems",
         "Combat support systems acquisition and sustainment",
         "Training systems and simulation modernization",
-        "Small business contracting across specialized technical areas"
+        "Small business contracting across specialized technical areas",
+        "Contested logistics capability - sustaining distributed forces in austere Pacific island environments",
+        "Cyber operations integration - embedding offensive and defensive cyber into ground combat units",
+        "Rapid acquisition for urgent operational needs - accelerating fielding timelines for emerging threats",
+        "Force Design 2030 modernization - divesting legacy systems and acquiring next-gen capabilities for littoral operations"
       ]
     },
     "Space Systems Command": {
@@ -168,7 +214,12 @@
         "Telehealth and virtual care expansion",
         "Claims processing automation",
         "IT infrastructure modernization",
-        "Veteran homelessness prevention"
+        "Veteran homelessness prevention",
+        "Mental health services expansion - addressing growing demand for PTSD, suicide prevention, and substance abuse treatment",
+        "Supply chain for medical facilities - procurement of pharmaceuticals, medical devices, and prosthetics",
+        "Facility construction and renovation backlog - $50B+ in deferred maintenance across 1,300+ healthcare sites",
+        "Cybersecurity for health records - protecting 9M+ veteran patient records from breaches",
+        "Workforce hiring and retention - filling 50,000+ vacancies in clinical and administrative positions"
       ]
     },
     "Department of Homeland Security": {
@@ -177,7 +228,12 @@
         "Cybersecurity for critical infrastructure",
         "Emergency response and preparedness",
         "Biometric identification systems",
-        "Counter-terrorism technology"
+        "Counter-terrorism technology",
+        "Immigration processing systems - modernizing asylum, visa, and case management backlogs",
+        "Supply chain security - cargo screening and trade facilitation at ports of entry",
+        "Workforce training and development - upskilling 240,000+ employees across 22 component agencies",
+        "Climate-related disaster frequency - scaling FEMA response capacity for increasing natural disasters",
+        "Critical infrastructure resilience - protecting 16 sectors from cyber and physical threats"
       ]
     },
     "U.S. Customs and Border Protection": {
@@ -186,7 +242,12 @@
         "Port of entry modernization",
         "Biometric entry/exit systems",
         "Cargo screening and inspection technology",
-        "Data analytics for threat detection"
+        "Data analytics for threat detection",
+        "Autonomous surveillance systems - deploying drones, sensors, and AI for remote border monitoring",
+        "Trade facilitation technology - automating customs declarations and trusted trader processing",
+        "Workforce recruitment - filling critical vacancies for Border Patrol agents and CBP officers",
+        "Fentanyl detection technology - advanced scanning and chemical detection for synthetic opioids",
+        "Trusted traveler program modernization - upgrading Global Entry, NEXUS, and SENTRI systems"
       ]
     },
     "U.S. Coast Guard": {
@@ -208,7 +269,12 @@
         "IT acquisition and cloud services",
         "Fleet vehicle electrification",
         "Workplace modernization and hybrid work support",
-        "Supply chain and procurement optimization"
+        "Supply chain and procurement optimization",
+        "Cybersecurity for government-wide shared systems - protecting Login.gov, SAM.gov, and other platforms",
+        "Shared services modernization - consolidating HR, finance, and IT services across federal agencies",
+        "FedRAMP acceleration - reducing authorization timelines for cloud service providers",
+        "Acquisition policy modernization - updating MAS and GWAC vehicles for emerging technologies",
+        "Data center consolidation - meeting OMB targets for reducing federal data center footprint"
       ]
     },
     "NASA": {
@@ -217,7 +283,12 @@
         "Earth observation and climate monitoring",
         "Aeronautics research and development",
         "IT infrastructure and cybersecurity",
-        "Facility modernization and maintenance"
+        "Facility modernization and maintenance",
+        "Artemis program supply chain - managing complex multi-contractor dependencies for lunar missions",
+        "Commercial crew and cargo partnerships - overseeing private sector space transportation services",
+        "Workforce STEM pipeline - recruiting next-generation engineers and scientists amid industry competition",
+        "Planetary defense systems - developing NEO detection and deflection capabilities",
+        "Space debris tracking and mitigation - monitoring 27,000+ tracked objects in Earth orbit"
       ]
     },
     "Department of Energy": {
@@ -227,7 +298,11 @@
         "Nuclear security and non-proliferation",
         "Cybersecurity for energy infrastructure",
         "Environmental cleanup and remediation",
-        "FY2026 NDAA: BIOSECURE Act compliance - biotechnology research programs (if applicable)"
+        "FY2026 NDAA: BIOSECURE Act compliance - biotechnology research programs (if applicable)",
+        "AI for energy grid management - deploying machine learning for load balancing and outage prediction",
+        "Workforce development - training next-generation nuclear and clean energy technicians",
+        "Supply chain for critical minerals - securing domestic sources of lithium, cobalt, and rare earth elements",
+        "Quantum computing research - advancing quantum advantage for energy modeling and materials science"
       ]
     },
     "NNSA": {
@@ -284,7 +359,12 @@
         "Healthcare IT modernization",
         "Biomedical research infrastructure",
         "Emergency preparedness and response",
-        "Cybersecurity for health data"
+        "Cybersecurity for health data",
+        "Pandemic preparedness stockpile - maintaining and modernizing Strategic National Stockpile inventory",
+        "Health equity data infrastructure - collecting and analyzing disparities data across populations",
+        "Opioid crisis response - technology for prescription monitoring and treatment program management",
+        "Behavioral health infrastructure - expanding telehealth and digital tools for mental health services",
+        "Medicare and Medicaid fraud prevention - AI-driven detection of improper payments across $1.5T+ in spending"
       ]
     },
     "NIH": {
@@ -350,7 +430,12 @@
         "Cybersecurity and IT modernization",
         "Trade and economic data systems",
         "Broadband infrastructure deployment",
-        "Intellectual property protection"
+        "Intellectual property protection",
+        "CHIPS Act semiconductor manufacturing support - administering $52B+ for domestic chip production",
+        "Export control modernization - updating systems for emerging technology restrictions",
+        "Supply chain resilience data - building analytics platforms for critical industry monitoring",
+        "AI governance frameworks - developing standards and policy for responsible AI deployment",
+        "Spectrum management - coordinating commercial and federal frequency allocation"
       ]
     },
     "NOAA": {
@@ -395,7 +480,12 @@
         "Transportation safety systems",
         "Electric vehicle infrastructure",
         "Aviation safety and modernization",
-        "Smart transportation technologies"
+        "Smart transportation technologies",
+        "Supply chain bottleneck analysis - freight flow data systems and port congestion monitoring",
+        "Autonomous vehicle regulation - developing safety standards and testing frameworks for self-driving vehicles",
+        "Cybersecurity for transportation systems - protecting air traffic control, rail signaling, and pipeline SCADA",
+        "Climate resilience for infrastructure - adapting roads, bridges, and transit to extreme weather events",
+        "Multimodal freight optimization - integrating rail, truck, air, and maritime logistics data"
       ]
     },
     "FAA": {
@@ -455,7 +545,9 @@
         "IT infrastructure modernization",
         "FY2026 NDAA: BIOSECURE Act compliance - vetting biotechnology suppliers and equipment",
         "FY2026 NDAA: Replacement of prohibited biotechnology systems and medical equipment",
-        "FY2026 NDAA: Alternative supplier identification for critical biotech capabilities"
+        "FY2026 NDAA: Alternative supplier identification for critical biotech capabilities",
+        "Mental health and behavioral services - expanding programs for 9.6M+ military health beneficiaries",
+        "Medical logistics and supply chain - pharmaceutical distribution and medical device lifecycle management"
       ]
     },
     "Defense Logistics Agency": {
@@ -542,7 +634,230 @@
         "FY2026 NDAA: Outbound investment controls - hypersonic technology export restrictions",
         "FY2026 NDAA: Small UAS industrial base expansion (SkyFoundry Program) - advanced UAS research"
       ]
+    },
+    "Department of the Treasury": {
+      "painPoints": [
+        "IRS modernization - $80B+ investment in taxpayer services, IT systems, and enforcement technology",
+        "Financial systems consolidation - migrating legacy mainframe systems to cloud-based platforms",
+        "Tax processing automation - reducing manual processing of 150M+ annual returns",
+        "Fraud detection and prevention - AI-driven analytics for tax evasion and identity theft",
+        "Sanctions enforcement technology - OFAC screening systems for global financial transactions",
+        "Cybersecurity for financial infrastructure - protecting Treasury payment systems processing $5T+ annually",
+        "BSA/AML compliance technology - Bank Secrecy Act reporting and suspicious activity monitoring",
+        "Cloud migration and data center consolidation - modernizing Treasury's IT footprint",
+        "Data analytics for economic policy - real-time economic monitoring and forecasting platforms",
+        "Customer service modernization - reducing IRS call wait times and expanding digital services"
+      ]
+    },
+    "Environmental Protection Agency": {
+      "painPoints": [
+        "PFAS contamination cleanup - nationwide remediation of per- and polyfluoroalkyl substances in water and soil",
+        "Air quality monitoring modernization - upgrading sensor networks and real-time emissions tracking",
+        "Water infrastructure grants - administering $50B+ for lead pipe replacement and treatment upgrades",
+        "Environmental data systems - consolidating 100+ databases into unified monitoring platforms",
+        "Superfund remediation acceleration - addressing 1,300+ contaminated sites with growing cleanup backlog",
+        "Climate change programs - greenhouse gas monitoring, reporting, and reduction technology",
+        "Environmental justice initiatives - deploying monitoring and enforcement in overburdened communities",
+        "Laboratory modernization - upgrading analytical capabilities for emerging contaminants",
+        "Regulatory compliance technology - digital permitting, reporting, and inspection systems",
+        "Chemical risk assessment - TSCA implementation requiring evaluation of thousands of chemicals"
+      ]
+    },
+    "Department of the Interior": {
+      "painPoints": [
+        "Wildfire management technology - predictive modeling, detection systems, and suppression coordination",
+        "Land management systems modernization - digitizing records for 245M+ acres of public lands",
+        "Tribal programs and self-governance - IT systems for trust responsibilities and tribal consultation",
+        "National park infrastructure - $22B+ deferred maintenance backlog across 400+ park units",
+        "Water resource management - dam safety, irrigation systems, and drought response in western states",
+        "Energy leasing modernization - streamlining oil, gas, and renewable energy permitting on federal lands",
+        "Wildlife conservation technology - endangered species monitoring, habitat mapping, and anti-poaching systems",
+        "Dam safety and rehabilitation - addressing aging infrastructure at Bureau of Reclamation facilities",
+        "Cultural resource preservation - digitizing and protecting archaeological and historical records",
+        "GIS and geospatial systems - enterprise mapping platforms for multi-bureau land management"
+      ]
+    },
+    "Department of Agriculture": {
+      "painPoints": [
+        "Food safety modernization - FSIS inspection technology and pathogen detection systems",
+        "Rural broadband deployment - administering $65B+ for last-mile connectivity in underserved areas",
+        "Crop insurance systems - modernizing risk management platforms serving 1.1M+ policies",
+        "Forest management technology - wildfire prediction, fuels management, and reforestation tracking",
+        "Conservation program delivery - digital platforms for CRP, EQIP, and other stewardship programs",
+        "Supply chain resilience - agricultural supply chain monitoring and disruption early warning",
+        "IT modernization across 29 agencies - consolidating disparate systems under USDA",
+        "Agricultural research technology - modernizing ARS laboratories and data sharing platforms",
+        "Nutrition program delivery - SNAP, WIC, and school meals systems serving 40M+ participants",
+        "Animal health surveillance - early detection systems for avian flu, African swine fever, and emerging diseases"
+      ]
+    },
+    "Department of Education": {
+      "painPoints": [
+        "Student loan servicing - managing $1.7T+ portfolio across multiple servicers with system integration challenges",
+        "FAFSA modernization - simplifying federal student aid application after troubled 2024 rollout",
+        "Data privacy and security - protecting 42M+ student borrower records under FERPA and cybersecurity mandates",
+        "IT infrastructure modernization - legacy systems supporting financial aid processing and compliance",
+        "Civil rights enforcement technology - case management and investigation systems for OCR",
+        "K-12 technology grants - administering E-Rate, Title I, and IDEA technology funding to schools",
+        "Education research platforms - modernizing NCES data collection and IES research infrastructure",
+        "Accessibility compliance - Section 508 and ADA compliance across digital platforms",
+        "Grant management systems - processing $70B+ in annual discretionary and formula grants",
+        "Special education data systems - IDEA reporting and compliance monitoring across states"
+      ]
+    },
+    "Department of Labor": {
+      "painPoints": [
+        "Unemployment insurance modernization - replacing decades-old COBOL-based state systems",
+        "Workplace safety technology (OSHA) - inspection management, hazard tracking, and compliance systems",
+        "Workforce development systems - job training program management under WIOA",
+        "Pension and benefits administration - EBSA oversight of $12T+ in private retirement assets",
+        "Wage enforcement technology - WHD investigation tools for minimum wage and overtime compliance",
+        "Job training platforms - expanding apprenticeship.gov and career pathways digital tools",
+        "Labor statistics modernization - BLS survey methodology and real-time economic data collection",
+        "Mine safety systems (MSHA) - underground monitoring, inspection technology, and emergency communications",
+        "Workers' compensation IT - OWCP claims processing for federal employee injury programs",
+        "Apprenticeship program technology - digital registration, tracking, and employer engagement platforms"
+      ]
+    },
+    "Small Business Administration": {
+      "painPoints": [
+        "Disaster loan processing - reducing application-to-disbursement times after surge events",
+        "8(a) program management - certification, annual review, and business development tracking systems",
+        "SBIR/STTR grant systems - managing $4B+ in annual small business innovation research awards",
+        "Lender portal modernization - upgrading systems for 7(a) and 504 loan program partners",
+        "Size standards verification - automated determination of small business eligibility",
+        "Contracting assistance platforms - modernizing subcontracting.net and procurement scorecards",
+        "SBA.gov modernization - digital services for small business registration and resource access",
+        "Cybersecurity for borrower data - protecting financial records of millions of loan applicants",
+        "HUBZone certification systems - geospatial mapping and eligibility verification technology",
+        "Government-wide contracting data - FPDS integration and small business goaling analytics"
+      ]
+    },
+    "Office of Personnel Management": {
+      "painPoints": [
+        "USAJOBS modernization - improving federal hiring platform serving 500K+ job postings annually",
+        "Retirement services backlog - processing claims for 2.7M+ federal annuitants with 6-month average wait",
+        "Background investigation systems - post-NBIB transition to DCSA coordination and data sharing",
+        "Federal employee health benefits administration - managing FEHB marketplace for 8M+ enrollees",
+        "HR shared services modernization - USA Staffing and other platforms for agency hiring support",
+        "Cybersecurity for personnel data - protecting SF-86 records after 2015 breach impacting 22M+ records",
+        "Workforce planning analytics - data-driven federal hiring forecasting and skills gap analysis",
+        "Classification system modernization - updating GS system and position management tools",
+        "Employee training platforms - expanding USALearning and leadership development technology",
+        "Telework policy systems - digital tools for remote work management and productivity tracking"
+      ]
+    },
+    "Social Security Administration": {
+      "painPoints": [
+        "Disability claims processing - reducing 1.1M+ case backlog with average 6-month wait times",
+        "IT modernization - replacing 60M+ lines of COBOL running on decades-old mainframes",
+        "Fraud prevention technology - identity verification and overpayment detection for $1.4T+ in annual benefits",
+        "Phone and field office service - addressing 30M+ annual calls with 30+ minute average hold times",
+        "Online services expansion - migrating in-person transactions to my Social Security digital platform",
+        "Cybersecurity for beneficiary data - protecting PII of 70M+ Social Security recipients",
+        "Workload management - handling 6M+ new claims annually with declining workforce",
+        "Data center consolidation - modernizing computing infrastructure for mission-critical systems",
+        "Document management - digitizing and automating processing of 100M+ paper records",
+        "Overpayment recovery systems - improving accuracy and collection of $23B+ in improper payments"
+      ]
+    },
+    "Nuclear Regulatory Commission": {
+      "painPoints": [
+        "Reactor licensing modernization - updating regulatory framework for 93 operating commercial reactors",
+        "Cybersecurity for nuclear facilities - implementing 10 CFR 73.54 digital asset protection requirements",
+        "Advanced reactor review framework - developing licensing pathways for Gen IV and fusion designs",
+        "Spent fuel oversight - monitoring interim storage and transportation safety across 70+ sites",
+        "Emergency preparedness systems - modernizing radiological response coordination technology",
+        "Inspection technology - remote monitoring, data analytics, and risk-informed inspection tools",
+        "Digital instrumentation and controls qualification - approving digital I&C for safety-critical reactor systems",
+        "Environmental review modernization - streamlining NEPA compliance for new reactor applications",
+        "Small modular reactor licensing - NuScale, Kairos, and X-energy regulatory review acceleration",
+        "Decommissioning oversight - managing safe shutdown and cleanup of retired reactor sites"
+      ]
+    },
+    "Federal Communications Commission": {
+      "painPoints": [
+        "Broadband mapping accuracy - updating National Broadband Map with location-level deployment data",
+        "Spectrum management modernization - rebalancing allocations for 5G, satellite, and federal users",
+        "5G and 6G policy development - spectrum auctions, infrastructure rules, and security standards",
+        "Universal Service Fund modernization - reforming $8B+ annual fund for broadband, schools, and healthcare",
+        "Robocall enforcement - implementing STIR/SHAKEN and tracing illegal call campaigns",
+        "Cybersecurity regulation - network security requirements for telecommunications carriers",
+        "Emergency communications (911) modernization - transitioning PSAPs to Next Generation 911 (NG911)",
+        "Digital equity programs - administering BEAD and Digital Equity Act funding",
+        "Media regulation systems - modernizing licensing and compliance databases for broadcast and cable",
+        "Accessibility compliance technology - closed captioning, hearing aid compatibility, and relay service oversight"
+      ]
+    },
+    "Department of State": {
+      "painPoints": [
+        "Diplomatic security technology - protecting 270+ embassies and consulates with surveillance and access systems",
+        "IT modernization - consolidating legacy systems across global diplomatic network",
+        "Visa processing systems - reducing appointment backlogs and modernizing consular workflow technology",
+        "Cybersecurity for diplomatic communications - protecting classified networks from nation-state threats",
+        "Overseas facility construction - $2B+ annual capital program for embassy security upgrades",
+        "Consular services technology - passport processing, citizen services, and emergency notification systems",
+        "Foreign aid management - tracking and reporting on $60B+ in annual foreign assistance programs",
+        "Global communications infrastructure - modernizing secure voice, video, and data across 190+ countries",
+        "Records management - digitizing millions of diplomatic cables and classified documents",
+        "Workforce planning - recruiting and retaining Foreign Service and Civil Service talent in 170+ countries"
+      ]
+    },
+    "Department of Justice": {
+      "painPoints": [
+        "Law enforcement technology - FBI, DEA, and ATF investigative tools, biometrics, and forensic systems",
+        "Federal prison system modernization - BOP facility technology, communications monitoring, and healthcare IT",
+        "Cybercrime investigation tools - digital forensics, cryptocurrency tracing, and dark web analysis capabilities",
+        "Case management systems - unifying litigation tracking across 94 U.S. Attorney offices",
+        "Forensic laboratory technology - DNA analysis, ballistics, and digital evidence processing at FBI labs",
+        "Civil rights enforcement - investigation and compliance monitoring systems for voting, housing, and policing",
+        "Grant management (OJP) - administering $6B+ annually in state and local justice assistance",
+        "Immigration court systems - EOIR case processing for 3M+ pending cases with years-long backlogs",
+        "FOIA processing - automating Freedom of Information Act request handling across DOJ components",
+        "Data analytics for criminal justice - predictive policing alternatives, recidivism analysis, and sentencing data"
+      ]
+    },
+    "Department of Housing and Urban Development": {
+      "painPoints": [
+        "Housing voucher system modernization - upgrading Section 8 platforms serving 2.3M+ families",
+        "FHA loan processing - automating underwriting and claims for $1.3T+ insurance portfolio",
+        "Homelessness data systems - HMIS modernization and Continuum of Care coordination technology",
+        "Fair housing enforcement - complaint tracking, investigation management, and AI-assisted pattern detection",
+        "Community development grants - CDBG and HOME program reporting and compliance systems",
+        "Lead hazard reduction - tracking abatement progress and grant administration for lead-safe housing",
+        "Disaster recovery programs - CDBG-DR application processing and long-term recovery tracking",
+        "Public housing capital needs - modernizing systems for $70B+ backlog in physical improvement needs",
+        "Cybersecurity for financial systems - protecting FHA and Ginnie Mae transaction data",
+        "Environmental review systems - automating NEPA compliance for HUD-funded projects"
+      ]
+    },
+    "National Science Foundation": {
+      "painPoints": [
+        "Research grant management - modernizing systems processing 40,000+ proposals and $9B+ annually",
+        "Merit review modernization - improving peer review workflows for 250,000+ reviewer assignments",
+        "Research infrastructure investment - Major Research Equipment and Facilities Construction portfolio",
+        "Cybersecurity for research data - protecting intellectual property and sensitive research outputs",
+        "Cloud computing for research - enabling large-scale scientific computing and AI workloads",
+        "Data management and sharing - implementing OSTP public access policies for federally funded research",
+        "STEM education programs - digital platforms for K-12, undergraduate, and graduate STEM initiatives",
+        "International collaboration platforms - facilitating multi-national research partnerships securely",
+        "Research facilities construction - Antarctic program infrastructure, observatories, and field stations",
+        "Antarctic program logistics - McMurdo Station modernization and icebreaker fleet support"
+      ]
+    },
+    "Agency for International Development": {
+      "painPoints": [
+        "Foreign aid delivery systems - modernizing procurement and disbursement for $30B+ annual programs",
+        "Cybersecurity for global operations - protecting systems across 80+ country missions",
+        "Development finance modernization - DFC and USAID coordination for private sector investment",
+        "Humanitarian response technology - rapid deployment logistics and disaster relief coordination",
+        "Monitoring and evaluation platforms - real-time impact measurement for development programs",
+        "Supply chain for global health - vaccine, pharmaceutical, and medical supply distribution networks",
+        "Procurement modernization - simplifying acquisition processes for small and local partners",
+        "Workforce safety overseas - communication, tracking, and evacuation systems for staff in conflict zones",
+        "Data analytics for development - using AI and satellite imagery to target aid and measure outcomes",
+        "Climate adaptation programs - technology for climate-resilient agriculture, water, and infrastructure"
+      ]
     }
   }
 }
-

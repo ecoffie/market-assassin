@@ -450,6 +450,15 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 9, 2026 (Session 7)
+- **Content Generator: Post originality overhaul** — posts were repetitive when generating 15-30 for the same agency
+- Added `shuffleArray()` (Fisher-Yates) + 20 `CONTENT_LENSES` (seasonal, perspective, framework, trending, emotional)
+- Pain points now shuffled and expanded: `shuffleArray(painPoints).slice(0, 7)` (was fixed `slice(0, 5)`)
+- 3 random content lenses injected into Step 2 prompt each generation as "CONTENT VARIETY DIRECTIONS"
+- Anti-repetition instruction added: "Each angle MUST use a completely different hook style..."
+- `callGrokAPI` now accepts optional `temperature` param — Step 2 uses 0.85, Step 3 stays at 0.7
+- Updated TOOL-BUILD.md: "Expand Agency Pain Points Database" added to MA, Content Gen, and Opp Hunter sections
+
 ### February 9, 2026 (Session 6)
 - **Content Generator: Bulk export feature** — "Export All as .docx" button (all tiers) and "Download All Visuals (.zip)" button (Full Fix only)
 - .docx export: one post per page, LinkedIn formatting preserved, hashtags in blue (#0077B5)
@@ -512,4 +521,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 9, 2026 (Session 6)*
+*Last Updated: February 9, 2026 (Session 7)*
