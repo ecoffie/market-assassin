@@ -76,9 +76,11 @@ interface PainPointsApiResponse {
   success: boolean;
   agency: string;
   painPoints: string[];
+  priorities?: string[];
   categorized: CategorizedPainPoints;
   ndaaPainPoints: string[];
   count: number;
+  priorityCount?: number;
 }
 
 type ReportTab =
@@ -443,7 +445,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   data.agency || agencyName,
                   category,
                   point,
-                  'Strategic Priority'
+                  'Pain Point'
                 ]);
               }
             }
@@ -454,7 +456,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                 data.agency || agencyName,
                 'General',
                 point,
-                'Priority'
+                'Pain Point'
               ]);
             }
           }
@@ -467,6 +469,19 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                 'NDAA/Legislative',
                 point,
                 'Legislative Mandate'
+              ]);
+            }
+          }
+
+          // Add spending priorities
+          if (data.priorities && data.priorities.length > 0) {
+            for (const priority of data.priorities) {
+              const isFunded = /\$[\d.]+[BMK]/i.test(priority);
+              painPointsRows.push([
+                data.agency || agencyName,
+                'Spending Priority',
+                priority,
+                isFunded ? 'Funded Priority' : 'Planned Priority'
               ]);
             }
           }
@@ -1013,6 +1028,92 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
       </div>
     `).join('');
   })()}
+
+  <!-- Agency Pain Points & Spending Priorities Report -->
+  <h2>🎯 Agency Pain Points & Spending Priorities</h2>
+  <div class="section-intro">Intelligence on agency challenges and where money is actively flowing — use these in capability statements, proposals, and SBLO conversations.</div>
+
+  ${reports.agencyPainPoints?.highOpportunityMatches?.length > 0 ? `
+  <h3 style="color: #dc2626;">⚡ High-Opportunity Matches</h3>
+  <p style="font-size: 14px; color: #64748b; margin-bottom: 12px;">Agencies with BOTH a documented problem AND funded spending in the same area — strongest pursuit targets.</p>
+  ${reports.agencyPainPoints.highOpportunityMatches.slice(0, 10).map((match: any) => `
+    <div class="card" style="border-left: 4px solid ${match.naicsRelevant ? '#dc2626' : '#f59e0b'}; margin-bottom: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div class="card-title" style="font-size: 16px;">${match.agency}</div>
+        <div>
+          <span class="badge" style="background: ${match.fundingStatus === 'funded' ? '#dcfce7' : '#fef3c7'}; color: ${match.fundingStatus === 'funded' ? '#166534' : '#92400e'};">${match.fundingStatus === 'funded' ? '💰 FUNDED' : '📋 PLANNED'}</span>
+          ${match.naicsRelevant ? '<span class="badge" style="background: #fee2e2; color: #991b1b; margin-left: 4px;">🎯 NAICS MATCH</span>' : ''}
+        </div>
+      </div>
+      <p style="font-size: 13px; margin-bottom: 4px;"><strong>Area:</strong> ${match.area}</p>
+      <p style="font-size: 13px; color: #7c3aed; margin-bottom: 4px;"><strong>Pain Point:</strong> ${match.painPoint}</p>
+      <p style="font-size: 13px; color: #059669;"><strong>Spending Priority:</strong> ${match.matchingPriority}</p>
+    </div>
+  `).join('')}
+  ` : ''}
+
+  ${reports.agencyPainPoints?.painPoints?.length > 0 ? `
+  <h3>Agency Pain Points</h3>
+  <p style="font-size: 14px; color: #64748b; margin-bottom: 12px;">Problems agencies struggle with — from GAO findings, IG reports, and oversight data.</p>
+  <table>
+    <thead><tr><th>Agency</th><th>Pain Point</th><th>Priority</th></tr></thead>
+    <tbody>
+      ${reports.agencyPainPoints.painPoints.slice(0, 15).map((pp: any) => `
+        <tr>
+          <td style="font-weight: 600;">${pp.agency}</td>
+          <td>${pp.painPoint}</td>
+          <td><span class="badge" style="background: ${pp.priority === 'high' ? '#fee2e2' : '#e0e7ff'}; color: ${pp.priority === 'high' ? '#991b1b' : '#3730a3'};">${pp.priority}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+
+  ${reports.agencyPainPoints?.spendingPriorities?.length > 0 ? `
+  <h3>Spending Priorities</h3>
+  <p style="font-size: 14px; color: #64748b; margin-bottom: 12px;">Where agencies are actively spending money — funded programs, budget line items, and contract priorities.</p>
+  <table>
+    <thead><tr><th>Agency</th><th>Spending Priority</th><th>Status</th><th>NAICS Relevance</th></tr></thead>
+    <tbody>
+      ${reports.agencyPainPoints.spendingPriorities.slice(0, 15).map((sp: any) => `
+        <tr>
+          <td style="font-weight: 600;">${sp.agency}</td>
+          <td>${sp.priority}</td>
+          <td><span class="badge" style="background: ${sp.fundingStatus === 'funded' ? '#dcfce7' : '#fef3c7'}; color: ${sp.fundingStatus === 'funded' ? '#166534' : '#92400e'};">${sp.fundingStatus === 'funded' ? '💰 Funded' : '📋 Planned'}</span></td>
+          <td><span class="badge" style="background: ${sp.naicsRelevance === 'high' ? '#fee2e2' : sp.naicsRelevance === 'medium' ? '#fef3c7' : '#f1f5f9'}; color: ${sp.naicsRelevance === 'high' ? '#991b1b' : sp.naicsRelevance === 'medium' ? '#92400e' : '#64748b'};">${sp.naicsRelevance || 'medium'}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+
+  ${reports.agencyPainPoints?.summary ? `
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">${reports.agencyPainPoints.summary.totalPainPoints}</div>
+      <div class="stat-label">Pain Points</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${reports.agencyPainPoints.summary.totalSpendingPriorities}</div>
+      <div class="stat-label">Spending Priorities</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${reports.agencyPainPoints.summary.fundedPriorities}</div>
+      <div class="stat-label">Funded Priorities</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${reports.agencyPainPoints.summary.highOpportunityMatches}</div>
+      <div class="stat-label">High-Opportunity Matches</div>
+    </div>
+  </div>
+  ` : ''}
+
+  ${reports.agencyPainPoints?.recommendations?.length > 0 ? `
+  <h3>Recommendations</h3>
+  <ul>
+    ${reports.agencyPainPoints.recommendations.map((rec: string) => `<li>${rec}</li>`).join('')}
+  </ul>
+  ` : ''}
 
   ${tier === 'premium' ? `
   <!-- Subcontracting Report -->
@@ -1704,7 +1805,8 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
 
               {/* Agency Pain Points */}
               <div className="bg-purple-500/10 border-l-4 border-purple-500 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-purple-300 mb-3">Agency Priorities & Pain Points</h3>
+                <h3 className="text-lg font-semibold text-purple-300 mb-1">Agency Pain Points</h3>
+                <p className="text-xs text-purple-400 mb-3">Problems this agency struggles with — sourced from GAO findings, IG reports, and oversight data</p>
                 {loadingPainPoints ? (
                   <p className="text-sm text-purple-400">Loading agency insights...</p>
                 ) : painPointsData && painPointsData.painPoints && painPointsData.painPoints.length > 0 ? (
@@ -1716,7 +1818,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                           {matchedCommand}
                         </span>
                         <span className="text-xs text-purple-400">
-                          {painPointsData.painPoints.length} priorities identified
+                          {painPointsData.painPoints.length} pain points identified
                         </span>
                       </div>
                     )}
@@ -1740,7 +1842,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                     ) : (
                       /* Fallback: show raw pain points if categorized is empty */
                       <div>
-                        <h4 className="font-semibold text-purple-300 mb-2">Key Priorities</h4>
+                        <h4 className="font-semibold text-purple-300 mb-2">Key Pain Points</h4>
                         <ul className="space-y-2 text-sm text-purple-200">
                           {painPointsData.painPoints.map((painPoint, index) => (
                             <li key={index} className="flex items-start">
@@ -1776,7 +1878,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                                 {cmd.command}
                               </span>
                               <span className="text-xs text-indigo-400">
-                                {cmd.painPoints.painPoints.length} priorities
+                                {cmd.painPoints.painPoints.length} pain points
                               </span>
                             </div>
                             <ul className="space-y-1 text-sm text-purple-200">
@@ -1788,7 +1890,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                               ))}
                               {cmd.painPoints.painPoints.length > 3 && (
                                 <li className="text-xs text-indigo-400 italic">
-                                  +{cmd.painPoints.painPoints.length - 3} more priorities...
+                                  +{cmd.painPoints.painPoints.length - 3} more...
                                 </li>
                               )}
                             </ul>
@@ -1799,10 +1901,33 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   </div>
                 ) : (
                   <p className="text-sm text-purple-400 italic">
-                    Agency priorities data not available for this office yet.
+                    Pain points data not available for this office yet.
                   </p>
                 )}
               </div>
+
+              {/* Spending Priorities */}
+              {!loadingPainPoints && painPointsData?.priorities && painPointsData.priorities.length > 0 && (
+                <div className="bg-emerald-500/10 border-l-4 border-emerald-500 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-emerald-300 mb-1">Spending Priorities</h3>
+                  <p className="text-xs text-emerald-400 mb-3">Where this agency is actively spending money — funded programs, budget line items, and contract priorities</p>
+                  <ul className="space-y-2 text-sm text-emerald-200">
+                    {painPointsData.priorities.map((priority, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="text-emerald-400 mr-2 font-bold">$</span>
+                        <span className="flex-1">
+                          {priority}
+                          {/\$[\d.]+[BMK]/i.test(priority) && (
+                            <span className="ml-2 px-1.5 py-0.5 text-xs rounded bg-emerald-500/30 text-emerald-300 font-semibold">
+                              FUNDED
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">

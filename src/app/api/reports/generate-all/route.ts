@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
       ],
     };
 
-    // Generate Agency Pain Points & Spending Priorities Report
+    // Generate Agency Pain Points & Spending Priorities Report (Enhanced)
     const allPainPoints = agenciesWithPainPoints.flatMap(a =>
       a.painPoints.map(pp => ({ agency: a.name, painPoint: pp }))
     );
@@ -196,22 +196,136 @@ export async function POST(request: NextRequest) {
       (a.priorities || []).map(pr => ({ agency: a.name, priority: pr }))
     );
 
+    // NAICS-to-keyword mapping for relevance scoring
+    const naicsKeywords: Record<string, string[]> = {
+      '54': ['consulting', 'professional', 'engineering', 'technical', 'IT', 'software', 'cyber', 'data', 'analytics', 'AI', 'cloud', 'digital', 'moderniz'],
+      '541': ['consulting', 'professional', 'engineering', 'technical', 'IT', 'software', 'cyber', 'data', 'analytics', 'AI', 'cloud', 'digital', 'moderniz'],
+      '23': ['construction', 'building', 'infrastructure', 'facility', 'renovation', 'HVAC', 'base infrastructure', 'energy'],
+      '236': ['construction', 'building', 'renovation', 'facility'],
+      '237': ['heavy construction', 'infrastructure', 'highway', 'bridge', 'utility'],
+      '238': ['specialty trade', 'electrical', 'plumbing', 'HVAC', 'mechanical'],
+      '56': ['administrative', 'facility support', 'security', 'janitorial', 'maintenance'],
+      '561': ['administrative', 'facility support', 'security', 'guard', 'staffing'],
+      '81': ['repair', 'maintenance', 'equipment'],
+      '811': ['repair', 'maintenance', 'equipment', 'vehicle'],
+      '518': ['hosting', 'cloud', 'data processing', 'data center'],
+      '336': ['manufacturing', 'aircraft', 'ship', 'vehicle', 'defense'],
+      '611': ['training', 'education', 'simulation'],
+      '621': ['health', 'medical', 'clinical'],
+      '622': ['hospital', 'health care'],
+    };
+
+    // Get keywords for user's NAICS
+    const userNaics = inputs.naicsCode || '';
+    const userKeywords: string[] = [];
+    // Check full code, 3-digit prefix, 2-digit sector
+    for (const prefix of [userNaics, userNaics.substring(0, 3), userNaics.substring(0, 2)]) {
+      if (naicsKeywords[prefix]) {
+        userKeywords.push(...naicsKeywords[prefix]);
+      }
+    }
+
+    // Score priority NAICS relevance
+    const scorePriorityRelevance = (priorityText: string): 'high' | 'medium' | 'low' => {
+      if (userKeywords.length === 0) return 'medium';
+      const lower = priorityText.toLowerCase();
+      const matchCount = userKeywords.filter(kw => lower.includes(kw.toLowerCase())).length;
+      if (matchCount >= 2) return 'high';
+      if (matchCount >= 1) return 'medium';
+      return 'low';
+    };
+
+    // Cross-reference: find areas where agency has BOTH a pain point AND a spending priority
+    const CROSS_REF_AREAS = [
+      { area: 'Cybersecurity', keywords: ['cyber', 'security', 'zero trust', 'cmmc', 'authorization'] },
+      { area: 'IT Modernization', keywords: ['moderniz', 'legacy system', 'cloud', 'digital', 'software'] },
+      { area: 'Infrastructure', keywords: ['infrastructure', 'facility', 'construction', 'building', 'base'] },
+      { area: 'Data & Analytics', keywords: ['data', 'analytics', 'AI', 'machine learning', 'artificial intelligence'] },
+      { area: 'Workforce', keywords: ['workforce', 'staffing', 'personnel', 'training', 'hiring'] },
+      { area: 'Supply Chain', keywords: ['supply chain', 'logistics', 'procurement', 'acquisition'] },
+      { area: 'Healthcare', keywords: ['health', 'medical', 'clinical', 'patient', 'EHR'] },
+      { area: 'Energy & Climate', keywords: ['energy', 'climate', 'renewable', 'sustainability', 'carbon'] },
+      { area: 'Compliance & Audit', keywords: ['compliance', 'audit', 'oversight', 'IG ', 'inspector general'] },
+      { area: 'Communications', keywords: ['5G', 'communication', 'network', 'spectrum', 'satellite'] },
+    ];
+
+    const highOpportunityMatches: Array<{
+      agency: string;
+      painPoint: string;
+      matchingPriority: string;
+      area: string;
+      fundingStatus: 'funded' | 'planned';
+      naicsRelevant: boolean;
+    }> = [];
+
+    for (const agencyData of agenciesWithPainPoints) {
+      const agencyPriorities = agencyData.priorities || [];
+      if (agencyPriorities.length === 0) continue;
+
+      for (const crossArea of CROSS_REF_AREAS) {
+        // Find pain points in this area
+        const matchingPainPoints = agencyData.painPoints.filter(pp =>
+          crossArea.keywords.some(kw => pp.toLowerCase().includes(kw))
+        );
+        // Find priorities in this area
+        const matchingPriorities = agencyPriorities.filter(pr =>
+          crossArea.keywords.some(kw => pr.toLowerCase().includes(kw))
+        );
+
+        if (matchingPainPoints.length > 0 && matchingPriorities.length > 0) {
+          const priority = matchingPriorities[0];
+          const isFunded = /\$[\d.]+[BMK]/i.test(priority);
+          const isNaicsRelevant = scorePriorityRelevance(priority) !== 'low';
+
+          highOpportunityMatches.push({
+            agency: agencyData.name,
+            painPoint: matchingPainPoints[0],
+            matchingPriority: priority,
+            area: crossArea.area,
+            fundingStatus: isFunded ? 'funded' : 'planned',
+            naicsRelevant: isNaicsRelevant,
+          });
+        }
+      }
+    }
+
+    // Sort: NAICS-relevant funded matches first
+    highOpportunityMatches.sort((a, b) => {
+      const aScore = (a.naicsRelevant ? 4 : 0) + (a.fundingStatus === 'funded' ? 2 : 0);
+      const bScore = (b.naicsRelevant ? 4 : 0) + (b.fundingStatus === 'funded' ? 2 : 0);
+      return bScore - aScore;
+    });
+
+    const naicsRelevantPriorities = allPriorities.filter(pr =>
+      scorePriorityRelevance(pr.priority) !== 'low'
+    );
+
     const agencyPainPoints = {
       painPoints: allPainPoints.slice(0, 20).map(({ agency, painPoint }) => ({
         agency,
         painPoint,
-        opportunityMatch: 'Your capabilities align with this agency challenge',
+        opportunityMatch: scorePriorityRelevance(painPoint) === 'high'
+          ? `Strong NAICS ${userNaics} alignment — directly relevant to your capabilities`
+          : scorePriorityRelevance(painPoint) === 'medium'
+          ? `Moderate alignment with NAICS ${userNaics} capabilities`
+          : 'Your capabilities may address this agency challenge',
         solutionPositioning: `Position your solutions to address: ${painPoint}`,
         priority: painPoint.toLowerCase().includes('ndaa') || painPoint.toLowerCase().includes('critical')
           ? 'high'
           : 'medium',
       })),
-      spendingPriorities: allPriorities.slice(0, 15).map(({ agency, priority }) => ({
+      spendingPriorities: allPriorities.slice(0, 20).map(({ agency, priority }) => ({
         agency,
         priority,
-        fundingStatus: priority.match(/\$[\d.]+[BMK]/i) ? 'funded' : 'planned',
-        actionItem: `Pursue opportunities related to: ${priority}`,
+        fundingStatus: (/\$[\d.]+[BMK]/i.test(priority) ? 'funded' : 'planned') as 'funded' | 'planned',
+        actionItem: scorePriorityRelevance(priority) === 'high'
+          ? `High relevance to NAICS ${userNaics} — pursue actively`
+          : scorePriorityRelevance(priority) === 'medium'
+          ? `Moderate relevance — explore alignment with your capabilities`
+          : `Monitor for opportunities as they develop`,
+        naicsRelevance: scorePriorityRelevance(priority),
       })),
+      highOpportunityMatches: highOpportunityMatches.slice(0, 15),
       summary: {
         totalPainPoints: allPainPoints.length,
         totalSpendingPriorities: allPriorities.length,
@@ -222,13 +336,20 @@ export async function POST(request: NextRequest) {
         fundedPriorities: allPriorities.filter(pr =>
           /\$[\d.]+[BMK]/i.test(pr.priority)
         ).length,
+        highOpportunityMatches: highOpportunityMatches.length,
+        naicsRelevantPriorities: naicsRelevantPriorities.length,
       },
       recommendations: [
-        'Position your solutions to address agency challenges',
-        'Reference pain points in capability statements',
-        'Target spending priorities with specific dollar amounts — these have allocated budgets',
-        'Address pain points in SBLO conversations',
-        'Highlight NDAA-related pain points for strategic positioning',
+        highOpportunityMatches.length > 0
+          ? `${highOpportunityMatches.length} high-opportunity matches found — agencies with BOTH a problem AND a funded priority in the same area`
+          : 'Cross-reference pain points with spending priorities to find funded opportunities',
+        naicsRelevantPriorities.length > 0
+          ? `${naicsRelevantPriorities.length} spending priorities align with your NAICS ${userNaics} capabilities`
+          : 'Review spending priorities for alignment with your capabilities',
+        'Target funded priorities (marked with $) — these have allocated budgets ready to spend',
+        'Reference pain points in capability statements and SBLO conversations',
+        'Highlight NDAA-related items for strategic positioning in proposals',
+        'Focus on high-opportunity matches first — these represent the strongest pursuit targets',
       ],
     };
 

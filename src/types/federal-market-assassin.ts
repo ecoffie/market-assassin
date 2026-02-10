@@ -232,9 +232,28 @@ export interface AgencyPainPointsReport {
     solutionPositioning: string;
     priority: string;
   }>;
+  spendingPriorities: Array<{
+    agency: string;
+    priority: string;
+    fundingStatus: 'funded' | 'planned';
+    actionItem: string;
+    naicsRelevance?: 'high' | 'medium' | 'low';
+  }>;
+  highOpportunityMatches: Array<{
+    agency: string;
+    painPoint: string;
+    matchingPriority: string;
+    area: string;
+    fundingStatus: 'funded' | 'planned';
+    naicsRelevant: boolean;
+  }>;
   summary: {
     totalPainPoints: number;
+    totalSpendingPriorities: number;
     highPriority: number;
+    fundedPriorities: number;
+    highOpportunityMatches: number;
+    naicsRelevantPriorities: number;
   };
   recommendations: string[];
 }

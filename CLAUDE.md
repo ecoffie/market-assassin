@@ -448,7 +448,68 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
+## Agency Pain Points & Priorities System
+
+**Database:** `src/data/agency-pain-points.json` — 135 agencies, 1,504 pain points, 1,350 spending priorities
+**Admin Endpoint:** `/api/admin/build-pain-points` — generates pain points + priorities via Grok AI + USASpending + GAO/IG data
+- Auth: `?password=galata-assassin-2026`
+- `?mode=preview` — dry run showing gaps
+- `?agency=X` — single agency generation
+- `?type=priorities` — generate priorities instead of pain points
+
+**Pain Points** = problems agencies struggle with (GAO findings, IG challenges, audit failures)
+**Spending Priorities** = where agencies are actively spending money (funded programs, budget line items)
+
+**Used by:**
+- **Content Generator** (`/api/content-generator/generate`) — both pain points and priorities fed into Step 2 prompt for thought leadership content
+- **Market Assassin** (`/api/reports/generate-all`) — Pain Points report with cross-referencing, NAICS relevance scoring, and high-opportunity matches
+- **Opportunity Hunter** (`/api/pain-points`) — agency modal shows pain points + spending priorities
+- **Pain Points API** (`/api/pain-points`) — returns both `painPoints` and `priorities` arrays
+
+**Cross-Reference Engine (Market Assassin):**
+- 10 areas: Cybersecurity, IT Modernization, Infrastructure, Data & Analytics, Workforce, Supply Chain, Healthcare, Energy & Climate, Compliance, Communications
+- Finds agencies with BOTH a pain point AND spending priority in the same area → "high-opportunity match"
+- NAICS keyword mapping scores relevance (high/medium/low) against user's NAICS code
+- HTML/PDF report, CSV export, and agency modal all show priorities
+
+**Key Files:**
+| File | Purpose |
+|------|---------|
+| `src/data/agency-pain-points.json` | 135 agencies with painPoints[] and priorities[] |
+| `src/lib/utils/pain-points.ts` | `getPainPointsForAgency()`, `getPrioritiesForAgency()` |
+| `src/lib/utils/pain-point-generator.ts` | Grok-powered generation |
+| `src/lib/utils/federal-oversight-data.ts` | GAO High Risk, IG challenges, spending priorities seed data |
+| `src/lib/utils/agency-list-builder.ts` | USASpending agency fetcher |
+| `src/app/api/admin/build-pain-points/route.ts` | Admin pipeline endpoint |
+
+---
+
 ## Recent Work History
+
+### February 10, 2026 (Session 9)
+- **Content Generator: Thought leadership rewrite** — prompts now create expert content that attracts government decision makers, NOT sales pitches
+  - Step 2: "Demonstrate deep insider knowledge" replaces "DIRECTLY connect services to pain points"
+  - Step 3: "THOUGHT LEADERSHIP TONE" section — "NEVER say 'we can help' or 'our services'"
+  - Company profile relabeled: "Core Services" → "Areas of Expertise", "Differentiators" → "Unique Perspective"
+  - Templates updated: story-driven, stat-heavy, case-study all shifted to insight-sharing tone
+  - Carousel CTA preserved — only post text changed, carousel last slide still has CTA
+- **Opportunity Hunter: Priorities wired in** — modal now shows pain points + spending priorities
+  - `/api/pain-points` now returns `priorities[]` and `priorityCount` in both GET and POST
+  - `loadPainPoints` tries `/api/pain-points` first (135 agencies) before falling back to `/api/agency-knowledge-base` (31 agencies)
+  - Modal split: purple "Pain Points" section + green "Spending Priorities" section with `$` bullets and FUNDED badges
+- **Market Assassin: Enhanced priorities intelligence**
+  - NAICS keyword mapping (15 sectors) scores each priority as high/medium/low relevance to user's NAICS
+  - Cross-reference engine: 10 areas detect agencies with BOTH a pain point AND spending priority in same area
+  - `highOpportunityMatches[]` sorted by NAICS-relevant + funded first
+  - Agency modal: separate green "Spending Priorities" section with FUNDED badges
+  - CSV export: priorities included as "Funded Priority" / "Planned Priority" rows
+  - HTML/PDF report: new section with High-Opportunity Matches cards, Pain Points table, Spending Priorities table, stats grid
+  - TypeScript types updated: `AgencyPainPointsReport` now includes `spendingPriorities`, `highOpportunityMatches`, enhanced summary
+
+### February 9-10, 2026 (Session 8)
+- **Agency Pain Points Database: 63 → 135 agencies** — built admin pipeline using USASpending + Grok AI + GAO/IG data
+- **Spending Priorities: 1,350 total** — generated for all 135 agencies via admin endpoint
+- **Priorities wired into Content Generator and Market Assassin** — initial wiring (before Session 9 enhancements)
 
 ### February 9, 2026 (Session 7)
 - **Content Generator: Post originality overhaul** — posts were repetitive when generating 15-30 for the same agency
@@ -521,4 +582,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 9, 2026 (Session 7)*
+*Last Updated: February 10, 2026 (Session 9)*

@@ -60,9 +60,9 @@ const POST_TEMPLATES: Record<string, { name: string; description: string; prompt
     prompt: `Write a story-based LinkedIn post that:
 - Opens with a relatable scenario or personal anecdote
 - Connects to the agency pain point naturally
-- Shows empathy and understanding
-- Transitions to how your solution helps
-- Ends with a thought-provoking question or call-to-action
+- Shows empathy and deep understanding of the challenge
+- Shares a lesson learned or insight that demonstrates expertise
+- Ends with a thought-provoking question that invites discussion
 - Uses conversational, authentic tone
 - 200-300 words`
   },
@@ -75,7 +75,7 @@ const POST_TEMPLATES: Record<string, { name: string; description: string; prompt
 - Uses bullet points for scannability
 - Cites authoritative sources (GAO, agency reports)
 - Connects numbers to real-world impact
-- Ends with how your capabilities address the data
+- Ends with an expert observation about what the data means for the market
 - Professional, authoritative tone
 - 150-250 words`
   },
@@ -94,15 +94,15 @@ const POST_TEMPLATES: Record<string, { name: string; description: string; prompt
   },
   'case-study': {
     name: 'Case Study',
-    description: 'Problem -> Solution -> Result format',
+    description: 'Problem -> Approach -> Impact analysis format',
     prompt: `Write a case study-style LinkedIn post that:
-- Problem: Describe the agency's specific challenge
-- Solution: Explain your approach or capability
-- Result: Share expected outcomes or impact
+- Challenge: Describe the agency's specific challenge with real data
+- Approach: Explain what smart contractors are doing to address it (industry perspective, not a pitch)
+- Impact: Share what outcomes agencies are seeing or could see
 - Uses clear section headers or emojis
 - Includes relevant statistics
-- Shows concrete value proposition
-- Professional, results-oriented tone
+- Demonstrates deep knowledge of the problem space
+- Professional, analytical tone
 - 200-250 words`
   },
   'thought-leadership': {
@@ -335,14 +335,14 @@ export async function POST(request: NextRequest) {
 
     // Build company profile section for prompts
     const companyProfileSection = `
-COMPANY PROFILE (Use this to personalize content):
+AUTHOR PROFILE (Use this to establish credibility — NOT to pitch services):
 ${enhancedCompanyData.companyName ? `- Company: ${enhancedCompanyData.companyName}` : ''}
 ${enhancedCompanyData.userRole ? `- Author Role: ${enhancedCompanyData.userRole}` : ''}
-${enhancedCompanyData.coreServices ? `- Core Services: ${enhancedCompanyData.coreServices}` : ''}
-${enhancedCompanyData.differentiators ? `- Differentiators: ${enhancedCompanyData.differentiators}` : ''}
-${enhancedCompanyData.certifications ? `- Certifications: ${enhancedCompanyData.certifications}` : ''}
+${enhancedCompanyData.coreServices ? `- Areas of Expertise: ${enhancedCompanyData.coreServices}` : ''}
+${enhancedCompanyData.differentiators ? `- Unique Perspective: ${enhancedCompanyData.differentiators}` : ''}
+${enhancedCompanyData.certifications ? `- Credentials: ${enhancedCompanyData.certifications}` : ''}
 ${enhancedCompanyData.contractVehicles ? `- Contract Vehicles: ${enhancedCompanyData.contractVehicles}` : ''}
-${enhancedCompanyData.pastPerformance ? `- Past Performance: ${enhancedCompanyData.pastPerformance}` : ''}
+${enhancedCompanyData.pastPerformance ? `- Experience: ${enhancedCompanyData.pastPerformance}` : ''}
 `.trim();
 
     // STEP 2: Generate content angles
@@ -374,28 +374,29 @@ CONTENT VARIETY DIRECTIONS (use these creative lenses to make each post unique):
 
 CRITICAL: Each angle MUST use a completely different hook style, different pain point, and different narrative approach. Do NOT reuse similar openings, structures, or talking points across angles. Vary between personal stories, data-driven insights, provocative questions, and actionable tips.
 
-TASK: Create PERSONALIZED content angles that:
-1. DIRECTLY connect the company's specific services to agency pain points AND spending priorities
-2. Highlight the company's differentiators
-3. Reference certifications when addressing small business opportunities
-4. Mix pain point angles (problems to solve) with spending priority angles (where money flows) — aim for roughly half of each
+TASK: Create THOUGHT LEADERSHIP content angles that:
+1. Demonstrate deep insider knowledge of agency challenges, spending priorities, and how federal procurement actually works
+2. Position the author as a trusted expert who UNDERSTANDS government — NOT someone pitching services
+3. Attract government decision makers (contracting officers, program managers, agency leaders) by speaking their language and addressing their real concerns
+4. Mix pain point angles (problems agencies face) with spending priority angles (where money flows) — aim for roughly half of each
 5. Use authoritative language with specific numbers ("$9.1B allocated for...", "According to GAO...", "DoD's FY2026 budget...")
-${geoBoost ? `6. Optimize for AI/search with clear questions and answers (GEO technique)` : ''}
+6. Show the author's expertise through INSIGHT, not through selling — the reader should think "this person really understands our challenges"
+${geoBoost ? `7. Optimize for AI/search with clear questions and answers (GEO technique)` : ''}
 
 Generate ${numPosts} distinct content angles. For each angle, provide:
 - Main theme/hook
-- Key pain point to address
+- Key pain point or priority to address
 - 2-3 relevant talking points
-- How THIS SPECIFIC COMPANY'S capabilities solve this
+- Expert insight that demonstrates deep understanding of this issue
 - Suggested structure (question format, list format, story format, etc.)
 
 Output as JSON array with this structure:
 [
   {
     "angle": "theme description",
-    "painPoint": "specific pain point",
+    "painPoint": "specific pain point or priority",
     "talkingPoints": ["point 1", "point 2"],
-    "solution": "how THIS COMPANY specifically helps",
+    "solution": "expert insight or perspective on this issue",
     "structure": "suggested format"
   }
 ]`;
@@ -466,17 +467,21 @@ ${template.prompt}
 
 PERSONALIZATION REQUIREMENTS:
 ${enhancedCompanyData.companyName ? `- Write from the perspective of someone at ${enhancedCompanyData.companyName}` : ''}
-${enhancedCompanyData.coreServices ? `- Reference the company's specific services: ${enhancedCompanyData.coreServices}` : ''}
-${enhancedCompanyData.differentiators ? `- Weave in their differentiators naturally: ${enhancedCompanyData.differentiators}` : ''}
-${enhancedCompanyData.certifications ? `- Mention relevant certifications when appropriate: ${enhancedCompanyData.certifications}` : ''}
+${enhancedCompanyData.coreServices ? `- Subtly reference expertise in: ${enhancedCompanyData.coreServices} (through demonstrated knowledge, NOT by pitching services)` : ''}
+${enhancedCompanyData.differentiators ? `- Let differentiators come through as expertise, not as a sales pitch: ${enhancedCompanyData.differentiators}` : ''}
+${enhancedCompanyData.certifications ? `- Mention certifications only when they add credibility to the insight: ${enhancedCompanyData.certifications}` : ''}
 
-ADDITIONAL REQUIREMENTS:
+THOUGHT LEADERSHIP TONE:
+- Write as an INDUSTRY EXPERT sharing insights — NOT as a vendor pitching services
+- The goal is to attract government decision makers who think "this person really gets our challenges"
+- Show deep understanding of how federal agencies operate, what they struggle with, and where money flows
+- NEVER say "we can help" or "our services" or "contact us" — instead, share knowledge that makes the reader want to connect
 - Use a professional, conversational tone
 - Use line breaks for readability
 - Start with a COMPELLING HOOK that captures attention
 - The hook should be the FIRST LINE and must be engaging
 ${geoBoost && templateKey !== 'question-based' ? '- Optimize for AI search with clear structure' : ''}
-- End with a clear call-to-action or engagement prompt
+- End with a question or invitation to discuss (NOT a sales CTA)
 - DO NOT be generic - every post should feel personalized
 - Include 3-5 relevant hashtags at the end
 

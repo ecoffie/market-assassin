@@ -75,6 +75,10 @@ interface PainPoint {
   priority?: 'critical' | 'high' | 'medium' | 'low';
 }
 
+interface SpendingPriority {
+  point: string;
+}
+
 
 interface SearchSuggestion {
   type: string;
@@ -110,6 +114,7 @@ export default function OpportunityScoutPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalAgency, setModalAgency] = useState<Agency | null>(null);
   const [painPoints, setPainPoints] = useState<PainPoint[]>([]);
+  const [spendingPriorities, setSpendingPriorities] = useState<SpendingPriority[]>([]);
   const [painPointsLoading, setPainPointsLoading] = useState(false);
 
   // Pro access state
@@ -215,6 +220,7 @@ export default function OpportunityScoutPage() {
 
     setPainPointsLoading(true);
     setPainPoints([]);
+    setSpendingPriorities([]);
 
     // Build search strategies
     const searchStrategies = [
@@ -245,7 +251,28 @@ export default function OpportunityScoutPage() {
         }
       }
 
-      // Try standard search strategies
+      // Try the pain-points API first (135 agencies with priorities)
+      for (const name of searchStrategies) {
+        if (!name) continue;
+        try {
+          const response = await fetch(`/api/pain-points?agency=${encodeURIComponent(name)}`);
+          const data = await response.json();
+
+          if (data.success && data.painPoints && data.painPoints.length > 0) {
+            const points: PainPoint[] = data.painPoints.map((item: string) => ({ point: item }));
+            setPainPoints(points);
+            if (data.priorities && data.priorities.length > 0) {
+              setSpendingPriorities(data.priorities.map((p: string) => ({ point: p })));
+            }
+            setPainPointsLoading(false);
+            return;
+          }
+        } catch {
+          // Continue to next strategy
+        }
+      }
+
+      // Fallback: try agency-knowledge-base (31 agencies, older data)
       for (const name of searchStrategies) {
         if (!name) continue;
 
@@ -285,6 +312,7 @@ export default function OpportunityScoutPage() {
     setModalOpen(false);
     setModalAgency(null);
     setPainPoints([]);
+    setSpendingPriorities([]);
   }, []);
 
   // Close modal on escape key
@@ -974,42 +1002,62 @@ export default function OpportunityScoutPage() {
                 </div>
               </div>
 
-              {/* Agency Pain Points - Pro Only */}
+              {/* Agency Pain Points & Spending Priorities - Pro Only */}
               {isPro ? (
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-500 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-purple-900 mb-3">Agency Priorities & Pain Points</h3>
-                  <div className="space-y-2">
-                    {painPointsLoading ? (
-                      <p className="text-sm text-purple-800">Loading agency insights...</p>
-                    ) : painPoints.length > 0 ? (
-                      <ul className="space-y-2 text-sm text-purple-800">
-                        {painPoints.map((item, i) => (
+                <div className="space-y-4">
+                  {/* Pain Points */}
+                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-500 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-purple-900 mb-3">Agency Pain Points</h3>
+                    <p className="text-xs text-purple-600 mb-3">Problems this agency struggles with — sourced from GAO findings, IG reports, and oversight data</p>
+                    <div className="space-y-2">
+                      {painPointsLoading ? (
+                        <p className="text-sm text-purple-800">Loading agency insights...</p>
+                      ) : painPoints.length > 0 ? (
+                        <ul className="space-y-2 text-sm text-purple-800">
+                          {painPoints.map((item, i) => (
+                            <li key={i} className="flex items-start">
+                              <span className="text-purple-600 mr-2">•</span>
+                              <div className="flex-1">
+                                <span>{item.point}</span>
+                                {item.source && (
+                                  <span className="text-purple-600 text-xs ml-2 italic">({item.source})</span>
+                                )}
+                                {item.priority && (
+                                  <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
+                                    item.priority === 'critical' ? 'bg-red-100 text-red-800' :
+                                    item.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                                    'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {item.priority}
+                                  </span>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-purple-700 italic">
+                          Pain points data not available for this office yet. Check the office website for current challenges.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Spending Priorities */}
+                  {!painPointsLoading && spendingPriorities.length > 0 && (
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-lg p-6">
+                      <h3 className="text-lg font-semibold text-green-900 mb-3">Spending Priorities</h3>
+                      <p className="text-xs text-green-600 mb-3">Where this agency is actively spending money — funded programs, budget line items, and contract priorities</p>
+                      <ul className="space-y-2 text-sm text-green-800">
+                        {spendingPriorities.map((item, i) => (
                           <li key={i} className="flex items-start">
-                            <span className="text-purple-600 mr-2">•</span>
-                            <div className="flex-1">
-                              <span>{item.point}</span>
-                              {item.source && (
-                                <span className="text-purple-600 text-xs ml-2 italic">({item.source})</span>
-                              )}
-                              {item.priority && (
-                                <span className={`ml-2 px-1.5 py-0.5 text-xs rounded ${
-                                  item.priority === 'critical' ? 'bg-red-100 text-red-800' :
-                                  item.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                                  'bg-blue-100 text-blue-800'
-                                }`}>
-                                  {item.priority}
-                                </span>
-                              )}
-                            </div>
+                            <span className="text-green-600 mr-2">$</span>
+                            <span>{item.point}</span>
                           </li>
                         ))}
                       </ul>
-                    ) : (
-                      <p className="text-sm text-purple-700 italic">
-                        Agency priorities data not available for this office yet. Check the office website for current priorities.
-                      </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="bg-gradient-to-r from-gray-100 to-gray-200 border-l-4 border-gray-400 rounded-lg p-6 relative overflow-hidden">
@@ -1024,14 +1072,14 @@ export default function OpportunityScoutPage() {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
-                      Unlock Pain Points (Pro)
+                      Unlock Pain Points & Priorities (Pro)
                     </button>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-500 mb-3">Agency Priorities & Pain Points</h3>
+                  <h3 className="text-lg font-semibold text-gray-500 mb-3">Agency Pain Points & Spending Priorities</h3>
                   <ul className="space-y-2 text-sm text-gray-400">
                     <li className="blur-sm">• Critical infrastructure modernization needs...</li>
                     <li className="blur-sm">• Cybersecurity concerns and compliance gaps...</li>
-                    <li className="blur-sm">• Budget constraints impacting program delivery...</li>
+                    <li className="blur-sm">• $2.3B allocated for cloud migration...</li>
                     <li className="blur-sm">• Workforce challenges in key technical areas...</li>
                   </ul>
                 </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getPainPointsForAgency,
+  getPrioritiesForAgency,
   getPainPointsForCommand,
   getAllAgenciesWithPainPoints,
   findAgenciesByPainPoint,
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
 
       const categorized = categorizePainPoints(painPoints);
       const ndaaPainPoints = painPoints.filter(pp => pp.includes('FY2026 NDAA'));
+      const priorities = getPrioritiesForAgency(command || subAgency || agency);
 
       return NextResponse.json({
         success: true,
@@ -48,9 +50,11 @@ export async function GET(request: NextRequest) {
         command: command || null,
         painPointSource,
         painPoints,
+        priorities,
         categorized,
         ndaaPainPoints,
-        count: painPoints.length
+        count: painPoints.length,
+        priorityCount: priorities.length
       });
     }
 
@@ -111,19 +115,25 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get pain points for multiple agencies
-    const results = agencies.map(agencyName => ({
-      agency: agencyName,
-      painPoints: getPainPointsForAgency(agencyName),
-      categorized: categorizePainPoints(getPainPointsForAgency(agencyName)),
-      ndaaPainPoints: getNDAAPainPoints(agencyName)
-    }));
+    // Get pain points and priorities for multiple agencies
+    const results = agencies.map(agencyName => {
+      const painPoints = getPainPointsForAgency(agencyName);
+      const priorities = getPrioritiesForAgency(agencyName);
+      return {
+        agency: agencyName,
+        painPoints,
+        priorities,
+        categorized: categorizePainPoints(painPoints),
+        ndaaPainPoints: getNDAAPainPoints(agencyName)
+      };
+    });
 
     return NextResponse.json({
       success: true,
       results,
       totalAgencies: results.length,
-      totalPainPoints: results.reduce((sum, r) => sum + r.painPoints.length, 0)
+      totalPainPoints: results.reduce((sum, r) => sum + r.painPoints.length, 0),
+      totalPriorities: results.reduce((sum, r) => sum + r.priorities.length, 0)
     });
 
   } catch (error) {
