@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,12 +50,33 @@ export default function LoginPage() {
           setError(result.error || 'Login failed');
         }
       } else {
+        // Validate access code before creating account
+        if (!accessCode.trim()) {
+          setError('Access code is required to create an account');
+          setIsLoading(false);
+          return;
+        }
+
+        const codeRes = await fetch('/api/planner/verify-access-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: accessCode }),
+        });
+        const codeData = await codeRes.json();
+
+        if (!codeData.valid) {
+          setError('Invalid access code. Contact your instructor for the correct code.');
+          setIsLoading(false);
+          return;
+        }
+
         const result = await signUp(email, password);
         if (result.success) {
           setSuccess('Account created! Check your email to confirm your account.');
           setEmail('');
           setPassword('');
           setConfirmPassword('');
+          setAccessCode('');
         } else {
           setError(result.error || 'Signup failed');
         }
@@ -155,6 +177,26 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     disabled={isLoading}
                   />
+                </div>
+              )}
+
+              {!isLogin && (
+                <div>
+                  <label htmlFor="accessCode" className="block text-sm font-medium text-gray-700 mb-2">
+                    Access Code
+                  </label>
+                  <input
+                    id="accessCode"
+                    type="text"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all font-mono tracking-wider"
+                    placeholder="Enter your access code"
+                    disabled={isLoading}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Provided by your bootcamp instructor
+                  </p>
                 </div>
               )}
 

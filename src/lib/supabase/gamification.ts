@@ -28,6 +28,69 @@ export const BADGE_DEFINITIONS: Omit<Badge, 'earnedAt'>[] = [
 ];
 
 /**
+ * Check if a user has completed the onboarding flow
+ */
+export async function getOnboardingStatus(userId: string): Promise<boolean> {
+  const supabase = getSupabase();
+
+  if (!supabase) return false;
+
+  try {
+    const { data, error } = await supabase
+      .from('planner_gamification')
+      .select('onboarding_completed')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return data?.onboarding_completed === true;
+  } catch (error) {
+    console.error('Error fetching onboarding status:', error);
+    return false;
+  }
+}
+
+/**
+ * Mark onboarding as complete for a user
+ */
+export async function completeOnboarding(userId: string): Promise<void> {
+  const supabase = getSupabase();
+
+  if (!supabase) return;
+
+  try {
+    const { data: existing } = await supabase
+      .from('planner_gamification')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase
+        .from('planner_gamification')
+        .update({ onboarding_completed: true, updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('planner_gamification')
+        .insert({
+          user_id: userId,
+          current_streak: 0,
+          longest_streak: 0,
+          last_completion_date: null,
+          badges: [],
+          onboarding_completed: true,
+        });
+      if (error) throw error;
+    }
+  } catch (error) {
+    console.error('Error completing onboarding:', error);
+  }
+}
+
+/**
  * Get gamification data for a user
  */
 export async function getGamificationData(userId: string): Promise<GamificationData> {

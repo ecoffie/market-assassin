@@ -25,3 +25,23 @@ export function getPlannerSupabase(): SupabaseClient | null {
 
   return plannerInstance;
 }
+
+/**
+ * Admin client for the planner Supabase project (server-side only).
+ * Uses the service role key to bypass RLS — needed for listing users
+ * and querying across all accounts (e.g., weekly digest cron).
+ */
+let plannerAdminInstance: SupabaseClient | null = null;
+
+export function getPlannerSupabaseAdmin(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_PLANNER_SUPABASE_URL;
+  const serviceKey = process.env.PLANNER_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceKey) return null;
+
+  if (!plannerAdminInstance) {
+    plannerAdminInstance = createClient(url, serviceKey);
+  }
+
+  return plannerAdminInstance;
+}

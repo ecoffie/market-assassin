@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { getUserProgress, getPhases, type ProgressSummary } from '@/lib/supabase/planner';
 import { useAuth } from '@/lib/supabase/AuthContext';
 import { signOut } from '@/lib/supabase/auth';
-import { getGamificationData, BADGE_DEFINITIONS, type GamificationData } from '@/lib/supabase/gamification';
+import { getGamificationData, getOnboardingStatus, BADGE_DEFINITIONS, type GamificationData } from '@/lib/supabase/gamification';
+import OnboardingFlow from '@/components/planner/OnboardingFlow';
 
 // Phase icons mapping
 const phaseIcons: Record<number, string> = {
@@ -344,6 +345,7 @@ export default function PlannerPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentQuote] = useState(() => Math.floor(Math.random() * quotes.length));
   const [gamification, setGamification] = useState<GamificationData | null>(null);
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -361,14 +363,16 @@ export default function PlannerPage() {
         setIsLoading(true);
         setError(null);
 
-        // Fetch progress and gamification data in parallel
-        const [progressData, gamificationData] = await Promise.all([
+        // Fetch progress, gamification, and onboarding status in parallel
+        const [progressData, gamificationData, onboardingStatus] = await Promise.all([
           getUserProgress(user.id),
           getGamificationData(user.id),
+          getOnboardingStatus(user.id),
         ]);
 
         setProgress(progressData);
         setGamification(gamificationData);
+        setOnboardingCompleted(onboardingStatus);
 
         // Map phases with icons
         const phasesWithIcons: PhaseDisplay[] = progressData.phases.map((p) => ({
@@ -419,6 +423,16 @@ export default function PlannerPage() {
   // Don't render anything while redirecting to login
   if (!isAuthenticated) {
     return null;
+  }
+
+  // Show onboarding for first-time users
+  if (onboardingCompleted === false && user) {
+    return (
+      <OnboardingFlow
+        userId={user.id}
+        onComplete={() => setOnboardingCompleted(true)}
+      />
+    );
   }
 
   return (

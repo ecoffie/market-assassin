@@ -99,3 +99,16 @@ CREATE POLICY "Users can insert their own gamification"
 CREATE POLICY "Users can update their own gamification"
   ON planner_gamification FOR UPDATE
   USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);
+
+
+-- ============================================================
+-- Migration: Onboarding Flow (February 2026)
+-- Adds onboarding_completed flag to planner_gamification.
+-- Run in the PLANNER Supabase SQL editor.
+-- ============================================================
+
+ALTER TABLE planner_gamification
+  ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
+
+-- Mark existing users as already onboarded so they skip the walkthrough
+UPDATE planner_gamification SET onboarding_completed = TRUE;
