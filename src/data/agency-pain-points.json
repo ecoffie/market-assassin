@@ -245,7 +245,10 @@
         "Small business participation across 115+ worldwide locations",
         "Contracting workforce retention and training at 6,100+ employee scale",
         "FY2026 NDAA: Cost Accounting Standards (CAS) threshold changes - $2M to $35M applicability",
-        "FY2026 NDAA: Cost or pricing data threshold changes - $2M to $10M (contracts after June 30, 2026)"
+        "FY2026 NDAA: Cost or pricing data threshold changes - $2M to $10M (contracts after June 30, 2026)",
+        "DOD IT business systems are $4.4B over budget and years behind schedule per GAO \u2014 ACC relies on legacy ERP and procurement platforms that delay contract award timelines and require costly workarounds across 115+ locations.",
+        "Other Transaction Authority (OTA) obligations surged from $1.8B (FY2016) to over $18B (FY2024), but GAO-25-107546 found DOD lacks standardized data to assess OTA effectiveness \u2014 ACC manages growing OTA portfolio without adequate tracking or performance metrics.",
+        "ACC contract closeout backlog persists as the command processes 14,000+ contract actions totaling $34.2B annually \u2014 AI-assisted closeout tools are in pilot phase but not yet scaled, leaving aged contracts consuming workforce capacity."
       ],
       "priorities": [
         "$1.2B allocated for Army Futures Command's hypersonic weapons development under the Long-Range Hypersonic Weapon program, with testing contracts and production awards expected in FY2025-2026",
@@ -591,7 +594,9 @@
         "Emergency response capabilities - Nuclear Emergency Support Team (NEST) readiness",
         "Laboratory infrastructure upgrades - Los Alamos, Livermore, Sandia modernization",
         "Production facility recapitalization - Y-12, Pantex, Kansas City, Savannah River",
-        "Supply chain security - critical materials and components for nuclear enterprise"
+        "Supply chain security - critical materials and components for nuclear enterprise",
+        "GAO-25-106675 (February 2025) found NNSA's Savannah River Plutonium Processing Facility lacks a construction schedule and has 'less than adequate' project management \u2014 cost estimates ballooned to $18B-$25B, the 2030 deadline for 50 plutonium pits per year will not be met, and a January 2025 GAO recommendation for a best-practices life cycle cost estimate remains unimplemented.",
+        "W93 warhead production depends on Savannah River producing at least half of required plutonium pits, but NNSA has acknowledged the facility cannot be ready in time to support the full W93 build schedule \u2014 Congressional scrutiny intensified with a December 2025 Senate letter citing pit production mismanagement and questioning NNSA's ability to meet nuclear deterrence modernization timelines."
       ],
       "priorities": [
         "$23B allocated for NNSA nuclear weapons modernization, including the W93 warhead and pit production expansion at Los Alamos and Savannah River, with contracts for design and manufacturing support open in FY2025-2026.",
@@ -615,7 +620,9 @@
         "Fusion energy research - ITER collaboration and domestic fusion programs",
         "Quantum information science - quantum computing and sensing technologies",
         "AI/ML for scientific research - computational modeling and data analysis",
-        "Workforce development - attracting top scientific talent to national labs"
+        "Workforce development - attracting top scientific talent to national labs",
+        "Federal civilian building deferred maintenance backlogs more than doubled from $171B to $370B between FY2017-2024 government-wide, with DOE's 10 Office of Science national laboratories collectively carrying billions in deferred infrastructure needs \u2014 the FY2026 request includes zero new line-item construction projects despite $832M annual maintenance spend.",
+        "Quantum Information Science research centers received $625M in renewals (FY2025), but GAO notes quantum technologies will take at least a decade and cost billions to develop for practical use \u2014 DOE must coordinate five national QIS centers, testbed operations, and workforce pipelines while the FY2026 SC budget request of $7.09B represents a 13.9% cut from FY2025 enacted levels."
       ],
       "priorities": [
         "$1.5B allocated for the Office of Science\u2019s Advanced Scientific Computing Research (ASCR) program to develop exascale computing systems, with contracts for hardware and software solutions expected in FY2025",
@@ -639,7 +646,9 @@
         "Spent fuel management - storage, transportation, and disposal solutions",
         "Reactor licensing support - navigating NRC approval for innovative designs",
         "Idaho National Laboratory infrastructure - research reactor and testing facilities",
-        "Nuclear energy R&D partnerships - industry collaboration programs"
+        "Nuclear energy R&D partnerships - industry collaboration programs",
+        "HALEU fuel supply gap threatens advanced reactor timelines \u2014 Congress mandated 21 metric tons available by June 2026, but the U.S. has no significant reliable domestic HALEU production capacity, with Centrus Energy's sole operating cascade producing only 900 kg by mid-2025 under a DOE contract extension.",
+        "NRC licensing timelines for non-light-water SMR designs remain 4-7 years per application despite the ADVANCE Act of 2024 introducing 50% fee reductions \u2014 only NuScale has achieved Standard Design Approval (77 MWe), while nine of ten DOE-funded advanced reactor designs still await fuel qualification and regulatory approval."
       ],
       "priorities": [
         "$1.2B allocated for the Advanced Reactor Demonstration Program (ARDP) to support private-sector development of innovative nuclear reactors, with funding opportunities for design and licensing through FY2027",
@@ -663,7 +672,9 @@
         "Natural gas infrastructure - pipeline safety and methane emissions reduction",
         "NETL research capabilities - only government-owned, government-operated DOE lab",
         "Energy storage solutions - grid-scale battery and thermal storage",
-        "Fossil energy cybersecurity - protecting energy infrastructure from threats"
+        "Fossil energy cybersecurity - protecting energy infrastructure from threats",
+        "GAO-24-106489 found DOE's Office of Clean Energy Demonstrations did not consistently follow risk-reduction guidance when selecting and managing carbon capture projects \u2014 critical gap given the $12B in CCUS funding DOE must deploy, with 10 CCS pilot and demonstration projects cut in May 2025.",
+        "CO2 pipeline permitting and Class VI injection well approvals create multi-year delays for carbon capture projects \u2014 PHMSA safety regulations remain unfinalized, and lack of transport and storage infrastructure threatens viability of 45Q tax credit-dependent projects across the fossil energy portfolio."
       ],
       "priorities": [
         "DOE Fossil Energy allocated $1.3B for Carbon Capture and Storage (CCS) demonstration projects under the Bipartisan Infrastructure Law, with solicitations for industry partners expected in FY2025.",
@@ -794,7 +805,9 @@
         "Quality measurement and reporting - value-based care analytics",
         "Interoperability standards - connecting providers, payers, and patients",
         "Cybersecurity for beneficiary data - protecting sensitive health information",
-        "Cloud migration - moving legacy systems to modern platforms"
+        "Cloud migration - moving legacy systems to modern platforms",
+        "GAO-25-106995 found CMS does not routinely verify hospital pricing data for completeness or accuracy under the Price Transparency Rule \u2014 only $4M in penalties issued to 14 hospitals out of 6,000+ despite widespread noncompliance, undermining the transparency mandate effective January 2025.",
+        "No Surprises Act Independent Dispute Resolution (IDR) backlog reached 1.2M cases in H1 2025 (40% increase over H2 2024) \u2014 61% of nearly 490,000 complaints remain unresolved, and a handful of private-equity-backed provider groups submit the majority of disputes, straining CMS enforcement capacity."
       ],
       "priorities": [
         "CMS allocating $1.4B for Medicare Program Integrity initiatives to combat fraud, waste, and abuse, with contracts for data analytics and auditing services expected in FY2025",
@@ -844,7 +857,9 @@
         "Climate data systems - long-term observation and analysis infrastructure",
         "National Weather Service modernization - forecasting technology and communication",
         "Ocean observation systems - buoys, sensors, and autonomous platforms",
-        "Coastal resilience - storm surge prediction and sea level rise monitoring"
+        "Coastal resilience - storm surge prediction and sea level rise monitoring",
+        "GeoXO satellite program faces existential budget pressure \u2014 OMB recommended NOAA 'immediately cancel all major instrument and spacecraft contracts' for the $19.6B program, calling projected costs 'unsustainable,' while proposing a $385M FY2026 budget that is $306.5M below what NESDIS planned to spend, threatening the six-satellite constellation's ability to replace aging GOES-R capabilities.",
+        "GAO-24-106336 found NOAA's fisheries bycatch monitoring does not meet its own standards \u2014 observer coverage is as low as 2% of fishing trips in some fisheries (Gulf of Mexico shrimp trawl), electronic monitoring implementation timelines have slipped, and NMFS lacks measurable performance goals for reducing and tracking bycatch across federally managed fisheries."
       ],
       "priorities": [
         "$1.1B allocated for NOAA's National Weather Service modernization under the FY2025 budget, with contracts for advanced forecasting tools and data analytics expected in FY2026.",
@@ -868,7 +883,9 @@
         "Measurement science - next-generation metrology and calibration",
         "Physical infrastructure upgrades - Gaithersburg campus modernization",
         "Bioscience and health IT standards - medical device interoperability",
-        "Emerging technology standards - 5G/6G, IoT, blockchain"
+        "Emerging technology standards - 5G/6G, IoT, blockchain",
+        "Post-quantum cryptography migration creates an urgent compliance timeline \u2014 NIST released the first three PQC standards in August 2024, but federal agencies must migrate all National Security Systems to quantum-safe algorithms by January 2027, and NIST must support government-wide transition planning while its own workforce planning was flagged by OIG-24-023-I as lacking a comprehensive plan.",
+        "CHIPS for America R&D execution disrupted after Commerce rescinded $7.4B previously awarded to Natcast for operating the National Semiconductor Technology Center in August 2025 \u2014 NIST must now directly administer CHIPS R&D funds from the $11B allocation while simultaneously developing AI safety standards, with draft cybersecurity framework guidelines for AI not expected until 2026."
       ],
       "priorities": [
         "NIST allocating $1.5B through FY2025-2027 for the CHIPS for America Act R&D programs, with contracts for semiconductor manufacturing technology development open to industry partners.",
@@ -946,7 +963,9 @@
         "Unmanned aircraft systems (UAS) integration - enabling safe drone operations",
         "Workforce challenges - hiring and retaining 45,000+ employees including controllers",
         "Aging infrastructure replacement - towers, radar systems, communications equipment",
-        "Commercial space launch oversight - supporting growing space industry"
+        "Commercial space launch oversight - supporting growing space industry",
+        "GAO-26-107320 (December 2025) found FAA lacks performance goals for recruiting, hiring, and training air traffic controllers \u2014 staffing fell to 13,164 controllers (6% below 2015 levels) while flight volume increased 10% to 30.8M, with over 40% of 290 terminal facilities understaffed as of September 2024 and trainee failure rates exceeding 30% in 2024.",
+        "FAA's legacy technology systems are up to 50 years old and suffering from lack of replacement parts \u2014 the January 2023 NOTAM system outage grounded all U.S. flights, and the National Airspace System Safety Review Team identified systemic infrastructure fragility that NextGen modernization (now decades behind original schedule) has not resolved."
       ],
       "priorities": [
         "$2.8B allocated for FAA's NextGen air traffic control modernization, with contracts for satellite-based navigation systems and data integration expected in FY2025-2026.",
@@ -970,7 +989,9 @@
         "Environmental mitigation - sustainable highway design and construction",
         "Climate resilience - adapting highways to extreme weather and flooding",
         "Workforce development - supporting state DOT technical capacity",
-        "Data systems modernization - highway performance monitoring and analytics"
+        "Data systems modernization - highway performance monitoring and analytics",
+        "NEVI EV charging program effectively frozen after DOT rescinded guidance and withdrew state plan approvals on February 6, 2025 \u2014 GAO found the funding pause constitutes an illegal impoundment, with only 57 NEVI-funded stations operational across 15 states out of $3.3B allocated, and 16 states plus D.C. filed suit challenging the action.",
+        "GAO-25-107227 found FHWA's Bridge Investment Program evaluation process did not fully align with federal regulations \u2014 despite $8.1B invested across 100 projects, 220,000+ bridges (36% of national inventory) still need major repair or replacement, and drivers cross structurally deficient bridges 167 million times daily."
       ],
       "priorities": [
         "FHWA allocating $40B from Bipartisan Infrastructure Law for highway modernization, with contracts for construction and engineering support open through state DOTs in FY2025-2027.",
@@ -994,7 +1015,9 @@
         "Transit cybersecurity - protecting rider data and operational systems",
         "State of Good Repair - addressing maintenance backlogs",
         "Rural transit solutions - serving underserved communities",
-        "Transit-oriented development - coordinating land use and transportation"
+        "Transit-oriented development - coordinating land use and transportation",
+        "FTA's $105B state of good repair backlog for transit assets in marginal or poor condition continues to grow \u2014 the Capital Investment Grants program received $3.8B in FY2025 appropriations but demand far exceeds funding, with GAO-25-107672 finding FTA needs to improve technical assistance for new project sponsors navigating the multi-year CIG approval pipeline.",
+        "Zero-emission bus transition faces workforce and infrastructure barriers \u2014 the $5.6B Low or No Emission Grant Program (FY2022-2026) requires skilled technicians for battery electric and hydrogen fuel cell maintenance, but FTA's FY2026 workforce development request of only $8M is insufficient for retraining thousands of transit mechanics nationwide."
       ],
       "priorities": [
         "FTA allocated $2.3B for the Capital Investment Grants (CIG) program in FY2025 to fund new transit projects, with grant solicitations open for construction and engineering firms.",
@@ -1018,7 +1041,9 @@
         "Grade crossing elimination - reducing vehicle-train collisions",
         "Rail cybersecurity - protecting signaling and control systems",
         "Freight rail efficiency - supporting supply chain resilience",
-        "Regulatory compliance - enforcing safety standards across rail industry"
+        "Regulatory compliance - enforcing safety standards across rail industry",
+        "The National Transportation Safety Board issued 81 recommendations to FRA from 2015-2024, but FRA has fully implemented only 5 \u2014 the lowest completion rate of any DOT regulatory agency \u2014 leaving critical safety gaps in areas including train-length risks, hazmat transport protocols, and inspection standards.",
+        "FRA terminated approximately $4B in unspent federal funding for the California high-speed rail project in summer 2025 citing schedule delays and cost overruns after 16 years and $15B spent with no completed track \u2014 broader high-speed rail corridor planning nationwide lacks a funded pipeline, and the FRA FY2026 budget request reflects diminished ambitions for intercity passenger rail expansion."
       ],
       "priorities": [
         "FRA allocated $2.4B for the Northeast Corridor Infrastructure and Operations program under the Bipartisan Infrastructure Law, with grants and contracts for rail upgrades open through FY2025.",
@@ -5685,6 +5710,1061 @@
         "Passport production and security: Next-generation e-passport issuance with enhanced biometric features and anti-counterfeiting technology",
         "American Citizens Services: Emergency response capability for US citizens abroad including evacuations, welfare/whereabouts checks, and crisis assistance",
         "Consular officer recruitment and training: Expanding adjudicative workforce with 34%+ growth since 2022 and developing expertise in fraud detection and immigration law"
+      ]
+    },
+    "Federal Student Aid (FSA)": {
+      "painPoints": [
+        "FAFSA rollout failure: GAO-24-107783 found FSA launched the 2024-25 FAFSA despite knowing it was not ready, identifying 55 technical defects post-launch \u2014 twice the number flagged during testing",
+        "Contract oversight gaps: GAO-25-107396 found FSA did not fully apply leading practices for IT system testing, with test cases lacking traceability to requirements and no agency guidance on test case documentation",
+        "Call center failures: 74% of calls to the FSA Call Center went unanswered during the FAFSA crisis, and FSA waited 5 months before increasing staffing after the delayed launch",
+        "Leadership instability: Six different Department of Education CIOs since the FAFSA overhaul began in 2021, creating continuity gaps in the $1.7T+ loan portfolio management",
+        "FAFSA completion decline: 9% fewer first-time applicants submitted FAFSAs, with 11% declines among households earning $30,000-$48,000 \u2014 the population most dependent on federal aid",
+        "Loan servicing modernization delays: The Unified Servicing and Data Solution (USDS/NextGen) project has been a decade in the making, with repeated timeline slippages and contractor integration failures",
+        "Contractor fragmentation: Multiple contractors working on different FAFSA system components used incompatible tools that did not integrate, creating systemic failure points",
+        "No internal engineering expertise: FSA had no in-house engineering capability until 2024, relying entirely on external contractors for its core technology systems",
+        "Income-Driven Repayment processing errors: SAVE Plan implementation created processing backlogs affecting millions of borrowers, with incorrect payment calculations reported across servicers",
+        "Improper payment exposure: OIG identified $145.2 million disbursed to potentially ineligible applicants whose loans matched Do Not Pay database records for death, suspension, or delinquent child support",
+        "GAO-24-107407 found FSA failed to communicate FAFSA changes effectively to schools and students, undermining the FAFSA Simplification Act's intent to reduce barriers"
+      ],
+      "priorities": [
+        "$135 billion in new federal student aid made available in FY2025, including $39B+ in Pell Grants and $93B+ in student loans requiring servicing infrastructure",
+        "$625 million increase over FY2024 for student loan servicing oversight and digital infrastructure improvements",
+        "$1 billion budgeted for FY2026 loan servicing activities supporting 12 months of operations across all federal loan servicers",
+        "FAFSA system stabilization: multi-year investment to rebuild the Better FAFSA platform with improved testing protocols per GAO-25-107396 recommendations",
+        "AI-powered borrower support: deployment of Aiden AI Assistant and new Loan Simulator tools for 45M+ borrower accounts",
+        "Income-Driven Repayment modernization: paperless IDR application processing and automated income verification systems",
+        "Call center capacity expansion: staffing and technology upgrades to reduce 74% unanswered call rate identified by GAO",
+        "Cybersecurity and data protection: securing personally identifiable information for 45M+ borrower records across multiple servicer platforms",
+        "Contractor oversight reform: implementing GAO-recommended traceability requirements and testing standards for all IT system contracts",
+        "NextGen/USDS completion: finalizing transition from legacy loan servicing platforms to the unified modern servicing environment"
+      ]
+    },
+    "Office of Elementary and Secondary Education (OESE)": {
+      "painPoints": [
+        "ESSER closeout accountability: $190 billion in pandemic relief funds required closeout by September 2024, with GAO-24-106913 finding districts struggled to track spending effectiveness across multiple simultaneous activities",
+        "Title I formula inequity: funding formula sends disproportionate sums to districts in smaller states, creating per-pupil spending disparities that disadvantage high-poverty urban districts",
+        "ESSER spending effectiveness uncertainty: GAO found 80% of $60B examined went to academic and operational needs, but districts reported inability to isolate effectiveness of individual ESSER-funded activities",
+        "ESSER cliff: approximately $50 billion in projected unspent ESSER funds as of September 2024, forcing districts to eliminate pandemic-era staff positions and academic recovery programs",
+        "Learning recovery gaps: National Assessment of Educational Progress (NAEP) scores remain below pre-pandemic levels in math and reading, with OESE lacking metrics to measure recovery program impact",
+        "Title I monitoring deficiencies: states reported inconsistent oversight of Title I compliance, with allowable activity interpretations varying significantly across jurisdictions",
+        "Evidence-based program implementation: districts struggle to meet ESSA evidence-based intervention requirements, with limited capacity to evaluate which Tier 1-4 strategies produce results",
+        "Chronic absenteeism crisis: post-pandemic chronic absenteeism rates nearly doubled nationally, and OESE lacks standardized metrics to track improvement across states receiving Title I funds",
+        "Teacher workforce shortage: estimated 300,000+ teacher vacancies nationwide, with Title II-A funding ($2.2B) insufficient to address recruitment, retention, and professional development at scale",
+        "Data infrastructure gaps: February 2025 termination of 89 IES research contracts ($900M) eliminated key data collection programs that informed OESE policy and program evaluation",
+        "ESSER maintenance-of-effort compliance: districts face complex MOE waiver processes, with HHS/ED coordination gaps creating confusion about fiscal requirements"
+      ],
+      "priorities": [
+        "$18.4 billion for Title I, Part A grants to local educational agencies serving 25 million students in high-poverty schools in FY2025",
+        "$2.2 billion for Title II-A Supporting Effective Instruction grants focused on teacher quality, recruitment, and retention",
+        "$1.3 billion for Title IV-A Student Support and Academic Enrichment grants covering well-rounded education, safe schools, and technology",
+        "$800 million for 21st Century Community Learning Centers (Title IV-B) after-school and summer learning programs",
+        "ESSER closeout oversight: completing financial reviews and program evaluations for $190B in pandemic relief spending across 13,000+ districts",
+        "$375 million for Title III English Language Acquisition grants supporting 5 million English learners in public schools",
+        "Evidence-based intervention expansion: increasing technical assistance for states implementing ESSA evidence requirements under Title I school improvement",
+        "Chronic absenteeism reduction: targeted funding for attendance improvement strategies in Title I schools with 30%+ chronic absence rates",
+        "$180 million for Education Innovation and Research (EIR) program to test and scale evidence-based practices",
+        "Charter Schools Program grants ($440M) for opening, replicating, and expanding high-quality charter schools serving disadvantaged students"
+      ]
+    },
+    "Office of Special Education and Rehabilitative Services (OSERS)": {
+      "painPoints": [
+        "IDEA funding gap: federal share covers only ~14% of per-pupil special education costs despite original 40% commitment, forcing states and districts to absorb $40B+ in unfunded mandates annually",
+        "Special education teacher shortage: GAO-25-107053 identified severe personnel shortages with 40+ states reporting special education teacher vacancies, particularly in rural and high-poverty districts",
+        "State implementation compliance: 2024 IDEA determination letters revealed ongoing noncompliance issues across multiple states, with monitoring cycles unable to keep pace with systemic problems",
+        "Vocational rehabilitation backlog: Rehabilitation Services Administration programs face waitlists in 20+ states due to order-of-selection policies triggered by insufficient funding",
+        "Disproportionate identification: persistent racial and ethnic disproportionality in special education identification, placement, and discipline \u2014 particularly for Black and Native American students",
+        "Transition services gaps: students with disabilities face 60%+ unemployment rates post-graduation, indicating systemic failures in IDEA-mandated transition planning and services",
+        "Research infrastructure loss: Department of Education FY2026 budget proposes 67% cut to IES funding ($261M from $785M), threatening the National Center for Special Education Research",
+        "Personnel preparation pipeline: despite $80M+ in IDEA personnel preparation grants, universities graduate fewer special education teachers each year than the field loses to attrition",
+        "Assistive technology access: uneven distribution of assistive technology across districts, with rural and underserved schools lacking devices and trained staff for IDEA compliance",
+        "Infant and toddler services (Part C): early intervention programs in 15+ states report waitlists and insufficient qualified providers for children ages 0-3 with disabilities",
+        "Data quality concerns: state-reported IDEA performance data varies in reliability, with OSEP lacking resources to independently verify compliance metrics"
+      ],
+      "priorities": [
+        "$14.9 billion for IDEA Grants to States (Part B) in FY2025 \u2014 a $677.5 million increase \u2014 supporting 7.5 million students with disabilities",
+        "$80 million for IDEA Personnel Preparation grants funding 78 new awards in FY2024 for special education teacher and related services training programs",
+        "$3 billion investment in educator workforce including $650M+ for competitive programs supporting diverse educator pipeline and teacher retention",
+        "$540 million for IDEA Preschool Grants (Section 619) and Infants and Families (Part C) early intervention programs",
+        "$250 million for Vocational Rehabilitation state grants to support employment outcomes for individuals with disabilities",
+        "National Technical Assistance Center expansion to support states in reducing racial disproportionality in special education identification and discipline",
+        "Assistive technology and accessible materials: funding for OSEP-supported centers developing universal design for learning resources",
+        "Transition services improvement: targeted investment in pre-employment transition services and competitive integrated employment programs",
+        "Personnel retention initiatives: implementation of January 2025 Dear Colleague Letter strategies on special education personnel retention",
+        "State systemic improvement plans: continued investment in results-driven accountability frameworks across all 50 states and territories"
+      ]
+    },
+    "Office of Postsecondary Education (OPE)": {
+      "painPoints": [
+        "Accreditation oversight backlog: OPE placed a temporary pause on reviewing applications from new accreditors in October 2024 due to a large volume of existing agencies under review",
+        "TRIO/GEAR UP funding threat: FY2026 budget proposal would eliminate $1.6 billion supporting 880,000 TRIO students and 560,000 GEAR UP students, representing the largest proposed cut in program history",
+        "Clery Act noncompliance: audits of California institutions found all six non-compliant, with inaccurate security statistics, incomplete daily crime logs, and undisclosed emergency procedures",
+        "For-profit institution oversight gaps: OPE struggles to enforce gainful employment rules and borrower defense claims against institutions with high default rates and low completion rates",
+        "Title IV program integrity: improper payment rates in student aid programs remain elevated, with OIG identifying institutions that fail to return unearned Title IV funds",
+        "Campus safety reporting inconsistency: confusion over Campus Security Authority (CSA) definitions leads to underreporting of Clery-reportable crimes across thousands of institutions",
+        "Accreditor accountability: accrediting agencies approved institutions with persistently low graduation rates and high student debt, raising questions about gatekeeping effectiveness",
+        "Hispanic-Serving Institution (HSI) capacity: rapid HSI designation growth outpaces dedicated Title V funding ($195M), leaving many eligible institutions without development grants",
+        "International education program reduction: Fulbright-Hays and other international education programs face proposed elimination despite national security language training needs",
+        "Student debt-to-income ratios: OPE lacks real-time data systems to monitor student borrowing against program-level earnings outcomes, hampering program integrity enforcement"
+      ],
+      "priorities": [
+        "$1.1 billion for Federal TRIO Programs supporting first-generation and low-income students through Upward Bound, Student Support Services, and Educational Opportunity Centers",
+        "$408 million for GEAR UP grants providing college readiness services to 560,000 students in high-poverty middle and high schools",
+        "$195 million for Title V Hispanic-Serving Institution grants supporting institutional capacity building at the fastest-growing segment of higher education",
+        "$380 million for Title III Strengthening Institutions grants including Historically Black Colleges and Universities (Part B) and Tribal Colleges (Part A)",
+        "Accreditation system modernization: implementing new recognition criteria and streamlining review processes for the 60+ federally recognized accrediting agencies",
+        "$90 million for Campus Safety programs including the Clery Act compliance infrastructure and Violence Against Women Act implementation grants",
+        "Gainful employment rule implementation: building data systems to measure and enforce program-level earnings thresholds for career education programs",
+        "Teacher Quality Partnership grants ($60M) for clinical preparation programs addressing teacher shortage areas in high-need districts",
+        "$50 million for Fund for the Improvement of Postsecondary Education (FIPSE) supporting innovation in college completion and affordability",
+        "Borrower defense streamlining: reducing processing time for borrower defense to repayment claims and institutional accountability actions"
+      ]
+    },
+    "Office of Public and Indian Housing (PIH)": {
+      "painPoints": [
+        "Capital needs backlog: public housing infrastructure requires an estimated $90 billion in repairs (up from $70B), with Congress funding only $3.4B annually \u2014 approximately 4% of total need",
+        "Unit loss crisis: HUD estimates 10,000-12,000 public housing units lost annually due to deterioration and demolition, shrinking the affordable housing supply serving 1.8M+ households",
+        "RAD conversion oversight gaps: HUD OIG found PIH lacks protocols for field offices to ensure Housing Quality Standards inspection reports are received and reviewed for RAD-converted properties",
+        "Non-FHA-insured PBV oversight: HUD OIG report found PIH needs to improve oversight of Project-Based Voucher projects converted under RAD that lack FHA insurance protections",
+        "Housing Choice Voucher utilization: chronic underutilization of authorized vouchers due to landlord participation barriers, with 200,000+ vouchers going unused while 4M+ families remain on waitlists",
+        "Tribal housing conditions: Native American housing stock on reservations has severe overcrowding and substandard conditions, with Indian Housing Block Grant ($886M) failing to address $50B+ in tribal housing needs",
+        "Reserve for replacement underfunding: HUD OIG found RAD-converted properties lack sufficient reserve accounts to address future capital needs, creating new deferred maintenance cycles",
+        "Lead paint and environmental hazards: public housing units built before 1978 face $3.5B+ in lead abatement costs, with children in public housing disproportionately affected by lead exposure",
+        "Proposed FY2025 funding cuts: both Public Housing Operating Fund ($5.1B) and Capital Fund ($3.09B) face $380M and $318M reductions respectively",
+        "PHA administrative capacity: small and troubled Public Housing Authorities lack staffing and financial management systems to comply with federal reporting and oversight requirements",
+        "Emergency voucher expiration: 70,000 Emergency Housing Vouchers issued under the American Rescue Plan face funding uncertainty as supplemental appropriations expire"
+      ],
+      "priorities": [
+        "$30.4 billion for Housing Choice Voucher program renewals serving 2.3 million families, with contract administration and tenant protection vouchers",
+        "$5.1 billion for Public Housing Operating Fund supporting day-to-day operations at 1.1 million public housing units across 3,000+ PHAs",
+        "$3.4 billion for Public Housing Capital Fund addressing critical infrastructure repairs, modernization, and safety improvements",
+        "$886 million for Indian Housing Block Grants supporting 562 federally recognized tribal housing entities",
+        "Rental Assistance Demonstration (RAD) expansion: converting additional public housing units to project-based Section 8 to access private capital for rehabilitation",
+        "$50 million Voucher Mobility Demonstration program to help families with vouchers move to higher-opportunity neighborhoods",
+        "Lead hazard remediation: targeted investment in lead paint abatement and environmental hazard removal in pre-1978 public housing stock",
+        "Choice Neighborhoods Implementation grants ($250M) for comprehensive neighborhood transformation around distressed public and assisted housing",
+        "PHA administrative modernization: technology upgrades for housing authority financial management, waiting list administration, and HUD reporting systems",
+        "Tribal housing infrastructure: Indian Community Development Block Grant ($70M) funding for water, sewer, and housing construction on tribal lands"
+      ]
+    },
+    "Office of Community Planning and Development (CPD)": {
+      "painPoints": [
+        "CDBG monitoring failures: HUD OIG found CPD monitoring identified numerous grantee deficiencies but grantee performance had not improved over time despite repeated findings",
+        "Civil rights compliance gaps: HUD OIG reported CPD performed civil rights monitoring reviews for only 2% of CDBG and HOME grantees monitored in FY2023",
+        "Homelessness crisis: unsheltered homelessness increased 18% from 2022-2024, overwhelming Emergency Solutions Grant ($290M) capacity in major metropolitan areas",
+        "CDBG performance measurement: HUD metrics do not demonstrate how grantees are increasing neighborhood health or attaining the primary CDBG objective of developing viable urban communities",
+        "HOME program production decline: rising construction costs reduced affordable housing units produced per HOME dollar by 30%+ since 2019, undermining program cost-effectiveness",
+        "Buy America compliance burden: Build America, Buy America Act implementation guidance creates procurement complexity for CPD grantees constructing infrastructure with CDBG-DR funds",
+        "CDBG-DR disaster recovery delays: average time from disaster declaration to CDBG-DR fund disbursement exceeds 24 months, leaving communities without federal rebuilding resources",
+        "Timeliness standards: 20%+ of CDBG entitlement grantees fail to meet spending timeliness standards, with unspent funds accumulating while community needs go unmet",
+        "Housing Trust Fund limitations: the $324M Housing Trust Fund serves extremely low-income households but funds fewer than 5,000 units annually against 10.8M+ renter households in severe need",
+        "Consolidated Plan complexity: 1,200+ CDBG entitlement communities must produce five-year Consolidated Plans with limited technical assistance, resulting in inconsistent needs assessments"
+      ],
+      "priorities": [
+        "$3.3 billion for Community Development Block Grants (CDBG) supporting housing, infrastructure, and economic development in 1,200+ communities",
+        "$1.5 billion for HOME Investment Partnerships Program funding affordable housing construction, rehabilitation, and rental assistance",
+        "$3.96 billion for Homeless Assistance Grants including Continuum of Care ($3.2B) and Emergency Solutions Grants ($290M)",
+        "$450 million for Housing Opportunities for Persons With AIDS (HOPWA) providing housing assistance and supportive services",
+        "$324 million for Housing Trust Fund supporting production of rental housing for extremely low-income households",
+        "CDBG-DR disaster recovery: ongoing management of $90B+ in allocated disaster recovery funds across multiple presidentially declared disasters",
+        "Eviction prevention and rapid rehousing: scaling Continuum of Care rapid rehousing models to address post-pandemic eviction surges",
+        "Section 108 Loan Guarantee program for large-scale economic development projects leveraging CDBG allocations",
+        "Fair housing compliance: strengthening Affirmatively Furthering Fair Housing requirements in Consolidated Plans across all CPD programs",
+        "Environmental review modernization: streamlining NEPA and environmental review processes that delay CPD-funded project timelines by 12-18 months"
+      ]
+    },
+    "Government National Mortgage Association (Ginnie Mae)": {
+      "painPoints": [
+        "Nonbank issuer concentration risk: 88.97% of Ginnie Mae's $2.6 trillion in guaranteed pooled loans are held by 30 mortgage companies, 22 of which are unregulated nonbank institutions (December 2024 data)",
+        "Staffing crisis: fewer than 280 employees manage a $2.4T+ MBS portfolio, with current $54M budget inadequate \u2014 calls for increase to $67M to match operational complexity",
+        "No prudential regulator: approximately 90% of Ginnie Mae MBS are issued by independent mortgage bankers with no federal safety and soundness regulator, creating systemic risk exposure",
+        "Crisis preparedness gaps: GAO-25-107862 found Ginnie Mae did not participate in FSOC interagency tabletop exercises for nonbank mortgage servicer failure scenarios",
+        "Issuer default planning: GAO found Ginnie Mae uses only internal planning for issuer defaults, lacking processes for incorporating lessons from interagency crisis exercises",
+        "HUD OIG ongoing audit: Inspector General conducting active audit of Ginnie Mae's evaluation of nonbank issuer concentration risk, with findings pending",
+        "Technology infrastructure age: Ginnie Mae's core systems require modernization to monitor real-time issuer financial health across hundreds of counterparties",
+        "Servicer buyout increases: rising volume of Ginnie Mae servicer buyouts in 2025 indicates growing financial stress among nonbank issuers in the portfolio",
+        "Taxpayer exposure: nonbank issuer failures could force Ginnie Mae to assume servicing of millions of government-backed mortgages, with potential costs in the hundreds of billions",
+        "Competitive compensation: Ginnie Mae salary levels are not competitive with other housing finance agencies (FHFA, FDIC), creating recruitment and retention challenges for risk management staff"
+      ],
+      "priorities": [
+        "$2.4 trillion MBS portfolio management: ensuring continuous payment flows on government-backed mortgage securities (FHA, VA, USDA loans)",
+        "Budget increase request from $54M to $67M for FY2025 to fund staffing, technology, and risk management capabilities",
+        "Nonbank issuer monitoring: building enhanced financial surveillance systems to track health of 22 nonbank companies holding 89% of guaranteed loans",
+        "Interagency crisis coordination: implementing GAO-25-107862 recommendation to develop processes for participating in FSOC tabletop exercises",
+        "Issuer default contingency planning: establishing pre-positioned contracts and operational playbooks for rapid assumption of defaulted issuer portfolios",
+        "Cybersecurity modernization: protecting payment systems processing $60B+ in monthly mortgage-backed security distributions",
+        "Staff recruitment and retention: increasing headcount from 280 to address growing portfolio complexity and regulatory expectations",
+        "Data analytics platform: deploying advanced analytics for real-time monitoring of issuer financial conditions and early warning indicators",
+        "Counterparty risk framework: enhancing capital and liquidity requirements for nonbank issuers per FSOC May 2024 report recommendations",
+        "FHA/VA loan performance monitoring: tracking delinquency trends across government loan programs that comprise the guaranteed MBS pool"
+      ]
+    },
+    "GSA Public Buildings Service (PBS)": {
+      "painPoints": [
+        "Deferred maintenance crisis: PBS reported $6.1 billion deferred maintenance backlog in FY2024, up from $1.39 billion in 2017 \u2014 a 339% increase in seven years",
+        "GAO High Risk List: managing federal real property has been on GAO's High-Risk List for 22 consecutive years, with building condition added as a specific high-risk factor in 2025",
+        "Broader federal backlog: combined DOD and civilian deferred maintenance doubled from $171B to $370B between FY2017-2024 (GAO-25-108400)",
+        "Reorganization challenges: GAO-26-108785 found successful PBS reorganization is critical for addressing longstanding challenges in federal real property management",
+        "Rising costs: PBS attributes backlog growth to funding constraints, rising labor and material costs, and the size and age of its 8,600+ property portfolio",
+        "Vacant federal space: post-pandemic federal telework policies left millions of square feet underutilized, with lease costs continuing on spaces with less than 25% occupancy",
+        "Disposal barriers: GAO-25-108400 found disposing of unneeded facilities could help reduce the maintenance backlog, but regulatory and political barriers slow the process",
+        "Premature replacement costs: GAO warned that continued deferred maintenance will force premature building replacements at significantly higher cost than timely repairs",
+        "Energy performance compliance: Executive Order requirements for net-zero emissions in federal buildings by 2045 require massive capital investment in aging PBS stock",
+        "Lease cost escalation: PBS manages $7B+ in annual lease payments, with market rate increases outpacing appropriations in major metropolitan areas"
+      ],
+      "priorities": [
+        "$11 billion annual construction and leasing program for federal buildings, courthouses, border stations, and land ports of entry",
+        "Federal Buildings Fund: building operations revenue (~$12B) supporting maintenance, construction, and leasing for 8,600+ government properties",
+        "Deferred maintenance reduction: targeted investment to address the $6.1B backlog per GAO-25-108400 recommendations on disposal and prioritization",
+        "Federal property disposal: accelerating disposition of underutilized buildings to reduce carrying costs per GAO-25-108400 findings",
+        "Net-zero building conversions: energy efficiency retrofits and renewable energy installations across the federal portfolio per Executive Order targets",
+        "Seismic retrofit program: structural upgrades to federal buildings in high-seismic zones, particularly courthouses and critical infrastructure",
+        "Space utilization optimization: right-sizing the federal footprint in response to telework and hybrid work policies reducing daily building occupancy",
+        "Building modernization: HVAC, electrical, and fire/life safety system upgrades in buildings averaging 50+ years old",
+        "Prospectus-level construction projects: congressional authorization for major renovations and new construction exceeding $3.6M threshold",
+        "Physical security upgrades: perimeter protection, access control, and blast-resistant improvements at federal facilities per ISC standards"
+      ]
+    },
+    "GSA Technology Transformation Services (TTS)": {
+      "painPoints": [
+        "50% workforce reduction: GSA announced it would reduce TTS by half, eliminating all non-statutory and non-critical work, threatening civic technology programs",
+        "Login.gov data backup gaps: GAO-25-107000 found GSA has not demonstrated that Login.gov fully implemented its data protection policy for testing data backups",
+        "Login.gov NIST compliance: GAO-25-106640 identified that GSA needs to address NIST identity assurance guidance, technical issues, and lessons learned for Login.gov",
+        "FedRAMP contractor elimination: FedRAMP's ~80 contractors will be reduced to zero as contracts expire in 2025, despite 300+ cloud authorizations requiring ongoing review",
+        "Fraud detection backlog: Login.gov's fraud detection roadmap was blocked \u2014 the security engineering team was not fully staffed until January 2024, delaying critical anti-fraud work",
+        "18F dissolution: elimination of 18F consulting practice removes federal agencies' access to in-house digital services expertise for technology modernization projects",
+        "Identity proofing challenges: only 15 of 24 CFO Act agencies use Login.gov, with fragmented identity verification across government creating duplicative systems",
+        "Cloud.gov sustainability: cloud.gov platform supporting federal agency applications faces uncertain future under TTS reduction despite hosting production government systems",
+        "FedRAMP authorization pace: growing backlog of cloud service providers awaiting FedRAMP authorization, with staff reductions threatening the program's ability to process reviews",
+        "Pricing model transition: Login.gov's July 2024 pricing restructure requires agencies to renegotiate agreements, creating adoption friction during a workforce reduction"
+      ],
+      "priorities": [
+        "Login.gov operations: maintaining service for 72+ million active users across 167 partner applications, including Department of State passport renewal",
+        "FedRAMP program: sustaining the federal cloud authorization framework as a statutory requirement despite contractor workforce elimination",
+        "Cloud.gov platform: continued hosting of government applications requiring FedRAMP-authorized Platform-as-a-Service infrastructure",
+        "Login.gov fraud detection: unblocking and accelerating the fraud detection work roadmap per organizational commitment to anti-fraud capability",
+        "Identity proofing expansion: achieving IAL2 compliance for both remote and in-person identity verification across all Login.gov partner agencies",
+        "FedRAMP Marketplace modernization: completing the redesigned marketplace launched in 2024-25 and maintaining the cloud authorization inventory",
+        "Cybersecurity compliance: implementing GAO-25-107000 recommendation on Login.gov data backup testing demonstration",
+        "U.S. Web Design System (USWDS): maintaining the federal design system used by hundreds of government websites for consistent user experience",
+        "Integrated Award Environment: sustaining SAM.gov and related acquisition data systems as statutory requirements",
+        "Centers of Excellence: continuing shared-service consulting engagements across federal agencies for IT modernization and customer experience"
+      ]
+    },
+    "SBA Office of Capital Access": {
+      "painPoints": [
+        "COVID-19 fraud exposure: SBA OIG estimated $200B+ in potentially fraudulent pandemic loans (PPP/EIDL), with GAO-25-107267 finding SBA failed to provide sufficient information for 2M of 3M fraud referrals",
+        "7(a) program risk management: SBA initiated actions to reverse what it called 'Biden-era mismanagement' of the core 7(a) lending program, citing elevated risk from lender eligibility expansion",
+        "Community Advantage program suspension: SBA imposed a moratorium on Community Advantage expansion and required existing lenders to meet new financial stability standards",
+        "Fraud referral failures: GAO found SBA's OIG was unable to fully investigate nearly 2 million fraud referrals because SBA did not provide enough or correct supporting documentation",
+        "Do Not Pay match failures: $145.2 million disbursed to applicants matching Do Not Pay records for death, suspension/debarment, or delinquent child support",
+        "Lender oversight gaps: rapid 7(a) volume growth ($8.73B in Q1 FY2025, up 38% YoY) strains SBA's capacity to monitor lender compliance and loan quality",
+        "Machine learning model flaws: GAO found flawed ML models and data played a role in SBA's COVID fraud detection estimates, undermining the accuracy of risk assessments",
+        "SBIC fund performance: Small Business Investment Company program faces portfolio stress with rising interest rates affecting fund returns and borrower repayment capacity",
+        "Microloan program reach: $55M microloan program serves fewer than 5,000 borrowers annually despite millions of underserved small businesses lacking access to capital",
+        "504 program utilization: CDC/504 debenture program faces declining participation as rising interest rates reduce demand for fixed-asset financing"
+      ],
+      "priorities": [
+        "7(a) loan program: managing $100B+ guaranteed loan portfolio with $8.73B in Q1 FY2025 approvals and Q2 exceeding $10B \u2014 one of the largest quarters on record",
+        "MARC loans: new Manufacturing and Recycling for Competitiveness lending product supporting American reshoring and industrial modernization",
+        "Lender financial stability standards: implementing enhanced oversight requirements for 7(a) and Community Advantage lenders per 2025 SOP updates",
+        "Fraud recovery: continuing investigation and recovery of $200B+ in potentially fraudulent pandemic-era loans per GAO-25-107267 recommendations",
+        "Credit score and identity verification: implementing new 2025 Standard Operating Procedure requirements for borrower eligibility verification",
+        "504 CDC program: supporting commercial real estate and equipment financing for small businesses through certified development companies",
+        "Small Business Investment Company (SBIC) program: licensing and overseeing privately managed venture capital funds that leverage SBA-guaranteed debentures",
+        "Surety Bond Guarantee program: expanding access to bonding for small contractors pursuing federal construction and service contracts",
+        "Technology modernization: upgrading loan origination and servicing systems to improve processing speed and fraud detection capabilities",
+        "Microloan program expansion: increasing intermediary lender network to serve underbanked small businesses in rural and underserved communities"
+      ]
+    },
+    "SBA Office of Government Contracting": {
+      "painPoints": [
+        "Small business goal enforcement: SBA reset SDB contracting goals from 15% to the statutory 5% floor for FY2025, representing a 67% reduction in the small disadvantaged business target",
+        "Set-aside compliance gaps: Rule of Two enforcement remains inconsistent, with agencies routinely bundling contracts in ways that exclude small business competition",
+        "Certification program backlogs: 8(a), HUBZone, Women-Owned Small Business, and Service-Disabled Veteran-Owned certification applications face processing delays of 90+ days",
+        "Mentor-protege oversight: GAO has previously found SBA lacks mechanisms to verify that mentor-protege relationships produce meaningful capability development for protege firms",
+        "Contract bundling: agencies continue to consolidate requirements into large contracts that exceed small business capabilities, despite Small Business Act provisions against unnecessary bundling",
+        "Subcontracting plan enforcement: prime contractors frequently miss small business subcontracting goals with minimal consequences, as SBA lacks real-time monitoring of subcontract flows",
+        "Category management conflicts: government-wide Best-in-Class (BIC) contracts concentrate spending with large primes, reducing opportunities for small businesses outside the BIC vehicle",
+        "Size standard accuracy: NAICS-based size standards lag behind industry consolidation trends, allowing large firms to qualify as small in sectors with outdated revenue/employee thresholds",
+        "Recertification rule impacts: 2025 final rule changes on recertification and negative controls create compliance uncertainty for small businesses in M&A transactions",
+        "Procurement scorecard methodology: agency small business scorecards lack granularity to measure quality of set-aside opportunities versus total contract value"
+      ],
+      "priorities": [
+        "23% statutory small business prime contracting goal: monitoring and enforcing the government-wide target across all federal agencies ($178B in FY2024 awards)",
+        "5% small disadvantaged business goal: implementing the reset SDB target with revised agency-specific goals for FY2025",
+        "3% HUBZone contracting goal: increasing utilization of HUBZone-certified firms in underserved communities",
+        "5% women-owned small business goal: expanding WOSB/EDWOSB set-aside utilization through sole-source and competitive set-asides",
+        "3% service-disabled veteran-owned small business goal: ensuring SDVOSB certification integrity and contract access",
+        "Multiple-award contract participation: implementing proposed Rule of Two for task/delivery orders under MAC vehicles per October 2024 proposed rule",
+        "Mentor-protege program expansion: increasing small business prime contractor capabilities through structured joint ventures and teaming",
+        "Procurement Center Representative (PCR) staffing: expanding SBA presence at major buying commands to identify set-aside opportunities",
+        "Small business size standard reviews: completing cyclical reviews of NAICS-based size standards to reflect current industry conditions",
+        "Scorecard modernization: enhancing the annual Small Business Procurement Scorecard methodology to better measure contract quality and access"
+      ]
+    },
+    "SBA Office of Disaster Assistance": {
+      "painPoints": [
+        "Historic funding lapse: SBA exhausted disaster loan funds on October 15, 2024 \u2014 the first credit subsidy fund lapse in program history \u2014 leaving 21,000+ applicants in a 68-day backlog",
+        "Hurricane processing under funding gap: despite processing Helene loans in 20 days and Milton in 17 days average, SBA could not disburse loans during the 68-day lapse (October-December 2024)",
+        "Duplication of benefits failures: GAO-25-107608 found SBA lacks procedures to ensure duplication-of-benefit cases get fully resolved, creating overpayment and recovery risks",
+        "$50B+ loan portfolio risk: aging disaster loan portfolio carries elevated delinquency rates, with pandemic-era EIDL loans compounding traditional disaster loan servicing burdens",
+        "Staffing surge limitations: disaster loan processing requires rapid workforce scaling from baseline to thousands of loan officers, with hiring timelines mismatched to disaster response needs",
+        "Application deadline extensions: funding lapse forced SBA to extend Helene/Milton application deadlines to April 2025, creating cascading processing and verification backlogs",
+        "Technology systems age: disaster loan origination and servicing platforms require modernization to handle concurrent multi-disaster processing at scale",
+        "Rural community outreach gaps: GAO-24-106755 found SBA's targeted outreach about disaster assistance could benefit rural communities with lower application rates",
+        "Fraud vulnerability: pandemic-era fraud patterns (fictitious businesses, manipulated documents) have migrated into disaster loan programs, straining verification resources",
+        "OIG capacity: Congress allocated $50M to SBA OIG specifically for disaster loan program audits under the American Relief Act, indicating scale of oversight concerns"
+      ],
+      "priorities": [
+        "$2.25 billion in disaster loan program funding provided by the American Relief Act, 2025 to clear the 21,000+ applicant backlog",
+        "Hurricane Helene and Milton recovery: processing remaining disaster loan applications from the largest concurrent hurricane disasters in recent history",
+        "Disaster loan portfolio servicing: managing $50B+ in outstanding disaster loans including pandemic-era EIDL and traditional physical/economic injury loans",
+        "Duplication of benefits resolution: implementing GAO-25-107608 recommendations for enhanced procedures and data systems to identify and resolve duplicate payments",
+        "Disaster preparedness staffing: pre-positioning trained loan officers and establishing rapid deployment protocols for future disaster responses",
+        "Loan origination modernization: upgrading technology platforms for faster application processing and automated eligibility verification",
+        "$50 million OIG oversight: supporting Inspector General audits and investigations of disaster loan program integrity",
+        "Rural outreach improvement: implementing GAO-24-106755 recommendations for targeted disaster assistance communication to underserved communities",
+        "Fraud prevention systems: deploying enhanced identity verification and business validation tools to prevent fraudulent disaster loan applications",
+        "Credit subsidy fund management: establishing reserves and congressional notification protocols to prevent future funding lapses during active disaster seasons"
+      ]
+    },
+    "EPA Office of Water": {
+      "painPoints": [
+        "PFAS regulatory uncertainty: EPA finalized drinking water limits for 6 PFAS in April 2024, then in May 2025 announced plans to rescind rules for PFHxS, PFNA, GenX, and the Hazard Index mixture while keeping PFOA/PFOS limits",
+        "Lead service line data gaps: EPA revised its estimate from 9 million to 4 million lead lines nationwide, using methodology that assumed blank inventories mean no lead \u2014 criticized by drinking water advocates as underestimating the problem",
+        "SRF funding delay: EPA released 2025 drinking water and clean water SRF allocations 6 months late, leaving states unable to plan and obligate infrastructure spending",
+        "Proposed 90% SRF funding cut: FY2026 budget proposal would slash Clean Water and Drinking Water State Revolving Fund appropriations by nearly $2.5 billion from FY2025 levels",
+        "PFAS treatment cost burden: GAO-25-107897 examined EPA's cost analysis for the PFAS drinking water regulation, with small water systems facing disproportionate compliance costs",
+        "Lead pipe replacement pace: despite $15B in Bipartisan Infrastructure Law funding over 5 years, states report needing more help and funding to replace millions of lead service lines",
+        "Bipartisan Infrastructure Law spending capacity: states struggle to absorb and deploy $14B+ in water infrastructure funding within BIL timelines, with technical assistance gaps in disadvantaged communities",
+        "Combined sewer overflow violations: aging sewer systems in 700+ cities discharge raw sewage during storms, with Clean Water SRF insufficient to fund $100B+ in needed separations",
+        "PFAS liability allocation: Superfund CERCLA designation of PFOA/PFOS as hazardous substances creates uncertainty for water utilities about cleanup cost recovery from manufacturers",
+        "Workforce capacity: water and wastewater utilities face 30%+ workforce retirement in the next decade, with insufficient pipeline of certified operators"
+      ],
+      "priorities": [
+        "$3 billion for Drinking Water State Revolving Fund (DWSRF) in FY2025 including dedicated lead service line replacement funding",
+        "$15 billion Bipartisan Infrastructure Law commitment for lead pipe replacement over 5 years, with $3B allocated in the fourth annual distribution",
+        "$14 billion in BIL funding for Clean Water and Drinking Water SRF programs addressing emerging contaminants including PFAS",
+        "$10 billion BIL allocation for communities affected by PFAS and other emerging contaminants through the DWSRF",
+        "$1.6 billion for Clean Water SRF base program supporting wastewater treatment plant upgrades and stormwater management",
+        "PFAS drinking water rule implementation: providing technical assistance and funding for water systems to meet PFOA/PFOS maximum contaminant levels",
+        "Water infrastructure resilience: funding for climate adaptation projects including flood protection, drought response, and water recycling",
+        "Environmental justice in water: ensuring 49%+ of BIL water infrastructure funds reach disadvantaged communities as required by Justice40 initiative",
+        "Nutrient pollution reduction: targeted TMDL implementation for nitrogen and phosphorus in impaired waterways including Chesapeake Bay and Gulf of Mexico",
+        "Water sector cybersecurity: protecting 150,000+ public water systems from cyber threats following EPA emergency authority warnings"
+      ]
+    },
+    "EPA Office of Air and Radiation": {
+      "painPoints": [
+        "Power plant rule reversal: EPA proposed to repeal greenhouse gas standards for fossil fuel-fired power plants in June 2025, after finalizing them in April 2024, creating regulatory whiplash for the utility sector",
+        "Methane rule compliance delays: EPA extended compliance deadlines for oil and gas methane emission standards by 18 months in July 2025, citing unrealistic Biden-era timelines",
+        "Ozone NAAQS implementation: states face nonattainment designations under the 2015 ozone standard (70 ppb), with implementation plans delayed and monitoring showing persistent exceedances in 200+ counties",
+        "PM2.5 standard tightening: February 2024 strengthening of annual PM2.5 NAAQS from 12.0 to 9.0 \u00b5g/m3 requires new monitoring networks and nonattainment area designations that many states contest",
+        "Aging air monitoring network infrastructure: state air monitoring networks rely on equipment averaging 15-20 years old, with replacement costs unfunded at the federal level",
+        "Mobile source emissions: transportation sector remains the largest source of air pollution, with electric vehicle transition pace uncertain and criteria pollutant levels stagnant in non-attainment areas",
+        "Environmental justice communities: disproportionate air quality impacts on fence-line communities near industrial facilities persist despite Title VI complaints and cumulative impact analyses",
+        "Methane waste emissions charge: Inflation Reduction Act methane fee implementation faces industry challenges and administrative complexity for petroleum and natural gas systems",
+        "Climate science data gaps: proposed budget cuts to atmospheric research programs threaten long-term air quality trend monitoring and climate projections",
+        "Indoor air quality: no federal regulatory framework for indoor air pollutants despite EPA estimates that Americans spend 90% of time indoors with pollutant levels 2-5x higher than outdoor"
+      ],
+      "priorities": [
+        "$1.2 billion for state and local air quality management grants supporting criteria pollutant monitoring and implementation of NAAQS",
+        "Methane emissions reduction: implementing the 2024 final rule projecting 58 million short tons of methane reduction (79% of covered source emissions) between 2024-2038",
+        "PM2.5 NAAQS implementation: supporting state transitions to the revised 9.0 \u00b5g/m3 annual standard including new monitoring requirements and attainment designations",
+        "Inflation Reduction Act climate programs: deploying $40B+ in IRA funding for clean energy, methane reduction, and environmental justice air monitoring",
+        "PFAS air emissions: developing regulations for PFAS releases from industrial sources including manufacturing facilities and waste incineration",
+        "Air monitoring network modernization: upgrading state monitoring equipment through Section 103 and 105 grants for next-generation sensor deployment",
+        "Greenhouse gas reporting program: maintaining the facility-level GHG reporting system (Subpart W) for 8,000+ major emitters",
+        "Wildfire smoke mitigation: expanding AirNow monitoring and public health notification systems for wildfire-impacted communities",
+        "Environmental justice screening: deploying EJScreen and community-level air toxics monitoring to identify and address disproportionate pollution burdens",
+        "Mobile source standards: implementing vehicle and engine emission standards for heavy-duty trucks and nonroad equipment per Clean Air Act authority"
+      ]
+    },
+    "EPA Office of Land and Emergency Management": {
+      "painPoints": [
+        "Superfund backlog: 1,340 active National Priorities List sites as of March 2025, with appropriations declining from $2.6B (FY1999) to $537M (FY2024) while remaining sites are more complex and costly",
+        "PFAS Superfund liability: April 2024 CERCLA hazardous substance designation for PFOA/PFOS creates massive new cleanup liability, with 9,552 PFAS contamination sites identified nationwide",
+        "Superfund tax transition: Treasury collected $1.44B in reinstated Superfund taxes in FY2023, requiring new program management systems to blend base appropriations with tax revenue",
+        "Site cleanup duration: average NPL site requires 15+ years from listing to deletion, with complex multi-party sites involving decades of litigation before remediation begins",
+        "Brownfields program capacity: $232M in FY2024 brownfield grants addresses only a fraction of estimated 450,000+ brownfield sites nationally requiring assessment and cleanup",
+        "RCRA corrective action backlog: thousands of RCRA facilities require corrective action for releases of hazardous waste, with EPA lacking resources for timely enforcement and cleanup oversight",
+        "Emergency response readiness: chemical facility incidents (East Palestine, OH) revealed gaps in EPA's emergency response capacity and coordination with state/local responders",
+        "E-waste and emerging waste streams: electronic waste, lithium battery disposal, and emerging contaminants create new waste management challenges without clear RCRA regulatory frameworks",
+        "Environmental justice in cleanup: Superfund sites disproportionately located in low-income and minority communities, with cleanup prioritization not adequately reflecting cumulative environmental burden",
+        "Responsible party identification: identifying and compelling financially viable responsible parties for orphan sites becomes harder as polluters merge, dissolve, or declare bankruptcy"
+      ],
+      "priorities": [
+        "$3.5 billion in Bipartisan Infrastructure Law funding for Superfund site cleanup, the largest investment in Superfund history",
+        "$1.44 billion in reinstated Superfund excise taxes collected in FY2023, supplementing base appropriations for hazardous waste cleanup",
+        "$232 million for Brownfields Assessment, Revolving Loan Fund, and Cleanup grants supporting redevelopment of 207 communities in FY2025",
+        "$14 million for Brownfields Job Training grants to prepare communities for cleanup and redevelopment employment opportunities",
+        "PFAS cleanup framework: developing CERCLA response and remediation strategies for 9,552+ identified PFAS contamination sites",
+        "Superfund economic benefits: maintaining the $71.8B in annual sales and 242,187 jobs generated by businesses at reused Superfund sites",
+        "Emergency preparedness: enhancing chemical facility accident prevention and response capabilities including mobile laboratory and assessment teams",
+        "Underground storage tank program: managing the $1.5B Leaking UST Trust Fund for petroleum contamination cleanup at 90,000+ sites",
+        "RCRA hazardous waste program: updating Resource Conservation and Recovery Act regulations for emerging waste streams including PFAS-containing materials",
+        "Environmental justice in site selection: incorporating cumulative impact assessments into NPL listing priorities and cleanup timelines"
+      ]
+    },
+    "Bureau of the Fiscal Service": {
+      "painPoints": [
+        "National debt scale: federal debt grew from $18.1T to $37.6T over 10 years (FY2015-2025), with FY2024 interest costs reaching $1.13 trillion \u2014 a $251B increase from FY2023",
+        "Improper payment prevention: despite preventing $154.9M and recovering $346.2M in FY2023, the Bureau identified 213,998 potential improper payments totaling $652.7M \u2014 indicating massive exposure",
+        "Legacy mainframe dependency: Bureau's 60+ FISMA systems include mainframe platforms requiring decommissioning by end of FY2025, with exponential cost increases for maintaining legacy technology",
+        "DOGE access controversy: external access to Treasury payment systems raised serious operational security and data integrity concerns about the $6T+ annual payment infrastructure",
+        "Payment fraud sophistication: evolving fraud techniques target the $6 trillion annual federal payment system, requiring continuous investment in detection and prevention technology",
+        "Do Not Pay data limitations: despite preventing $7.2B in improper payments in FY2024, Do Not Pay portal relies on data sources with completeness and timeliness gaps",
+        "Death data access: Congress granted Social Security Death Master File access on a 3-year pilot basis in 2023, creating uncertainty about long-term access to 83M+ death records critical for payment integrity",
+        "Debt management complexity: record treasury auction sizes and shorter-duration issuance strategies increase refinancing risk as interest rates remain elevated",
+        "Government-wide financial reporting: producing the consolidated Financial Report of the U.S. Government across hundreds of agencies with varying data quality and systems",
+        "Check fraud persistence: despite push toward electronic payments, Treasury checks remain vulnerable to mail theft and alteration fraud schemes"
+      ],
+      "priorities": [
+        "$37.6 trillion national debt management: conducting Treasury auctions and managing the maturity profile of federal debt securities",
+        "$12 billion stretch goal to prevent improper payments by 2029 through expanded use of Do Not Pay portal and data analytics",
+        "Mainframe decommissioning: completing migration of 60+ systems from legacy mainframe platforms to secure cloud-based architecture by end of FY2025",
+        "Do Not Pay portal expansion: building payment integrity analytics tools and data sources available to all federal agencies at no cost",
+        "Death Master File integration: leveraging 83M+ SSA death records to prevent payments to deceased individuals across government programs",
+        "Digital payment modernization: transitioning remaining paper check disbursements to electronic funds transfer for speed, security, and cost reduction",
+        "Treasury Direct modernization: upgrading the retail securities platform serving individual investors purchasing savings bonds and Treasury securities",
+        "Government-wide accounting standards: supporting implementation of new FASAB accounting standards across federal agencies through centralized reporting systems",
+        "Payment fraud detection: deploying advanced analytics and machine learning for real-time identification of fraudulent payment patterns",
+        "Fiscal data transparency: expanding USAspending.gov and other public fiscal data platforms to improve government financial accountability"
+      ]
+    },
+    "Federal Housing Finance Agency (FHFA)": {
+      "painPoints": [
+        "Conservatorship duration: Fannie Mae and Freddie Mac remain under conservatorship since 2008 \u2014 17+ years \u2014 with no definitive exit timeline despite January 2025 amended agreements",
+        "Housing affordability crisis: despite managing $7.7T in GSE-backed mortgages, homeownership affordability reached historic lows with median home prices exceeding 5x median household income",
+        "Housing goal reductions: 2026-2028 housing goals lowered low-income purchase mortgage targets from 25% to 21% and very-low-income from 6% to 3.5%, reducing affordable lending requirements",
+        "Conservatorship exit risk: January 2025 FHFA-Treasury amendments require public input and Treasury consent for conservatorship termination, adding uncertainty to housing market stability",
+        "Capital adequacy uncertainty: Fannie and Freddie are building capital reserves for eventual exit but Enterprise Regulatory Capital Framework implementation faces industry challenges",
+        "Nonbank servicer risk: FHFA oversight of Fannie/Freddie's counterparty exposure to nonbank mortgage servicers parallels Ginnie Mae's systemic risk concerns",
+        "Climate risk in housing: FHFA lacks comprehensive framework for assessing climate-related financial risks to the $7.7T GSE-backed mortgage portfolio from floods, fires, and storms",
+        "Federal Home Loan Bank mission compliance: FHLB system ($1.1T in assets) faces scrutiny over whether advances primarily support housing and community development versus bank liquidity",
+        "Racial homeownership gap: Black homeownership rate (45%) remains 30 points below white homeownership (75%), with FHFA housing goals insufficient to close the disparity",
+        "Appraisal bias: automated valuation models and traditional appraisals produce persistent racial disparities in home valuations, undermining fair lending in GSE-purchased loans"
+      ],
+      "priorities": [
+        "$7.7 trillion GSE-backed mortgage portfolio oversight: supervising Fannie Mae and Freddie Mac safety and soundness during conservatorship",
+        "Conservatorship transition planning: implementing January 2025 amended Preferred Stock Purchase Agreements including public input requirements for exit",
+        "2026-2028 housing goals: enforcing Enterprise benchmark targets including 21% low-income purchase mortgage and 61% affordable multifamily goals",
+        "LIHTC investment expansion: doubled annual GSE investment cap to $2B each ($4B total) with 50% reserved for difficult-to-serve markets including rural areas",
+        "Multifamily production caps: $88B per Enterprise for 2026 (total $176B), up 20.5% from 2025, supporting rental housing supply",
+        "$407 million agency operating budget for FY2024 supporting supervision of Fannie Mae, Freddie Mac, and 11 Federal Home Loan Banks",
+        "Enterprise capital requirements: continued implementation of the post-conservatorship capital framework requiring adequate loss-absorbing capacity",
+        "Federal Home Loan Bank reform: evaluating FHLB system mission alignment following 2023 advisory committee recommendations",
+        "Equitable housing finance: implementing fair lending oversight and appraisal bias mitigation across GSE-purchased loans",
+        "Climate risk assessment: developing frameworks for evaluating natural disaster and climate-related risks to the mortgage-backed securities portfolio"
+      ]
+    },
+    "Bureau of Economic Analysis (BEA)": {
+      "painPoints": [
+        "Digital Economy Satellite Account suspended: BEA ceased production of its Digital Economy statistics due to budget constraints, with the last update in December 2023 \u2014 leaving a gap in measuring 10%+ of GDP",
+        "Budget constraints: BEA requested $110M for FY2024 but operates with significantly less, forcing prioritization decisions that eliminate key statistical products",
+        "Data acquisition costs: private-sector data purchases for GDP estimation face rising costs, with BEA's largest non-labor expenditure growing faster than appropriations",
+        "IT infrastructure modernization: BEA's data processing systems require upgrades to handle increasing data volumes and API demand from 300,000+ monthly data requests",
+        "Regional statistics timeliness: GDP by county, state personal income, and consumer spending estimates face 12-18 month publication lags, reducing relevance for real-time economic decision-making",
+        "Source data degradation: declining survey response rates from Census Bureau and other statistical agencies reduce the quality of inputs used to estimate GDP and related indicators",
+        "Gig economy measurement: traditional economic accounts struggle to capture the growing gig, platform, and creator economies in national and regional statistics",
+        "Workforce retention: BEA's 500-person staff of specialized economists and statisticians faces attrition to private sector data science roles offering significantly higher compensation",
+        "Real-time economic indicators: policymakers and markets demand higher-frequency economic data, but BEA's production processes are designed for monthly and quarterly releases",
+        "International comparability: BEA must maintain alignment with UN System of National Accounts while adapting to uniquely American economic features like healthcare spending methodology"
+      ],
+      "priorities": [
+        "GDP production: publishing the nation's official Gross Domestic Product estimates (advance, second, third estimates plus annual revisions) on congressional and market timelines",
+        "Personal Income and Outlays: monthly release of consumer spending, personal income, and PCE price index \u2014 the Federal Reserve's preferred inflation measure",
+        "Regional economics program: producing GDP by county, GDP by state, and regional personal income statistics for 3,000+ counties and all 50 states",
+        "API infrastructure modernization: improving data delivery systems with caching and enhanced security to serve 300,000+ monthly API requests with reduced response times",
+        "Trade statistics: International Transactions Accounts and Trade in Goods and Services data supporting trade policy and balance of payments analysis",
+        "Industry accounts: GDP by industry and input-output tables supporting supply chain analysis and economic impact modeling",
+        "Digital economy restoration: seeking funding to resume the Digital Economy Satellite Account measuring the 10%+ of GDP attributable to digital activities",
+        "Data modernization initiative: upgrading estimation methodology and data processing infrastructure to improve timeliness and accuracy of economic statistics",
+        "Annual update program: conducting the comprehensive annual revision of national, industry, and state economic accounts incorporating new source data",
+        "International price comparison: maintaining the International Comparison Program and purchasing power parity estimates for global economic comparisons"
+      ]
+    },
+    "Minority Business Development Agency (MBDA)": {
+      "painPoints": [
+        "Existential threat: March 2025 executive order directed elimination of MBDA 'to the maximum extent consistent with applicable law,' despite permanent authorization under the 2021 Infrastructure Act",
+        "Budget reduction: FY2024 funding of $68.25M represents a 2.5% decrease from FY2023 ($70M), falling far short of the $110M authorized annually by the Minority Business Development Act of 2021",
+        "Business center coverage gaps: 131 business centers and specialty programs serve millions of potential minority business owners across the entire country \u2014 fewer than 3 centers per state on average",
+        "Capital access disparity: minority-owned businesses receive less than 3% of conventional business loans despite representing 20%+ of all businesses, with MBDA lacking direct lending authority",
+        "Federal contracting gap: minority-owned businesses received only 11% of federal contract dollars despite representing a growing share of the business population",
+        "Leadership vacancy: the Under Secretary of Commerce for Minority Business Development position created by the 2021 Act has faced political challenges in nomination and confirmation",
+        "Legal challenges: a federal judge ordered MBDA to serve all business owners regardless of race, creating program design conflicts with the agency's statutory minority business development mission",
+        "Rural business center establishment delays: the Rural Business Center Program authorized by the 2021 Act has been slow to launch due to funding and organizational constraints",
+        "Data and research limitations: MBDA's research on minority business conditions relies on Census Bureau surveys with 3-5 year lags, limiting real-time understanding of business needs",
+        "Grant competition capacity: small minority business organizations lack the administrative infrastructure to compete for MBDA technical assistance grants against larger institutional applicants"
+      ],
+      "priorities": [
+        "$68.25 million FY2024 appropriation supporting business center operations, technical assistance, and agency administration",
+        "$11 million in new FY2025 technical assistance funding competitions for Women's Entrepreneurship Program, Rural Business Centers, and Parren J. Mitchell Program",
+        "Business center network: operating 131 centers providing one-on-one consulting, capital access assistance, and federal contracting preparation to minority entrepreneurs",
+        "Federal contracting support: helping minority-owned businesses navigate SBA certification, SAM.gov registration, and capability statement development for government opportunities",
+        "Capital access programs: connecting minority businesses with SBA loans, CDFI lenders, and private equity through MBDA Capital Readiness Program partnerships",
+        "Export assistance: helping minority-owned businesses access international markets through MBDA Export Centers and 'Made in America' product programs",
+        "Minority Business Development Act implementation: standing up new programs authorized by the 2021 permanent authorization including rural and women's entrepreneurship centers",
+        "Research and data: publishing the State of Minority Business Enterprise report and maintaining the MBE database for federal and private sector procurement matching",
+        "Disaster recovery: providing targeted business recovery assistance to minority-owned businesses in federally declared disaster areas",
+        "Advanced manufacturing: supporting minority business participation in supply chain diversification, reshoring, and CHIPS Act manufacturing opportunities"
+      ]
+    },
+    "Army Futures Command": {
+      "painPoints": [
+        "Organizational dissolution: Army Futures Command merged with Training and Doctrine Command in October 2025 to form U.S. Army Transformation and Training Command, disrupting modernization program continuity",
+        "IVAS program troubles: Integrated Visual Augmentation System plagued by soldier complaints of nausea, visual discomfort, and cyber sickness \u2014 Microsoft replaced by Anduril for production oversight in April 2025",
+        "Technology maturity risk: GAO has warned for two decades that Army proceeds into weapons development at earlier technology maturity stages than leading practices recommend, increasing cost overrun risk",
+        "LTAMDS schedule delays: Lower Tier Air and Missile Defense Sensor completed MTA in October 2023 but delayed its production decision to FY2025 Q2, requiring additional operational assessment",
+        "XM30 combat vehicle timeline risk: $1.5B+ invested since FY2023 with LRIP not planned until FY2028 and full production at FY2030 \u2014 a decade-long replacement timeline for the 1980s-era Bradley",
+        "GAO-25-107491 found air and missile defense modernization efforts would benefit from applying leading practices, indicating systemic acquisition process deficiencies",
+        "GAO-24-107566 identified actions needed to support fielding new equipment, finding gaps between development timelines and operational unit readiness for new systems",
+        "Small business engagement gaps: GAO-19-511 found Army Futures Command should take steps to improve small business engagement for R&D, limiting innovation pipeline diversity",
+        "DOD-wide cost growth: combined cost estimates increased $49.3B for 30 Major Defense Acquisition Programs, with structural inefficiencies impeding speed and innovation",
+        "Industrial base constraints: defense industrial base capacity limits production rates for key modernization programs, creating bottlenecks in vehicle, missile, and sensor manufacturing",
+        "Dual competition costs: XM30 program running parallel prototyping with two contractors (General Dynamics and American Rheinmetall) at $1.6B split, with downselect risk"
+      ],
+      "priorities": [
+        "$30B+ in Army modernization funding across six priorities: Long-Range Precision Fires, Next Generation Combat Vehicle, Future Vertical Lift, Network, Air and Missile Defense, Soldier Lethality",
+        "$386.4 million in FY2026 RDT&E for XM30 Mechanized Infantry Combat Vehicle, with $1.6B in EMD phase funding split between General Dynamics and American Rheinmetall for 7 prototypes each",
+        "IVAS 1.2 development: Anduril and Rivet competing to deliver ruggedized augmented reality heads-up display addressing ergonomic failures of the original Microsoft design",
+        "LTAMDS production: transitioning the Lower Tier Air and Missile Defense Sensor from MTA to Major Capability Acquisition pathway following December 2024 full array operational assessment",
+        "Long-Range Hypersonic Weapon (LRHW): fielding the Dark Eagle hypersonic strike system to operational units as the Army's first hypersonic capability",
+        "Future Vertical Lift: managing the FLRAA (Bell V-280 Valor) and FARA programs for next-generation helicopters replacing Black Hawk and Apache fleets",
+        "Integrated Battle Command System (IBCS): fielding the networked air and missile defense command and control system connecting sensors and shooters",
+        "Robotic Combat Vehicle development: advancing RCV-Light, Medium, and Heavy autonomous ground combat platforms through prototyping and experimentation",
+        "Network modernization: deploying unified network infrastructure (Capability Set 25) for tactical communications and data sharing across echelons",
+        "Industrial base expansion: investing in production capacity for munitions, vehicle components, and sensor systems to meet modernization program demand"
+      ]
+    },
+    "U.S. Space Command (SPACECOM)": {
+      "painPoints": [
+        "Space domain awareness gaps \u2014 GAO-23-105565 found DOD has not fully evaluated how commercial space situational awareness data can supplement government sensors, leaving coverage holes in tracking 40,000+ objects",
+        "Space command and control delays \u2014 GAO-23-105920 reported $1.7B+ spent since 2000 replacing aging satellite tracking systems with persistent schedule slippages and unclear progress metrics",
+        "Orbital warfare C2 modernization \u2014 SPACECOM identified four high-priority kill chains requiring integrated C2 networks to increase speed and lethality by 2027, but current systems lack interoperability",
+        "Counter-space threat escalation \u2014 adversaries developing co-orbital ASATs, directed energy weapons, and electronic warfare capabilities targeting GPS and communications satellites without adequate defensive posture",
+        "GPS resilience and denial \u2014 SPACECOM lacks assured positioning, navigation, and timing (PNT) in contested environments, with commercial alternatives not yet integrated into military operations",
+        "Joint Commercial Operations cell maturity \u2014 established in 2020, the JCOC still struggles to integrate nonclassified commercial data with classified intelligence for protect-and-defend missions (GAO-25-108043)",
+        "Space debris collision risk \u2014 exponential growth of LEO mega-constellations creating cataloging backlogs that overwhelm manual tracking processes at the 18th Space Defense Squadron",
+        "Workforce shortfalls in space operations \u2014 competing with commercial space industry for trained space operators, intelligence analysts, and cyber specialists at below-market federal pay scales",
+        "Ally and partner interoperability \u2014 GAO-25-108043 found Combined Space Operations Center coordination with Five Eyes and NATO allies hampered by classification barriers and incompatible systems",
+        "Electromagnetic spectrum management \u2014 increasing congestion and adversary jamming of satellite communications requiring new spectrum monitoring and dynamic frequency allocation capabilities",
+        "Indo-Pacific SDA coverage gaps \u2014 insufficient sensor coverage in the region led to SpaceWERX funding Leo Labs to deploy next-generation Seeker-class UHF radar site to minimize blind spots",
+        "Golden Dome integration complexity \u2014 $13.8B FY2026 reconciliation funding for missile defense satellite layer requires unprecedented integration of space-based sensors with terrestrial interceptors"
+      ],
+      "priorities": [
+        "$26.3B FY2026 Space Force budget request, plus $13.8B in reconciliation funding for Golden Dome missile defense satellite systems \u2014 nearly 40% increase over FY2025",
+        "$1.8B for Space Development Agency Transport Layer satellite constellation connecting missile warning and tracking sensors in FY2026",
+        "$3.2B for Next-Generation Overhead Persistent Infrared (OPIR) missile warning satellite system replacing legacy SBIRS constellation through FY2028",
+        "SpaceWERX commercial partnership funding for space domain awareness sensors, including next-generation radar deployment in Indo-Pacific theater",
+        "$2.1B for GPS III Follow-On (GPS IIIF) satellites with enhanced anti-jamming capabilities and regional military protection codes through FY2027",
+        "Funding for Evolved Strategic SATCOM (ESS) program replacing legacy AEHF satellites with jam-resistant, nuclear-survivable communications",
+        "$850M for commercial space domain awareness data integration and Unified Data Library development for combined military-commercial threat picture",
+        "$500M for Tactically Responsive Space (TacRS) rapid launch capability enabling satellite reconstitution within hours of adversary attack",
+        "$1.2B for Space Operations Command headquarters build-out and Combined Space Operations Center modernization at Vandenberg SFB",
+        "Commercial PNT service contracts for GPS-denied environment alternatives, with RFPs for positioning augmentation systems in contested theaters"
+      ]
+    },
+    "Office of the Director of National Intelligence (ODNI)": {
+      "painPoints": [
+        "39 open GAO recommendations unimplemented from FY2011-2024 (GAO-24-107671), spanning workforce management, intelligence enterprise oversight, personnel vetting, and infrastructure modernization",
+        "IC-wide IT modernization stalled \u2014 May 2024 IC Information Environment roadmap requires migration to cloud-native architectures, but legacy classified systems resist modernization across 18 agencies",
+        "Cybersecurity contractor workforce data gap \u2014 GAO-25-107405 found 22 of 23 CFO Act agencies have partial or no data on size and costs of contractor cyber workforce supporting intelligence operations",
+        "Cybersecurity workforce planning failures \u2014 GAO-25-106795 found most IC agencies implemented less than half of key cybersecurity workforce practices, creating persistent skills shortages",
+        "Personnel vetting transformation delays \u2014 Trusted Workforce 2.0 continuous vetting initiative behind schedule, with DCSA and ODNI struggling to eliminate security clearance investigation backlog",
+        "OSINT integration deficiency \u2014 IC lacks enterprise-wide framework to systematically ingest, validate, and fuse open-source intelligence with classified reporting despite growing volume of publicly available data",
+        "Cross-domain data sharing barriers \u2014 classification compartments and legacy IT architectures prevent timely sharing of threat intelligence between IC members, degrading all-source analysis quality",
+        "AI governance framework gaps \u2014 no unified IC-wide policy for responsible AI deployment in intelligence analysis, creating inconsistent adoption and risk management across agencies",
+        "Foreign malign influence detection \u2014 inadequate technical capabilities and coordination to detect and counter AI-generated disinformation campaigns targeting democratic processes",
+        "Supply chain intelligence shortfalls \u2014 IC cannot adequately map and monitor adversary penetration of critical technology supply chains affecting defense and civilian infrastructure",
+        "Analytic workforce retention \u2014 15-20% annual attrition rates among junior analysts competing with private sector salaries 30-50% higher for comparable data science and cyber skills"
+      ],
+      "priorities": [
+        "$73.1B National Intelligence Program (NIP) budget for FY2025 supporting 18 IC agencies, with significant allocations for cyber, AI, and space-based intelligence collection",
+        "$200M+ for IC-wide cloud migration through IC Cloud initiative, transitioning analytics platforms and collaboration tools to multi-cloud classified environments",
+        "$350M for Trusted Workforce 2.0 continuous vetting system deployment, replacing periodic reinvestigation model with automated record checks and insider threat detection",
+        "OSINT modernization funding through newly established Open Source Enterprise, with contracts for commercial data aggregation, AI-powered analysis tools, and foreign media monitoring",
+        "$180M for IC Data Strategy implementation enabling cross-agency data cataloging, discovery, and secure sharing through common data fabric architecture",
+        "$250M for AI/ML adoption across intelligence analysis functions, including computer vision for imagery, NLP for SIGINT, and predictive analytics for counterterrorism",
+        "Foreign malign influence center funding for election security monitoring, deepfake detection technology, and social media analysis platforms through FY2027",
+        "Personnel security modernization contracts for biometric credentialing, automated background investigation systems, and zero-trust identity management",
+        "$500M for IC Information Technology Enterprise (IC ITE) expansion, modernizing desktop environments and collaboration platforms across all 18 agencies",
+        "Cyber threat intelligence sharing platform contracts to improve machine-speed threat indicator exchange between IC agencies and critical infrastructure sector partners"
+      ]
+    },
+    "National Reconnaissance Office (NRO)": {
+      "painPoints": [
+        "Commercial satellite imagery acquisition gaps \u2014 GAO-22-106106 found NRO has not transitioned study contracts for emerging commercial capabilities (SAR, hyperspectral) into sustained procurement funding",
+        "Unclear roles between NRO and DOD for commercial imagery \u2014 GAO found no guidance addressing organizational responsibilities despite multiple DOD organizations independently acquiring commercial imagery",
+        "Ground infrastructure deficit for new modalities \u2014 NGA has not developed enterprise-wide ground systems to process commercial radar satellite data despite NRO exploration of capabilities",
+        "Proliferated architecture integration risk \u2014 nearly 200 satellites deployed with launches through 2029, but integrating diverse commercial bus platforms with classified payloads creates reliability concerns",
+        "Commercial imagery budget vulnerability \u2014 lawmakers expressed concerns over OMB proposals to cut FY2026 commercial imagery funding from the approximately $400M annual allocation",
+        "Launch schedule compression \u2014 six launches planned for 2024 alone for proliferated constellation, straining manifest coordination with commercial launch providers and range infrastructure",
+        "Workforce security clearance processing \u2014 extended timelines for TS/SCI clearances delaying onboarding of engineers and analysts critical to satellite development programs",
+        "Constellation management complexity \u2014 operating largest government satellite fleet requires new automated mission management tools that do not yet exist at required scale",
+        "Supply chain security for space components \u2014 radiation-hardened electronics and specialized sensors sourced from limited suppliers create single points of failure in satellite production",
+        "Data downlink bandwidth constraints \u2014 proliferated constellation generates exponentially more intelligence data than existing ground station network can receive and process in near-real-time"
+      ],
+      "priorities": [
+        "Classified NRO budget estimated at $20B+ annually for satellite reconnaissance systems development, procurement, and operations across multiple orbital regimes",
+        "$400M annual commercial imagery acquisition budget through EOCL (Electro-Optical Commercial Layer) contracts with commercial satellite operators for global coverage",
+        "Proliferated architecture satellite procurement \u2014 multibillion-dollar contracts with multiple commercial bus providers for dozens of small satellite missions through 2029",
+        "Next-generation ground system modernization contracts for processing, exploitation, and dissemination of multi-INT data from proliferated constellation",
+        "$1.5B+ for classified heavy-lift and medium-lift launch services through National Security Space Launch Phase 3 contracts with SpaceX and ULA",
+        "Commercial SAR (synthetic aperture radar) data contracts expanding all-weather, day-night intelligence collection from providers like Capella Space and Umbra",
+        "Space vehicle cybersecurity hardening contracts to protect satellite command links and data downlinks from adversary electronic warfare and cyber attacks",
+        "AI/ML processing pipeline development for automated exploitation of massive imagery volumes generated by proliferated small satellite constellation",
+        "Ground station network expansion contracts to increase downlink capacity and reduce latency for time-sensitive intelligence delivery from new satellites",
+        "Workforce development programs including partnerships with universities for cleared space systems engineers, with hiring targets to support constellation operations"
+      ]
+    },
+    "National Weather Service (NWS)": {
+      "painPoints": [
+        "AWIPS cloud migration behind schedule \u2014 $22.5M FY2025 increase funds transition of Advanced Weather Interactive Processing System to cloud, but full-scale cloud configuration not expected until 2029",
+        "NEXRAD radar lifecycle risk \u2014 $150M Service Life Extension Program completed in 2024 for 159 radars, but aging infrastructure requires planning for eventual NEXRAD replacement in the 2030s",
+        "Forecast computing capacity shortfalls \u2014 operational weather models require exascale-class computing to match European forecast accuracy, but current HPC infrastructure lags behind international peers",
+        "Fire weather forecasting gaps \u2014 Incident Meteorologist (IMET) program understaffed relative to increasing wildfire frequency, with limited coverage for simultaneous fire events across western states",
+        "Integrated Dissemination Program dependencies \u2014 $129.6M IDP implementation maintaining hardware upgrades and 24/7 support, but aging dissemination systems risk service interruptions during severe weather",
+        "Staffing shortages at Weather Forecast Offices \u2014 difficulty recruiting and retaining meteorologists at 122 field offices, particularly in remote locations, due to below-market compensation",
+        "Observing network modernization delays \u2014 surface observation stations, radiosonde network, and upper-air monitoring systems require recapitalization but compete for limited budget with IT modernization",
+        "Flash flood prediction accuracy \u2014 NWS struggles to provide sufficient lead time for flash flood warnings in urban areas and complex terrain, contributing to the leading weather-related cause of death",
+        "Satellite data integration complexity \u2014 incorporating next-generation GOES-R series and JPSS polar-orbiting satellite data streams into operational forecasting workflows requires ongoing software development",
+        "Climate services demand growth \u2014 increasing requests for climate projections and extreme weather outlooks from emergency managers exceeding NWS capacity and mandate",
+        "Warning communication effectiveness \u2014 studies show public often ignores or misinterprets NWS warnings, requiring investment in behavioral science research and communication technology improvements"
+      ],
+      "priorities": [
+        "$1.4B NWS FY2025 budget including $22.5M increase for AWIPS cloud migration and Integrated Dissemination Program implementation",
+        "$129.6M for Integrated Dissemination Program maintaining hardware upgrades, software maintenance, and restoring 24/7 operational support for all applications",
+        "$11.4M increase for IDP implementation to modernize weather data dissemination infrastructure serving emergency managers and the public",
+        "$11M dedicated to AWIPS-in-the-Cloud migration, part of NWS 2023-2033 Strategic Plan goal for full cloud configuration by 2029",
+        "7-13% NWS funding increase proposed in FY2026 (House subcommittee draft proposes 13%, Senate proposes 1% over FY2025 levels)",
+        "$350M for weather satellite ground system operations supporting GOES-R and JPSS polar-orbiting satellite data processing and distribution",
+        "$200M for high-performance computing upgrades enabling next-generation Unified Forecast System and higher-resolution weather models",
+        "NEXRAD technology refresh contracts for radar signal processing, communications equipment, and pedestal maintenance across 159 sites",
+        "$75M for observation network sustainment including automated surface observing systems, radiosonde replacements, and cooperative observer programs",
+        "Fire weather program expansion funding for additional IMET positions, prescribed fire support, and Red Flag Warning decision tools for wildfire-prone regions"
+      ]
+    },
+    "National Credit Union Administration (NCUA)": {
+      "painPoints": [
+        "No authority to examine third-party technology service providers \u2014 GAO, FSOC, and NCUA OIG all recommend Congress grant vendor examination authority, but as of 2025 legislation has not passed",
+        "Ransomware cascade risk \u2014 2024 attack on a single core service provider disrupted 60+ small credit unions, exposing systemic concentration risk NCUA cannot mitigate without vendor authority",
+        "Cyber incident volume \u2014 892 incidents reported September 2023-May 2024, with 73% involving third-party vendors that NCUA has no power to examine or regulate",
+        "Credit card portfolio deterioration \u2014 OIG found delinquency and charge-off rates exceeding peak levels from the 2008 global financial crisis, threatening NCUSIF stability",
+        "Interest rate risk from fixed-rate mortgages \u2014 credit unions concentrated in low-rate mortgages originated 2020-2021 face significant unrealized losses as rates remain elevated",
+        "AI oversight gaps \u2014 GAO-25-107197 found NCUA lacks model risk management guidance and key supervisory tools for overseeing credit union AI adoption, unlike banking regulators",
+        "Examination technology modernization \u2014 examiners still rely on legacy information security exam procedures inadequate for assessing cloud computing, API-based banking, and real-time payment risks",
+        "Staffing for specialized examinations \u2014 OIG FY2025 challenges report identifies need for cybersecurity, AI, and consumer protection specialists that NCUA struggles to recruit and retain",
+        "NCUSIF adequacy concerns \u2014 fund must maintain 1.30% equity ratio while insuring $2.2T in credit union deposits, with concentration risk in commercial real estate and auto lending",
+        "Climate financial risk assessment \u2014 new staff positions budgeted but no established methodology for examining climate-related financial risks in credit union portfolios",
+        "Fraud detection capability gaps \u2014 emerging payment fraud and synthetic identity schemes outpacing NCUA examiner training and detection tools across 4,600+ federally insured credit unions"
+      ],
+      "priorities": [
+        "$395.4M combined FY2025 budget for operating, capital, and Share Insurance Fund administrative expenses with 1,255 authorized positions",
+        "Cybersecurity and fraud detection investment prioritized in both 2025 and 2026 budgets, with new analytic and operational tools for addressing sophisticated threats",
+        "New staff positions for consumer financial protection, artificial intelligence oversight, examiner training, and climate-related financial risk assessment in FY2025-2026",
+        "Capital project operations and maintenance funding for newly delivered IT systems supporting examination and supervisory functions",
+        "Information security examination program modernization to assess credit union cybersecurity posture, incident response, and third-party vendor management",
+        "NCUSIF reserve management targeting 1.30% equity ratio while maintaining sufficient liquidity for potential credit union failures during economic stress",
+        "Enterprise risk management platform upgrades providing examiners with real-time data analytics on credit risk, liquidity risk, and interest rate exposure across the system",
+        "Automated cyber incident reporting system improvements processing 800+ annual cyber reports with trend analysis and systemic risk identification",
+        "Examiner workforce development program funding for cybersecurity certifications, AI/ML training, and fintech examination skills across regional offices",
+        "Consumer financial protection technology investments for monitoring compliance with fair lending, Reg E, and emerging digital asset regulations"
+      ]
+    },
+    "Merit Systems Protection Board (MSPB)": {
+      "painPoints": [
+        "Quorum crisis recurring \u2014 after 2017-2022 quorum loss created 3,800-case backlog, MSPB again reduced to single board member after presidential firing and retirement in 2025",
+        "Case volume surge \u2014 MSPB received 11,166 appeals in FY2026 (as of May), more than double typical annual workload, driven by mass federal workforce reductions",
+        "IT modernization incomplete \u2014 e-Appeal system achieved 83% electronic filing in FY2024, but 17% of appeals still filed on paper, creating processing inefficiencies",
+        "Budget constraints under Fiscal Responsibility Act \u2014 MSPB acknowledges outlook for additional funding to support staffing needs is 'extremely limited' despite surging caseload",
+        "Administrative law judge capacity \u2014 insufficient ALJ positions to adjudicate initial appeals within statutory timeframes given doubled case volume",
+        "Probationary employee appeal rights uncertainty \u2014 policy changes regarding probationary termination appeals creating legal complexity and inconsistent adjudication standards",
+        "Cybersecurity maturity gaps \u2014 despite meeting FY2024 100% asset scanning target, MSPB IT reliability rated only 70% and customer satisfaction at 65%",
+        "Workforce recruitment challenges \u2014 small agency with limited budget cannot compete for legal, IT, and administrative talent needed to process complex federal employment cases",
+        "Case management system limitations \u2014 legacy systems not designed for current volume levels, with SDWAN migration only recently completed for all network traffic",
+        "Studies and policy research suspended \u2014 MSPB's Office of Policy and Evaluation unable to conduct merit system studies during quorum gaps, creating multi-year research deficit",
+        "Reduction-in-force appeal complexity \u2014 RIF appeals require specialized expertise in complex regulatory frameworks that few administrative judges and staff attorneys possess"
+      ],
+      "priorities": [
+        "$55M FY2025 budget request for case adjudication operations, IT modernization, and staffing to address residual backlog and new appeals",
+        "e-Appeal system enhancement contracts to achieve 100% electronic filing and integrated case management workflow for judges and staff attorneys",
+        "SDWAN network modernization completion and cloud migration for case management databases and document storage systems",
+        "ALJ and staff attorney hiring surge to address doubled FY2026 caseload, with recruitment incentives for experienced federal employment law practitioners",
+        "Cybersecurity improvement program targeting IT reliability above 70% baseline and implementing zero-trust architecture for case data protection",
+        "Physical hearing room technology upgrades enabling hybrid in-person and virtual proceedings for geographically dispersed appellants",
+        "Enterprise case analytics platform for tracking processing times, identifying bottlenecks, and generating Congressional reporting metrics",
+        "Board member confirmation support \u2014 operational planning for immediate activation of full adjudication capacity when Senate confirms new members",
+        "Merit systems research program restart funding to resume studies on federal hiring, performance management, and workplace practices suspended during quorum gaps",
+        "Records digitization project converting decades of paper case files to searchable electronic format for precedent research and transparency"
+      ]
+    },
+    "Federal Energy Regulatory Commission (FERC)": {
+      "painPoints": [
+        "Interconnection queue backlog \u2014 2,300 GW of proposed generation and storage awaiting grid connection approval, more than twice the nation's current installed capacity",
+        "FERC Order 2023 implementation challenges \u2014 transition from serial to cluster-based interconnection processing requiring grid operators to overhaul decades-old study processes",
+        "Transmission buildout gap \u2014 only 888 miles of new 345kV+ transmission constructed in 2024 versus DOE target of 5,000 miles annually, a 10:1 shortfall",
+        "Data center load growth overwhelming grid planning \u2014 IEA projects U.S. data center energy demand accounting for nearly half of electricity demand growth through 2030",
+        "Interregional transfer capacity deficit \u2014 NERC study found 35 GW of additional interregional capacity needed for reliability, with 14 GW between ERCOT and neighbors alone",
+        "Large load interconnection risks \u2014 NERC Level 2 Alert in September 2024 flagged grid disturbances, inadequate modeling, and insufficient protocols for large data center connections",
+        "Pipeline and LNG permitting delays \u2014 average 2-4 year review timelines for natural gas infrastructure creating energy supply constraints during winter peak demand events",
+        "Order 1920 transmission planning implementation \u2014 landmark long-term planning rule requires RTOs/ISOs to develop 20-year plans, but compliance timelines face industry resistance",
+        "Grid reliability standards enforcement complexity \u2014 FY2025 enforcement resulted in $36.57M in settlements across 11 cases, but chronic Reliability Standards violations persist across utilities",
+        "Cybersecurity for energy infrastructure \u2014 expanding mandatory CIP Reliability Standards to address evolving threats to bulk power system from state-sponsored cyber actors",
+        "Commissioner vacancy impacts \u2014 FERC effectiveness depends on maintaining full five-member commission, but political confirmation delays create decision-making bottlenecks"
+      ],
+      "priorities": [
+        "$525M FY2025 FERC operating budget funded through regulatory fees assessed on energy companies, with zero net appropriations from general treasury",
+        "Order 2023 compliance oversight requiring transmission providers to implement cluster-based interconnection study processes and financial commitment reforms",
+        "Order 1920 long-term regional transmission planning implementation requiring RTOs to plan for 20-year load growth and extreme weather scenarios",
+        "$36.57M in FY2025 enforcement settlements including $22.84M in civil penalties and $13.73M in disgorgement for market manipulation and reliability violations",
+        "Large load interconnection rulemaking directed by DOE under rarely-used authority to accelerate and standardize data center and industrial load grid connections",
+        "Enhanced cybersecurity CIP standards development for supply chain security, cloud computing, and virtual infrastructure protecting bulk power system operations",
+        "Natural gas certificate modernization streamlining pipeline and LNG facility review while maintaining environmental and safety oversight",
+        "Reliability technical conference series addressing extreme weather grid resilience, resource adequacy, and inverter-based resource integration",
+        "Interregional transfer capability expansion initiative based on NERC study identifying 35 GW of additional transfer capacity needed across regional boundaries",
+        "Market-based rate oversight modernization incorporating AI analytics for detecting manipulation in wholesale electricity and natural gas markets"
+      ]
+    },
+    "Office of the National Coordinator for Health IT (ONC)": {
+      "painPoints": [
+        "TEFCA adoption scaling challenges \u2014 despite Qualified Health Information Network (QHIN) growth, treatment exchange and individual access services have not achieved critical mass participation",
+        "Information blocking enforcement complexity \u2014 HTI-1 created TEFCA Manner Exception but HTI-5 proposes removal, creating regulatory whiplash for health IT developers and providers",
+        "USCDI v3 compliance burden \u2014 new baseline standard effective January 2026 adds Sexual Orientation, Gender Identity, Disability Status, and SDOH data elements that EHR vendors must support",
+        "Health IT certification program obsolescence \u2014 long-standing functionality-oriented and non-FHIR-based requirements persist despite industry shift to FHIR APIs and modern data exchange",
+        "AI transparency requirements lagging adoption \u2014 HTI-1 required algorithmic transparency but the health care sector deploys AI faster than ONC can develop testing and certification criteria",
+        "Electronic prior authorization implementation delays \u2014 HTI-4 final rule mandates API-based prior authorization, but payer and provider system readiness varies significantly",
+        "Interoperability measurement gaps \u2014 no reliable national metrics for measuring actual health data exchange rates, information blocking incidents, or patient access improvements",
+        "Small practice digital divide \u2014 rural and safety-net providers lack resources to implement FHIR APIs, participate in TEFCA, or meet evolving certification requirements",
+        "Public health data exchange deficiencies \u2014 COVID-19 exposed fragmented state-federal reporting systems that TEFCA and USCDI have not fully addressed for case reporting and immunization tracking",
+        "Deregulatory whiplash \u2014 HTI-5 proposes significant rollbacks of certification requirements under 'Unleash Prosperity' framing, creating uncertainty for health IT vendors mid-implementation"
+      ],
+      "priorities": [
+        "$100M FY2025 ONC budget request supporting health IT standards development, TEFCA implementation, and information blocking enforcement",
+        "TEFCA scaling investment for expanding QHIN participation, Individual Access Service (IAS) testing, and enabling new authorized exchange purposes including payment and public health",
+        "USCDI v3.1 standards development and adoption support to maintain interoperability baseline across certified EHR systems and health information exchanges",
+        "FHIR API-first certification modernization eliminating legacy non-FHIR certification criteria and anchoring health IT standards on HL7 FHIR R4 and future releases",
+        "Electronic prior authorization API deployment supporting HTI-4 requirements for payer-provider data exchange reducing administrative burden estimated at $12B annually",
+        "AI and predictive model transparency framework development for health IT certification ensuring algorithmic fairness, bias testing, and clinical decision support safety",
+        "Health IT workforce development grants supporting clinical informaticists, health information exchange specialists, and FHIR developers in underserved communities",
+        "Information blocking enforcement technology investment for complaint processing, investigation support, and penalty assessment infrastructure at HHS OIG",
+        "Public health data modernization through TEFCA-enabled electronic case reporting, immunization information exchange, and syndromic surveillance standardization",
+        "Patient access technology grants enabling consumer-facing FHIR apps to retrieve health records from multiple providers through TEFCA Individual Access Services"
+      ]
+    },
+    "Architect of the Capitol (AOC)": {
+      "painPoints": [
+        "Cannon House Office Building renovation cost escalation \u2014 project estimated at $890M in 2019, with COVID-19 and January 6 security events creating additional unknown cost impacts across 5 phases",
+        "Cannon renovation oversight deficiencies \u2014 AOC OIG found the agency 'lacked sufficient oversight of the Cannon Caucus Room Renovations,' raising concerns about contract management practices",
+        "Deferred maintenance backlog across 16.5M square feet \u2014 aging infrastructure in Capitol Complex facilities including heating, ventilation, and electrical systems requiring billions in recapitalization",
+        "Cost estimation credibility \u2014 GAO-14-333 found AOC not incorporating all leading practices for cost estimation, reducing accuracy of project budgets that Congress relies on for appropriations",
+        "Physical security infrastructure integration \u2014 post-January 6 security upgrades must be integrated with historic preservation requirements across landmark buildings and grounds",
+        "Energy systems modernization \u2014 aging power plant and distribution systems serving Capitol Complex require significant investment while maintaining 24/7 operations for Congressional activities",
+        "Workforce recruitment and retention \u2014 difficulty attracting skilled trades workers (electricians, plumbers, HVAC technicians) for maintenance of historic facilities at federal pay scales",
+        "450+ acres of grounds maintenance \u2014 managing landscapes, trees, and hardscapes across Capitol Hill while addressing climate-related stress on historic plantings and drainage systems",
+        "Asbestos and hazardous materials management \u2014 pre-1970s building materials in Senate and House office buildings require ongoing abatement during renovation and maintenance activities",
+        "Capitol Dome and Rotunda preservation \u2014 continuous structural monitoring and stone restoration required for the iconic cast-iron dome and surrounding masonry constructed in the 1860s",
+        "IT and building automation systems age \u2014 legacy building control systems for HVAC, lighting, and security across the complex are outdated and vulnerable to cyber and physical threats"
+      ],
+      "priorities": [
+        "$890M+ Cannon House Office Building renovation program across 5 phases, with Phase 3 (east side) currently underway and Phases 4-5 planned for completion by late 2020s",
+        "$800M+ annual operating budget for Capitol Complex maintenance, operations, and preservation of 16.5 million square feet of landmark buildings",
+        "$300M for Capitol Power Plant modernization including boiler replacement, steam and chilled water distribution upgrades, and energy efficiency improvements",
+        "$150M for Senate Office Building infrastructure renewal including Russell, Dirksen, and Hart buildings mechanical system upgrades",
+        "$120M for Capitol Complex security infrastructure enhancements including access control systems, surveillance technology, and perimeter protection",
+        "$100M for Botanic Garden and Capitol Grounds preservation including landscape restoration, irrigation modernization, and visitor facility improvements",
+        "$200M for Library of Congress facility preservation including Jefferson, Adams, and Madison buildings deferred maintenance and fire suppression system upgrades",
+        "Supreme Court Building infrastructure contracts for HVAC modernization, stone restoration, and accessibility improvements in the historic 1935 structure",
+        "$75M for Capitol Visitor Center maintenance and technology upgrades supporting 2+ million annual visitors with modern accessibility and security screening",
+        "Multi-year energy performance contracts targeting 30% reduction in Capitol Complex energy consumption through building envelope improvements and controls upgrades"
+      ]
+    },
+    "Congressional Budget Office (CBO)": {
+      "painPoints": [
+        "Systematic cost estimation errors \u2014 CBO underestimated Inflation Reduction Act green energy tax credits by $224B over the decade, with clean vehicle credits alone requiring major upward adjustment",
+        "IRS enforcement revenue overestimation \u2014 projected $180B deficit reduction from $80B IRS investment fell significantly short, undermining CBO scoring credibility for enforcement provisions",
+        "FY2025 projection inaccuracies \u2014 CBO underestimated revenues by 6% and outlays by 2% in June 2024 projections, with deficit overestimated by 0.7% of GDP",
+        "Dynamic scoring methodology limitations \u2014 CBO uses five macroeconomic models but excludes behavioral micro-dynamic effects from official scores unless legislation exceeds 0.25% of GDP threshold",
+        "Model transparency concerns \u2014 25 proposed reforms identified by NTU Foundation for enhancing transparency and accountability of CBO analytical assumptions and data inputs",
+        "Unforeseen event modeling gaps \u2014 CBO models cannot adequately account for pandemic-scale disruptions, geopolitical shocks, or rapid technological change affecting budget projections",
+        "Talent recruitment and retention \u2014 CBO competes with private sector economic consultancies, think tanks, and financial firms offering significantly higher compensation for quantitative analysts",
+        "Scoring of AI and technology provisions \u2014 no established methodology for estimating fiscal impact of rapid AI adoption on federal workforce costs, tax revenues, and program eligibility",
+        "Healthcare cost projection difficulty \u2014 persistent inaccuracies in projecting Medicare, Medicaid, and ACA marketplace costs due to rapidly evolving medical technology and utilization patterns",
+        "Debt sustainability analysis complexity \u2014 $36T+ national debt requires sophisticated modeling of interest rate feedback loops that CBO's existing frameworks struggle to capture accurately"
+      ],
+      "priorities": [
+        "$70M annual CBO operating budget within Legislative Branch appropriations supporting approximately 275 staff economists, analysts, and support personnel",
+        "Analytical model modernization investments including high-performance computing infrastructure for dynamic scoring and microsimulation capabilities",
+        "Healthcare cost estimation model upgrades incorporating pharmaceutical innovation pipelines, value-based care transitions, and demographic shift projections",
+        "AI and machine learning integration into revenue forecasting, spending projection, and baseline estimation processes for improved accuracy",
+        "Dynamic scoring capacity expansion as required by House rules for legislation exceeding 0.25% of GDP, requiring additional macroeconomic modeling staff",
+        "Workforce development and retention programs including competitive salary adjustments for PhD economists and data scientists critical to scoring accuracy",
+        "Transparency initiative investments for publishing model documentation, data sources, and sensitivity analyses alongside official cost estimates",
+        "Climate and energy modeling capabilities for scoring Inflation Reduction Act provisions, carbon pricing proposals, and clean energy tax credit costs",
+        "Debt and interest rate modeling improvements capturing feedback effects between fiscal policy, monetary policy, and financial market conditions",
+        "IT infrastructure modernization for secure data processing, remote collaboration tools, and automated report generation supporting Congressional schedule demands"
+      ]
+    },
+    "AbilityOne Commission": {
+      "painPoints": [
+        "75% direct labor ratio compliance failures \u2014 as many as half of contracting nonprofits under SourceAmerica may operate below the legally required threshold for disabled worker hours",
+        "Compliance division leadership vacancy \u2014 Commission lost permanent Director of Compliance and cannot rehire core compliance functions, risking inconsistent oversight of CNAs and NPAs",
+        "Procurement list pricing rejections \u2014 Commission experienced 77% rejection rate for initial pricing packages from nonprofit agencies, indicating systemic pricing oversight challenges (GAO-13-457)",
+        "CNA transparency deficiency \u2014 GAO found Central Nonprofit Agencies do not fully disclose project assignment decisions, increasing risk of biased allocation with wide official latitude",
+        "Data-driven decision-making immaturity \u2014 OIG found Commission only beginning to create data dashboards from CNA data, with no established methodology for what additional data to collect or analyze",
+        "Buy America Act compliance risks \u2014 September 2025 directive required full domestic sourcing compliance, but Commission lacks verification infrastructure for global supply chains",
+        "Exempt from full and open competition \u2014 $4.1B+ in annual mandatory-source procurement operates outside normal FAR competition requirements, creating heightened fraud and waste risks",
+        "Inspector general capacity limitations \u2014 OIG established per GAO recommendation but still building capacity for auditing $4.1B procurement program across hundreds of nonprofit agencies",
+        "Strategic plan implementation gaps \u2014 OIG evaluation of FY2022-2026 Strategic Plan found insufficient metrics and accountability mechanisms for measuring program effectiveness",
+        "Workforce with disabilities retention \u2014 federal disability employment shows persistent retention problems, with disabled employees leaving at higher rates than non-disabled counterparts"
+      ],
+      "priorities": [
+        "$4.1B+ annual AbilityOne procurement program supporting 37,000 people who are blind or have significant disabilities across products and services to federal agencies",
+        "Compliance monitoring system modernization with digital tools for tracking 75% direct labor ratio across hundreds of nonprofit agencies nationwide",
+        "Inspector General capacity building for expanded audit coverage of CNA and NPA financial management, contract performance, and disability ratio compliance",
+        "Data analytics platform development creating dashboards from CNA/NPA data for evidence-based program oversight and Congressional reporting",
+        "Domestic sourcing compliance verification infrastructure responding to September 2025 directive for Buy America Act conformance across AbilityOne products",
+        "Pricing methodology reform investments establishing transparent, consistent frameworks for setting fair market prices on procurement list items and services",
+        "Workforce development grants to nonprofit agencies for training people with significant disabilities in high-demand federal service areas including IT, cybersecurity, and logistics",
+        "Program expansion into professional services \u2014 IT help desk, document management, and cybersecurity monitoring contracts creating higher-skilled employment opportunities",
+        "Anti-fraud technology investment for detecting non-compliant labor practices, subcontracting violations, and financial irregularities across the nonprofit agency network",
+        "Strategic plan performance measurement framework development with outcome-based metrics for employment quality, competitive integrated employment transitions, and wage growth"
+      ]
+    },
+    "U.S. Army Corps of Engineers Civil Works": {
+      "painPoints": [
+        "$110B authorized construction project backlog \u2014 at current $2B annual Construction account funding, Corps would need 50+ years to complete congressionally authorized water resource projects",
+        "FY2026 budget cut \u2014 $6.66B request is $2.04B less than the $8.70B provided in each of FY2024 and FY2025, threatening ongoing project schedules and new construction starts",
+        "Dam safety deterioration \u2014 15% of the nation's 16,746 high-hazard-potential dams (2,522) rated poor or unsatisfactory condition as of 2025, earning D+ grade from ASCE",
+        "Flood risk management project cost escalation \u2014 GAO-14-35 identified persistent cost increases in flood control construction that reduce benefit-cost ratios and delay completion",
+        "Inland waterway lock infrastructure failure risk \u2014 average lock age exceeds 60 years, with unscheduled closures causing billions in commercial shipping delays annually",
+        "Navigation channel maintenance dredging backlog \u2014 insufficient funding to maintain authorized depths in harbors and waterways, with only 35% of channels at full authorized dimensions",
+        "Water storage fee communication failures \u2014 GAO-25-107242 found Corps needs to improve communication with users on water storage fees and cost estimates for reservoir operations",
+        "Environmental compliance costs \u2014 Endangered Species Act, Clean Water Act, and NEPA requirements adding years and hundreds of millions to project timelines and budgets",
+        "Geographic funding distribution concerns \u2014 GAO-25-107241 examined whether construction funding is equitably distributed across states, finding concentration in certain regions",
+        "Climate change impact on project design \u2014 existing flood risk infrastructure designed for historical hydrology increasingly inadequate under changing precipitation and sea level patterns",
+        "Real estate acquisition delays \u2014 securing rights-of-way and easements from non-federal sponsors adds years to project schedules before construction can begin"
+      ],
+      "priorities": [
+        "$6.66B FY2026 budget request for Civil Works including construction, operations and maintenance, investigations, and Mississippi River and Tributaries programs",
+        "$1.65B for inland flood risk reduction including $659M in construction funding, with $571M dedicated to dam safety work at Whittier Narrows, CA",
+        "$9.883B proposed in House-passed FY2026 Energy and Water bill, representing significant increase over Administration request for USACE projects",
+        "$28.5B allocated across 278 construction projects in FY2018-2023 period, with ongoing multi-year project completion requiring sustained funding",
+        "$50M Inland Waterways Trust Fund allocation in FY2025 for inland waterway construction projects addressing lock and dam modernization",
+        "Navigation construction including deep-draft harbor improvements and inland waterway lock rehabilitation contracts at 23 priority locations",
+        "Ecosystem restoration construction at Everglades, Columbia River, and Great Lakes sites with multi-billion-dollar authorized project scopes",
+        "Continuing Authorities Program small project contracts for flood risk, navigation, and environmental projects under $10M individual authorization",
+        "Levee safety program investments for inspecting and rehabilitating 15,000+ miles of federal levees protecting communities from flood damage",
+        "Hydropower modernization at 75 USACE power plants generating 24% of U.S. hydroelectric power, with turbine replacements and efficiency upgrades"
+      ]
+    },
+    "Office of Science and Technology Policy (OSTP)": {
+      "painPoints": [
+        "Global R&D competitiveness gap \u2014 China has overtaken U.S. in public sector R&D investment at 1.6x American levels, threatening technological leadership in AI, quantum, and biotech",
+        "AI governance framework uncertainty \u2014 rejection of international AI governance frameworks leaves domestic policy fragmented across agencies without unified risk management standards",
+        "Quantum computing transition timeline pressure \u2014 adversary quantum capabilities could threaten current encryption standards, but federal agencies lag in post-quantum cryptography migration",
+        "R&D budget constraints \u2014 bipartisan budget deals still reduce funding for science agencies including NSF and NASA despite OSTP priority-setting for frontier technology investments",
+        "Interagency coordination complexity \u2014 OSTP has limited staff and no direct budget authority to compel 20+ federal research agencies to align spending with presidential priorities",
+        "STEM workforce pipeline erosion \u2014 declining domestic PhD enrollment in critical fields while competitors invest heavily in human capital for AI, semiconductor, and quantum research",
+        "Research security vs. openness tension \u2014 balancing protection of federally funded research from foreign interference while maintaining international collaboration essential for scientific progress",
+        "Biotechnology supply chain vulnerability \u2014 domestic biomanufacturing capacity insufficient for pandemic response, therapeutic production, and agricultural innovation at scale",
+        "Climate and energy research politicization \u2014 shifting administration priorities create whiplash for multi-year research programs requiring sustained investment horizons",
+        "Critical minerals R&D gaps \u2014 insufficient domestic research capacity for rare earth extraction, processing, and recycling technologies critical to defense and clean energy supply chains"
+      ],
+      "priorities": [
+        "$5.5M OSTP operational budget supporting approximately 50 staff advising the President on science, technology, and innovation policy across all federal agencies",
+        "AI R&D prioritization directing agencies to invest in architecture, efficiency, interpretability, and security research with $200M mandatory funding in FY2025 budget",
+        "$150M for DOE AI R&D in Senate reconciliation including AI-ready scientific datasets and seed funding for self-improving AI models for science and engineering",
+        "National Quantum Strategy update directing OSTP, Commerce, Energy, and Defense to launch federally backed scientific quantum computer and expand quantum sensing and networking",
+        "Biotechnology and biomanufacturing R&D investments in modular and scalable platforms supporting domestic supply chain security and bringing biological products to market",
+        "Critical and emerging technology priority-setting for FY2027 R&D budgets across AI, quantum, nuclear energy, biotechnology, and space exploration",
+        "STEM education and workforce development coordination directing agencies to align training programs with national technology priority areas and emerging industry needs",
+        "Research security framework implementation requiring federal funding recipients to disclose foreign funding sources and institutional affiliations",
+        "Nuclear energy R&D coordination for small modular reactors, advanced fuel cycles, and fusion energy research supporting energy security and AI data center power demands",
+        "International S&T cooperation agreements with allied nations on semiconductor supply chains, quantum information science, and responsible AI development standards"
+      ]
+    },
+    "Office of Government Ethics (OGE)": {
+      "painPoints": [
+        "Integrity electronic filing system limitations \u2014 platform operational since 2015 requires continuous modernization to handle 25,000+ annual public financial disclosure reports across the executive branch",
+        "Agency resource shortfalls \u2014 37% of 143 reporting agencies (53 agencies) reported needing more ethics program resources for officials, financial disclosure, training, and enforcement",
+        "FedRAMP cloud migration costs \u2014 OGE estimates $600,000+ for FY2026 cloud services and governance, risk, and compliance tools, straining a $22.4M total budget",
+        "Financial disclosure form complexity \u2014 OGE Form 278e modifications require OMB approval cycles that delay implementation of needed filer data fields and appointment type tracking",
+        "Ethics official training capacity \u2014 OGE must train designated agency ethics officials across 130+ executive branch agencies with limited staff and budget for program delivery",
+        "Special Government Employee oversight \u2014 part-time and intermittent appointees require financial disclosure and ethics compliance monitoring with different rules than regular employees",
+        "Ethics Pledge enforcement during transitions \u2014 presidential transition periods create surges in nominee financial disclosure filings that overwhelm OGE review capacity",
+        "Confidential disclosure program oversight \u2014 OGE Form 450 covers tens of thousands of mid-level employees, but OGE lacks visibility into agency-level compliance and timeliness",
+        "Post-employment restriction monitoring \u2014 no systematic capability to track compliance with revolving door restrictions after officials leave government service",
+        "Budget erosion against expanding mandate \u2014 $22.4M FY2025 request represents flat or declining real funding while executive branch ethics program scope continuously expands"
+      ],
+      "priorities": [
+        "$22.4M FY2025 appropriation request for OGE operations supporting ethics oversight of 130+ executive branch agencies and 2.7 million federal employees",
+        "$600,000+ for Integrity system FedRAMP cloud migration and governance, risk, and compliance tool deployment in FY2026",
+        "Integrity electronic filing platform enhancement supporting OGE Form 278e public financial disclosure with new appointment type fields and extension request module",
+        "Ethics official training program expansion with virtual and in-person curriculum for designated agency ethics officials managing financial disclosure and conflict-of-interest reviews",
+        "Data analytics investment for systematic monitoring of financial disclosure filing timeliness, completeness, and conflict-of-interest resolution across agencies",
+        "Cybersecurity improvements for protecting sensitive financial disclosure data containing PII, financial account information, and asset holdings of senior officials",
+        "Ethics program evaluation methodology development for assessing effectiveness of agency ethics programs beyond compliance metrics to measure culture and behavior change",
+        "Public transparency platform modernization making financial disclosure reports accessible to citizens and media through improved search, download, and API capabilities",
+        "Special Government Employee compliance tracking system for monitoring growing number of part-time advisors, commission members, and expert consultants",
+        "Post-employment restriction monitoring pilot program exploring technology solutions for tracking compliance with cooling-off period and representational restrictions"
+      ]
+    },
+    "Federal Prison Industries (UNICOR)": {
+      "painPoints": [
+        "Revenue shortfall against plan \u2014 FY2024 sales through July were $335M, missing target by $32M, indicating declining federal agency purchasing from UNICOR mandatory source programs",
+        "Defect rate increases \u2014 Board minutes report rising quality defects linked to increased part-time inmate workers, requiring additional training investment and quality control processes",
+        "Inmate workforce availability decline \u2014 early pandemic releases and First Step Act earned time credits reduce pool of inmates within 3 years of release eligible for UNICOR programs",
+        "Factory utilization pressure \u2014 $303M backlog must be maintained to keep 76 active UNICOR factory locations operating at sustainable capacity across furniture, textiles, and electronics",
+        "Cybersecurity posture historically poor \u2014 FPI ranked last among 27 DOJ groups in cybersecurity before extensive upgrades moved it to 10th place, indicating continued improvement needed",
+        "IT recycling environmental compliance risk \u2014 prior investigations found inmates exposed to hazardous materials during e-waste recycling operations, requiring ongoing safety program investment",
+        "Competition from private sector \u2014 federal agencies increasingly prefer commercial sources over UNICOR mandatory-source preference, driving revenue decline from peak $900M+ levels",
+        "Net profit margin compression \u2014 $14.8M net profit on $450M+ annual revenue in FY2024 represents thin margins vulnerable to supply chain cost increases and workforce disruptions",
+        "Manufacturing modernization needs \u2014 aging equipment in textile, furniture, and electronics factories requires capital investment that self-funded UNICOR must generate from operations",
+        "Reentry program effectiveness measurement \u2014 limited data on whether UNICOR work experience reduces recidivism compared to other Bureau of Prisons programming options",
+        "Supply chain disruptions \u2014 ongoing global supply chain volatility affects raw material availability and costs for UNICOR manufacturing operations across multiple product lines"
+      ],
+      "priorities": [
+        "$450M+ annual UNICOR revenue target from self-funded operations across manufacturing, services, and recycling business groups with zero Congressional appropriations",
+        "Recycling Business Group growth \u2014 technology sector recycling on track to exceed FY2024 sales plan, with FY2025 projected to build on exceptional performance across all indicators",
+        "Cybersecurity improvement program continuing upgrades from 27th to 10th ranking among DOJ components, targeting top-5 positioning within FY2025-2026",
+        "Quality control and training investment addressing rising defect rates through standardized worker training programs and manufacturing process improvements",
+        "Services Business Group expansion into IT help desk, contact center, and data processing contracts to offset declining traditional manufacturing revenue",
+        "Factory modernization capital investment for CNC equipment, automated textile production, and digital manufacturing capabilities across 76 active locations",
+        "Workforce development program enhancement aligned with First Step Act requirements providing marketable job skills and industry certifications for reentry",
+        "Environmental health and safety program for recycling operations ensuring compliance with OSHA and EPA regulations for e-waste handling and hazardous materials processing",
+        "Federal customer outreach to agencies increasing awareness of UNICOR products and services competitive with commercial alternatives on quality and delivery",
+        "MIS Branch technology investments continuing IT infrastructure modernization for enterprise resource planning, order management, and supply chain visibility systems"
+      ]
+    },
+    "Chemical Safety and Hazard Investigation Board (CSB)": {
+      "painPoints": [
+        "Agency existence threatened \u2014 President Trump signed executive order in 2025 calling for elimination of CSB, the only federal agency investigating chemical explosions and industrial accidents",
+        "Critical staffing crisis \u2014 investigators dropped from 24 to 9 at lowest point, and staffing level 21% below 52 authorized FTEs as of June 2024 despite $17.4M budget increase",
+        "Post-elimination operational uncertainty \u2014 agency reduced to 42 professional staff after additional losses, with ongoing litigation challenging shutdown authority under federal court injunction",
+        "Investigation capacity constraints \u2014 cleared 17-report backlog by end of 2023, but cannot sustain deployment to new incidents while completing ongoing investigations with depleted staff",
+        "No regulatory enforcement authority \u2014 CSB can only investigate and recommend, relying on OSHA and EPA to implement safety recommendations with historically low adoption rates",
+        "Budget inadequacy relative to mission \u2014 budget never exceeded $12M until 2023 despite investigating some of the world's most complicated and violent industrial accidents",
+        "Loss of institutional expertise \u2014 experienced investigators departing creates knowledge gaps in petrochemical, refining, and chemical manufacturing accident investigation specialties",
+        "Safety recommendation tracking challenges \u2014 1,000+ cumulative recommendations issued but no systematic capability to monitor industry implementation and effectiveness over time",
+        "Chemical incident frequency increasing \u2014 rising number of reportable chemical incidents nationally while CSB has fewer resources to investigate root causes and publish findings",
+        "Contracting and administrative support deficiency \u2014 staffing problems affect not just investigations but contracting, procurement, and administrative functions supporting core mission"
+      ],
+      "priorities": [
+        "$17.4M FY2025 budget request representing 20% increase over FY2023 funding to restore investigative capacity and rebuild professional staff",
+        "Investigator recruitment and retention program targeting restoration of 24+ accident investigation positions from current single-digit staffing levels",
+        "Safety video and recommendation publication program \u2014 CSB's widely-viewed safety videos and detailed investigation reports serve as primary chemical safety education resource globally",
+        "Chemical incident data collection and analysis platform for systematic tracking of reportable incidents, root cause patterns, and recommendation implementation rates",
+        "Administrative and contracting staff rebuild addressing operational support deficits that compound investigative capacity limitations",
+        "Training and certification program for new investigators in petrochemical accident investigation, hazardous materials assessment, and root cause analysis methodologies",
+        "Interagency coordination with OSHA, EPA, and state agencies for safety recommendation implementation follow-up and compliance monitoring",
+        "IT infrastructure modernization for case management, evidence preservation, and secure collaboration with industry stakeholders during active investigations",
+        "Legal defense funding for ongoing litigation challenging executive order agency elimination and protecting statutory investigative mandate",
+        "Public outreach and industry engagement maintaining CSB's role as independent chemical safety advocate through speaking, training, and technical assistance programs"
+      ]
+    },
+    "Federal Mediation and Conciliation Service (FMCS)": {
+      "painPoints": [
+        "Agency dismantlement threat \u2014 March 2025 executive order called for elimination of FMCS, with DOGE operatives reducing mediator headcount from 220 employees to 5",
+        "Judicial injunction uncertainty \u2014 May 2025 federal judge issued preliminary injunction stopping closure, but agency operations remain severely degraded pending litigation outcome",
+        "Catastrophic mediator loss \u2014 reduction from full complement to 5 mediators eliminates capacity to mediate 2,318 collective bargaining sessions and 1,362 high-impact grievances annually",
+        "Arbitration panel service collapse \u2014 agency provided 10,004 arbitration panels and appointed 4,350 arbitrators in FY2024, services now essentially unavailable to federal and private sectors",
+        "Labor dispute resolution vacuum \u2014 FMCS saved employers and unions $500M annually in litigation costs; elimination shifts disputes to courts and increases work stoppages",
+        "Training program discontinuation \u2014 1,477 training and intervention panels conducted in FY2024 for labor-management cooperation now suspended indefinitely",
+        "Institutional knowledge destruction \u2014 decades of mediator expertise in complex labor relations, industry-specific negotiation, and dispute prevention lost through mass workforce reduction",
+        "Alternative dispute resolution access gap \u2014 federal agencies losing access to FMCS ADR services for workplace disputes, EEO complaints, and interagency conflicts",
+        "International labor mediation disruption \u2014 FMCS provided technical assistance to foreign governments on labor dispute resolution, damaging U.S. soft power and trade relationships",
+        "Cost-effectiveness evidence ignored \u2014 $54M annual budget (0.0014% of federal spending) generating $500M in savings demonstrates 10:1 return on investment being discarded"
+      ],
+      "priorities": [
+        "$54M annual budget supporting 220 employees providing mediation, arbitration, and training services to federal, state, and private sector labor-management relationships",
+        "Mediator workforce restoration \u2014 rebuilding from 5 remaining mediators to functional capacity for 2,300+ annual collective bargaining mediation sessions",
+        "Arbitration panel service resumption providing access to 10,000+ panels and 4,350+ arbitrator appointments annually for labor dispute resolution",
+        "Training and intervention program rebuild delivering 1,477+ labor-management cooperation training sessions and relationship-building interventions per year",
+        "Alternative dispute resolution services restoration for federal agencies, including workplace mediation, EEO dispute resolution, and facilitated dialogue programs",
+        "Technology platform maintenance for case management, mediator scheduling, and arbitrator roster management systems supporting nationwide operations",
+        "Legal defense of agency statutory mandate under the Federal Service Labor-Management Relations Statute and the Labor Management Relations Act",
+        "Graduate school partnerships for mediator training and professional development in negotiation, conflict resolution, and labor law",
+        "International technical assistance programs supporting labor dispute resolution capacity building in trading partner nations",
+        "Data analytics for labor dispute trend monitoring, early intervention, and preventive mediation targeting high-risk negotiation situations before they escalate"
+      ]
+    },
+    "Southeastern Power Administration (SEPA)": {
+      "painPoints": [
+        "Aging transmission infrastructure \u2014 initial facilities built approximately 60 years ago require continuous evaluation, with technology obsolescence limiting availability of replacement parts",
+        "Hydropower generation variability \u2014 climate-driven drought patterns and changing precipitation affect water levels at 22 Army Corps dams, creating revenue uncertainty for wholesale customers",
+        "Grid modernization investment pressure \u2014 commitment to resilience, reliability, efficiency, and Federal asset utilization requires capital investment in systems and infrastructure",
+        "Revenue sufficiency challenges \u2014 $307M FY2024 revenue from 7.5 billion kWh to 471 wholesale customers must cover operations, maintenance, and infrastructure modernization simultaneously",
+        "Workforce succession planning \u2014 small agency faces retirements of experienced hydropower and transmission professionals with limited pipeline of replacement talent",
+        "Cybersecurity for operational technology \u2014 NERC CIP compliance requirements for power marketing administration IT and operational technology systems stretch small agency resources",
+        "Dam safety dependency \u2014 SEPA revenue depends entirely on Army Corps dam operations and maintenance, with no direct control over the hydropower generation assets it markets",
+        "Climate adaptation uncertainty \u2014 changing hydrological patterns in southeastern states affect long-term power purchase agreements and customer rate structures",
+        "Customer rate pressure \u2014 wholesale customers (municipal utilities and cooperatives) resist rate increases needed to fund infrastructure modernization and reserve building",
+        "Interoperability with modern grid \u2014 integrating 1960s-era hydropower scheduling and dispatch systems with modern energy markets and renewable energy variability"
+      ],
+      "priorities": [
+        "$307M annual revenue from marketing 7.5 billion kWh of federal hydropower from 22 Army Corps of Engineers projects across 10 southeastern states",
+        "2024-2029 Strategic Plan implementation with initiatives for employee engagement, relationship enhancement, and organizational modernization",
+        "Infrastructure modernization investments for transmission systems, SCADA controls, and metering equipment supporting reliability and efficiency improvements",
+        "DOE hydropower incentive program participation \u2014 eligible for share of $430M in capital improvement payments for grid resiliency, dam safety, and environmental improvements",
+        "Cybersecurity compliance investments meeting NERC CIP reliability standards for bulk electric system operations and power marketing IT infrastructure",
+        "Workforce development and succession planning programs recruiting and training next-generation hydropower operations, transmission, and power marketing professionals",
+        "Grid integration technology for coordinating federal hydropower dispatch with variable renewable energy resources and evolving wholesale electricity markets",
+        "Customer relationship management modernization for rate-setting, billing, and power scheduling with 471 wholesale utility customers across the Southeast",
+        "Environmental compliance investments supporting fish passage, water quality, and recreation management at federal hydropower projects per FERC license conditions",
+        "Emergency preparedness and resilience planning for extreme weather events, grid disturbances, and extended drought scenarios affecting hydropower generation capacity"
+      ]
+    },
+    "Southwestern Power Administration (SWPA)": {
+      "painPoints": [
+        "22.8% rate increase required \u2014 SWPA proposes raising Integrated System rates by $44.2M annually to meet $237.8M revenue need effective April 2025, straining customer relationships",
+        "Congressional budget scoring impediment \u2014 since FY2018, CBO scoring changes to purchase power and wheeling receipt authority have impacted approved funding levels during generation shortfalls",
+        "Drought vulnerability \u2014 when hydropower generation is unavailable during drought, SWPA must purchase replacement power at market rates but lacks financial certainty to cover costs",
+        "Aging infrastructure obsolescence \u2014 60-year-old initial facilities face parts unavailability and technology obsolescence requiring costly custom engineering solutions",
+        "Limited fiscal flexibility \u2014 SWPA cannot retain funds across fiscal years for long-term planning, relying on annually approved appropriation authority that constrains infrastructure investment",
+        "Robert D. Willis Hydropower Project rate increase \u2014 28.6% revenue increase from $1.28M to $1.65M effective August 2025 reflecting infrastructure and operational cost pressures",
+        "Dam safety concerns at 24 Army Corps projects \u2014 national ASCE D+ dam grade reflects deteriorating conditions at the hydropower projects SWPA depends on for generation",
+        "O&M net appropriation constraints \u2014 $47.5M for FY2025-2028 must cover operations, maintenance, and asset replacement across transmission infrastructure in 6-state territory",
+        "Extreme weather event frequency \u2014 climate variability in Arkansas, Kansas, Louisiana, Missouri, Oklahoma, and Texas increases grid stress and generation/demand imbalance",
+        "Proposed SWPA fund establishment \u2014 S.1034 (119th Congress) seeks to create revolving fund addressing structural fiscal limitations, but passage uncertain"
+      ],
+      "priorities": [
+        "$237.8M annual revenue requirement for Integrated System operations covering 24 Army Corps hydropower projects marketed across Arkansas, Kansas, Louisiana, Missouri, Oklahoma, and Texas",
+        "$47.5M Operation and Maintenance net appropriation for FY2025-2028 covering transmission infrastructure maintenance, repair, and replacement",
+        "Rate structure modernization effective April 2025 addressing $44.2M revenue gap through revised Integrated System rate schedules",
+        "SWPA Fund Establishment Act (S.1034) advocacy for creating revolving fund providing fiscal year carryover authority and financial certainty during drought conditions",
+        "Transmission infrastructure rehabilitation contracts for aging lines, substations, and switchgear serving 6-state hydropower marketing territory",
+        "SCADA and energy management system upgrades for real-time monitoring and dispatch optimization across 24 federal hydropower projects",
+        "Purchase power and wheeling agreements maintaining reliability of service to customers when federal hydropower generation falls below contractual obligations",
+        "DOE hydropower incentive program participation for dam safety, grid resiliency, and environmental improvement capital investments at federal projects",
+        "Cybersecurity and NERC CIP compliance program investments for bulk electric system operational technology and power marketing administration IT systems",
+        "Climate resilience and drought contingency planning establishing financial reserves and operational protocols for extended periods of reduced hydropower generation"
+      ]
+    },
+    "Federal Permitting Improvement Steering Council (FPISC)": {
+      "painPoints": [
+        "Performance schedule development failures \u2014 GAO-20-19 found FPISC had not issued performance schedules for ten infrastructure sectors as mandated by FAST-41 due to insufficient data and resources",
+        "Staffing below authorized levels \u2014 FY2025 budget request sought funding to reach full staffing capacity, indicating persistent vacancies limiting coordination across 13 federal permitting agencies",
+        "Environmental review timeline accountability gaps \u2014 FAST-41 Permitting Dashboard tracks project milestones but lacks enforcement mechanisms when agencies miss statutory review deadlines",
+        "Cross-agency coordination complexity \u2014 FPISC must synchronize environmental reviews across 13+ federal agencies with different mandates, cultures, and IT systems for each covered project",
+        "Limited project coverage \u2014 FAST-41 is voluntary for eligible infrastructure projects, meaning many major projects proceed without coordinated permitting review and timeline accountability",
+        "NEPA reform implementation uncertainty \u2014 CEQ Phase 2 NEPA regulations finalized in 2024 require FPISC to update best practices and coordination procedures, but political shifts may alter rules",
+        "Dashboard technology limitations \u2014 Permitting Dashboard (permits.performance.gov) provides transparency but lacks advanced analytics for identifying systemic bottlenecks and predicting delays",
+        "Sector-specific permitting expertise shortfalls \u2014 FPISC staff must understand permitting requirements across energy, transportation, water, broadband, and mining sectors simultaneously",
+        "State and local coordination gaps \u2014 federal permitting reforms do not address state and local permit processes that often add more time than federal reviews to project timelines",
+        "Cost recovery and fee structures \u2014 no standardized approach for recovering FPISC operational costs from project sponsors benefiting from coordinated permitting services"
+      ],
+      "priorities": [
+        "$10M annual FPISC operating budget supporting coordinated environmental review and permitting for major infrastructure projects under FAST-41 authority",
+        "Full staffing capacity recruitment to support growing portfolio of FAST-41 covered projects across energy, transportation, water, and broadband infrastructure sectors",
+        "Permitting Dashboard (permits.performance.gov) technology modernization for enhanced project tracking, milestone analytics, and public transparency features",
+        "FAST-41 covered project expansion \u2014 designating additional major infrastructure projects for coordinated federal environmental review and permitting oversight",
+        "Best practices development and dissemination for environmental review processes across 13 federal permitting agencies, incorporating NEPA reform requirements",
+        "Performance schedule establishment for ten infrastructure sectors as mandated by FAST-41, using accumulated project data to set baseline review timelines",
+        "Interagency memoranda of understanding for resource sharing, concurrent review processing, and dispute resolution among federal permitting agencies",
+        "GSA Basic Ordering Agreement contracts for environmental review support services, technical analysis, and project management assistance to covered projects",
+        "Training program for federal agency permitting staff on FAST-41 requirements, Permitting Dashboard usage, and coordinated review best practices",
+        "Broadband and clean energy project permitting acceleration in support of Infrastructure Investment and Jobs Act and Inflation Reduction Act implementation timelines"
       ]
     }
   }
