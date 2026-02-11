@@ -2742,7 +2742,7 @@ function IDVContractsReport({ data, inputs }: { data: any; inputs: CoreInputs })
     return null;
   }
 
-  const idvContracts = data?.contracts || [];
+  const idvContracts: IDVContract[] = data?.contracts || [];
   const totalValue = data?.summary?.totalValue || 0;
   const uniquePrimes = data?.summary?.uniquePrimes || 0;
   const idvPagination = usePagination(idvContracts, 10);
