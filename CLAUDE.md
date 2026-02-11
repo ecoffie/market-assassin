@@ -74,7 +74,7 @@
 
 **Features:**
 - Generate up to 30 LinkedIn posts per click
-- 175 federal agencies supported
+- 250 federal agencies supported (pain points database)
 - GovCon-tuned AI model
 - GEO Boost optimization
 - Multiple content styles
@@ -450,7 +450,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Agency Pain Points & Priorities System
 
-**Database:** `src/data/agency-pain-points.json` — 135 agencies, 1,504 pain points, 1,350 spending priorities
+**Database:** `src/data/agency-pain-points.json` — 250 agencies, 2,765 pain points, 2,500 spending priorities
 **Admin Endpoint:** `/api/admin/build-pain-points` — generates pain points + priorities via Grok AI + USASpending + GAO/IG data
 - Auth: `?password=galata-assassin-2026`
 - `?mode=preview` — dry run showing gaps
@@ -463,6 +463,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 **Used by:**
 - **Content Generator** (`/api/content-generator/generate`) — both pain points and priorities fed into Step 2 prompt for thought leadership content
 - **Market Assassin** (`/api/reports/generate-all`) — Pain Points report with cross-referencing, NAICS relevance scoring, and high-opportunity matches
+- **Market Assassin** (AgencySelectionTable) — agency modal shows pain points + spending priorities sections
 - **Opportunity Hunter** (`/api/pain-points`) — agency modal shows pain points + spending priorities
 - **Pain Points API** (`/api/pain-points`) — returns both `painPoints` and `priorities` arrays
 
@@ -472,19 +473,39 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 - NAICS keyword mapping scores relevance (high/medium/low) against user's NAICS code
 - HTML/PDF report, CSV export, and agency modal all show priorities
 
+**Business Types (CoreInputForm):**
+- Women Owned, HUBZone, 8(a) Certified, Small Business, Native American/Tribal
+- DOT Certified was removed (Feb 10, 2026) — it mapped to same codes as Small Business
+- Veteran Status is a separate optional field: Not Applicable, Veteran Owned, Service Disabled Veteran
+
 **Key Files:**
 | File | Purpose |
 |------|---------|
-| `src/data/agency-pain-points.json` | 135 agencies with painPoints[] and priorities[] |
+| `src/data/agency-pain-points.json` | 250 agencies with painPoints[] and priorities[] |
 | `src/lib/utils/pain-points.ts` | `getPainPointsForAgency()`, `getPrioritiesForAgency()` |
 | `src/lib/utils/pain-point-generator.ts` | Grok-powered generation |
 | `src/lib/utils/federal-oversight-data.ts` | GAO High Risk, IG challenges, spending priorities seed data |
 | `src/lib/utils/agency-list-builder.ts` | USASpending agency fetcher |
 | `src/app/api/admin/build-pain-points/route.ts` | Admin pipeline endpoint |
+| `src/components/federal-market-assassin/tables/AgencySelectionTable.tsx` | Agency modal with pain points + spending priorities |
+| `src/components/federal-market-assassin/reports/ReportsDisplay.tsx` | Report display with dynamic month/quarter labels |
+| `src/components/federal-market-assassin/forms/CoreInputForm.tsx` | Business type + PSC/NAICS input form |
 
 ---
 
 ## Recent Work History
+
+### February 10, 2026 (Session 10)
+- **Agency Pain Points Database: 210 → 250 agencies** — 40 new agencies across Education, HUD, GSA, SBA, EPA, Treasury, Commerce, DoD, Intel, Independent
+  - All 250 agencies have 10+ pain points (zero thin)
+  - Total: 2,765 pain points, 2,500 spending priorities
+  - All data grounded in GAO reports, IG audits, CRS analyses, FY2025-2026 budget justifications
+- **Market Assassin UI fixes:**
+  - Fixed mislabeled "priorities identified" → "pain points identified" in agency modal
+  - Added Spending Priorities section (emerald green) to agency modal
+  - Made Similar Awards dynamic: "December Hit List" → current month, "Q4 Spend" → current fiscal quarter
+- **Removed DOT Certified business type** from all tools (6 files: type def, 2 set-aside maps, 3 dropdowns)
+  - DOT Certified mapped to `['SBP']` which was already included in Small Business codes
 
 ### February 10, 2026 (Session 9)
 - **Content Generator: Thought leadership rewrite** — prompts now create expert content that attracts government decision makers, NOT sales pitches
@@ -495,7 +516,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
   - Carousel CTA preserved — only post text changed, carousel last slide still has CTA
 - **Opportunity Hunter: Priorities wired in** — modal now shows pain points + spending priorities
   - `/api/pain-points` now returns `priorities[]` and `priorityCount` in both GET and POST
-  - `loadPainPoints` tries `/api/pain-points` first (135 agencies) before falling back to `/api/agency-knowledge-base` (31 agencies)
+  - `loadPainPoints` tries `/api/pain-points` first (250 agencies) before falling back to `/api/agency-knowledge-base` (31 agencies)
   - Modal split: purple "Pain Points" section + green "Spending Priorities" section with `$` bullets and FUNDED badges
 - **Market Assassin: Enhanced priorities intelligence**
   - NAICS keyword mapping (15 sectors) scores each priority as high/medium/low relevance to user's NAICS
@@ -582,4 +603,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 10, 2026 (Session 9)*
+*Last Updated: February 10, 2026 (Session 10)*
