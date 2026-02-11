@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPainPointsForAgency, getPrioritiesForAgency, categorizePainPoints } from '@/lib/utils/pain-points';
-import { checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
+import { checkContentRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
+import { trackGeneration } from '@/lib/abuse-detection';
 
 // Fisher-Yates shuffle — returns a new array in random order
 function shuffleArray<T>(arr: T[]): T[] {
@@ -282,19 +283,29 @@ export async function OPTIONS() {
 // Main POST handler
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting by IP
-    const ip = getClientIP(request);
-    const rl = await checkIPRateLimit(ip);
-    if (!rl.allowed) return rateLimitResponse(rl);
-
     const body = await request.json();
     const {
       targetAgencies = [],
-      numPosts = 3,
+      numPosts: rawNumPosts = 3,
       geoBoost = true,
       templates = [],
-      companyProfile = {}
+      companyProfile = {},
+      userEmail = ''
     } = body;
+
+    // Cap numPosts at 30 max
+    const numPosts = Math.min(Math.max(1, Number(rawNumPosts) || 3), 30);
+
+    // Rate limiting: email-based if available, IP fallback
+    if (userEmail) {
+      const rl = await checkContentRateLimit(userEmail);
+      if (!rl.allowed) return rateLimitResponse(rl);
+      trackGeneration(userEmail);
+    } else {
+      const ip = getClientIP(request);
+      const rl = await checkIPRateLimit(ip);
+      if (!rl.allowed) return rateLimitResponse(rl);
+    }
 
     console.log(`[Content Generator] Request for ${numPosts} posts, agencies:`, targetAgencies);
 

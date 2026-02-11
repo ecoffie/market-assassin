@@ -2559,7 +2559,8 @@
                         numPosts: numPosts,
                         contentStyle: contentStyle,
                         geoBoost: geoBoost,
-                        useFineTuned: fineTuned
+                        useFineTuned: fineTuned,
+                        userEmail: SupabaseAuth.user?.email || ''
                     })
                 });
 
