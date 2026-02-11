@@ -41,9 +41,9 @@ export function checkReportRateLimit(email: string): Promise<RateLimitResult> {
   return checkRateLimit(`report:${email.toLowerCase()}`, 50, 86400);
 }
 
-/** 100 content generations per day per email */
+/** 10 content generations per day per email (max 300 posts at 30/request) */
 export function checkContentRateLimit(email: string): Promise<RateLimitResult> {
-  return checkRateLimit(`content:${email.toLowerCase()}`, 100, 86400);
+  return checkRateLimit(`content:${email.toLowerCase()}`, 10, 86400);
 }
 
 /** 30 requests per hour per IP (unauthenticated fallback) */
