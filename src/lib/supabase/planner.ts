@@ -1,4 +1,4 @@
-import { getSupabase } from './client';
+import { getPlannerSupabase as getSupabase } from './planner-client';
 
 // TypeScript interfaces
 export interface Phase {

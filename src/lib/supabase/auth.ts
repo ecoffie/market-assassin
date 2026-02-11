@@ -1,6 +1,6 @@
 'use client';
 
-import { getSupabase } from './client';
+import { getPlannerSupabase as getSupabase } from './planner-client';
 import type { User, Session } from '@supabase/supabase-js';
 
 export interface AuthResult {

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { getSupabase } from './client';
+import { getPlannerSupabase as getSupabase } from './planner-client';
 
 interface AuthContextType {
   user: User | null;

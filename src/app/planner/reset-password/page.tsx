@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getSupabase } from '@/lib/supabase/client';
+import { getPlannerSupabase as getSupabase } from '@/lib/supabase/planner-client';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
