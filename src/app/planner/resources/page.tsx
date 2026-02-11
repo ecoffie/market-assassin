@@ -27,27 +27,37 @@ const quotes = [
   },
 ];
 
-// YouTube video placeholders (replace with actual bootcamp video IDs)
-const bootcampVideos = [
+// Phase training videos — replace 'PLACEHOLDER' with actual YouTube video IDs
+const phaseVideos = [
   {
-    id: 'dQw4w9WgXcQ', // Placeholder - replace with actual video ID
-    title: 'How to Create Your SAM.gov Profile',
-    description: 'Step-by-step guide to registering in SAM.gov and setting up your federal contractor profile.',
+    phase: 1,
+    id: 'PLACEHOLDER', // Replace with actual video ID
+    title: 'Phase 1: Setup & Registrations',
+    description: 'Get your SAM.gov profile, UEI number, DSBS registration, and capability statement set up the right way.',
   },
   {
-    id: 'dQw4w9WgXcQ', // Placeholder - replace with actual video ID
-    title: 'Writing Winning Capability Statements',
-    description: 'Learn how to create compelling capability statements that stand out to government buyers.',
+    phase: 2,
+    id: 'PLACEHOLDER', // Replace with actual video ID
+    title: 'Phase 2: Finding & Bidding on Opportunities',
+    description: 'How to search SAM.gov, read solicitations, and submit your first proposal or quote.',
   },
   {
-    id: 'dQw4w9WgXcQ', // Placeholder - replace with actual video ID
-    title: 'Finding and Responding to Opportunities',
-    description: 'Master the art of finding government contracting opportunities and crafting winning proposals.',
+    phase: 3,
+    id: 'PLACEHOLDER', // Replace with actual video ID
+    title: 'Phase 3: Business Development & Networking',
+    description: 'Building relationships with government buyers, SBLOs, and prime contractors that lead to contracts.',
   },
   {
-    id: 'dQw4w9WgXcQ', // Placeholder - replace with actual video ID
-    title: 'Networking with Government Buyers',
-    description: 'Strategies for building relationships with contracting officers and program managers.',
+    phase: 4,
+    id: 'PLACEHOLDER', // Replace with actual video ID
+    title: 'Phase 4: Business Enhancement',
+    description: 'Certifications, teaming agreements, past performance strategy, and positioning for larger contracts.',
+  },
+  {
+    phase: 5,
+    id: 'PLACEHOLDER', // Replace with actual video ID
+    title: 'Phase 5: Contract Management & Growth',
+    description: 'Managing active contracts, compliance, invoicing, and scaling your government contracting business.',
   },
 ];
 
@@ -221,28 +231,44 @@ export default function ResourcesPage() {
           </div>
         </div>
 
-        {/* YouTube Videos Section */}
+        {/* Phase Training Videos Section */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-[#1e40af] mb-6 flex items-center gap-2">
             <span>📹</span>
-            Bootcamp Video Library
+            Phase Training Videos
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {bootcampVideos.map((video, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-                <div className="aspect-video bg-gray-100">
-                  <iframe
-                    width="100%"
-                    height="100%"
-                    src={`https://www.youtube.com/embed/${video.id}`}
-                    title={video.title}
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="w-full h-full"
-                  />
-                </div>
+            {phaseVideos.map((video) => (
+              <div key={video.phase} className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+                {video.id !== 'PLACEHOLDER' ? (
+                  <div className="aspect-video bg-gray-100">
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      src={`https://www.youtube.com/embed/${video.id}`}
+                      title={video.title}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full"
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-[#1e40af]/10 flex items-center justify-center mb-3">
+                      <svg className="w-8 h-8 text-[#1e40af]" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-medium text-gray-500">Video Coming Soon</p>
+                  </div>
+                )}
                 <div className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#1e40af]/10 text-[#1e40af]">
+                      Phase {video.phase}
+                    </span>
+                  </div>
                   <h3 className="font-bold text-lg text-gray-900 mb-2">{video.title}</h3>
                   <p className="text-sm text-gray-600">{video.description}</p>
                 </div>
