@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
+import { verifyAdminPassword } from '@/lib/admin-auth';
+import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 // Admin endpoint to revoke access
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIP(request);
+    const rl = await checkAdminRateLimit(ip);
+    if (!rl.allowed) return rateLimitResponse(rl);
+
     const { email, product, adminPassword } = await request.json();
 
-    // Verify admin password
-    const expectedPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    if (adminPassword !== expectedPassword) {
+    if (!verifyAdminPassword(adminPassword)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

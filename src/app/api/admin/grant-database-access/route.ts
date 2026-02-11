@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createDatabaseToken } from '@/lib/access-codes';
 import { sendDatabaseAccessEmail } from '@/lib/send-email';
-
-// Admin password - set this in your environment variables
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'govcon-admin-2024';
+import { verifyAdminPassword } from '@/lib/admin-auth';
+import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIP(request);
+    const rl = await checkAdminRateLimit(ip);
+    if (!rl.allowed) return rateLimitResponse(rl);
+
     const { email, name, adminPassword } = await request.json();
 
-    // Validate admin password
-    if (adminPassword !== ADMIN_PASSWORD) {
+    if (!verifyAdminPassword(adminPassword)) {
       return NextResponse.json(
-        { error: 'Invalid admin password' },
+        { error: 'Unauthorized' },
         { status: 401 }
       );
     }

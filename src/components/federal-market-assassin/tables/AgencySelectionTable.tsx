@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Agency, AlternativeSearchOption } from '@/types/federal-market-assassin';
+import { usePagination } from '@/hooks/usePagination';
+import LoadMoreButton from '@/components/ui/LoadMoreButton';
 
 interface AgencySelectionTableProps {
   agencies: Agency[];
@@ -67,6 +69,8 @@ export default function AgencySelectionTable({
       return sortDirection === 'asc' ? comparison : -comparison;
     });
   }, [agencies, sortField, sortDirection]);
+
+  const agencyPagination = usePagination(sortedAgencies, 25);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -462,7 +466,7 @@ export default function AgencySelectionTable({
             </tr>
           </thead>
           <tbody>
-            {sortedAgencies.map((agency) => (
+            {agencyPagination.currentItems.map((agency) => (
               <tr
                 key={agency.id}
                 className={`border-t border-slate-700 hover:bg-slate-700/50 cursor-pointer ${
@@ -513,6 +517,15 @@ export default function AgencySelectionTable({
           </tbody>
         </table>
       </div>
+
+      <LoadMoreButton
+        showingCount={agencyPagination.showingCount}
+        totalItems={agencyPagination.totalItems}
+        hasMore={agencyPagination.hasMore}
+        onLoadMore={agencyPagination.showMore}
+        onShowAll={agencyPagination.showAll}
+        label="agencies"
+      />
 
       {/* Agency Details Modal */}
       {modalAgency && (

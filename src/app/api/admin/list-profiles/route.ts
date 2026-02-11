@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyAdminPassword } from '@/lib/admin-auth';
+import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function getAdminClient() {
   if (!supabaseUrl || !supabaseServiceKey) {
@@ -15,9 +16,12 @@ function getAdminClient() {
 }
 
 export async function GET(request: NextRequest) {
-  // Verify admin password
+  const ip = getClientIP(request);
+  const rl = await checkAdminRateLimit(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   const password = request.headers.get('x-admin-password');
-  if (!password || password !== ADMIN_PASSWORD) {
+  if (!verifyAdminPassword(password)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

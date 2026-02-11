@@ -7,6 +7,8 @@ import {
   grantContentGeneratorAccess,
   grantRecompeteAccess,
 } from '@/lib/access-codes';
+import { verifyAdminPassword } from '@/lib/admin-auth';
+import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 // Pull all completed Stripe checkout sessions and grant KV access
 // based on tier/bundle metadata. Run from market-assassin where KV is connected.
@@ -75,10 +77,13 @@ async function grantByBundle(bundle: string, email: string, name?: string): Prom
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIP(request);
+    const rl = await checkAdminRateLimit(ip);
+    if (!rl.allowed) return rateLimitResponse(rl);
+
     const { password } = await request.json();
 
-    const expectedPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    if (password !== expectedPassword) {
+    if (!verifyAdminPassword(password)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

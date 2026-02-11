@@ -7,17 +7,48 @@ import { getForecastsForSelectedAgencies, getUpcomingForecasts, getForecastStati
 import { searchIDVContracts } from '@/lib/idv-search';
 import { getEnhancedAgencyInfo, isDoDAgency } from '@/lib/utils/command-info';
 import { ComprehensiveReport, CoreInputs, Agency } from '@/types/federal-market-assassin';
+import { checkReportRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
+import { getEmailFromRequest, verifyMAAccess } from '@/lib/api-auth';
+import { validateReportInputs } from '@/lib/validate';
+import { trackGeneration } from '@/lib/abuse-detection';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { inputs, selectedAgencies, selectedAgencyData, userEmail }: { inputs: CoreInputs; selectedAgencies: string[]; selectedAgencyData?: Agency[]; userEmail?: string } = body;
 
-    if (!inputs || !selectedAgencies || selectedAgencies.length === 0) {
+    // Input validation
+    const validation = validateReportInputs(body);
+    if (!validation.valid) {
       return NextResponse.json(
-        { success: false, error: 'inputs and selectedAgencies are required' },
+        { success: false, error: validation.errors.join('; ') },
         { status: 400 }
       );
+    }
+
+    // Rate limiting: email-based if available, IP-based fallback
+    const email = getEmailFromRequest(request, body);
+    if (email) {
+      const rl = await checkReportRateLimit(email);
+      if (!rl.allowed) return rateLimitResponse(rl);
+    } else {
+      const ip = getClientIP(request);
+      const rl = await checkIPRateLimit(ip);
+      if (!rl.allowed) return rateLimitResponse(rl);
+    }
+
+    // Server-side access verification
+    const auth = await verifyMAAccess(email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error },
+        { status: 403 }
+      );
+    }
+
+    // Track generation for abuse monitoring
+    if (email) {
+      trackGeneration(email);
     }
 
     // Get pain points for selected agencies, using command-level data when available

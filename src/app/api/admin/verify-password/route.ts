@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdminPassword } from '@/lib/admin-auth';
+import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
-// Admin endpoint to verify password
 export async function POST(request: NextRequest) {
   try {
+    // Brute-force protection
+    const ip = getClientIP(request);
+    const rl = await checkAdminRateLimit(ip);
+    if (!rl.allowed) return rateLimitResponse(rl);
+
     const { password } = await request.json();
 
-    // Verify admin password
-    const expectedPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
-    if (password === expectedPassword) {
+    if (verifyAdminPassword(password)) {
       return NextResponse.json({ valid: true });
     } else {
-      return NextResponse.json({ valid: false });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
   } catch (error) {
     console.error('Error verifying password:', error);
     return NextResponse.json(

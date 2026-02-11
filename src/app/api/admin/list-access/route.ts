@@ -1,9 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAllMarketAssassinAccess, getAllContentGeneratorAccess, getAllRecompeteAccess, getAllDatabaseAccess } from '@/lib/access-codes';
 import { kv } from '@vercel/kv';
+import { verifyAdminPassword } from '@/lib/admin-auth';
+import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 // Admin endpoint to list all access records
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const ip = getClientIP(request);
+  const rl = await checkAdminRateLimit(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  const password = request.headers.get('x-admin-password');
+  if (!verifyAdminPassword(password)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     // Get Market Assassin records
     const marketAssassin = await getAllMarketAssassinAccess();

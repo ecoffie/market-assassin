@@ -3,8 +3,8 @@ import { buildComprehensiveAgencyList, KNOWN_SUB_AGENCIES, AgencyListEntry } fro
 import { getOversightContextForAgency } from '@/lib/utils/federal-oversight-data';
 import { generatePainPointsForAgency, generatePrioritiesForAgency } from '@/lib/utils/pain-point-generator';
 import agencyPainPointsData from '@/data/agency-pain-points.json';
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+import { verifyAdminPassword } from '@/lib/admin-auth';
+import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 interface AgencyData {
   painPoints: string[];
@@ -24,10 +24,14 @@ const existingDB = agencyPainPointsData as PainPointsDatabase;
  * No API calls to Grok — just identifies gaps
  */
 export async function GET(request: NextRequest) {
+  const ip = getClientIP(request);
+  const rl = await checkAdminRateLimit(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   const { searchParams } = new URL(request.url);
   const password = searchParams.get('password');
 
-  if (password !== ADMIN_PASSWORD) {
+  if (!verifyAdminPassword(password)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -135,10 +139,14 @@ export async function GET(request: NextRequest) {
  * - target: Target number of pain points per agency (default: 12)
  */
 export async function POST(request: NextRequest) {
+  const ip = getClientIP(request);
+  const rl2 = await checkAdminRateLimit(ip);
+  if (!rl2.allowed) return rateLimitResponse(rl2);
+
   const { searchParams } = new URL(request.url);
   const password = searchParams.get('password');
 
-  if (password !== ADMIN_PASSWORD) {
+  if (!verifyAdminPassword(password)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

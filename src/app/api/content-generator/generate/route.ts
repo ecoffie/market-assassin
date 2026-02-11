@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPainPointsForAgency, getPrioritiesForAgency, categorizePainPoints } from '@/lib/utils/pain-points';
+import { checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 // Fisher-Yates shuffle — returns a new array in random order
 function shuffleArray<T>(arr: T[]): T[] {
@@ -281,6 +282,11 @@ export async function OPTIONS() {
 // Main POST handler
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting by IP
+    const ip = getClientIP(request);
+    const rl = await checkIPRateLimit(ip);
+    if (!rl.allowed) return rateLimitResponse(rl);
+
     const body = await request.json();
     const {
       targetAgencies = [],

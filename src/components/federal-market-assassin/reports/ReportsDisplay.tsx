@@ -32,6 +32,8 @@
 
 import { ComprehensiveReport, CoreInputs } from '@/types/federal-market-assassin';
 import { useState, useEffect, useCallback } from 'react';
+import { usePagination } from '@/hooks/usePagination';
+import LoadMoreButton from '@/components/ui/LoadMoreButton';
 import {
   AgencySpendingChart,
   SpendingTrendChart,
@@ -2030,6 +2032,8 @@ function PremiumExclusiveBadge() {
 // Individual Report Components (simplified versions - can be expanded)
 
 function SubcontractingReport({ tier2Data, primeData }: { tier2Data: any; primeData: any }) {
+  const tier2Pagination = usePagination(tier2Data.suggestedPrimes || [], 5);
+  const primePagination = usePagination(primeData.suggestedPrimes || [], 5);
   return (
     <div className="space-y-6">
       {/* Premium badge */}
@@ -2062,7 +2066,7 @@ function SubcontractingReport({ tier2Data, primeData }: { tier2Data: any; primeD
       <div>
         <h3 className="text-lg font-bold text-slate-100 mb-4">Tier 2 Subcontracting Opportunities</h3>
         <div className="space-y-4">
-          {tier2Data.suggestedPrimes.map((prime: any, idx: number) => (
+          {tier2Pagination.currentItems.map((prime: any, idx: number) => (
             <div key={`tier2-${idx}`} className="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-all card-hover">
               {/* Header Row */}
               <div className="flex justify-between items-start mb-4">
@@ -2167,13 +2171,21 @@ function SubcontractingReport({ tier2Data, primeData }: { tier2Data: any; primeD
             </div>
           ))}
         </div>
+        <LoadMoreButton
+          showingCount={tier2Pagination.showingCount}
+          totalItems={tier2Pagination.totalItems}
+          hasMore={tier2Pagination.hasMore}
+          onLoadMore={tier2Pagination.showMore}
+          onShowAll={tier2Pagination.showAll}
+          label="Tier 2 contractors"
+        />
       </div>
 
       {/* Prime Contractor Opportunities */}
       <div>
         <h3 className="text-lg font-bold text-slate-100 mb-4">Prime Contractor Opportunities</h3>
         <div className="space-y-4">
-          {primeData.suggestedPrimes.map((prime: any, idx: number) => (
+          {primePagination.currentItems.map((prime: any, idx: number) => (
             <div key={`prime-${idx}`} className="bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-all card-hover">
               {/* Header Row */}
               <div className="flex justify-between items-start mb-4">
@@ -2278,6 +2290,14 @@ function SubcontractingReport({ tier2Data, primeData }: { tier2Data: any; primeD
             </div>
           ))}
         </div>
+        <LoadMoreButton
+          showingCount={primePagination.showingCount}
+          totalItems={primePagination.totalItems}
+          hasMore={primePagination.hasMore}
+          onLoadMore={primePagination.showMore}
+          onShowAll={primePagination.showAll}
+          label="prime contractors"
+        />
       </div>
 
       {/* Other Agencies to Consider */}
@@ -2328,6 +2348,8 @@ function SubcontractingReport({ tier2Data, primeData }: { tier2Data: any; primeD
 }
 
 function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyClick: (agency: AgencyForModal) => void }) {
+  const buyersPagination = usePagination(data.agencies || [], 10);
+
   return (
     <div className="space-y-6">
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-6">
@@ -2365,7 +2387,7 @@ function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyCl
               </tr>
             </thead>
             <tbody className="bg-slate-800 divide-y divide-slate-700">
-              {data.agencies.slice(0, 20).map((agency: any, idx: number) => {
+              {buyersPagination.currentItems.map((agency: any, idx: number) => {
                 // Contracting office is the command/office that awards contracts (e.g., "Naval Sea Systems Command")
                 const contractingOffice = agency.contractingOffice || agency.name;
                 // Sub-agency is the intermediate level (e.g., "Department of the Navy")
@@ -2445,6 +2467,14 @@ function GovernmentBuyersReport({ data, onAgencyClick }: { data: any; onAgencyCl
         <p className="text-xs text-slate-500 mt-2 italic">
           Click on Office ID to search for active opportunities on <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">SAM.gov</a>
         </p>
+        <LoadMoreButton
+          showingCount={buyersPagination.showingCount}
+          totalItems={buyersPagination.totalItems}
+          hasMore={buyersPagination.hasMore}
+          onLoadMore={buyersPagination.showMore}
+          onShowAll={buyersPagination.showAll}
+          label="agencies"
+        />
       </div>
 
       <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-6">
@@ -2715,6 +2745,7 @@ function IDVContractsReport({ data, inputs }: { data: any; inputs: CoreInputs })
   const idvContracts = data?.contracts || [];
   const totalValue = data?.summary?.totalValue || 0;
   const uniquePrimes = data?.summary?.uniquePrimes || 0;
+  const idvPagination = usePagination(idvContracts, 10);
 
   return (
     <div className="space-y-6">
@@ -2759,7 +2790,7 @@ function IDVContractsReport({ data, inputs }: { data: any; inputs: CoreInputs })
         <div>
           <h3 className="text-lg font-bold text-slate-100 mb-4">Active IDV Contracts</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {idvContracts.map((contract: IDVContract, idx: number) => {
+            {idvPagination.currentItems.map((contract: IDVContract, idx: number) => {
               const sbloContact = findSBLOContact(contract.recipientName);
               const hasContactInfo = sbloContact && (sbloContact.email || sbloContact.phone || sbloContact.sbloName);
 
@@ -2864,6 +2895,14 @@ function IDVContractsReport({ data, inputs }: { data: any; inputs: CoreInputs })
               );
             })}
           </div>
+          <LoadMoreButton
+            showingCount={idvPagination.showingCount}
+            totalItems={idvPagination.totalItems}
+            hasMore={idvPagination.hasMore}
+            onLoadMore={idvPagination.showMore}
+            onShowAll={idvPagination.showAll}
+            label="contracts"
+          />
         </div>
       )}
 
@@ -3202,6 +3241,7 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
   const [hitListOpps, setHitListOpps] = useState<HitListOpportunity[]>([]);
   const [loadingHitList, setLoadingHitList] = useState(true);
   const hitListStats = getHitListStats();
+  const hitListPagination = usePagination(hitListOpps, 10);
 
   // Dynamic month/quarter labels
   const now = new Date();
@@ -3273,7 +3313,7 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
           </div>
         ) : hitListOpps.length > 0 ? (
           <div className="space-y-3">
-            {hitListOpps.map((opp: HitListOpportunity, idx: number) => {
+            {hitListPagination.currentItems.map((opp: HitListOpportunity, idx: number) => {
               const daysUntil = getDaysUntilDeadline(opp.deadline);
               const urgencyBadge = getUrgencyBadge(opp);
               const actionStrategy = getHitListActionStrategy(opp, inputs);
@@ -3384,6 +3424,14 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
                 </div>
               );
             })}
+            <LoadMoreButton
+              showingCount={hitListPagination.showingCount}
+              totalItems={hitListPagination.totalItems}
+              hasMore={hitListPagination.hasMore}
+              onLoadMore={hitListPagination.showMore}
+              onShowAll={hitListPagination.showAll}
+              label="opportunities"
+            />
           </div>
         ) : (
           <div className="text-center py-8 text-slate-400">

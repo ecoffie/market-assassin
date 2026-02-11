@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
-
-// Admin secret - set this in your Vercel environment variables
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'gcg-admin-2024';
+import { verifyAdminSecret } from '@/lib/admin-auth';
+import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 interface TokenData {
   token: string;
@@ -22,10 +21,13 @@ function generateToken(): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIP(request);
+    const rl = await checkAdminRateLimit(ip);
+    if (!rl.allowed) return rateLimitResponse(rl);
+
     const { secret, email, customerName, product } = await request.json();
 
-    // Verify admin secret
-    if (secret !== ADMIN_SECRET) {
+    if (!verifyAdminSecret(secret)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -80,11 +82,15 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to check if a user has access
 export async function GET(request: NextRequest) {
+  const ip = getClientIP(request);
+  const rl = await checkAdminRateLimit(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get('secret');
   const email = searchParams.get('email');
 
-  if (secret !== ADMIN_SECRET) {
+  if (!verifyAdminSecret(secret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
