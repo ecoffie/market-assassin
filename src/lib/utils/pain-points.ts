@@ -71,32 +71,32 @@ export function getPainPointsForAgency(agencyName: string, command?: string | nu
   if (command) {
     // Direct command match (e.g., "NAVFAC", "NAVSEA", "Army Materiel Command")
     if (painPointsDB.agencies[command]) {
-      return painPointsDB.agencies[command].painPoints;
+      return painPointsDB.agencies[command].painPoints || [];
     }
 
     // Check for partial matches for commands
     for (const [dbAgencyName, data] of Object.entries(painPointsDB.agencies)) {
       if (command.includes(dbAgencyName) || dbAgencyName.includes(command)) {
-        return data.painPoints;
+        return data.painPoints || [];
       }
     }
   }
 
   // Direct agency name match
   if (painPointsDB.agencies[agencyName]) {
-    return painPointsDB.agencies[agencyName].painPoints;
+    return painPointsDB.agencies[agencyName].painPoints || [];
   }
 
   // Try to find parent agency if this is a component agency
   const componentInfo = (componentAgencyRules as any)?.componentAgencies?.[agencyName];
   if (componentInfo?.parentAgency && painPointsDB.agencies[componentInfo.parentAgency]) {
-    return painPointsDB.agencies[componentInfo.parentAgency].painPoints;
+    return painPointsDB.agencies[componentInfo.parentAgency].painPoints || [];
   }
 
   // Check for partial matches (e.g., "Department of Defense" in agency name)
   for (const [dbAgencyName, data] of Object.entries(painPointsDB.agencies)) {
     if (agencyName.includes(dbAgencyName) || dbAgencyName.includes(agencyName)) {
-      return data.painPoints;
+      return data.painPoints || [];
     }
   }
 
@@ -121,30 +121,30 @@ export function getPrioritiesForAgency(agencyName: string, command?: string | nu
   // If a specific command is provided, try that first
   if (command) {
     if (painPointsDB.agencies[command]?.priorities) {
-      return painPointsDB.agencies[command].priorities;
+      return painPointsDB.agencies[command].priorities || [];
     }
     for (const [dbAgencyName, data] of Object.entries(painPointsDB.agencies)) {
       if ((command.includes(dbAgencyName) || dbAgencyName.includes(command)) && data.priorities) {
-        return data.priorities;
+        return data.priorities || [];
       }
     }
   }
 
   // Direct agency name match
   if (painPointsDB.agencies[agencyName]?.priorities) {
-    return painPointsDB.agencies[agencyName].priorities;
+    return painPointsDB.agencies[agencyName].priorities || [];
   }
 
   // Try to find parent agency if this is a component agency
   const componentInfo = (componentAgencyRules as any)?.componentAgencies?.[agencyName];
   if (componentInfo?.parentAgency && painPointsDB.agencies[componentInfo.parentAgency]?.priorities) {
-    return painPointsDB.agencies[componentInfo.parentAgency].priorities;
+    return painPointsDB.agencies[componentInfo.parentAgency].priorities || [];
   }
 
   // Check for partial matches
   for (const [dbAgencyName, data] of Object.entries(painPointsDB.agencies)) {
     if ((agencyName.includes(dbAgencyName) || dbAgencyName.includes(agencyName)) && data.priorities) {
-      return data.priorities;
+      return data.priorities || [];
     }
   }
 
