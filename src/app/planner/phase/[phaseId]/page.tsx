@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { exportPhaseToPDF, type PhaseDataForExport } from '@/lib/utils/exportPlan';
@@ -8,8 +8,15 @@ import {
   getPhaseTasksWithDetails,
   updateTaskCompletion,
   getPhaseSeedTasks,
+  saveCustomTask,
+  deleteCustomTask,
+  updateTaskOrder,
+  bulkUpdateTasks,
+  getUserProgress,
 } from '@/lib/supabase/planner';
 import { useAuth } from '@/lib/supabase/AuthContext';
+import { updateStreak, checkAndAwardBadges } from '@/lib/supabase/gamification';
+import ConfettiCelebration from '@/components/planner/ConfettiCelebration';
 
 // Phase data mapping
 const phaseDataMap: Record<string, { id: number; name: string; icon: string }> = {
@@ -25,6 +32,8 @@ const phaseDataMap: Record<string, { id: number; name: string; icon: string }> =
   'contract-management': { id: 5, name: 'Contract Management', icon: '📋' },
 };
 
+type FilterType = 'all' | 'pending' | 'completed' | 'overdue' | 'high';
+
 // Task interface for display
 interface Task {
   id: string;
@@ -33,22 +42,85 @@ interface Task {
   completed: boolean;
   dueDate?: string;
   notes: string;
-  attachments: string[];
+  priority: 'high' | 'medium' | 'low';
+  isCustom: boolean;
+  link: string;
+}
+
+// Priority Badge Component
+function PriorityBadge({ priority }: { priority: 'high' | 'medium' | 'low' }) {
+  const config = {
+    high: { bg: 'bg-red-100', text: 'text-red-700', label: 'High' },
+    medium: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Med' },
+    low: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Low' },
+  };
+  const c = config[priority];
+  return (
+    <span className={`px-2 py-0.5 ${c.bg} ${c.text} text-xs font-semibold rounded-full`}>
+      {c.label}
+    </span>
+  );
+}
+
+// Priority Selector Component
+function PrioritySelector({
+  priority,
+  onChange,
+}: {
+  priority: 'high' | 'medium' | 'low';
+  onChange: (p: 'high' | 'medium' | 'low') => void;
+}) {
+  const options: Array<{ value: 'high' | 'medium' | 'low'; label: string; activeClass: string }> = [
+    { value: 'high', label: 'High', activeClass: 'bg-red-500 text-white' },
+    { value: 'medium', label: 'Medium', activeClass: 'bg-yellow-500 text-white' },
+    { value: 'low', label: 'Low', activeClass: 'bg-gray-400 text-white' },
+  ];
+
+  return (
+    <div className="flex gap-1">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange(opt.value);
+          }}
+          className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+            priority === opt.value ? opt.activeClass : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 // Accordion Item Component
 function AccordionItem({
   task,
   onUpdate,
-  userId
+  onDelete,
+  userId,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  isDragTarget,
 }: {
   task: Task;
   onUpdate: (updatedTask: Task) => void;
+  onDelete?: () => void;
   userId: string;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  isDragTarget: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [localTask, setLocalTask] = useState(task);
   const [isSaving, setIsSaving] = useState(false);
+  const notesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Update local task when prop changes
   useEffect(() => {
@@ -58,24 +130,23 @@ function AccordionItem({
   const isOverdue = localTask.dueDate && !localTask.completed && new Date(localTask.dueDate) < new Date();
 
   const handleCheckboxChange = async (checked: boolean) => {
-    // Optimistic UI update
     const updatedTask = { ...localTask, completed: checked };
     setLocalTask(updatedTask);
     setIsSaving(true);
 
     try {
-      // Save to Supabase
       await updateTaskCompletion(
         userId,
         localTask.id,
         checked,
         localTask.notes || undefined,
-        localTask.dueDate ? new Date(localTask.dueDate) : undefined
+        localTask.dueDate ? new Date(localTask.dueDate) : undefined,
+        localTask.priority,
+        localTask.link || undefined
       );
 
       onUpdate(updatedTask);
     } catch (error) {
-      // Revert on error
       setLocalTask(localTask);
       console.error('Failed to update task:', error);
     } finally {
@@ -87,15 +158,38 @@ function AccordionItem({
     const updatedTask = { ...localTask, [field]: value };
     setLocalTask(updatedTask);
 
-    // Auto-save notes and due date to Supabase
-    if (field === 'notes' || field === 'dueDate') {
+    if (field === 'notes') {
+      // Debounce notes saves
+      if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
+      notesTimeoutRef.current = setTimeout(async () => {
+        try {
+          await updateTaskCompletion(
+            userId,
+            localTask.id,
+            localTask.completed,
+            value as string,
+            localTask.dueDate ? new Date(localTask.dueDate) : undefined,
+            localTask.priority,
+            localTask.link || undefined
+          );
+        } catch (error) {
+          console.error('Failed to save notes:', error);
+        }
+      }, 800);
+      onUpdate(updatedTask);
+      return;
+    }
+
+    if (field === 'dueDate' || field === 'link') {
       try {
         await updateTaskCompletion(
           userId,
           localTask.id,
           localTask.completed,
-          field === 'notes' ? value as string : localTask.notes || undefined,
-          field === 'dueDate' && value ? new Date(value as string) : (localTask.dueDate ? new Date(localTask.dueDate) : undefined)
+          localTask.notes || undefined,
+          field === 'dueDate' && value ? new Date(value as string) : (localTask.dueDate ? new Date(localTask.dueDate) : undefined),
+          localTask.priority,
+          field === 'link' ? (value as string) : (localTask.link || undefined)
         );
       } catch (error) {
         console.error('Failed to save field update:', error);
@@ -105,26 +199,48 @@ function AccordionItem({
     onUpdate(updatedTask);
   };
 
-  const handleFileUpload = () => {
-    // Mock file upload
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const newAttachments = [...localTask.attachments, file.name];
-        handleFieldUpdate('attachments', newAttachments);
-      }
-    };
-    input.click();
+  const handlePriorityChange = async (newPriority: 'high' | 'medium' | 'low') => {
+    const updatedTask = { ...localTask, priority: newPriority };
+    setLocalTask(updatedTask);
+
+    try {
+      await updateTaskCompletion(
+        userId,
+        localTask.id,
+        localTask.completed,
+        localTask.notes || undefined,
+        localTask.dueDate ? new Date(localTask.dueDate) : undefined,
+        newPriority,
+        localTask.link || undefined
+      );
+    } catch (error) {
+      console.error('Failed to save priority:', error);
+    }
+
+    onUpdate(updatedTask);
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg mb-4 bg-white shadow-sm">
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={`border rounded-lg mb-2 bg-white shadow-sm transition-all ${
+        isDragTarget ? 'border-[#1e40af] border-2 shadow-md' : 'border-gray-200'
+      }`}
+    >
       <div
         className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
+        {/* Drag handle */}
+        <div className="flex-shrink-0 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing" onMouseDown={(e) => e.stopPropagation()}>
+          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+          </svg>
+        </div>
+
         <div className="flex-shrink-0">
           <input
             type="checkbox"
@@ -138,17 +254,23 @@ function AccordionItem({
           />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <h3 className={`font-bold text-lg ${localTask.completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className={`font-bold text-base ${localTask.completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
               {localTask.title}
             </h3>
+            <PriorityBadge priority={localTask.priority} />
+            {localTask.isCustom && (
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
+                Custom
+              </span>
+            )}
             {isOverdue && (
-              <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
                 Overdue
               </span>
             )}
             {localTask.completed && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
                 Complete
               </span>
             )}
@@ -159,7 +281,21 @@ function AccordionItem({
             </p>
           )}
         </div>
-        <div className="flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {localTask.isCustom && onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+              title="Delete custom task"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
           <svg
             className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
             fill="none"
@@ -178,6 +314,12 @@ function AccordionItem({
               <p className="text-gray-700 text-sm leading-relaxed">{localTask.description}</p>
             </div>
 
+            {/* Priority Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+              <PrioritySelector priority={localTask.priority} onChange={handlePriorityChange} />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -194,31 +336,29 @@ function AccordionItem({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Attachments
+                  Reference Link
                 </label>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleFileUpload();
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm text-gray-700 flex items-center justify-center gap-2"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Attach File
-                </button>
-                {localTask.attachments.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {localTask.attachments.map((file, idx) => (
-                      <div key={idx} className="text-xs text-gray-600 flex items-center gap-2">
-                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        {file}
-                      </div>
-                    ))}
-                  </div>
+                <input
+                  type="url"
+                  value={localTask.link || ''}
+                  onChange={(e) => handleFieldUpdate('link', e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                />
+                {localTask.link && (
+                  <a
+                    href={localTask.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 mt-1 text-sm text-[#1e40af] hover:underline"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Open link
+                  </a>
                 )}
               </div>
             </div>
@@ -244,10 +384,19 @@ function AccordionItem({
 }
 
 // Add Custom Task Modal
-function AddTaskModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: () => void; onAdd: (task: Omit<Task, 'id'>) => void }) {
+function AddTaskModal({
+  isOpen,
+  onClose,
+  onAdd,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (task: { title: string; description: string; dueDate?: string; priority: 'high' | 'medium' | 'low' }) => void;
+}) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,14 +404,13 @@ function AddTaskModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: ()
       onAdd({
         title: title.trim(),
         description: description.trim(),
-        completed: false,
         dueDate: dueDate || undefined,
-        notes: '',
-        attachments: [],
+        priority,
       });
       setTitle('');
       setDescription('');
       setDueDate('');
+      setPriority('medium');
       onClose();
     }
   };
@@ -313,16 +461,25 @@ function AddTaskModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: ()
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Due Date
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <PrioritySelector priority={priority} onChange={setPriority} />
+              </div>
             </div>
 
             <div className="flex gap-3 pt-4">
@@ -347,6 +504,83 @@ function AddTaskModal({ isOpen, onClose, onAdd }: { isOpen: boolean; onClose: ()
   );
 }
 
+// Bulk Actions Dropdown
+function BulkActionsDropdown({
+  onAction,
+}: {
+  onAction: (action: 'complete' | 'incomplete' | 'clear_notes') => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
+      >
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+        </svg>
+        Bulk Actions
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 bottom-full mb-2 w-52 rounded-lg bg-white shadow-lg border border-gray-200 z-20 py-1">
+            <button
+              onClick={() => { onAction('complete'); setIsOpen(false); }}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Mark All Complete
+            </button>
+            <button
+              onClick={() => { onAction('incomplete'); setIsOpen(false); }}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Mark All Incomplete
+            </button>
+            <button
+              onClick={() => { onAction('clear_notes'); setIsOpen(false); }}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <svg className="h-4 w-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear All Notes
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Toast notification
+function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 4000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 bg-[#1e40af] text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3 animate-[slideUp_0.3s_ease-out]">
+      <span className="text-xl">🏆</span>
+      <span className="font-medium">{message}</span>
+      <button onClick={onClose} className="ml-2 text-white/70 hover:text-white">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export default function PhaseDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -357,6 +591,11 @@ export default function PhaseDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+  const draggedTaskIdRef = useRef<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const phase = phaseDataMap[phaseId] || phaseDataMap['1'];
 
@@ -376,10 +615,8 @@ export default function PhaseDetailPage() {
         setIsLoading(true);
         setError(null);
 
-        // Get tasks with user progress from Supabase
         const tasksWithDetails = await getPhaseTasksWithDetails(user.id, phase.id);
 
-        // Map to display format
         const displayTasks: Task[] = tasksWithDetails.map((t) => ({
           id: t.id,
           title: t.title,
@@ -387,7 +624,9 @@ export default function PhaseDetailPage() {
           completed: t.userTask?.completed || false,
           dueDate: t.userTask?.dueDate || undefined,
           notes: t.userTask?.notes || '',
-          attachments: [],
+          priority: ((t.userTask as any)?.priority || t.priority || 'medium') as 'high' | 'medium' | 'low',
+          isCustom: t.isCustom || false,
+          link: ((t.userTask as any)?.link || t.link || '') as string,
         }));
 
         setTasks(displayTasks);
@@ -395,7 +634,6 @@ export default function PhaseDetailPage() {
         console.error('Error fetching tasks:', err);
         setError('Failed to load tasks. Using offline data.');
 
-        // Fallback to seed data if Supabase fails
         const seedTasks = getPhaseSeedTasks(phase.id);
         setTasks(seedTasks.map(t => ({
           id: t.id,
@@ -404,7 +642,9 @@ export default function PhaseDetailPage() {
           completed: false,
           dueDate: undefined,
           notes: '',
-          attachments: [],
+          priority: 'medium' as const,
+          isCustom: false,
+          link: '',
         })));
       } finally {
         setIsLoading(false);
@@ -421,24 +661,174 @@ export default function PhaseDetailPage() {
   const totalTasks = tasks.length;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+  // Filter tasks
+  const filteredTasks = tasks.filter(task => {
+    switch (filter) {
+      case 'pending': return !task.completed;
+      case 'completed': return task.completed;
+      case 'overdue': return task.dueDate && !task.completed && new Date(task.dueDate) < new Date();
+      case 'high': return task.priority === 'high';
+      default: return true;
+    }
+  });
+
+  // Gamification check after task completion
+  const handleGamificationCheck = useCallback(async (wasCompleted: boolean) => {
+    if (!user?.id || !wasCompleted) return;
+
+    try {
+      const streak = await updateStreak(user.id);
+      const progressData = await getUserProgress(user.id);
+      const totalCompleted = progressData.completedTasks;
+      const phaseComplete = progress === 100;
+      const allComplete = progressData.overall === 100;
+
+      const newBadges = await checkAndAwardBadges(
+        user.id,
+        totalCompleted,
+        streak,
+        phaseComplete,
+        allComplete
+      );
+
+      if (newBadges.length > 0) {
+        setShowConfetti(true);
+        setToastMessage(`Badge earned: ${newBadges[0].name} ${newBadges[0].icon}`);
+      } else if (phaseComplete) {
+        setShowConfetti(true);
+        setToastMessage('Phase complete! Amazing work!');
+      }
+    } catch (err) {
+      console.error('Gamification error:', err);
+    }
+  }, [user?.id, progress]);
+
   const handleTaskUpdate = (updatedTask: Task) => {
+    const oldTask = tasks.find(t => t.id === updatedTask.id);
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+
+    // Check if task was just completed
+    if (!oldTask?.completed && updatedTask.completed) {
+      handleGamificationCheck(true);
+    }
   };
 
-  const handleAddTask = (taskData: Omit<Task, 'id'>) => {
-    const newTask: Task = {
-      ...taskData,
-      id: `${phase.id}-custom-${Date.now()}`,
-    };
-    setTasks(prev => [...prev, newTask]);
-    // TODO: Save custom task to Supabase
+  const handleAddTask = async (taskData: { title: string; description: string; dueDate?: string; priority: 'high' | 'medium' | 'low' }) => {
+    if (!user?.id) return;
+
+    try {
+      const taskId = await saveCustomTask(
+        user.id,
+        phase.id,
+        taskData.title,
+        taskData.description,
+        taskData.dueDate,
+        taskData.priority
+      );
+
+      const newTask: Task = {
+        id: taskId,
+        title: taskData.title,
+        description: taskData.description,
+        completed: false,
+        dueDate: taskData.dueDate,
+        notes: '',
+        priority: taskData.priority,
+        isCustom: true,
+        link: '',
+      };
+      setTasks(prev => [...prev, newTask]);
+    } catch (err) {
+      console.error('Failed to add custom task:', err);
+      alert('Failed to add task. Please try again.');
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user?.id) return;
+    if (!confirm('Delete this custom task?')) return;
+
+    try {
+      await deleteCustomTask(user.id, taskId);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+      alert('Failed to delete task. Please try again.');
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (taskId: string) => (e: React.DragEvent) => {
+    draggedTaskIdRef.current = taskId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', taskId);
+  };
+
+  const handleDragOver = (taskId: string) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedTaskIdRef.current !== taskId) {
+      setDragOverTaskId(taskId);
+    }
+  };
+
+  const handleDrop = (targetTaskId: string) => async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverTaskId(null);
+    const draggedId = draggedTaskIdRef.current;
+    draggedTaskIdRef.current = null;
+
+    if (!draggedId || draggedId === targetTaskId || !user?.id) return;
+
+    // Reorder locally
+    const newTasks = [...tasks];
+    const draggedIndex = newTasks.findIndex(t => t.id === draggedId);
+    const targetIndex = newTasks.findIndex(t => t.id === targetTaskId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const [draggedTask] = newTasks.splice(draggedIndex, 1);
+    newTasks.splice(targetIndex, 0, draggedTask);
+    setTasks(newTasks);
+
+    // Persist order
+    try {
+      await updateTaskOrder(user.id, phase.id, newTasks.map(t => t.id));
+    } catch (err) {
+      console.error('Failed to save order:', err);
+    }
+  };
+
+  // Bulk actions
+  const handleBulkAction = async (action: 'complete' | 'incomplete' | 'clear_notes') => {
+    if (!user?.id) return;
+
+    try {
+      switch (action) {
+        case 'complete':
+          await bulkUpdateTasks(user.id, phase.id, { completed: true });
+          setTasks(prev => prev.map(t => ({ ...t, completed: true })));
+          handleGamificationCheck(true);
+          break;
+        case 'incomplete':
+          await bulkUpdateTasks(user.id, phase.id, { completed: false });
+          setTasks(prev => prev.map(t => ({ ...t, completed: false })));
+          break;
+        case 'clear_notes':
+          await bulkUpdateTasks(user.id, phase.id, { notes: null });
+          setTasks(prev => prev.map(t => ({ ...t, notes: '' })));
+          break;
+      }
+    } catch (err) {
+      console.error('Bulk action failed:', err);
+      alert('Bulk action failed. Please try again.');
+    }
   };
 
   const handleExportPDF = async () => {
     try {
       setIsExporting(true);
 
-      // Prepare phase data for export
       const exportData: PhaseDataForExport = {
         phaseId: phase.id,
         phaseName: phase.name,
@@ -450,6 +840,7 @@ export default function PhaseDetailPage() {
           completed: task.completed,
           dueDate: task.dueDate,
           notes: task.notes,
+          priority: task.priority,
         })),
         progress,
         completedTasks,
@@ -483,8 +874,19 @@ export default function PhaseDetailPage() {
     return null;
   }
 
+  const filters: { key: FilterType; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'completed', label: 'Completed' },
+    { key: 'overdue', label: 'Overdue' },
+    { key: 'high', label: 'High Priority' },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <ConfettiCelebration show={showConfetti} onComplete={() => setShowConfetti(false)} />
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+
       {/* Top Navbar */}
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -535,7 +937,7 @@ export default function PhaseDetailPage() {
               </h1>
               <div className="flex items-center gap-4 text-sm text-gray-600">
                 <span>{progress}% Complete</span>
-                <span>•</span>
+                <span>-</span>
                 <span>{completedTasks} of {totalTasks} tasks completed</span>
               </div>
             </div>
@@ -544,27 +946,59 @@ export default function PhaseDetailPage() {
           {/* Progress Bar */}
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div
-              className="bg-[#1e40af] h-3 rounded-full transition-all duration-500"
+              className={`h-3 rounded-full transition-all duration-500 ${progress === 100 ? 'bg-green-500' : 'bg-[#1e40af]'}`}
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
-        {/* Tasks Accordion */}
+        {/* Filter Bar */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {filters.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                filter === f.key
+                  ? 'bg-[#1e40af] text-white'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tasks List */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Tasks</h2>
-          {tasks.length === 0 ? (
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">Tasks</h2>
+            <span className="text-sm text-gray-500">
+              {filteredTasks.length} of {totalTasks} shown
+            </span>
+          </div>
+
+          {filteredTasks.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md border border-gray-200 p-8 text-center">
-              <p className="text-gray-500">No tasks yet. Add your first task to get started!</p>
+              <p className="text-gray-500">
+                {filter === 'all'
+                  ? 'No tasks yet. Add your first task to get started!'
+                  : `No ${filter} tasks found.`}
+              </p>
             </div>
           ) : (
             <div>
-              {tasks.map((task) => (
+              {filteredTasks.map((task) => (
                 <AccordionItem
                   key={task.id}
                   task={task}
                   onUpdate={handleTaskUpdate}
+                  onDelete={task.isCustom ? () => handleDeleteTask(task.id) : undefined}
                   userId={user?.id || ''}
+                  onDragStart={handleDragStart(task.id)}
+                  onDragOver={handleDragOver(task.id)}
+                  onDrop={handleDrop(task.id)}
+                  isDragTarget={dragOverTaskId === task.id}
                 />
               ))}
             </div>
@@ -582,6 +1016,7 @@ export default function PhaseDetailPage() {
             </svg>
             Add Custom Task
           </button>
+          <BulkActionsDropdown onAction={handleBulkAction} />
           <button
             onClick={handleExportPDF}
             disabled={isExporting}
@@ -600,7 +1035,7 @@ export default function PhaseDetailPage() {
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Export Phase as PDF
+                Export as PDF
               </>
             )}
           </button>
@@ -613,6 +1048,13 @@ export default function PhaseDetailPage() {
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddTask}
       />
+
+      <style jsx global>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

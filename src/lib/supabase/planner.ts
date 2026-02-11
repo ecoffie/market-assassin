@@ -14,6 +14,9 @@ export interface Task {
   title: string;
   description: string;
   order: number;
+  priority?: 'high' | 'medium' | 'low';
+  isCustom?: boolean;
+  link?: string;
 }
 
 export interface UserTask {
@@ -26,6 +29,12 @@ export interface UserTask {
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
+  priority?: 'high' | 'medium' | 'low';
+  sortOrder?: number;
+  isCustom?: boolean;
+  title?: string;
+  description?: string;
+  link?: string;
 }
 
 export interface PhaseProgress {
@@ -53,7 +62,7 @@ const SEED_PHASES: Phase[] = [
 ];
 
 const SEED_TASKS: Omit<Task, 'id'>[] = [
-  // Phase 1: Setup/Once (10 tasks)
+  // Phase 1: Setup/Once (12 tasks)
   { phaseId: 1, title: 'Choose your Business Structure', description: 'Determine your business structure: Supplier v Service Provider v Consultant. This decision affects how you will be classified and what opportunities you can pursue.', order: 1 },
   { phaseId: 1, title: 'DUNS and UEI', description: 'Obtain your DUNS number (if needed) and Unique Entity Identifier (UEI). The UEI is automatically assigned when you register in SAM.gov and replaces the DUNS number for federal contracts.', order: 2 },
   { phaseId: 1, title: 'Creating Pro Email', description: 'Set up a professional email domain (e.g., yourname@yourcompany.com) rather than using free email services. This enhances credibility and professionalism when communicating with government agencies and prime contractors.', order: 3 },
@@ -66,7 +75,7 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
   { phaseId: 1, title: 'Benefits / What to say to Apex Accelerator', description: 'Prepare for your APEX Accelerator meeting. Know what services they offer, what questions to ask, and how to make the most of their free resources and counseling.', order: 10 },
   { phaseId: 1, title: 'Create/ Fix your Business Resume (Cap Statement)', description: 'Create or update your Capability Statement. This one-page document highlights your company\'s core competencies, past performance, differentiators, and key personnel. Include what makes you unique based on bootcamp guidance.', order: 11 },
   { phaseId: 1, title: 'What to put on Capability Statement / Clip from Bootcamp - differentiators', description: 'Learn what to include on your Capability Statement: core competencies, past performance examples, key personnel, certifications, and most importantly - your differentiators that set you apart from competitors.', order: 12 },
-  
+
   // Phase 2: Bidding/Repeat (6 tasks)
   { phaseId: 2, title: 'Review Immediate Bid Opportunities', description: 'Regularly review and identify immediate bid opportunities that match your capabilities and NAICS codes. Focus on opportunities with realistic win potential.', order: 1 },
   { phaseId: 2, title: 'How to Find Bid Opportunities', description: 'Learn where and how to find bid opportunities: SAM.gov, agency websites, forecast lists, industry days, and networking contacts. Set up alerts and monitoring systems.', order: 2 },
@@ -74,7 +83,7 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
   { phaseId: 2, title: 'Apply for Vendor/ Supplier Credit', description: 'Establish vendor/supplier credit lines to support contract performance. Many contracts require you to purchase materials or services before receiving payment.', order: 4 },
   { phaseId: 2, title: 'Respond to Opportunity (RFP, RFQ, RFI, Task Orders)', description: 'Prepare and submit responses to Requests for Proposals (RFP), Requests for Quotations (RFQ), Requests for Information (RFI), and Task Orders. Follow all instructions carefully.', order: 5 },
   { phaseId: 2, title: 'Evaluate Bid Results', description: 'After each bid submission, evaluate the results whether you win or lose. Learn from feedback, identify areas for improvement, and refine your approach for future opportunities.', order: 6 },
-  
+
   // Phase 3: Business Development/Repeat (7 tasks)
   { phaseId: 3, title: 'Identify Top 25 Buyers & Future Bids (NOT ON SAM)', description: 'Research and identify your top 25 target buyers and future bid opportunities that may not be publicly listed on SAM.gov. Use agency forecasts, industry knowledge, and networking.', order: 1 },
   { phaseId: 3, title: 'Setup and attend meetings with government buyers', description: 'Schedule and attend meetings with government buyers, contracting officers, and program managers. Build relationships before opportunities are released.', order: 2 },
@@ -83,16 +92,16 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
   { phaseId: 3, title: 'Get on Supplier List for top 25 Federal Suppliers', description: 'Register and get on the supplier lists for your top 25 federal suppliers (prime contractors). This positions you for subcontracting opportunities.', order: 5 },
   { phaseId: 3, title: 'Monitor Contract Awards and Identify Sub Opportunities', description: 'Monitor contract awards to identify subcontracting opportunities. Track which primes won contracts and reach out to offer your services as a subcontractor.', order: 6 },
   { phaseId: 3, title: 'Track long term contracts to bid (IDIQ)', description: 'Identify and track long-term contracts like Indefinite Delivery Indefinite Quantity (IDIQ) contracts. These provide ongoing opportunities to compete for task orders.', order: 7 },
-  
+
   // Phase 4: Business Enhancement/Once (7 tasks)
   { phaseId: 4, title: 'Apply for Small Business Certification', description: 'Apply for relevant small business certifications such as WOSB (Women-Owned Small Business), EDWOSB (Economically Disadvantaged WOSB), HUBZone, SDVOSB (Service-Disabled Veteran-Owned), or VOSB (Veteran-Owned Small Business).', order: 1 },
   { phaseId: 4, title: '8(a) Certification', description: 'If eligible, apply for the SBA 8(a) Business Development Program. This 9-year program provides access to sole-source and set-aside contracts.', order: 2 },
-  { phaseId: 4, title: 'Mentor Protege Program', description: 'Participate in mentor-protégé programs to gain experience, build capabilities, and access larger contracts through partnerships with established contractors.', order: 3 },
+  { phaseId: 4, title: 'Mentor Protege Program', description: 'Participate in mentor-protege programs to gain experience, build capabilities, and access larger contracts through partnerships with established contractors.', order: 3 },
   { phaseId: 4, title: 'Focus on Self Performance Capability as Differentiator', description: 'Develop and highlight your self-performance capabilities as a key differentiator. Many agencies prefer contractors who can perform work directly rather than just manage subcontractors.', order: 4 },
   { phaseId: 4, title: 'Find Better Partners', description: 'Continuously evaluate and improve your teaming and subcontracting partnerships. Seek partners who complement your capabilities and have strong past performance.', order: 5 },
   { phaseId: 4, title: 'Identify Mid Size Mentor', description: 'Identify and establish relationships with mid-size companies that can serve as mentors. They can provide guidance, teaming opportunities, and help you navigate larger contracts.', order: 6 },
   { phaseId: 4, title: 'Speak at an event', description: 'Position yourself as a subject matter expert by speaking at industry events, webinars, or conferences. This increases visibility and credibility with government buyers.', order: 7 },
-  
+
   // Phase 5: Contract Management (4 tasks)
   { phaseId: 5, title: 'System Registrations (PIEE, WAWF)', description: 'Register in required contract management systems: PIEE (Procurement Integrated Enterprise Environment) and WAWF (Wide Area Workflow) for invoicing and contract administration.', order: 1 },
   { phaseId: 5, title: 'Subcontractor Compliance', description: 'Ensure subcontractor compliance with all contract requirements, including small business subcontracting plans, reporting, and performance standards.', order: 2 },
@@ -177,7 +186,7 @@ function calculateProgress(userTasks: any[]): ProgressSummary {
     phaseMap.set(phase.id, { completed: 0, total: 0, phaseName: phase.name });
   });
 
-  // Count tasks per phase
+  // Count tasks per phase (includes both seed and custom tasks)
   userTasks.forEach(task => {
     const phase = phaseMap.get(task.phase_id);
     if (phase) {
@@ -217,14 +226,16 @@ function calculateProgress(userTasks: any[]): ProgressSummary {
 }
 
 /**
- * Update task completion status and optional notes/due date
+ * Update task completion status and optional notes/due date/priority/link
  */
 export async function updateTaskCompletion(
   userId: string,
   taskId: string,
   completed: boolean,
   notes?: string,
-  dueDate?: Date
+  dueDate?: Date,
+  priority?: 'high' | 'medium' | 'low',
+  link?: string
 ): Promise<UserTask | null> {
   const supabase = getSupabase();
 
@@ -235,15 +246,20 @@ export async function updateTaskCompletion(
   }
 
   try {
-    // Parse taskId (format: "phaseId-order")
-    const [phaseIdStr, orderStr] = taskId.split('-');
-    const phaseId = parseInt(phaseIdStr, 10);
-    const order = parseInt(orderStr, 10);
+    // Determine if this is a custom task or a seed task
+    const isCustomTask = taskId.includes('custom');
 
-    // Find the task in seed data
-    const task = SEED_TASKS.find(t => t.phaseId === phaseId && t.order === order);
-    if (!task) {
-      throw new Error(`Task not found: ${taskId}`);
+    if (!isCustomTask) {
+      // Parse taskId (format: "phaseId-order")
+      const [phaseIdStr, orderStr] = taskId.split('-');
+      const phaseId = parseInt(phaseIdStr, 10);
+      const order = parseInt(orderStr, 10);
+
+      // Find the task in seed data
+      const task = SEED_TASKS.find(t => t.phaseId === phaseId && t.order === order);
+      if (!task) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
     }
 
     // Check if user_plan record exists
@@ -267,6 +283,14 @@ export async function updateTaskCompletion(
       updateData.due_date = dueDate.toISOString();
     }
 
+    if (priority !== undefined) {
+      updateData.priority = priority;
+    }
+
+    if (link !== undefined) {
+      updateData.link = link;
+    }
+
     if (existing) {
       // Update existing record
       const { data, error } = await supabase
@@ -279,16 +303,22 @@ export async function updateTaskCompletion(
       if (error) throw error;
       return data as UserTask;
     } else {
+      // Parse phaseId from taskId
+      const phaseId = parseInt(taskId.split('-')[0], 10);
+
       // Create new record
       const { data, error } = await supabase
         .from('user_plans')
         .insert({
           user_id: userId,
-          phase_id: task.phaseId,
+          phase_id: phaseId,
           task_id: taskId,
           completed,
           notes: notes || null,
           due_date: dueDate ? dueDate.toISOString() : null,
+          priority: priority || 'medium',
+          link: link || null,
+          is_custom: isCustomTask,
         })
         .select()
         .single();
@@ -298,6 +328,151 @@ export async function updateTaskCompletion(
     }
   } catch (error) {
     console.error('Error updating task completion:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save a custom task to Supabase
+ */
+export async function saveCustomTask(
+  userId: string,
+  phaseId: number,
+  title: string,
+  description: string,
+  dueDate?: string,
+  priority?: 'high' | 'medium' | 'low'
+): Promise<string> {
+  const supabase = getSupabase();
+
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
+
+  const taskId = `${phaseId}-custom-${Date.now()}`;
+
+  try {
+    const { error } = await supabase
+      .from('user_plans')
+      .insert({
+        user_id: userId,
+        phase_id: phaseId,
+        task_id: taskId,
+        completed: false,
+        notes: null,
+        due_date: dueDate || null,
+        title,
+        description,
+        priority: priority || 'medium',
+        is_custom: true,
+        sort_order: 9999, // append to end
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (error) throw error;
+    return taskId;
+  } catch (error) {
+    console.error('Error saving custom task:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a custom task (only works for is_custom=true tasks)
+ */
+export async function deleteCustomTask(userId: string, taskId: string): Promise<void> {
+  const supabase = getSupabase();
+
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
+
+  try {
+    const { error } = await supabase
+      .from('user_plans')
+      .delete()
+      .eq('user_id', userId)
+      .eq('task_id', taskId)
+      .eq('is_custom', true);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting custom task:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update task display order for a phase
+ */
+export async function updateTaskOrder(
+  userId: string,
+  phaseId: number,
+  orderedTaskIds: string[]
+): Promise<void> {
+  const supabase = getSupabase();
+
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
+
+  try {
+    // Batch update sort_order for each task
+    const updates = orderedTaskIds.map((taskId, index) =>
+      supabase
+        .from('user_plans')
+        .update({ sort_order: index, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('task_id', taskId)
+    );
+
+    const results = await Promise.all(updates);
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) {
+      console.error('Errors updating task order:', errors.map(e => e.error));
+    }
+  } catch (error) {
+    console.error('Error updating task order:', error);
+    throw error;
+  }
+}
+
+/**
+ * Bulk update all tasks in a phase
+ */
+export async function bulkUpdateTasks(
+  userId: string,
+  phaseId: number,
+  updates: { completed?: boolean; notes?: string | null }
+): Promise<void> {
+  const supabase = getSupabase();
+
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
+
+  try {
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (updates.completed !== undefined) {
+      updateData.completed = updates.completed;
+    }
+    if (updates.notes !== undefined) {
+      updateData.notes = updates.notes;
+    }
+
+    const { error } = await supabase
+      .from('user_plans')
+      .update(updateData)
+      .eq('user_id', userId)
+      .eq('phase_id', phaseId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error bulk updating tasks:', error);
     throw error;
   }
 }
@@ -327,7 +502,7 @@ export async function seedInitialPlan(userId: string): Promise<void> {
     }
 
     // Insert all tasks for all phases
-    const userPlans = SEED_TASKS.map((task) => {
+    const userPlans = SEED_TASKS.map((task, index) => {
       // Generate a unique task_id (could be phaseId-order or a UUID)
       const taskId = `${task.phaseId}-${task.order}`;
 
@@ -338,6 +513,9 @@ export async function seedInitialPlan(userId: string): Promise<void> {
         completed: false,
         notes: null,
         due_date: null,
+        priority: 'medium',
+        sort_order: index,
+        is_custom: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -374,6 +552,7 @@ export async function getPhaseTasks(userId: string, phaseId: number): Promise<Us
       .select('*')
       .eq('user_id', userId)
       .eq('phase_id', phaseId)
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
 
     if (error) throw error;
@@ -390,16 +569,16 @@ export async function getPhaseTasks(userId: string, phaseId: number): Promise<Us
 export function getTaskDetails(taskId: string): Task | null {
   const parts = taskId.split('-');
   if (parts.length !== 2) return null;
-  
+
   const phaseId = parseInt(parts[0], 10);
   const order = parseInt(parts[1], 10);
-  
+
   if (isNaN(phaseId) || isNaN(order)) return null;
-  
+
   const task = SEED_TASKS.find(t => t.phaseId === phaseId && t.order === order);
-  
+
   if (!task) return null;
-  
+
   return {
     id: taskId,
     ...task,
@@ -408,21 +587,49 @@ export function getTaskDetails(taskId: string): Task | null {
 
 /**
  * Get all tasks for a phase with merged seed data and user progress
+ * Now also returns custom tasks from the database
  */
 export async function getPhaseTasksWithDetails(userId: string, phaseId: number): Promise<Array<Task & { userTask?: UserTask }>> {
   try {
     // Get user tasks for this phase
     const userTasks = await getPhaseTasks(userId, phaseId);
     const userTaskMap = new Map(userTasks.map(ut => [ut.taskId, ut]));
-    
+
     // Get seed tasks for this phase
     const seedTasks = getPhaseSeedTasks(phaseId);
-    
+
     // Merge seed tasks with user progress
-    return seedTasks.map(seedTask => ({
+    const mergedTasks: Array<Task & { userTask?: UserTask }> = seedTasks.map(seedTask => ({
       ...seedTask,
+      priority: (userTaskMap.get(seedTask.id) as any)?.priority || 'medium',
+      link: (userTaskMap.get(seedTask.id) as any)?.link || undefined,
       userTask: userTaskMap.get(seedTask.id),
     }));
+
+    // Add custom tasks from DB
+    const customUserTasks = userTasks.filter(ut => ut.isCustom || (ut as any).is_custom);
+    customUserTasks.forEach(customUt => {
+      mergedTasks.push({
+        id: customUt.taskId,
+        phaseId,
+        title: (customUt as any).title || customUt.taskId,
+        description: (customUt as any).description || '',
+        order: (customUt as any).sort_order ?? 9999,
+        priority: (customUt as any).priority || 'medium',
+        isCustom: true,
+        link: (customUt as any).link || undefined,
+        userTask: customUt,
+      });
+    });
+
+    // Sort by sort_order from DB if available, then by original order
+    mergedTasks.sort((a, b) => {
+      const aOrder = (a.userTask as any)?.sort_order ?? a.order;
+      const bOrder = (b.userTask as any)?.sort_order ?? b.order;
+      return aOrder - bOrder;
+    });
+
+    return mergedTasks;
   } catch (error) {
     console.error('Error fetching phase tasks with details:', error);
     throw error;
@@ -442,9 +649,8 @@ export function getPhases(): Phase[] {
 export function getPhaseSeedTasks(phaseId: number): Task[] {
   return SEED_TASKS
     .filter(t => t.phaseId === phaseId)
-    .map((t, index) => ({
+    .map((t) => ({
       id: `${t.phaseId}-${t.order}`,
       ...t,
     }));
 }
-

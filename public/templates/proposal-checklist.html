@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proposal Response Checklist - GovCon Giants</title>
+  <style>
+    @media print {
+      body { margin: 0; padding: 0; font-size: 11px; }
+      .no-print { display: none !important; }
+      .container { box-shadow: none !important; max-width: 100% !important; }
+      .section { break-inside: avoid; }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; background: #f3f4f6; color: #1f2937; }
+    .no-print {
+      background: #1e40af; color: white; text-align: center; padding: 16px;
+      font-size: 14px; position: sticky; top: 0; z-index: 10;
+    }
+    .no-print button {
+      background: white; color: #1e40af; border: none; padding: 8px 24px;
+      border-radius: 6px; font-weight: 700; cursor: pointer; margin-left: 12px; font-size: 14px;
+    }
+    .container { max-width: 800px; margin: 24px auto; padding: 0 16px 48px; }
+    .page-header {
+      background: #1e40af; color: white; padding: 32px; border-radius: 8px 8px 0 0;
+      text-align: center;
+    }
+    .page-header h1 { font-size: 24px; margin-bottom: 4px; }
+    .page-header p { font-size: 14px; opacity: 0.9; }
+    .meta-bar {
+      background: white; padding: 16px 24px; border-bottom: 2px solid #e5e7eb;
+      display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px;
+    }
+    .meta-bar label { font-weight: 700; color: #1e40af; margin-right: 6px; }
+    .meta-bar input {
+      border: none; border-bottom: 1px solid #d1d5db; padding: 2px 4px;
+      font-size: 13px; width: 180px; outline: none;
+    }
+    .meta-bar input:focus { border-bottom-color: #1e40af; }
+    .progress-bar {
+      background: white; padding: 12px 24px; border-bottom: 1px solid #e5e7eb;
+      font-size: 13px; color: #6b7280;
+    }
+    .progress-bar .bar { background: #e5e7eb; height: 8px; border-radius: 4px; margin-top: 6px; }
+    .progress-bar .fill { background: #1e40af; height: 8px; border-radius: 4px; transition: width 0.3s; }
+    .section {
+      background: white; margin-bottom: 2px;
+    }
+    .section-header {
+      padding: 16px 24px; cursor: pointer; display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .section-num {
+      background: #1e40af; color: white; width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; flex-shrink: 0;
+    }
+    .section-header h2 { font-size: 16px; font-weight: 700; color: #1f2937; flex: 1; }
+    .section-header .count { font-size: 12px; color: #9ca3af; }
+    .checklist { padding: 0 24px 16px; }
+    .checklist-item {
+      display: flex; align-items: flex-start; gap: 12px; padding: 10px 0;
+      border-bottom: 1px solid #f9fafb;
+    }
+    .checklist-item:last-child { border-bottom: none; }
+    .checklist-item input[type="checkbox"] {
+      width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0;
+      accent-color: #1e40af; cursor: pointer;
+    }
+    .checklist-item label { font-size: 13px; color: #374151; cursor: pointer; line-height: 1.5; }
+    .checklist-item input:checked + label { text-decoration: line-through; color: #9ca3af; }
+    .footer {
+      background: white; border-radius: 0 0 8px 8px; padding: 24px; text-align: center;
+      font-size: 12px; color: #9ca3af; border-top: 2px solid #1e40af;
+    }
+  </style>
+  <script>
+    function updateProgress() {
+      const all = document.querySelectorAll('.checklist-item input[type="checkbox"]');
+      const checked = document.querySelectorAll('.checklist-item input[type="checkbox"]:checked');
+      const pct = all.length > 0 ? Math.round((checked.length / all.length) * 100) : 0;
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-text').textContent = checked.length + ' of ' + all.length + ' items completed (' + pct + '%)';
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.checklist-item input').forEach(function(cb) {
+        cb.addEventListener('change', updateProgress);
+      });
+      updateProgress();
+    });
+  </script>
+</head>
+<body>
+  <div class="no-print">
+    Use this interactive checklist to track your proposal progress. Print or save as PDF when done.
+    <button onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Proposal Response Checklist</h1>
+      <p>40 items across 7 critical sections</p>
+    </div>
+
+    <div class="meta-bar">
+      <div><label>Solicitation #:</label><input type="text" placeholder="W9133L-26-R-0001"></div>
+      <div><label>Agency:</label><input type="text" placeholder="Department of Defense"></div>
+      <div><label>Due Date:</label><input type="date"></div>
+    </div>
+
+    <div class="progress-bar">
+      <span id="progress-text">0 of 40 items completed (0%)</span>
+      <div class="bar"><div class="fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+
+    <!-- Section 1 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">1</div>
+        <h2>Pre-Bid Decision (Bid/No-Bid)</h2>
+        <span class="count">6 items</span>
+      </div>
+      <div class="checklist">
+        <div class="checklist-item"><input type="checkbox" id="c1"><label for="c1">Read the ENTIRE solicitation document including all amendments and attachments</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c2"><label for="c2">Verify NAICS code matches your capabilities and size standard</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c3"><label for="c3">Confirm set-aside eligibility (8(a), WOSB, HUBZone, SDVOSB, etc.)</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c4"><label for="c4">Assess competitive advantage - do you have relevant past performance?</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c5"><label for="c5">Evaluate resource availability (key personnel, equipment, time to respond)</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c6"><label for="c6">Complete formal bid/no-bid decision with team and document rationale</label></div>
+      </div>
+    </div>
+
+    <!-- Section 2 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">2</div>
+        <h2>Proposal Preparation</h2>
+        <span class="count">7 items</span>
+      </div>
+      <div class="checklist">
+        <div class="checklist-item"><input type="checkbox" id="c7"><label for="c7">Create compliance matrix mapping every requirement to your response</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c8"><label for="c8">Identify all required forms (SF-330, SF-1449, reps & certs, etc.)</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c9"><label for="c9">Note all evaluation criteria and assign weights/priority in your outline</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c10"><label for="c10">Identify key personnel and confirm their availability and commitment letters</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c11"><label for="c11">Identify teaming partners and obtain signed teaming agreements</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c12"><label for="c12">Assign section writers and establish internal deadlines (at least 3 days before due)</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c13"><label for="c13">Create proposal outline matching the solicitation's required format exactly</label></div>
+      </div>
+    </div>
+
+    <!-- Section 3 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">3</div>
+        <h2>Technical Volume</h2>
+        <span class="count">7 items</span>
+      </div>
+      <div class="checklist">
+        <div class="checklist-item"><input type="checkbox" id="c14"><label for="c14">Technical approach clearly addresses the Statement of Work (SOW/PWS)</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c15"><label for="c15">Management plan demonstrates your ability to manage the contract</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c16"><label for="c16">Staffing plan includes resumes, org chart, and labor category qualifications</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c17"><label for="c17">Quality control plan outlines specific QA/QC processes and metrics</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c18"><label for="c18">Transition plan (if applicable) details how you will onboard and start work</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c19"><label for="c19">Every evaluation criterion has explicit coverage in the technical volume</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c20"><label for="c20">Page count is within limits; formatting matches specified requirements exactly</label></div>
+      </div>
+    </div>
+
+    <!-- Section 4 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">4</div>
+        <h2>Past Performance Volume</h2>
+        <span class="count">5 items</span>
+      </div>
+      <div class="checklist">
+        <div class="checklist-item"><input type="checkbox" id="c21"><label for="c21">Select most relevant contracts (similar scope, size, complexity, and recency)</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c22"><label for="c22">Include contract numbers, values, period of performance, and agency POCs</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c23"><label for="c23">Describe relevance to current opportunity with specific metrics and outcomes</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c24"><label for="c24">Verify all reference contact information is current (call them first!)</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c25"><label for="c25">Notify references that they may be contacted and brief them on the opportunity</label></div>
+      </div>
+    </div>
+
+    <!-- Section 5 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">5</div>
+        <h2>Price/Cost Volume</h2>
+        <span class="count">5 items</span>
+      </div>
+      <div class="checklist">
+        <div class="checklist-item"><input type="checkbox" id="c26"><label for="c26">Labor rates are competitive, realistic, and aligned with market data</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c27"><label for="c27">All CLINs (Contract Line Item Numbers) are priced correctly per the schedule</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c28"><label for="c28">Indirect rates (overhead, G&A, profit) are properly calculated and documented</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c29"><label for="c29">Price narrative explains your pricing methodology and any assumptions</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c30"><label for="c30">Math has been double-checked across all spreadsheets and totals</label></div>
+      </div>
+    </div>
+
+    <!-- Section 6 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">6</div>
+        <h2>Final Review</h2>
+        <span class="count">6 items</span>
+      </div>
+      <div class="checklist">
+        <div class="checklist-item"><input type="checkbox" id="c31"><label for="c31">Run compliance matrix check - every requirement has a response</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c32"><label for="c32">Independent reviewer (not the writer) has reviewed each volume</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c33"><label for="c33">Spell check and grammar review complete on all documents</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c34"><label for="c34">All required forms are completed, signed, and dated correctly</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c35"><label for="c35">Representations and certifications are current and accurate</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c36"><label for="c36">Verify solicitation number and title appear correctly on all documents</label></div>
+      </div>
+    </div>
+
+    <!-- Section 7 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-num">7</div>
+        <h2>Submission</h2>
+        <span class="count">4 items</span>
+      </div>
+      <div class="checklist">
+        <div class="checklist-item"><input type="checkbox" id="c37"><label for="c37">Files are in required format (PDF, Word, Excel) and within file size limits</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c38"><label for="c38">Submitted through correct method (SAM.gov, email, physical) per solicitation instructions</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c39"><label for="c39">Submitted at least 2 hours before deadline to account for system issues</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c40"><label for="c40">Submission confirmation received and saved for your records</label></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Powered by GovCon Giants Action Planner
+    </div>
+  </div>
+</body>
+</html>

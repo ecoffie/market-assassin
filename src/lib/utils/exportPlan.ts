@@ -12,6 +12,7 @@ export interface TaskForExport {
   completed: boolean;
   dueDate?: string;
   notes: string;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export interface PhaseDataForExport {
@@ -23,6 +24,34 @@ export interface PhaseDataForExport {
   progress: number;
   completedTasks: number;
   totalTasks: number;
+}
+
+// Priority badge colors
+const PRIORITY_COLORS: Record<string, { r: number; g: number; b: number; label: string }> = {
+  high: { r: 220, g: 38, b: 38, label: 'HIGH' },
+  medium: { r: 202, g: 138, b: 4, label: 'MED' },
+  low: { r: 156, g: 163, b: 175, label: 'LOW' },
+};
+
+/**
+ * Draw priority badge next to task title
+ */
+function drawPriorityBadge(doc: jsPDFExtended, priority: string | undefined, x: number, y: number): number {
+  if (!priority || priority === 'medium') return 0; // Skip medium (default) to reduce noise
+
+  const config = PRIORITY_COLORS[priority];
+  if (!config) return 0;
+
+  const badgeText = `[${config.label}]`;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(config.r, config.g, config.b);
+  doc.text(badgeText, x, y);
+  const badgeWidth = doc.getTextWidth(badgeText) + 3;
+
+  // Reset
+  doc.setTextColor(0, 0, 0);
+  return badgeWidth;
 }
 
 /**
@@ -65,13 +94,13 @@ export async function exportPhaseToPDF(phaseData: PhaseDataForExport): Promise<v
   // Header Section
   doc.setFillColor(30, 64, 175); // #1e40af
   doc.rect(0, 0, pageWidth, 40, 'F');
-  
+
   // Logo/Title
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   doc.text('GovCon Giants', margin, 25);
-  
+
   // User name (if provided)
   if (phaseData.userName) {
     doc.setFontSize(10);
@@ -110,7 +139,7 @@ export async function exportPhaseToPDF(phaseData: PhaseDataForExport): Promise<v
   yPosition += 5;
 
   // Task List
-  phaseData.tasks.forEach((task, index) => {
+  phaseData.tasks.forEach((task) => {
     // Check if we need a new page
     checkPageBreak(30);
 
@@ -118,26 +147,31 @@ export async function exportPhaseToPDF(phaseData: PhaseDataForExport): Promise<v
     const checkboxSize = 4;
     const checkboxX = margin;
     const checkboxY = yPosition - 3;
-    
+
     // Draw checkbox
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.5);
     doc.rect(checkboxX, checkboxY, checkboxSize, checkboxSize, 'S');
-    
+
     // Checkmark if completed
     if (task.completed) {
       doc.setFontSize(8);
       doc.text('✓', checkboxX + 1.5, checkboxY + 3);
     }
 
+    // Priority badge
+    const titleX = margin + checkboxSize + 5;
+    const badgeWidth = drawPriorityBadge(doc, task.priority, titleX, yPosition);
+    const titleStartX = titleX + badgeWidth;
+    const titleMaxWidth = contentWidth - checkboxSize - 5 - badgeWidth;
+
     // Task title
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    const titleX = margin + checkboxSize + 5;
-    const titleMaxWidth = contentWidth - checkboxSize - 5;
+    doc.setTextColor(0, 0, 0);
     const titleHeight = addWrappedText(
       task.completed ? `✓ ${task.title}` : task.title,
-      titleX,
+      titleStartX,
       yPosition,
       titleMaxWidth,
       11
@@ -150,7 +184,7 @@ export async function exportPhaseToPDF(phaseData: PhaseDataForExport): Promise<v
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(80, 80, 80);
-      const descHeight = addWrappedText(task.description, titleX, yPosition, titleMaxWidth, 9);
+      const descHeight = addWrappedText(task.description, titleX, yPosition, contentWidth - checkboxSize - 5, 9);
       yPosition += descHeight + 3;
     }
 
@@ -175,13 +209,13 @@ export async function exportPhaseToPDF(phaseData: PhaseDataForExport): Promise<v
       doc.setTextColor(100, 100, 100);
       doc.setFont('helvetica', 'italic');
       const notesText = `Notes: ${task.notes}`;
-      const notesHeight = addWrappedText(notesText, titleX, yPosition, titleMaxWidth, 8);
+      const notesHeight = addWrappedText(notesText, titleX, yPosition, contentWidth - checkboxSize - 5, 8);
       yPosition += notesHeight + 3;
     }
 
     // Reset text color
     doc.setTextColor(0, 0, 0);
-    
+
     // Add spacing between tasks
     yPosition += 5;
 
@@ -252,12 +286,12 @@ export async function exportFullPlanToPDF(phases: PhaseDataForExport[], userName
   // Header
   doc.setFillColor(30, 64, 175);
   doc.rect(0, 0, pageWidth, 40, 'F');
-  
+
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   doc.text('GovCon Giants', margin, 25);
-  
+
   if (userName) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
@@ -333,23 +367,28 @@ export async function exportFullPlanToPDF(phases: PhaseDataForExport[], userName
       const checkboxSize = 4;
       const checkboxX = margin;
       const checkboxY = yPosition - 3;
-      
+
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.5);
       doc.rect(checkboxX, checkboxY, checkboxSize, checkboxSize, 'S');
-      
+
       if (task.completed) {
         doc.setFontSize(8);
         doc.text('✓', checkboxX + 1.5, checkboxY + 3);
       }
 
+      // Priority badge
+      const titleX = margin + checkboxSize + 5;
+      const badgeWidth = drawPriorityBadge(doc, task.priority, titleX, yPosition);
+      const titleStartX = titleX + badgeWidth;
+      const titleMaxWidth = contentWidth - checkboxSize - 5 - badgeWidth;
+
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      const titleX = margin + checkboxSize + 5;
-      const titleMaxWidth = contentWidth - checkboxSize - 5;
+      doc.setTextColor(0, 0, 0);
       const titleHeight = addWrappedText(
         task.completed ? `✓ ${task.title}` : task.title,
-        titleX,
+        titleStartX,
         yPosition,
         titleMaxWidth,
         11
@@ -361,7 +400,7 @@ export async function exportFullPlanToPDF(phases: PhaseDataForExport[], userName
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(80, 80, 80);
-        const descHeight = addWrappedText(task.description, titleX, yPosition, titleMaxWidth, 9);
+        const descHeight = addWrappedText(task.description, titleX, yPosition, contentWidth - checkboxSize - 5, 9);
         yPosition += descHeight + 3;
       }
 
@@ -384,7 +423,7 @@ export async function exportFullPlanToPDF(phases: PhaseDataForExport[], userName
         doc.setTextColor(100, 100, 100);
         doc.setFont('helvetica', 'italic');
         const notesText = `Notes: ${task.notes}`;
-        const notesHeight = addWrappedText(notesText, titleX, yPosition, titleMaxWidth, 8);
+        const notesHeight = addWrappedText(notesText, titleX, yPosition, contentWidth - checkboxSize - 5, 8);
         yPosition += notesHeight + 3;
       }
 
@@ -417,4 +456,3 @@ export async function exportFullPlanToPDF(phases: PhaseDataForExport[], userName
   // Save the PDF
   doc.save(filename);
 }
-

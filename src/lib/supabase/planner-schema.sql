@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS user_plans (
   due_date TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
+
   -- Ensure one record per user per task
   UNIQUE(user_id, task_id)
 );
@@ -60,4 +60,42 @@ CREATE TRIGGER update_user_plans_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 
+-- ============================================================
+-- Migration: Action Planner Overhaul (February 2026)
+-- Run this AFTER the initial schema above is already in place.
+-- ============================================================
 
+-- Add new columns to user_plans
+ALTER TABLE user_plans
+  ADD COLUMN IF NOT EXISTS title TEXT,
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
+  ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS is_custom BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS link TEXT;
+
+-- Index for sort ordering
+CREATE INDEX IF NOT EXISTS idx_user_plans_sort_order ON user_plans(user_id, phase_id, sort_order);
+
+-- Gamification table
+CREATE TABLE IF NOT EXISTS planner_gamification (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  current_streak INTEGER DEFAULT 0,
+  longest_streak INTEGER DEFAULT 0,
+  last_completion_date DATE,
+  badges JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+ALTER TABLE planner_gamification ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own gamification"
+  ON planner_gamification FOR SELECT USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can insert their own gamification"
+  ON planner_gamification FOR INSERT WITH CHECK (auth.uid()::text = user_id);
+CREATE POLICY "Users can update their own gamification"
+  ON planner_gamification FOR UPDATE
+  USING (auth.uid()::text = user_id) WITH CHECK (auth.uid()::text = user_id);

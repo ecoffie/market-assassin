@@ -56,25 +56,25 @@ const templates = [
   {
     name: 'Capability Statement Template',
     description: 'Professional one-page capability statement template with sections for core competencies, past performance, and differentiators.',
-    file: '/templates/capability-statement-template.pdf',
+    file: '/templates/capability-statement-template.html',
     icon: '📄',
   },
   {
     name: 'Email Scripts for SBLO Outreach',
     description: 'Ready-to-use email templates for reaching out to Small Business Liaison Officers and contracting officers.',
-    file: '/templates/email-scripts-sblo.pdf',
+    file: '/templates/email-scripts-sblo.html',
     icon: '✉️',
   },
   {
     name: 'Proposal Response Checklist',
     description: 'Comprehensive checklist to ensure your proposal responses are complete and compliant.',
-    file: '/templates/proposal-checklist.pdf',
+    file: '/templates/proposal-checklist.html',
     icon: '✅',
   },
   {
     name: 'Past Performance Questionnaire',
     description: 'Template for collecting past performance information from previous clients and prime contractors.',
-    file: '/templates/past-performance-questionnaire.pdf',
+    file: '/templates/past-performance-questionnaire.html',
     icon: '📊',
   },
 ];
@@ -270,13 +270,14 @@ export default function ResourcesPage() {
                     <p className="text-sm text-gray-600 mb-4">{template.description}</p>
                     <a
                       href={template.file}
-                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e40af] text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
                     >
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
-                      Download Template
+                      View Template
                     </a>
                   </div>
                 </div>

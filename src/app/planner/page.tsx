@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getUserProgress, getPhases, type ProgressSummary } from '@/lib/supabase/planner';
 import { useAuth } from '@/lib/supabase/AuthContext';
 import { signOut } from '@/lib/supabase/auth';
+import { getGamificationData, BADGE_DEFINITIONS, type GamificationData } from '@/lib/supabase/gamification';
 
 // Phase icons mapping
 const phaseIcons: Record<number, string> = {
@@ -43,7 +44,7 @@ function CircularProgress({ percentage, size = 200 }: { percentage: number; size
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#1e40af"
+          stroke={percentage === 100 ? '#10b981' : '#1e40af'}
           strokeWidth="12"
           fill="none"
           strokeDasharray={circumference}
@@ -54,7 +55,7 @@ function CircularProgress({ percentage, size = 200 }: { percentage: number; size
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-4xl font-bold text-[#1e40af]">{percentage}%</div>
+          <div className={`text-4xl font-bold ${percentage === 100 ? 'text-green-600' : 'text-[#1e40af]'}`}>{percentage}%</div>
         </div>
       </div>
     </div>
@@ -130,7 +131,16 @@ interface PhaseDisplay {
 // Phase Card Component
 function PhaseCard({ phase }: { phase: PhaseDisplay }) {
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+    <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow relative">
+      {/* Phase complete badge */}
+      {phase.progress === 100 && (
+        <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-md">
+          <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      )}
+
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <span className="text-3xl">{phase.icon}</span>
@@ -151,7 +161,7 @@ function PhaseCard({ phase }: { phase: PhaseDisplay }) {
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2.5">
           <div
-            className="bg-[#1e40af] h-2.5 rounded-full transition-all duration-500"
+            className={`h-2.5 rounded-full transition-all duration-500 ${phase.progress === 100 ? 'bg-green-500' : 'bg-[#1e40af]'}`}
             style={{ width: `${phase.progress}%` }}
           />
         </div>
@@ -163,6 +173,69 @@ function PhaseCard({ phase }: { phase: PhaseDisplay }) {
       >
         View Phase
       </Link>
+    </div>
+  );
+}
+
+// Gamification Card Component
+function GamificationCard({ data }: { data: GamificationData }) {
+  const earnedBadgeIds = new Set(data.badges.map(b => b.id));
+
+  return (
+    <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 mb-8">
+      <h2 className="text-xl font-bold text-gray-900 mb-4">Your Progress</h2>
+
+      <div className="flex flex-col sm:flex-row gap-6">
+        {/* Streak */}
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">🔥</div>
+          <div>
+            <div className="text-2xl font-bold text-[#1e40af]">{data.currentStreak}</div>
+            <div className="text-sm text-gray-500">day streak</div>
+          </div>
+        </div>
+
+        {/* Best streak */}
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">⭐</div>
+          <div>
+            <div className="text-2xl font-bold text-[#1e40af]">{data.longestStreak}</div>
+            <div className="text-sm text-gray-500">best streak</div>
+          </div>
+        </div>
+
+        {/* Badge count */}
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">🏆</div>
+          <div>
+            <div className="text-2xl font-bold text-[#1e40af]">{data.badges.length}</div>
+            <div className="text-sm text-gray-500">badges earned</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Badges Row */}
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <div className="flex flex-wrap gap-2">
+          {BADGE_DEFINITIONS.map((badge) => {
+            const earned = earnedBadgeIds.has(badge.id);
+            return (
+              <div
+                key={badge.id}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm ${
+                  earned
+                    ? 'bg-[#1e40af] text-white'
+                    : 'bg-gray-100 text-gray-400'
+                }`}
+                title={earned ? `${badge.name}: ${badge.description}` : `Locked: ${badge.description}`}
+              >
+                <span className={earned ? '' : 'grayscale opacity-50'}>{badge.icon}</span>
+                <span className="font-medium">{badge.name}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -215,7 +288,13 @@ function Sidebar({ isOpen, onClose, phases }: { isOpen: boolean; onClose: () => 
                     {phase.completed}/{phase.total} tasks
                   </div>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-[#1e40af] opacity-60" />
+                {phase.progress === 100 ? (
+                  <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <div className="w-2 h-2 rounded-full bg-[#1e40af] opacity-60" />
+                )}
               </Link>
             ))}
 
@@ -264,6 +343,7 @@ export default function PlannerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentQuote] = useState(() => Math.floor(Math.random() * quotes.length));
+  const [gamification, setGamification] = useState<GamificationData | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -281,9 +361,14 @@ export default function PlannerPage() {
         setIsLoading(true);
         setError(null);
 
-        // Get user progress from Supabase using real user ID
-        const progressData = await getUserProgress(user.id);
+        // Fetch progress and gamification data in parallel
+        const [progressData, gamificationData] = await Promise.all([
+          getUserProgress(user.id),
+          getGamificationData(user.id),
+        ]);
+
         setProgress(progressData);
+        setGamification(gamificationData);
 
         // Map phases with icons
         const phasesWithIcons: PhaseDisplay[] = progressData.phases.map((p) => ({
@@ -403,6 +488,9 @@ export default function PlannerPage() {
                 </div>
               </div>
             </div>
+
+            {/* Gamification Card */}
+            {gamification && <GamificationCard data={gamification} />}
 
             {/* Phase Summary Cards Grid */}
             <div className="mb-8">
