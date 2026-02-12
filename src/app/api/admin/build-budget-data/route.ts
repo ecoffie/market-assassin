@@ -3,7 +3,7 @@ import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import {
   fetchAllToptierBudgets,
-  fetchAgencyBudget,
+  compareYearOverYear,
   classifyAgencyTrend,
   type AgencyBudgetSnapshot,
   type BudgetTrend,
@@ -77,32 +77,21 @@ export async function GET(request: NextRequest) {
 
     for (const agency of agenciesToProcess) {
       try {
-        // Fetch FY2025 and FY2026 budget data for this agency
-        const [fy2025, fy2026] = await Promise.all([
-          fetchAgencyBudget(agency.toptierCode, 2025),
-          fetchAgencyBudget(agency.toptierCode, 2026),
-        ]);
-
-        const amount = fy2026.budgetAuthority - fy2025.budgetAuthority;
-        const percent = fy2025.budgetAuthority > 0
-          ? fy2026.budgetAuthority / fy2025.budgetAuthority
-          : 1;
-        const trend = classifyAgencyTrend(percent);
+        // Single API call per agency — budgetary_resources returns all FYs
+        const result = await compareYearOverYear(agency.toptierCode);
 
         results[agency.agencyName] = {
           toptierCode: agency.toptierCode,
-          fy2025,
-          fy2026,
-          change: { amount, percent, trend },
+          ...result,
         };
 
         processed++;
         console.log(
-          `[build-budget-data] ${agency.agencyName}: FY25 $${(fy2025.budgetAuthority / 1e9).toFixed(1)}B → FY26 $${(fy2026.budgetAuthority / 1e9).toFixed(1)}B (${trend})`
+          `[build-budget-data] ${agency.agencyName}: FY25 $${(result.fy2025.budgetAuthority / 1e9).toFixed(1)}B → FY26 $${(result.fy2026.budgetAuthority / 1e9).toFixed(1)}B (${result.change.trend})`
         );
 
-        // Rate limit between API calls (250ms per agency = 2 calls * 125ms)
-        await new Promise(resolve => setTimeout(resolve, 250));
+        // Rate limit: 300ms between API calls (1 call per agency now)
+        await new Promise(resolve => setTimeout(resolve, 300));
       } catch (error: any) {
         errors++;
         errorDetails.push({ agency: agency.agencyName, error: error.message });

@@ -62,7 +62,9 @@ interface ToptierAgencyResult {
   agency_name: string;
   toptier_code: string;
   abbreviation: string;
-  current_total_budget_authority_amount: number;
+  budget_authority_amount: number;          // per-agency budget authority
+  current_total_budget_authority_amount: number; // total federal budget (all agencies)
+  percentage_of_total_budget_authority: number;
   obligated_amount: number;
   outlay_amount: number;
   active_fy: string;
@@ -111,7 +113,7 @@ export async function fetchAllToptierBudgets(fiscalYear?: number): Promise<Array
 
   if (data.results && Array.isArray(data.results)) {
     for (const agency of data.results as ToptierAgencyResult[]) {
-      const budget = agency.current_total_budget_authority_amount || 0;
+      const budget = agency.budget_authority_amount || 0;
       if (budget <= 0) continue;
 
       results.push({
@@ -129,14 +131,18 @@ export async function fetchAllToptierBudgets(fiscalYear?: number): Promise<Array
 }
 
 /**
- * Fetch budget data for a specific agency by toptier code.
- * Uses the agency overview endpoint for fiscal year-specific data.
+ * Fetch budgetary resources for a specific agency — returns ALL fiscal years in one call.
+ * Uses the /agency/{code}/budgetary_resources/ endpoint.
  */
-export async function fetchAgencyBudget(
-  toptierCode: string,
-  fiscalYear: number
-): Promise<AgencyBudgetSnapshot> {
-  const url = `${USASPENDING_BASE}/agency/${toptierCode}/?fiscal_year=${fiscalYear}`;
+export async function fetchAgencyBudgetaryResources(
+  toptierCode: string
+): Promise<Array<{
+  fiscalYear: number;
+  budgetAuthority: number;
+  obligated: number;
+  outlays: number;
+}>> {
+  const url = `${USASPENDING_BASE}/agency/${toptierCode}/budgetary_resources/`;
 
   const response = await fetch(url, {
     method: 'GET',
@@ -145,15 +151,46 @@ export async function fetchAgencyBudget(
   });
 
   if (!response.ok) {
-    throw new Error(`USASpending agency/${toptierCode} returned ${response.status}`);
+    throw new Error(`USASpending agency/${toptierCode}/budgetary_resources returned ${response.status}`);
   }
 
   const data = await response.json();
+  const results: Array<{
+    fiscalYear: number;
+    budgetAuthority: number;
+    obligated: number;
+    outlays: number;
+  }> = [];
+
+  if (data.agency_data_by_year && Array.isArray(data.agency_data_by_year)) {
+    for (const yearData of data.agency_data_by_year) {
+      results.push({
+        fiscalYear: yearData.fiscal_year,
+        budgetAuthority: yearData.agency_budgetary_resources || 0,
+        obligated: yearData.agency_total_obligated || 0,
+        outlays: yearData.agency_total_outlayed || 0,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Fetch budget data for a specific agency and fiscal year.
+ * Convenience wrapper around fetchAgencyBudgetaryResources.
+ */
+export async function fetchAgencyBudget(
+  toptierCode: string,
+  fiscalYear: number
+): Promise<AgencyBudgetSnapshot> {
+  const allYears = await fetchAgencyBudgetaryResources(toptierCode);
+  const yearData = allYears.find(y => y.fiscalYear === fiscalYear);
 
   return {
-    budgetAuthority: data.budget_authority_amount || 0,
-    obligated: data.obligated_amount || 0,
-    outlays: data.outlay_amount || 0,
+    budgetAuthority: yearData?.budgetAuthority || 0,
+    obligated: yearData?.obligated || 0,
+    outlays: yearData?.outlays || 0,
   };
 }
 
@@ -172,14 +209,27 @@ export function classifyAgencyTrend(percentChange: number): BudgetTrend {
 
 /**
  * Compare year-over-year budgets for a single agency.
+ * Fetches FY2025 + FY2026 in a single API call via budgetary_resources endpoint.
  */
 export async function compareYearOverYear(
   toptierCode: string
 ): Promise<{ fy2025: AgencyBudgetSnapshot; fy2026: AgencyBudgetSnapshot; change: { amount: number; percent: number; trend: BudgetTrend } }> {
-  const [fy2025, fy2026] = await Promise.all([
-    fetchAgencyBudget(toptierCode, 2025),
-    fetchAgencyBudget(toptierCode, 2026),
-  ]);
+  const allYears = await fetchAgencyBudgetaryResources(toptierCode);
+
+  const fy2025Data = allYears.find(y => y.fiscalYear === 2025);
+  const fy2026Data = allYears.find(y => y.fiscalYear === 2026);
+
+  const fy2025: AgencyBudgetSnapshot = {
+    budgetAuthority: fy2025Data?.budgetAuthority || 0,
+    obligated: fy2025Data?.obligated || 0,
+    outlays: fy2025Data?.outlays || 0,
+  };
+
+  const fy2026: AgencyBudgetSnapshot = {
+    budgetAuthority: fy2026Data?.budgetAuthority || 0,
+    obligated: fy2026Data?.obligated || 0,
+    outlays: fy2026Data?.outlays || 0,
+  };
 
   const amount = fy2026.budgetAuthority - fy2025.budgetAuthority;
   const percent = fy2025.budgetAuthority > 0
