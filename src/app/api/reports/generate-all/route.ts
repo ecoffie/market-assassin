@@ -455,34 +455,18 @@ export async function POST(request: NextRequest) {
           };
         })()
       : {
-          // Fallback to mock data if agency data not provided (backward compatibility)
-          agencies: selectedAgencies.map((agencyName, idx) => ({
-            contractingOffice: agencyName,
-            subAgency: agencyName,
-            parentAgency: agencyName.includes('Department') ? agencyName.split(' ')[0] + ' ' + agencyName.split(' ')[1] : agencyName,
-            spending: 10000000 + idx * 1000000,
-            contractCount: 50 + idx * 10,
-            officeId: `OFF${idx + 1}`,
-            subAgencyCode: '',
-            contactStrategy: 'Contact the Office of Small Business Programs (OSBP)',
-            location: 'Washington, DC',
-            command: null,
-            website: null,
-            forecastUrl: null,
-            samForecastUrl: null,
-            osbp: null,
-          })),
+          // No agency data provided — return empty report (no mock data)
+          agencies: [],
           summary: {
-            totalAgencies: selectedAgencies.length,
-            totalSpending: selectedAgencies.length * 15000000,
-            totalContracts: selectedAgencies.length * 75,
+            totalAgencies: 0,
+            totalSpending: 0,
+            totalContracts: 0,
             commandEnhancedAgencies: 0,
           },
           recommendations: [
+            'Agency data was not available — re-run the search to populate government buyer details',
             'Contact the Office of Small Business Programs (OSBP) at each agency to introduce your capabilities',
-            'Attend industry days and networking events',
             'Register in SAM.gov and agency-specific vendor databases',
-            'Prepare tailored capability statements for each agency',
           ],
         };
 

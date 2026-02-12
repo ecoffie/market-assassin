@@ -3915,6 +3915,22 @@ function BudgetCheckupTab({ report }: { report: ComprehensiveReport }) {
           </ul>
         </div>
       )}
+
+      {/* OMB Source Disclaimer */}
+      <div className="bg-slate-800/40 rounded-lg px-4 py-3 border border-slate-700/50">
+        <p className="text-slate-500 text-xs leading-relaxed">
+          Source:{' '}
+          <a
+            href="https://www.whitehouse.gov/wp-content/uploads/2025/05/Fiscal-Year-2026-Discretionary-Budget-Request.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-400 underline hover:text-slate-300"
+          >
+            OMB FY2026 Discretionary Budget Request, Table 2 (May 2025)
+          </a>
+          . FY2025 = Enacted appropriation. FY2026 = President&apos;s discretionary request. Figures reflect discretionary budget authority only and do not include mandatory spending.
+        </p>
+      </div>
     </div>
   );
 }

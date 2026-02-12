@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPainPointsForAgency, getPrioritiesForAgency, categorizePainPoints } from '@/lib/utils/pain-points';
+import { getBudgetForAgency } from '@/lib/utils/budget-authority';
 import { checkContentRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { trackGeneration } from '@/lib/abuse-detection';
 
@@ -335,9 +336,10 @@ export async function POST(request: NextRequest) {
       naicsCodes: companyProfile.naicsCodes || []
     };
 
-    // STEP 1: Get agency pain points and spending priorities
-    console.log('[Step 1] Identifying agency pain points and priorities...');
+    // STEP 1: Get agency pain points, spending priorities, and budget trends
+    console.log('[Step 1] Identifying agency pain points, priorities, and budget trends...');
     const agencyPainPoints: { agency: string; painPoints: string[]; priorities: string[]; categorized: ReturnType<typeof categorizePainPoints> }[] = [];
+    const budgetTrends: string[] = [];
 
     for (const agencyName of targetAgencies) {
       const painPoints = getPainPointsForAgency(agencyName);
@@ -348,6 +350,17 @@ export async function POST(request: NextRequest) {
         priorities: priorities,
         categorized: categorizePainPoints(painPoints)
       });
+
+      // Lookup FY2025 vs FY2026 budget trend
+      const budget = getBudgetForAgency(agencyName);
+      if (budget) {
+        const pctChange = ((budget.change.percent - 1) * 100).toFixed(1);
+        const fy25 = (budget.fy2025.budgetAuthority / 1e9).toFixed(1);
+        const fy26 = (budget.fy2026.budgetAuthority / 1e9).toFixed(1);
+        budgetTrends.push(
+          `${agencyName}: FY2025 $${fy25}B → FY2026 $${fy26}B (${budget.change.percent >= 1 ? '+' : ''}${pctChange}%, trend: ${budget.change.trend})`
+        );
+      }
     }
 
     // Build company profile section for prompts
@@ -384,6 +397,10 @@ ${ap.agency}:
 ${shuffleArray(ap.priorities).slice(0, 5).map(p => `- ${p}`).join('\n')}
 ` : '').filter(Boolean).join('\n---\n')}
 
+${budgetTrends.length > 0 ? `FY2026 BUDGET TRENDS (use these real numbers to add authority and timeliness):
+${budgetTrends.map(t => `- ${t}`).join('\n')}
+Source: OMB FY2026 Discretionary Budget Request. Reference these numbers naturally — e.g., "With DoD's budget growing 13% to $962B..." or "As HHS faces a 26% budget cut..."
+` : ''}
 CONTENT VARIETY DIRECTIONS (use these creative lenses to make each post unique):
 - ${selectedLenses[0]}
 - ${selectedLenses[1]}

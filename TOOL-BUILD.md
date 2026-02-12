@@ -59,11 +59,11 @@ Tracking all instances of hardcoded/simulated data that should be replaced with 
 | # | Location | Issue | Fix | Priority |
 |---|----------|-------|-----|----------|
 | 1 | SpendingTrendChart.tsx:83-95 | Hardcoded Q4 multipliers `[0.85, 0.90, 0.95, 1.30, 0.88, 0.92]` | Replaced with real FY2025 vs FY2026 budget data from `budgetComparison` prop | **DONE** |
-| 2 | generate-all/route.ts:450-482 | Mock `$10M` agency spending fallback when no `selectedAgencyData` | Remove fallback, require real agency data or return error | HIGH |
-| 3 | find-agencies/route.ts:818-920 | Static DoD command expansion distributes spending by formula | Mark as "estimated" or require FPDS success | HIGH |
+| 2 | generate-all/route.ts:450-482 | Mock `$10M` agency spending fallback when no `selectedAgencyData` | Removed mock fallback — returns empty report with "re-run search" message | **DONE** |
+| 3 | find-agencies/route.ts:818-920 | Static DoD command expansion distributes spending by formula | Added `isEstimated: true` flag on all expanded agencies, "Est." badge in UI | **DONE** |
 | 4 | planner/resources/page.tsx:30-62 | 5 placeholder YouTube video IDs | Replace with real video IDs (needs Eric's videos) | HIGH |
 | 5 | command-info.ts:441-631 | Generic "OSBP Director" contacts for DoD commands | Build real SBLO database from SAM.gov | MEDIUM |
-| 6 | command-info.ts:838-868 | DoD spending distribution formula `budget * 0.15` etc. | Use FPDS real command spend data | MEDIUM |
+| 6 | command-info.ts:838-868 | DoD spending distribution formula `budget * 0.15` etc. | Marked with `isEstimated: true` — distribution formula labeled, not hidden | **DONE** |
 | 7 | generate-all/route.ts:527-551 | Generic forecast recommendations with no real forecast URLs | Populate real forecast URLs from command databases | LOW |
 
 ---

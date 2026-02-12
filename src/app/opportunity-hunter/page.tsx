@@ -116,6 +116,7 @@ export default function OpportunityScoutPage() {
   const [painPoints, setPainPoints] = useState<PainPoint[]>([]);
   const [spendingPriorities, setSpendingPriorities] = useState<SpendingPriority[]>([]);
   const [painPointsLoading, setPainPointsLoading] = useState(false);
+  const [agencyBudget, setAgencyBudget] = useState<{ fy2025: number; fy2026: number; change: number; trend: string } | null>(null);
 
   // Pro access state
   const [isPro, setIsPro] = useState(false);
@@ -305,7 +306,27 @@ export default function OpportunityScoutPage() {
   const openAgencyModal = useCallback((agency: Agency) => {
     setModalAgency(agency);
     setModalOpen(true);
+    setAgencyBudget(null);
     loadPainPoints(agency);
+
+    // Fetch budget trend for this agency
+    const parentName = agency.parentAgency || (typeof agency.agencyName === 'string' ? agency.agencyName : '');
+    if (parentName) {
+      fetch(`/api/budget-authority?agency=${encodeURIComponent(parentName)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data && data.data.length > 0) {
+            const b = data.data[0];
+            setAgencyBudget({
+              fy2025: b.fy2025.budgetAuthority,
+              fy2026: b.fy2026.budgetAuthority,
+              change: ((b.change.percent - 1) * 100),
+              trend: b.change.trend,
+            });
+          }
+        })
+        .catch(() => {}); // silent fail
+    }
   }, [loadPainPoints]);
 
   const closeAgencyModal = useCallback(() => {
@@ -313,6 +334,7 @@ export default function OpportunityScoutPage() {
     setModalAgency(null);
     setPainPoints([]);
     setSpendingPriorities([]);
+    setAgencyBudget(null);
   }, []);
 
   // Close modal on escape key
@@ -892,7 +914,7 @@ export default function OpportunityScoutPage() {
             {/* Modal Content */}
             <div className="p-6 space-y-6">
               {/* Key Statistics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className={`grid grid-cols-2 ${agencyBudget ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
                 <div className="bg-blue-50 rounded-lg p-4">
                   <div className="text-sm text-gray-600 mb-1">Set-Aside Spending</div>
                   <div className="text-2xl font-bold text-blue-600">
@@ -923,6 +945,22 @@ export default function OpportunityScoutPage() {
                   </div>
                   <div className="text-xs text-gray-500 mt-1">Search on SAM.gov</div>
                 </div>
+                {agencyBudget && (
+                  <div className={`rounded-lg p-4 ${
+                    agencyBudget.trend === 'surging' || agencyBudget.trend === 'growing' ? 'bg-emerald-50' :
+                    agencyBudget.trend === 'stable' ? 'bg-amber-50' : 'bg-red-50'
+                  }`}>
+                    <div className="text-sm text-gray-600 mb-1">FY2026 Budget Trend</div>
+                    <div className={`text-2xl font-bold ${
+                      agencyBudget.trend === 'surging' || agencyBudget.trend === 'growing' ? 'text-emerald-600' :
+                      agencyBudget.trend === 'stable' ? 'text-amber-600' : 'text-red-600'
+                    }`}>
+                      {agencyBudget.change >= 0 ? '+' : ''}{agencyBudget.change.toFixed(1)}%
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1 capitalize">{agencyBudget.trend} — ${(agencyBudget.fy2026 / 1e9).toFixed(1)}B</div>
+                    <div className="text-[10px] text-gray-400 mt-1">Source: OMB FY2026 Budget Request</div>
+                  </div>
+                )}
               </div>
 
               {/* Office Information */}

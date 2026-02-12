@@ -738,9 +738,41 @@
         let currentPage = 1;
         let currentSort = { field: 'value', direction: 'desc' };
         const perPage = 25;
+        let budgetMap = {};
+
+        function getBudgetBadge(agencyName) {
+            if (!agencyName || !budgetMap) return '';
+            const normalized = agencyName.toLowerCase().replace(/\s+/g, ' ').trim();
+            let match = null;
+            for (const [key, data] of Object.entries(budgetMap)) {
+                const normKey = key.toLowerCase().replace(/\s+/g, ' ').trim();
+                if (normKey === normalized || normalized.includes(normKey) || normKey.includes(normalized)) {
+                    match = data;
+                    break;
+                }
+            }
+            if (!match) return '';
+            const pct = ((match.change.percent - 1) * 100).toFixed(1);
+            const isGrowth = match.change.percent >= 1;
+            const color = match.change.trend === 'surging' || match.change.trend === 'growing' ? '#10b981' :
+                          match.change.trend === 'stable' ? '#f59e0b' : '#ef4444';
+            const arrow = isGrowth ? '▲' : '▼';
+            return `<span style="display:inline-block;font-size:10px;padding:1px 5px;border-radius:4px;margin-left:6px;background:${color}15;color:${color};font-weight:600" title="FY2026 budget ${isGrowth ? 'increase' : 'decrease'} vs FY2025 (Source: OMB FY2026 Discretionary Budget Request, May 2025)">${arrow} ${isGrowth ? '+' : ''}${pct}%</span>`;
+        }
 
         function loadData() {
             allContracts = expiringContractsData;
+
+            // Fetch budget data for agency badges
+            fetch('/api/budget-authority?limit=200')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        data.data.forEach(a => { budgetMap[a.agency] = a; });
+                        renderResults(); // re-render with badges
+                    }
+                })
+                .catch(() => {});
 
             // Populate agency dropdown
             const agencies = [...new Set(allContracts.map(c => c.Agency))].filter(a => a).sort();
@@ -920,7 +952,7 @@
                 return `
                     <tr>
                         <td class="prime-name clickable" onclick="showContractDetails(${globalIdx})">${contract.Recipient || 'Unknown'}</td>
-                        <td class="agency-name">${contract.Agency || 'N/A'}<br><small style="color:#94a3b8">${contract.Office || ''}</small></td>
+                        <td class="agency-name">${contract.Agency || 'N/A'}${getBudgetBadge(contract.Agency)}<br><small style="color:#94a3b8">${contract.Office || ''}</small></td>
                         <td class="contract-value ${valueClass}">${formatValueDisplay(contract['Total Value'])}</td>
                         <td><span class="naics-badge">${naicsCode}</span></td>
                         <td><span class="date-badge">${contract.Expiration || 'N/A'}</span></td>
@@ -1018,11 +1050,37 @@
                 `;
             }
 
+            // Build budget row if data available
+            let budgetRow = '';
+            const agencyBudget = contract.Agency ? (() => {
+                const norm = contract.Agency.toLowerCase().replace(/\s+/g, ' ').trim();
+                for (const [key, data] of Object.entries(budgetMap)) {
+                    const nk = key.toLowerCase().replace(/\s+/g, ' ').trim();
+                    if (nk === norm || norm.includes(nk) || nk.includes(norm)) return data;
+                }
+                return null;
+            })() : null;
+            if (agencyBudget) {
+                const pct = ((agencyBudget.change.percent - 1) * 100).toFixed(1);
+                const isUp = agencyBudget.change.percent >= 1;
+                const color = isUp ? '#059669' : '#dc2626';
+                budgetRow = `
+                <div class="detail-row">
+                    <div class="detail-label">FY2026 Budget</div>
+                    <div class="detail-value" style="color:${color};font-weight:600">
+                        $${(agencyBudget.fy2025.budgetAuthority / 1e9).toFixed(1)}B → $${(agencyBudget.fy2026.budgetAuthority / 1e9).toFixed(1)}B
+                        (${isUp ? '+' : ''}${pct}%, ${agencyBudget.change.trend})
+                        <div style="font-size:10px;color:#94a3b8;font-weight:400;margin-top:2px">Source: OMB FY2026 Discretionary Budget Request (May 2025)</div>
+                    </div>
+                </div>`;
+            }
+
             document.getElementById('modalBody').innerHTML = `
                 <div class="detail-row">
                     <div class="detail-label">Agency</div>
-                    <div class="detail-value">${contract.Agency || 'N/A'}</div>
+                    <div class="detail-value">${contract.Agency || 'N/A'}${getBudgetBadge(contract.Agency)}</div>
                 </div>
+                ${budgetRow}
                 <div class="detail-row">
                     <div class="detail-label">Office</div>
                     <div class="detail-value">${contract.Office || 'N/A'}</div>

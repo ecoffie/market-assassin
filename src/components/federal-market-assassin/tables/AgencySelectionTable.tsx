@@ -541,7 +541,7 @@ export default function AgencySelectionTable({
                           className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
                             isUp ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
                           }`}
-                          title={`FY2026 budget ${isUp ? 'increase' : 'decrease'} vs FY2025`}
+                          title={`FY2026 budget ${isUp ? 'increase' : 'decrease'} vs FY2025 (Source: OMB FY2026 Discretionary Budget Request)`}
                         >
                           {isUp ? '▲' : '▼'} Budget {isUp ? '+' : ''}{pct}%
                         </span>
@@ -554,6 +554,14 @@ export default function AgencySelectionTable({
                 </td>
                 <td className="px-4 py-3 text-sm font-semibold text-emerald-400">
                   {formatCurrency(agency.setAsideSpending)}
+                  {agency.isEstimated && (
+                    <span
+                      className="ml-1 text-[9px] text-slate-500 font-normal"
+                      title="Spending estimate — distributed from parent agency total"
+                    >
+                      Est.
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-slate-400">
                   {agency.contractCount}

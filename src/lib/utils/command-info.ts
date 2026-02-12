@@ -857,6 +857,7 @@ export function expandGenericDoDAgency(
       forecastUrl: cmd.forecastUrl,
       samForecastUrl: cmd.samForecastUrl,
       hasSpecificOffice: true,
+      isEstimated: true,
       osbp: cmd.smallBusinessOffice ? {
         name: cmd.smallBusinessOffice.name,
         director: cmd.smallBusinessOffice.director,
