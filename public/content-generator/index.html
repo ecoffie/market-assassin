@@ -2629,7 +2629,7 @@
                             <h4 class="font-bold text-govcon-blue">${post.title || `Post ${index + 1}`}</h4>
                             <span class="text-xs bg-govcon-light text-govcon-blue px-2 py-1 rounded">${post.template || 'LinkedIn'}</span>
                         </div>
-                        <div class="bg-gray-50 rounded-lg p-4 mb-4 whitespace-pre-wrap text-sm text-gray-700 max-h-64 overflow-y-auto">${post.content.replace(/\*\*/g, '')}</div>
+                        <div class="bg-gray-50 rounded-lg p-4 mb-4 whitespace-pre-wrap text-sm text-gray-700 max-h-64 overflow-y-auto">${renderMarkdown(post.content)}</div>
                         ${post.hashtags ? `<p class="text-sm text-linkedin-blue mb-4">${post.hashtags}</p>` : ''}
 
                         <!-- Action Buttons -->
@@ -2701,7 +2701,7 @@
             const post = generatedPosts[index];
             if (!post) return;
 
-            const text = post.content + (post.hashtags ? '\n\n' + post.hashtags : '');
+            const text = stripMarkdown(post.content) + (post.hashtags ? '\n\n' + post.hashtags : '');
             navigator.clipboard.writeText(text).then(() => {
                 // Show permanent feedback
                 const btn = document.getElementById(`copy-btn-${index}`);
@@ -2814,9 +2814,16 @@
                     // Post content — split by newline, parse markdown bold/italic into Word formatting
                     const contentLines = (post.content || '').split('\n');
                     contentLines.forEach(line => {
+                        const isBlank = !line.trim();
+                        const isBullet = line.trimStart().startsWith('- ');
+                        const lineText = isBullet ? line.trimStart().substring(2) : line;
+
                         children.push(new Paragraph({
-                            children: parseMarkdownLine(line),
-                            spacing: { after: 80 }
+                            children: isBlank
+                                ? [new TextRun({ text: '', size: 24, font: 'Calibri' })]
+                                : parseMarkdownLine(lineText),
+                            spacing: { after: isBlank ? 200 : 80 },
+                            ...(isBullet ? { bullet: { level: 0 } } : {})
                         }));
                     });
 
@@ -3474,7 +3481,7 @@
 
             try {
                 const post = visualSourcePost;
-                const cleanContent = post.content.replace(/\*\*/g, '');
+                const cleanContent = stripMarkdown(post.content);
                 const companyName = SupabaseAuth.profile?.company_name || document.getElementById('company-name')?.value || 'Your Company';
 
                 // Call API
@@ -6417,6 +6424,22 @@
             }
         }
 
+        // Convert markdown bold/italic to HTML (with XSS sanitization)
+        function renderMarkdown(text) {
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            return html;
+        }
+
+        // Strip markdown markers for plain text (clipboard, graphic APIs)
+        function stripMarkdown(text) {
+            return text.replace(/\*\*/g, '').replace(/\*/g, '');
+        }
+
         // Get preview text (first 2-3 lines)
         function getPreviewText(content) {
             const lines = content.split('\n').filter(l => l.trim());
@@ -6525,11 +6548,11 @@
                         <div id="post-content-${index}" class="bg-gray-50 rounded-lg p-4 mb-3 border border-gray-200">
                             <!-- Preview (collapsed) -->
                             <div id="post-preview-${index}">
-                                <pre class="whitespace-pre-wrap font-sans text-gray-800 leading-relaxed text-sm">${previewText}${hasMoreContent ? '...' : ''}</pre>
+                                <div class="whitespace-pre-wrap font-sans text-gray-800 leading-relaxed text-sm">${renderMarkdown(previewText)}${hasMoreContent ? '...' : ''}</div>
                             </div>
                             <!-- Full content (hidden) -->
                             <div id="post-full-${index}" class="hidden">
-                                <pre class="whitespace-pre-wrap font-sans text-gray-800 leading-relaxed text-sm">${post.content}</pre>
+                                <div class="whitespace-pre-wrap font-sans text-gray-800 leading-relaxed text-sm">${renderMarkdown(post.content)}</div>
                                 ${post.hashtags && post.hashtags.length > 0 ? `
                                 <div class="mt-3 pt-3 border-t border-gray-300">
                                     <div class="flex flex-wrap gap-1">
@@ -6650,7 +6673,7 @@
             const post = generatedPosts[index];
             if (!post) return;
 
-            let fullText = post.content;
+            let fullText = stripMarkdown(post.content);
             if (post.hashtags && post.hashtags.length > 0) {
                 fullText += '\n\n' + post.hashtags.join(' ');
             }

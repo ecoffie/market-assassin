@@ -533,13 +533,9 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       // Extract hashtags (handles both comma and space separated)
       const hashtagMatch = postContent.match(/#[\w]+/g);
       const hashtags = hashtagMatch || [];
-      // Remove hashtags, markdown formatting, and clean up whitespace
+      // Remove hashtags and clean up whitespace (preserve markdown bold/italic for .docx export)
       const postText = postContent
         .replace(/#[\w]+/g, '')
-        .replace(/\*\*/g, '')           // Remove bold markdown **
-        .replace(/\*/g, '')             // Remove italic markdown *
-        .replace(/__/g, '')             // Remove bold markdown __
-        .replace(/_([^_]+)_/g, '$1')    // Remove italic markdown _text_
         .replace(/,\s*,/g, '')
         .replace(/[ \t]+/g, ' ')        // Collapse multiple spaces (not newlines)
         .replace(/\n\s*\n\s*\n/g, '\n\n')
