@@ -514,6 +514,11 @@ THOUGHT LEADERSHIP TONE:
 - Use line breaks for readability
 - Start with a COMPELLING HOOK that captures attention
 - The hook should be the FIRST LINE and must be engaging
+
+TEXT FORMATTING (use markdown):
+- Use **bold** for section headers, key terms, and important phrases (e.g. **Zero Trust Architecture**)
+- Use *italic* for tips, warnings, asides, and emphasis (e.g. *This is often overlooked.*)
+- Every post should have at least 2-3 bold phrases and 1-2 italic phrases for visual variety
 ${geoBoost && templateKey !== 'question-based' ? '- Optimize for AI search with clear structure' : ''}
 - End with a question or invitation to discuss (NOT a sales CTA)
 - DO NOT be generic - every post should feel personalized
