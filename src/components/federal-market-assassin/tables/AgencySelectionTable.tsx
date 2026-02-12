@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Agency, AlternativeSearchOption } from '@/types/federal-market-assassin';
+import { Agency, AlternativeSearchOption, AgencyBudgetData } from '@/types/federal-market-assassin';
 import { usePagination } from '@/hooks/usePagination';
 import LoadMoreButton from '@/components/ui/LoadMoreButton';
 
@@ -53,6 +53,35 @@ export default function AgencySelectionTable({
   const [loadingPainPoints, setLoadingPainPoints] = useState(false);
   const [matchedCommand, setMatchedCommand] = useState<string | null>(null);
   const [additionalCommands, setAdditionalCommands] = useState<Array<{command: string, painPoints: PainPointsApiResponse}>>([]);
+
+  // Budget data for trend badges
+  const [budgetMap, setBudgetMap] = useState<Record<string, AgencyBudgetData>>({});
+
+  useEffect(() => {
+    // Fetch all budget data once for the badges
+    fetch('/api/budget-authority?limit=200')
+      .then(res => res.json())
+      .then(result => {
+        if (result.success && result.data) {
+          const map: Record<string, AgencyBudgetData> = {};
+          for (const item of result.data as AgencyBudgetData[]) {
+            map[item.agency.toLowerCase()] = item;
+          }
+          setBudgetMap(map);
+        }
+      })
+      .catch(() => { /* Budget data is optional — don't block table render */ });
+  }, []);
+
+  const getBudgetBadge = useCallback((agency: Agency): AgencyBudgetData | null => {
+    // Try parent agency first (toptier codes map to parent agencies)
+    const parent = agency.parentAgency?.toLowerCase();
+    if (parent && budgetMap[parent]) return budgetMap[parent];
+    // Try agency name
+    const name = agency.name?.toLowerCase();
+    if (name && budgetMap[name]) return budgetMap[name];
+    return null;
+  }, [budgetMap]);
 
   const sortedAgencies = useMemo(() => {
     return [...agencies].sort((a, b) => {
@@ -484,21 +513,41 @@ export default function AgencySelectionTable({
                   />
                 </td>
                 <td className="px-4 py-3 text-sm font-medium text-slate-200">
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      openAgencyModal(agency);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') openAgencyModal(agency);
-                    }}
-                    className="text-left text-cyan-400 hover:text-cyan-300 hover:underline font-semibold transition-colors cursor-pointer"
-                  >
-                    {agency.name}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openAgencyModal(agency);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') openAgencyModal(agency);
+                      }}
+                      className="text-left text-cyan-400 hover:text-cyan-300 hover:underline font-semibold transition-colors cursor-pointer"
+                    >
+                      {agency.name}
+                    </span>
+                    {(() => {
+                      const bd = getBudgetBadge(agency);
+                      if (!bd) return null;
+                      const pct = ((bd.change.percent - 1) * 100).toFixed(0);
+                      const isUp = Number(pct) > 0;
+                      const isDown = Number(pct) < 0;
+                      if (!isUp && !isDown) return null;
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
+                            isUp ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
+                          }`}
+                          title={`FY2026 budget ${isUp ? 'increase' : 'decrease'} vs FY2025`}
+                        >
+                          {isUp ? '▲' : '▼'} Budget {isUp ? '+' : ''}{pct}%
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-slate-400">
                   {agency.parentAgency}

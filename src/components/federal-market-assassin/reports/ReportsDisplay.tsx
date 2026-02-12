@@ -38,6 +38,7 @@ import {
   AgencySpendingChart,
   SpendingTrendChart,
   GeographicDistributionChart,
+  BudgetComparisonChart,
 } from '../charts';
 import {
   getHitListByCoreInputs,
@@ -92,7 +93,8 @@ type ReportTab =
   | 'idvContracts'
   | 'osbpContacts'
   | 'december'
-  | 'tribal';
+  | 'tribal'
+  | 'budget';
 
 // Helper function to format currency values intelligently
 function formatCurrency(value: number): string {
@@ -326,6 +328,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
 
   const tabs = [
     { id: 'analytics' as ReportTab, label: '📈 Analytics', icon: '📈' },
+    { id: 'budget' as ReportTab, label: '💰 Budget Checkup', icon: '💰' },
     { id: 'buyers' as ReportTab, label: '👥 Government Buyers', icon: '👥' },
     { id: 'osbpContacts' as ReportTab, label: '📞 OSBP Contacts', icon: '📞' },
     { id: 'subcontracting' as ReportTab, label: '🔗 Subcontracting', icon: '🔗' },
@@ -1655,6 +1658,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   <SpendingTrendChart
                     forecasts={reports.forecastList?.forecasts}
                     agencies={reports.governmentBuyers.agencies}
+                    budgetComparison={reports.budgetCheckup?.agencyBudgets}
                   />
                   <GeographicDistributionChart agencies={reports.governmentBuyers.agencies} />
                 </div>
@@ -1691,6 +1695,9 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
               ) : (
                 <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />
               )
+            )}
+            {activeTab === 'budget' && (
+              <BudgetCheckupTab report={reports} />
             )}
             {activeTab === 'tribal' && (
               isSectionLocked('tribal') ? (
@@ -3699,6 +3706,215 @@ function PrimesReport({ data }: { data: any }) {
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+// Budget Checkup Tab Component
+function BudgetCheckupTab({ report }: { report: ComprehensiveReport }) {
+  const budgetCheckup = report.budgetCheckup;
+
+  if (!budgetCheckup || budgetCheckup.agencyBudgets.length === 0) {
+    return (
+      <div className="bg-slate-800/50 rounded-xl p-8 text-center">
+        <div className="text-4xl mb-4">💰</div>
+        <h3 className="text-xl font-bold text-white mb-2">Budget Data Not Available</h3>
+        <p className="text-slate-400 max-w-md mx-auto">
+          FY2025 vs FY2026 budget comparison data has not been loaded yet.
+          Budget data is populated by an admin process.
+        </p>
+      </div>
+    );
+  }
+
+  const fmtCurrency = (value: number): string => {
+    if (value >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(2)}T`;
+    if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
+    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(0)}M`;
+    return `$${(value / 1_000).toFixed(0)}K`;
+  };
+
+  const trendBadge = (trend: string) => {
+    const config: Record<string, { bg: string; text: string; label: string }> = {
+      surging: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Surging ▲▲' },
+      growing: { bg: 'bg-green-500/10', text: 'text-green-300', label: 'Growing ▲' },
+      stable: { bg: 'bg-amber-500/10', text: 'text-amber-400', label: 'Stable ─' },
+      declining: { bg: 'bg-orange-500/10', text: 'text-orange-400', label: 'Declining ▼' },
+      cut: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Cut ▼▼' },
+    };
+    const c = config[trend] || config.stable;
+    return (
+      <span className={`${c.bg} ${c.text} px-2 py-0.5 rounded-full text-xs font-medium`}>
+        {c.label}
+      </span>
+    );
+  };
+
+  const overallPct = ((budgetCheckup.summary.overallChange - 1) * 100).toFixed(1);
+  const overallPositive = Number(overallPct) >= 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">FY2025 Total</p>
+          <p className="text-white text-xl font-bold">{fmtCurrency(budgetCheckup.summary.totalFY2025)}</p>
+        </div>
+        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">FY2026 Total</p>
+          <p className="text-white text-xl font-bold">{fmtCurrency(budgetCheckup.summary.totalFY2026)}</p>
+        </div>
+        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Overall Change</p>
+          <p className={`text-xl font-bold ${overallPositive ? 'text-green-400' : 'text-red-400'}`}>
+            {overallPositive ? '+' : ''}{overallPct}%
+          </p>
+        </div>
+        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Agencies</p>
+          <p className="text-white text-xl font-bold">
+            <span className="text-green-400">{budgetCheckup.summary.agenciesGrowing}</span>
+            {' / '}
+            <span className="text-red-400">{budgetCheckup.summary.agenciesDeclining}</span>
+            <span className="text-slate-400 text-sm ml-1">up/down</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Budget Comparison Chart */}
+      <BudgetComparisonChart budgetData={budgetCheckup.agencyBudgets} maxAgencies={12} />
+
+      {/* Winners and Losers */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Winners */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+          <div className="bg-green-900/30 px-4 py-3 border-b border-green-800/30">
+            <h4 className="text-green-400 font-bold flex items-center gap-2">
+              <span>▲</span> Budget Winners
+            </h4>
+          </div>
+          <div className="divide-y divide-slate-700/50">
+            {budgetCheckup.winners.slice(0, 8).map((agency, i) => {
+              const pct = ((agency.change.percent - 1) * 100).toFixed(1);
+              return (
+                <div key={i} className="px-4 py-3 flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{agency.agency}</p>
+                    <p className="text-slate-400 text-xs">
+                      {fmtCurrency(agency.fy2025.budgetAuthority)} → {fmtCurrency(agency.fy2026.budgetAuthority)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-green-400 text-sm font-medium">+{pct}%</span>
+                    {trendBadge(agency.change.trend)}
+                  </div>
+                </div>
+              );
+            })}
+            {budgetCheckup.winners.length === 0 && (
+              <p className="px-4 py-3 text-slate-400 text-sm">No agencies with budget increases</p>
+            )}
+          </div>
+        </div>
+
+        {/* Losers */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+          <div className="bg-red-900/30 px-4 py-3 border-b border-red-800/30">
+            <h4 className="text-red-400 font-bold flex items-center gap-2">
+              <span>▼</span> Budget Losers
+            </h4>
+          </div>
+          <div className="divide-y divide-slate-700/50">
+            {budgetCheckup.losers.slice(0, 8).map((agency, i) => {
+              const pct = ((1 - agency.change.percent) * 100).toFixed(1);
+              return (
+                <div key={i} className="px-4 py-3 flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{agency.agency}</p>
+                    <p className="text-slate-400 text-xs">
+                      {fmtCurrency(agency.fy2025.budgetAuthority)} → {fmtCurrency(agency.fy2026.budgetAuthority)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-red-400 text-sm font-medium">-{pct}%</span>
+                    {trendBadge(agency.change.trend)}
+                  </div>
+                </div>
+              );
+            })}
+            {budgetCheckup.losers.length === 0 && (
+              <p className="px-4 py-3 text-slate-400 text-sm">No agencies with budget decreases</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Your Agencies Section */}
+      {budgetCheckup.agencyBudgets.length > 0 && (
+        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+          <div className="bg-blue-900/30 px-4 py-3 border-b border-blue-800/30">
+            <h4 className="text-blue-400 font-bold">Your Selected Agencies — Budget Status</h4>
+          </div>
+          <div className="divide-y divide-slate-700/50">
+            {budgetCheckup.agencyBudgets.map((agency, i) => {
+              const pctChange = ((agency.change.percent - 1) * 100).toFixed(1);
+              const isPositive = Number(pctChange) >= 0;
+              return (
+                <div key={i} className="px-4 py-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <p className="text-white font-medium">{agency.agency}</p>
+                      {trendBadge(agency.change.trend)}
+                    </div>
+                    <span className={`text-lg font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                      {isPositive ? '+' : ''}{pctChange}%
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-400">FY2025:</span>{' '}
+                      <span className="text-slate-300">{fmtCurrency(agency.fy2025.budgetAuthority)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">FY2026:</span>{' '}
+                      <span className="text-slate-300">{fmtCurrency(agency.fy2026.budgetAuthority)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Change:</span>{' '}
+                      <span className={isPositive ? 'text-green-400' : 'text-red-400'}>
+                        {isPositive ? '+' : ''}{fmtCurrency(agency.change.amount)}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-xs mt-2">
+                    {agency.change.trend === 'surging' || agency.change.trend === 'growing'
+                      ? 'Growing budget — prioritize outreach and new solicitation tracking'
+                      : agency.change.trend === 'stable'
+                      ? 'Stable budget — active procurement cycle expected'
+                      : 'Declining budget — focus on recompetes and cost-savings positioning'}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Recommendations */}
+      {budgetCheckup.recommendations.length > 0 && (
+        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+          <h4 className="text-white font-bold mb-3">Recommendations</h4>
+          <ul className="space-y-2">
+            {budgetCheckup.recommendations.map((rec, i) => (
+              <li key={i} className="text-slate-300 text-sm flex items-start gap-2">
+                <span className="text-blue-400 mt-0.5">•</span>
+                {rec}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

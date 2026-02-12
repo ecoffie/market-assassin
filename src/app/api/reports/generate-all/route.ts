@@ -7,6 +7,7 @@ import { getForecastsForSelectedAgencies, getUpcomingForecasts, getForecastStati
 import { searchIDVContracts } from '@/lib/idv-search';
 import { getEnhancedAgencyInfo, isDoDAgency } from '@/lib/utils/command-info';
 import { ComprehensiveReport, CoreInputs, Agency } from '@/types/federal-market-assassin';
+import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget-authority';
 import { checkReportRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { getEmailFromRequest, verifyMAAccess } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
@@ -320,10 +321,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Sort: NAICS-relevant funded matches first
+    // Sort: NAICS-relevant funded matches first, boosted by budget growth
     highOpportunityMatches.sort((a, b) => {
-      const aScore = (a.naicsRelevant ? 4 : 0) + (a.fundingStatus === 'funded' ? 2 : 0);
-      const bScore = (b.naicsRelevant ? 4 : 0) + (b.fundingStatus === 'funded' ? 2 : 0);
+      const aBudget = getBudgetForAgency(a.agency);
+      const bBudget = getBudgetForAgency(b.agency);
+      const aBudgetGrowing = aBudget && aBudget.change.percent > 1 ? 3 : 0;
+      const bBudgetGrowing = bBudget && bBudget.change.percent > 1 ? 3 : 0;
+      const aScore = (a.naicsRelevant ? 4 : 0) + (a.fundingStatus === 'funded' ? 2 : 0) + aBudgetGrowing;
+      const bScore = (b.naicsRelevant ? 4 : 0) + (b.fundingStatus === 'funded' ? 2 : 0) + bBudgetGrowing;
       return bScore - aScore;
     });
 
@@ -707,6 +712,14 @@ export async function POST(request: NextRequest) {
             ],
           };
         }
+      })(),
+      budgetCheckup: (() => {
+        // Build budget checkup from cached FY2025 vs FY2026 data
+        // Uses parent agency names for toptier budget lookups
+        const agencyNamesForBudget = selectedAgencyData && selectedAgencyData.length > 0
+          ? [...new Set(selectedAgencyData.map(a => a.parentAgency || a.name))]
+          : selectedAgencies;
+        return buildCachedBudgetCheckup(agencyNamesForBudget) || undefined;
       })(),
       metadata: {
         generatedAt: new Date().toISOString(),

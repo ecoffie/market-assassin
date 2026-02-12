@@ -12,6 +12,7 @@
 | **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | "$82B hero page" | Marketing funnel (govcongiants.org) |
 | **Market Assassin** | This project | "tools", "market assassin" | Dev/staging tools |
 | **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | "live shop", "production" | Live shop (shop.govcongiants.org) |
+| **Action Planner** | `/Users/ericcoffie/Projects/govcon-planner` | "planner", "action planner" | Standalone planner ([github.com/ecoffie/action-planner](https://github.com/ecoffie/action-planner)) |
 
 ---
 
@@ -412,6 +413,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 | Project | Location | Deploys To | Purpose |
 |---------|----------|------------|---------|
 | **Market Assassin** | This project | `tools.govcongiants.org` | All GovCon tools (active) |
+| **Action Planner** | `/Users/ericcoffie/Projects/govcon-planner` | GitHub: `ecoffie/action-planner` | Standalone planner (extracted Feb 11) |
 | **LinkedIn Deal Magnet** | `/Users/ericcoffie/Projects/linkedin-deal-magnet` | Dead Vercel deployment | Original Express backend (reference only) |
 | **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | `govcongiants.org` | Marketing funnel |
 | **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | `shop.govcongiants.org` | Live shop (production) |
@@ -445,6 +447,8 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 12. **KV store connected to BOTH projects** - Vercel KV `market-assassin-codes` is connected to both market-assassin and govcon-shop via Vercel Storage integration. KV backfills can run from either project now.
 
 13. **Admin backfill endpoints** - `/api/admin/backfill-kv` reads Stripe checkout sessions and grants KV access based on tier/bundle metadata. Use for new customer onboarding issues.
+
+14. **Action Planner standalone repo** - `github.com/ecoffie/action-planner` at `/Users/ericcoffie/Projects/govcon-planner`. Copy of planner extracted Feb 11. Planner files remain in market-assassin too — this is a copy, not a move. Uses its own Supabase instance, no MA dependencies.
 
 ---
 
@@ -494,6 +498,30 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 ---
 
 ## Recent Work History
+
+### February 12, 2026 (Session 12)
+- **FY2026 Budget Integration & Simulated Data Elimination**
+  - Created budget authority data layer: `src/lib/utils/budget-authority.ts` with USASpending API integration
+  - Created admin build endpoint: `/api/admin/build-budget-data` — fetches FY2025 vs FY2026 budget data for all toptier agencies
+  - Created cached data file: `src/data/agency-budget-data.json` (populated by admin endpoint)
+  - Created public API: `/api/budget-authority` — GET endpoint for all tools to query budget data
+  - Added `AgencyBudgetData` and `BudgetCheckupReport` types to `federal-market-assassin.ts`
+  - Extended `ComprehensiveReport` with optional `budgetCheckup` field
+  - Wired budget data into report generation: `generate-all/route.ts` now builds budget checkup and uses budget growth as a scoring signal in `highOpportunityMatches`
+  - New Budget Checkup tab in ReportsDisplay: summary cards, winners/losers table, agency detail section, BudgetComparisonChart
+  - Created `BudgetComparisonChart.tsx` — grouped bar chart showing FY2025 vs FY2026 per agency with trend-colored bars
+  - Updated `SpendingTrendChart.tsx` to accept `budgetComparison` prop — shows real FY budget bars instead of simulated Q4-spike pattern
+  - Added budget trend badges to `AgencySelectionTable.tsx` — shows green/red badge next to agency names
+  - Added Simulated Data Elimination backlog to `TOOL-BUILD.md` with 7 tracked items
+  - **Agency toptier code mapping**: `src/data/agency-toptier-codes.json` — 49 agencies mapped to USASpending toptier codes
+  - **12 files created/modified** across data, utility, API, type, and component layers
+
+### February 11, 2026 (Session 11)
+- **Extracted Action Planner into standalone repo** — `github.com/ecoffie/action-planner` at `/Users/ericcoffie/Projects/govcon-planner`
+  - Copy (not move) — all planner files remain in market-assassin, live planner at `tools.govcongiants.org/planner` unchanged
+  - 25 files: 17 copied from market-assassin + 8 new (package.json, layout, globals.css, redirect page, next.config, vercel.json, .env.example, README)
+  - Zero MA dependencies: no Stripe, no KV, no OpenAI — only Supabase, jsPDF, nodemailer
+  - Standalone Next.js 16 project another developer can clone and run independently
 
 ### February 10, 2026 (Session 10)
 - **Agency Pain Points Database: 210 → 250 agencies** — 40 new agencies across Education, HUD, GSA, SBA, EPA, Treasury, Commerce, DoD, Intel, Independent
@@ -603,4 +631,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 10, 2026 (Session 10)*
+*Last Updated: February 11, 2026 (Session 11)*

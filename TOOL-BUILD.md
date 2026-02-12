@@ -52,6 +52,20 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 | Tool Integrations | LOW | Pending | Link to Opportunity Scout, Content Generator, CRM export (Salesforce/HubSpot). |
 | Expand Agency Pain Points Database | MEDIUM | Pending | Add more pain points per agency in `src/data/agency-pain-points.json`. Cross-tool priority — feeds Market Assassin, Content Generator, and Opportunity Hunter. |
 
+### Simulated Data Elimination
+
+Tracking all instances of hardcoded/simulated data that should be replaced with real figures.
+
+| # | Location | Issue | Fix | Priority |
+|---|----------|-------|-----|----------|
+| 1 | SpendingTrendChart.tsx:83-95 | Hardcoded Q4 multipliers `[0.85, 0.90, 0.95, 1.30, 0.88, 0.92]` | Replaced with real FY2025 vs FY2026 budget data from `budgetComparison` prop | **DONE** |
+| 2 | generate-all/route.ts:450-482 | Mock `$10M` agency spending fallback when no `selectedAgencyData` | Remove fallback, require real agency data or return error | HIGH |
+| 3 | find-agencies/route.ts:818-920 | Static DoD command expansion distributes spending by formula | Mark as "estimated" or require FPDS success | HIGH |
+| 4 | planner/resources/page.tsx:30-62 | 5 placeholder YouTube video IDs | Replace with real video IDs (needs Eric's videos) | HIGH |
+| 5 | command-info.ts:441-631 | Generic "OSBP Director" contacts for DoD commands | Build real SBLO database from SAM.gov | MEDIUM |
+| 6 | command-info.ts:838-868 | DoD spending distribution formula `budget * 0.15` etc. | Use FPDS real command spend data | MEDIUM |
+| 7 | generate-all/route.ts:527-551 | Generic forecast recommendations with no real forecast URLs | Populate real forecast URLs from command databases | LOW |
+
 ---
 
 ## 2. Recompete Contracts Tracker
@@ -201,6 +215,8 @@ A new certification program mapping to real BD job requirements ($80K-$150K+ rol
 | Data Protection (All Tools) | HIGH | Pending | Watermarks on exports, canary traps for scrapers. |
 | Beta Testing Program | MEDIUM | Pending | 50-100 free users for feedback. |
 | Integration Between Tools | LOW | Pending | Cross-tool data sharing and workflows. |
+| **PSC-NAICS Crosswalk Integration** | HIGH | Pending | Bi-directional NAICS-PSC mapping so searches use both codes. SAM.gov solicitations often have wrong NAICS but correct PSC (or vice versa). One NAICS → 50+ PSCs. Build crosswalk from USAspending, dual-search in find-agencies, agencies/lookup, idv-search. See PSC-NAICS integration plan. |
+| **FY2026 Budget / Legislation Integration** | HIGH | Pending | Pull enacted appropriations (Congress.gov), identify currently funded agencies (USAspending budget_authority), spending checkup chart (FY2025 vs FY2026), agency/sub-agency/command/office hierarchy. Focus on agencies with fresh FY2026 funding. See FY2026 budget plan. |
 
 ---
 
@@ -213,17 +229,19 @@ A new certification program mapping to real BD job requirements ($80K-$150K+ rol
 4. Finish LinkedIn Lead Magnet
 
 ### Short-Term (2-4 Weeks)
-1. AI Win Probability Score (both tools)
-2. Teaming Suggestions (both tools)
-3. Custom Alerts system
-4. Mobile responsiveness fixes
+1. PSC-NAICS Crosswalk Integration (cross-tool)
+2. AI Win Probability Score (both tools)
+3. Teaming Suggestions (both tools)
+4. Custom Alerts system
+5. Mobile responsiveness fixes
 
 ### Medium-Term (1-3 Months)
-1. Historical trends dashboards
-2. Ghosting Intel feature
-3. Set-Aside Gap Analysis
-4. Tool integrations
-5. 30-Day Certification Program launch
+1. FY2026 Budget / Legislation Integration (budget checkup page, spending chart)
+2. Historical trends dashboards
+3. Ghosting Intel feature
+4. Set-Aside Gap Analysis
+5. Tool integrations
+6. 30-Day Certification Program launch
 
 ---
 
@@ -240,4 +258,4 @@ A new certification program mapping to real BD job requirements ($80K-$150K+ rol
 
 ---
 
-*Last Updated: February 9, 2026*
+*Last Updated: February 12, 2026*

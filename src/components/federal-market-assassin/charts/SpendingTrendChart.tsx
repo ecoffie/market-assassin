@@ -12,7 +12,11 @@ import {
   AreaChart,
   Area,
   Legend,
+  BarChart,
+  Bar,
+  Cell,
 } from 'recharts';
+import type { AgencyBudgetData } from '@/types/federal-market-assassin';
 
 interface ForecastData {
   agency: string;
@@ -32,9 +36,18 @@ interface AgencyData {
 interface SpendingTrendChartProps {
   forecasts?: ForecastData[];
   agencies?: AgencyData[];
+  budgetComparison?: AgencyBudgetData[];
 }
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+
+const TREND_COLORS: Record<string, string> = {
+  surging: '#22C55E',
+  growing: '#4ADE80',
+  stable: '#F59E0B',
+  declining: '#F97316',
+  cut: '#EF4444',
+};
 
 const formatCurrency = (value: number): string => {
   if (value >= 1_000_000_000) {
@@ -58,9 +71,33 @@ const formatFullCurrency = (value: number): string => {
   }).format(value);
 };
 
-export default function SpendingTrendChart({ forecasts = [], agencies = [] }: SpendingTrendChartProps) {
+export default function SpendingTrendChart({ forecasts = [], agencies = [], budgetComparison }: SpendingTrendChartProps) {
   const [chartType, setChartType] = useState<'line' | 'area'>('area');
   const [viewMode, setViewMode] = useState<'quarterly' | 'cumulative'>('quarterly');
+
+  // If budget comparison data is available, build a bar chart dataset
+  const budgetBarData = useMemo(() => {
+    if (!budgetComparison || budgetComparison.length === 0) return null;
+
+    return budgetComparison.map(d => {
+      let shortName = d.agency
+        .replace('Department of the ', '')
+        .replace('Department of ', '')
+        .replace('National Aeronautics and Space Administration', 'NASA')
+        .replace('Environmental Protection Agency', 'EPA')
+        .replace('General Services Administration', 'GSA');
+      if (shortName.length > 18) shortName = shortName.substring(0, 16) + '...';
+
+      return {
+        name: shortName,
+        fullName: d.agency,
+        fy2025: d.fy2025.budgetAuthority,
+        fy2026: d.fy2026.budgetAuthority,
+        trend: d.change.trend,
+        changePercent: ((d.change.percent - 1) * 100).toFixed(1),
+      };
+    });
+  }, [budgetComparison]);
 
   // Generate quarterly trend data from forecasts
   const quarterlyData = useMemo(() => {
@@ -80,23 +117,25 @@ export default function SpendingTrendChart({ forecasts = [], agencies = [] }: Sp
       return quarterlyTotals;
     }
 
-    // Otherwise, generate simulated trend based on agency spending
+    // If we have budget comparison data, show FY annual comparison as bars instead of simulated quarterly
+    if (budgetBarData) {
+      return []; // quarterly view not applicable when showing budget comparison
+    }
+
+    // Otherwise, generate trend based on agency spending (no simulated multipliers)
     if (agencies.length > 0) {
       const totalSpending = agencies.reduce((sum, a) => sum + a.spending, 0);
       const avgQuarterly = totalSpending / 4;
 
-      // Simulate spending pattern (Q4 typically higher due to end-of-year spending)
-      const patterns = [0.85, 0.90, 0.95, 1.30, 0.88, 0.92]; // Q4 spike
-
-      return quarters.map((quarter, i) => ({
+      return quarters.map((quarter) => ({
         quarter,
-        spending: Math.round(avgQuarterly * patterns[i]),
-        opportunities: Math.round(agencies.length * patterns[i] * 0.5),
+        spending: Math.round(avgQuarterly),
+        opportunities: agencies.length,
       }));
     }
 
     return [];
-  }, [forecasts, agencies]);
+  }, [forecasts, agencies, budgetBarData]);
 
   // Calculate cumulative data
   const cumulativeData = useMemo(() => {
@@ -132,6 +171,57 @@ export default function SpendingTrendChart({ forecasts = [], agencies = [] }: Sp
     }
     return null;
   };
+
+  // If we have budget comparison data and no quarterly data, show budget bars
+  if (budgetBarData && budgetBarData.length > 0 && quarterlyData.length === 0) {
+    const BudgetTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string; dataKey: string }>; label?: string }) => {
+      if (active && payload && payload.length) {
+        const item = budgetBarData.find(d => d.name === label);
+        return (
+          <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl max-w-xs">
+            <p className="text-white font-semibold text-sm mb-2">{item?.fullName || label}</p>
+            {payload.map((entry, index) => (
+              <p key={index} className={`text-sm ${entry.dataKey === 'fy2025' ? 'text-slate-400' : 'text-blue-400'}`}>
+                {entry.dataKey === 'fy2025' ? 'FY2025' : 'FY2026'}: {formatFullCurrency(entry.value)}
+              </p>
+            ))}
+            {item && (
+              <p className={`text-sm mt-1 ${Number(item.changePercent) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {Number(item.changePercent) >= 0 ? '+' : ''}{item.changePercent}%
+              </p>
+            )}
+          </div>
+        );
+      }
+      return null;
+    };
+
+    return (
+      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+        <div className="mb-6">
+          <h3 className="text-xl font-bold text-white">Budget Authority: FY2025 vs FY2026</h3>
+          <p className="text-slate-400 text-sm mt-1">Real budget data from USASpending.gov</p>
+        </div>
+        <div className="h-[350px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={budgetBarData} margin={{ top: 10, right: 30, left: 10, bottom: 60 }} barGap={2}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="name" stroke="#9CA3AF" fontSize={11} angle={-35} textAnchor="end" height={80} interval={0} />
+              <YAxis tickFormatter={formatCurrency} stroke="#9CA3AF" fontSize={12} />
+              <Tooltip content={<BudgetTooltip />} />
+              <Legend formatter={(value: string) => <span className="text-slate-300 text-sm">{value === 'fy2025' ? 'FY2025' : 'FY2026'}</span>} />
+              <Bar dataKey="fy2025" name="fy2025" fill="#64748B" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="fy2026" name="fy2026" radius={[2, 2, 0, 0]}>
+                {budgetBarData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={TREND_COLORS[entry.trend] || '#3B82F6'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  }
 
   if (quarterlyData.length === 0) {
     return (

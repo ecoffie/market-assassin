@@ -337,6 +337,35 @@ export interface IDVContractsReport {
   recommendations: string[];
 }
 
+// Budget Authority Data (FY2025 vs FY2026)
+export interface AgencyBudgetData {
+  agency: string;
+  toptierCode: string;
+  fy2025: { budgetAuthority: number; obligated: number; outlays: number };
+  fy2026: { budgetAuthority: number; obligated: number; outlays: number };
+  change: {
+    amount: number;       // raw dollar change
+    percent: number;      // e.g., 1.05 = 5% increase
+    trend: 'surging' | 'growing' | 'stable' | 'declining' | 'cut';
+  };
+}
+
+export interface BudgetCheckupReport {
+  agencyBudgets: AgencyBudgetData[];
+  winners: AgencyBudgetData[];      // top agencies by % increase
+  losers: AgencyBudgetData[];       // agencies with biggest % decrease
+  summary: {
+    totalFY2025: number;
+    totalFY2026: number;
+    overallChange: number;          // percent as decimal (1.05 = 5% increase)
+    agenciesGrowing: number;
+    agenciesDeclining: number;
+    biggestWinner: string;
+    biggestLoser: string;
+  };
+  recommendations: string[];
+}
+
 // All Reports Combined
 export interface ComprehensiveReport {
   governmentBuyers: GovernmentBuyersReport;
@@ -348,6 +377,7 @@ export interface ComprehensiveReport {
   tribalContracting: TribalContractingReport;
   primeContractor: PrimeContractorReport;
   idvContracts?: IDVContractsReport;  // IDV Indefinite Delivery contracts for subcontracting
+  budgetCheckup?: BudgetCheckupReport;  // FY2025 vs FY2026 budget comparison
   metadata: {
     generatedAt: string;
     inputs: CoreInputs;
