@@ -2630,7 +2630,7 @@
                             <span class="text-xs bg-govcon-light text-govcon-blue px-2 py-1 rounded">${post.template || 'LinkedIn'}</span>
                         </div>
                         <div class="bg-gray-50 rounded-lg p-4 mb-4 whitespace-pre-wrap text-sm text-gray-700 max-h-64 overflow-y-auto">${renderMarkdown(post.content)}</div>
-                        ${post.hashtags ? `<p class="text-sm text-linkedin-blue mb-4">${post.hashtags}</p>` : ''}
+                        ${post.hashtags && post.hashtags.length > 0 ? `<p class="text-sm text-linkedin-blue mb-4">${Array.isArray(post.hashtags) ? post.hashtags.join(' ') : post.hashtags}</p>` : ''}
 
                         <!-- Action Buttons -->
                         <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
@@ -2701,7 +2701,7 @@
             const post = generatedPosts[index];
             if (!post) return;
 
-            const text = stripMarkdown(post.content) + (post.hashtags ? '\n\n' + post.hashtags : '');
+            const text = stripMarkdown(post.content) + (post.hashtags ? '\n\n' + (Array.isArray(post.hashtags) ? post.hashtags.join(' ') : post.hashtags) : '');
             navigator.clipboard.writeText(text).then(() => {
                 // Show permanent feedback
                 const btn = document.getElementById(`copy-btn-${index}`);
@@ -2833,7 +2833,7 @@
                         children.push(new Paragraph({
                             children: [
                                 new TextRun({
-                                    text: post.hashtags,
+                                    text: Array.isArray(post.hashtags) ? post.hashtags.join(' ') : post.hashtags,
                                     size: 22,
                                     color: '0077B5',
                                     font: 'Calibri'
