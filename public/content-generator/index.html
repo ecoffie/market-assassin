@@ -6427,6 +6427,7 @@
         // Convert markdown bold/italic to HTML (with XSS sanitization)
         function renderMarkdown(text) {
             let html = text
+                .replace(/^[ \t]+/gm, '')   // Left-justify all lines
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
