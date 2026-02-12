@@ -542,6 +542,7 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       const postText = postContent
         .replace(/#[\w]+/g, '')
         .replace(/,\s*,/g, '')
+        .replace(/^[ \t]+/gm, '')       // Left-justify: strip leading spaces from every line
         .replace(/[ \t]+/g, ' ')        // Collapse multiple spaces (not newlines)
         .replace(/\n\s*\n\s*\n/g, '\n\n')
         .trim();
