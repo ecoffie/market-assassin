@@ -1,1754 +1,424 @@
 {
-  "lastUpdated": "2026-02-12T17:47:39.275Z",
+  "lastUpdated": "2026-02-12T00:00:00Z",
+  "source": "OMB FY2026 Discretionary Budget Request, Table 2 (May 2, 2025). FY2025=Enacted, FY2026=President's Request. Discretionary budget authority only.",
+  "sourceUrl": "https://www.whitehouse.gov/wp-content/uploads/2025/05/Fiscal-Year-2026-Discretionary-Budget-Request.pdf",
   "fiscalYears": [
     2025,
     2026
   ],
   "agencies": {
-    "Department of the Treasury": {
-      "toptierCode": "020",
-      "fy2025": {
-        "budgetAuthority": 2378074445400.83,
-        "obligated": 1953689394142.66,
-        "outlays": 1951762873839.55
-      },
-      "fy2026": {
-        "budgetAuthority": 3721993897579.42,
-        "obligated": 462896029886.86,
-        "outlays": 464576144770.76
-      },
-      "change": {
-        "amount": 1343919452178.5898,
-        "percent": 1.5651292602625269,
-        "trend": "surging"
-      }
-    },
-    "Department of Health and Human Services": {
-      "toptierCode": "075",
-      "fy2025": {
-        "budgetAuthority": 3129725212729.56,
-        "obligated": 2794349803088.6,
-        "outlays": 2722170048224.94
-      },
-      "fy2026": {
-        "budgetAuthority": 2583134115181.89,
-        "obligated": 700039633788.1,
-        "outlays": 697622904759.35
-      },
-      "change": {
-        "amount": -546591097547.6699,
-        "percent": 0.8253549240283092,
-        "trend": "declining"
-      }
-    },
-    "Department of Defense": {
-      "toptierCode": "097",
-      "fy2025": {
-        "budgetAuthority": 2213230963902.27,
-        "obligated": 1451320548889.53,
-        "outlays": 1342207853342.79
-      },
-      "fy2026": {
-        "budgetAuthority": 1422204199256.95,
-        "obligated": 750169801359.65,
-        "outlays": 759865461688.29
-      },
-      "change": {
-        "amount": -791026764645.3201,
-        "percent": 0.6425918588945562,
-        "trend": "cut"
-      }
-    },
-    "Department of Veterans Affairs": {
-      "toptierCode": "036",
-      "fy2025": {
-        "budgetAuthority": 458775858774.24,
-        "obligated": 412393503627.75,
-        "outlays": 404935929341.22
-      },
-      "fy2026": {
-        "budgetAuthority": 517777206639.85,
-        "obligated": 118742674733.49,
-        "outlays": 117591522475.39
-      },
-      "change": {
-        "amount": 59001347865.609985,
-        "percent": 1.1286060430974945,
-        "trend": "growing"
-      }
-    },
-    "Social Security Administration": {
-      "toptierCode": "028",
-      "fy2025": {
-        "budgetAuthority": 1742135483086.93,
-        "obligated": 1740398104292.52,
-        "outlays": 1729219098343.68
-      },
-      "fy2026": {
-        "budgetAuthority": 473714257671.79,
-        "obligated": 446209062616.34,
-        "outlays": 440966783296.65
-      },
-      "change": {
-        "amount": -1268421225415.14,
-        "percent": 0.27191585400258583,
-        "trend": "cut"
-      }
-    },
     "Department of Agriculture": {
       "toptierCode": "012",
       "fy2025": {
-        "budgetAuthority": 463595143994.27,
-        "obligated": 276630012349.95,
-        "outlays": 253236497823.79
+        "budgetAuthority": 27300000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "fy2026": {
-        "budgetAuthority": 449817475095.81,
-        "obligated": 28901819476.97,
-        "outlays": 64840154594.93
+        "budgetAuthority": 22300000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "change": {
-        "amount": -13777668898.460022,
-        "percent": 0.9702808170513747,
-        "trend": "stable"
-      }
-    },
-    "Office of Personnel Management": {
-      "toptierCode": "024",
-      "fy2025": {
-        "budgetAuthority": 338563979349.98,
-        "obligated": 262040905041.82,
-        "outlays": 260545784316.09
-      },
-      "fy2026": {
-        "budgetAuthority": 359194328266.24,
-        "obligated": 54128515743.61,
-        "outlays": 53709442143.96
-      },
-      "change": {
-        "amount": 20630348916.26001,
-        "percent": 1.0609348606897546,
-        "trend": "growing"
-      }
-    },
-    "Department of Homeland Security": {
-      "toptierCode": "070",
-      "fy2025": {
-        "budgetAuthority": 396844094127.43,
-        "obligated": 171203552614.18,
-        "outlays": 155738644383.29
-      },
-      "fy2026": {
-        "budgetAuthority": 349537498049.36,
-        "obligated": 37756573518.04,
-        "outlays": 31146134992.27
-      },
-      "change": {
-        "amount": -47306596078.07001,
-        "percent": 0.8807929945837131,
-        "trend": "declining"
-      }
-    },
-    "Department of Housing and Urban Development": {
-      "toptierCode": "086",
-      "fy2025": {
-        "budgetAuthority": 322553564283.29,
-        "obligated": 90532059832.78,
-        "outlays": 89883738203.95
-      },
-      "fy2026": {
-        "budgetAuthority": 275088549583.33,
-        "obligated": 23798933019.26,
-        "outlays": 21284336456.37
-      },
-      "change": {
-        "amount": -47465014699.95996,
-        "percent": 0.8528461007540666,
-        "trend": "declining"
-      }
-    },
-    "Department of Transportation": {
-      "toptierCode": "069",
-      "fy2025": {
-        "budgetAuthority": 323419787921.75,
-        "obligated": 169614068976.54,
-        "outlays": 144627702918.66
-      },
-      "fy2026": {
-        "budgetAuthority": 222623653331.54,
-        "obligated": 17373993155.27,
-        "outlays": 33856701228.62
-      },
-      "change": {
-        "amount": -100796134590.20999,
-        "percent": 0.6883427101417889,
-        "trend": "cut"
-      }
-    },
-    "Federal Deposit Insurance Corporation": {
-      "toptierCode": "051",
-      "fy2025": {
-        "budgetAuthority": 133792902246.18,
-        "obligated": 5110573076.79,
-        "outlays": 5108010966.77
-      },
-      "fy2026": {
-        "budgetAuthority": 132961394531.94,
-        "obligated": 1753325381.35,
-        "outlays": 1670104007.45
-      },
-      "change": {
-        "amount": -831507714.2399902,
-        "percent": 0.9937851134082583,
-        "trend": "stable"
-      }
-    },
-    "Department of Energy": {
-      "toptierCode": "089",
-      "fy2025": {
-        "budgetAuthority": 143372995073.14,
-        "obligated": 98524875710.33,
-        "outlays": 68745351385.78
-      },
-      "fy2026": {
-        "budgetAuthority": 100366818511.07,
-        "obligated": 17299160514.87,
-        "outlays": 17367637655.66
-      },
-      "change": {
-        "amount": -43006176562.07001,
-        "percent": 0.7000399096068899,
-        "trend": "cut"
-      }
-    },
-    "Pension Benefit Guaranty Corporation": {
-      "toptierCode": "1602",
-      "fy2025": {
-        "budgetAuthority": 85452974769.8,
-        "obligated": 13294541941.73,
-        "outlays": 13284613883.06
-      },
-      "fy2026": {
-        "budgetAuthority": 91017183850.17,
-        "obligated": 2852695724.32,
-        "outlays": 2471324757.89
-      },
-      "change": {
-        "amount": 5564209080.369995,
-        "percent": 1.0651142818065644,
-        "trend": "growing"
-      }
-    },
-    "Department of the Interior": {
-      "toptierCode": "014",
-      "fy2025": {
-        "budgetAuthority": 94273869060.16,
-        "obligated": 42848868679.89,
-        "outlays": 41048339291.34
-      },
-      "fy2026": {
-        "budgetAuthority": 74676455191.89,
-        "obligated": 6799509271.53,
-        "outlays": 8111028601.63
-      },
-      "change": {
-        "amount": -19597413868.270004,
-        "percent": 0.7921225248985581,
-        "trend": "cut"
-      }
-    },
-    "Corps of Engineers - Civil Works": {
-      "toptierCode": "096",
-      "fy2025": {
-        "budgetAuthority": 82205161673.11,
-        "obligated": 35302736346.35,
-        "outlays": 34330067805.7
-      },
-      "fy2026": {
-        "budgetAuthority": 65068477269.4,
-        "obligated": 5438831626.8,
-        "outlays": 6970309432.96
-      },
-      "change": {
-        "amount": -17136684403.71,
-        "percent": 0.7915376108393988,
-        "trend": "cut"
-      }
-    },
-    "Department of State": {
-      "toptierCode": "019",
-      "fy2025": {
-        "budgetAuthority": 79024742379.05,
-        "obligated": 44468610026.04,
-        "outlays": 45143093710.79
-      },
-      "fy2026": {
-        "budgetAuthority": 61689287350.31,
-        "obligated": 5321156723.38,
-        "outlays": 10301006679.11
-      },
-      "change": {
-        "amount": -17335455028.740005,
-        "percent": 0.7806325651074093,
-        "trend": "cut"
-      }
-    },
-    "Department of Justice": {
-      "toptierCode": "015",
-      "fy2025": {
-        "budgetAuthority": 79483838493.75,
-        "obligated": 50454183477.6,
-        "outlays": 52345326420.1
-      },
-      "fy2026": {
-        "budgetAuthority": 60020146129.32,
-        "obligated": 16121111870.89,
-        "outlays": 15849234238.45
-      },
-      "change": {
-        "amount": -19463692364.43,
-        "percent": 0.7551239002384054,
-        "trend": "cut"
-      }
-    },
-    "Environmental Protection Agency": {
-      "toptierCode": "068",
-      "fy2025": {
-        "budgetAuthority": 64632979013.99,
-        "obligated": 34262577412.72,
-        "outlays": 38514194344.6
-      },
-      "fy2026": {
-        "budgetAuthority": 48792273201.76,
-        "obligated": 2212395511.02,
-        "outlays": 4801530310.97
-      },
-      "change": {
-        "amount": -15840705812.229996,
-        "percent": 0.7549129553690969,
-        "trend": "cut"
-      }
-    },
-    "General Services Administration": {
-      "toptierCode": "047",
-      "fy2025": {
-        "budgetAuthority": 55829643516.09,
-        "obligated": 41896513755.49,
-        "outlays": 40909307234.88
-      },
-      "fy2026": {
-        "budgetAuthority": 45368844681.94,
-        "obligated": 8033258607.69,
-        "outlays": -46623322.06
-      },
-      "change": {
-        "amount": -10460798834.149994,
-        "percent": 0.8126300263562455,
+        "amount": -5000000000.0,
+        "percent": 0.81685,
         "trend": "declining"
       }
     },
     "Department of Commerce": {
       "toptierCode": "013",
       "fy2025": {
-        "budgetAuthority": 91383627355.44,
-        "obligated": 71825784798.61,
-        "outlays": 38055562694.14
+        "budgetAuthority": 10200000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "fy2026": {
-        "budgetAuthority": 34374847879.92,
-        "obligated": 3039649020.63,
-        "outlays": 5102713777.9
+        "budgetAuthority": 8500000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "change": {
-        "amount": -57008779475.520004,
-        "percent": 0.3761598097459817,
+        "amount": -1700000000.0,
+        "percent": 0.833333,
+        "trend": "declining"
+      }
+    },
+    "Department of Defense": {
+      "toptierCode": "097",
+      "fy2025": {
+        "budgetAuthority": 848300000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 961600000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 113300000000.0,
+        "percent": 1.133561,
+        "trend": "growing"
+      }
+    },
+    "Department of Education": {
+      "toptierCode": "018",
+      "fy2025": {
+        "budgetAuthority": 78700000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 66700000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -12000000000.0,
+        "percent": 0.847522,
+        "trend": "declining"
+      }
+    },
+    "Department of Energy": {
+      "toptierCode": "089",
+      "fy2025": {
+        "budgetAuthority": 49800000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 45100000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -4700000000.0,
+        "percent": 0.905622,
+        "trend": "declining"
+      }
+    },
+    "Department of Health and Human Services": {
+      "toptierCode": "075",
+      "fy2025": {
+        "budgetAuthority": 127000000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 93800000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -33200000000.0,
+        "percent": 0.738583,
         "trend": "cut"
+      }
+    },
+    "Department of Homeland Security": {
+      "toptierCode": "070",
+      "fy2025": {
+        "budgetAuthority": 65100000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 107400000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 42300000000.0,
+        "percent": 1.64977,
+        "trend": "surging"
+      }
+    },
+    "Department of Housing and Urban Development": {
+      "toptierCode": "086",
+      "fy2025": {
+        "budgetAuthority": 70300000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 33200000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -37100000000.0,
+        "percent": 0.472262,
+        "trend": "cut"
+      }
+    },
+    "Department of the Interior": {
+      "toptierCode": "014",
+      "fy2025": {
+        "budgetAuthority": 16800000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 11700000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -5100000000.0,
+        "percent": 0.696429,
+        "trend": "cut"
+      }
+    },
+    "Department of Justice": {
+      "toptierCode": "015",
+      "fy2025": {
+        "budgetAuthority": 36000000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 33200000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -2800000000.0,
+        "percent": 0.922222,
+        "trend": "declining"
       }
     },
     "Department of Labor": {
       "toptierCode": "1601",
       "fy2025": {
-        "budgetAuthority": 75955972878.18,
-        "obligated": 70577614918.43,
-        "outlays": 70787234430.18
+        "budgetAuthority": 13300000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "fy2026": {
-        "budgetAuthority": 29187055517.24,
-        "obligated": 17658517530.52,
-        "outlays": 16861730146.38
+        "budgetAuthority": 8600000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "change": {
-        "amount": -46768917360.93999,
-        "percent": 0.384262809246758,
+        "amount": -4700000000.0,
+        "percent": 0.646617,
         "trend": "cut"
+      }
+    },
+    "Department of State": {
+      "toptierCode": "019",
+      "fy2025": {
+        "budgetAuthority": 58700000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 9600000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -49100000000.0,
+        "percent": 0.163543,
+        "trend": "cut"
+      }
+    },
+    "Department of Transportation": {
+      "toptierCode": "069",
+      "fy2025": {
+        "budgetAuthority": 25200000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 26700000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 1500000000.0,
+        "percent": 1.059524,
+        "trend": "growing"
+      }
+    },
+    "Department of the Treasury": {
+      "toptierCode": "020",
+      "fy2025": {
+        "budgetAuthority": 14200000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 11500000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -2700000000.0,
+        "percent": 0.809859,
+        "trend": "declining"
+      }
+    },
+    "Department of Veterans Affairs": {
+      "toptierCode": "036",
+      "fy2025": {
+        "budgetAuthority": 159700000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 187200000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 27500000000.0,
+        "percent": 1.172198,
+        "trend": "growing"
+      }
+    },
+    "Corps of Engineers - Civil Works": {
+      "toptierCode": "096",
+      "fy2025": {
+        "budgetAuthority": 5900000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 5000000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -900000000.0,
+        "percent": 0.847458,
+        "trend": "declining"
+      }
+    },
+    "Environmental Protection Agency": {
+      "toptierCode": "068",
+      "fy2025": {
+        "budgetAuthority": 9100000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 4200000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -4900000000.0,
+        "percent": 0.461538,
+        "trend": "cut"
+      }
+    },
+    "General Services Administration": {
+      "toptierCode": "047",
+      "fy2025": {
+        "budgetAuthority": 500000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 500000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
       }
     },
     "National Aeronautics and Space Administration": {
       "toptierCode": "080",
       "fy2025": {
-        "budgetAuthority": 41459964664.05,
-        "obligated": 28773421746.59,
-        "outlays": 26820529908.4
+        "budgetAuthority": 24800000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "fy2026": {
-        "budgetAuthority": 27231751895.97,
-        "obligated": 4345435144.21,
-        "outlays": 7076126764.81
+        "budgetAuthority": 18800000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "change": {
-        "amount": -14228212768.080002,
-        "percent": 0.6568204318703313,
-        "trend": "cut"
-      }
-    },
-    "Agency for International Development": {
-      "toptierCode": "072",
-      "fy2025": {
-        "budgetAuthority": 30515120984.18,
-        "obligated": 15844167462.19,
-        "outlays": 21685530208.91
-      },
-      "fy2026": {
-        "budgetAuthority": 20056056800.15,
-        "obligated": 4313133347.28,
-        "outlays": 4057774704.07
-      },
-      "change": {
-        "amount": -10459064184.029999,
-        "percent": 0.6572497880820363,
-        "trend": "cut"
-      }
-    },
-    "Railroad Retirement Board": {
-      "toptierCode": "060",
-      "fy2025": {
-        "budgetAuthority": 17820611246.57,
-        "obligated": 17522536724.9,
-        "outlays": 17504267773.3
-      },
-      "fy2026": {
-        "budgetAuthority": 17028636687.21,
-        "obligated": 4218009797.76,
-        "outlays": 4143309975.63
-      },
-      "change": {
-        "amount": -791974559.3600006,
-        "percent": 0.9555585075953871,
-        "trend": "stable"
-      }
-    },
-    "Farm Credit System Insurance Corporation": {
-      "toptierCode": "7802",
-      "fy2025": {
-        "budgetAuthority": 7989101047.83,
-        "obligated": 82011373.51,
-        "outlays": 81339133.39
-      },
-      "fy2026": {
-        "budgetAuthority": 8423312709.83,
-        "obligated": 4182071.02,
-        "outlays": 1288806.08
-      },
-      "change": {
-        "amount": 434211662,
-        "percent": 1.0543505031918379,
-        "trend": "growing"
-      }
-    },
-    "U.S. International Development Finance Corporation": {
-      "toptierCode": "077",
-      "fy2025": {
-        "budgetAuthority": 8663000251.11,
-        "obligated": 1105779615.45,
-        "outlays": 1193476161.14
-      },
-      "fy2026": {
-        "budgetAuthority": 8208191292.04,
-        "obligated": 162352536.94,
-        "outlays": 141959414.61
-      },
-      "change": {
-        "amount": -454808959.07000065,
-        "percent": 0.947499833096308,
-        "trend": "declining"
-      }
-    },
-    "Small Business Administration": {
-      "toptierCode": "073",
-      "fy2025": {
-        "budgetAuthority": 17288617083.84,
-        "obligated": 12534817541.37,
-        "outlays": 12137905953.21
-      },
-      "fy2026": {
-        "budgetAuthority": 5864689299.41,
-        "obligated": 410511460.43,
-        "outlays": 402997689.92
-      },
-      "change": {
-        "amount": -11423927784.43,
-        "percent": 0.33922258043946363,
+        "amount": -6000000000.0,
+        "percent": 0.758065,
         "trend": "cut"
       }
     },
     "National Science Foundation": {
       "toptierCode": "049",
       "fy2025": {
-        "budgetAuthority": 10738133526.14,
-        "obligated": 9885079238.42,
-        "outlays": 10153840632.98
-      },
-      "fy2026": {
-        "budgetAuthority": 3837055122.08,
-        "obligated": 305843688.56,
-        "outlays": 2085530274.76
-      },
-      "change": {
-        "amount": -6901078404.059999,
-        "percent": 0.35732980156555133,
-        "trend": "cut"
-      }
-    },
-    "Millennium Challenge Corporation": {
-      "toptierCode": "524",
-      "fy2025": {
-        "budgetAuthority": 3229158172.79,
-        "obligated": 487931638.23,
-        "outlays": 779815198.14
-      },
-      "fy2026": {
-        "budgetAuthority": 3052236668.09,
-        "obligated": 76592980.85,
-        "outlays": 218865000.1
-      },
-      "change": {
-        "amount": -176921504.6999998,
-        "percent": 0.9452112608819223,
-        "trend": "declining"
-      }
-    },
-    "Executive Office of the President": {
-      "toptierCode": "1100",
-      "fy2025": {
-        "budgetAuthority": 2406506457.62,
-        "obligated": 1083639268.25,
-        "outlays": 1073971706.67
-      },
-      "fy2026": {
-        "budgetAuthority": 2797936024.85,
-        "obligated": 116729331.79,
-        "outlays": 193823634.19
-      },
-      "change": {
-        "amount": 391429567.23,
-        "percent": 1.162654692236778,
-        "trend": "growing"
-      }
-    },
-    "Securities and Exchange Commission": {
-      "toptierCode": "050",
-      "fy2025": {
-        "budgetAuthority": 3086668618.31,
-        "obligated": 2279809318.74,
-        "outlays": 2389014526.53
-      },
-      "fy2026": {
-        "budgetAuthority": 1826955434.39,
-        "obligated": 383417511.28,
-        "outlays": 433181133.28
-      },
-      "change": {
-        "amount": -1259713183.9199998,
-        "percent": 0.5918858356068969,
-        "trend": "cut"
-      }
-    },
-    "Corporation for National and Community Service": {
-      "toptierCode": "485",
-      "fy2025": {
-        "budgetAuthority": 2511398584.91,
-        "obligated": 1628697960.11,
-        "outlays": 1621539618.25
-      },
-      "fy2026": {
-        "budgetAuthority": 1408885537.58,
-        "obligated": 77315710.47,
-        "outlays": 238660680.07
-      },
-      "change": {
-        "amount": -1102513047.33,
-        "percent": 0.56099638904212,
-        "trend": "cut"
-      }
-    },
-    "Patient-Centered Outcomes Research Trust Fund": {
-      "toptierCode": "579",
-      "fy2025": {
-        "budgetAuthority": 1185134896.83,
-        "obligated": 1185134896.83,
-        "outlays": 1186160460.22
-      },
-      "fy2026": {
-        "budgetAuthority": 1287763787.92,
-        "obligated": 740429080.21,
-        "outlays": 663596123.19
-      },
-      "change": {
-        "amount": 102628891.09000015,
-        "percent": 1.0865968012287142,
-        "trend": "growing"
-      }
-    },
-    "Commodity Futures Trading Commission": {
-      "toptierCode": "339",
-      "fy2025": {
-        "budgetAuthority": 666440593.47,
-        "obligated": 365969179.87,
-        "outlays": 365711470.44
-      },
-      "fy2026": {
-        "budgetAuthority": 1226181474.64,
-        "obligated": 56119204.38,
-        "outlays": 69584620.34
-      },
-      "change": {
-        "amount": 559740881.1700001,
-        "percent": 1.839896138762437,
-        "trend": "surging"
-      }
-    },
-    "Government Accountability Office": {
-      "toptierCode": "005",
-      "fy2025": {
-        "budgetAuthority": 1057313328.14,
-        "obligated": 943770259.66,
-        "outlays": 928445525.56
-      },
-      "fy2026": {
-        "budgetAuthority": 961473784.89,
-        "obligated": 205258491.89,
-        "outlays": 194723911.11
-      },
-      "change": {
-        "amount": -95839543.25,
-        "percent": 0.9093555895879998,
-        "trend": "declining"
-      }
-    },
-    "Nuclear Regulatory Commission": {
-      "toptierCode": "031",
-      "fy2025": {
-        "budgetAuthority": 1069846047.07,
-        "obligated": 988090435.96,
-        "outlays": 990460467.5
-      },
-      "fy2026": {
-        "budgetAuthority": 627841320.66,
-        "obligated": 183926921.49,
-        "outlays": 209287980.64
-      },
-      "change": {
-        "amount": -442004726.4100001,
-        "percent": 0.5868520264008792,
-        "trend": "cut"
-      }
-    },
-    "Consumer Financial Protection Bureau": {
-      "toptierCode": "581",
-      "fy2025": {
-        "budgetAuthority": 3119840930.9,
-        "obligated": 2582561302.33,
-        "outlays": 2779992829.9
-      },
-      "fy2026": {
-        "budgetAuthority": 606018021.36,
-        "obligated": 113436301.31,
-        "outlays": 119455986.62
-      },
-      "change": {
-        "amount": -2513822909.54,
-        "percent": 0.1942464487076199,
-        "trend": "cut"
-      }
-    },
-    "National Archives and Records Administration": {
-      "toptierCode": "088",
-      "fy2025": {
-        "budgetAuthority": 888106703.9,
-        "obligated": 747214997.43,
-        "outlays": 764823660.7
-      },
-      "fy2026": {
-        "budgetAuthority": 550235991.28,
-        "obligated": 134516063.62,
-        "outlays": 152176194.45
-      },
-      "change": {
-        "amount": -337870712.62,
-        "percent": 0.6195606776344704,
-        "trend": "cut"
-      }
-    },
-    "U.S. Agency for Global Media": {
-      "toptierCode": "514",
-      "fy2025": {
-        "budgetAuthority": 991508584.58,
-        "obligated": 762743620.21,
-        "outlays": 778561171.39
-      },
-      "fy2026": {
-        "budgetAuthority": 549959001.55,
-        "obligated": 143786386.11,
-        "outlays": 137259830.65
-      },
-      "change": {
-        "amount": -441549583.0300001,
-        "percent": 0.5546689258197002,
-        "trend": "cut"
-      }
-    },
-    "Presidio Trust": {
-      "toptierCode": "512",
-      "fy2025": {
-        "budgetAuthority": 540928836.52,
-        "obligated": 207710653.33,
-        "outlays": 240662924.12
-      },
-      "fy2026": {
-        "budgetAuthority": 544005473.21,
-        "obligated": 179712484.16,
-        "outlays": 165883886.37
-      },
-      "change": {
-        "amount": 3076636.690000057,
-        "percent": 1.0056876921367204,
-        "trend": "stable"
-      }
-    },
-    "Export-Import Bank of the United States": {
-      "toptierCode": "083",
-      "fy2025": {
-        "budgetAuthority": 393580139.53,
-        "obligated": 261239723.31,
-        "outlays": 235720336.17
-      },
-      "fy2026": {
-        "budgetAuthority": 302005684.63,
-        "obligated": 17316704.27,
-        "outlays": 25563921.06
-      },
-      "change": {
-        "amount": -91574454.89999998,
-        "percent": 0.7673295837301265,
-        "trend": "cut"
-      }
-    },
-    "National Endowment for the Humanities": {
-      "toptierCode": "418",
-      "fy2025": {
-        "budgetAuthority": 311362059.57,
-        "obligated": 109789564.89,
-        "outlays": 200452068.51
-      },
-      "fy2026": {
-        "budgetAuthority": 284790419.35,
-        "obligated": 55668727.45,
-        "outlays": 10613850.66
-      },
-      "change": {
-        "amount": -26571640.21999997,
-        "percent": 0.9146599933958037,
-        "trend": "declining"
-      }
-    },
-    "Armed Forces Retirement Home": {
-      "toptierCode": "084",
-      "fy2025": {
-        "budgetAuthority": 293725991.22,
-        "obligated": 142878765.4,
-        "outlays": 140619390.01
-      },
-      "fy2026": {
-        "budgetAuthority": 262580831.68,
-        "obligated": 42482901.67,
-        "outlays": 45171714.5
-      },
-      "change": {
-        "amount": -31145159.54000002,
-        "percent": 0.8939652585369186,
-        "trend": "declining"
-      }
-    },
-    "American Battle Monuments Commission": {
-      "toptierCode": "074",
-      "fy2025": {
-        "budgetAuthority": 271727324.63,
-        "obligated": 126597477.59,
-        "outlays": 103483062.3
-      },
-      "fy2026": {
-        "budgetAuthority": 255675170.98,
-        "obligated": 23659749.53,
-        "outlays": 23456873.37
-      },
-      "change": {
-        "amount": -16052153.650000006,
-        "percent": 0.9409255080553361,
-        "trend": "declining"
-      }
-    },
-    "Peace Corps": {
-      "toptierCode": "1125",
-      "fy2025": {
-        "budgetAuthority": 506078421.83,
-        "obligated": 456879972.55,
-        "outlays": 458057106.32
-      },
-      "fy2026": {
-        "budgetAuthority": 215428332.95,
-        "obligated": 94372247.96,
-        "outlays": 98632479.49
-      },
-      "change": {
-        "amount": -290650088.88,
-        "percent": 0.42568171978367,
-        "trend": "cut"
-      }
-    },
-    "Gulf Coast Ecosystem Restoration Council": {
-      "toptierCode": "471",
-      "fy2025": {
-        "budgetAuthority": 393422677.46,
-        "obligated": 196956121.36,
-        "outlays": 184025557.19
-      },
-      "fy2026": {
-        "budgetAuthority": 205689844.88,
-        "obligated": 15365126.82,
-        "outlays": 59338296.47
-      },
-      "change": {
-        "amount": -187732832.57999998,
-        "percent": 0.5228215267304027,
-        "trend": "cut"
-      }
-    },
-    "Equal Employment Opportunity Commission": {
-      "toptierCode": "045",
-      "fy2025": {
-        "budgetAuthority": 487807722.07,
-        "obligated": 458978768.26,
-        "outlays": 451838578.32
-      },
-      "fy2026": {
-        "budgetAuthority": 184600389.33,
-        "obligated": 87015244.63,
-        "outlays": 113427461.37
-      },
-      "change": {
-        "amount": -303207332.74,
-        "percent": 0.3784285917956625,
-        "trend": "cut"
-      }
-    },
-    "Northern Border Regional Commission": {
-      "toptierCode": "573",
-      "fy2025": {
-        "budgetAuthority": 261041083.7,
-        "obligated": 96316585.88,
-        "outlays": 28562184.26
-      },
-      "fy2026": {
-        "budgetAuthority": 182026170.93,
-        "obligated": 14104241.74,
-        "outlays": 12530991.21
-      },
-      "change": {
-        "amount": -79014912.76999998,
-        "percent": 0.69730851691986,
-        "trend": "cut"
-      }
-    },
-    "Court Services and Offender Supervision Agency": {
-      "toptierCode": "9553",
-      "fy2025": {
-        "budgetAuthority": 366375083.16,
-        "obligated": 281968178.49,
-        "outlays": 275688472.08
-      },
-      "fy2026": {
-        "budgetAuthority": 179386443.32,
-        "obligated": 54137351.76,
-        "outlays": 61057936.54
-      },
-      "change": {
-        "amount": -186988639.84000003,
-        "percent": 0.4896251179877862,
-        "trend": "cut"
-      }
-    },
-    "District of Columbia Courts": {
-      "toptierCode": "349",
-      "fy2025": {
-        "budgetAuthority": 426301267.04,
-        "obligated": 362748446.19,
-        "outlays": 337094144.8
-      },
-      "fy2026": {
-        "budgetAuthority": 178273207.93,
-        "obligated": 64432816.01,
-        "outlays": 73209171.86
-      },
-      "change": {
-        "amount": -248028059.11,
-        "percent": 0.418185967796508,
-        "trend": "cut"
-      }
-    },
-    "Federal Permitting Improvement Steering Council": {
-      "toptierCode": "473",
-      "fy2025": {
-        "budgetAuthority": 237163813.57,
-        "obligated": 82234873.62,
-        "outlays": 34987587.83
-      },
-      "fy2026": {
-        "budgetAuthority": 163020509.96,
-        "obligated": 5896110.85,
-        "outlays": 9152804.88
-      },
-      "change": {
-        "amount": -74143303.60999998,
-        "percent": 0.6873751417050973,
-        "trend": "cut"
-      }
-    },
-    "United States Trade and Development Agency": {
-      "toptierCode": "1133",
-      "fy2025": {
-        "budgetAuthority": 179969679.02,
-        "obligated": 59690323.13,
-        "outlays": 72697472.46
-      },
-      "fy2026": {
-        "budgetAuthority": 150385691.31,
-        "obligated": 5321826.55,
-        "outlays": 12612380.07
-      },
-      "change": {
-        "amount": -29583987.71000001,
-        "percent": 0.8356168223942193,
-        "trend": "declining"
-      }
-    },
-    "National Endowment for the Arts": {
-      "toptierCode": "417",
-      "fy2025": {
-        "budgetAuthority": 245711532.41,
-        "obligated": 176960854.01,
-        "outlays": 234036774.22
-      },
-      "fy2026": {
-        "budgetAuthority": 145669784.04,
-        "obligated": 18742619.64,
-        "outlays": 39888422
-      },
-      "change": {
-        "amount": -100041748.37,
-        "percent": 0.5928487874021802,
-        "trend": "cut"
-      }
-    },
-    "United States Court of Appeals for Veterans Claims": {
-      "toptierCode": "345",
-      "fy2025": {
-        "budgetAuthority": 127288477.06,
-        "obligated": 45241515.39,
-        "outlays": 44518593.89
-      },
-      "fy2026": {
-        "budgetAuthority": 131542724.91,
-        "obligated": 17444365.2,
-        "outlays": 9126968.12
-      },
-      "change": {
-        "amount": 4254247.849999994,
-        "percent": 1.0334220971784795,
-        "trend": "stable"
-      }
-    },
-    "Council of the Inspectors General on Integrity and Efficiency": {
-      "toptierCode": "542",
-      "fy2025": {
-        "budgetAuthority": 71753317.55,
-        "obligated": 32574004.3,
-        "outlays": 31269212.18
-      },
-      "fy2026": {
-        "budgetAuthority": 128706626.79,
-        "obligated": 6079355.35,
-        "outlays": 6131688
-      },
-      "change": {
-        "amount": 56953309.24000001,
-        "percent": 1.7937376442603248,
-        "trend": "surging"
-      }
-    },
-    "Institute of Museum and Library Services": {
-      "toptierCode": "474",
-      "fy2025": {
-        "budgetAuthority": 308182985.39,
-        "obligated": 294970942.46,
-        "outlays": 337050070.96
-      },
-      "fy2026": {
-        "budgetAuthority": 111911052.84,
-        "obligated": 2521241.34,
-        "outlays": 59193489.62
-      },
-      "change": {
-        "amount": -196271932.54999998,
-        "percent": 0.36313183447937136,
-        "trend": "cut"
-      }
-    },
-    "National Labor Relations Board": {
-      "toptierCode": "420",
-      "fy2025": {
-        "budgetAuthority": 315424867.13,
-        "obligated": 306857241.42,
-        "outlays": 309191573.68
-      },
-      "fy2026": {
-        "budgetAuthority": 108828591.54,
-        "obligated": 65155784.57,
-        "outlays": 64131005.55
-      },
-      "change": {
-        "amount": -206596275.58999997,
-        "percent": 0.34502223153873,
-        "trend": "cut"
-      }
-    },
-    "Delta Regional Authority": {
-      "toptierCode": "517",
-      "fy2025": {
-        "budgetAuthority": 171875815.65,
-        "obligated": 108247981.2,
-        "outlays": 62597029.74
-      },
-      "fy2026": {
-        "budgetAuthority": 78095405.65,
-        "obligated": 2612234.75,
-        "outlays": 14403511.6
-      },
-      "change": {
-        "amount": -93780410,
-        "percent": 0.4543711129728099,
-        "trend": "cut"
-      }
-    },
-    "National Transportation Safety Board": {
-      "toptierCode": "424",
-      "fy2025": {
-        "budgetAuthority": 178029168.94,
-        "obligated": 154274105.53,
-        "outlays": 147425759.61
-      },
-      "fy2026": {
-        "budgetAuthority": 72390602.35,
-        "obligated": 23772228.87,
-        "outlays": 30279355
-      },
-      "change": {
-        "amount": -105638566.59,
-        "percent": 0.4066221438937196,
-        "trend": "cut"
-      }
-    },
-    "Denali Commission": {
-      "toptierCode": "513",
-      "fy2025": {
-        "budgetAuthority": 268015616.4,
-        "obligated": 220080708.68,
-        "outlays": 44791686.16
-      },
-      "fy2026": {
-        "budgetAuthority": 70934482.48,
-        "obligated": 1856931.53,
-        "outlays": 22021071.31
-      },
-      "change": {
-        "amount": -197081133.92000002,
-        "percent": 0.2646654826789414,
-        "trend": "cut"
-      }
-    },
-    "Consumer Product Safety Commission": {
-      "toptierCode": "061",
-      "fy2025": {
-        "budgetAuthority": 162503586.89,
-        "obligated": 152039604.66,
-        "outlays": 158345166.73
-      },
-      "fy2026": {
-        "budgetAuthority": 64865763.44,
-        "obligated": 28339233.15,
-        "outlays": 32565419.22
-      },
-      "change": {
-        "amount": -97637823.44999999,
-        "percent": 0.39916511802233734,
-        "trend": "cut"
-      }
-    },
-    "Southeast Crescent Regional Commission": {
-      "toptierCode": "574",
-      "fy2025": {
-        "budgetAuthority": 57991272.54,
-        "obligated": 4683253.12,
-        "outlays": 6520911.5
-      },
-      "fy2026": {
-        "budgetAuthority": 56876894.06,
-        "obligated": 484474.11,
-        "outlays": 1173788.71
-      },
-      "change": {
-        "amount": -1114378.4799999967,
-        "percent": 0.980783686386062,
-        "trend": "stable"
-      }
-    },
-    "Federal Mediation and Conciliation Service": {
-      "toptierCode": "093",
-      "fy2025": {
-        "budgetAuthority": 75787975.32,
-        "obligated": 49159149.34,
-        "outlays": 51000790.92
-      },
-      "fy2026": {
-        "budgetAuthority": 47579567.7,
-        "obligated": 6557125.51,
-        "outlays": 7758739.76
-      },
-      "change": {
-        "amount": -28208407.61999999,
-        "percent": 0.6277983743345106,
-        "trend": "cut"
-      }
-    },
-    "International Trade Commission": {
-      "toptierCode": "034",
-      "fy2025": {
-        "budgetAuthority": 133608408.09,
-        "obligated": 129667558.27,
-        "outlays": 131510575.37
-      },
-      "fy2026": {
-        "budgetAuthority": 44732178.82,
-        "obligated": 25486522.64,
-        "outlays": 27935923.26
-      },
-      "change": {
-        "amount": -88876229.27000001,
-        "percent": 0.3348006271421776,
-        "trend": "cut"
-      }
-    },
-    "Barry Goldwater Scholarship and Excellence In Education Foundation": {
-      "toptierCode": "313",
-      "fy2025": {
-        "budgetAuthority": 43179166.71,
-        "obligated": 3941865.44,
-        "outlays": 3341641.8
-      },
-      "fy2026": {
-        "budgetAuthority": 39917015.23,
-        "obligated": 266485.96,
-        "outlays": 1179240.93
-      },
-      "change": {
-        "amount": -3262151.480000004,
-        "percent": 0.9244508005004063,
-        "trend": "declining"
-      }
-    },
-    "James Madison Memorial Fellowship Foundation": {
-      "toptierCode": "381",
-      "fy2025": {
-        "budgetAuthority": 38193500.63,
-        "obligated": 2640416.62,
-        "outlays": 2518654.64
-      },
-      "fy2026": {
-        "budgetAuthority": 35726574.28,
-        "obligated": 1129447.37,
-        "outlays": 314284.99
-      },
-      "change": {
-        "amount": -2466926.3500000015,
-        "percent": 0.9354097867619315,
-        "trend": "declining"
-      }
-    },
-    "African Development Foundation": {
-      "toptierCode": "166",
-      "fy2025": {
-        "budgetAuthority": 39729640.42,
-        "obligated": 20290440.92,
-        "outlays": 21823400.84
-      },
-      "fy2026": {
-        "budgetAuthority": 35605583.35,
-        "obligated": 1821526.61,
-        "outlays": 2440106.29
-      },
-      "change": {
-        "amount": -4124057.0700000003,
-        "percent": 0.8961969696578492,
-        "trend": "declining"
-      }
-    },
-    "Federal Election Commission": {
-      "toptierCode": "360",
-      "fy2025": {
-        "budgetAuthority": 86229213.35,
-        "obligated": 83334387.34,
-        "outlays": 81657049.65
-      },
-      "fy2026": {
-        "budgetAuthority": 33597394.85,
-        "obligated": 16548503.92,
-        "outlays": 18316953.08
-      },
-      "change": {
-        "amount": -52631818.49999999,
-        "percent": 0.38962891512914405,
-        "trend": "cut"
-      }
-    },
-    "Inter-American Foundation": {
-      "toptierCode": "164",
-      "fy2025": {
-        "budgetAuthority": 39684863.15,
-        "obligated": 18140283.73,
-        "outlays": 30794019.99
-      },
-      "fy2026": {
-        "budgetAuthority": 31014509.25,
-        "obligated": 3235254.99,
-        "outlays": 2614053.66
-      },
-      "change": {
-        "amount": -8670353.899999999,
-        "percent": 0.7815198740328779,
-        "trend": "cut"
-      }
-    },
-    "Harry S Truman Scholarship Foundation": {
-      "toptierCode": "372",
-      "fy2025": {
-        "budgetAuthority": 31590000.71,
-        "obligated": 6095709.81,
-        "outlays": 6106299.55
-      },
-      "fy2026": {
-        "budgetAuthority": 26832536.63,
-        "obligated": 563270.28,
-        "outlays": 511401.12
-      },
-      "change": {
-        "amount": -4757464.080000002,
-        "percent": 0.8493996842964933,
-        "trend": "declining"
-      }
-    },
-    "Merit Systems Protection Board": {
-      "toptierCode": "389",
-      "fy2025": {
-        "budgetAuthority": 58025539.24,
-        "obligated": 51024006.35,
-        "outlays": 51974427.54
-      },
-      "fy2026": {
-        "budgetAuthority": 24235573.88,
-        "obligated": 12559390.85,
-        "outlays": 11636570.34
-      },
-      "change": {
-        "amount": -33789965.36,
-        "percent": 0.41767080836179743,
-        "trend": "cut"
-      }
-    },
-    "Surface Transportation Board": {
-      "toptierCode": "472",
-      "fy2025": {
-        "budgetAuthority": 54505202.5,
-        "obligated": 47582198.94,
-        "outlays": 46576533.69
-      },
-      "fy2026": {
-        "budgetAuthority": 23769974.5,
-        "obligated": 5078379.91,
-        "outlays": 5801474.79
-      },
-      "change": {
-        "amount": -30735228,
-        "percent": 0.4361046911072388,
-        "trend": "cut"
-      }
-    },
-    "Defense Nuclear Facilities Safety Board": {
-      "toptierCode": "347",
-      "fy2025": {
-        "budgetAuthority": 50216559.09,
-        "obligated": 42587519.71,
-        "outlays": 43703554.49
-      },
-      "fy2026": {
-        "budgetAuthority": 22806069.43,
-        "obligated": 11059276.66,
-        "outlays": 9827624.41
-      },
-      "change": {
-        "amount": -27410489.660000004,
-        "percent": 0.45415436348647675,
-        "trend": "cut"
-      }
-    },
-    "Morris K. Udall and Stewart L. Udall Foundation": {
-      "toptierCode": "487",
-      "fy2025": {
-        "budgetAuthority": 28466070.15,
-        "obligated": 11466700.5,
-        "outlays": 11635136.02
-      },
-      "fy2026": {
-        "budgetAuthority": 22707213.26,
-        "obligated": 3096905.92,
-        "outlays": 1762374.72
-      },
-      "change": {
-        "amount": -5758856.889999997,
-        "percent": 0.797693996408563,
-        "trend": "cut"
-      }
-    },
-    "Federal Maritime Commission": {
-      "toptierCode": "065",
-      "fy2025": {
-        "budgetAuthority": 44055430.85,
-        "obligated": 39295602.34,
-        "outlays": 39765223.57
-      },
-      "fy2026": {
-        "budgetAuthority": 19290322.46,
-        "obligated": 7170850.58,
-        "outlays": 12241999.14
-      },
-      "change": {
-        "amount": -24765108.39,
-        "percent": 0.4378648009522304,
-        "trend": "cut"
-      }
-    },
-    "National Credit Union Administration": {
-      "toptierCode": "025",
-      "fy2025": {
-        "budgetAuthority": 18341270.22,
-        "obligated": 1956489.28,
-        "outlays": 3704774.49
-      },
-      "fy2026": {
-        "budgetAuthority": 16515913.87,
+        "budgetAuthority": 8800000000.0,
         "obligated": 0,
-        "outlays": 484367.27
-      },
-      "change": {
-        "amount": -1825356.3499999996,
-        "percent": 0.9004781932709566,
-        "trend": "declining"
-      }
-    },
-    "Election Assistance Commission": {
-      "toptierCode": "525",
-      "fy2025": {
-        "budgetAuthority": 48448164.1,
-        "obligated": 42380998.93,
-        "outlays": 39674335.83
+        "outlays": 0
       },
       "fy2026": {
-        "budgetAuthority": 16020294.59,
-        "obligated": 4141933.2,
-        "outlays": 6159724.86
-      },
-      "change": {
-        "amount": -32427869.51,
-        "percent": 0.3306687650110564,
-        "trend": "cut"
-      }
-    },
-    "Office of Government Ethics": {
-      "toptierCode": "434",
-      "fy2025": {
-        "budgetAuthority": 28383411,
-        "obligated": 21801177.92,
-        "outlays": 20920623.54
-      },
-      "fy2026": {
-        "budgetAuthority": 15034246.33,
-        "obligated": 3990860.61,
-        "outlays": 4598170.06
-      },
-      "change": {
-        "amount": -13349164.67,
-        "percent": 0.5296842698011173,
-        "trend": "cut"
-      }
-    },
-    "Overseas Private Investment Corporation": {
-      "toptierCode": "071",
-      "fy2025": {
-        "budgetAuthority": 14795213.01,
-        "obligated": 0,
-        "outlays": 540761.17
-      },
-      "fy2026": {
-        "budgetAuthority": 14795213.01,
+        "budgetAuthority": 3900000000.0,
         "obligated": 0,
         "outlays": 0
       },
       "change": {
-        "amount": 0,
-        "percent": 1,
+        "amount": -4900000000.0,
+        "percent": 0.443182,
+        "trend": "cut"
+      }
+    },
+    "Small Business Administration": {
+      "toptierCode": "073",
+      "fy2025": {
+        "budgetAuthority": 900000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 600000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -300000000.0,
+        "percent": 0.666667,
+        "trend": "cut"
+      }
+    },
+    "Social Security Administration": {
+      "toptierCode": "028",
+      "fy2025": {
+        "budgetAuthority": 12700000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 12700000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
         "trend": "stable"
       }
     },
-    "Federal Mine Safety and Health Review Commission": {
-      "toptierCode": "368",
+    "Office of Personnel Management": {
+      "toptierCode": "024",
       "fy2025": {
-        "budgetAuthority": 24615373.22,
-        "obligated": 17548515.24,
-        "outlays": 15933134.41
-      },
-      "fy2026": {
-        "budgetAuthority": 13092219.53,
-        "obligated": 3075086.36,
-        "outlays": 3651425.75
-      },
-      "change": {
-        "amount": -11523153.69,
-        "percent": 0.5318716646295888,
-        "trend": "cut"
-      }
-    },
-    "Appalachian Regional Commission": {
-      "toptierCode": "309",
-      "fy2025": {
-        "budgetAuthority": 34547200.26,
-        "obligated": 9215690.61,
-        "outlays": 20594672.67
-      },
-      "fy2026": {
-        "budgetAuthority": 12616188.93,
+        "budgetAuthority": 400000000.0,
         "obligated": 0,
-        "outlays": 3564005.76
-      },
-      "change": {
-        "amount": -21931011.33,
-        "percent": 0.3651870147233749,
-        "trend": "cut"
-      }
-    },
-    "Advisory Council on Historic Preservation": {
-      "toptierCode": "306",
-      "fy2025": {
-        "budgetAuthority": 17051674.66,
-        "obligated": 11327181.61,
-        "outlays": 11914678.47
+        "outlays": 0
       },
       "fy2026": {
-        "budgetAuthority": 11955604.94,
-        "obligated": 3266125.25,
-        "outlays": 1928932.71
+        "budgetAuthority": 400000000.0,
+        "obligated": 0,
+        "outlays": 0
       },
       "change": {
-        "amount": -5096069.720000001,
-        "percent": 0.7011396345747544,
-        "trend": "cut"
-      }
-    },
-    "Office of Special Counsel": {
-      "toptierCode": "062",
-      "fy2025": {
-        "budgetAuthority": 32226434.95,
-        "obligated": 31510829.63,
-        "outlays": 32046788.26
-      },
-      "fy2026": {
-        "budgetAuthority": 11302370.36,
-        "obligated": 5694421.68,
-        "outlays": 6425678.58
-      },
-      "change": {
-        "amount": -20924064.59,
-        "percent": 0.3507173653410893,
-        "trend": "cut"
-      }
-    },
-    "Public Buildings Reform Board": {
-      "toptierCode": "290",
-      "fy2025": {
-        "budgetAuthority": 11404685.71,
-        "obligated": 2014046.92,
-        "outlays": 2465609.17
-      },
-      "fy2026": {
-        "budgetAuthority": 10714070.79,
-        "obligated": 1691172.96,
-        "outlays": 639876.15
-      },
-      "change": {
-        "amount": -690614.9200000018,
-        "percent": 0.9394446337618538,
-        "trend": "declining"
-      }
-    },
-    "Federal Labor Relations Authority": {
-      "toptierCode": "054",
-      "fy2025": {
-        "budgetAuthority": 29773804.88,
-        "obligated": 29478562.36,
-        "outlays": 30483385
-      },
-      "fy2026": {
-        "budgetAuthority": 10354559.55,
-        "obligated": 5627248.19,
-        "outlays": 5766427.38
-      },
-      "change": {
-        "amount": -19419245.33,
-        "percent": 0.34777414548570124,
-        "trend": "cut"
-      }
-    },
-    "Occupational Safety and Health Review Commission": {
-      "toptierCode": "432",
-      "fy2025": {
-        "budgetAuthority": 18635695.01,
-        "obligated": 14074434.17,
-        "outlays": 14125844.03
-      },
-      "fy2026": {
-        "budgetAuthority": 10175874.83,
-        "obligated": 2904850.94,
-        "outlays": 3086571.64
-      },
-      "change": {
-        "amount": -8459820.180000002,
-        "percent": 0.5460421424872847,
-        "trend": "cut"
-      }
-    },
-    "Committee for Purchase from People Who Are Blind or Severely Disabled": {
-      "toptierCode": "338",
-      "fy2025": {
-        "budgetAuthority": 16724316.29,
-        "obligated": 13114121.25,
-        "outlays": 12337763.96
-      },
-      "fy2026": {
-        "budgetAuthority": 9038677.8,
-        "obligated": 2785625.18,
-        "outlays": 3074837.33
-      },
-      "change": {
-        "amount": -7685638.489999998,
-        "percent": 0.5404512593082513,
-        "trend": "cut"
-      }
-    },
-    "United States Chemical Safety Board": {
-      "toptierCode": "510",
-      "fy2025": {
-        "budgetAuthority": 19645911.49,
-        "obligated": 14452094.07,
-        "outlays": 14113024.85
-      },
-      "fy2026": {
-        "budgetAuthority": 8973965.86,
-        "obligated": 2608346.04,
-        "outlays": 3316622.41
-      },
-      "change": {
-        "amount": -10671945.629999999,
-        "percent": 0.4567854163736742,
-        "trend": "cut"
-      }
-    },
-    "Privacy and Civil Liberties Oversight Board": {
-      "toptierCode": "535",
-      "fy2025": {
-        "budgetAuthority": 17906710.88,
-        "obligated": 13778832.52,
-        "outlays": 13137136.55
-      },
-      "fy2026": {
-        "budgetAuthority": 8843698.03,
-        "obligated": 3214315.97,
-        "outlays": 2793272.03
-      },
-      "change": {
-        "amount": -9063012.85,
-        "percent": 0.4938761835864298,
-        "trend": "cut"
-      }
-    },
-    "National Mediation Board": {
-      "toptierCode": "421",
-      "fy2025": {
-        "budgetAuthority": 18409803.07,
-        "obligated": 14971320.47,
-        "outlays": 14454845.78
-      },
-      "fy2026": {
-        "budgetAuthority": 8535697.83,
-        "obligated": 2819553.95,
-        "outlays": 2892544.35
-      },
-      "change": {
-        "amount": -9874105.24,
-        "percent": 0.46364960002801375,
-        "trend": "cut"
-      }
-    },
-    "National Capital Planning Commission": {
-      "toptierCode": "394",
-      "fy2025": {
-        "budgetAuthority": 17525797.95,
-        "obligated": 12378944.74,
-        "outlays": 11144655.78
-      },
-      "fy2026": {
-        "budgetAuthority": 8078413.13,
-        "obligated": 2163133.79,
-        "outlays": 2851816.8
-      },
-      "change": {
-        "amount": -9447384.82,
-        "percent": 0.46094409812592874,
-        "trend": "cut"
-      }
-    },
-    "Commission on Civil Rights": {
-      "toptierCode": "326",
-      "fy2025": {
-        "budgetAuthority": 16761763.64,
-        "obligated": 14140597.15,
-        "outlays": 14672566.44
-      },
-      "fy2026": {
-        "budgetAuthority": 7296683.77,
-        "obligated": 3056910.32,
-        "outlays": 2831237.92
-      },
-      "change": {
-        "amount": -9465079.870000001,
-        "percent": 0.43531718539374414,
-        "trend": "cut"
-      }
-    },
-    "Access Board": {
-      "toptierCode": "310",
-      "fy2025": {
-        "budgetAuthority": 13450796.25,
-        "obligated": 9965498.76,
-        "outlays": 9128912.13
-      },
-      "fy2026": {
-        "budgetAuthority": 6829369.75,
-        "obligated": 1457089.98,
-        "outlays": 2086827.77
-      },
-      "change": {
-        "amount": -6621426.5,
-        "percent": 0.5077297747335962,
-        "trend": "cut"
-      }
-    },
-    "Department of Education": {
-      "toptierCode": "091",
-      "fy2025": {
-        "budgetAuthority": 190636961083.79,
-        "obligated": 179690157931.34,
-        "outlays": 187970767574.49
-      },
-      "fy2026": {
-        "budgetAuthority": 4573282.87,
-        "obligated": 3117126.87,
-        "outlays": 6318763.96
-      },
-      "change": {
-        "amount": -190632387800.92,
-        "percent": 0.000023989486844526024,
-        "trend": "cut"
-      }
-    },
-    "Marine Mammal Commission": {
-      "toptierCode": "387",
-      "fy2025": {
-        "budgetAuthority": 5506824.01,
-        "obligated": 3999099.8,
-        "outlays": 4368869.07
-      },
-      "fy2026": {
-        "budgetAuthority": 3023744.82,
-        "obligated": 684977.82,
-        "outlays": 710661.01
-      },
-      "change": {
-        "amount": -2483079.19,
-        "percent": 0.549090512881671,
-        "trend": "cut"
-      }
-    },
-    "Nuclear Waste Technical Review Board": {
-      "toptierCode": "431",
-      "fy2025": {
-        "budgetAuthority": 5298790.45,
-        "obligated": 3906469.41,
-        "outlays": 3975853.1
-      },
-      "fy2026": {
-        "budgetAuthority": 2751464.04,
-        "obligated": 1007805.75,
-        "outlays": 932485.57
-      },
-      "change": {
-        "amount": -2547326.41,
-        "percent": 0.5192626630479414,
-        "trend": "cut"
-      }
-    },
-    "Administrative Conference of the U.S.": {
-      "toptierCode": "302",
-      "fy2025": {
-        "budgetAuthority": 3563103.49,
-        "obligated": 3495248.89,
-        "outlays": 3586605.37
-      },
-      "fy2026": {
-        "budgetAuthority": 1412089.53,
-        "obligated": 916368.98,
-        "outlays": 870426.85
-      },
-      "change": {
-        "amount": -2151013.96,
-        "percent": 0.3963088734197838,
-        "trend": "cut"
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
       }
     }
   }

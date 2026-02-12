@@ -49,6 +49,8 @@ export interface BudgetCheckupReport {
 
 interface CachedBudgetDatabase {
   lastUpdated: string;
+  source?: string;
+  sourceUrl?: string;
   fiscalYears: number[];
   agencies: Record<string, {
     toptierCode: string;
