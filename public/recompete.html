@@ -614,22 +614,222 @@
             box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
         }
 
-        /* Responsive */
+        .state-badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 6px;
+            vertical-align: middle;
+            letter-spacing: 0.5px;
+        }
+
+        /* Responsive — Tablets */
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Responsive — Mobile */
         @media (max-width: 768px) {
-            .header h1 {
-                font-size: 32px;
+            .header {
+                padding: 30px 15px;
             }
 
-            .search-section {
-                padding: 25px;
+            .header h1 {
+                font-size: 26px;
+            }
+
+            .header p {
+                font-size: 15px;
+            }
+
+            .container {
+                padding: 20px 12px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+                margin-bottom: 25px;
+            }
+
+            .stat-card {
+                padding: 18px 12px;
+                border-radius: 14px;
+            }
+
+            .stat-icon {
+                font-size: 24px;
+                margin-bottom: 6px;
             }
 
             .stat-number {
-                font-size: 24px;
+                font-size: 22px;
+            }
+
+            .stat-label {
+                font-size: 11px;
+            }
+
+            .search-section {
+                padding: 20px 16px;
+                border-radius: 16px;
+                margin-bottom: 20px;
+            }
+
+            .search-header {
+                margin-bottom: 18px;
+            }
+
+            .search-header-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+                border-radius: 10px;
+            }
+
+            .search-header h2 {
+                font-size: 18px;
+            }
+
+            .search-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .input-group input,
+            .input-group select {
+                padding: 12px 14px;
+                font-size: 14px;
+            }
+
+            .button-row {
+                flex-direction: column;
+            }
+
+            .btn {
+                justify-content: center;
+                padding: 14px 20px;
+            }
+
+            .results-section {
+                border-radius: 16px;
+            }
+
+            .results-header {
+                padding: 16px 18px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .results-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
             }
 
             td, th {
-                padding: 12px 15px;
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+
+            .prime-name {
+                max-width: 160px;
+                font-size: 13px;
+            }
+
+            .agency-name {
+                max-width: 140px;
+                font-size: 12px;
+            }
+
+            .award-id {
+                max-width: 100px;
+                font-size: 11px;
+            }
+
+            .pagination {
+                padding: 18px 12px;
+                gap: 6px;
+            }
+
+            .pagination button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .modal-card {
+                max-width: 100%;
+                margin: 10px;
+                border-radius: 16px;
+            }
+
+            .modal-header {
+                padding: 20px;
+                border-radius: 16px 16px 0 0;
+            }
+
+            .modal-header h3 {
+                font-size: 17px;
+                padding-right: 30px;
+            }
+
+            .modal-body {
+                padding: 18px;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .detail-label {
+                width: auto;
+            }
+
+            .footer {
+                padding: 25px 15px;
+                font-size: 13px;
+            }
+        }
+
+        /* Responsive — Small phones */
+        @media (max-width: 400px) {
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .stat-number {
+                font-size: 18px;
+            }
+
+            .stat-card {
+                padding: 14px 10px;
+            }
+
+            .results-controls {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .btn-sm {
+                padding: 6px 12px;
+                font-size: 12px;
             }
         }
     </style>
@@ -723,6 +923,12 @@
                 <div class="input-group">
                     <label>Contracting Office</label>
                     <input type="text" id="searchOffice" placeholder="Search office name...">
+                </div>
+                <div class="input-group">
+                    <label>State</label>
+                    <select id="searchState">
+                        <option value="">All States</option>
+                    </select>
                 </div>
             </div>
 
@@ -859,6 +1065,33 @@
                 agencySelect.appendChild(option);
             });
 
+            // Populate state dropdown (only if State field exists in data)
+            const states = [...new Set(allContracts.map(c => c.State).filter(s => s && s.trim()))].sort();
+            if (states.length > 0) {
+                const stateSelect = document.getElementById('searchState');
+                const STATE_NAMES = {
+                    AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',
+                    CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',
+                    FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',
+                    IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',
+                    ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',
+                    MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',
+                    NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',
+                    NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',
+                    PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',
+                    TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',
+                    WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
+                    PR:'Puerto Rico',GU:'Guam',VI:'Virgin Islands',AS:'American Samoa',
+                    MP:'Northern Mariana Islands'
+                };
+                states.forEach(st => {
+                    const option = document.createElement('option');
+                    option.value = st;
+                    option.textContent = STATE_NAMES[st] ? `${STATE_NAMES[st]} (${st})` : st;
+                    stateSelect.appendChild(option);
+                });
+            }
+
             updateStats();
             filteredResults = [...allContracts];
             sortResults();
@@ -965,6 +1198,7 @@
             const awardSearch = document.getElementById('searchAward').value.toLowerCase();
             const expirationSearch = document.getElementById('searchExpiration').value;
             const officeSearch = document.getElementById('searchOffice').value.toLowerCase();
+            const stateSearch = document.getElementById('searchState').value;
 
             const now = new Date();
 
@@ -972,6 +1206,7 @@
                 if (primeSearch && !contract.Recipient?.toLowerCase().includes(primeSearch)) return false;
                 if (naicsSearch && !contract.NAICS?.includes(naicsSearch)) return false;
                 if (agencySearch && contract.Agency !== agencySearch) return false;
+                if (stateSearch && contract.State !== stateSearch) return false;
                 if (awardSearch && !contract['Award ID']?.toLowerCase().includes(awardSearch)) return false;
                 if (officeSearch && !contract.Office?.toLowerCase().includes(officeSearch)) return false;
 
@@ -1010,6 +1245,7 @@
             document.getElementById('searchAward').value = '';
             document.getElementById('searchExpiration').value = '';
             document.getElementById('searchOffice').value = '';
+            document.getElementById('searchState').value = '';
             filteredResults = [...allContracts];
             sortResults();
             currentPage = 1;
@@ -1052,7 +1288,7 @@
                 return `
                     <tr>
                         <td class="prime-name clickable" onclick="showContractDetails(${globalIdx})">${contract.Recipient || 'Unknown'}</td>
-                        <td class="agency-name">${contract.Agency || 'N/A'}${getBudgetBadge(contract.Agency)}<br><small style="color:#94a3b8">${contract.Office || ''}</small></td>
+                        <td class="agency-name">${contract.Agency || 'N/A'}${getBudgetBadge(contract.Agency)}${contract.State ? `<span class="state-badge">${contract.State}</span>` : ''}<br><small style="color:#94a3b8">${contract.Office || ''}</small></td>
                         <td class="contract-value ${valueClass}">${formatValueDisplay(contract['Total Value'])}</td>
                         <td><span class="naics-badge">${naicsCode}</span></td>
                         <td><span class="date-badge">${contract.Expiration || 'N/A'}</span></td>
@@ -1187,6 +1423,10 @@
                     <div class="detail-label">Office</div>
                     <div class="detail-value">${contract.Office || 'N/A'}</div>
                 </div>
+                ${contract.State ? `<div class="detail-row">
+                    <div class="detail-label">State</div>
+                    <div class="detail-value"><span class="state-badge" style="font-size:13px;padding:4px 10px;">${contract.State}</span></div>
+                </div>` : ''}
                 <div class="detail-row">
                     <div class="detail-label">Total Value</div>
                     <div class="detail-value highlight">${formatValueDisplay(contract['Total Value'])}</div>
@@ -1227,7 +1467,7 @@
         function exportFilteredCSV() {
             if (filteredResults.length === 0) return;
 
-            const headers = ['Recipient', 'Agency', 'Office', 'NAICS Code', 'NAICS Description', 'Total Value', 'Expiration', 'Start Date', 'Award ID', 'Contract Count'];
+            const headers = ['Recipient', 'Agency', 'Office', 'State', 'NAICS Code', 'NAICS Description', 'Total Value', 'Expiration', 'Start Date', 'Award ID', 'Contract Count'];
 
             function csvEscape(val) {
                 const str = String(val ?? '');
@@ -1247,6 +1487,7 @@
                     c.Recipient || '',
                     c.Agency || '',
                     c.Office || '',
+                    c.State || '',
                     naicsCode,
                     naicsDesc,
                     c['Total Value'] || '',
@@ -1284,6 +1525,7 @@
                     'Recipient': c.Recipient || '',
                     'Agency': c.Agency || '',
                     'Office': c.Office || '',
+                    'State': c.State || '',
                     'NAICS Code': naicsCode,
                     'NAICS Description': naicsDesc,
                     'Total Value': c['Total Value'] || '',
@@ -1318,7 +1560,7 @@
             });
 
             // Attach instant search to dropdowns
-            ['searchAgency', 'searchValue', 'searchExpiration'].forEach(id => {
+            ['searchAgency', 'searchValue', 'searchExpiration', 'searchState'].forEach(id => {
                 document.getElementById(id).addEventListener('change', performSearch);
             });
 
