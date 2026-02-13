@@ -374,8 +374,13 @@ npm run build
 - `file-saver@2.0.5` — `saveAs()` for reliable blob downloads
 
 **Bulk Export Functions (index.html):**
-- `exportAllPostsToDocx()` — exports all `generatedPosts` to Word doc, one post per page, hashtags in LinkedIn blue
+- `exportAllPostsToDocx()` — exports all `generatedPosts` to Word doc, one post per page, hashtags in LinkedIn blue. `parseMarkdownLine()` converts `**bold**`/`*italic*` to Word TextRuns. Blank lines get `spacing: { after: 200 }`, `- ` lines render as Word bullets.
 - `downloadAllVisuals()` — generates quote card PNGs for each post (cycles 6 `quoteCardStyles` themes), bundles into .zip. Gated on `hasGraphicsAccess` (Full Fix tier only)
+
+**Formatting Pipeline (index.html):**
+- `renderMarkdown(text)` — HTML-escapes, strips leading whitespace, converts `**bold**` → `<strong>`, `*italic*` → `<em>`. Used for web display.
+- `stripMarkdown(text)` — removes all `*` markers. Used for clipboard copy and graphic API calls.
+- Two display functions: `displayQuickGeneratedPosts()` (quick flow) and `displayPosts()` (full flow with expand/collapse)
 
 **CRITICAL:** `API_BASE` in all three HTML files MUST be `''` (empty string) for same-origin API calls. NEVER set it to an external URL like `govcon-content-generator.vercel.app` — that deployment is dead.
 
@@ -498,6 +503,19 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 ---
 
 ## Recent Work History
+
+### February 12, 2026 (Session 13)
+- **Content Generator .docx Export & Formatting Overhaul**
+  - API route (`generate/route.ts`): stopped stripping `**bold**` and `*italic*` markdown markers — now preserved for .docx and web display
+  - Added `renderMarkdown(text)` to `index.html` — converts `**bold**` → `<strong>`, `*italic*` → `<em>` with HTML entity escaping (XSS-safe)
+  - Added `stripMarkdown(text)` — removes all `*` markers for clipboard copy and graphic API calls
+  - Post card rendering changed from `<pre>` to `<div>` with `renderMarkdown()` for proper bold/italic display
+  - Fixed hashtag display bug: `displayQuickGeneratedPosts` was rendering array via `${post.hashtags}` (comma-joined) → now uses `.join(' ')`
+  - Fixed hashtag display in .docx export: `text: post.hashtags` → `Array.isArray(...) ? .join(' ') : post.hashtags`
+  - Added "TEXT FORMATTING" section to Step 3 prompt: instructs AI to use `**bold**` for key terms and `*italic*` for tips/warnings across ALL templates
+  - Left-justified all content: `.replace(/^[ \t]+/gm, '')` in both API route and frontend `renderMarkdown` — no indentation in any post
+  - .docx export: blank lines now get `spacing: { after: 200 }` (was 80) for proper paragraph breaks
+  - .docx export: lines starting with `- ` render as Word bullet paragraphs with `bullet: { level: 0 }`
 
 ### February 12, 2026 (Session 12)
 - **FY2026 Budget Integration & Simulated Data Elimination**
@@ -631,4 +649,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 11, 2026 (Session 11)*
+*Last Updated: February 12, 2026 (Session 13)*

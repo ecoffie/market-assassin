@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recompete Contracts Tracker | GovCon Giants</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -568,6 +569,51 @@
             text-decoration: none;
         }
 
+        /* Results Controls */
+        .results-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .per-page-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .per-page-control label {
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .per-page-control select {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #ffffff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .per-page-control select option {
+            background: #1e293b;
+            color: #ffffff;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .btn-export:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .header h1 {
@@ -664,6 +710,20 @@
                     <label>Award ID</label>
                     <input type="text" id="searchAward" placeholder="Search award ID...">
                 </div>
+                <div class="input-group">
+                    <label>Expiration Timeline</label>
+                    <select id="searchExpiration">
+                        <option value="">All Dates</option>
+                        <option value="3">Next 3 Months</option>
+                        <option value="3-6">3-6 Months</option>
+                        <option value="6-12">6-12 Months</option>
+                        <option value="12+">12+ Months</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Contracting Office</label>
+                    <input type="text" id="searchOffice" placeholder="Search office name...">
+                </div>
             </div>
 
             <div class="button-row">
@@ -679,8 +739,23 @@
         <!-- Results Section -->
         <div class="results-section">
             <div class="results-header">
-                <h3>Contract Results</h3>
-                <span class="results-count" id="resultsCount">Loading...</span>
+                <div>
+                    <h3>Contract Results</h3>
+                    <span class="results-count" id="resultsCount">Loading...</span>
+                </div>
+                <div class="results-controls">
+                    <div class="per-page-control">
+                        <label for="perPageSelect">Show</label>
+                        <select id="perPageSelect">
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-export btn-sm" onclick="exportFilteredCSV()">CSV</button>
+                    <button class="btn btn-export btn-sm" onclick="exportFilteredExcel()">Excel</button>
+                </div>
             </div>
 
             <div class="table-container">
@@ -737,7 +812,7 @@
         let filteredResults = [];
         let currentPage = 1;
         let currentSort = { field: 'value', direction: 'desc' };
-        const perPage = 25;
+        let perPage = 25;
         let budgetMap = {};
 
         function getBudgetBadge(agencyName) {
@@ -876,18 +951,29 @@
             });
         }
 
+        function parseExpirationDate(dateStr) {
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
         function performSearch() {
             const primeSearch = document.getElementById('searchPrime').value.toLowerCase();
             const naicsSearch = document.getElementById('searchNaics').value;
             const agencySearch = document.getElementById('searchAgency').value;
             const valueSearch = document.getElementById('searchValue').value;
             const awardSearch = document.getElementById('searchAward').value.toLowerCase();
+            const expirationSearch = document.getElementById('searchExpiration').value;
+            const officeSearch = document.getElementById('searchOffice').value.toLowerCase();
+
+            const now = new Date();
 
             filteredResults = allContracts.filter(contract => {
                 if (primeSearch && !contract.Recipient?.toLowerCase().includes(primeSearch)) return false;
                 if (naicsSearch && !contract.NAICS?.includes(naicsSearch)) return false;
                 if (agencySearch && contract.Agency !== agencySearch) return false;
                 if (awardSearch && !contract['Award ID']?.toLowerCase().includes(awardSearch)) return false;
+                if (officeSearch && !contract.Office?.toLowerCase().includes(officeSearch)) return false;
 
                 if (valueSearch) {
                     const value = parseValue(contract['Total Value']);
@@ -896,6 +982,16 @@
                     if (valueSearch === 'medium' && (value < 1e6 || value >= 1e7)) return false;
                     if (valueSearch === 'large' && (value < 1e7 || value >= 1e8)) return false;
                     if (valueSearch === 'major' && value < 1e8) return false;
+                }
+
+                if (expirationSearch) {
+                    const expDate = parseExpirationDate(contract.Expiration);
+                    if (!expDate) return false;
+                    const monthsAway = (expDate - now) / (1000 * 60 * 60 * 24 * 30.44);
+                    if (expirationSearch === '3' && monthsAway > 3) return false;
+                    if (expirationSearch === '3-6' && (monthsAway <= 3 || monthsAway > 6)) return false;
+                    if (expirationSearch === '6-12' && (monthsAway <= 6 || monthsAway > 12)) return false;
+                    if (expirationSearch === '12+' && monthsAway <= 12) return false;
                 }
 
                 return true;
@@ -912,6 +1008,8 @@
             document.getElementById('searchAgency').value = '';
             document.getElementById('searchValue').value = '';
             document.getElementById('searchAward').value = '';
+            document.getElementById('searchExpiration').value = '';
+            document.getElementById('searchOffice').value = '';
             filteredResults = [...allContracts];
             sortResults();
             currentPage = 1;
@@ -920,8 +1018,10 @@
 
         function renderResults() {
             const tbody = document.getElementById('resultsBody');
-            const start = (currentPage - 1) * perPage;
-            const end = start + perPage;
+            const perPageSelect = document.getElementById('perPageSelect');
+            const effectivePerPage = perPageSelect && perPageSelect.value === 'all' ? filteredResults.length : perPage;
+            const start = (currentPage - 1) * effectivePerPage;
+            const end = start + effectivePerPage;
             const pageResults = filteredResults.slice(start, end);
 
             document.getElementById('resultsCount').textContent =
@@ -947,7 +1047,7 @@
                 const value = parseValue(contract['Total Value']);
                 const valueClass = value >= 100000000 ? 'high' : '';
                 const naicsCode = contract.NAICS?.split(' ')[0] || '';
-                const globalIdx = (currentPage - 1) * perPage + idx;
+                const globalIdx = (currentPage - 1) * effectivePerPage + idx;
 
                 return `
                     <tr>
@@ -965,7 +1065,9 @@
         }
 
         function renderPagination() {
-            const totalPages = Math.ceil(filteredResults.length / perPage);
+            const perPageSelect = document.getElementById('perPageSelect');
+            const effectivePerPage = perPageSelect && perPageSelect.value === 'all' ? filteredResults.length : perPage;
+            const totalPages = Math.ceil(filteredResults.length / effectivePerPage);
             const pagination = document.getElementById('pagination');
 
             if (totalPages <= 1) {
@@ -1106,7 +1208,123 @@
             document.body.style.overflow = '';
         }
 
-        document.addEventListener('DOMContentLoaded', loadData);
+        // Debounced auto-search
+        let searchTimeout = null;
+        function debouncedSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(performSearch, 300);
+        }
+
+        // Per-page selector
+        function handlePerPageChange() {
+            const val = document.getElementById('perPageSelect').value;
+            perPage = val === 'all' ? filteredResults.length || allContracts.length : parseInt(val);
+            currentPage = 1;
+            renderResults();
+        }
+
+        // CSV Export
+        function exportFilteredCSV() {
+            if (filteredResults.length === 0) return;
+
+            const headers = ['Recipient', 'Agency', 'Office', 'NAICS Code', 'NAICS Description', 'Total Value', 'Expiration', 'Start Date', 'Award ID', 'Contract Count'];
+
+            function csvEscape(val) {
+                const str = String(val ?? '');
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+            }
+
+            const rows = filteredResults.map(c => {
+                const naicsParts = (c.NAICS || '').split(' ');
+                const naicsCode = naicsParts[0] || '';
+                const naicsDesc = naicsParts.slice(1).join(' ').replace(/^-\s*/, '') || '';
+                const contractCount = c.Contracts ? c.Contracts.length : 1;
+                const startDate = c.Contracts && c.Contracts.length > 0 ? c.Contracts[0]['Start Date'] || '' : '';
+                return [
+                    c.Recipient || '',
+                    c.Agency || '',
+                    c.Office || '',
+                    naicsCode,
+                    naicsDesc,
+                    c['Total Value'] || '',
+                    c.Expiration || '',
+                    startDate,
+                    c['Award ID'] || '',
+                    contractCount
+                ].map(csvEscape).join(',');
+            });
+
+            const csv = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const date = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `recompete-contracts-${date}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Excel Export
+        function exportFilteredExcel() {
+            if (filteredResults.length === 0 || typeof XLSX === 'undefined') return;
+
+            const data = filteredResults.map(c => {
+                const naicsParts = (c.NAICS || '').split(' ');
+                const naicsCode = naicsParts[0] || '';
+                const naicsDesc = naicsParts.slice(1).join(' ').replace(/^-\s*/, '') || '';
+                const contractCount = c.Contracts ? c.Contracts.length : 1;
+                const startDate = c.Contracts && c.Contracts.length > 0 ? c.Contracts[0]['Start Date'] || '' : '';
+                return {
+                    'Recipient': c.Recipient || '',
+                    'Agency': c.Agency || '',
+                    'Office': c.Office || '',
+                    'NAICS Code': naicsCode,
+                    'NAICS Description': naicsDesc,
+                    'Total Value': c['Total Value'] || '',
+                    'Expiration': c.Expiration || '',
+                    'Start Date': startDate,
+                    'Award ID': c['Award ID'] || '',
+                    'Contract Count': contractCount
+                };
+            });
+
+            const ws = XLSX.utils.json_to_sheet(data);
+
+            // Auto-width columns
+            const colWidths = Object.keys(data[0]).map(key => {
+                const maxLen = Math.max(key.length, ...data.map(row => String(row[key] || '').length));
+                return { wch: Math.min(maxLen + 2, 40) };
+            });
+            ws['!cols'] = colWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Recompete Contracts');
+            const date = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `recompete-contracts-${date}.xlsx`);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+
+            // Attach debounced search to text inputs
+            ['searchPrime', 'searchNaics', 'searchAward', 'searchOffice'].forEach(id => {
+                document.getElementById(id).addEventListener('input', debouncedSearch);
+            });
+
+            // Attach instant search to dropdowns
+            ['searchAgency', 'searchValue', 'searchExpiration'].forEach(id => {
+                document.getElementById(id).addEventListener('change', performSearch);
+            });
+
+            // Per-page selector
+            document.getElementById('perPageSelect').addEventListener('change', handlePerPageChange);
+        });
         document.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') performSearch();
         });
