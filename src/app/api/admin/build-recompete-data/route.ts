@@ -32,14 +32,8 @@ interface RawAward {
   'Place of Performance State Code': string;
 }
 
-interface ContractGroup {
-  Recipient: string;
-  Agency: string;
-  Office: string;
-  NAICS: string;
-  contracts: RawAward[];
-  states: string[];
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface ExistingContract { [key: string]: any }
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -52,50 +46,18 @@ function formatCurrency(value: number): string {
 }
 
 /**
- * GET /api/admin/build-recompete-data?password=...&mode=preview|build
- *
- * Fetches expiring contracts from USASpending API with Place of Performance State.
- * Outputs data in contracts-data.js format for the Recompete Tracker.
- *
- * Query params:
- * - password: admin password (required)
- * - mode: 'preview' (5 pages, 10 results shown) or 'build' (full fetch)
- * - pages: max pages to fetch from USASpending (default: 100 for build, 5 for preview)
- * - start: action date start (default: 2023-01-01)
- * - end: action date end (default: 2026-12-31)
- * - expireAfter: only include contracts expiring after this date (default: today)
- * - expireBefore: only include contracts expiring before this date (default: 2027-12-31)
+ * Fetch pages from USASpending API and collect all awards
  */
-export async function GET(request: NextRequest) {
-  const ip = getClientIP(request);
-  const rl = await checkAdminRateLimit(ip);
-  if (!rl.allowed) return rateLimitResponse(rl);
-
-  const { searchParams } = new URL(request.url);
-  const password = searchParams.get('password');
-
-  if (!verifyAdminPassword(password)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const mode = searchParams.get('mode') || 'preview';
-  const maxPages = parseInt(searchParams.get('pages') || (mode === 'build' ? '100' : '5'));
-  const actionStart = searchParams.get('start') || '2023-01-01';
-  const actionEnd = searchParams.get('end') || '2026-12-31';
-  const expireAfterStr = searchParams.get('expireAfter');
-  const expireBeforeStr = searchParams.get('expireBefore') || '2027-12-31';
-
-  const expireAfter = expireAfterStr ? new Date(expireAfterStr) : new Date();
-  const expireBefore = new Date(expireBeforeStr);
-
+async function fetchUSASpendingAwards(maxPages: number, actionStart: string, actionEnd: string): Promise<{
+  awards: RawAward[];
+  pagesActuallyFetched: number;
+  fetchErrors: number;
+}> {
   const filters = {
     award_type_codes: ['A', 'B', 'C', 'D'],
-    time_period: [
-      { start_date: actionStart, end_date: actionEnd }
-    ]
+    time_period: [{ start_date: actionStart, end_date: actionEnd }]
   };
 
-  // Fetch all pages from USASpending
   const allAwards: RawAward[] = [];
   let pagesActuallyFetched = 0;
   let fetchErrors = 0;
@@ -121,22 +83,222 @@ export async function GET(request: NextRequest) {
 
       if (data?.results) {
         allAwards.push(...data.results);
-        if (data.results.length < 100) break; // Last page
+        if (data.results.length < 100) break;
       } else {
         break;
       }
     } catch (error) {
       console.error(`Error fetching page ${page}:`, error);
       fetchErrors++;
-      if (fetchErrors >= 3) break; // Too many errors, stop
+      if (fetchErrors >= 3) break;
       continue;
     }
 
-    // Rate limit delay between requests
     if (page < maxPages) {
       await new Promise(resolve => setTimeout(resolve, 150));
     }
   }
+
+  return { awards: allAwards, pagesActuallyFetched, fetchErrors };
+}
+
+/**
+ * Build a state lookup map from USASpending awards.
+ * Key: normalized "recipient|||agency" → state code
+ * Also builds Award ID → state lookup.
+ */
+function buildStateLookup(awards: RawAward[]): {
+  byRecipientAgency: Map<string, string>;
+  byAwardId: Map<string, string>;
+} {
+  const recipientAgencyStates = new Map<string, Map<string, number>>();
+  const awardIdStates = new Map<string, string>();
+
+  for (const award of awards) {
+    const state = award['Place of Performance State Code']?.trim();
+    if (!state) continue;
+
+    // Award ID lookup
+    if (award['Award ID']) {
+      awardIdStates.set(award['Award ID'].trim(), state);
+    }
+
+    // Recipient + Agency lookup (accumulate counts for most common state)
+    const key = `${(award['Recipient Name'] || '').trim().toUpperCase()}|||${(award['Awarding Agency'] || '').trim().toUpperCase()}`;
+    if (!recipientAgencyStates.has(key)) {
+      recipientAgencyStates.set(key, new Map());
+    }
+    const counts = recipientAgencyStates.get(key)!;
+    counts.set(state, (counts.get(state) || 0) + 1);
+  }
+
+  // Resolve to most common state per recipient+agency
+  const byRecipientAgency = new Map<string, string>();
+  for (const [key, counts] of recipientAgencyStates) {
+    let bestState = '';
+    let bestCount = 0;
+    for (const [st, ct] of counts) {
+      if (ct > bestCount) { bestState = st; bestCount = ct; }
+    }
+    byRecipientAgency.set(key, bestState);
+  }
+
+  return { byRecipientAgency, byAwardId: awardIdStates };
+}
+
+/**
+ * GET /api/admin/build-recompete-data?password=...&mode=preview|build|enrich
+ *
+ * Modes:
+ * - preview: Quick test (5 pages, 10 results shown)
+ * - build: Full rebuild from USASpending (replaces all data)
+ * - enrich: Fetches live contracts-data.js, adds State from USASpending, returns enriched file
+ *
+ * Query params:
+ * - password: admin password (required)
+ * - mode: preview | build | enrich
+ * - format: 'js' to get downloadable contracts-data.js file (build/enrich modes)
+ * - pages: max USASpending pages (default: 100 for build/enrich, 5 for preview)
+ * - start: action date start (default: 2023-01-01)
+ * - end: action date end (default: 2026-12-31)
+ * - expireAfter: filter contracts expiring after (default: today, build mode only)
+ * - expireBefore: filter contracts expiring before (default: 2027-12-31, build mode only)
+ */
+export async function GET(request: NextRequest) {
+  const ip = getClientIP(request);
+  const rl = await checkAdminRateLimit(ip);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
+  const { searchParams } = new URL(request.url);
+  const password = searchParams.get('password');
+
+  if (!verifyAdminPassword(password)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const mode = searchParams.get('mode') || 'preview';
+  const format = searchParams.get('format');
+  const maxPages = parseInt(searchParams.get('pages') || (mode === 'preview' ? '5' : '100'));
+  const actionStart = searchParams.get('start') || '2023-01-01';
+  const actionEnd = searchParams.get('end') || '2026-12-31';
+
+  // ─── ENRICH MODE ───
+  // Fetches existing contracts-data.js from live site, adds State field using USASpending lookup
+  if (mode === 'enrich') {
+    // Step 1: Fetch existing contracts-data.js from live site
+    let existingContracts: ExistingContract[];
+    try {
+      const liveUrl = `${new URL(request.url).origin}/contracts-data.js?v=${Date.now()}`;
+      const resp = await fetch(liveUrl, { signal: AbortSignal.timeout(15000) });
+      const text = await resp.text();
+      // Parse: strip "const expiringContractsData = " prefix and trailing ";"
+      const jsonStr = text.replace(/^[^[]*/, '').replace(/;?\s*$/, '');
+      existingContracts = JSON.parse(jsonStr);
+    } catch (error) {
+      return NextResponse.json({
+        error: 'Failed to fetch/parse existing contracts-data.js',
+        details: String(error)
+      }, { status: 500 });
+    }
+
+    // Step 2: Fetch state data from USASpending
+    const { awards, pagesActuallyFetched, fetchErrors } = await fetchUSASpendingAwards(maxPages, actionStart, actionEnd);
+
+    // Step 3: Build state lookup maps
+    const { byRecipientAgency, byAwardId } = buildStateLookup(awards);
+
+    // Step 4: Merge states into existing contracts
+    let matched = 0;
+    let matchedByAwardId = 0;
+    let matchedByRecipient = 0;
+
+    for (const contract of existingContracts) {
+      if (contract.State) continue; // Already has state, skip
+
+      // Try matching by Award ID first (most precise)
+      const primaryAwardId = (contract['Award ID'] || '').split(' (')[0].split(' +')[0].trim();
+      if (primaryAwardId && byAwardId.has(primaryAwardId)) {
+        contract.State = byAwardId.get(primaryAwardId);
+        matched++;
+        matchedByAwardId++;
+        continue;
+      }
+
+      // Try matching individual contracts' Award IDs
+      if (contract.Contracts && Array.isArray(contract.Contracts)) {
+        for (const sub of contract.Contracts) {
+          const subId = (sub['Award ID'] || '').trim();
+          if (subId && byAwardId.has(subId)) {
+            contract.State = byAwardId.get(subId);
+            matched++;
+            matchedByAwardId++;
+            break;
+          }
+        }
+        if (contract.State) continue;
+      }
+
+      // Fallback: match by Recipient + Agency
+      const key = `${(contract.Recipient || '').trim().toUpperCase()}|||${(contract.Agency || '').trim().toUpperCase()}`;
+      if (byRecipientAgency.has(key)) {
+        contract.State = byRecipientAgency.get(key);
+        matched++;
+        matchedByRecipient++;
+      }
+    }
+
+    const totalWithState = existingContracts.filter(c => c.State).length;
+    const uniqueStates = [...new Set(existingContracts.map(c => c.State).filter(Boolean))].sort();
+
+    // Return as downloadable .js file
+    if (format === 'js') {
+      const jsContent = `const expiringContractsData = ${JSON.stringify(existingContracts)};`;
+      return new Response(jsContent, {
+        headers: {
+          'Content-Type': 'application/javascript',
+          'Content-Disposition': 'attachment; filename="contracts-data.js"',
+        }
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      mode: 'enrich',
+      stats: {
+        existingRecords: existingContracts.length,
+        usaSpendingAwardsFetched: awards.length,
+        pagesActuallyFetched,
+        fetchErrors,
+        stateLookupsBuilt: {
+          byAwardId: byAwardId.size,
+          byRecipientAgency: byRecipientAgency.size
+        },
+        matched,
+        matchedByAwardId,
+        matchedByRecipient,
+        totalWithState,
+        totalWithoutState: existingContracts.length - totalWithState,
+        coveragePercent: ((totalWithState / existingContracts.length) * 100).toFixed(1) + '%',
+        uniqueStates: uniqueStates.length,
+        states: uniqueStates
+      },
+      // Show first 10 enriched records as preview
+      sample: existingContracts.slice(0, 10).map(c => ({
+        Recipient: c.Recipient,
+        Agency: c.Agency,
+        State: c.State || '(none)',
+        'Total Value': c['Total Value']
+      }))
+    });
+  }
+
+  // ─── BUILD / PREVIEW MODE ───
+  const expireAfterStr = searchParams.get('expireAfter');
+  const expireBeforeStr = searchParams.get('expireBefore') || '2027-12-31';
+  const expireAfter = expireAfterStr ? new Date(expireAfterStr) : new Date();
+  const expireBefore = new Date(expireBeforeStr);
+
+  const { awards: allAwards, pagesActuallyFetched, fetchErrors } = await fetchUSASpendingAwards(maxPages, actionStart, actionEnd);
 
   // Filter for contracts expiring in target range
   const expiringAwards = allAwards.filter(award => {
@@ -146,7 +308,7 @@ export async function GET(request: NextRequest) {
   });
 
   // Group by Recipient + Agency + NAICS Code
-  const groups: Record<string, ContractGroup> = {};
+  const groups: Record<string, { Recipient: string; Agency: string; Office: string; NAICS: string; contracts: RawAward[]; states: string[] }> = {};
 
   for (const award of expiringAwards) {
     const recipient = award['Recipient Name'] || 'Unknown';
@@ -168,44 +330,27 @@ export async function GET(request: NextRequest) {
     }
 
     groups[key].contracts.push(award);
-
     const stateCode = award['Place of Performance State Code'];
-    if (stateCode && stateCode.trim()) {
-      groups[key].states.push(stateCode.trim());
-    }
+    if (stateCode?.trim()) groups[key].states.push(stateCode.trim());
   }
 
   // Build output records
   const output = Object.values(groups).map(group => {
-    // Most common state in the group
     const stateCounts: Record<string, number> = {};
     group.states.forEach(s => { stateCounts[s] = (stateCounts[s] || 0) + 1; });
     const sortedStates = Object.entries(stateCounts).sort((a, b) => b[1] - a[1]);
     const state = sortedStates[0]?.[0] || '';
 
-    // Sum total value
     const totalValue = group.contracts.reduce(
       (sum, c) => sum + (typeof c['Award Amount'] === 'number' ? c['Award Amount'] : parseFloat(String(c['Award Amount'])) || 0),
       0
     );
 
-    // Earliest expiration
-    const endDates = group.contracts
-      .map(c => new Date(c['End Date']))
-      .filter(d => !isNaN(d.getTime()))
-      .sort((a, b) => a.getTime() - b.getTime());
+    const endDates = group.contracts.map(c => new Date(c['End Date'])).filter(d => !isNaN(d.getTime())).sort((a, b) => a.getTime() - b.getTime());
+    const startDates = group.contracts.map(c => new Date(c['Start Date'])).filter(d => !isNaN(d.getTime())).sort((a, b) => a.getTime() - b.getTime());
 
-    // Earliest start date
-    const startDates = group.contracts
-      .map(c => new Date(c['Start Date']))
-      .filter(d => !isNaN(d.getTime()))
-      .sort((a, b) => a.getTime() - b.getTime());
-
-    // Award ID display
     const awardIds = [...new Set(group.contracts.map(c => c['Award ID']))];
-    const awardIdDisplay = awardIds.length > 1
-      ? `${awardIds[0]} (+${awardIds.length - 1} more)`
-      : awardIds[0] || '';
+    const awardIdDisplay = awardIds.length > 1 ? `${awardIds[0]} (+${awardIds.length - 1} more)` : awardIds[0] || '';
 
     return {
       Recipient: group.Recipient,
@@ -222,37 +367,30 @@ export async function GET(request: NextRequest) {
         'Award ID': c['Award ID'],
         'Start Date': formatDate(c['Start Date']),
         Expiration: formatDate(c['End Date']),
-        Value: formatCurrency(
-          typeof c['Award Amount'] === 'number' ? c['Award Amount'] : parseFloat(String(c['Award Amount'])) || 0
-        )
+        Value: formatCurrency(typeof c['Award Amount'] === 'number' ? c['Award Amount'] : parseFloat(String(c['Award Amount'])) || 0)
       }))
     };
   });
 
-  // Sort by total value descending
   output.sort((a, b) => {
     const aVal = parseFloat(a['Total Value'].replace(/[$,\s]/g, '')) || 0;
     const bVal = parseFloat(b['Total Value'].replace(/[$,\s]/g, '')) || 0;
     return bVal - aVal;
   });
 
-  // Unique states for reference
   const uniqueStates = [...new Set(output.map(r => r.State).filter(Boolean))].sort();
 
-  const format = searchParams.get('format');
-
-  // Return as downloadable .js file
   if (format === 'js' && mode === 'build') {
     const jsContent = `const expiringContractsData = ${JSON.stringify(output)};`;
     return new Response(jsContent, {
       headers: {
         'Content-Type': 'application/javascript',
-        'Content-Disposition': `attachment; filename="contracts-data.js"`,
+        'Content-Disposition': 'attachment; filename="contracts-data.js"',
       }
     });
   }
 
-  const result = {
+  return NextResponse.json({
     success: true,
     mode,
     stats: {
@@ -270,7 +408,5 @@ export async function GET(request: NextRequest) {
       }
     },
     data: mode === 'build' ? output : output.slice(0, 10)
-  };
-
-  return NextResponse.json(result);
+  });
 }
