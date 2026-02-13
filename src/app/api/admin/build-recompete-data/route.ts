@@ -239,6 +239,19 @@ export async function GET(request: NextRequest) {
   // Unique states for reference
   const uniqueStates = [...new Set(output.map(r => r.State).filter(Boolean))].sort();
 
+  const format = searchParams.get('format');
+
+  // Return as downloadable .js file
+  if (format === 'js' && mode === 'build') {
+    const jsContent = `const expiringContractsData = ${JSON.stringify(output)};`;
+    return new Response(jsContent, {
+      headers: {
+        'Content-Type': 'application/javascript',
+        'Content-Disposition': `attachment; filename="contracts-data.js"`,
+      }
+    });
+  }
+
   const result = {
     success: true,
     mode,
