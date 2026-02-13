@@ -110,7 +110,9 @@ async function fetchUSASpendingAwards(
     } catch (error) {
       console.error(`Error fetching page ${page} (sort: ${sortField}):`, error);
       fetchErrors++;
-      if (fetchErrors >= 3) break;
+      if (fetchErrors >= 5) break;
+      // Back off after errors
+      await new Promise(resolve => setTimeout(resolve, 500 * fetchErrors));
       continue;
     }
 
@@ -135,7 +137,7 @@ async function fetchTargetedAwards(
   totalFetchErrors: number;
   batchStats: { sort: string; awards: number; pages: number }[];
 }> {
-  const sortFields = ['Award Amount', 'Start Date', 'End Date'];
+  const sortFields = ['Award Amount', 'Recipient Name', 'Last Modified Date'];
   const seenAwardIds = new Set<string>();
   const allAwards: RawAward[] = [];
   let totalPagesFetched = 0;
@@ -290,7 +292,8 @@ export async function GET(request: NextRequest) {
   const strategy = searchParams.get('strategy') || 'default'; // 'default' or 'targeted'
   const defaultPages = mode === 'preview' ? '5' : (mode === 'enrich' ? '200' : '100');
   const maxPages = parseInt(searchParams.get('pages') || defaultPages);
-  const actionStart = searchParams.get('start') || '2023-01-01';
+  const defaultStart = mode === 'enrich' ? '2018-01-01' : '2023-01-01';
+  const actionStart = searchParams.get('start') || defaultStart;
   const actionEnd = searchParams.get('end') || '2026-12-31';
 
   // ─── ENRICH MODE ───
