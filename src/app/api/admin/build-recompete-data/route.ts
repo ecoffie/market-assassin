@@ -45,10 +45,30 @@ function formatCurrency(value: number): string {
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `;
 }
 
+/** Normalize an Award ID for fuzzy matching: uppercase, strip whitespace and dashes */
+function normalizeAwardId(id: string): string {
+  return id.trim().toUpperCase().replace(/[-\s]/g, '');
+}
+
+/** Normalize a recipient name: uppercase, strip common suffixes and trailing punctuation */
+function normalizeRecipientName(name: string): string {
+  const SUFFIXES = /\b(INCORPORATED|CORPORATION|COMPANY|LIMITED|PLLC|LLC|INC|CORP|LLP|PLC|LTD|LP|CO|PC)\b\.?/g;
+  return name.trim().toUpperCase()
+    .replace(SUFFIXES, '')
+    .replace(/[,.\s]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Fetch pages from USASpending API and collect all awards
  */
-async function fetchUSASpendingAwards(maxPages: number, actionStart: string, actionEnd: string): Promise<{
+async function fetchUSASpendingAwards(
+  maxPages: number,
+  actionStart: string,
+  actionEnd: string,
+  sortField: string = 'Award Amount'
+): Promise<{
   awards: RawAward[];
   pagesActuallyFetched: number;
   fetchErrors: number;
@@ -73,7 +93,7 @@ async function fetchUSASpendingAwards(maxPages: number, actionStart: string, act
           page,
           limit: 100,
           order: 'desc',
-          sort: 'Award Amount'
+          sort: sortField
         }),
         signal: AbortSignal.timeout(30000)
       });
@@ -88,7 +108,7 @@ async function fetchUSASpendingAwards(maxPages: number, actionStart: string, act
         break;
       }
     } catch (error) {
-      console.error(`Error fetching page ${page}:`, error);
+      console.error(`Error fetching page ${page} (sort: ${sortField}):`, error);
       fetchErrors++;
       if (fetchErrors >= 3) break;
       continue;
@@ -103,47 +123,135 @@ async function fetchUSASpendingAwards(maxPages: number, actionStart: string, act
 }
 
 /**
- * Build a state lookup map from USASpending awards.
- * Key: normalized "recipient|||agency" → state code
- * Also builds Award ID → state lookup.
+ * Targeted fetch: multiple batches with different sort orders to maximize data diversity
+ */
+async function fetchTargetedAwards(
+  maxPagesPerBatch: number,
+  actionStart: string,
+  actionEnd: string
+): Promise<{
+  awards: RawAward[];
+  totalPagesFetched: number;
+  totalFetchErrors: number;
+  batchStats: { sort: string; awards: number; pages: number }[];
+}> {
+  const sortFields = ['Award Amount', 'Start Date', 'End Date'];
+  const seenAwardIds = new Set<string>();
+  const allAwards: RawAward[] = [];
+  let totalPagesFetched = 0;
+  let totalFetchErrors = 0;
+  const batchStats: { sort: string; awards: number; pages: number }[] = [];
+
+  for (const sortField of sortFields) {
+    const batch = await fetchUSASpendingAwards(maxPagesPerBatch, actionStart, actionEnd, sortField);
+    totalPagesFetched += batch.pagesActuallyFetched;
+    totalFetchErrors += batch.fetchErrors;
+
+    // Deduplicate across batches by Award ID
+    let newCount = 0;
+    for (const award of batch.awards) {
+      const id = award['Award ID'];
+      if (id && seenAwardIds.has(id)) continue;
+      if (id) seenAwardIds.add(id);
+      allAwards.push(award);
+      newCount++;
+    }
+
+    batchStats.push({ sort: sortField, awards: newCount, pages: batch.pagesActuallyFetched });
+  }
+
+  return { awards: allAwards, totalPagesFetched, totalFetchErrors, batchStats };
+}
+
+/**
+ * Build state lookup maps from USASpending awards.
+ * Returns exact and normalized maps for Award ID, Recipient+Agency, and Recipient-only fallback.
  */
 function buildStateLookup(awards: RawAward[]): {
-  byRecipientAgency: Map<string, string>;
   byAwardId: Map<string, string>;
+  byNormalizedAwardId: Map<string, string>;
+  byRecipientAgency: Map<string, string>;
+  byNormalizedRecipientAgency: Map<string, string>;
+  byRecipientOnly: Map<string, string>;
 } {
-  const recipientAgencyStates = new Map<string, Map<string, number>>();
   const awardIdStates = new Map<string, string>();
+  const normalizedAwardIdStates = new Map<string, string>();
+  const recipientAgencyStates = new Map<string, Map<string, number>>();
+  const normalizedRecipientAgencyStates = new Map<string, Map<string, number>>();
+  const recipientOnlyStates = new Map<string, Map<string, number>>();
 
   for (const award of awards) {
     const state = award['Place of Performance State Code']?.trim();
     if (!state) continue;
 
-    // Award ID lookup
+    // Exact Award ID lookup
     if (award['Award ID']) {
-      awardIdStates.set(award['Award ID'].trim(), state);
+      const id = award['Award ID'].trim();
+      awardIdStates.set(id, state);
+      normalizedAwardIdStates.set(normalizeAwardId(id), state);
     }
 
-    // Recipient + Agency lookup (accumulate counts for most common state)
-    const key = `${(award['Recipient Name'] || '').trim().toUpperCase()}|||${(award['Awarding Agency'] || '').trim().toUpperCase()}`;
-    if (!recipientAgencyStates.has(key)) {
-      recipientAgencyStates.set(key, new Map());
+    const recipientRaw = (award['Recipient Name'] || '').trim().toUpperCase();
+    const agencyRaw = (award['Awarding Agency'] || '').trim().toUpperCase();
+
+    // Exact Recipient + Agency lookup
+    const exactKey = `${recipientRaw}|||${agencyRaw}`;
+    if (!recipientAgencyStates.has(exactKey)) recipientAgencyStates.set(exactKey, new Map());
+    const exactCounts = recipientAgencyStates.get(exactKey)!;
+    exactCounts.set(state, (exactCounts.get(state) || 0) + 1);
+
+    // Normalized Recipient + Agency lookup
+    const normKey = `${normalizeRecipientName(recipientRaw)}|||${agencyRaw}`;
+    if (!normalizedRecipientAgencyStates.has(normKey)) normalizedRecipientAgencyStates.set(normKey, new Map());
+    const normCounts = normalizedRecipientAgencyStates.get(normKey)!;
+    normCounts.set(state, (normCounts.get(state) || 0) + 1);
+
+    // Recipient-only lookup (for fallback)
+    const recipientNorm = normalizeRecipientName(recipientRaw);
+    if (recipientNorm) {
+      if (!recipientOnlyStates.has(recipientNorm)) recipientOnlyStates.set(recipientNorm, new Map());
+      const rCounts = recipientOnlyStates.get(recipientNorm)!;
+      rCounts.set(state, (rCounts.get(state) || 0) + 1);
     }
-    const counts = recipientAgencyStates.get(key)!;
-    counts.set(state, (counts.get(state) || 0) + 1);
   }
 
-  // Resolve to most common state per recipient+agency
-  const byRecipientAgency = new Map<string, string>();
-  for (const [key, counts] of recipientAgencyStates) {
+  // Helper: resolve count map to most common state
+  function resolveBest(countMap: Map<string, Map<string, number>>): Map<string, string> {
+    const result = new Map<string, string>();
+    for (const [key, counts] of countMap) {
+      let bestState = '';
+      let bestCount = 0;
+      for (const [st, ct] of counts) {
+        if (ct > bestCount) { bestState = st; bestCount = ct; }
+      }
+      result.set(key, bestState);
+    }
+    return result;
+  }
+
+  // Recipient-only: only use if >=3 contracts and all point to same state
+  const byRecipientOnly = new Map<string, string>();
+  for (const [recipient, counts] of recipientOnlyStates) {
+    const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
+    if (total < 3) continue;
     let bestState = '';
     let bestCount = 0;
     for (const [st, ct] of counts) {
       if (ct > bestCount) { bestState = st; bestCount = ct; }
     }
-    byRecipientAgency.set(key, bestState);
+    // Only use if dominant state accounts for >=80% of contracts
+    if (bestCount / total >= 0.8) {
+      byRecipientOnly.set(recipient, bestState);
+    }
   }
 
-  return { byRecipientAgency, byAwardId: awardIdStates };
+  return {
+    byAwardId: awardIdStates,
+    byNormalizedAwardId: normalizedAwardIdStates,
+    byRecipientAgency: resolveBest(recipientAgencyStates),
+    byNormalizedRecipientAgency: resolveBest(normalizedRecipientAgencyStates),
+    byRecipientOnly,
+  };
 }
 
 /**
@@ -158,7 +266,8 @@ function buildStateLookup(awards: RawAward[]): {
  * - password: admin password (required)
  * - mode: preview | build | enrich
  * - format: 'js' to get downloadable contracts-data.js file (build/enrich modes)
- * - pages: max USASpending pages (default: 100 for build/enrich, 5 for preview)
+ * - pages: max USASpending pages (default: 200 for enrich, 100 for build, 5 for preview)
+ * - strategy: 'default' (single sort by amount) or 'targeted' (3 sorts: amount, start date, end date)
  * - start: action date start (default: 2023-01-01)
  * - end: action date end (default: 2026-12-31)
  * - expireAfter: filter contracts expiring after (default: today, build mode only)
@@ -178,7 +287,9 @@ export async function GET(request: NextRequest) {
 
   const mode = searchParams.get('mode') || 'preview';
   const format = searchParams.get('format');
-  const maxPages = parseInt(searchParams.get('pages') || (mode === 'preview' ? '5' : '100'));
+  const strategy = searchParams.get('strategy') || 'default'; // 'default' or 'targeted'
+  const defaultPages = mode === 'preview' ? '5' : (mode === 'enrich' ? '200' : '100');
+  const maxPages = parseInt(searchParams.get('pages') || defaultPages);
   const actionStart = searchParams.get('start') || '2023-01-01';
   const actionEnd = searchParams.get('end') || '2026-12-31';
 
@@ -202,51 +313,116 @@ export async function GET(request: NextRequest) {
     }
 
     // Step 2: Fetch state data from USASpending
-    const { awards, pagesActuallyFetched, fetchErrors } = await fetchUSASpendingAwards(maxPages, actionStart, actionEnd);
+    let awards: RawAward[];
+    let totalPagesFetched: number;
+    let totalFetchErrors: number;
+    let batchStats: { sort: string; awards: number; pages: number }[] | null = null;
 
-    // Step 3: Build state lookup maps
-    const { byRecipientAgency, byAwardId } = buildStateLookup(awards);
+    if (strategy === 'targeted') {
+      const result = await fetchTargetedAwards(maxPages, actionStart, actionEnd);
+      awards = result.awards;
+      totalPagesFetched = result.totalPagesFetched;
+      totalFetchErrors = result.totalFetchErrors;
+      batchStats = result.batchStats;
+    } else {
+      const result = await fetchUSASpendingAwards(maxPages, actionStart, actionEnd);
+      awards = result.awards;
+      totalPagesFetched = result.pagesActuallyFetched;
+      totalFetchErrors = result.fetchErrors;
+    }
 
-    // Step 4: Merge states into existing contracts
-    let matched = 0;
+    // Step 3: Build state lookup maps (exact + normalized + recipient-only)
+    const lookups = buildStateLookup(awards);
+
+    // Step 4: Merge states into existing contracts (6 strategies, most precise first)
     let matchedByAwardId = 0;
-    let matchedByRecipient = 0;
+    let matchedBySubAwardId = 0;
+    let matchedByNormalizedId = 0;
+    let matchedByRecipientAgency = 0;
+    let matchedByNormalizedRecipientAgency = 0;
+    let matchedByRecipientOnly = 0;
 
     for (const contract of existingContracts) {
       if (contract.State) continue; // Already has state, skip
 
-      // Try matching by Award ID first (most precise)
+      // Strategy 1: Exact Award ID match
       const primaryAwardId = (contract['Award ID'] || '').split(' (')[0].split(' +')[0].trim();
-      if (primaryAwardId && byAwardId.has(primaryAwardId)) {
-        contract.State = byAwardId.get(primaryAwardId);
-        matched++;
+      if (primaryAwardId && lookups.byAwardId.has(primaryAwardId)) {
+        contract.State = lookups.byAwardId.get(primaryAwardId);
         matchedByAwardId++;
         continue;
       }
 
-      // Try matching individual contracts' Award IDs
+      // Strategy 2: Sub-contract Award IDs (exact)
       if (contract.Contracts && Array.isArray(contract.Contracts)) {
+        let found = false;
         for (const sub of contract.Contracts) {
           const subId = (sub['Award ID'] || '').trim();
-          if (subId && byAwardId.has(subId)) {
-            contract.State = byAwardId.get(subId);
-            matched++;
-            matchedByAwardId++;
+          if (subId && lookups.byAwardId.has(subId)) {
+            contract.State = lookups.byAwardId.get(subId);
+            matchedBySubAwardId++;
+            found = true;
             break;
           }
         }
-        if (contract.State) continue;
+        if (found) continue;
       }
 
-      // Fallback: match by Recipient + Agency
-      const key = `${(contract.Recipient || '').trim().toUpperCase()}|||${(contract.Agency || '').trim().toUpperCase()}`;
-      if (byRecipientAgency.has(key)) {
-        contract.State = byRecipientAgency.get(key);
-        matched++;
-        matchedByRecipient++;
+      // Strategy 3: Normalized Award ID (strip dashes/spaces)
+      if (primaryAwardId) {
+        const normId = normalizeAwardId(primaryAwardId);
+        if (lookups.byNormalizedAwardId.has(normId)) {
+          contract.State = lookups.byNormalizedAwardId.get(normId);
+          matchedByNormalizedId++;
+          continue;
+        }
+      }
+      // Also try sub-contract IDs normalized
+      if (contract.Contracts && Array.isArray(contract.Contracts)) {
+        let found = false;
+        for (const sub of contract.Contracts) {
+          const subId = (sub['Award ID'] || '').trim();
+          if (subId) {
+            const normSubId = normalizeAwardId(subId);
+            if (lookups.byNormalizedAwardId.has(normSubId)) {
+              contract.State = lookups.byNormalizedAwardId.get(normSubId);
+              matchedByNormalizedId++;
+              found = true;
+              break;
+            }
+          }
+        }
+        if (found) continue;
+      }
+
+      // Strategy 4: Exact Recipient + Agency match
+      const recipientUpper = (contract.Recipient || '').trim().toUpperCase();
+      const agencyUpper = (contract.Agency || '').trim().toUpperCase();
+      const exactKey = `${recipientUpper}|||${agencyUpper}`;
+      if (lookups.byRecipientAgency.has(exactKey)) {
+        contract.State = lookups.byRecipientAgency.get(exactKey);
+        matchedByRecipientAgency++;
+        continue;
+      }
+
+      // Strategy 5: Normalized Recipient + Agency match (strip suffixes)
+      const normKey = `${normalizeRecipientName(recipientUpper)}|||${agencyUpper}`;
+      if (lookups.byNormalizedRecipientAgency.has(normKey)) {
+        contract.State = lookups.byNormalizedRecipientAgency.get(normKey);
+        matchedByNormalizedRecipientAgency++;
+        continue;
+      }
+
+      // Strategy 6: Recipient-only fallback (>=3 contracts, >=80% same state)
+      const recipientNorm = normalizeRecipientName(recipientUpper);
+      if (recipientNorm && lookups.byRecipientOnly.has(recipientNorm)) {
+        contract.State = lookups.byRecipientOnly.get(recipientNorm);
+        matchedByRecipientOnly++;
       }
     }
 
+    const totalMatched = matchedByAwardId + matchedBySubAwardId + matchedByNormalizedId +
+      matchedByRecipientAgency + matchedByNormalizedRecipientAgency + matchedByRecipientOnly;
     const totalWithState = existingContracts.filter(c => c.State).length;
     const uniqueStates = [...new Set(existingContracts.map(c => c.State).filter(Boolean))].sort();
 
@@ -264,25 +440,33 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       mode: 'enrich',
+      strategy,
       stats: {
         existingRecords: existingContracts.length,
         usaSpendingAwardsFetched: awards.length,
-        pagesActuallyFetched,
-        fetchErrors,
+        totalPagesFetched,
+        totalFetchErrors,
+        ...(batchStats ? { batchStats } : {}),
         stateLookupsBuilt: {
-          byAwardId: byAwardId.size,
-          byRecipientAgency: byRecipientAgency.size
+          byAwardId: lookups.byAwardId.size,
+          byNormalizedAwardId: lookups.byNormalizedAwardId.size,
+          byRecipientAgency: lookups.byRecipientAgency.size,
+          byNormalizedRecipientAgency: lookups.byNormalizedRecipientAgency.size,
+          byRecipientOnly: lookups.byRecipientOnly.size
         },
-        matched,
+        totalMatched,
         matchedByAwardId,
-        matchedByRecipient,
+        matchedBySubAwardId,
+        matchedByNormalizedId,
+        matchedByRecipientAgency,
+        matchedByNormalizedRecipientAgency,
+        matchedByRecipientOnly,
         totalWithState,
         totalWithoutState: existingContracts.length - totalWithState,
         coveragePercent: ((totalWithState / existingContracts.length) * 100).toFixed(1) + '%',
         uniqueStates: uniqueStates.length,
         states: uniqueStates
       },
-      // Show first 10 enriched records as preview
       sample: existingContracts.slice(0, 10).map(c => ({
         Recipient: c.Recipient,
         Agency: c.Agency,

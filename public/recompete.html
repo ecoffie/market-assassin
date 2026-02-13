@@ -6,6 +6,8 @@
     <title>Recompete Contracts Tracker | GovCon Giants</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -961,6 +963,7 @@
                     </div>
                     <button class="btn btn-export btn-sm" onclick="exportFilteredCSV()">CSV</button>
                     <button class="btn btn-export btn-sm" onclick="exportFilteredExcel()">Excel</button>
+                    <button class="btn btn-export btn-sm" onclick="exportFilteredPDF()">PDF</button>
                 </div>
             </div>
 
@@ -1549,6 +1552,135 @@
             XLSX.utils.book_append_sheet(wb, ws, 'Recompete Contracts');
             const date = new Date().toISOString().split('T')[0];
             XLSX.writeFile(wb, `recompete-contracts-${date}.xlsx`);
+        }
+
+        // PDF Export
+        function exportFilteredPDF() {
+            if (filteredResults.length === 0 || typeof jspdf === 'undefined') return;
+
+            const { jsPDF } = jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const date = new Date().toISOString().split('T')[0];
+
+            // --- Header branding ---
+            // Red/orange gradient bar
+            doc.setFillColor(220, 38, 38);
+            doc.rect(0, 0, pageWidth * 0.6, 28, 'F');
+            doc.setFillColor(245, 158, 11);
+            doc.rect(pageWidth * 0.6, 0, pageWidth * 0.4, 28, 'F');
+
+            // Brand name
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('GOVCON GIANTS', 14, 10);
+
+            // Title
+            doc.setFontSize(16);
+            doc.text('Recompete Contracts Report', 14, 20);
+
+            // Date on right side
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Generated: ${date}`, pageWidth - 14, 10, { align: 'right' });
+            doc.text(`${filteredResults.length.toLocaleString()} contracts`, pageWidth - 14, 17, { align: 'right' });
+
+            // Filter summary
+            const activeFilters = [];
+            const primeVal = document.getElementById('searchPrime').value;
+            const naicsVal = document.getElementById('searchNaics').value;
+            const agencyVal = document.getElementById('searchAgency').value;
+            const valueVal = document.getElementById('searchValue').value;
+            const stateVal = document.getElementById('searchState').value;
+            const expVal = document.getElementById('searchExpiration').value;
+            const officeVal = document.getElementById('searchOffice').value;
+            if (primeVal) activeFilters.push(`Contractor: ${primeVal}`);
+            if (naicsVal) activeFilters.push(`NAICS: ${naicsVal}`);
+            if (agencyVal) activeFilters.push(`Agency: ${agencyVal}`);
+            if (valueVal) activeFilters.push(`Value: ${valueVal}`);
+            if (stateVal) activeFilters.push(`State: ${stateVal}`);
+            if (expVal) activeFilters.push(`Expires: ${expVal} mo`);
+            if (officeVal) activeFilters.push(`Office: ${officeVal}`);
+
+            let tableStartY = 34;
+            if (activeFilters.length > 0) {
+                doc.setTextColor(100, 116, 139);
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'italic');
+                doc.text(`Filters: ${activeFilters.join(' | ')}`, 14, 32);
+                tableStartY = 37;
+            }
+
+            // --- Table data ---
+            const tableData = filteredResults.map(c => {
+                const recipient = (c.Recipient || 'Unknown');
+                const truncated = recipient.length > 30 ? recipient.substring(0, 28) + '...' : recipient;
+                const naicsCode = (c.NAICS || '').split(' ')[0] || '';
+                return [
+                    truncated,
+                    (c.Agency || 'N/A').substring(0, 35),
+                    c.State || '',
+                    naicsCode,
+                    formatValueDisplay(c['Total Value']),
+                    c.Expiration || 'N/A'
+                ];
+            });
+
+            doc.autoTable({
+                startY: tableStartY,
+                head: [['Recipient', 'Agency', 'State', 'NAICS', 'Total Value', 'Expiration']],
+                body: tableData,
+                theme: 'grid',
+                styles: {
+                    fontSize: 7.5,
+                    cellPadding: 2.5,
+                    lineColor: [226, 232, 240],
+                    lineWidth: 0.2,
+                    overflow: 'ellipsize',
+                    font: 'helvetica'
+                },
+                headStyles: {
+                    fillColor: [30, 41, 59],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    fontSize: 8
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 250, 252]
+                },
+                columnStyles: {
+                    0: { cellWidth: 65 },
+                    1: { cellWidth: 70 },
+                    2: { cellWidth: 18, halign: 'center' },
+                    3: { cellWidth: 25, halign: 'center' },
+                    4: { cellWidth: 35, halign: 'right', fontStyle: 'bold' },
+                    5: { cellWidth: 30, halign: 'center' }
+                },
+                margin: { left: 14, right: 14 },
+                didDrawPage: function(data) {
+                    // Footer on every page
+                    const pageNum = doc.internal.getCurrentPageInfo().pageNumber;
+                    const totalPages = doc.internal.getNumberOfPages();
+                    doc.setFontSize(7);
+                    doc.setTextColor(148, 163, 184);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(
+                        'Data from USASpending.gov | GovCon Giants',
+                        14,
+                        pageHeight - 8
+                    );
+                    doc.text(
+                        `Page ${pageNum} of ${totalPages}`,
+                        pageWidth - 14,
+                        pageHeight - 8,
+                        { align: 'right' }
+                    );
+                }
+            });
+
+            doc.save(`recompete-contracts-${date}.pdf`);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
