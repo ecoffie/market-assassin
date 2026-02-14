@@ -24,9 +24,9 @@ function SuccessContent() {
         'market-assassin-standard': 'Market Assassin Standard',
         'market-assassin-premium': 'Market Assassin Premium',
         'market-assassin-premium-upgrade': 'Market Assassin Premium Upgrade',
-        'content-engine': 'Content Generator',
-        'full-fix': 'Content Generator Full Fix',
-        'content-full-fix-upgrade': 'Content Generator Full Fix Upgrade',
+        'content-engine': 'Content Reaper',
+        'full-fix': 'Content Reaper Full Fix',
+        'content-full-fix-upgrade': 'Content Reaper Full Fix Upgrade',
       };
       setProductName(productNames[product] || product);
     }
@@ -123,7 +123,7 @@ function SuccessContent() {
               href="/content-generator-product"
               className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
             >
-              Content Generator
+              Content Reaper
             </Link>
             <Link
               href="/opportunity-hunter"

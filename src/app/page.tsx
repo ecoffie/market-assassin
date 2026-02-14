@@ -152,14 +152,14 @@ export default function Home() {
               </span>
             </Link>
 
-            {/* GovCon Content Generator */}
+            {/* Content Reaper */}
             <Link
               href="/content-generator"
               className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-purple-500 hover:shadow-xl"
             >
               <div className="text-4xl mb-4">✍️</div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Content Generator
+                Content Reaper
               </h3>
               <p className="text-slate-400 text-sm mb-5 leading-relaxed">
                 AI-powered LinkedIn content creation for government contractors. Generate personalized posts that resonate with federal buyers and position you as a thought leader.

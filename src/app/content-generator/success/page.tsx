@@ -51,7 +51,7 @@ function SuccessContent() {
       <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Activating your Content Generator access...</p>
+          <p className="text-white text-lg">Activating your Content Reaper access...</p>
         </div>
       </div>
     );
@@ -72,7 +72,7 @@ function SuccessContent() {
             href="/content-generator"
             className="block w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition text-center"
           >
-            Go to Content Generator
+            Go to Content Reaper
           </Link>
           <p className="text-sm text-gray-500 mt-4">
             Log in with your purchase email to access

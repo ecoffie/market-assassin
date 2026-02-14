@@ -446,7 +446,7 @@ export default function AdminDashboard() {
                 : 'bg-white text-slate-600 hover:bg-slate-100'
             }`}
           >
-            Content Generator ({cgRecords.length})
+            Content Reaper ({cgRecords.length})
           </button>
           <button
             onClick={() => setActiveTab('recompete')}

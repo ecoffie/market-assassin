@@ -139,7 +139,7 @@ export default function UltimateBundlePage() {
           name: 'Carlos D.',
           date: '1 month ago',
           rating: 5,
-          text: "Our BD team uses this daily. The combination of all tools working together is powerful. Find opportunities with Recompete Tracker, research with Market Assassin, find teammates with the Database, then promote with Content Generator. Complete workflow.",
+          text: "Our BD team uses this daily. The combination of all tools working together is powerful. Find opportunities with Recompete Tracker, research with Market Assassin, find teammates with the Database, then promote with Content Reaper. Complete workflow.",
         },
       ]}
     />

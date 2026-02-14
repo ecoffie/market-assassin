@@ -101,7 +101,7 @@ export default function ProBundlePage() {
           name: 'Patricia L.',
           date: '2 weeks ago',
           rating: 5,
-          text: "The combination of market intelligence and content creation is genius. I use Market Assassin to research agencies, then use the Content Generator to create targeted LinkedIn posts. My engagement is up 300%.",
+          text: "The combination of market intelligence and content creation is genius. I use Market Assassin to research agencies, then use Content Reaper to create targeted LinkedIn posts. My engagement is up 300%.",
         },
         {
           name: 'Robert K.',
