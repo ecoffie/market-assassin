@@ -15,11 +15,11 @@ export default function UltimateBundlePage() {
       badge="BEST VALUE - EVERYTHING INCLUDED"
       includedProducts={[
         {
-          name: 'AI Content Generator (Full Fix)',
-          description: 'The premium tier of our content generator with enhanced AI capabilities, more content types, and advanced customization for creating content that converts.',
+          name: 'Content Reaper (Full Fix)',
+          description: 'The premium tier of Content Reaper with enhanced AI capabilities, more content types, and advanced customization for creating content that converts.',
           price: 397,
           icon: '✍️',
-          link: '/content-generator-product',
+          link: '/content-reaper',
           features: [
             'Everything in standard, plus:',
             'Advanced AI model access',
@@ -109,7 +109,7 @@ export default function UltimateBundlePage() {
         'Quarterly strategy webinar access',
       ]}
       highlightTitle="For Contractors Who Refuse to Compromise"
-      highlightText="The Ultimate Bundle includes every tool at its highest tier. You get Market Assassin Premium with all 8 reports and unlimited generations. You get the Full Fix Content Generator with advanced AI capabilities. You get every database, every tracker, every tool we offer. This is for contractors who understand that having the best intelligence and tools is the difference between winning and losing contracts worth hundreds of thousands—or millions—of dollars."
+      highlightText="The Ultimate Bundle includes every tool at its highest tier. You get Market Assassin Premium with all 8 reports and unlimited generations. You get Content Reaper Full Fix with advanced AI capabilities. You get every database, every tracker, every tool we offer. This is for contractors who understand that having the best intelligence and tools is the difference between winning and losing contracts worth hundreds of thousands—or millions—of dollars."
       reviews={[
         {
           name: 'Michael S.',

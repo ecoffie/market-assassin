@@ -3,7 +3,7 @@
 export const PRODUCTS = {
   AI_CONTENT_GENERATOR: {
     id: 'ai-content-generator',
-    name: 'AI Content Generator',
+    name: 'Content Reaper',
     tiers: {
       'content-engine': {
         price: 197,
@@ -87,7 +87,7 @@ export const PRODUCTS = {
       { name: 'Federal Contractor Database', price: 497 },
       { name: 'Recompete Contracts Tracker', price: 397 },
       { name: 'Market Assassin Standard', price: 297 },
-      { name: 'AI Content Generator', price: 197 },
+      { name: 'Content Reaper', price: 197 },
     ],
   },
   ULTIMATE_GOVCON_BUNDLE: {
@@ -97,7 +97,7 @@ export const PRODUCTS = {
     stripeUrl: 'https://buy.stripe.com/6oU3cwff897ceND84UfnO0t',
     includes: ['ai-content-generator', 'contractor-database', 'recompete-contracts', 'market-assassin-premium'],
     includesDisplay: [
-      { name: 'AI Content Generator (Full Fix)', price: 397 },
+      { name: 'Content Reaper (Full Fix)', price: 397 },
       { name: 'Federal Contractor Database', price: 497 },
       { name: 'Recompete Contracts Tracker', price: 397 },
       { name: 'Market Assassin Premium', price: 497 },

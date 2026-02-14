@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     // Build tools response with names
     const toolNames: Record<string, string> = {
       access_hunter_pro: 'Opportunity Hunter Pro',
-      access_content_standard: 'GovCon Content Generator',
+      access_content_standard: 'Content Reaper',
       access_content_full_fix: 'Content Generator Full Fix',
       access_assassin_standard: 'Federal Market Assassin',
       access_assassin_premium: 'Market Assassin Premium',

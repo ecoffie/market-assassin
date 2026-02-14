@@ -339,7 +339,7 @@ export default function AdminDashboard() {
                 >
                   <option value="market-assassin">Market Assassin</option>
                   <option value="opportunity-hunter-pro">Opportunity Hunter Pro</option>
-                  <option value="content-generator">GovCon Content Generator</option>
+                  <option value="content-generator">Content Reaper</option>
                   <option value="recompete">Recompete Contracts Tracker</option>
                   <option value="database">Federal Contractor Database</option>
                 </select>
@@ -601,7 +601,7 @@ export default function AdminDashboard() {
                 {cgRecords.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                      No GovCon Content Generator access records found
+                      No Content Reaper access records found
                     </td>
                   </tr>
                 ) : (

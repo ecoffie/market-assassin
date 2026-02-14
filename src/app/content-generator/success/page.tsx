@@ -109,7 +109,7 @@ function SuccessContent() {
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">You&apos;re In!</h1>
-        <p className="text-lg text-gray-600 mb-2">Welcome to GovCon Content Generator</p>
+        <p className="text-lg text-gray-600 mb-2">Welcome to Content Reaper</p>
         <p className="text-sm font-semibold text-blue-600 mb-4">{tierName} Access</p>
 
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-6">

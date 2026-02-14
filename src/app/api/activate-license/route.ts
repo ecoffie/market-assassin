@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       // Content Generator Standard
       if (profile.access_content_standard && !profile.access_content_full_fix) {
         products.push({
-          name: 'GovCon Content Generator',
+          name: 'Content Reaper',
           tier: 'standard',
           accessUrl: '/content-generator-product',
           cookieName: 'access_content_standard',
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       // Content Generator Full Fix
       if (profile.access_content_full_fix) {
         products.push({
-          name: 'GovCon Content Generator - Full Fix',
+          name: 'Content Reaper - Full Fix',
           tier: 'full_fix',
           accessUrl: '/content-generator-product',
           cookieName: 'access_content_full_fix',
@@ -140,8 +140,8 @@ export async function POST(request: NextRequest) {
       for (const purchase of purchases) {
         const tierToCookie: Record<string, { name: string; cookie: string; url: string }> = {
           'hunter_pro': { name: 'Opportunity Hunter Pro', cookie: 'access_hunter_pro', url: '/opportunity-hunter' },
-          'content_standard': { name: 'GovCon Content Generator', cookie: 'access_content_standard', url: '/content-generator-product' },
-          'content_full_fix': { name: 'GovCon Content Generator - Full Fix', cookie: 'access_content_full_fix', url: '/content-generator-product' },
+          'content_standard': { name: 'Content Reaper', cookie: 'access_content_standard', url: '/content-generator-product' },
+          'content_full_fix': { name: 'Content Reaper - Full Fix', cookie: 'access_content_full_fix', url: '/content-generator-product' },
           'assassin_standard': { name: 'Federal Market Assassin', cookie: 'access_assassin_standard', url: '/federal-market-assassin' },
           'assassin_premium': { name: 'Federal Market Assassin - Premium', cookie: 'access_assassin_premium', url: '/federal-market-assassin' },
           'recompete': { name: 'Recompete Contracts Tracker', cookie: 'access_recompete', url: '/recompete' },
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
       if (cgAccess) {
         const isFullFix = cgAccess.tier === 'full-fix';
         products.push({
-          name: isFullFix ? 'GovCon Content Generator - Full Fix' : 'GovCon Content Generator',
+          name: isFullFix ? 'Content Reaper - Full Fix' : 'Content Reaper',
           tier: cgAccess.tier,
           accessUrl: '/content-generator-product',
           cookieName: isFullFix ? 'access_content_full_fix' : 'access_content_standard',

@@ -30,6 +30,12 @@ const nextConfig: NextConfig = {
         destination: '/opportunity-hunter',
         permanent: true,
       },
+      // Content Reaper product page route
+      {
+        source: '/content-reaper',
+        destination: '/content-generator-product',
+        permanent: false,
+      },
       // Redirect old /content-generator routes to new location (without trailing path)
       {
         source: '/library',

@@ -83,7 +83,7 @@ export default function AboutPage() {
             <div className="flex items-start gap-3">
               <span className="text-2xl">🤖</span>
               <div>
-                <h3 className="font-bold text-gray-900">AI Content Generator</h3>
+                <h3 className="font-bold text-gray-900">Content Reaper</h3>
                 <p className="text-sm text-gray-600">Generate capability statements and proposals</p>
               </div>
             </div>

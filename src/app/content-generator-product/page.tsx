@@ -3,9 +3,9 @@ import ProductPageAppSumo from '@/components/ProductPageAppSumo';
 export default function ContentGeneratorProductPage() {
   return (
     <ProductPageAppSumo
-      title="GovCon Content Generator"
+      title="Content Reaper"
       tagline="Create LinkedIn posts that resonate with government buyers"
-      description="Stop staring at blank screens wondering what to post. The GovCon Content Generator creates LinkedIn posts specifically designed to resonate with government buyers and contracting officers. Our custom fine-tuned model was trained on 146 viral GovCon posts, so it writes in the authentic voice of successful GovCon thought leaders."
+      description="Stop staring at blank screens wondering what to post. Content Reaper creates LinkedIn posts specifically designed to resonate with government buyers and contracting officers. Our custom fine-tuned model was trained on 146 viral GovCon posts, so it writes in the authentic voice of successful GovCon thought leaders."
       primaryColor="#7c3aed"
       gradientFrom="#7c3aed"
       gradientTo="#a855f7"
@@ -45,7 +45,7 @@ export default function ContentGeneratorProductPage() {
           ],
         },
       ]}
-      videoTitle="GovCon Content Generator Demo"
+      videoTitle="Content Reaper Demo"
       videoSubtitle="See how to generate LinkedIn posts in seconds"
       videoUrl="https://youtu.be/vO420eQ97Dw"
       screenshots={[

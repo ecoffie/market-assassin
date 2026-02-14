@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const tierName = validTier === 'full-fix' ? 'Full Fix' : 'Content Engine';
     return NextResponse.json({
       success: true,
-      message: `GovCon Content Generator (${tierName}) access granted to ${email}`,
+      message: `Content Reaper (${tierName}) access granted to ${email}`,
       access,
     });
 

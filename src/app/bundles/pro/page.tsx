@@ -60,11 +60,11 @@ export default function ProBundlePage() {
           ],
         },
         {
-          name: 'AI Content Generator',
+          name: 'Content Reaper',
           description: 'Create LinkedIn posts that resonate with government buyers. GovCon-tuned AI trained on 146 viral posts to help you build your brand.',
           price: 197,
           icon: '✍️',
-          link: '/content-generator-product',
+          link: '/content-reaper',
           features: [
             'Generate 10 posts per click',
             '175 federal agencies',
@@ -89,7 +89,7 @@ export default function ProBundlePage() {
         'GovCon Giants community access',
       ]}
       highlightTitle="Why Pro Contractors Choose This Bundle"
-      highlightText="The Pro Giant Bundle is our most popular package because it gives you everything you need to compete at a higher level. Use Market Assassin to understand your target agencies, the Contractor Database to find teaming partners, Recompete Tracker to identify opportunities early, and the AI Content Generator to build your brand. This is the complete GovCon toolkit."
+      highlightText="The Pro Giant Bundle is our most popular package because it gives you everything you need to compete at a higher level. Use Market Assassin to understand your target agencies, the Contractor Database to find teaming partners, Recompete Tracker to identify opportunities early, and Content Reaper to build your brand. This is the complete GovCon toolkit."
       reviews={[
         {
           name: 'David M.',

@@ -16,7 +16,7 @@ function SuccessContent() {
         'contractor-database': 'Contractor Database',
         'recompete-contracts': 'Recompete Contracts',
         'prime-lookup': 'Prime Lookup',
-        'ai-content-generator': 'AI Content Generator',
+        'ai-content-generator': 'Content Reaper',
         'govcon-starter-bundle': 'GovCon Starter Bundle',
         'pro-giant-bundle': 'Pro Giant Bundle',
         'ultimate-govcon-bundle': 'Ultimate GovCon Bundle',
