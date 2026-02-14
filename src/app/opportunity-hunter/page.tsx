@@ -142,6 +142,7 @@ export default function OpportunityScoutPage() {
         const parsed = JSON.parse(savedProAccess);
         if (parsed.hasAccess && parsed.expiresAt > Date.now()) {
           setIsPro(true);
+          if (parsed.email) setAccessEmail(parsed.email);
         } else {
           localStorage.removeItem('opportunityScoutPro');
         }
@@ -467,8 +468,25 @@ export default function OpportunityScoutPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('opportunityScoutPro');
+    setIsPro(false);
+    setAccessEmail('');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+      {/* Email + Logout Bar */}
+      {isPro && accessEmail && (
+        <div className="sticky top-0 z-50" style={{ background: '#1a1a2e' }}>
+          <div className="max-w-5xl mx-auto px-4 py-2 flex justify-between items-center" style={{ color: '#94a3b8', fontSize: '13px' }}>
+            <span>Logged in as: {accessEmail}</span>
+            <button onClick={handleLogout} className="font-semibold hover:underline" style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}>
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Header */}
         <div className="text-center mb-8">

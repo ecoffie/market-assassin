@@ -542,6 +542,28 @@
 </head>
 <body>
 
+<div id="user-bar" style="display:none; background:#1a1a2e; color:#94a3b8; font-size:13px; padding:8px 20px; font-family:Inter,-apple-system,sans-serif; position:sticky; top:0; z-index:1000;">
+    <div style="max-width:1400px; margin:0 auto; display:flex; justify-content:space-between; align-items:center;">
+        <span id="user-email-display"></span>
+        <span onclick="logout()" style="color:#ef4444; cursor:pointer; font-weight:600;">Logout</span>
+    </div>
+</div>
+<script>
+    (function() {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var c = cookies[i].trim();
+            if (c.indexOf('db_access_email=') === 0) {
+                var email = decodeURIComponent(c.substring('db_access_email='.length));
+                if (email) {
+                    document.getElementById('user-bar').style.display = 'block';
+                    document.getElementById('user-email-display').textContent = 'Logged in as: ' + email;
+                }
+                break;
+            }
+        }
+    })();
+</script>
 <div class="container">
     <div class="govcon-banner" style="display: flex; justify-content: space-between; align-items: center;">
         <span></span>

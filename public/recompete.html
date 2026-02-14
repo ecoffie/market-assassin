@@ -837,6 +837,26 @@
     </style>
 </head>
 <body>
+    <!-- Email + Logout Banner -->
+    <div id="user-banner" style="display:none; background:#1a1a2e; color:#94a3b8; font-size:13px; padding:8px 20px; font-family:'Inter',sans-serif; position:sticky; top:0; z-index:1000;">
+        <div style="max-width:1400px; margin:0 auto; display:flex; justify-content:space-between; align-items:center;">
+            <span id="user-email-display"></span>
+            <span id="logout-btn" onclick="handleLogout()" style="color:#ef4444; cursor:pointer; font-weight:600;">Logout</span>
+        </div>
+    </div>
+    <script>
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            var email = params.get('email');
+            if (email) {
+                document.getElementById('user-banner').style.display = 'block';
+                document.getElementById('user-email-display').textContent = 'Logged in as: ' + email;
+            }
+        })();
+        function handleLogout() {
+            window.parent.postMessage({ type: 'recompete-logout' }, '*');
+        }
+    </script>
     <div class="header">
         <div class="header-content">
             <div class="logo">GOVCON GIANTS</div>

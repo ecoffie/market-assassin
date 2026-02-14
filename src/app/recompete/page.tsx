@@ -10,6 +10,7 @@ export default function RecompeteLockedPage() {
   const [error, setError] = useState('');
   const [hasAccess, setHasAccess] = useState(false);
   const [accessMethod, setAccessMethod] = useState<'email' | 'password'>('email');
+  const [accessEmail, setAccessEmail] = useState('');
 
   // Check for cached access on mount
   useEffect(() => {
@@ -19,12 +20,30 @@ export default function RecompeteLockedPage() {
         const data = JSON.parse(cached);
         if (data.hasAccess && data.expiresAt > Date.now()) {
           setHasAccess(true);
+          if (data.email) setAccessEmail(data.email);
         }
       } catch {
         // Invalid cache, ignore
       }
     }
   }, []);
+
+  // Listen for logout postMessage from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'recompete-logout') {
+        handleLogout();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('recompeteAccess');
+    setHasAccess(false);
+    setAccessEmail('');
+  };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,10 +110,13 @@ export default function RecompeteLockedPage() {
 
   // If has access, show the tool
   if (hasAccess) {
+    const iframeSrc = accessEmail
+      ? `/recompete.html?email=${encodeURIComponent(accessEmail)}`
+      : '/recompete.html';
     return (
       <div className="w-screen h-screen">
         <iframe
-          src="/recompete.html"
+          src={iframeSrc}
           className="w-full h-full border-0"
           title="Recompete Contracts Tracker"
         />
