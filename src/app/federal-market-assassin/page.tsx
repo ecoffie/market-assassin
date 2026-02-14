@@ -106,6 +106,35 @@ export default function FederalMarketAssassinPage() {
           if (data.tier === 'standard') {
             fetchUsageInfo(data.email);
           }
+
+          // Background tier refresh — catches upgrades (e.g. bundle purchase)
+          if (data.email) {
+            fetch('/api/verify-ma-tier', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: data.email }),
+            })
+              .then(r => r.json())
+              .then(serverData => {
+                if (serverData.hasAccess && serverData.tier !== data.tier) {
+                  // Tier changed (e.g. standard → premium) — update cache
+                  const updated = {
+                    hasAccess: true,
+                    tier: serverData.tier,
+                    expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+                    email: serverData.email,
+                  };
+                  localStorage.setItem('marketAssassinAccess', JSON.stringify(updated));
+                  setTier(serverData.tier);
+                  setUserEmail(serverData.email);
+                  // If upgraded from standard, clear usage meter
+                  if (serverData.tier === 'premium') {
+                    setUsageInfo(null);
+                  }
+                }
+              })
+              .catch(() => {}); // Silently fail — cached access still works
+          }
           return;
         }
       } catch {
