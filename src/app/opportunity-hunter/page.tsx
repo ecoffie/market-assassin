@@ -1,5 +1,5 @@
 /**
- * OPPORTUNITY SCOUT PAGE
+ * OPPORTUNITY HUNTER PAGE
  * ======================
  *
  * CRITICAL FEATURES - DO NOT REMOVE OR MODIFY WITHOUT TESTING:
@@ -33,7 +33,7 @@
 import React, { useState, FormEvent, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
-const OPPORTUNITY_SCOUT_PRO_PRODUCT_ID = 'opportunity-scout-pro';
+const OPPORTUNITY_HUNTER_PRO_PRODUCT_ID = 'opportunity-scout-pro';
 
 interface SearchCriteria {
   businessFormation: string;
@@ -105,7 +105,7 @@ interface SearchResult {
   naicsCorrectionMessage?: string;
 }
 
-export default function OpportunityScoutPage() {
+export default function OpportunityHunterPage() {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [progress, setProgress] = useState(0);
@@ -136,7 +136,7 @@ export default function OpportunityScoutPage() {
 
   // Check for Pro access on mount (from localStorage)
   useEffect(() => {
-    const savedProAccess = localStorage.getItem('opportunityScoutPro');
+    const savedProAccess = localStorage.getItem('opportunityHunterPro');
     if (savedProAccess) {
       try {
         const parsed = JSON.parse(savedProAccess);
@@ -144,10 +144,10 @@ export default function OpportunityScoutPage() {
           setIsPro(true);
           if (parsed.email) setAccessEmail(parsed.email);
         } else {
-          localStorage.removeItem('opportunityScoutPro');
+          localStorage.removeItem('opportunityHunterPro');
         }
       } catch {
-        localStorage.removeItem('opportunityScoutPro');
+        localStorage.removeItem('opportunityHunterPro');
       }
     }
     setProCheckComplete(true);
@@ -178,7 +178,7 @@ export default function OpportunityScoutPage() {
         setIsPro(true);
         setShowUpgradeModal(false);
         // Cache access for 24 hours
-        localStorage.setItem('opportunityScoutPro', JSON.stringify({
+        localStorage.setItem('opportunityHunterPro', JSON.stringify({
           hasAccess: true,
           expiresAt: Date.now() + 24 * 60 * 60 * 1000,
           email: data.email,
@@ -461,7 +461,7 @@ export default function OpportunityScoutPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `opportunity-scout-results-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `opportunity-hunter-results-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -469,7 +469,7 @@ export default function OpportunityScoutPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('opportunityScoutPro');
+    localStorage.removeItem('opportunityHunterPro');
     setIsPro(false);
     setAccessEmail('');
   };
@@ -538,7 +538,7 @@ export default function OpportunityScoutPage() {
               <div className="flex items-center space-x-4">
                 <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin" />
                 <div>
-                  <p className="font-semibold">Scouting Opportunities...</p>
+                  <p className="font-semibold">Hunting Opportunities...</p>
                   <p className="text-sm opacity-90">{loadingMessage}</p>
                 </div>
               </div>
@@ -643,7 +643,7 @@ export default function OpportunityScoutPage() {
                   disabled={loading}
                   className="w-full bg-blue-600 text-white px-6 py-2 text-sm rounded-lg font-bold hover:bg-blue-700 transition shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Scout Opportunities
+                  Hunt Opportunities
                 </button>
               </div>
             </div>

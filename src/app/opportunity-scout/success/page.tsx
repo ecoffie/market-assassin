@@ -22,13 +22,13 @@ function SuccessContent() {
     // Fetch session and grant access
     async function grantAccess() {
       try {
-        const response = await fetch(`/api/stripe-session?session_id=${sessionId}&product=opportunity-scout-pro`);
+        const response = await fetch(`/api/stripe-session?session_id=${sessionId}&product=opportunity-hunter-pro`);
         const data = await response.json();
 
         if (data.success && data.email) {
           setEmail(data.email);
           // Store in localStorage for immediate access
-          localStorage.setItem('opportunityScoutPro', JSON.stringify({
+          localStorage.setItem('opportunityHunterPro', JSON.stringify({
             hasAccess: true,
             expiresAt: Date.now() + 24 * 60 * 60 * 1000,
             email: data.email,
@@ -70,7 +70,7 @@ function SuccessContent() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Almost There!</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <Link
-            href="/opportunity-scout"
+            href="/opportunity-hunter"
             className="block w-full px-6 py-3 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-lg transition text-center"
           >
             Go to Opportunity Hunter
@@ -133,7 +133,7 @@ function SuccessContent() {
         </div>
 
         <Link
-          href="/opportunity-scout"
+          href="/opportunity-hunter"
           className="block w-full px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg transition text-center text-lg"
         >
           Start Finding Agencies
@@ -147,7 +147,7 @@ function SuccessContent() {
   );
 }
 
-export default function OpportunityScoutSuccessPage() {
+export default function OpportunityHunterSuccessPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
