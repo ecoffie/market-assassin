@@ -69,7 +69,7 @@
 
 ---
 
-### 2. GovCon Content Generator
+### 2. Content Reaper
 **Location:** `/src/app/content-generator/`, `/src/app/ai-content/`
 **Purpose:** AI-powered LinkedIn post generator for GovCon
 
@@ -111,7 +111,7 @@
 
 ---
 
-### 4. Recompete Contracts Tracker
+### 4. Recompete Tracker
 **Location:** `/src/app/expiring-contracts/`, `/src/app/recompete/`
 **Purpose:** Track expiring federal contracts for recompete opportunities
 
@@ -195,7 +195,7 @@ src/
 │   │   ├── usaspending/          # USASpending integration
 │   │   └── ...
 │   ├── market-assassin/          # Market Assassin tool
-│   ├── content-generator/        # Content Generator tool
+│   ├── content-generator/        # Content Reaper tool
 │   ├── contractor-database/      # Contractor Database
 │   ├── expiring-contracts/       # Recompete Tracker
 │   ├── opportunity-hunter/       # Opportunity Hunter
@@ -226,10 +226,10 @@ src/
 | Product | Price | Stripe Metadata |
 |---------|-------|-----------------|
 | Opportunity Hunter Pro | $49 | `tier: hunter_pro` |
-| AI Content Generator | $197 | `tier: content_standard` |
+| Content Reaper | $197 | `tier: content_standard` |
 | Market Assassin Standard | $297 | `tier: assassin_standard` |
-| Content Generator Full Fix | $397 | `tier: content_full_fix` |
-| Recompete Contracts Tracker | $397 | `tier: recompete` |
+| Content Reaper Full Fix | $397 | `tier: content_full_fix` |
+| Recompete Tracker | $397 | `tier: recompete` |
 | Federal Contractor Database | $497 | `tier: contractor_db` |
 | Market Assassin Premium | $497 | `tier: assassin_premium` |
 
@@ -254,7 +254,7 @@ src/
 | Flag | Products That Grant It |
 |------|------------------------|
 | `access_hunter_pro` | Opp Hunter Pro, Starter, Ultimate |
-| `access_content_standard` | Content Generator, Pro, Ultimate |
+| `access_content_standard` | Content Reaper, Pro, Ultimate |
 | `access_content_full_fix` | Content Full Fix, Ultimate |
 | `access_assassin_standard` | MA Standard, Pro, Ultimate |
 | `access_assassin_premium` | MA Premium, Ultimate |
@@ -347,7 +347,7 @@ npm run build
 
 ---
 
-## Content Generator (Critical Details)
+## Content Reaper (Critical Details)
 
 **Frontend:** Static HTML files in `public/content-generator/`
 - `index.html` — Main content generator UI (~6000+ lines)
@@ -391,7 +391,7 @@ npm run build
 Access is managed in TWO places (both must be considered):
 
 ### 1. Vercel KV (`@vercel/kv`) — Primary for individual tools
-- **Content Generator:** `contentgen:{email}` key → checked by `hasContentGeneratorAccess()`
+- **Content Reaper:** `contentgen:{email}` key → checked by `hasContentGeneratorAccess()`
 - **Market Assassin:** `ma:{email}` key → checked by `hasMarketAssassinAccess()`
 - **Opportunity Hunter Pro:** `ospro:{email}` key
 - **Contractor Database:** `dbtoken:{token}` + `dbaccess:{email}` keys
@@ -439,7 +439,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 6. **No Node.js on dev machine** - Can't run `npm run build` locally. Vercel handles builds on push
 
-7. **Content Generator HTML uses same-origin API** - Never hardcode external API URLs in `public/content-generator/*.html`
+7. **Content Reaper HTML uses same-origin API** - Never hardcode external API URLs in `public/content-generator/*.html`
 
 8. **No Node.js on dev machine** - `npm`, `node`, `vercel` CLI are not available locally
 
@@ -470,7 +470,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 **Spending Priorities** = where agencies are actively spending money (funded programs, budget line items)
 
 **Used by:**
-- **Content Generator** (`/api/content-generator/generate`) — both pain points and priorities fed into Step 2 prompt for thought leadership content
+- **Content Reaper** (`/api/content-generator/generate`) — both pain points and priorities fed into Step 2 prompt for thought leadership content
 - **Market Assassin** (`/api/reports/generate-all`) — Pain Points report with cross-referencing, NAICS relevance scoring, and high-opportunity matches
 - **Market Assassin** (AgencySelectionTable) — agency modal shows pain points + spending priorities sections
 - **Opportunity Hunter** (`/api/pain-points`) — agency modal shows pain points + spending priorities
@@ -504,8 +504,24 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 15, 2026 (Session 14)
+- **govcon-shop: Opportunity Hunter Email Gate + Contextual Upsell**
+  - Email gate: shows 3 agencies free, blurs remaining with email capture overlay, unlocks up to 10 on submit
+  - Created `/api/capture-opportunity-lead` — upserts to Supabase `leads` table with `source: 'opportunity-hunter'` and `context` JSONB (NAICS, business type, zip, agency count, spending)
+  - Pro users and returning visitors (30-day localStorage) bypass gate entirely
+  - Contextual upsell cards below results: Recompete Tracker ($397) + Starter Bundle ($697) with user's NAICS and top agencies
+  - Fire-and-forget pattern — API errors never block user access
+  - Fixed invisible form input text (added `text-gray-900`), fixed email gate overlay cutoff (`minHeight: 280px`)
+- **govcon-shop: Blog donut chart rebuilt** — expanded from 4 to 7 segments (Task Orders 55%, Sole Source 30%, Micropurchases 4%, DIBBS 3%, Niche Sites 2%, Classified 1%, SAM 5%) with distinct colors
+- **govcon-shop: Blog header branding** — added `shop.govcongiants.org` monospace text to nav on both blog index and article pages
+- **govcon-shop: Store page "Which bundle is right for me?"** — three persona cards (Starter/Pro/Ultimate) with anchor links to bundle sections, plus "Best for:" buyer lines on each bundle card
+- **Scout → Hunter rename** — renamed all "Scout Opportunities" → "Hunt Opportunities" across govcon-shop and market-assassin (button text, loading state, CSV filename, localStorage keys, variable names)
+- **Fixed pre-existing build error** — removed `export const runtime = 'edge'` from `blog/[slug]/opengraph-image.tsx` (Edge runtime conflicts with `generateStaticParams` in Next.js 16)
+- **Case study videos organized** — 11 videos total (7 student demos + 4 tutorials) in `docs/case-studies/`, transcripts with key quotes and repurposing ideas
+- **Supabase migration** — added `context JSONB` and `updated_at` columns to govcon-shop `leads` table
+
 ### February 12, 2026 (Session 13)
-- **Content Generator .docx Export & Formatting Overhaul**
+- **Content Reaper .docx Export & Formatting Overhaul**
   - API route (`generate/route.ts`): stopped stripping `**bold**` and `*italic*` markdown markers — now preserved for .docx and web display
   - Added `renderMarkdown(text)` to `index.html` — converts `**bold**` → `<strong>`, `*italic*` → `<em>` with HTML entity escaping (XSS-safe)
   - Added `stripMarkdown(text)` — removes all `*` markers for clipboard copy and graphic API calls
@@ -554,7 +570,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
   - DOT Certified mapped to `['SBP']` which was already included in Small Business codes
 
 ### February 10, 2026 (Session 9)
-- **Content Generator: Thought leadership rewrite** — prompts now create expert content that attracts government decision makers, NOT sales pitches
+- **Content Reaper: Thought leadership rewrite** — prompts now create expert content that attracts government decision makers, NOT sales pitches
   - Step 2: "Demonstrate deep insider knowledge" replaces "DIRECTLY connect services to pain points"
   - Step 3: "THOUGHT LEADERSHIP TONE" section — "NEVER say 'we can help' or 'our services'"
   - Company profile relabeled: "Core Services" → "Areas of Expertise", "Differentiators" → "Unique Perspective"
@@ -576,10 +592,10 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 ### February 9-10, 2026 (Session 8)
 - **Agency Pain Points Database: 63 → 135 agencies** — built admin pipeline using USASpending + Grok AI + GAO/IG data
 - **Spending Priorities: 1,350 total** — generated for all 135 agencies via admin endpoint
-- **Priorities wired into Content Generator and Market Assassin** — initial wiring (before Session 9 enhancements)
+- **Priorities wired into Content Reaper and Market Assassin** — initial wiring (before Session 9 enhancements)
 
 ### February 9, 2026 (Session 7)
-- **Content Generator: Post originality overhaul** — posts were repetitive when generating 15-30 for the same agency
+- **Content Reaper: Post originality overhaul** — posts were repetitive when generating 15-30 for the same agency
 - Added `shuffleArray()` (Fisher-Yates) + 20 `CONTENT_LENSES` (seasonal, perspective, framework, trending, emotional)
 - Pain points now shuffled and expanded: `shuffleArray(painPoints).slice(0, 7)` (was fixed `slice(0, 5)`)
 - 3 random content lenses injected into Step 2 prompt each generation as "CONTENT VARIETY DIRECTIONS"
@@ -588,7 +604,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 - Updated TOOL-BUILD.md: "Expand Agency Pain Points Database" added to MA, Content Gen, and Opp Hunter sections
 
 ### February 9, 2026 (Session 6)
-- **Content Generator: Bulk export feature** — "Export All as .docx" button (all tiers) and "Download All Visuals (.zip)" button (Full Fix only)
+- **Content Reaper: Bulk export feature** — "Export All as .docx" button (all tiers) and "Download All Visuals (.zip)" button (Full Fix only)
 - .docx export: one post per page, LinkedIn formatting preserved, hashtags in blue (#0077B5)
 - Visuals .zip: generates quote card PNG for each post via `renderQuoteCard()`, cycles 6 themes, progress indicator
 - Added CDN libs: docx@9.0.2, jszip@3.10.1, file-saver@2.0.5
@@ -596,7 +612,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ### February 8, 2026 (Session 5)
 - **govcon-shop: Fixed fix-access-flags** — `continue` after Supabase FK error was skipping KV updates (only 2/33 fixed). Removed Supabase insert, KV granting now unconditional
-- **Fixed Content Generator tier** — Ultimate Bundle customers now show "Full Fix" (was "Content Engine") in KV
+- **Fixed Content Reaper tier** — Ultimate Bundle customers now show "Full Fix" (was "Content Engine") in KV
 - **Fixed Market Assassin tier** — Ultimate Bundle customers confirmed "Premium" in KV
 - **All 33 customers KV-verified** — 33/33 kv_fixed, 0 errors
 - **MA Standard entries are students** — $99/month subscription users, correctly showing Standard tier
@@ -631,7 +647,7 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 - Removed PDF carousel download — LinkedIn no longer supports PDF carousels
 - Made PNG slide images the primary/only download option in carousel preview modal
 - Updated help text from "Upload PDF to LinkedIn" to "Upload images to LinkedIn"
-- Fixed Content Generator API URLs — replaced all hardcoded `govcon-content-generator.vercel.app` with relative paths (same-origin)
+- Fixed Content Reaper API URLs — replaced all hardcoded `govcon-content-generator.vercel.app` with relative paths (same-origin)
 - Affected files: `public/content-generator/index.html`, `library.html`, `calendar.html`
 - Verified Olga's (olga@olaexecutiveconsulting.com) Full Fix access is intact via API
 - **Note:** Missing API endpoints: `/api/generate-carousel` (standalone builder) and `/api/upload-carousel` (save to library) — not yet implemented
