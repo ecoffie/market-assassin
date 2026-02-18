@@ -377,6 +377,10 @@ export interface OfficeSpending {
   bidsPerContract5th?: number | null;
   bidsPerContractAvg?: number | null;
   bidsPerContract95th?: number | null;
+  satSpending: number;
+  satContractCount: number;
+  microSpending: number;
+  microContractCount: number;
 }
 
 export interface SearchSuggestion {
