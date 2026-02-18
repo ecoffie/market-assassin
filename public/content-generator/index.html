@@ -674,6 +674,7 @@
                         <span class="text-xs text-gray-500 mr-1">Sort:</span>
                         <button onclick="sortQuickAgencies('spending')" id="sort-spending-btn" class="text-xs px-2 py-1 rounded bg-govcon-blue/20 text-govcon-blue font-medium">$ Spending</button>
                         <button onclick="sortQuickAgencies('contracts')" id="sort-contracts-btn" class="text-xs px-2 py-1 rounded bg-ma-dark text-gray-400 hover:bg-govcon-blue/10 transition">Contracts</button>
+                        <button onclick="sortQuickAgencies('budget')" id="sort-budget-btn" class="text-xs px-2 py-1 rounded bg-ma-dark text-gray-400 hover:bg-govcon-blue/10 transition">FY26 Trend</button>
                     </div>
                 </div>
                 <input type="text" id="quick-agency-search" placeholder="Search agencies..." oninput="filterQuickAgencies()" class="w-full mb-3 px-3 py-2 text-sm bg-ma-dark border border-ma-border rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-govcon-blue focus:border-transparent hidden">
@@ -1360,6 +1361,7 @@
         let loadingTipInterval = null;
         let progressInterval = null;
         let quickAgencyData = []; // Full agency objects {name, spending, contracts, spendingFormatted, parentAgency} for rich display
+        let budgetTrendCache = {}; // {agencyName: {pctChange, trend}} from /api/budget-authority
 
         // --- Generation History (localStorage memory system) ---
         const HISTORY_KEY = 'gcg_post_history';
@@ -2282,6 +2284,41 @@
         // Display target agencies in quick generate section
         let quickAgencySortMode = 'spending'; // 'spending' or 'contracts'
 
+        // Fetch FY2025→FY2026 budget trend data (fire-and-forget, cached)
+        async function loadBudgetTrends() {
+            if (Object.keys(budgetTrendCache).length > 0) return; // already loaded
+            try {
+                const resp = await fetch('/api/budget-authority?limit=100');
+                if (!resp.ok) return;
+                const result = await resp.json();
+                if (result.success && result.data) {
+                    for (const agency of result.data) {
+                        budgetTrendCache[agency.agencyName] = {
+                            pctChange: ((agency.change?.percent || 1) - 1) * 100,
+                            trend: agency.change?.trend || 'flat',
+                            fy25: agency.fy2025?.budgetAuthority || 0,
+                            fy26: agency.fy2026?.budgetAuthority || 0
+                        };
+                    }
+                    console.log('[Budget] Loaded trends for', Object.keys(budgetTrendCache).length, 'agencies');
+                }
+            } catch (e) {
+                console.warn('[Budget] Failed to load trends:', e);
+            }
+        }
+
+        function getBudgetBadge(agencyName) {
+            const data = budgetTrendCache[agencyName];
+            if (!data) return '';
+            const pct = data.pctChange.toFixed(1);
+            if (data.trend === 'increasing') {
+                return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-green-400" title="FY26 budget up ${pct}%">▲ +${pct}%</span>`;
+            } else if (data.trend === 'decreasing') {
+                return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-red-400" title="FY26 budget down ${pct}%">▼ ${pct}%</span>`;
+            }
+            return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-gray-400" title="FY26 budget flat">— ${pct}%</span>`;
+        }
+
         async function displayQuickAgencies(profile) {
             const container = document.getElementById('quick-agencies-list');
             if (!container) return;
@@ -2352,6 +2389,11 @@
                 }
             }
 
+            // Load budget trends (non-blocking, then re-render with badges)
+            loadBudgetTrends().then(() => {
+                renderQuickAgencyCards(agencyNames);
+            });
+
             renderQuickAgencyCards(agencyNames);
         }
 
@@ -2375,22 +2417,34 @@
             // Sort by current mode
             if (quickAgencySortMode === 'contracts') {
                 displayList.sort((a, b) => b.contracts - a.contracts);
+            } else if (quickAgencySortMode === 'budget') {
+                // Sort by FY26 budget growth (biggest increase first)
+                displayList.sort((a, b) => {
+                    const aPct = budgetTrendCache[a.name]?.pctChange || 0;
+                    const bPct = budgetTrendCache[b.name]?.pctChange || 0;
+                    return bPct - aPct;
+                });
             } else {
                 displayList.sort((a, b) => b.spending - a.spending);
             }
 
             const hasData = quickAgencyData.length > 0;
 
-            container.innerHTML = displayList.map(agency => `
+            container.innerHTML = displayList.map(agency => {
+                const badge = getBudgetBadge(agency.name);
+                return `
                 <label class="quick-agency-card flex items-start gap-2 p-2.5 bg-ma-dark border border-ma-border rounded-lg cursor-pointer hover:border-govcon-blue/50 transition has-[:checked]:border-govcon-blue has-[:checked]:bg-govcon-blue/10" data-name="${agency.name.toLowerCase()}">
                     <input type="checkbox" name="quick-agency" value="${agency.name}" checked class="mt-0.5 w-4 h-4 text-govcon-blue rounded border-gray-600 bg-ma-dark focus:ring-govcon-blue" onchange="updateQuickAgencyCount()">
                     <div class="flex-1 min-w-0">
-                        <p class="font-medium text-white text-sm truncate" title="${agency.name}">${agency.name}</p>
+                        <div class="flex items-center gap-2">
+                            <p class="font-medium text-white text-sm truncate" title="${agency.name}">${agency.name}</p>
+                            ${badge}
+                        </div>
                         ${hasData ? `<p class="text-xs text-gray-400">${agency.parentAgency}</p>
                         <p class="text-xs text-green-400 font-medium mt-0.5">${agency.spendingFormatted || 'N/A'}${agency.contracts ? ` · ${agency.contracts.toLocaleString()} contracts` : ''}</p>` : ''}
                     </div>
-                </label>
-            `).join('');
+                </label>`;
+            }).join('');
 
             updateQuickAgencyCount();
         }
@@ -2404,16 +2458,11 @@
 
         function sortQuickAgencies(mode) {
             quickAgencySortMode = mode;
-            // Update button styles
-            const spendBtn = document.getElementById('sort-spending-btn');
-            const contBtn = document.getElementById('sort-contracts-btn');
-            if (mode === 'spending') {
-                spendBtn.className = 'text-xs px-2 py-1 rounded bg-govcon-blue/20 text-govcon-blue font-medium';
-                contBtn.className = 'text-xs px-2 py-1 rounded bg-ma-dark text-gray-400 hover:bg-govcon-blue/10 transition';
-            } else {
-                contBtn.className = 'text-xs px-2 py-1 rounded bg-govcon-blue/20 text-govcon-blue font-medium';
-                spendBtn.className = 'text-xs px-2 py-1 rounded bg-ma-dark text-gray-400 hover:bg-govcon-blue/10 transition';
-            }
+            const activeClass = 'text-xs px-2 py-1 rounded bg-govcon-blue/20 text-govcon-blue font-medium';
+            const inactiveClass = 'text-xs px-2 py-1 rounded bg-ma-dark text-gray-400 hover:bg-govcon-blue/10 transition';
+            document.getElementById('sort-spending-btn').className = mode === 'spending' ? activeClass : inactiveClass;
+            document.getElementById('sort-contracts-btn').className = mode === 'contracts' ? activeClass : inactiveClass;
+            document.getElementById('sort-budget-btn').className = mode === 'budget' ? activeClass : inactiveClass;
             // Re-render with current profile agencies
             const profile = SupabaseAuth?.profile;
             if (profile?.target_agencies?.length) {
