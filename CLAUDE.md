@@ -504,6 +504,17 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 18, 2026 (Session 16)
+- **FY2026 Budget Data Expansion: 23 → 47 toptier agencies**
+  - Added 24 independent agencies to `agency-budget-data.json` with verified OMB FY2026 data
+  - Key additions: USAID (cut -47%), NRC (stable +3%), SEC (stable), FTC (declining -10%), EEOC (stable -4%), NLRB (stable -5%), CFTC (growing +12%), CPSC (declining -11%), MCC (cut -76%), Smithsonian (cut -27%), NARA (stable), GAO (stable), Peace Corps (stable), FDIC/CFPB/FCC/TVA (self-funded, stable)
+- **Sub-Agency → Parent Toptier Mapping**
+  - Added `SUB_AGENCY_PARENT_MAP` to `budget-authority.ts` — 175 entries mapping all sub-agencies to parent toptier
+  - Covers all DoD commands (DARPA, DLA, DISA, combatant commands), HHS agencies (CDC, CMS, FDA, NIH), DHS (FEMA, CISA, CBP, ICE), and all other department sub-agencies
+  - Updated `getBudgetForAgency()` with parent map fallback + fuzzy parent map fallback
+  - **Coverage: 218/250 pain-point agencies (87%)** now resolve to budget trend data
+  - Remaining 32 uncovered are tiny boards/commissions where budget trends aren't meaningful
+
 ### February 17, 2026 (Session 15)
 - **Content Reaper: Generation Memory System**
   - localStorage-based history (`gcg_post_history`): stores angle, painPoint, templateKey, agency, timestamp per post
