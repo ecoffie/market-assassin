@@ -504,6 +504,22 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 17, 2026 (Session 15)
+- **Content Reaper: Generation Memory System**
+  - localStorage-based history (`gcg_post_history`): stores angle, painPoint, templateKey, agency, timestamp per post
+  - Max 100 entries, auto-prunes after 30 days, filtered by target agencies
+  - `getGenerationHistory(agencies)`, `saveGenerationHistory(posts, agencies)`, `getPreviousAngles(agencies, limit)`
+  - Both `quickGenerate()` and `generateContent()` read history before API call, send `previousAngles[]` in request body, save after success
+  - Both `/api/generate` and `/api/content-generator/generate` accept `previousAngles` (sanitized, max 50), inject "DO NOT REPEAT" section into Step 2 prompt
+- **Content Reaper: Visual Card Quote Variety**
+  - `/api/generate-graphic` prompts rewritten: instead of "1-2 sentences" now asks AI to randomly pick from 5 formats (bold phrase, punchy question, stat hook, contrarian take, full sentence)
+  - Word limit changed to "under 15 words" for punchier output
+  - Temperature bumped from 0.7 → 0.9 for more creative variety
+- **Content Reaper: Agency Persistence Fix**
+  - `findAgencies()` now saves all found agency names to `target_agencies` in Supabase (was missing — `saveCompanyProfile()` never included agencies)
+  - `generateContent()` now persists checked agencies to Supabase after generation so selections survive across sessions
+  - Removed `.slice(0, 15)` cap from all 5 agency lookup paths — users now see full agency list from API instead of truncated 15
+
 ### February 15, 2026 (Session 14)
 - **govcon-shop: Opportunity Hunter Email Gate + Contextual Upsell**
   - Email gate: shows 3 agencies free, blurs remaining with email capture overlay, unlocks up to 10 on submit
@@ -665,4 +681,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 12, 2026 (Session 13)*
+*Last Updated: February 17, 2026 (Session 15)*
