@@ -524,6 +524,9 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
   - Upgrade CTA banner: "Entry Point Analysis Available — Unlock with Market Assassin"
   - Blurred "Simplified Acquisition Analysis" section in agency modal with upgrade link
   - All users (free and Pro) see the blur — this is a Market Assassin feature, not OH Pro
+- **Build Fix: `OfficeSpending` interface**
+  - `government-contracts/search` uses typed `OfficeSpending` from `src/lib/government-contracts.ts` (not `any`)
+  - Added `satSpending`, `satContractCount`, `microSpending`, `microContractCount` to interface
 
 ### February 18, 2026 (Session 16)
 - **FY2026 Budget Data Expansion: 23 → 47 toptier agencies**
