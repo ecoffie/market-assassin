@@ -31,7 +31,7 @@ interface PainPointsApiResponse {
   priorityCount: number;
 }
 
-type SortField = 'name' | 'spending' | 'contractCount';
+type SortField = 'name' | 'spending' | 'contractCount' | 'satPercent' | 'budgetChange';
 type SortDirection = 'asc' | 'desc';
 
 export default function AgencySelectionTable({
@@ -83,6 +83,17 @@ export default function AgencySelectionTable({
     return null;
   }, [budgetMap]);
 
+  const getSATPercent = useCallback((agency: Agency): number => {
+    if (!agency.contractCount || agency.contractCount === 0) return 0;
+    return ((agency.satContractCount || 0) / agency.contractCount) * 100;
+  }, []);
+
+  const getBudgetChange = useCallback((agency: Agency): number => {
+    const bd = getBudgetBadge(agency);
+    if (!bd) return 0;
+    return (bd.change.percent - 1) * 100;
+  }, [getBudgetBadge]);
+
   const sortedAgencies = useMemo(() => {
     return [...agencies].sort((a, b) => {
       let comparison = 0;
@@ -93,11 +104,15 @@ export default function AgencySelectionTable({
         comparison = a.setAsideSpending - b.setAsideSpending;
       } else if (sortField === 'contractCount') {
         comparison = a.contractCount - b.contractCount;
+      } else if (sortField === 'satPercent') {
+        comparison = getSATPercent(a) - getSATPercent(b);
+      } else if (sortField === 'budgetChange') {
+        comparison = getBudgetChange(a) - getBudgetChange(b);
       }
 
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [agencies, sortField, sortDirection]);
+  }, [agencies, sortField, sortDirection, getSATPercent, getBudgetChange]);
 
   const agencyPagination = usePagination(sortedAgencies, 25);
 
@@ -438,6 +453,40 @@ export default function AgencySelectionTable({
             </>
           )}
         </button>
+      </div>
+
+      {/* Sort Mode Pills */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-slate-500 uppercase tracking-wider mr-1">Sort by:</span>
+        {([
+          { field: 'spending' as SortField, label: '$ Top Spending' },
+          { field: 'satPercent' as SortField, label: 'Easy Entry (SAT)' },
+          { field: 'budgetChange' as SortField, label: 'Budget Growth' },
+          { field: 'contractCount' as SortField, label: 'Contracts' },
+          { field: 'name' as SortField, label: 'A-Z' },
+        ]).map(({ field, label }) => (
+          <button
+            key={field}
+            onClick={() => {
+              if (sortField === field) {
+                setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+              } else {
+                setSortField(field);
+                setSortDirection(field === 'name' ? 'asc' : 'desc');
+              }
+            }}
+            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+              sortField === field
+                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-slate-300'
+            }`}
+          >
+            {label}
+            {sortField === field && (
+              <span className="ml-1">{sortDirection === 'desc' ? '↓' : '↑'}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Table - Limited height with scroll */}
