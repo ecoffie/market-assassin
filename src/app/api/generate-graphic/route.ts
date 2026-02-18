@@ -13,20 +13,36 @@ const GROK_MODEL = process.env.GROK_MODEL || 'grok-3';
 type GraphicType = 'quote' | 'highlight';
 
 const prompts: Record<GraphicType, string> = {
-  quote: `Extract or create a powerful, shareable quote from this LinkedIn post. The quote should be:
-- 1-2 sentences max
-- Inspirational or thought-provoking
-- Suitable for a quote graphic
-- Capture the essence of the post
+  quote: `Extract or create a powerful, shareable quote from this LinkedIn post for a visual graphic card.
+
+RANDOMLY pick ONE of these formats (vary it each time — do NOT always use the same style):
+- A bold phrase or fragment (3-8 words): "Zero Trust Isn't Optional Anymore"
+- A punchy question: "What if your biggest competitor is already inside the agency?"
+- A stat-driven hook: "73% of contracts are won before the RFP drops."
+- A contrarian take: "Stop chasing SAM.gov. Start chasing relationships."
+- A full sentence insight (1 sentence max): "The contractors who win aren't the cheapest — they're the most trusted."
+
+Rules:
+- Keep it under 15 words
+- Make it visually striking on a quote card
+- Capture the core insight of the post
+- Do NOT default to full sentences every time — mix it up
 
 Return ONLY valid JSON: {"quote": "the quote text"}`,
 
-  highlight: `Extract a powerful quote from this LinkedIn post AND identify 2-3 key words or short phrases in the quote that should be visually highlighted.
+  highlight: `Extract a powerful quote from this LinkedIn post AND identify 2-3 key words or short phrases to visually highlight.
+
+RANDOMLY pick ONE of these quote formats (vary it — do NOT always use full sentences):
+- A bold phrase or fragment (3-8 words)
+- A punchy question
+- A stat-driven hook with a number
+- A contrarian take
+- A full sentence insight (1 sentence max)
 
 Return ONLY valid JSON: {"quote": "the full quote text", "highlights": ["key word", "another phrase"]}
 
 Rules:
-- Quote should be 1-2 sentences, capture the essence of the post
+- Quote should be under 15 words and capture the essence of the post
 - highlights should be 2-3 individual words or 2-word phrases FROM the quote
 - Choose words that are emotionally impactful or represent the core message`
 };
@@ -75,7 +91,7 @@ ${postContent}`;
       body: JSON.stringify({
         model: GROK_MODEL,
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
+        temperature: 0.9,
         max_tokens: 400
       })
     });

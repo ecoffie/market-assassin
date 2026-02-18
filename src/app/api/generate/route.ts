@@ -222,8 +222,14 @@ export async function POST(request: NextRequest) {
       geoBoost = true,
       templates = [],
       companyProfile = {},
-      userEmail = ''
+      userEmail = '',
+      previousAngles: rawPreviousAngles = []
     } = body;
+
+    // Sanitize previousAngles: cap at 50 entries, strings only
+    const previousAngles: string[] = (Array.isArray(rawPreviousAngles) ? rawPreviousAngles : [])
+      .filter((a: unknown) => typeof a === 'string' && a.length > 0)
+      .slice(0, 50);
 
     // Cap numPosts at 30 max
     const numPosts = Math.min(Math.max(1, Number(rawNumPosts) || 3), 30);
@@ -239,7 +245,7 @@ export async function POST(request: NextRequest) {
       if (!rl.allowed) return rateLimitResponse(rl);
     }
 
-    console.log(`[Content Generator] Request for ${numPosts} posts, agencies:`, targetAgencies);
+    console.log(`[Content Reaper] Request for ${numPosts} posts, agencies:`, targetAgencies, `| ${previousAngles.length} previous angles`);
 
     if (!GROK_API_KEY) {
       return NextResponse.json({
@@ -305,7 +311,12 @@ Pain Points:
 ${ap.painPoints.slice(0, 5).map(p => `- ${p}`).join('\n')}
 `).join('\n---\n')}
 
-TASK: Create PERSONALIZED content angles that:
+${previousAngles.length > 0 ? `PREVIOUSLY GENERATED CONTENT — DO NOT REPEAT:
+The user has already generated posts with these angles. You MUST create completely NEW and DIFFERENT angles:
+${previousAngles.map(a => `- ${a}`).join('\n')}
+
+Create fresh perspectives that cover DIFFERENT pain points, use DIFFERENT hooks, and take DIFFERENT approaches than the above.
+` : ''}TASK: Create PERSONALIZED content angles that:
 1. DIRECTLY connect the company's specific services to agency pain points
 2. Highlight the company's differentiators
 3. Reference certifications when addressing small business opportunities
@@ -451,7 +462,7 @@ Output ONLY the post text, followed by hashtags on separate lines.`;
       posts.push(...batchResults);
     }
 
-    console.log(`[Content Generator] Generated ${posts.length} posts`);
+    console.log(`[Content Reaper] Generated ${posts.length} posts`);
 
     return NextResponse.json({
       success: true,
@@ -465,7 +476,7 @@ Output ONLY the post text, followed by hashtags on separate lines.`;
     }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('[Content Generator] Error:', error);
+    console.error('[Content Reaper] Error:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to generate content'

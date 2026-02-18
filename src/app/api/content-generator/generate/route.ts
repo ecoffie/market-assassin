@@ -291,8 +291,14 @@ export async function POST(request: NextRequest) {
       geoBoost = true,
       templates = [],
       companyProfile = {},
-      userEmail = ''
+      userEmail = '',
+      previousAngles: rawPreviousAngles = []
     } = body;
+
+    // Sanitize previousAngles: cap at 50 entries, strings only
+    const previousAngles: string[] = (Array.isArray(rawPreviousAngles) ? rawPreviousAngles : [])
+      .filter((a: unknown) => typeof a === 'string' && a.length > 0)
+      .slice(0, 50);
 
     // Cap numPosts at 30 max
     const numPosts = Math.min(Math.max(1, Number(rawNumPosts) || 3), 30);
@@ -308,7 +314,7 @@ export async function POST(request: NextRequest) {
       if (!rl.allowed) return rateLimitResponse(rl);
     }
 
-    console.log(`[Content Generator] Request for ${numPosts} posts, agencies:`, targetAgencies);
+    console.log(`[Content Reaper] Request for ${numPosts} posts, agencies:`, targetAgencies, `| ${previousAngles.length} previous angles`);
 
     if (!GROK_API_KEY) {
       return NextResponse.json({
@@ -406,7 +412,12 @@ CONTENT VARIETY DIRECTIONS (use these creative lenses to make each post unique):
 - ${selectedLenses[1]}
 - ${selectedLenses[2]}
 
-CRITICAL: Each angle MUST use a completely different hook style, different pain point, and different narrative approach. Do NOT reuse similar openings, structures, or talking points across angles. Vary between personal stories, data-driven insights, provocative questions, and actionable tips.
+${previousAngles.length > 0 ? `PREVIOUSLY GENERATED CONTENT — DO NOT REPEAT:
+The user has already generated posts with these angles. You MUST create completely NEW and DIFFERENT angles:
+${previousAngles.map(a => `- ${a}`).join('\n')}
+
+Create fresh perspectives that cover DIFFERENT pain points, use DIFFERENT hooks, and take DIFFERENT approaches than the above.
+` : ''}CRITICAL: Each angle MUST use a completely different hook style, different pain point, and different narrative approach. Do NOT reuse similar openings, structures, or talking points across angles. Vary between personal stories, data-driven insights, provocative questions, and actionable tips.
 
 TASK: Create THOUGHT LEADERSHIP content angles that:
 1. Demonstrate deep insider knowledge of agency challenges, spending priorities, and how federal procurement actually works
@@ -578,7 +589,7 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       posts.push(...batchResults);
     }
 
-    console.log(`[Content Generator] Generated ${posts.length} posts`);
+    console.log(`[Content Reaper] Generated ${posts.length} posts`);
 
     return NextResponse.json({
       success: true,
@@ -592,7 +603,7 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
     }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('[Content Generator] Error:', error);
+    console.error('[Content Reaper] Error:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to generate content'

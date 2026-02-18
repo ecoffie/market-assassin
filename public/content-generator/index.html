@@ -203,7 +203,7 @@
     <!-- Supabase Auth - Inlined to avoid static file issues -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Supabase Auth Configuration - GovCon Content Generator project
+        // Supabase Auth Configuration - Content Reaper project
         const SUPABASE_URL = 'https://krpyelfrbicmvsmwovti.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtycHllbGZyYmljbXZzbXdvdnRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNzU1MDAsImV4cCI6MjA4MzY1MTUwMH0.xI3qosl35ieKa5ObeExh0BiSwDdoZy74lZQWg1Fzn6M';
 
@@ -713,7 +713,7 @@
             </div>
         </div>
 
-        <!-- Content Generator Form (for new users or full form mode) -->
+        <!-- Content Reaper Form (for new users or full form mode) -->
         <div id="generator-form" class="bg-ma-card rounded-2xl shadow-xl p-8 mb-6 border border-ma-border">
             <div class="space-y-6">
 
@@ -1340,6 +1340,73 @@
         let hasGraphicsAccess = false;
         let loadingTipInterval = null;
         let progressInterval = null;
+
+        // --- Generation History (localStorage memory system) ---
+        const HISTORY_KEY = 'gcg_post_history';
+        const HISTORY_MAX = 100;
+        const HISTORY_TTL_DAYS = 30;
+
+        function getGenerationHistory(agencies) {
+            try {
+                const raw = localStorage.getItem(HISTORY_KEY);
+                if (!raw) return [];
+                let history = JSON.parse(raw);
+                // Prune entries older than 30 days
+                const cutoff = Date.now() - (HISTORY_TTL_DAYS * 24 * 60 * 60 * 1000);
+                history = history.filter(h => h.timestamp > cutoff);
+                // Save pruned list back
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+                // Filter to matching agencies if provided
+                if (agencies && agencies.length > 0) {
+                    const agencySet = new Set(agencies.map(a => a.toLowerCase()));
+                    history = history.filter(h => agencySet.has((h.agency || '').toLowerCase()));
+                }
+                return history;
+            } catch (e) {
+                console.warn('[History] Failed to read generation history:', e);
+                return [];
+            }
+        }
+
+        function saveGenerationHistory(posts, agencies) {
+            try {
+                const raw = localStorage.getItem(HISTORY_KEY);
+                let history = raw ? JSON.parse(raw) : [];
+                const now = Date.now();
+                // Add each post as a history entry
+                for (const post of posts) {
+                    const agency = (agencies && agencies.length === 1)
+                        ? agencies[0]
+                        : (agencies && agencies.length > 1 ? agencies.join(', ') : 'Multiple');
+                    history.push({
+                        agency: agency,
+                        angle: post.angle || '',
+                        painPoint: post.painPointAddressed || '',
+                        templateKey: post.templateKey || '',
+                        timestamp: now
+                    });
+                }
+                // Trim to max entries (keep newest)
+                if (history.length > HISTORY_MAX) {
+                    history = history.slice(history.length - HISTORY_MAX);
+                }
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+            } catch (e) {
+                console.warn('[History] Failed to save generation history:', e);
+            }
+        }
+
+        function getPreviousAngles(agencies, limit) {
+            limit = limit || 50;
+            const history = getGenerationHistory(agencies);
+            // Return just the angle strings, most recent first
+            return history
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .slice(0, limit)
+                .map(h => h.angle)
+                .filter(a => a && a.length > 0);
+        }
+        // --- End Generation History ---
 
         // Loading tips that rotate during content generation
         const loadingTips = [
@@ -2229,7 +2296,7 @@
                         console.log('[Auto-fetch] Result:', result);
 
                         if (result.success && result.agencies?.length) {
-                            agencies = result.agencies.slice(0, 15).map(a => a.name);
+                            agencies = result.agencies.map(a => a.name);
 
                             // Save to profile for next time
                             await SupabaseAuth.saveUserProfile({
@@ -2331,7 +2398,7 @@
                 console.log('[Find Agencies] Result:', result);
 
                 if (result.success && result.agencies?.length) {
-                    const agencyNames = result.agencies.slice(0, 15).map(a => a.name);
+                    const agencyNames = result.agencies.map(a => a.name);
 
                     // Save to profile
                     await SupabaseAuth.saveUserProfile({
@@ -2535,9 +2602,12 @@
                     });
                     const agencyResult = await agencyResponse.json();
                     if (agencyResult.success) {
-                        agencies = agencyResult.agencies.slice(0, 15).map(a => a.name);
+                        agencies = agencyResult.agencies.map(a => a.name);
                     }
                 }
+
+                // Get previous angles to avoid repetition
+                const previousAngles = getPreviousAngles(agencies);
 
                 // Generate posts
                 const response = await fetch('/api/generate', {
@@ -2560,7 +2630,8 @@
                         contentStyle: contentStyle,
                         geoBoost: geoBoost,
                         useFineTuned: fineTuned,
-                        userEmail: SupabaseAuth.user?.email || ''
+                        userEmail: SupabaseAuth.user?.email || '',
+                        previousAngles: previousAngles
                     })
                 });
 
@@ -2590,6 +2661,9 @@
 
                 // Store generated posts
                 generatedPosts = result.posts || [];
+
+                // Save to generation history for future anti-repetition
+                saveGenerationHistory(generatedPosts, agencies);
 
                 // Record usage for tier limits (server-side)
                 await recordPostGeneration(generatedPosts.length);
@@ -5791,7 +5865,7 @@
             const progressCount = document.getElementById('generation-count');
 
             // Check for agencies - auto-find if needed
-            let agencies = foundAgencies.slice(0, 15);
+            let agencies = [...foundAgencies];
             if (!agencies.length && naicsCodes.length) {
                 try {
                     progressText.textContent = 'Finding target agencies...';
@@ -5807,7 +5881,7 @@
                     });
                     const agencyResult = await agencyResponse.json();
                     if (agencyResult.success && agencyResult.agencies?.length) {
-                        agencies = agencyResult.agencies.slice(0, 15);
+                        agencies = agencyResult.agencies;
                         foundAgencies = agencies;
                     }
                 } catch (e) {
@@ -6149,6 +6223,9 @@
                 const formProfile = getCompanyProfile();
                 console.log('[Profile] Auto-saving profile after finding agencies...');
 
+                // Save all found agency names to target_agencies so they persist across sessions
+                const allFoundAgencyNames = result.agencies.map(a => a.name);
+
                 try {
                     // Save with timeout to prevent hanging
                     await Promise.race([
@@ -6158,7 +6235,12 @@
                             resolve(false);
                         }, 5000))
                     ]);
-                    console.log('[Profile] Profile saved successfully');
+
+                    // Now save target_agencies separately (saveCompanyProfile doesn't include them)
+                    await SupabaseAuth.saveUserProfile({
+                        target_agencies: allFoundAgencyNames
+                    });
+                    console.log('[Profile] Profile + agencies saved successfully (' + allFoundAgencyNames.length + ' agencies)');
 
                     // Reload profile to ensure we have latest data
                     await SupabaseAuth.loadUserProfile();
@@ -6364,6 +6446,9 @@
             }, 4000);
 
             try {
+                // Get previous angles to avoid repetition
+                const previousAngles = getPreviousAngles(selectedAgencies);
+
                 const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -6373,7 +6458,8 @@
                         geoBoost: geoBoost,
                         templates: selectedTemplates,
                         useFineTuned: useFineTuned,
-                        companyProfile: companyProfile
+                        companyProfile: companyProfile,
+                        previousAngles: previousAngles
                     })
                 });
 
@@ -6409,6 +6495,17 @@
                 await new Promise(resolve => setTimeout(resolve, 500));
 
                 displayPosts(result.posts, result.metadata);
+
+                // Persist the selected agencies to Supabase so they show on return
+                try {
+                    await SupabaseAuth.saveUserProfile({ target_agencies: selectedAgencies });
+                    SupabaseAuth.profile.target_agencies = selectedAgencies;
+                } catch (e) {
+                    console.warn('[Profile] Failed to save selected agencies:', e);
+                }
+
+                // Save to generation history for future anti-repetition
+                saveGenerationHistory(result.posts, selectedAgencies);
 
             } catch (error) {
                 console.error('Error generating content:', error);
