@@ -2307,8 +2307,10 @@
             }
         }
 
-        function getBudgetBadge(agencyName) {
-            const data = budgetTrendCache[agencyName];
+        function getBudgetBadge(agencyName, parentAgency) {
+            // Try exact match first, then parent agency (budget data is toptier)
+            let data = budgetTrendCache[agencyName];
+            if (!data && parentAgency) data = budgetTrendCache[parentAgency];
             if (!data) return '';
             const pct = data.pctChange.toFixed(1);
             if (data.trend === 'increasing') {
@@ -2427,16 +2429,21 @@
             const container = document.getElementById('quick-agencies-list');
             if (!container) return;
 
-            // Build display list with spending data where available
+            // Remember checked state before re-render
+            const previouslyChecked = new Set(
+                Array.from(document.querySelectorAll('input[name="quick-agency"]:checked')).map(cb => cb.value)
+            );
+            const isFirstRender = document.querySelectorAll('input[name="quick-agency"]').length === 0;
+
+            // Build display list — use API field names: setAsideSpending, contractCount
             let displayList = agencyNames.map(name => {
                 const nameStr = typeof name === 'string' ? name : name.name;
                 const data = quickAgencyData.find(a => a.name === nameStr);
                 return {
                     name: nameStr,
-                    spending: data?.spending || 0,
-                    spendingFormatted: data?.spendingFormatted || '',
-                    contracts: data?.contracts || 0,
-                    parentAgency: data?.parentAgency || 'Federal Agency'
+                    spending: data?.setAsideSpending || 0,
+                    contracts: data?.contractCount || 0,
+                    parentAgency: data?.parentAgency || ''
                 };
             });
 
@@ -2444,10 +2451,9 @@
             if (quickAgencySortMode === 'contracts') {
                 displayList.sort((a, b) => b.contracts - a.contracts);
             } else if (quickAgencySortMode === 'budget') {
-                // Sort by FY26 budget growth (biggest increase first)
                 displayList.sort((a, b) => {
-                    const aPct = budgetTrendCache[a.name]?.pctChange || 0;
-                    const bPct = budgetTrendCache[b.name]?.pctChange || 0;
+                    const aPct = (budgetTrendCache[a.name] || budgetTrendCache[a.parentAgency])?.pctChange || 0;
+                    const bPct = (budgetTrendCache[b.name] || budgetTrendCache[b.parentAgency])?.pctChange || 0;
                     return bPct - aPct;
                 });
             } else {
@@ -2456,18 +2462,27 @@
 
             const hasData = quickAgencyData.length > 0;
 
+            function fmtSpend(amount) {
+                if (!amount) return '';
+                if (amount >= 1e9) return '$' + (amount / 1e9).toFixed(1) + 'B';
+                if (amount >= 1e6) return '$' + (amount / 1e6).toFixed(1) + 'M';
+                if (amount >= 1e3) return '$' + (amount / 1e3).toFixed(0) + 'K';
+                return '$' + amount.toLocaleString();
+            }
+
             container.innerHTML = displayList.map(agency => {
-                const badge = getBudgetBadge(agency.name);
+                const badge = getBudgetBadge(agency.name, agency.parentAgency);
+                const isChecked = isFirstRender || previouslyChecked.has(agency.name);
+                const spendStr = fmtSpend(agency.spending);
                 return `
                 <label class="quick-agency-card flex items-start gap-2 p-2.5 bg-ma-dark border border-ma-border rounded-lg cursor-pointer hover:border-govcon-blue/50 transition has-[:checked]:border-govcon-blue has-[:checked]:bg-govcon-blue/10" data-name="${agency.name.toLowerCase()}">
-                    <input type="checkbox" name="quick-agency" value="${agency.name}" checked class="mt-0.5 w-4 h-4 text-govcon-blue rounded border-gray-600 bg-ma-dark focus:ring-govcon-blue" onchange="updateQuickAgencyCount()">
+                    <input type="checkbox" name="quick-agency" value="${agency.name}" ${isChecked ? 'checked' : ''} class="mt-0.5 w-4 h-4 text-govcon-blue rounded border-gray-600 bg-ma-dark focus:ring-govcon-blue" onchange="updateQuickAgencyCount()">
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
                             <p class="font-medium text-white text-sm truncate" title="${agency.name}">${agency.name}</p>
                             ${badge}
                         </div>
-                        ${hasData ? `<p class="text-xs text-gray-400">${agency.parentAgency}</p>
-                        <p class="text-xs text-green-400 font-medium mt-0.5">${agency.spendingFormatted || 'N/A'}${agency.contracts ? ` · ${agency.contracts.toLocaleString()} contracts` : ''}</p>` : ''}
+                        ${hasData ? `<p class="text-xs text-gray-400">${agency.parentAgency || 'Federal Agency'}${spendStr ? ' · ' + spendStr : ''}${agency.contracts ? ' · ' + agency.contracts.toLocaleString() + ' contracts' : ''}</p>` : ''}
                     </div>
                 </label>`;
             }).join('');
