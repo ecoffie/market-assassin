@@ -527,6 +527,13 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 - **Build Fix: `OfficeSpending` interface**
   - `government-contracts/search` uses typed `OfficeSpending` from `src/lib/government-contracts.ts` (not `any`)
   - Added `satSpending`, `satContractCount`, `microSpending`, `microContractCount` to interface
+- **AgencySelectionTable: Sort Mode Pills**
+  - 5 sort modes above table: $ Top Spending (default), Easy Entry (SAT %), Budget Growth, Contracts, A-Z
+  - Cyan pill for active sort, click again to toggle asc/desc
+  - "Top 10/20" buttons select from current sort order
+- **Entry Points Tab: Sortable Column Headers**
+  - All 6 columns (Agency, SAT %, SAT Contracts, Avg Award, Micro, Score) clickable to sort
+  - Active column highlighted in cyan with direction arrow, default sort by Score desc
 
 ### February 18, 2026 (Session 16)
 - **FY2026 Budget Data Expansion: 23 → 47 toptier agencies**
