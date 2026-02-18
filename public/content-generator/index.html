@@ -652,12 +652,21 @@
                         <svg class="w-5 h-5 text-govcon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                         <span class="font-medium text-gray-700">Target Agencies</span>
                     </div>
-                    <button onclick="findAgenciesQuick()" class="text-sm bg-govcon-blue hover:bg-govcon-blue/90 text-white px-3 py-1.5 rounded-lg transition flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        Refresh
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="clearAllAgencies()" class="text-sm bg-red-500/10 hover:bg-red-500/20 text-red-600 px-3 py-1.5 rounded-lg transition">
+                            Clear All
+                        </button>
+                        <button onclick="findAgenciesQuick()" class="text-sm bg-govcon-blue hover:bg-govcon-blue/90 text-white px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Refresh
+                        </button>
+                    </div>
                 </div>
-                <p class="text-xs text-gray-500 mb-3">Top spending agencies for your NAICS codes (click to remove)</p>
+                <div class="flex items-center gap-2 mb-3">
+                    <p class="text-xs text-gray-500">Top spending agencies for your NAICS codes (click to remove)</p>
+                    <span id="quick-agency-count" class="text-xs text-govcon-blue font-medium"></span>
+                </div>
+                <input type="text" id="quick-agency-search" placeholder="Search agencies..." oninput="filterQuickAgencies()" class="w-full mb-3 px-3 py-2 text-sm bg-ma-dark border border-ma-border rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-govcon-blue focus:border-transparent hidden">
                 <div id="quick-agencies-list" class="flex flex-wrap gap-2">
                     <span class="text-sm text-gray-500 italic">Loading agencies...</span>
                 </div>
@@ -2320,9 +2329,24 @@
                 return;
             }
 
+            // Show count badge
+            const countBadge = document.getElementById('quick-agency-count');
+            if (countBadge) countBadge.textContent = `(${agencies.length} selected)`;
+
+            // Show search box when 10+ agencies
+            const searchBox = document.getElementById('quick-agency-search');
+            if (searchBox) {
+                if (agencies.length >= 10) {
+                    searchBox.classList.remove('hidden');
+                } else {
+                    searchBox.classList.add('hidden');
+                    searchBox.value = '';
+                }
+            }
+
             container.innerHTML = agencies.map((agency, index) => {
                 const name = typeof agency === 'string' ? agency : agency.name;
-                return `<span class="inline-flex items-center gap-1 px-3 py-1 bg-govcon-blue/10 text-govcon-blue text-sm rounded-full cursor-pointer hover:bg-red-100 hover:text-red-600 transition group" onclick="removeAgency(${index})" title="Click to remove">
+                return `<span class="quick-agency-pill inline-flex items-center gap-1 px-3 py-1 bg-govcon-blue/10 text-govcon-blue text-sm rounded-full cursor-pointer hover:bg-red-100 hover:text-red-600 transition group" data-name="${name.toLowerCase()}" onclick="removeAgency(${index})" title="Click to remove">
                     ${name}
                     <svg class="w-3 h-3 opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </span>`;
@@ -2354,6 +2378,41 @@
 
             // Update display
             displayQuickAgencies({ ...profile, target_agencies: agencies });
+        }
+
+        // Clear all agencies
+        async function clearAllAgencies() {
+            const profile = SupabaseAuth.profile;
+            if (!profile?.target_agencies?.length) return;
+
+            console.log('[Clear Agencies] Clearing', profile.target_agencies.length, 'agencies');
+
+            SupabaseAuth.profile.target_agencies = [];
+
+            try {
+                await SupabaseAuth.saveUserProfile({
+                    ...profile,
+                    target_agencies: []
+                });
+            } catch (e) {
+                console.log('[Clear Agencies] Could not save:', e.message);
+            }
+
+            displayQuickAgencies({ ...profile, target_agencies: [] });
+
+            // Clear search
+            const searchBox = document.getElementById('quick-agency-search');
+            if (searchBox) { searchBox.value = ''; searchBox.classList.add('hidden'); }
+        }
+
+        // Filter agency pills by search text
+        function filterQuickAgencies() {
+            const query = (document.getElementById('quick-agency-search')?.value || '').toLowerCase().trim();
+            const pills = document.querySelectorAll('.quick-agency-pill');
+            pills.forEach(pill => {
+                const name = pill.getAttribute('data-name') || '';
+                pill.style.display = (!query || name.includes(query)) ? '' : 'none';
+            });
         }
 
         // Find agencies for returning users
