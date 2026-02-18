@@ -2389,12 +2389,38 @@
                 }
             }
 
+            // Render cards immediately with whatever data we have
+            renderQuickAgencyCards(agencyNames);
+
+            // If we have names but no spending data, fetch it in background
+            if (agencyNames.length > 0 && quickAgencyData.length === 0 && profile.naics_codes?.length) {
+                try {
+                    let naicsCodes = profile.naics_codes;
+                    if (typeof naicsCodes === 'string') naicsCodes = naicsCodes.split(',').map(c => c.trim()).filter(Boolean);
+                    if (!Array.isArray(naicsCodes)) naicsCodes = [String(naicsCodes)];
+
+                    const response = await fetch('/api/agencies/lookup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ naicsCodes, businessFormation: profile.business_type || '' })
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success && result.agencies?.length) {
+                            quickAgencyData = result.agencies;
+                            console.log('[Agency Data] Enriched', quickAgencyData.length, 'agencies with spending data');
+                            renderQuickAgencyCards(agencyNames);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Agency Data] Failed to enrich:', e);
+                }
+            }
+
             // Load budget trends (non-blocking, then re-render with badges)
             loadBudgetTrends().then(() => {
                 renderQuickAgencyCards(agencyNames);
             });
-
-            renderQuickAgencyCards(agencyNames);
         }
 
         function renderQuickAgencyCards(agencyNames) {
