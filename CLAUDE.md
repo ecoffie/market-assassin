@@ -519,6 +519,14 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
   - `findAgencies()` now saves all found agency names to `target_agencies` in Supabase (was missing — `saveCompanyProfile()` never included agencies)
   - `generateContent()` now persists checked agencies to Supabase after generation so selections survive across sessions
   - Removed `.slice(0, 15)` cap from all 5 agency lookup paths — users now see full agency list from API instead of truncated 15
+- **Content Reaper: Agency Selection Redesign (Quick Generate)**
+  - Replaced plain name pills with checkbox cards showing spending amounts, contract counts, and FY26 budget trend badges
+  - Cards in 2-column scrollable grid (`max-h-80`) with `has-[:checked]` styling for selected state
+  - Three sort modes: $ Spending (default), Contracts, FY26 Trend (biggest budget growth first)
+  - Select All / Clear All buttons, search filter (auto-shown at 10+ agencies)
+  - `quickGenerate()` now reads checked agencies from DOM checkboxes via `getSelectedQuickAgencies()`
+  - `quickAgencyData` module-level cache stores full agency objects from API; `budgetTrendCache` loaded from `/api/budget-authority`
+  - Budget badges: green ▲ +X% / red ▼ -X% fetched non-blocking, cards re-render when data arrives
 
 ### February 15, 2026 (Session 14)
 - **govcon-shop: Opportunity Hunter Email Gate + Contextual Upsell**
