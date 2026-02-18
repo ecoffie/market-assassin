@@ -94,7 +94,8 @@ type ReportTab =
   | 'osbpContacts'
   | 'december'
   | 'tribal'
-  | 'budget';
+  | 'budget'
+  | 'entryPoints';
 
 // Helper function to format currency values intelligently
 function formatCurrency(value: number): string {
@@ -157,7 +158,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
   const [additionalCommands, setAdditionalCommands] = useState<Array<{command: string, painPoints: PainPointsApiResponse}>>([]);
 
   // Premium sections that are blocked for standard tier
-  const premiumSections: ReportTab[] = ['idvContracts', 'december', 'subcontracting', 'tribal'];
+  const premiumSections: ReportTab[] = ['idvContracts', 'december', 'subcontracting', 'tribal', 'entryPoints'];
   const isSectionLocked = (tabId: ReportTab) => tier === 'standard' && premiumSections.includes(tabId);
 
   // Helper to extract DoD command abbreviations from agency names
@@ -327,6 +328,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
   const tabs = [
     { id: 'analytics' as ReportTab, label: '📈 Analytics', icon: '📈' },
     { id: 'budget' as ReportTab, label: '💰 Budget Checkup', icon: '💰' },
+    { id: 'entryPoints' as ReportTab, label: '🚪 Entry Points', icon: '🚪' },
     { id: 'buyers' as ReportTab, label: '👥 Government Buyers', icon: '👥' },
     { id: 'osbpContacts' as ReportTab, label: '📞 OSBP Contacts', icon: '📞' },
     { id: 'subcontracting' as ReportTab, label: '🔗 Subcontracting', icon: '🔗' },
@@ -1696,6 +1698,16 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
             )}
             {activeTab === 'budget' && (
               <BudgetCheckupTab report={reports} />
+            )}
+            {activeTab === 'entryPoints' && (
+              isSectionLocked('entryPoints') ? (
+                <LockedSectionOverlay
+                  sectionName="Entry Points"
+                  onUpgrade={() => setShowUpgradeModal(true)}
+                />
+              ) : (
+                <EntryPointsTab report={reports} />
+              )
             )}
             {activeTab === 'tribal' && (
               isSectionLocked('tribal') ? (
@@ -3931,6 +3943,167 @@ function BudgetCheckupTab({ report }: { report: ComprehensiveReport }) {
           </a>
           . FY2025 = Enacted appropriation. FY2026 = President&apos;s discretionary request. Figures reflect discretionary budget authority only and do not include mandatory spending.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// Entry Points (Simplified Acquisition Analysis) Tab
+function EntryPointsTab({ report }: { report: ComprehensiveReport }) {
+  const sat = report.simplifiedAcquisition;
+
+  if (!sat || sat.agencies.length === 0) {
+    return (
+      <div className="bg-slate-800/50 rounded-xl p-8 text-center">
+        <p className="text-slate-400 text-lg">No simplified acquisition data available for selected agencies.</p>
+        <p className="text-slate-500 text-sm mt-2">SAT metrics are computed from individual award amounts in your search results.</p>
+      </div>
+    );
+  }
+
+  const { summary, agencies, recommendations } = sat;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl p-6">
+        <h3 className="text-xl font-bold text-amber-400 mb-2">Simplified Acquisition Entry Points</h3>
+        <p className="text-slate-400 text-sm">
+          Contracts under $250K use simplified acquisition procedures — faster timelines, less paperwork, and easier for small businesses to win.
+          Micro-purchases under $10K use government purchase cards with minimal competition.
+        </p>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">SAT Contracts</div>
+          <div className="text-2xl font-bold text-amber-400">{summary.totalSATContracts.toLocaleString()}</div>
+          <div className="text-xs text-slate-500 mt-1">${(summary.totalSATSpending / 1e6).toFixed(2)}M total</div>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Micro-Purchases</div>
+          <div className="text-2xl font-bold text-green-400">{summary.totalMicroContracts.toLocaleString()}</div>
+          <div className="text-xs text-slate-500 mt-1">${(summary.totalMicroSpending / 1e6).toFixed(2)}M total</div>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Avg SAT %</div>
+          <div className="text-2xl font-bold text-cyan-400">{summary.avgSATPercent}%</div>
+          <div className="text-xs text-slate-500 mt-1">across {summary.totalAgenciesAnalyzed} agencies</div>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">SAT-Friendly</div>
+          <div className="text-2xl font-bold text-emerald-400">{summary.satFriendlyAgencies}</div>
+          <div className="text-xs text-slate-500 mt-1">agencies with &gt;50% SAT</div>
+        </div>
+      </div>
+
+      {/* Ranked Agency Table */}
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/50">
+          <h4 className="text-lg font-semibold text-slate-200">Agency Rankings by Entry Accessibility</h4>
+          <p className="text-xs text-slate-500 mt-1">Sorted by SAT Friendliness Score (composite of SAT %, micro %, and volume)</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-900/50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Agency</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">SAT %</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">SAT Contracts</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg Award</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Micro</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Score</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/30">
+              {agencies.map((a, i) => (
+                <tr key={i} className="hover:bg-slate-700/20 transition">
+                  <td className="px-4 py-3">
+                    <div className="text-sm font-medium text-slate-200">{a.agency}</div>
+                    {a.parentAgency && a.parentAgency !== a.agency && (
+                      <div className="text-xs text-slate-500">{a.parentAgency}</div>
+                    )}
+                    {a.isEstimated && (
+                      <span className="text-[10px] text-slate-600 italic">estimated</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <span className={`text-sm font-bold ${
+                      a.satPercent > 50 ? 'text-emerald-400' :
+                      a.satPercent > 25 ? 'text-amber-400' : 'text-slate-500'
+                    }`}>
+                      {a.satPercent}%
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-sm text-slate-300">
+                    {a.satContractCount.toLocaleString()}
+                    <span className="text-slate-500 text-xs ml-1">/ {a.totalContractCount.toLocaleString()}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-sm text-slate-300">
+                    ${a.avgSATAwardSize > 1000 ? `${(a.avgSATAwardSize / 1000).toFixed(0)}K` : a.avgSATAwardSize.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-right text-sm text-slate-300">
+                    {a.microContractCount > 0 ? (
+                      <span className="text-green-400">{a.microContractCount}</span>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                      a.accessibilityLevel === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
+                      a.accessibilityLevel === 'moderate' ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-slate-600/20 text-slate-500'
+                    }`}>
+                      {a.satFriendlinessScore}
+                      <span className="ml-1 text-[10px] font-normal">
+                        {a.accessibilityLevel === 'high' ? 'High' :
+                         a.accessibilityLevel === 'moderate' ? 'Mod' : 'Low'}
+                      </span>
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Recommendations */}
+      {recommendations.length > 0 && (
+        <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+          <h4 className="text-lg font-semibold text-slate-200 mb-3">Entry Strategy Recommendations</h4>
+          <ul className="space-y-3">
+            {recommendations.map((rec, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="text-amber-400 mt-0.5 text-lg leading-none">→</span>
+                <span className="text-sm text-slate-300">{rec}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="bg-slate-900/30 rounded-lg p-4 border border-slate-700/30">
+        <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            High (&gt;50% SAT) — Highly Accessible
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            Moderate (25-50% SAT)
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+            Low (&lt;25% SAT)
+          </div>
+          <div className="ml-auto">
+            SAT = Simplified Acquisition Threshold ($250K) | Micro = Government Purchase Card ($10K)
+          </div>
+        </div>
       </div>
     </div>
   );

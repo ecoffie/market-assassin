@@ -547,6 +547,14 @@ export default function AgencySelectionTable({
                         </span>
                       );
                     })()}
+                    {agency.contractCount > 0 && (agency.satContractCount || 0) / agency.contractCount > 0.5 && (
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap bg-amber-500/15 text-amber-400"
+                        title={`${Math.round(((agency.satContractCount || 0) / agency.contractCount) * 100)}% of contracts are under $250K (Simplified Acquisition Threshold)`}
+                      >
+                        Easy Entry
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-slate-400">

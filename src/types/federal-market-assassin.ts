@@ -44,6 +44,10 @@ export interface Agency {
   command?: string;             // Specific DoD command (e.g., "NAVFAC", "NAVSEA") for pain points matching
   hasSpecificOffice?: boolean;  // True if we have distinct contracting office data
   isEstimated?: boolean;        // True if spending was distributed by formula (not from FPDS/USASpending)
+  satSpending?: number;         // Spending on awards <= $250K (Simplified Acquisition Threshold)
+  satContractCount?: number;    // Count of awards <= $250K
+  microSpending?: number;       // Spending on awards <= $10K (micro-purchases)
+  microContractCount?: number;  // Count of awards <= $10K
   website?: string | null;      // Command/agency website URL
   forecastUrl?: string | null;  // Forecast opportunities URL
   samForecastUrl?: string;      // SAM.gov forecast search URL
@@ -367,6 +371,40 @@ export interface BudgetCheckupReport {
   recommendations: string[];
 }
 
+// Simplified Acquisition Analysis (Entry Points)
+export interface SimplifiedAcquisitionAgency {
+  agency: string;
+  parentAgency: string;
+  satSpending: number;
+  satContractCount: number;
+  microSpending: number;
+  microContractCount: number;
+  totalSpending: number;
+  totalContractCount: number;
+  satPercent: number;           // % of contracts that are SAT (by count)
+  satSpendPercent: number;      // % of spending that is SAT
+  microPercent: number;         // % of contracts that are micro-purchases
+  avgSATAwardSize: number;      // Average award size for SAT contracts
+  satFriendlinessScore: number; // 0-100 composite score
+  accessibilityLevel: 'high' | 'moderate' | 'low';
+  isEstimated?: boolean;
+}
+
+export interface SimplifiedAcquisitionReport {
+  agencies: SimplifiedAcquisitionAgency[];
+  summary: {
+    totalSATSpending: number;
+    totalSATContracts: number;
+    totalMicroSpending: number;
+    totalMicroContracts: number;
+    avgSATPercent: number;
+    topSATAgency: string;
+    satFriendlyAgencies: number;   // agencies with >50% SAT
+    totalAgenciesAnalyzed: number;
+  };
+  recommendations: string[];
+}
+
 // All Reports Combined
 export interface ComprehensiveReport {
   governmentBuyers: GovernmentBuyersReport;
@@ -379,6 +417,7 @@ export interface ComprehensiveReport {
   primeContractor: PrimeContractorReport;
   idvContracts?: IDVContractsReport;  // IDV Indefinite Delivery contracts for subcontracting
   budgetCheckup?: BudgetCheckupReport;  // FY2025 vs FY2026 budget comparison
+  simplifiedAcquisition?: SimplifiedAcquisitionReport;  // SAT & micro-purchase entry point analysis
   metadata: {
     generatedAt: string;
     inputs: CoreInputs;

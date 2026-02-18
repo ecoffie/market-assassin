@@ -65,6 +65,10 @@ interface Agency {
   bidsPerContractAvg?: number | null;
   bidsPerContract5th?: number | null;
   bidsPerContract95th?: number | null;
+  satSpending?: number;
+  satContractCount?: number;
+  microSpending?: number;
+  microContractCount?: number;
 }
 
 const FREE_AGENCY_LIMIT = 10;
@@ -803,6 +807,9 @@ export default function OpportunityHunterPage() {
                           <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Set-Aside Spending</th>
                           <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Total Spending</th>
                           <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Contracts</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 relative">
+                            <span className="blur-[3px] select-none">Entry Points</span>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -851,12 +858,39 @@ export default function OpportunityHunterPage() {
                                 ${(agency.totalSpending / 1000000).toFixed(2)}M
                               </td>
                               <td className="px-4 py-4 text-sm text-gray-900">{agency.contractCount}</td>
+                              <td className="px-4 py-4 text-sm relative">
+                                <div className="blur-[4px] select-none pointer-events-none">
+                                  <span className="text-amber-600 font-semibold">
+                                    {agency.contractCount > 0 ? `${Math.round(((agency.satContractCount || 0) / agency.contractCount) * 100)}%` : '—'}
+                                  </span>
+                                </div>
+                              </td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
                   </div>
+
+                  {/* SAT Entry Points Upgrade CTA */}
+                  {results.agencies.some(a => (a.satContractCount || 0) > 0) && (
+                    <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg mt-4">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div>
+                          <p className="font-semibold text-amber-900 text-sm">Entry Point Analysis Available</p>
+                          <p className="text-xs text-amber-700">
+                            See which agencies have the most simplified acquisitions (under $250K) — the easiest contracts to win.
+                          </p>
+                        </div>
+                        <a
+                          href="/store#market-assassin"
+                          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold text-sm rounded-lg shadow transition whitespace-nowrap"
+                        >
+                          Unlock with Market Assassin
+                        </a>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Upgrade CTA for free users when more agencies available */}
                   {!isPro && results.agencies.length > FREE_AGENCY_LIMIT && (
@@ -1137,6 +1171,41 @@ export default function OpportunityHunterPage() {
                     <li className="blur-sm">• $2.3B allocated for cloud migration...</li>
                     <li className="blur-sm">• Workforce challenges in key technical areas...</li>
                   </ul>
+                </div>
+              )}
+
+              {/* Simplified Acquisition Analysis - Market Assassin Upgrade */}
+              {modalAgency && (modalAgency.satContractCount || 0) > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-400 rounded-lg p-6 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <a
+                        href="/store#market-assassin"
+                        className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold rounded-lg shadow-lg transition inline-flex items-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Unlock Entry Point Analysis (Market Assassin)
+                      </a>
+                      <p className="text-xs text-gray-500 mt-2">See full SAT breakdown, micro-purchases, and friendliness scores</p>
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-semibold text-amber-900 mb-3">Simplified Acquisition Analysis</h3>
+                  <div className="grid grid-cols-3 gap-3 blur-sm">
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="text-xs text-gray-500">SAT Contracts</div>
+                      <div className="text-lg font-bold text-amber-600">—</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="text-xs text-gray-500">Micro-Purchases</div>
+                      <div className="text-lg font-bold text-green-600">—</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="text-xs text-gray-500">Friendliness Score</div>
+                      <div className="text-lg font-bold text-blue-600">—/100</div>
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -669,12 +669,26 @@ export async function POST(request: NextRequest) {
           location: location || 'Unknown',
           officeId: searchableOfficeCode,
           setAsideSpending: 0,
-          contractCount: 0
+          contractCount: 0,
+          satSpending: 0,
+          satContractCount: 0,
+          microSpending: 0,
+          microContractCount: 0
         };
       }
 
       officeSpending[officeKey].setAsideSpending += amount;
       officeSpending[officeKey].contractCount += 1;
+
+      // Track Simplified Acquisition Threshold (SAT) and micro-purchase metrics
+      if (amount > 0 && amount <= 250000) {
+        officeSpending[officeKey].satSpending += amount;
+        officeSpending[officeKey].satContractCount += 1;
+      }
+      if (amount > 0 && amount <= 10000) {
+        officeSpending[officeKey].microSpending += amount;
+        officeSpending[officeKey].microContractCount += 1;
+      }
     });
 
     // Convert to array and sort by spending
@@ -992,11 +1006,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Build SAT summary across all agencies
+    const satSummary = {
+      totalSATSpending: agencies.reduce((sum: number, a: any) => sum + (a.satSpending || 0), 0),
+      totalSATContracts: agencies.reduce((sum: number, a: any) => sum + (a.satContractCount || 0), 0),
+      totalMicroSpending: agencies.reduce((sum: number, a: any) => sum + (a.microSpending || 0), 0),
+      totalMicroContracts: agencies.reduce((sum: number, a: any) => sum + (a.microContractCount || 0), 0),
+      totalContracts: agencies.reduce((sum: number, a: any) => sum + (a.contractCount || 0), 0),
+      satFriendlyAgencies: agencies.filter((a: any) => a.contractCount > 0 && (a.satContractCount || 0) / a.contractCount > 0.5).length,
+    };
+
     return NextResponse.json({
       success: true,
       agencies,
       totalCount: agencies.length,
       totalSpending,
+      satSummary,
       naicsCorrectionMessage,
       alternativeSearches,
       wasAutoAdjusted, // Let frontend know if search was auto-broadened

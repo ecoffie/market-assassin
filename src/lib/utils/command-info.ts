@@ -772,12 +772,17 @@ export interface ExpandedDoDAgency {
   parentAgency: string;
   setAsideSpending: number;
   contractCount: number;
+  satSpending: number;
+  satContractCount: number;
+  microSpending: number;
+  microContractCount: number;
   location: string;
   command: string;
   website: string | null;
   forecastUrl: string | null;
   samForecastUrl: string;
   hasSpecificOffice: boolean;
+  isEstimated: boolean;
   osbp?: {
     name: string;
     director: string;
@@ -796,6 +801,10 @@ export function expandGenericDoDAgency(
     setAsideSpending: number;
     contractCount: number;
     location: string;
+    satSpending?: number;
+    satContractCount?: number;
+    microSpending?: number;
+    microContractCount?: number;
   },
   maxCommands: number = 5
 ): ExpandedDoDAgency[] {
@@ -834,14 +843,19 @@ export function expandGenericDoDAgency(
   // Major acquisition commands (NAVFAC, NAVSEA, USACE, ACC) get more
   const totalSpending = genericAgency.setAsideSpending;
   const totalContracts = genericAgency.contractCount;
+  const totalSATSpending = genericAgency.satSpending || 0;
+  const totalSATContracts = genericAgency.satContractCount || 0;
+  const totalMicroSpending = genericAgency.microSpending || 0;
+  const totalMicroContracts = genericAgency.microContractCount || 0;
 
   return selectedCommands.map((cmd, index) => {
     // Give higher proportion to first commands (main acquisition)
     const weight = Math.max(1, maxCommands - index);
     const totalWeight = selectedCommands.reduce((sum, _, i) => sum + Math.max(1, maxCommands - i), 0);
+    const proportion = weight / totalWeight;
 
-    const commandSpending = Math.round(totalSpending * (weight / totalWeight));
-    const commandContracts = Math.max(1, Math.round(totalContracts * (weight / totalWeight)));
+    const commandSpending = Math.round(totalSpending * proportion);
+    const commandContracts = Math.max(1, Math.round(totalContracts * proportion));
 
     return {
       id: `${genericAgency.id}-${cmd.abbreviation}`,
@@ -851,6 +865,10 @@ export function expandGenericDoDAgency(
       parentAgency: genericAgency.parentAgency,
       setAsideSpending: commandSpending,
       contractCount: commandContracts,
+      satSpending: Math.round(totalSATSpending * proportion),
+      satContractCount: Math.max(0, Math.round(totalSATContracts * proportion)),
+      microSpending: Math.round(totalMicroSpending * proportion),
+      microContractCount: Math.max(0, Math.round(totalMicroContracts * proportion)),
       location: genericAgency.location,
       command: cmd.abbreviation,
       website: cmd.website,

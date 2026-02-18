@@ -461,12 +461,26 @@ export async function POST(request: NextRequest) {
           contractCount: 0,
           setAsideContractCount: 0,
           totalOffers: 0,
-          offersData: []
+          offersData: [],
+          satSpending: 0,
+          satContractCount: 0,
+          microSpending: 0,
+          microContractCount: 0
         };
       }
 
       officeSpending[officeKey].totalSpending += amount;
       officeSpending[officeKey].contractCount += 1;
+
+      // Track Simplified Acquisition Threshold (SAT) and micro-purchase metrics
+      if (amount > 0 && amount <= 250000) {
+        officeSpending[officeKey].satSpending += amount;
+        officeSpending[officeKey].satContractCount += 1;
+      }
+      if (amount > 0 && amount <= 10000) {
+        officeSpending[officeKey].microSpending += amount;
+        officeSpending[officeKey].microContractCount += 1;
+      }
 
       if (numberOfOffersReceived !== null && numberOfOffersReceived !== undefined) {
         let offersValue = 0;

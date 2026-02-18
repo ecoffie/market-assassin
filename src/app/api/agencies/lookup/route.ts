@@ -12,6 +12,10 @@ interface Agency {
   location: string;
   setAsideSpending: number;
   contractCount: number;
+  satSpending?: number;
+  satContractCount?: number;
+  microSpending?: number;
+  microContractCount?: number;
   agencyId?: string;
   agencyCode?: string;
   subAgencyCode?: string;
@@ -153,12 +157,25 @@ export async function POST(request: NextRequest) {
           subAgencyCode: (award['Awarding Sub Agency Code'] as string) || '',
           location,
           setAsideSpending: 0,
-          contractCount: 0
+          contractCount: 0,
+          satSpending: 0,
+          satContractCount: 0,
+          microSpending: 0,
+          microContractCount: 0
         };
       }
 
       officeSpending[officeKey].setAsideSpending += amount;
       officeSpending[officeKey].contractCount += 1;
+
+      if (amount > 0 && amount <= 250000) {
+        officeSpending[officeKey].satSpending = (officeSpending[officeKey].satSpending || 0) + amount;
+        officeSpending[officeKey].satContractCount = (officeSpending[officeKey].satContractCount || 0) + 1;
+      }
+      if (amount > 0 && amount <= 10000) {
+        officeSpending[officeKey].microSpending = (officeSpending[officeKey].microSpending || 0) + amount;
+        officeSpending[officeKey].microContractCount = (officeSpending[officeKey].microContractCount || 0) + 1;
+      }
     }
 
     // Convert to array and sort

@@ -6,7 +6,7 @@ import { getOpportunitiesByCoreInputs, getUrgencyLevel, getQuickWinStrategy } fr
 import { getForecastsForSelectedAgencies, getUpcomingForecasts, getForecastStatistics } from '@/lib/utils/agency-forecasts';
 import { searchIDVContracts } from '@/lib/idv-search';
 import { getEnhancedAgencyInfo, isDoDAgency } from '@/lib/utils/command-info';
-import { ComprehensiveReport, CoreInputs, Agency } from '@/types/federal-market-assassin';
+import { ComprehensiveReport, CoreInputs, Agency, SimplifiedAcquisitionReport, SimplifiedAcquisitionAgency } from '@/types/federal-market-assassin';
 import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget-authority';
 import { checkReportRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { getEmailFromRequest, verifyMAAccess } from '@/lib/api-auth';
@@ -704,6 +704,108 @@ export async function POST(request: NextRequest) {
           ? [...new Set(selectedAgencyData.map(a => a.parentAgency || a.name))]
           : selectedAgencies;
         return buildCachedBudgetCheckup(agencyNamesForBudget) || undefined;
+      })(),
+      simplifiedAcquisition: (() => {
+        // Build SAT analysis from selectedAgencyData (SAT fields flow from find-agencies)
+        if (!selectedAgencyData || selectedAgencyData.length === 0) return undefined;
+
+        const agenciesWithSAT = selectedAgencyData.filter(a =>
+          (a.satContractCount && a.satContractCount > 0) || (a.contractCount && a.contractCount > 0)
+        );
+        if (agenciesWithSAT.length === 0) return undefined;
+
+        const satAgencies: SimplifiedAcquisitionAgency[] = agenciesWithSAT.map(a => {
+          const satCount = a.satContractCount || 0;
+          const microCount = a.microContractCount || 0;
+          const totalCount = a.contractCount || 0;
+          const satSpend = a.satSpending || 0;
+          const microSpend = a.microSpending || 0;
+          const totalSpend = a.setAsideSpending || 0;
+
+          const satPercent = totalCount > 0 ? (satCount / totalCount) * 100 : 0;
+          const satSpendPercent = totalSpend > 0 ? (satSpend / totalSpend) * 100 : 0;
+          const microPercent = totalCount > 0 ? (microCount / totalCount) * 100 : 0;
+          const avgSATAwardSize = satCount > 0 ? satSpend / satCount : 0;
+
+          // Composite score: 60% SAT%, 20% micro%, 20% volume (log-scaled)
+          const volumeScore = Math.min(100, (Math.log10(Math.max(1, satCount)) / Math.log10(500)) * 100);
+          const satFriendlinessScore = Math.round(
+            satPercent * 0.6 + microPercent * 0.2 + volumeScore * 0.2
+          );
+
+          const accessibilityLevel: 'high' | 'moderate' | 'low' =
+            satPercent > 50 ? 'high' : satPercent > 25 ? 'moderate' : 'low';
+
+          return {
+            agency: a.name,
+            parentAgency: a.parentAgency || a.subAgency || '',
+            satSpending: satSpend,
+            satContractCount: satCount,
+            microSpending: microSpend,
+            microContractCount: microCount,
+            totalSpending: totalSpend,
+            totalContractCount: totalCount,
+            satPercent: Math.round(satPercent * 10) / 10,
+            satSpendPercent: Math.round(satSpendPercent * 10) / 10,
+            microPercent: Math.round(microPercent * 10) / 10,
+            avgSATAwardSize: Math.round(avgSATAwardSize),
+            satFriendlinessScore,
+            accessibilityLevel,
+            isEstimated: a.isEstimated,
+          };
+        });
+
+        // Sort by friendliness score descending
+        satAgencies.sort((a, b) => b.satFriendlinessScore - a.satFriendlinessScore);
+
+        const totalSATSpending = satAgencies.reduce((s, a) => s + a.satSpending, 0);
+        const totalSATContracts = satAgencies.reduce((s, a) => s + a.satContractCount, 0);
+        const totalMicroSpending = satAgencies.reduce((s, a) => s + a.microSpending, 0);
+        const totalMicroContracts = satAgencies.reduce((s, a) => s + a.microContractCount, 0);
+        const satFriendlyCount = satAgencies.filter(a => a.accessibilityLevel === 'high').length;
+        const topSATAgency = satAgencies.length > 0 ? satAgencies[0].agency : 'N/A';
+        const avgSATPercent = satAgencies.length > 0
+          ? Math.round(satAgencies.reduce((s, a) => s + a.satPercent, 0) / satAgencies.length * 10) / 10
+          : 0;
+
+        // Generate recommendations based on data
+        const recommendations: string[] = [];
+        if (satFriendlyCount > 0) {
+          recommendations.push(
+            `${satFriendlyCount} of ${satAgencies.length} agencies have high SAT activity (>50% simplified acquisitions). These are your best entry points for winning first contracts.`
+          );
+        }
+        if (totalMicroContracts > 0) {
+          recommendations.push(
+            `${totalMicroContracts} micro-purchases (under $10K) found — these require minimal paperwork and use government purchase cards. Consider these for quick wins.`
+          );
+        }
+        const highScoreAgencies = satAgencies.filter(a => a.satFriendlinessScore >= 60).slice(0, 3);
+        if (highScoreAgencies.length > 0) {
+          recommendations.push(
+            `Top entry points: ${highScoreAgencies.map(a => a.agency).join(', ')}. Focus outreach on these offices first.`
+          );
+        }
+        if (avgSATPercent < 25) {
+          recommendations.push(
+            'Most agencies in your search use larger contracts. Consider expanding your search or positioning for subcontracting on larger awards.'
+          );
+        }
+
+        return {
+          agencies: satAgencies,
+          summary: {
+            totalSATSpending,
+            totalSATContracts,
+            totalMicroSpending,
+            totalMicroContracts,
+            avgSATPercent,
+            topSATAgency,
+            satFriendlyAgencies: satFriendlyCount,
+            totalAgenciesAnalyzed: satAgencies.length,
+          },
+          recommendations,
+        } as SimplifiedAcquisitionReport;
       })(),
       metadata: {
         generatedAt: new Date().toISOString(),
