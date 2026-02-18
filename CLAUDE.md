@@ -504,6 +504,27 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 18, 2026 (Session 17)
+- **Simplified Acquisition (SAT) Entry Point Analysis — Zero Extra API Calls**
+  - Computes SAT (≤$250K) and micro-purchase (≤$10K) metrics during existing award aggregation in 3 routes: `find-agencies`, `government-contracts/search`, `agencies/lookup`
+  - New fields on Agency type: `satSpending`, `satContractCount`, `microSpending`, `microContractCount`
+  - DoD expansion distributes SAT metrics proportionally (same as spending) via updated `expandGenericDoDAgency()`
+  - `satSummary` added to find-agencies JSON response
+- **Market Assassin: Entry Points Tab (Premium)**
+  - `SimplifiedAcquisitionReport` type with `SimplifiedAcquisitionAgency[]` — ranked by `satFriendlinessScore` (0-100 composite: 60% SAT%, 20% micro%, 20% volume)
+  - Accessibility levels: high (>50% SAT), moderate (25-50%), low (<25%)
+  - `generate-all/route.ts` builds report from `selectedAgencyData` SAT fields
+  - New "Entry Points" tab in ReportsDisplay: summary cards, ranked agency table with color-coded badges, strategic recommendations
+  - Tab is premium-locked (standard tier sees LockedSectionOverlay)
+- **Market Assassin: "Easy Entry" Badge**
+  - Amber badge in AgencySelectionTable next to agency names with >50% SAT contracts
+  - Shows alongside existing budget trend badges
+- **Opportunity Hunter: Blurred SAT Teaser**
+  - Blurred "Entry Points" column in results table showing real-but-hidden SAT % values
+  - Upgrade CTA banner: "Entry Point Analysis Available — Unlock with Market Assassin"
+  - Blurred "Simplified Acquisition Analysis" section in agency modal with upgrade link
+  - All users (free and Pro) see the blur — this is a Market Assassin feature, not OH Pro
+
 ### February 18, 2026 (Session 16)
 - **FY2026 Budget Data Expansion: 23 → 47 toptier agencies**
   - Added 24 independent agencies to `agency-budget-data.json` with verified OMB FY2026 data
@@ -700,4 +721,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 17, 2026 (Session 15)*
+*Last Updated: February 18, 2026 (Session 17)*
