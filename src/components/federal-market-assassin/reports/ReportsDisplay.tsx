@@ -3951,6 +3951,8 @@ function BudgetCheckupTab({ report }: { report: ComprehensiveReport }) {
 // Entry Points (Simplified Acquisition Analysis) Tab
 function EntryPointsTab({ report }: { report: ComprehensiveReport }) {
   const sat = report.simplifiedAcquisition;
+  const [sortCol, setSortCol] = useState<'score' | 'satPercent' | 'satContracts' | 'avgAward' | 'micro' | 'agency'>('score');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   if (!sat || sat.agencies.length === 0) {
     return (
@@ -3961,7 +3963,41 @@ function EntryPointsTab({ report }: { report: ComprehensiveReport }) {
     );
   }
 
-  const { summary, agencies, recommendations } = sat;
+  const { summary, recommendations } = sat;
+
+  const handleSort = (col: typeof sortCol) => {
+    if (sortCol === col) {
+      setSortDir(sortDir === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortCol(col);
+      setSortDir(col === 'agency' ? 'asc' : 'desc');
+    }
+  };
+
+  const sortedAgencies = [...sat.agencies].sort((a, b) => {
+    let cmp = 0;
+    if (sortCol === 'score') cmp = a.satFriendlinessScore - b.satFriendlinessScore;
+    else if (sortCol === 'satPercent') cmp = a.satPercent - b.satPercent;
+    else if (sortCol === 'satContracts') cmp = a.satContractCount - b.satContractCount;
+    else if (sortCol === 'avgAward') cmp = a.avgSATAwardSize - b.avgSATAwardSize;
+    else if (sortCol === 'micro') cmp = a.microContractCount - b.microContractCount;
+    else if (sortCol === 'agency') cmp = a.agency.localeCompare(b.agency);
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const SortHeader = ({ col, label, align = 'right' }: { col: typeof sortCol; label: string; align?: 'left' | 'right' | 'center' }) => (
+    <th
+      onClick={() => handleSort(col)}
+      className={`px-4 py-3 text-${align} text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-800/50 transition-colors ${
+        sortCol === col ? 'text-cyan-400' : 'text-slate-400'
+      }`}
+    >
+      <div className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
+        {label}
+        {sortCol === col && <span>{sortDir === 'desc' ? '↓' : '↑'}</span>}
+      </div>
+    </th>
+  );
 
   return (
     <div className="space-y-6">
@@ -4002,22 +4038,22 @@ function EntryPointsTab({ report }: { report: ComprehensiveReport }) {
       <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-700/50">
           <h4 className="text-lg font-semibold text-slate-200">Agency Rankings by Entry Accessibility</h4>
-          <p className="text-xs text-slate-500 mt-1">Sorted by SAT Friendliness Score (composite of SAT %, micro %, and volume)</p>
+          <p className="text-xs text-slate-500 mt-1">Click any column header to sort</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-900/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Agency</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">SAT %</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">SAT Contracts</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg Award</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Micro</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Score</th>
+                <SortHeader col="agency" label="Agency" align="left" />
+                <SortHeader col="satPercent" label="SAT %" />
+                <SortHeader col="satContracts" label="SAT Contracts" />
+                <SortHeader col="avgAward" label="Avg Award" />
+                <SortHeader col="micro" label="Micro" />
+                <SortHeader col="score" label="Score" align="center" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/30">
-              {agencies.map((a, i) => (
+              {sortedAgencies.map((a, i) => (
                 <tr key={i} className="hover:bg-slate-700/20 transition">
                   <td className="px-4 py-3">
                     <div className="text-sm font-medium text-slate-200">{a.agency}</div>
