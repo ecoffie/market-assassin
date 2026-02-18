@@ -286,6 +286,227 @@ function loadCachedBudgetData(): CachedBudgetDatabase | null {
   return cachedBudgetDB;
 }
 
+// ──────────────────────────────────────────────
+// Sub-Agency → Parent Toptier Mapping
+// Maps all 250 pain-point agencies to their parent toptier agency
+// so sub-agencies inherit the parent's budget trend data.
+// ──────────────────────────────────────────────
+
+const SUB_AGENCY_PARENT_MAP: Record<string, string> = {
+  // ── Department of Agriculture ──
+  'Agricultural Marketing Service (AMS)': 'Department of Agriculture',
+  'Agricultural Research Service': 'Department of Agriculture',
+  'Animal and Plant Health Inspection Service (APHIS)': 'Department of Agriculture',
+  'Farm Service Agency (FSA)': 'Department of Agriculture',
+  'Food Safety and Inspection Service': 'Department of Agriculture',
+  'Natural Resources Conservation Service': 'Department of Agriculture',
+  'U.S. Forest Service': 'Department of Agriculture',
+  'USDA Rural Development': 'Department of Agriculture',
+
+  // ── Department of Commerce ──
+  'Bureau of Economic Analysis (BEA)': 'Department of Commerce',
+  'Bureau of Industry and Security (BIS)': 'Department of Commerce',
+  'Census Bureau': 'Department of Commerce',
+  'Economic Development Administration (EDA)': 'Department of Commerce',
+  'International Trade Administration (ITA)': 'Department of Commerce',
+  'Minority Business Development Agency (MBDA)': 'Department of Commerce',
+  'National Institute of Standards and Technology': 'Department of Commerce',
+  'NIST': 'Department of Commerce',
+  'National Oceanic and Atmospheric Administration': 'Department of Commerce',
+  'NOAA': 'Department of Commerce',
+  'National Telecommunications and Information Administration (NTIA)': 'Department of Commerce',
+  'National Weather Service (NWS)': 'Department of Commerce',
+  'Patent and Trademark Office': 'Department of Commerce',
+
+  // ── Department of Defense ──
+  'Air Force Materiel Command': 'Department of Defense',
+  'Air Force Sustainment Center': 'Department of Defense',
+  'Army Contracting Command': 'Department of Defense',
+  'Army Futures Command': 'Department of Defense',
+  'Army Materiel Command': 'Department of Defense',
+  'DARPA': 'Department of Defense',
+  'Defense Commissary Agency (DeCA)': 'Department of Defense',
+  'Defense Contract Audit Agency': 'Department of Defense',
+  'Defense Contract Management Agency': 'Department of Defense',
+  'Defense Counterintelligence and Security Agency (DCSA)': 'Department of Defense',
+  'Defense Finance and Accounting Service (DFAS)': 'Department of Defense',
+  'Defense Health Agency': 'Department of Defense',
+  'Defense Information Systems Agency': 'Department of Defense',
+  'Defense Intelligence Agency (DIA)': 'Department of Defense',
+  'Defense Logistics Agency': 'Department of Defense',
+  'Defense Threat Reduction Agency (DTRA)': 'Department of Defense',
+  'Department of the Air Force': 'Department of Defense',
+  'Department of the Army': 'Department of Defense',
+  'Department of the Navy': 'Department of Defense',
+  'Marine Corps Systems Command': 'Department of Defense',
+  'Missile Defense Agency': 'Department of Defense',
+  'National Guard Bureau': 'Department of Defense',
+  'National Geospatial-Intelligence Agency (NGA)': 'Department of Defense',
+  'National Reconnaissance Office (NRO)': 'Department of Defense',
+  'NAVAIR': 'Department of Defense',
+  'NAVFAC': 'Department of Defense',
+  'NAVSEA': 'Department of Defense',
+  'NAVWAR': 'Department of Defense',
+  'Space Systems Command': 'Department of Defense',
+  'USACE': 'Department of Defense',
+  'U.S. Army Corps of Engineers Civil Works': 'Department of Defense',
+  'U.S. Africa Command (AFRICOM)': 'Department of Defense',
+  'U.S. Central Command (CENTCOM)': 'Department of Defense',
+  'U.S. Cyber Command (CYBERCOM)': 'Department of Defense',
+  'U.S. European Command (EUCOM)': 'Department of Defense',
+  'U.S. Indo-Pacific Command (INDOPACOM)': 'Department of Defense',
+  'U.S. Northern Command (NORTHCOM)': 'Department of Defense',
+  'U.S. Southern Command (SOUTHCOM)': 'Department of Defense',
+  'U.S. Space Command (SPACECOM)': 'Department of Defense',
+  'U.S. Special Operations Command (SOCOM)': 'Department of Defense',
+  'U.S. Strategic Command (STRATCOM)': 'Department of Defense',
+  'U.S. Transportation Command (TRANSCOM)': 'Department of Defense',
+
+  // ── Department of Education ──
+  'Federal Student Aid (FSA)': 'Department of Education',
+  'Office of Elementary and Secondary Education (OESE)': 'Department of Education',
+  'Office of Postsecondary Education (OPE)': 'Department of Education',
+  'Office of Special Education and Rehabilitative Services (OSERS)': 'Department of Education',
+
+  // ── Department of Energy ──
+  'ARPA-E (Advanced Research Projects Agency-Energy)': 'Department of Energy',
+  'Bonneville Power Administration (BPA)': 'Department of Energy',
+  'DOE Fossil Energy': 'Department of Energy',
+  'DOE Nuclear Energy': 'Department of Energy',
+  'DOE Office of Environmental Management': 'Department of Energy',
+  'DOE Office of Science': 'Department of Energy',
+  'Federal Energy Regulatory Commission (FERC)': 'Department of Energy',
+  'NNSA': 'Department of Energy',
+  'National Nuclear Security Administration': 'Department of Energy',
+  'Office of Energy Efficiency and Renewable Energy (EERE)': 'Department of Energy',
+  'Southeastern Power Administration (SEPA)': 'Department of Energy',
+  'Southwestern Power Administration (SWPA)': 'Department of Energy',
+  'Western Area Power Administration (WAPA)': 'Department of Energy',
+
+  // ── Department of Health and Human Services ──
+  'Administration for Children and Families (ACF)': 'Department of Health and Human Services',
+  'Administration for Community Living (ACL)': 'Department of Health and Human Services',
+  'Administration for Strategic Preparedness and Response (ASPR)': 'Department of Health and Human Services',
+  'Agency for Healthcare Research and Quality (AHRQ)': 'Department of Health and Human Services',
+  'CDC': 'Department of Health and Human Services',
+  'Centers for Disease Control and Prevention': 'Department of Health and Human Services',
+  'CMS': 'Department of Health and Human Services',
+  'Centers for Medicare & Medicaid Services': 'Department of Health and Human Services',
+  'FDA': 'Department of Health and Human Services',
+  'Food and Drug Administration': 'Department of Health and Human Services',
+  'Health Resources and Services Administration (HRSA)': 'Department of Health and Human Services',
+  'Indian Health Service': 'Department of Health and Human Services',
+  'NIH': 'Department of Health and Human Services',
+  'National Institutes of Health': 'Department of Health and Human Services',
+  'Office of the National Coordinator for Health IT (ONC)': 'Department of Health and Human Services',
+  'Substance Abuse and Mental Health Services Administration (SAMHSA)': 'Department of Health and Human Services',
+
+  // ── Department of Homeland Security ──
+  'Countering Weapons of Mass Destruction Office (CWMD)': 'Department of Homeland Security',
+  'Cybersecurity and Infrastructure Security Agency': 'Department of Homeland Security',
+  'DHS Science and Technology Directorate (S&T)': 'Department of Homeland Security',
+  'Federal Emergency Management Agency': 'Department of Homeland Security',
+  'Federal Law Enforcement Training Centers (FLETC)': 'Department of Homeland Security',
+  'Immigration and Customs Enforcement': 'Department of Homeland Security',
+  'Transportation Security Administration': 'Department of Homeland Security',
+  'U.S. Citizenship and Immigration Services (USCIS)': 'Department of Homeland Security',
+  'U.S. Coast Guard': 'Department of Homeland Security',
+  'U.S. Customs and Border Protection': 'Department of Homeland Security',
+  'U.S. Secret Service': 'Department of Homeland Security',
+
+  // ── Department of Housing and Urban Development ──
+  'Federal Housing Administration (FHA)': 'Department of Housing and Urban Development',
+  'Government National Mortgage Association (Ginnie Mae)': 'Department of Housing and Urban Development',
+  'Office of Community Planning and Development (CPD)': 'Department of Housing and Urban Development',
+  'Office of Public and Indian Housing (PIH)': 'Department of Housing and Urban Development',
+
+  // ── Department of the Interior ──
+  'Bureau of Indian Affairs': 'Department of the Interior',
+  'Bureau of Land Management': 'Department of the Interior',
+  'Bureau of Ocean Energy Management (BOEM)': 'Department of the Interior',
+  'Bureau of Reclamation': 'Department of the Interior',
+  'Bureau of Safety and Environmental Enforcement (BSEE)': 'Department of the Interior',
+  'National Park Service': 'Department of the Interior',
+  'Office of Surface Mining Reclamation and Enforcement (OSMRE)': 'Department of the Interior',
+  'U.S. Fish and Wildlife Service': 'Department of the Interior',
+  'U.S. Geological Survey': 'Department of the Interior',
+
+  // ── Department of Justice ──
+  'Bureau of Alcohol, Tobacco, Firearms and Explosives': 'Department of Justice',
+  'Bureau of Prisons': 'Department of Justice',
+  'Community Oriented Policing Services (COPS Office)': 'Department of Justice',
+  'Drug Enforcement Administration': 'Department of Justice',
+  'Executive Office for Immigration Review (EOIR)': 'Department of Justice',
+  'Federal Bureau of Investigation': 'Department of Justice',
+  'Federal Prison Industries (UNICOR)': 'Department of Justice',
+  'National Institute of Corrections (NIC)': 'Department of Justice',
+  'Office of Justice Programs (OJP)': 'Department of Justice',
+  'Office on Violence Against Women (OVW)': 'Department of Justice',
+  'U.S. Marshals Service': 'Department of Justice',
+
+  // ── Department of Labor ──
+  'Bureau of Labor Statistics (BLS)': 'Department of Labor',
+  'Employment and Training Administration (ETA)': 'Department of Labor',
+  'Mine Safety and Health Administration (MSHA)': 'Department of Labor',
+  'Occupational Safety and Health Administration (OSHA)': 'Department of Labor',
+  'Wage and Hour Division (WHD)': 'Department of Labor',
+
+  // ── Department of State ──
+  'Bureau of Consular Affairs': 'Department of State',
+  'Bureau of Diplomatic Security (DS)': 'Department of State',
+
+  // ── Department of Transportation ──
+  'FAA': 'Department of Transportation',
+  'Federal Aviation Administration': 'Department of Transportation',
+  'Federal Highway Administration': 'Department of Transportation',
+  'FHWA': 'Department of Transportation',
+  'Federal Motor Carrier Safety Administration (FMCSA)': 'Department of Transportation',
+  'Federal Railroad Administration (FRA)': 'Department of Transportation',
+  'FRA': 'Department of Transportation',
+  'Federal Transit Administration': 'Department of Transportation',
+  'FTA': 'Department of Transportation',
+  'Maritime Administration (MARAD)': 'Department of Transportation',
+  'National Highway Traffic Safety Administration': 'Department of Transportation',
+  'Pipeline and Hazardous Materials Safety Administration (PHMSA)': 'Department of Transportation',
+  'Surface Transportation Board': 'Department of Transportation',
+
+  // ── Department of the Treasury ──
+  'Alcohol and Tobacco Tax and Trade Bureau (TTB)': 'Department of the Treasury',
+  'Bureau of Engraving and Printing (BEP)': 'Department of the Treasury',
+  'Bureau of the Fiscal Service': 'Department of the Treasury',
+  'CDFI Fund': 'Department of the Treasury',
+  'Financial Crimes Enforcement Network (FinCEN)': 'Department of the Treasury',
+  'Internal Revenue Service': 'Department of the Treasury',
+  'Office of the Comptroller of the Currency (OCC)': 'Department of the Treasury',
+  'United States Mint': 'Department of the Treasury',
+
+  // ── Department of Veterans Affairs ──
+  'National Cemetery Administration (NCA)': 'Department of Veterans Affairs',
+  'Veterans Benefits Administration (VBA)': 'Department of Veterans Affairs',
+  'Veterans Health Administration (VHA)': 'Department of Veterans Affairs',
+
+  // ── Environmental Protection Agency (sub-offices) ──
+  'EPA Office of Air and Radiation': 'Environmental Protection Agency',
+  'EPA Office of Land and Emergency Management': 'Environmental Protection Agency',
+  'EPA Office of Water': 'Environmental Protection Agency',
+
+  // ── General Services Administration (sub-offices) ──
+  'Federal Acquisition Service': 'General Services Administration',
+  'GSA Public Buildings Service (PBS)': 'General Services Administration',
+  'GSA Technology Transformation Services (TTS)': 'General Services Administration',
+
+  // ── NASA (abbreviation) ──
+  'NASA': 'National Aeronautics and Space Administration',
+
+  // ── Small Business Administration (sub-offices) ──
+  'SBA Office of Capital Access': 'Small Business Administration',
+  'SBA Office of Disaster Assistance': 'Small Business Administration',
+  'SBA Office of Government Contracting': 'Small Business Administration',
+
+  // ── Intelligence Community → DoD budget ──
+  'Office of the Director of National Intelligence (ODNI)': 'Department of Defense',
+};
+
 /**
  * Normalize an agency name for fuzzy matching against cached data.
  */
@@ -325,6 +546,20 @@ export function getBudgetForAgency(agencyName: string): AgencyBudgetData | null 
     const normalizedKey = normalizeAgencyName(key);
     if (normalizedInput.includes(normalizedKey) || normalizedKey.includes(normalizedInput)) {
       return { agency: key, ...entry };
+    }
+  }
+
+  // Sub-agency → parent mapping fallback
+  const parentName = SUB_AGENCY_PARENT_MAP[agencyName];
+  if (parentName) {
+    return getBudgetForAgency(parentName);
+  }
+
+  // Fuzzy sub-agency mapping (handles slight name variations)
+  const normalizedForMap = normalizeAgencyName(agencyName);
+  for (const [subAgency, parent] of Object.entries(SUB_AGENCY_PARENT_MAP)) {
+    if (normalizeAgencyName(subAgency) === normalizedForMap) {
+      return getBudgetForAgency(parent);
     }
   }
 

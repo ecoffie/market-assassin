@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-02-12T00:00:00Z",
-  "source": "OMB FY2026 Discretionary Budget Request, Table 2 (May 2, 2025). FY2025=Enacted, FY2026=President's Request. Discretionary budget authority only.",
+  "lastUpdated": "2026-02-18T00:00:00Z",
+  "source": "OMB FY2026 Discretionary Budget Request + agency Congressional Budget Justifications (May-Jun 2025). FY2025=Enacted, FY2026=President's Request. Discretionary budget authority only.",
   "sourceUrl": "https://www.whitehouse.gov/wp-content/uploads/2025/05/Fiscal-Year-2026-Discretionary-Budget-Request.pdf",
   "fiscalYears": [
     2025,
@@ -412,6 +412,438 @@
       },
       "fy2026": {
         "budgetAuthority": 400000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Agency for International Development": {
+      "toptierCode": "072",
+      "fy2025": {
+        "budgetAuthority": 36300000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 19200000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -17100000000.0,
+        "percent": 0.528926,
+        "trend": "cut"
+      }
+    },
+    "Nuclear Regulatory Commission": {
+      "toptierCode": "031",
+      "fy2025": {
+        "budgetAuthority": 944000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 971000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 27000000.0,
+        "percent": 1.028602,
+        "trend": "stable"
+      }
+    },
+    "Securities and Exchange Commission": {
+      "toptierCode": "050",
+      "fy2025": {
+        "budgetAuthority": 2149000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 2149000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Federal Trade Commission": {
+      "toptierCode": "029",
+      "fy2025": {
+        "budgetAuthority": 428000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 385000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -43000000.0,
+        "percent": 0.899533,
+        "trend": "declining"
+      }
+    },
+    "Equal Employment Opportunity Commission": {
+      "toptierCode": "045",
+      "fy2025": {
+        "budgetAuthority": 455000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 435000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -20000000.0,
+        "percent": 0.956044,
+        "trend": "stable"
+      }
+    },
+    "National Labor Relations Board": {
+      "toptierCode": "025",
+      "fy2025": {
+        "budgetAuthority": 299000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 285000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -14000000.0,
+        "percent": 0.953177,
+        "trend": "stable"
+      }
+    },
+    "Commodity Futures Trading Commission": {
+      "toptierCode": "339",
+      "fy2025": {
+        "budgetAuthority": 365000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 410000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 45000000.0,
+        "percent": 1.123288,
+        "trend": "growing"
+      }
+    },
+    "Consumer Product Safety Commission": {
+      "toptierCode": "000",
+      "fy2025": {
+        "budgetAuthority": 152000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 135000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -17000000.0,
+        "percent": 0.888158,
+        "trend": "declining"
+      }
+    },
+    "Peace Corps": {
+      "toptierCode": "011",
+      "fy2025": {
+        "budgetAuthority": 410000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 410000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Millennium Challenge Corporation": {
+      "toptierCode": "184",
+      "fy2025": {
+        "budgetAuthority": 930000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 224000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -706000000.0,
+        "percent": 0.24086,
+        "trend": "cut"
+      }
+    },
+    "National Archives and Records Administration": {
+      "toptierCode": "088",
+      "fy2025": {
+        "budgetAuthority": 430000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 415000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -15000000.0,
+        "percent": 0.965116,
+        "trend": "stable"
+      }
+    },
+    "Smithsonian Institution": {
+      "toptierCode": "033",
+      "fy2025": {
+        "budgetAuthority": 1100000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 800000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": -300000000.0,
+        "percent": 0.727273,
+        "trend": "cut"
+      }
+    },
+    "Government Accountability Office": {
+      "toptierCode": "004",
+      "fy2025": {
+        "budgetAuthority": 780000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 780000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Export-Import Bank of the United States": {
+      "toptierCode": "083",
+      "fy2025": {
+        "budgetAuthority": 120000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 120000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Federal Communications Commission": {
+      "toptierCode": "027",
+      "fy2025": {
+        "budgetAuthority": 400000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 400000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Federal Deposit Insurance Corporation": {
+      "toptierCode": "051",
+      "fy2025": {
+        "budgetAuthority": 2500000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 2500000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Consumer Financial Protection Bureau": {
+      "toptierCode": "581",
+      "fy2025": {
+        "budgetAuthority": 750000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 750000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Tennessee Valley Authority": {
+      "toptierCode": "064",
+      "fy2025": {
+        "budgetAuthority": 500000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 500000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Selective Service System": {
+      "toptierCode": "090",
+      "fy2025": {
+        "budgetAuthority": 30000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 30000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Railroad Retirement Board": {
+      "toptierCode": "060",
+      "fy2025": {
+        "budgetAuthority": 130000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 130000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Merit Systems Protection Board": {
+      "toptierCode": "541",
+      "fy2025": {
+        "budgetAuthority": 50000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 50000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Court Services and Offender Supervision Agency": {
+      "toptierCode": "511",
+      "fy2025": {
+        "budgetAuthority": 280000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 280000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "Federal Housing Finance Agency": {
+      "toptierCode": "537",
+      "fy2025": {
+        "budgetAuthority": 350000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 350000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "change": {
+        "amount": 0.0,
+        "percent": 1.0,
+        "trend": "stable"
+      }
+    },
+    "International Trade Commission": {
+      "toptierCode": "061",
+      "fy2025": {
+        "budgetAuthority": 115000000.0,
+        "obligated": 0,
+        "outlays": 0
+      },
+      "fy2026": {
+        "budgetAuthority": 115000000.0,
         "obligated": 0,
         "outlays": 0
       },
