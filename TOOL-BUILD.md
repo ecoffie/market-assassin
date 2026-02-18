@@ -6,9 +6,9 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 
 ## Table of Contents
 - [Federal Market Assassin](#1-federal-market-assassin)
-- [Recompete Contracts Tracker](#2-recompete-contracts-tracker)
+- [Recompete Tracker](#2-recompete-tracker)
 - [Opportunity Hunter / Opp Scout Pro](#3-opportunity-hunter--opp-scout-pro)
-- [GovCon Content Generator](#4-govcon-content-generator)
+- [Content Reaper](#4-content-reaper)
 - [Federal Contractor Database](#5-federal-contractor-database)
 - [Action Planner Dashboard](#6-action-planner-dashboard)
 - [LinkedIn Lead Magnet](#7-linkedin-lead-magnet)
@@ -41,6 +41,7 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 | Agency Gap Analysis | MEDIUM | Pending | Show agencies with unmet small biz goals (e.g., "DoD under 3% SDVOSB spend"). |
 | Custom Alerts | MEDIUM | Pending | User sets NAICS/agency watchlists. Weekly email with new data + scores. Supabase Edge Function + cron. |
 | Proposal Prep Starter | LOW | Pending | One-click "Start Proposal" button. Export key data + AI outline prompt. Integrate with AI Proposal Toolkit. |
+| **Simplified Acquisition Entry Points** | HIGH | **DONE** | SAT (≤$250K) and micro (≤$10K) metrics computed during existing award aggregation — zero extra API calls. Premium "Entry Points" tab with ranked agencies, satFriendlinessScore (0-100), accessibility levels (high/moderate/low), strategic recommendations. "Easy Entry" badge on AgencySelectionTable. Blurred teaser in Opportunity Hunter drives MA upgrades. |
 
 ### Future Polish (Post-Launch)
 
@@ -49,8 +50,8 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 | Ghosting Intel | MEDIUM | Pending | Competitor weaknesses, past loss reasons. AI summary from FPDS data. Add "Ghost Report" button. |
 | Historical Trends Graphs | LOW | Pending | Agency spend charts, win rate visuals. Chart.js integration. |
 | User Notes & Sharing | LOW | Pending | Private notes per report + shareable team links. Supabase notes table. |
-| Tool Integrations | LOW | Pending | Link to Opportunity Scout, Content Generator, CRM export (Salesforce/HubSpot). |
-| Expand Agency Pain Points Database | MEDIUM | Pending | Add more pain points per agency in `src/data/agency-pain-points.json`. Cross-tool priority — feeds Market Assassin, Content Generator, and Opportunity Hunter. |
+| Tool Integrations | LOW | Pending | Link to Opportunity Scout, Content Reaper, CRM export (Salesforce/HubSpot). |
+| Expand Agency Pain Points Database | MEDIUM | Pending | Add more pain points per agency in `src/data/agency-pain-points.json`. Cross-tool priority — feeds Market Assassin, Content Reaper, and Opportunity Hunter. |
 
 ### Simulated Data Elimination
 
@@ -68,7 +69,7 @@ Tracking all instances of hardcoded/simulated data that should be replaced with 
 
 ---
 
-## 2. Recompete Contracts Tracker
+## 2. Recompete Tracker
 
 **Current:** $397 (one-time)
 
@@ -115,15 +116,16 @@ Tracking all instances of hardcoded/simulated data that should be replaced with 
 | Feature | Priority | Status | Notes |
 |---------|----------|--------|-------|
 | Pain Points Feature | HIGH | Pending | Add agency pain points analysis. |
-| Expand Agency Pain Points Database | MEDIUM | Pending | More pain points per agency in `src/data/agency-pain-points.json`. Shared data source with Market Assassin and Content Generator. |
+| Expand Agency Pain Points Database | MEDIUM | Pending | More pain points per agency in `src/data/agency-pain-points.json`. Shared data source with Market Assassin and Content Reaper. |
 | CSV Export/Print | HIGH | Pending | Print results to CSV for offline use. |
 | Enhanced Pro Features | MEDIUM | Pending | Differentiate Pro tier with advanced filters and data. |
 | Agency Spending Analysis | MEDIUM | Pending | Deeper spending breakdown by NAICS. |
+| **Simplified Acquisition Teaser** | HIGH | **DONE** | Blurred SAT % column in results table + blurred modal section. Upgrade CTA drives users to Market Assassin for full Entry Points analysis. All users (free + Pro) see the blur — this is a Market Assassin exclusive. |
 | Prime Contractor Matching | MEDIUM | Pending | Match user profile to relevant primes. |
 
 ---
 
-## 4. GovCon Content Generator
+## 4. Content Reaper
 
 **Current:** $197 Standard / $397 Full Fix
 
@@ -217,6 +219,8 @@ A new certification program mapping to real BD job requirements ($80K-$150K+ rol
 | Integration Between Tools | LOW | Pending | Cross-tool data sharing and workflows. |
 | **PSC-NAICS Crosswalk Integration** | HIGH | Pending | Bi-directional NAICS-PSC mapping so searches use both codes. SAM.gov solicitations often have wrong NAICS but correct PSC (or vice versa). One NAICS → 50+ PSCs. Build crosswalk from USAspending, dual-search in find-agencies, agencies/lookup, idv-search. See PSC-NAICS integration plan. |
 | **FY2026 Budget / Legislation Integration** | HIGH | Pending | Pull enacted appropriations (Congress.gov), identify currently funded agencies (USAspending budget_authority), spending checkup chart (FY2025 vs FY2026), agency/sub-agency/command/office hierarchy. Focus on agencies with fresh FY2026 funding. See FY2026 budget plan. |
+| **Separate Supabase for govcon-shop** | MEDIUM | Pending | govcon-shop (production) currently shares the "Govcon Content Generator" Supabase instance with market-assassin (dev/staging). Create a dedicated Supabase project for govcon-shop. Migrate tables: `leads`, `purchases`, `user_profiles`. Update Vercel env vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`). Verify all API routes work after switch. Keep KV shared (already connected to both via Vercel Storage). |
+| **Blog: Own Federal Award Channel Data** | MEDIUM | Pending | The "Where to Find the 95%" blog article cites HigherGov for the contract channel breakdown (55% task orders, 30% sole source, 10% micropurchases, 5% SAM.gov). Verify these percentages independently using USASpending API data (FPDS award types, competition extent codes, contract vehicle flags). Replace HigherGov attribution with "GovCon Giants analysis of USASpending data, FY2024-2025" once verified. Update donut chart in `src/data/blog-articles.ts` with our own numbers. |
 
 ---
 
@@ -258,4 +262,4 @@ A new certification program mapping to real BD job requirements ($80K-$150K+ rol
 
 ---
 
-*Last Updated: February 12, 2026*
+*Last Updated: February 18, 2026*
