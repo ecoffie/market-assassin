@@ -2292,12 +2292,12 @@
                 if (!resp.ok) return;
                 const result = await resp.json();
                 if (result.success && result.data) {
-                    for (const agency of result.data) {
-                        budgetTrendCache[agency.agencyName] = {
-                            pctChange: ((agency.change?.percent || 1) - 1) * 100,
-                            trend: agency.change?.trend || 'flat',
-                            fy25: agency.fy2025?.budgetAuthority || 0,
-                            fy26: agency.fy2026?.budgetAuthority || 0
+                    for (const item of result.data) {
+                        budgetTrendCache[item.agency] = {
+                            pctChange: ((item.change?.percent || 1) - 1) * 100,
+                            trend: item.change?.trend || 'stable',
+                            fy25: item.fy2025?.budgetAuthority || 0,
+                            fy26: item.fy2026?.budgetAuthority || 0
                         };
                     }
                     console.log('[Budget] Loaded trends for', Object.keys(budgetTrendCache).length, 'agencies');
@@ -2313,12 +2313,13 @@
             if (!data && parentAgency) data = budgetTrendCache[parentAgency];
             if (!data) return '';
             const pct = data.pctChange.toFixed(1);
-            if (data.trend === 'increasing') {
-                return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-green-400" title="FY26 budget up ${pct}%">▲ +${pct}%</span>`;
-            } else if (data.trend === 'decreasing') {
-                return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-red-400" title="FY26 budget down ${pct}%">▼ ${pct}%</span>`;
+            // Trends: surging (>10%), growing (>0%), stable (~0%), declining (<0%), cut (<-10%)
+            if (data.trend === 'surging' || data.trend === 'growing') {
+                return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-green-400" title="FY26 budget +${pct}%">▲ +${pct}%</span>`;
+            } else if (data.trend === 'declining' || data.trend === 'cut') {
+                return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-red-400" title="FY26 budget ${pct}%">▼ ${pct}%</span>`;
             }
-            return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-gray-400" title="FY26 budget flat">— ${pct}%</span>`;
+            return `<span class="inline-flex items-center gap-0.5 text-xs font-medium text-gray-400" title="FY26 budget ${pct}%">— ${pct}%</span>`;
         }
 
         async function displayQuickAgencies(profile) {
