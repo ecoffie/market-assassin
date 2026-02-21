@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 interface Feature {
@@ -77,6 +77,10 @@ interface ProductPageProps {
   upgradeProduct?: UpgradeProduct;
 }
 
+function isResourceUrl(url: string) {
+  return url.startsWith('/resources/') || url.startsWith('/templates/');
+}
+
 export default function ProductPageAppSumo({
   title,
   tagline,
@@ -109,10 +113,99 @@ export default function ProductPageAppSumo({
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedTier, setSelectedTier] = useState(0);
 
+  // Email gate state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [hasAccess, setHasAccess] = useState(false);
+
+  // Check for existing email on mount
+  useEffect(() => {
+    const cachedEmail = localStorage.getItem('lead_email');
+    if (cachedEmail) {
+      setEmail(cachedEmail);
+      setHasAccess(true);
+    }
+  }, []);
+
   // Get current pricing (from tier if available, otherwise from props)
   const currentPrice = pricingTiers ? pricingTiers[selectedTier].price : price;
   const currentOriginalPrice = pricingTiers ? pricingTiers[selectedTier].originalPrice : originalPrice;
   const currentCheckoutUrl = pricingTiers ? pricingTiers[selectedTier].checkoutUrl : checkoutUrl;
+
+  // Handle click on free resource buttons
+  const handleFreeResourceClick = (resourceUrl: string) => {
+    if (hasAccess) {
+      // Already gave email — open resource directly
+      window.open(resourceUrl, '_blank');
+    } else {
+      // Show email gate
+      setPendingDownloadUrl(resourceUrl);
+      setShowEmailModal(true);
+      setError('');
+    }
+  };
+
+  // Submit email and grant access
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email.trim()) {
+      setError('Email is required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      // Derive a resourceId from the URL for tracking
+      const resourceId = pendingDownloadUrl
+        ?.replace('/resources/', '')
+        .replace('/templates/', '')
+        .replace(/\.(html|csv|pdf)$/, '')
+        .replace(/-/g, '-') || 'unknown';
+
+      const response = await fetch('/api/capture-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          name: name.trim() || undefined,
+          resourceId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success || response.ok) {
+        // Save email for future visits
+        localStorage.setItem('lead_email', email.trim().toLowerCase());
+        setHasAccess(true);
+        setShowEmailModal(false);
+
+        // Open the resource
+        if (pendingDownloadUrl) {
+          window.open(pendingDownloadUrl, '_blank');
+        }
+      } else {
+        setError(data.error || 'Something went wrong. Please try again.');
+      }
+    } catch {
+      // Even if API fails, grant access (don't block the user)
+      localStorage.setItem('lead_email', email.trim().toLowerCase());
+      setHasAccess(true);
+      setShowEmailModal(false);
+      if (pendingDownloadUrl) {
+        window.open(pendingDownloadUrl, '_blank');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -139,7 +232,14 @@ export default function ProductPageAppSumo({
           <a href="#features" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Features</a>
           <a href="#pricing" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Pricing</a>
           <a href="#reviews" className="py-4 text-gray-500 text-sm font-medium border-b-2 border-transparent hover:border-gray-300">Reviews</a>
-          {checkoutUrl.startsWith('/') ? (
+          {isResourceUrl(checkoutUrl) ? (
+            <button
+              onClick={() => handleFreeResourceClick(checkoutUrl)}
+              className="ml-auto px-6 py-2 bg-yellow-400 text-gray-900 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all"
+            >
+              Download Free
+            </button>
+          ) : checkoutUrl.startsWith('/') ? (
             <Link href={checkoutUrl} className="ml-auto px-6 py-2 bg-yellow-400 text-gray-900 rounded-lg font-bold text-sm hover:bg-yellow-300 transition-all">
               Get Access
             </Link>
@@ -182,17 +282,14 @@ export default function ProductPageAppSumo({
                   className="w-full h-full object-contain bg-gray-100"
                 />
               ) : (
-                // Fallback gradient placeholder
+                // Fallback gradient placeholder (no fake video button)
                 <div
                   className="w-full h-full flex items-center justify-center"
                   style={{ background: `linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%)` }}
                 >
                   <div className="text-center text-white p-10">
-                    <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center mx-auto mb-5 cursor-pointer hover:scale-110 transition-transform">
-                      <div className="w-0 h-0 border-l-[24px] border-t-[16px] border-b-[16px] border-l-current border-t-transparent border-b-transparent ml-1" style={{ color: primaryColor }}></div>
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2">{videoTitle || `${title} Demo`}</h2>
-                    <p className="text-lg opacity-90">{videoSubtitle || 'See how it works'}</p>
+                    <h2 className="text-2xl font-bold mb-2">{videoTitle || title}</h2>
+                    <p className="text-lg opacity-90">{videoSubtitle || tagline}</p>
                   </div>
                 </div>
               )}
@@ -426,7 +523,14 @@ export default function ProductPageAppSumo({
             </div>
 
             {/* Buy Button */}
-            {currentCheckoutUrl.startsWith('/') ? (
+            {isResourceUrl(currentCheckoutUrl) ? (
+              <button
+                onClick={() => handleFreeResourceClick(currentCheckoutUrl)}
+                className="block w-full text-center py-4 rounded-lg text-lg font-bold text-gray-900 mb-6 hover:opacity-90 transition-all bg-yellow-400 hover:bg-yellow-300"
+              >
+                {hasAccess ? 'Download Free' : 'Get Free Access'}
+              </button>
+            ) : currentCheckoutUrl.startsWith('/') ? (
               <Link
                 href={currentCheckoutUrl}
                 className="block w-full text-center py-4 rounded-lg text-lg font-bold text-gray-900 mb-6 hover:opacity-90 transition-all bg-yellow-400 hover:bg-yellow-300"
@@ -503,6 +607,77 @@ export default function ProductPageAppSumo({
           </div>
         </div>
       </div>
+
+      {/* Email Gate Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Get Free Access</h3>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-gray-600 mb-6">
+              Enter your email to download <strong>{title}</strong> for free.
+            </p>
+
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name (optional)
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? 'Processing...' : 'Download Free'}
+              </button>
+
+              <p className="text-xs text-gray-500 text-center">
+                By submitting, you agree to receive occasional emails from GovCon Giants.
+                Unsubscribe anytime.
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12 px-6 mt-20">

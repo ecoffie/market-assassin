@@ -11,13 +11,13 @@ export default function SBLODirectoryPage() {
       gradientTo="#10b981"
       price="FREE"
       originalPrice="$997 value"
-      checkoutUrl="/free-resources"
+      checkoutUrl="/resources/sblo-contact-list.html"
       pricingTiers={[
         {
           name: 'Free Sample',
           price: 'FREE',
           originalPrice: '$997 value',
-          checkoutUrl: '/free-resources',
+          checkoutUrl: '/resources/sblo-contact-list.html',
           description: '225 SBLO contacts for 76+ federal agencies',
           features: [
             '225 SBLO contacts',

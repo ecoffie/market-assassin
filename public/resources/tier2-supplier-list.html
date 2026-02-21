@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tier 2 Federal Contractors - Vendor Registration Directory</title>
+    <style>
+        @media print {
+            body {
+                margin: 0;
+                padding: 20mm;
+            }
+            .company-card {
+                page-break-inside: avoid;
+            }
+            .header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                padding: 10mm 20mm;
+                background: white;
+                border-bottom: 2px solid #1e3a8a;
+            }
+            .content {
+                margin-top: 50mm;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f9fafb;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            margin: 5px 0;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #3b82f6;
+        }
+
+        .stat-card h3 {
+            margin: 0 0 5px 0;
+            font-size: 14px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1e3a8a;
+        }
+
+        .key-insight {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+
+        .key-insight h2 {
+            margin: 0 0 10px 0;
+            color: #92400e;
+            font-size: 20px;
+        }
+
+        .key-insight p {
+            margin: 0;
+            color: #78350f;
+        }
+
+        .company-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .company-card {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #3b82f6;
+        }
+
+        .company-card.has-portal {
+            border-left-color: #10b981;
+        }
+
+        .company-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e3a8a;
+            margin: 0 0 15px 0;
+        }
+
+        .company-info {
+            display: grid;
+            gap: 12px;
+        }
+
+        .info-row {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 10px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .info-value {
+            color: #1f2937;
+        }
+
+        .portal-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .portal-badge.full {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .portal-badge.email {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .portal-url {
+            color: #3b82f6;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .portal-url:hover {
+            text-decoration: underline;
+        }
+
+        .notes {
+            background: #f3f4f6;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #4b5563;
+            margin-top: 10px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Tier 2 Federal Contractors</h1>
+        <div class="subtitle">Vendor Registration & SBLO Contact Directory</div>
+        <div class="subtitle">Generated: December 11, 2025</div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <h3>Total Companies</h3>
+            <div class="value">46</div>
+        </div>
+        <div class="stat-card">
+            <h3>Full Portals</h3>
+            <div class="value">1</div>
+        </div>
+        <div class="stat-card">
+            <h3>SBLO Contact Required</h3>
+            <div class="value">45</div>
+        </div>
+        <div class="stat-card">
+            <h3>Success Rate</h3>
+            <div class="value">97.8%</div>
+        </div>
+    </div>
+
+    <div class="key-insight">
+        <h2>🎯 Key Insight: Relationship-Based Go-to-Market</h2>
+        <p><strong>97.8% of Tier 2 companies</strong> do NOT have public vendor registration portals. This means direct SBLO relationships are critical for success. Personal connections, faster response times, and agile procurement processes are the key advantages in the Tier 2 space.</p>
+    </div>
+
+    <div class="company-grid">
+
+        <div class="company-card ">
+            <h2 class="company-name">1. AArete</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Lynn Jenkins</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">ljenkins@aarete.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">2. ABS Group Consulting</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Ruta Haile</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">rhaile@absconsulting.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">3. APTIM</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Ellen Mack</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">ellen.mack@aptim.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">4. Acuity International</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Susan Thibodeaux</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Susan.Thibodeaux@acuityinternational.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">5. Akima Global Services</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Heidi Anderson</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Heidi.anderson@akima.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">6. BI Incorporated</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Mark Rushworth</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">mark.rushworth@bi.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">7. Bollinger Shipyards</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Chris Remont</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Markm@bollingershipyards.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">8. CH2M Hill</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Nannette Woods</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Nannette.woods@jacobs.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">9. CleanHarbors</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Elwood Shannon</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">elwood.shannon@cleanharbors.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration process.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">10. Composite Analysis Group</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Neal Chibba</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">neal@lipseywater.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Small company - no formal portal. Contact SBLO directly for subcontracting opportunities.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">11. CoreCivic</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Dawn Mason</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">dawn.mason@corecivic.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">12. Covenant Aviation Security, LLC</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Christine Mueller</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">chris.mueller@covenantsecurity.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">13. Deployed Resources</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Lori Riley</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">lriely@deployedresources.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">14. Dewberry</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">See email</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">dedwards@dewberry.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for subcontractor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">15. Environmental Chemical Corporation (ECC)</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Terry Huber</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">thuber@ecc.net</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">16. Ernst & Young LLP</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Celia Marino</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">celia.marino@ey.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Large firm but no public vendor portal found. Contact SBLO for vendor registration process.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">17. FJC Security Services, Inc.</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Stephanie Stevens</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">sstevens@FJCSecurity.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">18. G4S Secure Solutions (USA) Inc.</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Sunni Richmond</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">sunni.richmond@aus.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Note: G4S was acquired by Allied Universal. May use Allied Universal supplier portal - check with SBLO.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">19. GE Power</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Beth Reina</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">beth.reina@ge.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> General Electric Power division. May use GE corporate supplier portal - contact SBLO for access.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">20. Grant Thornton, LLP</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Kristen Lillard</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">kristen.lillard@us.gt.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Professional services firm. No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">21. Grunley Construction Company, Inc.</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">See email</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">toddallengifford@grunley.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Construction services. No public vendor portal found. Contact SBLO for subcontractor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">22. ICF International</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Mark Youman</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Mark.youman@icf.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Consulting and technology services. No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">23. Insitu</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Stephanie Engel</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">stephanie.engel@insitu.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Note: Insitu is a Boeing subsidiary. May use Boeing supplier portal (boeing.suppliergateway.com) or have separate system - contact SBLO.</div>
+        </div>
+
+        <div class="company-card has-portal">
+            <h2 class="company-name">24. KPMG</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Tina Ho</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">tinanho@KPMG.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge full">Full Portal</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value"><a href="https://kpmg.supplierone.co/" class="portal-url" target="_blank">https://kpmg.supplierone.co/</a></div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Uses Coupa Supplier Portal (CSP) for transactions. Supplier diversity registration at kpmg.supplierone.co. Invitation-based system.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">25. Leo A Daly</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Debra Crafter</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">drcrafter@leoadaly.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Architecture and engineering. No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">26. Loyal Source</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Chad Janovec</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">cjanovec@loyalsource.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Healthcare and government services. No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">27. M V M, Inc.</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Ty Richards</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">richardsta@mvminc.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">28. Maximus Federal</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Abeer Bhatia</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">abeerbhatia@maximus.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Government services. No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">29. McDean</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Kathy Athey</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Kathy.Athey@mcdean.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">30. Michael Baker Jr., Inc.</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Morgan Karimi</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">morgan.karimi@mbakerintl.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Engineering and consulting. No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">31. Monster Government Solutions LLC</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Maria Maze</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">maria.maze@monstergovernmentsolutions.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">32. Mortenson</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Mike Hommer</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Mike.hommer@mortenson.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Construction services. No public vendor portal found. Contact SBLO for subcontractor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">33. Motorola Solutions, Inc.</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Edith Moralis</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">edith.moralis@motorolasolutions.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Technology and communications. Large company but no public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">34. NTTData Federal</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Angela Hannah</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">angela.hannah@nttdatafed.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> IT services. No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">35. Neopost Inc.</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Stacey Graham</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">s.graham@quadient.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Note: Neopost rebranded to Quadient. Check quadient.com for supplier portal or contact SBLO.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">36. Noblis</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Anna Crawley</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">anna.crawley@noblis.org</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Science and technology consulting. No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">37. Noresco LLC</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Gopal Shiddapur</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">gshiddapur@noresco.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Energy services. No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">38. Paragon Systems</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Leslie Kaciban</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">lkaciban@parasys.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Security services. No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">39. Rapiscan</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Lakisha Bird</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">contracts@rapiscansystems.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Security screening equipment. No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">40. ReadyAmerica</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Neil Chapin</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">neil@readyamerica.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">41. Salient</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Debra Vanderhoof</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Debra.Vanderhoof@salientcrgt.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Note: Likely Salient CRGT. No public vendor portal found. Contact SBLO for supplier registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">42. Systems, Inc BAE</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">See email</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">Marianne.Tenore@BAESYSTEMS.COM</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">43. THE GEO GROUP</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Ray Castro</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">racastro@geogroup.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Corrections and detention services. No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">44. The Haskell Company</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Teri Williams</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">teri.williams@haskell.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Construction and engineering. No public vendor portal found. Contact SBLO for subcontractor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">45. The Rand Company</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Linda Duffy</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">byone@rand.org</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Note: Likely RAND Corporation. Research and analysis. No public vendor portal found. Contact SBLO for vendor registration.</div>
+        </div>
+
+        <div class="company-card ">
+            <h2 class="company-name">46. Triple Canopy</h2>
+            <div class="company-info">
+                <div class="info-row">
+                    <div class="info-label">SBLO Contact:</div>
+                    <div class="info-value">Christopher Philippsen</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">chris.philippsen@constellis.com</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Portal Type:</div>
+                    <div class="info-value"><span class="portal-badge email">Email Registration</span></div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Registration:</div>
+                    <div class="info-value">Contact SBLO directly</div>
+                </div>
+            </div>
+            <div class="notes"><strong>Notes:</strong> Note: Triple Canopy is part of Constellis. Check constellis.com for supplier portal or contact SBLO.</div>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        <p><strong>Tier 2 Vendor Registration Directory</strong></p>
+        <p>Research completed and data cleaned: December 2025</p>
+        <p>46 high-priority Tier 2 federal contractors with vendor registration information</p>
+    </div>
+</body>
+</html>

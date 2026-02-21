@@ -107,7 +107,7 @@ export default function Home() {
             </Link>
 
             {/* Content Reaper */}
-            <Link href="/content-reaper" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
+            <Link href="/content-generator" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
               <div className="h-48 bg-gradient-to-br from-purple-600 to-pink-500 relative overflow-hidden">
                 <Image src="/images/products/ai content generator/ai content generator home page.png" alt="Content Reaper" fill className="object-cover object-top" />
               </div>
@@ -117,7 +117,7 @@ export default function Home() {
                 <p className="text-gray-500 text-sm mb-4">Create LinkedIn posts that resonate with government buyers. GovCon-tuned AI trained on 146 viral posts.</p>
                 <ul className="text-sm mb-5 space-y-1">
                   <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> Generate 10 Posts Per Click</li>
-                  <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> 175 Federal Agencies</li>
+                  <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> 250 Federal Agencies</li>
                   <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> GovCon-Tuned AI Model</li>
                   <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> GEO Boost Optimization</li>
                 </ul>
@@ -169,7 +169,7 @@ export default function Home() {
               </div>
               <div className="p-6">
                 <span className="inline-block bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">PREMIUM</span>
-                <h3 className="text-xl font-bold mb-2 text-gray-900">Expiring Contracts Database</h3>
+                <h3 className="text-xl font-bold mb-2 text-gray-900">Recompete Tracker</h3>
                 <p className="text-gray-500 text-sm mb-4">Track expiring federal contracts. Get ahead of competition with incumbent contractor details.</p>
                 <ul className="text-sm mb-5 space-y-1">
                   <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">✓</span> Contracts Expiring 12 Months</li>
@@ -484,7 +484,7 @@ export default function Home() {
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <span className="text-emerald-500 font-bold text-lg">✓</span>
                     <div>
-                      <div className="font-medium text-gray-900">Recompete Contracts Tracker</div>
+                      <div className="font-medium text-gray-900">Recompete Tracker</div>
                       <div className="text-sm text-gray-500">$397 value</div>
                     </div>
                   </div>
@@ -540,7 +540,7 @@ export default function Home() {
                   <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
                     <span className="text-blue-600 font-bold text-lg">✓</span>
                     <div>
-                      <div className="font-medium text-gray-900">Recompete Contracts Tracker</div>
+                      <div className="font-medium text-gray-900">Recompete Tracker</div>
                       <div className="text-sm text-gray-500">$397 value</div>
                     </div>
                   </div>
@@ -607,7 +607,7 @@ export default function Home() {
                   <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
                     <span className="text-amber-600 font-bold text-lg">✓</span>
                     <div>
-                      <div className="font-medium text-gray-900">Recompete Contracts Tracker</div>
+                      <div className="font-medium text-gray-900">Recompete Tracker</div>
                       <div className="text-sm text-gray-500">$397 value</div>
                     </div>
                   </div>

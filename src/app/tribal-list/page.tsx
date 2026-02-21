@@ -11,7 +11,7 @@ export default function TribalListPage() {
       gradientTo="#10b981"
       price="FREE"
       originalPrice="$297 value"
-      checkoutUrl="/tribal-list-download"
+      checkoutUrl="/resources/tribal-contractor-list.csv"
       videoTitle="Tribal Contractor List Overview"
       videoSubtitle="See how to find tribal teaming partners"
       screenshots={[

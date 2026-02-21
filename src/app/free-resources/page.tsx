@@ -18,23 +18,71 @@ const FREE_RESOURCES: Resource[] = [
     name: 'SBLO Contact List',
     description: 'Directory of Small Business Liaison Officers across federal agencies. Direct contacts for small business outreach.',
     icon: '📋',
-    file: '/resources/sblo-contact-list.pdf',
+    file: '/resources/sblo-contact-list.html',
     price: '$47',
+  },
+  {
+    id: 'tier2-list',
+    name: 'Tier-2 Supplier List',
+    description: 'Access Tier-2 supplier contacts and vendor registration portals at major prime contractors.',
+    icon: '🏢',
+    file: '/resources/tier2-supplier-list.html',
+    price: '$697',
   },
   {
     id: 'december-spend',
     name: 'December Spend Forecast',
     description: 'Year-end government spending predictions and Q4 opportunity analysis. Know where the money is going.',
     icon: '💰',
-    file: '/resources/december-spend-forecast.pdf',
+    file: '/resources/december-spend-forecast.html',
     price: '$97',
+  },
+  {
+    id: 'ai-prompts',
+    name: '75+ AI Prompts for GovCon',
+    description: 'Ready-to-use AI prompts for proposals, BD, marketing, and operations. Works with ChatGPT, Claude & more.',
+    icon: '🤖',
+    file: '/resources/ai-prompts-govcon.html',
+    price: '$797',
+  },
+  {
+    id: 'action-plan',
+    name: '2026 GovCon Action Plan',
+    description: 'Your step-by-step roadmap to winning federal contracts in 2026. Month-by-month milestones and task checklists.',
+    icon: '📅',
+    file: '/resources/action-plan-2026.html',
+    price: '$497',
+  },
+  {
+    id: 'guides-templates',
+    name: 'GovCon Guides & Templates',
+    description: 'Comprehensive guides and ready-to-use templates including capability statements, email scripts, and proposal checklists.',
+    icon: '📝',
+    file: '/resources/govcon-guides-templates.html',
+    price: '$97',
+  },
+  {
+    id: 'expiring-contracts-csv',
+    name: 'Expiring Contracts CSV',
+    description: 'Sample of expiring federal contracts data. Import into Excel, Google Sheets, or your CRM.',
+    icon: '📊',
+    file: '/resources/expiring-contracts-sample.csv',
+    price: '$697',
+  },
+  {
+    id: 'tribal-list',
+    name: 'Tribal Contractor List',
+    description: '500+ Native American-owned federal contractors for teaming and subcontracting opportunities.',
+    icon: '🏛️',
+    file: '/resources/tribal-contractor-list.csv',
+    price: '$297',
   },
   {
     id: 'capability-template',
     name: 'Capability Statement Template',
     description: 'Professional one-page capability statement template ready to customize for your business.',
     icon: '📄',
-    file: '/templates/capability-statement-template.pdf',
+    file: '/templates/capability-statement-template.html',
     price: '$29',
   },
   {
@@ -42,7 +90,7 @@ const FREE_RESOURCES: Resource[] = [
     name: 'SBLO Email Scripts',
     description: 'Ready-to-use email templates for reaching out to Small Business Liaison Officers and contracting officers.',
     icon: '✉️',
-    file: '/templates/email-scripts-sblo.pdf',
+    file: '/templates/email-scripts-sblo.html',
     price: '$37',
   },
   {
@@ -50,7 +98,7 @@ const FREE_RESOURCES: Resource[] = [
     name: 'Proposal Response Checklist',
     description: 'Comprehensive checklist to ensure your proposal responses are complete and compliant.',
     icon: '✅',
-    file: '/templates/proposal-checklist.pdf',
+    file: '/templates/proposal-checklist.html',
     price: '$19',
   },
 ];
@@ -367,10 +415,12 @@ export default function FreeResourcesPage() {
 
             <a
               href={downloadUrl}
-              download
+              target="_blank"
+              rel="noopener noreferrer"
+              {...(downloadUrl.endsWith('.csv') ? { download: true } : {})}
               className="block w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors mb-4"
             >
-              Download Now
+              {downloadUrl.endsWith('.csv') ? 'Download Now' : 'Open Resource'}
             </a>
 
             <button

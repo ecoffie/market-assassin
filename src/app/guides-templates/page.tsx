@@ -11,7 +11,7 @@ export default function GuidesTemplatesPage() {
       gradientTo="#10b981"
       price="FREE"
       originalPrice="$97 value"
-      checkoutUrl="/free-resources"
+      checkoutUrl="/resources/govcon-guides-templates.html"
       videoTitle="GovCon Guides & Templates"
       videoSubtitle="Everything you need to get started in federal contracting"
       screenshots={[

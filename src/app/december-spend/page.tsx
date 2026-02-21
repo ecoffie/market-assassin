@@ -11,7 +11,7 @@ export default function DecemberSpendPage() {
       gradientTo="#f97316"
       price="FREE"
       originalPrice="$1,297 value"
-      checkoutUrl="/free-resources"
+      checkoutUrl="/resources/december-spend-forecast.html"
       videoTitle="December Spend Forecast"
       videoSubtitle="Q4 spending predictions and positioning strategies"
       screenshots={[

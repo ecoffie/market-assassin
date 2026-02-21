@@ -7,27 +7,57 @@ export const FREE_RESOURCES = {
   'sblo-list': {
     name: 'SBLO Contact List',
     description: 'Small Business Liaison Officers directory',
-    file: '/resources/sblo-contact-list.pdf',
+    file: '/resources/sblo-contact-list.html',
+  },
+  'tier2-list': {
+    name: 'Tier-2 Supplier List',
+    description: 'Tier-2 supplier contacts and vendor registration portals',
+    file: '/resources/tier2-supplier-list.html',
   },
   'december-spend': {
     name: 'December Spend Forecast',
     description: 'Year-end government spending predictions',
-    file: '/resources/december-spend-forecast.pdf',
+    file: '/resources/december-spend-forecast.html',
+  },
+  'ai-prompts': {
+    name: '75+ AI Prompts for GovCon',
+    description: 'Ready-to-use AI prompts for proposals, BD, marketing, and operations',
+    file: '/resources/ai-prompts-govcon.html',
+  },
+  'action-plan': {
+    name: '2026 GovCon Action Plan',
+    description: 'Step-by-step roadmap to winning federal contracts in 2026',
+    file: '/resources/action-plan-2026.html',
+  },
+  'guides-templates': {
+    name: 'GovCon Guides & Templates',
+    description: 'Comprehensive guides and ready-to-use templates',
+    file: '/resources/govcon-guides-templates.html',
+  },
+  'expiring-contracts-csv': {
+    name: 'Expiring Contracts CSV',
+    description: 'Sample of expiring federal contracts data',
+    file: '/resources/expiring-contracts-sample.csv',
+  },
+  'tribal-list': {
+    name: 'Tribal Contractor List',
+    description: '500+ Native American-owned federal contractors',
+    file: '/resources/tribal-contractor-list.csv',
   },
   'capability-template': {
     name: 'Capability Statement Template',
     description: 'Professional capability statement template',
-    file: '/templates/capability-statement-template.pdf',
+    file: '/templates/capability-statement-template.html',
   },
   'email-scripts': {
     name: 'SBLO Email Scripts',
     description: 'Ready-to-use outreach email templates',
-    file: '/templates/email-scripts-sblo.pdf',
+    file: '/templates/email-scripts-sblo.html',
   },
   'proposal-checklist': {
     name: 'Proposal Response Checklist',
     description: 'Comprehensive proposal compliance checklist',
-    file: '/templates/proposal-checklist.pdf',
+    file: '/templates/proposal-checklist.html',
   },
 } as const;
 

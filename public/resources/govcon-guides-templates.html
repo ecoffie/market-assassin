@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GovCon Guides & Templates | GovCon Giants Tools</title>
+    <meta name="description" content="Comprehensive guides and ready-to-use templates for federal contracting">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #1e40af;
+            --secondary-color: #7c3aed;
+            --accent-color: #10b981;
+            --text-dark: #1f2937;
+            --text-light: #6b7280;
+            --bg-light: #f9fafb;
+            --border-color: #e5e7eb;
+            --yellow: #fbbf24;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            color: var(--text-dark);
+            background: #ffffff;
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .header {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .header-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-dark);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+        }
+
+        /* Product Nav */
+        .product-nav {
+            border-bottom: 1px solid var(--border-color);
+            background: white;
+        }
+
+        .product-nav-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .product-nav a {
+            padding: 16px 0;
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .product-nav a.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .btn-primary-large {
+            background: var(--yellow);
+            color: var(--text-dark);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-block;
+            margin-left: auto;
+        }
+
+        /* Main Content */
+        .main-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 40px 24px;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 40px;
+        }
+
+        /* Left Column */
+        .product-main {
+            min-width: 0;
+        }
+
+        .product-title-section {
+            margin-bottom: 24px;
+        }
+
+        .product-title {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            line-height: 1.1;
+        }
+
+        .product-tagline {
+            font-size: 20px;
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        /* Deal Timer */
+        .deal-timer {
+            background: #dbeafe;
+            border: 2px solid #93c5fd;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
+        }
+
+        .deal-timer-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 12px;
+        }
+
+        .timer-display {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .timer-unit {
+            text-align: center;
+        }
+
+        .timer-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: block;
+        }
+
+        .timer-label {
+            font-size: 12px;
+            color: var(--text-light);
+            text-transform: uppercase;
+        }
+
+        /* Video/Media Section */
+        .product-media {
+            margin-bottom: 40px;
+        }
+
+        .main-video {
+            width: 100%;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .video-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .play-button {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .play-button:hover {
+            transform: scale(1.1);
+        }
+
+        .play-button::after {
+            content: '';
+            width: 0;
+            height: 0;
+            border-left: 24px solid var(--primary-color);
+            border-top: 16px solid transparent;
+            border-bottom: 16px solid transparent;
+            margin-left: 4px;
+        }
+
+        .thumbnail-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .thumbnail {
+            aspect-ratio: 16/9;
+            border-radius: 8px;
+            background: var(--bg-light);
+            border: 2px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .thumbnail:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        /* Product Description */
+        .product-description {
+            font-size: 18px;
+            line-height: 1.8;
+            margin-bottom: 32px;
+            color: var(--text-dark);
+        }
+
+        /* TL;DR Section */
+        .tldr {
+            background: var(--bg-light);
+            border-left: 4px solid var(--accent-color);
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 32px;
+        }
+
+        .tldr-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .tldr-list {
+            list-style: none;
+        }
+
+        .tldr-list li {
+            padding: 8px 0;
+            padding-left: 28px;
+            position: relative;
+            font-size: 16px;
+        }
+
+        .tldr-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        /* At-a-glance */
+        .at-a-glance {
+            background: var(--bg-light);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .at-a-glance-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .glance-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .glance-item:last-child {
+            border-bottom: none;
+        }
+
+        .glance-label {
+            font-weight: 600;
+            color: var(--text-light);
+        }
+
+        .glance-value {
+            color: var(--text-dark);
+        }
+
+        .glance-value a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        /* Features Section */
+        .features-section {
+            margin: 60px 0;
+        }
+
+        .section-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 32px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            padding: 24px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        .feature-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .feature-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .feature-desc {
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        /* Right Column - Pricing */
+        .pricing-sidebar {
+            position: sticky;
+            top: 80px;
+            height: fit-content;
+        }
+
+        .pricing-card {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .pricing-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .discount-badge {
+            background: #ef4444;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+
+        .price-current {
+            font-size: 48px;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .price-original {
+            font-size: 20px;
+            color: var(--text-light);
+            text-decoration: line-through;
+        }
+
+        .pricing-badge {
+            background: var(--accent-color);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 24px;
+        }
+
+        .plan-select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 16px;
+            background: white;
+        }
+
+        .btn-buy {
+            width: 100%;
+            background: var(--yellow);
+            color: var(--text-dark);
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 16px;
+            transition: transform 0.2s;
+        }
+
+        .btn-buy:hover {
+            transform: translateY(-2px);
+        }
+
+        .benefits-list {
+            list-style: none;
+            margin-top: 24px;
+        }
+
+        .benefits-list li {
+            padding: 12px 0;
+            padding-left: 32px;
+            position: relative;
+            font-size: 14px;
+        }
+
+        .benefits-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .guarantee-badge {
+            background: #f0fdf4;
+            border: 2px solid var(--accent-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            text-align: center;
+        }
+
+        .guarantee-badge strong {
+            color: var(--accent-color);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        /* Reviews Section */
+        .reviews-section {
+            margin: 60px 0;
+        }
+
+        .review-summary {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .review-stars {
+            font-size: 24px;
+            color: var(--yellow);
+        }
+
+        .review-count {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .review-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .reviewer-name {
+            font-weight: 700;
+        }
+
+        .review-date {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+
+            .pricing-sidebar {
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-container">
+            <nav class="nav">
+                <a href="govcon-giants-tools-appsumo-style.html" class="logo">🚀 GovCon Giants</a>
+                <ul class="nav-links">
+                    <li><a href="govcon-giants-tools-appsumo-style.html#tools">Tools</a></li>
+                    <li><a href="govcon-giants-tools-appsumo-style.html#databases">Databases</a></li>
+                    <li><a href="govcon-giants-tools-appsumo-style.html#guides">Guides</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="product-nav">
+        <div class="product-nav-container">
+            <a href="#overview" class="active">Overview</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#reviews">Reviews</a>
+            <a href="#pricing" class="btn-primary-large">Choose Plan</a>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="product-main">
+            <div class="product-title-section">
+                <h1 class="product-title">GovCon Guides & Templates</h1>
+                <p class="product-tagline">Comprehensive guides and ready-to-use templates for federal contracting</p>
+            </div>
+
+            <div class="deal-timer">
+                <div class="deal-timer-label">Deal ends in</div>
+                <div class="timer-display">
+                    <div class="timer-unit">
+                        <span class="timer-value" id="days">12</span>
+                        <span class="timer-label">Days</span>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-value" id="hours">12</span>
+                        <span class="timer-label">Hours</span>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-value" id="mins">00</span>
+                        <span class="timer-label">Mins</span>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-value" id="secs">59</span>
+                        <span class="timer-label">Secs</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-media">
+                <div class="main-video">
+                    <div class="video-placeholder">
+                        <div class="play-button"></div>
+                        <h2 style="font-size: 28px; margin-bottom: 12px;">GovCon Guides & Templates Demo</h2>
+                        <p style="font-size: 18px; opacity: 0.9;">Watch how to use this tool<br>to grow your federal contracting business</p>
+                    </div>
+                </div>
+                <div class="thumbnail-grid">
+                    <div class="thumbnail">📚</div>
+                    <div class="thumbnail">✉️</div>
+                    <div class="thumbnail">✓</div>
+                    <div class="thumbnail">📖</div>
+                </div>
+            </div>
+
+            <div class="product-description">
+                <p>Federal contracting doesn't have to be complicated. Our guides break down every step, and our templates give you professional communications ready to customize and send.</p>
+            </div>
+
+            <div class="tldr">
+                <div class="tldr-title">TL;DR</div>
+                <ul class="tldr-list">
+                    <li>Step-by-step guides for every stage</li>
+                    <li>Ready-to-use email templates</li>
+                    <li>Checklists and best practices</li>
+                    <li>Updated with latest regulations</li>
+                </ul>
+            </div>
+
+            <div class="at-a-glance">
+                <div class="at-a-glance-title">At-a-glance</div>
+                <div class="glance-item">
+                    <span class="glance-label">Website</span>
+                    <span class="glance-value"><a href="GENERAL-CONTRACTOR-GUIDE.md" target="_blank">govcongiants.com</a></span>
+                </div>
+                <div class="glance-item">
+                    <span class="glance-label">Best for</span>
+                    <span class="glance-value">Small businesses, BD professionals, Contractors</span>
+                </div>
+            </div>
+
+            <div class="features-section">
+                <h2 class="section-title">Key features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">📖</div>
+                        <div class="feature-title">Step-by-Step Guides</div>
+                        <div class="feature-desc">Detailed guides from registration to contract execution.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">✉️</div>
+                        <div class="feature-title">Email Templates</div>
+                        <div class="feature-desc">Professional templates for SBLO outreach and follow-ups.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-title">Checklists</div>
+                        <div class="feature-desc">Never miss a step with our comprehensive checklists.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📚</div>
+                        <div class="feature-title">Best Practices</div>
+                        <div class="feature-desc">Learn from successful contractors' strategies.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="reviews-section" id="reviews">
+                <h2 class="section-title">What users are saying</h2>
+                <div class="review-summary">
+                    <div class="review-stars">★★★★★</div>
+                    <div class="review-count">178 reviews</div>
+                </div>
+                <div class="review-card">
+                    <div class="review-header">
+                        <div>
+                            <div class="reviewer-name">Chris M.</div>
+                            <div class="review-date">6 days ago</div>
+                        </div>
+                        <div class="review-stars" style="font-size: 16px;">★★★★★</div>
+                    </div>
+                    <p>"The email templates alone are worth it. Got my first meeting using one of them."</p>
+                </div>
+                <div class="review-card">
+                    <div class="review-header">
+                        <div>
+                            <div class="reviewer-name">Patricia L.</div>
+                            <div class="review-date">2 weeks ago</div>
+                        </div>
+                        <div class="review-stars" style="font-size: 16px;">★★★★★</div>
+                    </div>
+                    <p>"Finally understand the federal contracting process. These guides are excellent."</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="pricing-sidebar" id="pricing">
+            <div class="pricing-card">
+                <div class="pricing-header">
+                    <span class="discount-badge">FREE RESOURCE</span>
+                    <div class="price-current">FREE</div>
+                    <div class="price-original">$97</div>
+                    <div class="pricing-badge" style="background: #10b981;">FREE FOREVER</div>
+                </div>
+
+                <select class="plan-select">
+                    <option>GovCon Guides & Templates</option>
+                </select>
+
+                <button class="btn-buy" style="background: #10b981;" onclick="alert('Access coming soon!')">Access Guides Free</button>
+
+                <ul class="benefits-list">
+                    <li>Step-by-step guides</li>
+                    <li>Email templates</li>
+                    <li>BD checklists</li>
+                    <li>Best practices</li>
+                    <li>Regular updates</li>
+                </ul>
+
+                <div class="guarantee-badge">
+                    <strong>Instant Access</strong>
+                    <div style="font-size: 12px; color: var(--text-light);">No credit card required</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateTimer() {
+            let days = parseInt(document.getElementById('days').textContent);
+            let hours = parseInt(document.getElementById('hours').textContent);
+            let mins = parseInt(document.getElementById('mins').textContent);
+            let secs = parseInt(document.getElementById('secs').textContent);
+
+            secs--;
+            if (secs < 0) {
+                secs = 59;
+                mins--;
+                if (mins < 0) {
+                    mins = 59;
+                    hours--;
+                    if (hours < 0) {
+                        hours = 23;
+                        days--;
+                    }
+                }
+            }
+
+            document.getElementById('days').textContent = String(days).padStart(2, '0');
+            document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+            document.getElementById('mins').textContent = String(mins).padStart(2, '0');
+            document.getElementById('secs').textContent = String(secs).padStart(2, '0');
+        }
+        setInterval(updateTimer, 1000);
+
+        document.querySelector('.play-button').addEventListener('click', function() {
+            alert('Video demo coming soon! Click "Access Tool Now" to try the tool.');
+        });
+    </script>
+</body>
+</html>

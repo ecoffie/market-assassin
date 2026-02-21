@@ -11,7 +11,7 @@ export default function AIPromptsPage() {
       gradientTo="#ec4899"
       price="FREE"
       originalPrice="$797 value"
-      checkoutUrl="/free-resources"
+      checkoutUrl="/resources/ai-prompts-govcon.html"
       videoTitle="75+ AI Prompts for GovCon"
       videoSubtitle="Copy-paste prompts that actually work"
       screenshots={[

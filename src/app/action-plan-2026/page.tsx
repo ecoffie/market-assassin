@@ -11,7 +11,7 @@ export default function ActionPlan2026Page() {
       gradientTo="#7c3aed"
       price="FREE"
       originalPrice="$497 value"
-      checkoutUrl="/free-resources"
+      checkoutUrl="/resources/action-plan-2026.html"
       videoTitle="2026 GovCon Action Plan"
       videoSubtitle="12-month roadmap to federal contract wins"
       screenshots={[

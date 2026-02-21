@@ -11,13 +11,13 @@ export default function ExpiringContractsCSVPage() {
       gradientTo="#06b6d4"
       price="FREE"
       originalPrice="$697 value"
-      checkoutUrl="/free-resources"
+      checkoutUrl="/resources/expiring-contracts-sample.csv"
       pricingTiers={[
         {
           name: 'Free Sample',
           price: 'FREE',
           originalPrice: '$697 value',
-          checkoutUrl: '/free-resources',
+          checkoutUrl: '/resources/expiring-contracts-sample.csv',
           description: 'Sample expiring contracts data to test your process',
           features: [
             'Sample contract data',
@@ -45,7 +45,7 @@ export default function ExpiringContractsCSVPage() {
         },
       ]}
       upgradeProduct={{
-        title: 'Expiring Contracts Forecast',
+        title: 'Recompete Tracker',
         description: 'Go from sample data to $77.1T+ in expiring federal contracts with monthly updates and advanced filtering.',
         price: '$397',
         originalPrice: '$997',
@@ -148,7 +148,7 @@ export default function ExpiringContractsCSVPage() {
         'Works with any spreadsheet',
       ]}
       highlightTitle="Test Your Process Before You Commit"
-      highlightText="This free sample lets you validate your outreach process before upgrading to the full database. Import the data, build your workflow, and see how expiring contracts fit into your BD strategy. When youre ready for more, upgrade to the full Expiring Contracts Forecast."
+      highlightText="This free sample lets you validate your outreach process before upgrading to the full database. Import the data, build your workflow, and see how expiring contracts fit into your BD strategy. When youre ready for more, upgrade to the full Recompete Tracker."
       reviews={[
         {
           name: 'Kevin L.',
