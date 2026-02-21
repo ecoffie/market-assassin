@@ -169,16 +169,20 @@
 
 ## Free Resources / PDFs
 
-| Resource | Location |
-|----------|----------|
-| SBLO Directory | `/src/app/sblo-directory/` |
-| Tier-2 Directory | `/src/app/tier2-directory/` |
-| December Spend Forecast | `/src/app/december-spend/` |
-| AI Prompts (75+) | `/src/app/ai-prompts/` |
-| 2026 Action Plan | `/src/app/action-plan-2026/` |
-| Guides & Templates | `/src/app/guides-templates/` |
-| Tribal Contractor List | `/src/app/tribal-list/` |
-| Expiring Contracts CSV | `/src/app/expiring-contracts-csv/` |
+All free resources require email capture before download (via `ProductPageAppSumo` email gate → `/api/capture-lead`).
+
+| Resource | Page | Download File |
+|----------|------|---------------|
+| SBLO Directory | `/src/app/sblo-directory/` | `/public/resources/sblo-contact-list.html` |
+| Tier-2 Directory | `/src/app/tier2-directory/` | `/public/resources/tier2-supplier-list.html` |
+| December Spend Forecast | `/src/app/december-spend/` | `/public/resources/december-spend-forecast.html` |
+| AI Prompts (75+) | `/src/app/ai-prompts/` | `/public/resources/ai-prompts-govcon.html` |
+| 2026 Action Plan | `/src/app/action-plan-2026/` | `/public/resources/action-plan-2026.html` |
+| Guides & Templates | `/src/app/guides-templates/` | `/public/resources/govcon-guides-templates.html` |
+| Tribal Contractor List | `/src/app/tribal-list/` | `/public/resources/tribal-contractor-list.csv` |
+| Expiring Contracts CSV | `/src/app/expiring-contracts-csv/` | `/public/resources/expiring-contracts-sample.csv` |
+
+**Templates** (also in `/free-resources` page): `public/templates/capability-statement-template.html`, `email-scripts-sblo.html`, `proposal-checklist.html`
 
 ---
 
@@ -206,7 +210,7 @@ src/
 │   └── ...
 ├── components/
 │   ├── BundleProductPage.tsx     # Bundle landing template
-│   ├── ProductPageAppSumo.tsx    # Product page template
+│   ├── ProductPageAppSumo.tsx    # Product page template (includes email gate for free resources)
 │   ├── PurchaseGate.tsx          # Access gate component
 │   └── ...
 └── lib/
@@ -504,6 +508,23 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ## Recent Work History
 
+### February 21, 2026 (Session 18)
+- **Free Download Pages: Complete Fix**
+  - Copied 8 resource files from `Bootcamp/` into `public/resources/` (6 HTML, 2 CSV)
+  - Fixed all 8 free product pages — `checkoutUrl` now points to actual resource files instead of `/free-resources` (eliminated redirect loop)
+  - Fixed `/tribal-list` broken link (`/tribal-list-download` → `/resources/tribal-contractor-list.csv`)
+  - Fixed `pricingTiers` free tier URLs on `sblo-directory`, `tier2-directory`, `expiring-contracts-csv`
+- **Email Gate on All Free Resources**
+  - `ProductPageAppSumo` now has built-in email capture modal for any URL starting with `/resources/` or `/templates/`
+  - First-time visitors must enter email before downloading — calls `/api/capture-lead` to save to Supabase `leads` table
+  - Returning visitors (email cached in `localStorage` as `lead_email`) bypass gate and download immediately
+  - Both nav bar button and sidebar button go through the gate
+  - Graceful fallback: if API fails, user still gets access (email saved to localStorage)
+- **Expanded `/free-resources` page**: 5 → 11 resources with correct file extensions (.html/.csv not .pdf)
+- **Expanded `/api/capture-lead`**: 5 → 11 resource entries with correct file paths
+- **Store page fixes**: Content Reaper link `/content-reaper` → `/content-generator`, agency count 175 → 250
+- **Removed fake video play button** from `ProductPageAppSumo` — pages without videos show title/tagline instead of misleading play icon
+
 ### February 18, 2026 (Session 17)
 - **Simplified Acquisition (SAT) Entry Point Analysis — Zero Extra API Calls**
   - Computes SAT (≤$250K) and micro-purchase (≤$10K) metrics during existing award aggregation in 3 routes: `find-agencies`, `government-contracts/search`, `agencies/lookup`
@@ -731,4 +752,4 @@ curl -s -X POST https://tools.govcongiants.org/api/verify-content-generator \
 
 ---
 
-*Last Updated: February 18, 2026 (Session 17)*
+*Last Updated: February 21, 2026 (Session 18)*
