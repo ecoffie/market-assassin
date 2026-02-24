@@ -51,9 +51,9 @@ export function checkIPRateLimit(ip: string): Promise<RateLimitResult> {
   return checkRateLimit(`ip:${ip}`, 30, 3600);
 }
 
-/** 5 attempts per minute per IP (admin brute-force protection) */
+/** 30 requests per minute per IP (admin endpoints are password-protected) */
 export function checkAdminRateLimit(ip: string): Promise<RateLimitResult> {
-  return checkRateLimit(`admin:${ip}`, 5, 60);
+  return checkRateLimit(`admin:${ip}`, 30, 60);
 }
 
 /** Extract client IP from request headers */
