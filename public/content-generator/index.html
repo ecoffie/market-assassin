@@ -7852,7 +7852,7 @@
                     ctx.beginPath();
                     ctx.arc(avatarCX, avatarCY, avatarR, 0, Math.PI * 2);
                     ctx.clip();
-                    ctx.drawImage(img, avatarCX - avatarR, avatarCY - avatarR, avatarR * 2, avatarR * 2);
+                    drawAvatarImage(ctx, img, avatarCX, avatarCY, avatarR);
                     ctx.restore();
                 } catch (e) {
                     drawInitialsCircle(ctx, avatarCX, avatarCY, avatarR, companyName, theme);
@@ -7986,7 +7986,7 @@
                     ctx.beginPath();
                     ctx.arc(innerX + avatarR, avatarY, avatarR, 0, Math.PI * 2);
                     ctx.clip();
-                    ctx.drawImage(img, innerX, avatarY - avatarR, avatarR * 2, avatarR * 2);
+                    drawAvatarImage(ctx, img, innerX + avatarR, avatarY, avatarR);
                     ctx.restore();
                 } catch (e) {
                     drawInitialsCircle(ctx, innerX + avatarR, avatarY, avatarR, companyName, theme);
@@ -8117,6 +8117,23 @@
                 img.onerror = () => reject(new Error('Failed to load image'));
                 img.src = url;
             });
+        }
+
+        // Draw avatar image with cover-crop (no distortion)
+        function drawAvatarImage(ctx, img, cx, cy, r) {
+            const size = r * 2;
+            const aspect = img.width / img.height;
+            let sx = 0, sy = 0, sw = img.width, sh = img.height;
+            if (aspect > 1) {
+                // Wider than tall — crop sides
+                sw = img.height;
+                sx = (img.width - sw) / 2;
+            } else if (aspect < 1) {
+                // Taller than wide — crop top/bottom
+                sh = img.width;
+                sy = (img.height - sh) / 2;
+            }
+            ctx.drawImage(img, sx, sy, sw, sh, cx - r, cy - r, size, size);
         }
 
         // Draw initials circle helper
@@ -8416,7 +8433,7 @@
                     ctx.beginPath();
                     ctx.arc(attrX + avatarR, attrCenterY, avatarR, 0, Math.PI * 2);
                     ctx.clip();
-                    ctx.drawImage(img, attrX, attrCenterY - avatarR, avatarR * 2, avatarR * 2);
+                    drawAvatarImage(ctx, img, attrX + avatarR, attrCenterY, avatarR);
                     ctx.restore();
 
                     ctx.strokeStyle = theme.accent;
