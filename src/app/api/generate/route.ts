@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPainPointsForAgency, categorizePainPoints } from '@/lib/utils/pain-points';
 import { checkContentRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { trackGeneration } from '@/lib/abuse-detection';
+import { humanizePost } from '@/lib/utils/humanize-post';
 
 // CORS headers for cross-origin requests
 const corsHeaders = {
@@ -413,7 +414,7 @@ ${enhancedCompanyData.differentiators ? `- Weave in their differentiators natura
 ${enhancedCompanyData.certifications ? `- Mention relevant certifications when appropriate: ${enhancedCompanyData.certifications}` : ''}
 
 ADDITIONAL REQUIREMENTS:
-- Use a professional, conversational tone
+- Use a professional, conversational tone — like a real person writing on LinkedIn, not an AI
 - Use line breaks for readability
 - Start with a COMPELLING HOOK that captures attention
 - The hook should be the FIRST LINE and must be engaging
@@ -422,6 +423,14 @@ ${geoBoost && templateKey !== 'question-based' ? '- Optimize for AI search with 
 - DO NOT be generic - every post should feel personalized
 - Include 3-5 relevant hashtags at the end
 
+SOUND HUMAN — AVOID THESE AI PATTERNS:
+- NEVER start with "In today's landscape/world/environment" or "In the ever-changing world of"
+- NEVER use "Let's dive in", "Here's the thing", "Picture this", "Imagine this"
+- NEVER use "It's worth noting", "Needless to say", "At the end of the day"
+- NEVER use filler closers like "Let that sink in", "Read that again", "Full stop", "Period"
+- AVOID buzzwords: seamless, leverage, utilize, robust, holistic, synergy, paradigm shift, game-changing, cutting-edge, groundbreaking
+- Write like a human with REAL experience — vary sentence length, use contractions naturally
+
 Output ONLY the post text, followed by hashtags on separate lines.`;
 
       const postContent = await callGrokAPI(step3Prompt, null);
@@ -429,7 +438,7 @@ Output ONLY the post text, followed by hashtags on separate lines.`;
       // Extract hashtags
       const hashtagMatch = postContent.match(/#[\w]+/g);
       const hashtags = hashtagMatch || [];
-      const postText = postContent.replace(/#[\w]+/g, '').trim();
+      const postText = humanizePost(postContent.replace(/#[\w]+/g, '').trim());
 
       return {
         angle: angle.angle,

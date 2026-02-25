@@ -3,6 +3,7 @@ import { getPainPointsForAgency, getPrioritiesForAgency, categorizePainPoints } 
 import { getBudgetForAgency } from '@/lib/utils/budget-authority';
 import { checkContentRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { trackGeneration } from '@/lib/abuse-detection';
+import { humanizePost } from '@/lib/utils/humanize-post';
 
 // Fisher-Yates shuffle — returns a new array in random order
 function shuffleArray<T>(arr: T[]): T[] {
@@ -521,10 +522,20 @@ THOUGHT LEADERSHIP TONE:
 - The goal is to attract government decision makers who think "this person really gets our challenges"
 - Show deep understanding of how federal agencies operate, what they struggle with, and where money flows
 - NEVER say "we can help" or "our services" or "contact us" — instead, share knowledge that makes the reader want to connect
-- Use a professional, conversational tone
+- Use a professional, conversational tone — like a real person writing on LinkedIn, not an AI
 - Use line breaks for readability
 - Start with a COMPELLING HOOK that captures attention
 - The hook should be the FIRST LINE and must be engaging
+
+SOUND HUMAN — AVOID THESE AI PATTERNS:
+- NEVER start with "In today's landscape/world/environment" or "In the ever-changing world of"
+- NEVER use "Let's dive in", "Here's the thing", "Picture this", "Imagine this"
+- NEVER use "It's worth noting", "Needless to say", "At the end of the day"
+- NEVER use filler closers like "Let that sink in", "Read that again", "Full stop", "Period"
+- AVOID overused buzzwords: seamless, leverage, utilize, robust, holistic, synergy, paradigm shift, game-changing, cutting-edge, groundbreaking, transformative
+- Write like a human who has REAL experience, not like an AI summarizing a topic
+- Vary your sentence length — mix short punchy lines with longer explanations
+- Use contractions naturally (don't, won't, it's, they're)
 
 TEXT FORMATTING (use markdown):
 - Use **bold** for section headers, key terms, and important phrases (e.g. **Zero Trust Architecture**)
@@ -550,13 +561,16 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       const hashtagMatch = postContent.match(/#[\w]+/g);
       const hashtags = hashtagMatch || [];
       // Remove hashtags and clean up whitespace (preserve markdown bold/italic for .docx export)
-      const postText = postContent
+      const rawText = postContent
         .replace(/#[\w]+/g, '')
         .replace(/,\s*,/g, '')
         .replace(/^[ \t]+/gm, '')       // Left-justify: strip leading spaces from every line
         .replace(/[ \t]+/g, ' ')        // Collapse multiple spaces (not newlines)
         .replace(/\n\s*\n\s*\n/g, '\n\n')
         .trim();
+
+      // Humanize: strip AI patterns (filler openers, buzzwords, robotic phrases)
+      const postText = humanizePost(rawText);
 
       return {
         angle: angle.angle,
