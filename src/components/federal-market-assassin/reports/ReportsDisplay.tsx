@@ -524,13 +524,24 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
       subcontractingCSV = createCSV(subHeaders, subRows);
 
       // 5. IDV Contracts CSV
-      const idvHeaders = ['Contract Name', 'Agency', 'Value', 'Type', 'Set-Aside'];
+      const idvHeaders = ['Award ID', 'Prime Contractor', 'Contractor State', 'UEI', 'Contract Value', 'Agency', 'Sub-Agency', 'NAICS Code', 'NAICS Description', 'PSC Code', 'PSC Description', 'Description', 'Start Date', 'End Date', 'Place of Performance', 'USASpending URL'];
       const idvRows = (reports.idvContracts?.contracts || []).map((contract: any) => [
-        contract.name || contract.title || '',
+        contract.awardId || '',
+        contract.recipientName || '',
+        contract.recipientState || '',
+        contract.recipientUei || '',
+        contract.awardAmount ? `$${(contract.awardAmount / 1000000).toFixed(2)}M` : '',
         contract.agency || '',
-        contract.value ? `$${(contract.value / 1000000).toFixed(2)}M` : '',
-        contract.type || '',
-        contract.setAside || ''
+        contract.subAgency || '',
+        contract.naicsCode || '',
+        contract.naicsDescription || '',
+        contract.pscCode || '',
+        contract.pscDescription || '',
+        contract.description || '',
+        contract.startDate || '',
+        contract.endDate || '',
+        contract.popState || '',
+        contract.usaSpendingUrl || ''
       ]);
       idvCSV = createCSV(idvHeaders, idvRows);
 
