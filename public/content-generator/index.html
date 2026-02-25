@@ -7189,23 +7189,24 @@
             }
         }
 
-        // Get brand style for quote cards (if enabled)
+        // Get brand style for quote cards — reads live from DOM checkbox + color pickers
         function getBrandStyle() {
-            const profile = SupabaseAuth.profile;
-            if (!profile?.brand_colors?.enabled || userTier !== 'full-fix') {
-                return null;
-            }
+            if (userTier !== 'full-fix') return null;
 
-            const colors = profile.brand_colors;
-            // Create a darker version of background for gradient
-            const bgColor = colors.background || '#0d1f33';
+            // Check DOM checkbox directly (works without saving profile)
+            const enabled = document.getElementById('use-brand-colors')?.checked;
+            if (!enabled) return null;
+
+            // Read colors from DOM pickers (live values)
+            const bgColor = document.getElementById('brand-bg-color')?.value || '#0d1f33';
+            const accent = document.getElementById('brand-accent-color')?.value || '#c5a028';
             const darkerBg = darkenColor(bgColor, 20);
 
             return {
                 name: 'Your Brand',
                 bgGradient: [bgColor, darkerBg],
-                textColor: '#ffffff',
-                accentColor: colors.accent || '#c5a028',
+                textColor: getContrastColor(bgColor),
+                accentColor: accent,
                 quoteColor: getContrastColor(bgColor)
             };
         }
