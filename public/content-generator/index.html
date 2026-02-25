@@ -3176,7 +3176,7 @@
 
                     // Pick layout and theme — cycle through all 4 layouts and their themes
                     const layoutKey = layoutKeys[i % layoutKeys.length];
-                    const themes = graphicLayouts[layoutKey]?.themes || quoteCardStyles;
+                    const themes = getThemesForLayout(layoutKey);
                     const theme = themes[Math.floor(i / layoutKeys.length) % themes.length];
 
                     // Render using the unified renderGraphic router
@@ -3462,6 +3462,8 @@
             carouselSourcePost = { ...post, index };
             visualActiveTab = defaultTab || 'graphic';
             visualSelectedLayout = 'classic';
+            // Default to brand theme (index 0) if brand colors are enabled
+            const brandStyle = getBrandStyle();
             visualSelectedThemeIndex = 0;
 
             const existing = document.getElementById('visual-modal');
@@ -3624,8 +3626,17 @@
         }
 
         // Build theme picker circles for a given layout
-        function buildThemePicker(layout, selectedIdx) {
+        function getThemesForLayout(layout) {
             const themes = graphicLayouts[layout]?.themes || quoteCardStyles;
+            const brandStyle = getBrandStyle();
+            if (brandStyle && themes[0]?.name !== 'Your Brand') {
+                return [brandStyle, ...themes];
+            }
+            return themes;
+        }
+
+        function buildThemePicker(layout, selectedIdx) {
+            const themes = getThemesForLayout(layout);
             return themes.map((theme, i) => {
                 const bgColor = theme.accent || theme.bg || theme.bgGradient?.[0] || '#333';
                 const isSelected = i === selectedIdx;
@@ -3710,7 +3721,7 @@
             const index = visualSourcePost.index;
             const layout = document.getElementById('visual-layout').value;
             const themeIdx = parseInt(document.getElementById('visual-theme-index').value) || 0;
-            const themes = graphicLayouts[layout]?.themes || quoteCardStyles;
+            const themes = getThemesForLayout(layout);
             const theme = themes[themeIdx] || themes[0];
             const apiType = graphicLayouts[layout]?.apiType || 'quote';
 
@@ -3821,7 +3832,7 @@
             if (!post) return;
 
             const layout = post.graphicLayout || 'classic';
-            const themes = graphicLayouts[layout]?.themes || quoteCardStyles;
+            const themes = getThemesForLayout(layout);
             const currentIdx = post.graphicThemeIndex !== undefined ? post.graphicThemeIndex : -1;
             const nextIdx = (currentIdx + 1) % themes.length;
             const theme = themes[nextIdx];
