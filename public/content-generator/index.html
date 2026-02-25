@@ -4301,6 +4301,15 @@
                 bgText.classList.remove('text-blue-600');
                 bgText.classList.add('text-green-600');
 
+                // Warn if landscape orientation (Photo Quote uses 4:5 portrait)
+                const tempImg = new Image();
+                tempImg.onload = () => {
+                    if (tempImg.width > tempImg.height) {
+                        showWarningToast('Tip: Portrait photos (taller than wide) look best for Photo Quote. Your landscape photo will be auto-cropped to fit.');
+                    }
+                };
+                tempImg.src = backgroundPhotoUrl;
+
                 showSuccessToast('Background photo uploaded! Click Save Profile to save.');
             } catch (error) {
                 console.error('Background photo upload error:', error);
@@ -5839,6 +5848,11 @@
                     bg: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                     icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
                     shadow: 'rgba(59, 130, 246, 0.4)'
+                },
+                warning: {
+                    bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>`,
+                    shadow: 'rgba(245, 158, 11, 0.4)'
                 }
             };
 
@@ -5905,6 +5919,10 @@
 
         function showInfoToast(message) {
             createStyledToast(message, 'info');
+        }
+
+        function showWarningToast(message) {
+            createStyledToast(message, 'warning');
         }
 
         async function schedulePostQuick(dateStr) {
@@ -8359,11 +8377,13 @@
 
                     let sx = 0, sy = 0, sw = img.width, sh = img.height;
                     if (imgRatio > canvasRatio) {
+                        // Image is wider — crop sides, center horizontally
                         sw = img.height * canvasRatio;
                         sx = (img.width - sw) / 2;
                     } else {
+                        // Image is taller — crop top/bottom, center vertically
                         sh = img.width / canvasRatio;
-                        sy = 0;
+                        sy = (img.height - sh) / 2;
                     }
                     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
                 } catch (e) {
