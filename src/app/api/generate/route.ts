@@ -429,7 +429,8 @@ SOUND HUMAN — AVOID THESE AI PATTERNS:
 - NEVER use "It's worth noting", "Needless to say", "At the end of the day"
 - NEVER use filler closers like "Let that sink in", "Read that again", "Full stop", "Period"
 - AVOID buzzwords: seamless, leverage, utilize, robust, holistic, synergy, paradigm shift, game-changing, cutting-edge, groundbreaking
-- Write like a human with REAL experience — vary sentence length, use contractions naturally
+- LIMIT dashes (-- or —) to at most ONE per post. Use commas, colons, or periods instead
+- Write like a human with REAL experience, vary sentence length, use contractions naturally
 
 Output ONLY the post text, followed by hashtags on separate lines.`;
 

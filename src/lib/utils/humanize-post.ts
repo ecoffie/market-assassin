@@ -82,6 +82,12 @@ export function humanizePost(text: string): string {
     result = result.replace(pattern, replacement as string);
   }
 
+  // Convert double dashes to proper em dash or remove excessive usage
+  result = result
+    .replace(/\s*--\s*/g, ' — ')         // Double dash to em dash with spaces
+    .replace(/\s*———*\s*/g, ' — ')       // Triple+ em dashes to single
+    .replace(/(.*—.*—.*?)—/g, '$1:')     // 3+ em dashes in one line — replace extras with colon
+
   // Clean up artifacts: double spaces, orphaned punctuation, leading commas
   result = result
     .replace(/^\s*,\s*/gm, '')           // Lines starting with comma after removal
