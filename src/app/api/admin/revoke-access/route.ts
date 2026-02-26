@@ -44,11 +44,11 @@ export async function POST(request: NextRequest) {
       await kv.del(`ospro:${emailLower}`);
       await kv.lrem('ospro:all', 1, emailLower);
     } else if (product === 'content-generator') {
-      // Delete Content Generator access
+      // Delete Content Reaper access
       await kv.del(`contentgen:${emailLower}`);
       await kv.lrem('contentgen:all', 1, emailLower);
     } else if (product === 'recompete') {
-      // Delete Recompete Contracts Tracker access
+      // Delete Recompete Tracker access
       await kv.del(`recompete:${emailLower}`);
       await kv.lrem('recompete:all', 1, emailLower);
     } else if (product === 'database') {

@@ -26,7 +26,7 @@
 |---------|----------|------------|---------|
 | **Market Assassin** | This project | `tools.govcongiants.org` | Dev/staging tools |
 | **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | `shop.govcongiants.org` | Live shop (production) |
-| **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | `govcongiants.org` | Marketing funnel |
+| **GovCon Funnels** | `/Users/ericcoffie/Projects/govcon-funnels` | `funnels.govcongiants.org` | Marketing funnel |
 | **Action Planner** | `/Users/ericcoffie/Projects/govcon-planner` | GitHub: `ecoffie/action-planner` | Standalone planner (copy, not move) |
 | **LinkedIn Deal Magnet** | `/Users/ericcoffie/Projects/linkedin-deal-magnet` | Dead | Reference only (31-agency knowledge base) |
 

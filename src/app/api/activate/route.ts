@@ -96,10 +96,10 @@ export async function POST(request: NextRequest) {
     const toolNames: Record<string, string> = {
       access_hunter_pro: 'Opportunity Hunter Pro',
       access_content_standard: 'Content Reaper',
-      access_content_full_fix: 'Content Generator Full Fix',
+      access_content_full_fix: 'Content Reaper Full Fix',
       access_assassin_standard: 'Federal Market Assassin',
       access_assassin_premium: 'Market Assassin Premium',
-      access_recompete: 'Recompete Contracts Tracker',
+      access_recompete: 'Recompete Tracker',
       access_contractor_db: 'Federal Contractor Database',
     };
 

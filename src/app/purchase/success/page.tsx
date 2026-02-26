@@ -14,7 +14,7 @@ function SuccessContent() {
     if (product) {
       const productNames: Record<string, string> = {
         'contractor-database': 'Contractor Database',
-        'recompete-contracts': 'Recompete Contracts',
+        'recompete-contracts': 'Recompete Tracker',
         'prime-lookup': 'Prime Lookup',
         'ai-content-generator': 'Content Reaper',
         'govcon-starter-bundle': 'GovCon Starter Bundle',

@@ -527,7 +527,7 @@ export async function getUsageStats(email: string): Promise<{
 }
 
 // ============================================
-// GovCon Content Generator Access (Tiered)
+// Content Reaper Access (Tiered)
 // ============================================
 
 export type ContentGeneratorTier = 'content-engine' | 'full-fix';
@@ -572,7 +572,7 @@ export const CONTENT_GENERATOR_TIER_FEATURES: Record<ContentGeneratorTier, {
   },
 };
 
-// Grant GovCon Content Generator access to a customer
+// Grant Content Reaper access to a customer
 export async function grantContentGeneratorAccess(
   email: string,
   tier: ContentGeneratorTier = 'content-engine',
@@ -598,23 +598,23 @@ export async function grantContentGeneratorAccess(
     await kv.lpush('contentgen:all', email.toLowerCase());
   }
 
-  console.log(`✅ GovCon Content Generator ${tier} access granted to: ${email}`);
+  console.log(`✅ Content Reaper ${tier} access granted to: ${email}`);
   return access;
 }
 
-// Check if an email has Content Generator access
+// Check if an email has Content Reaper access
 export async function hasContentGeneratorAccess(email: string): Promise<boolean> {
   const access = await kv.get(`contentgen:${email.toLowerCase()}`);
   return !!access;
 }
 
-// Get Content Generator access details
+// Get Content Reaper access details
 export async function getContentGeneratorAccess(email: string): Promise<ContentGeneratorAccess | null> {
   const access = await kv.get<ContentGeneratorAccess>(`contentgen:${email.toLowerCase()}`);
   return access;
 }
 
-// Get all Content Generator access records (for admin)
+// Get all Content Reaper access records (for admin)
 export async function getAllContentGeneratorAccess(): Promise<ContentGeneratorAccess[]> {
   const allEmails = await kv.lrange('contentgen:all', 0, -1) as string[];
 
@@ -638,7 +638,7 @@ export async function getAllContentGeneratorAccess(): Promise<ContentGeneratorAc
   );
 }
 
-// Revoke Content Generator access
+// Revoke Content Reaper access
 export async function revokeContentGeneratorAccess(email: string): Promise<boolean> {
   const deleted = await kv.del(`contentgen:${email.toLowerCase()}`);
   if (deleted) {
@@ -648,7 +648,7 @@ export async function revokeContentGeneratorAccess(email: string): Promise<boole
 }
 
 // ============================================
-// Recompete Contracts Tracker Access
+// Recompete Tracker Access
 // ============================================
 
 export interface RecompeteAccess {
@@ -657,7 +657,7 @@ export interface RecompeteAccess {
   createdAt: string;
 }
 
-// Grant Recompete Contracts Tracker access to a customer
+// Grant Recompete Tracker access to a customer
 export async function grantRecompeteAccess(
   email: string,
   customerName?: string | null
@@ -690,7 +690,7 @@ export async function grantRecompeteAccess(
     await kv.lpush('recompete:all', email.toLowerCase());
   }
 
-  console.log(`✅ Recompete Contracts Tracker access granted to: ${email}`);
+  console.log(`✅ Recompete Tracker access granted to: ${email}`);
   return access;
 }
 

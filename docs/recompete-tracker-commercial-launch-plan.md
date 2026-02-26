@@ -1,4 +1,4 @@
-# Improving the Recompete Contracts Tracker for Commercial Launch
+# Improving the Recompete Tracker for Commercial Launch
 
 Your current dashboard looks clean and functional — great stats overview and basic filters. To make it **commercial-ready** (scalable, secure, user-friendly) and **more valuable** (higher retention, upsell opportunities, real ROI for $397 LTD users), here's a prioritized list of enhancements. I'll break it into **must-have** (launch essentials), **high-value adds** (differentiators), and **future polish** (post-launch).
 

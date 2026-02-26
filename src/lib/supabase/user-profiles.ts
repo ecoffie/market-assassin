@@ -282,7 +282,7 @@ export async function updateAccessFlags(
       updates.access_recompete = true;
       updates.access_contractor_db = true;
     }
-    // Pro Giant Bundle ($997): Contractor DB + Recompete + MA Standard + Content Generator
+    // Pro Giant Bundle ($997): Contractor DB + Recompete + MA Standard + Content Reaper
     else if (bundle === 'pro' || bundle === 'pro-giant-bundle') {
       updates.access_contractor_db = true;
       updates.access_recompete = true;

@@ -3,7 +3,7 @@ import { grantRecompeteAccess } from '@/lib/access-codes';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
-// Admin endpoint to manually grant Recompete Contracts Tracker access
+// Admin endpoint to manually grant Recompete Tracker access
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIP(request);

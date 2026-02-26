@@ -3,7 +3,7 @@ import { grantContentGeneratorAccess, ContentGeneratorTier } from '@/lib/access-
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
-// Admin endpoint to manually grant GovCon Content Generator access
+// Admin endpoint to manually grant Content Reaper access
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIP(request);
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error granting Content Generator access:', error);
+    console.error('Error granting Content Reaper access:', error);
     return NextResponse.json(
       { error: 'Failed to grant access' },
       { status: 500 }

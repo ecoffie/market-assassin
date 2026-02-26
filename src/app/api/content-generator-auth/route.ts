@@ -28,10 +28,10 @@ export async function OPTIONS() {
 }
 
 /**
- * Content Generator Auth Endpoint
+ * Content Reaper Auth Endpoint
  *
  * This endpoint:
- * 1. Verifies the email has Content Generator access
+ * 1. Verifies the email has Content Reaper access
  * 2. Creates a Supabase user if they don't exist
  * 3. Generates a magic link for passwordless login
  */
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Step 1: Verify email has Content Generator access
+    // Step 1: Verify email has Content Reaper access
     const hasAccess = await hasContentGeneratorAccess(normalizedEmail);
 
     if (!hasAccess) {

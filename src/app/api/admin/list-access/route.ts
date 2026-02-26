@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get Content Generator records
+    // Get Content Reaper records
     const contentGenerator = await getAllContentGeneratorAccess();
 
     // Get Recompete records

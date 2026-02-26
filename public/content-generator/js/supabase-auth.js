@@ -1,5 +1,5 @@
 // Supabase Auth Configuration
-// Shared across all pages - GovCon Content Generator project
+// Shared across all pages - Content Reaper project
 // Version: 2.4 - Using correct Supabase project
 console.log('[Auth] Supabase Auth v2.4 loaded');
 

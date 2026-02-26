@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Content Generator Standard
+      // Content Reaper Standard
       if (profile.access_content_standard && !profile.access_content_full_fix) {
         products.push({
           name: 'Content Reaper',
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Content Generator Full Fix
+      // Content Reaper Full Fix
       if (profile.access_content_full_fix) {
         products.push({
           name: 'Content Reaper - Full Fix',
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       // Recompete
       if (profile.access_recompete) {
         products.push({
-          name: 'Recompete Contracts Tracker',
+          name: 'Recompete Tracker',
           accessUrl: '/recompete',
           cookieName: 'access_recompete',
           cookieValue: 'true',
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
           'content_full_fix': { name: 'Content Reaper - Full Fix', cookie: 'access_content_full_fix', url: '/content-generator-product' },
           'assassin_standard': { name: 'Federal Market Assassin', cookie: 'access_assassin_standard', url: '/federal-market-assassin' },
           'assassin_premium': { name: 'Federal Market Assassin - Premium', cookie: 'access_assassin_premium', url: '/federal-market-assassin' },
-          'recompete': { name: 'Recompete Contracts Tracker', cookie: 'access_recompete', url: '/recompete' },
+          'recompete': { name: 'Recompete Tracker', cookie: 'access_recompete', url: '/recompete' },
           'contractor_db': { name: 'Federal Contractor Database', cookie: 'access_contractor_db', url: '/contractor-database' },
         };
 
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Content Generator
+      // Content Reaper
       const cgAccess = await getContentGeneratorAccess(normalizedEmail);
       if (cgAccess) {
         const isFullFix = cgAccess.tier === 'full-fix';
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
       const hasRecompete = await hasRecompeteAccess(normalizedEmail);
       if (hasRecompete) {
         products.push({
-          name: 'Recompete Contracts Tracker',
+          name: 'Recompete Tracker',
           accessUrl: '/recompete',
           cookieName: 'access_recompete',
           cookieValue: 'true',

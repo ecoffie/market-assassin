@@ -3,16 +3,16 @@ import ProductPageAppSumo from '@/components/ProductPageAppSumo';
 export default function ExpiringContractsPage() {
   return (
     <ProductPageAppSumo
-      title="Expiring Contracts Forecast"
+      title="Recompete Tracker"
       tagline="Track $77.1T+ in expiring federal contracts and get ahead of recompete opportunities"
-      description="When contracts expire, they get recompeted—and thats your window of opportunity. The Expiring Contracts Forecast shows you exactly which contracts are ending, when primes are building their teams, and where to focus your BD efforts. Stop chasing dead ends and start targeting real opportunities."
+      description="When contracts expire, they get recompeted—and thats your window of opportunity. The Recompete Tracker shows you exactly which contracts are ending, when primes are building their teams, and where to focus your BD efforts. Stop chasing dead ends and start targeting real opportunities."
       primaryColor="#0891b2"
       gradientFrom="#0891b2"
       gradientTo="#06b6d4"
       price="$397"
       originalPrice="$997/month"
       checkoutUrl="https://buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k"
-      videoTitle="Expiring Contracts Forecast Demo"
+      videoTitle="Recompete Tracker Demo"
       videoSubtitle="See how to find recompete opportunities 3-6 months early"
       screenshots={[
         '/images/products/expiring-contracts/home page expiring contracts.png',

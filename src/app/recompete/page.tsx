@@ -118,7 +118,7 @@ export default function RecompeteLockedPage() {
         <iframe
           src={iframeSrc}
           className="w-full h-full border-0"
-          title="Recompete Contracts Tracker"
+          title="Recompete Tracker"
         />
       </div>
     );
@@ -129,7 +129,7 @@ export default function RecompeteLockedPage() {
       <div className="bg-white rounded-2xl p-10 max-w-lg text-center shadow-2xl">
         <div className="text-6xl mb-5">📋</div>
         <h1 className="text-amber-800 mb-3 text-3xl font-bold">
-          Recompete Contracts Tracker
+          Recompete Tracker
         </h1>
         <p className="text-gray-600 mb-8 text-base leading-relaxed">
           Track expiring federal contracts and identify recompete opportunities before they hit the market.

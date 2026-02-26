@@ -13,7 +13,7 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-// Public endpoint to verify Content Generator access by email
+// Public endpoint to verify Content Reaper access by email
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('Error verifying Content Generator access:', error);
+    console.error('Error verifying Content Reaper access:', error);
     return NextResponse.json(
       { error: 'Failed to verify access' },
       { status: 500, headers: corsHeaders }

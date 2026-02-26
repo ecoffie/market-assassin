@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Handle Content Generator - Content Engine ($197)
+    // Handle Content Reaper - Content Engine ($197)
     if (product === 'content-engine') {
       const existingAccess = await getContentGeneratorAccess(email);
 
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Handle Content Generator - Full Fix ($297)
+    // Handle Content Reaper - Full Fix ($297)
     if (product === 'full-fix') {
       const existingAccess = await getContentGeneratorAccess(email);
 
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Handle Content Generator - Full Fix Upgrade (from Content Engine to Full Fix)
+    // Handle Content Reaper - Full Fix Upgrade (from Content Engine to Full Fix)
     if (product === 'content-full-fix-upgrade') {
       const existingAccess = await getContentGeneratorAccess(email);
 

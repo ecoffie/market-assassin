@@ -11,9 +11,9 @@ interface AccessGateProps {
   accessType: ProductAccessType;
 
   /**
-   * Optional: require a specific tier (for MA or Content Generator)
+   * Optional: require a specific tier (for MA or Content Reaper)
    * - 'premium' for Market Assassin Premium
-   * - 'full_fix' for Content Generator Full Fix
+   * - 'full_fix' for Content Reaper Full Fix
    */
   requiredTier?: 'standard' | 'premium' | 'full_fix';
 
@@ -87,7 +87,7 @@ export function AccessGate({
           accessGranted = false;
         }
       }
-      // Check tier for Content Generator
+      // Check tier for Content Reaper
       else if (accessType === 'access_content_standard' || accessType === 'access_content_full_fix') {
         const cgAccess = checkContentGeneratorAccess();
         accessGranted = cgAccess.hasAccess;

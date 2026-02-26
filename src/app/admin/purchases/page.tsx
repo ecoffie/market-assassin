@@ -355,7 +355,7 @@ export default function AdminPurchasesPage() {
                     } else if (profile.access_assassin_standard) {
                       accessFlags.push('MA Standard');
                     }
-                    // Content Generator
+                    // Content Reaper
                     if (profile.access_content_full_fix) {
                       accessFlags.push('CG Full Fix');
                     } else if (profile.access_content_standard) {

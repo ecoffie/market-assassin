@@ -46,7 +46,7 @@ export default function UltimateBundlePage() {
           ],
         },
         {
-          name: 'Recompete Contracts Tracker',
+          name: 'Recompete Tracker',
           description: 'Track expiring federal contracts before they hit the market. Get ahead of the competition by knowing exactly when contracts are up for recompete.',
           price: 397,
           icon: '📅',

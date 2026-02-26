@@ -121,14 +121,14 @@ export default function Home() {
               </span>
             </Link>
 
-            {/* Recompete Contracts Tracker */}
+            {/* Recompete Tracker */}
             <Link
               href="/recompete"
               className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-amber-500 hover:shadow-xl"
             >
               <div className="text-4xl mb-4">📋</div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Recompete Contracts Tracker
+                Recompete Tracker
               </h3>
               <p className="text-slate-400 text-sm mb-5 leading-relaxed">
                 Track expiring federal contracts and identify recompete opportunities. Filter by agency, NAICS, prime contractor, and contract value to find your next win.

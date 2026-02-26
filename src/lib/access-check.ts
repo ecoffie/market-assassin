@@ -6,8 +6,8 @@
  *
  * Cookie Names (matching your database columns):
  * - access_hunter_pro: "true" if user has Opportunity Hunter Pro
- * - access_content_standard: "true" if user has Content Generator standard
- * - access_content_full_fix: "true" if user has Content Generator Full Fix
+ * - access_content_standard: "true" if user has Content Reaper standard
+ * - access_content_full_fix: "true" if user has Content Reaper Full Fix
  * - access_assassin_standard: "true" if user has Market Assassin standard
  * - access_assassin_premium: "true" if user has Market Assassin premium
  * - access_recompete: "true" if user has Recompete access
@@ -103,7 +103,7 @@ export function checkMarketAssassinAccess(): {
 }
 
 /**
- * Client-side: Check Content Generator access with tier
+ * Client-side: Check Content Reaper access with tier
  */
 export function checkContentGeneratorAccess(): {
   hasAccess: boolean;
@@ -154,7 +154,7 @@ export const Access = {
   // Opportunity Hunter Pro
   hunterPro: () => hasAccessCookie('access_hunter_pro'),
 
-  // Content Generator
+  // Content Reaper
   contentStandard: () => hasAccessCookie('access_content_standard'),
   contentFullFix: () => hasAccessCookie('access_content_full_fix'),
   contentGenerator: () => hasAccessCookie('access_content_standard') || hasAccessCookie('access_content_full_fix'),

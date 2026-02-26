@@ -13,10 +13,10 @@ All products now have working Stripe checkout URLs:
 |---------|-------|--------|
 | Market Assassin Standard | $297 | ✅ Connected |
 | Market Assassin Premium | $497 | ✅ Connected |
-| Content Generator (Content Engine) | $197 | ✅ Connected |
-| Content Generator (Full Fix) | $397 | ✅ Connected |
+| Content Reaper (Content Engine) | $197 | ✅ Connected |
+| Content Reaper (Full Fix) | $397 | ✅ Connected |
 | Federal Contractor Database | $497 | ✅ Connected |
-| Recompete Contracts Tracker | $397 | ✅ Connected |
+| Recompete Tracker | $397 | ✅ Connected |
 | Opportunity Hunter Pro | $49 | ✅ Connected |
 | GovCon Starter Bundle | $697 | ✅ Connected |
 | Pro Giant Bundle | $997 | ✅ Connected |
@@ -95,8 +95,8 @@ All products now have working Stripe checkout URLs:
 |---------|--------------|----------------|
 | Market Assassin Standard | `tier` | `assassin_standard` |
 | Market Assassin Premium | `tier` | `assassin_premium` |
-| Content Generator | `tier` | `content_standard` |
-| Content Generator Full Fix | `tier` | `content_full_fix` |
+| Content Reaper | `tier` | `content_standard` |
+| Content Reaper Full Fix | `tier` | `content_full_fix` |
 | Contractor Database | `tier` | `contractor_db` |
 | Recompete Contracts | `tier` | `recompete` |
 | Opportunity Hunter Pro | `tier` | `hunter_pro` |
@@ -105,7 +105,7 @@ All products now have working Stripe checkout URLs:
 | Upgrade Product | Price | Metadata Key | Metadata Value |
 |-----------------|-------|--------------|----------------|
 | Market Assassin Premium Upgrade | $200 | `tier` | `assassin_premium_upgrade` |
-| Content Generator Full Fix Upgrade | $200 | `tier` | `content_full_fix_upgrade` |
+| Content Reaper Full Fix Upgrade | $200 | `tier` | `content_full_fix_upgrade` |
 
 **Note:** Upgrades grant the higher tier access. Users must already own the standard version.
 
@@ -123,8 +123,8 @@ All products now have working Stripe checkout URLs:
 | Flag | Products That Grant It |
 |------|------------------------|
 | `access_hunter_pro` | Opportunity Hunter Pro, Starter Bundle, Ultimate Bundle |
-| `access_content_standard` | Content Generator, Pro Bundle, Ultimate Bundle |
-| `access_content_full_fix` | Content Generator Full Fix, Ultimate Bundle |
+| `access_content_standard` | Content Reaper, Pro Bundle, Ultimate Bundle |
+| `access_content_full_fix` | Content Reaper Full Fix, Ultimate Bundle |
 | `access_assassin_standard` | Market Assassin Standard, Pro Bundle, Ultimate Bundle |
 | `access_assassin_premium` | Market Assassin Premium, Ultimate Bundle |
 | `access_recompete` | Recompete Contracts, Starter Bundle, Pro Bundle, Ultimate Bundle |
@@ -136,21 +136,21 @@ All products now have working Stripe checkout URLs:
 
 ### GovCon Starter Bundle ($697)
 - Opportunity Hunter Pro ($49)
-- Recompete Contracts Tracker ($397)
+- Recompete Tracker ($397)
 - Federal Contractor Database ($497)
 - **Individual Total: $943 | Save $246**
 
 ### Pro Giant Bundle ($997)
 - Federal Contractor Database ($497)
-- Recompete Contracts Tracker ($397)
+- Recompete Tracker ($397)
 - Market Assassin Standard ($297)
-- AI Content Generator ($197)
+- Content Reaper ($197)
 - **Individual Total: $1,388 | Save $391**
 
 ### Ultimate GovCon Bundle ($1,497)
-- AI Content Generator Full Fix ($397)
+- Content Reaper Full Fix ($397)
 - Federal Contractor Database ($497)
-- Recompete Contracts Tracker ($397)
+- Recompete Tracker ($397)
 - Market Assassin Premium ($497)
 - Opportunity Hunter Pro ($49)
 - **Individual Total: $1,837 | Save $340**
@@ -166,7 +166,7 @@ For users upgrading from Standard to Premium:
    ↓
 2. Redirects to Stripe Checkout (upgrade payment link)
    - Market Assassin Premium Upgrade: $200
-   - Content Generator Full Fix Upgrade: $200
+   - Content Reaper Full Fix Upgrade: $200
    ↓
 3. Stripe webhook receives checkout.session.completed
    - tier: assassin_premium_upgrade OR content_full_fix_upgrade
@@ -181,7 +181,7 @@ For users upgrading from Standard to Premium:
 
 **Stripe Success URL for Upgrades:**
 - Market Assassin: `https://shop.govcongiants.org/purchase/success?product=market-assassin-premium-upgrade`
-- Content Generator: `https://shop.govcongiants.org/purchase/success?product=content-full-fix-upgrade`
+- Content Reaper: `https://shop.govcongiants.org/purchase/success?product=content-full-fix-upgrade`
 
 ---
 

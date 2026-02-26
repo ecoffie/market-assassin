@@ -17,7 +17,7 @@ export const PRODUCTS = {
   },
   CONTENT_GENERATOR_FULL_FIX_UPGRADE: {
     id: 'content-full-fix-upgrade',
-    name: 'Content Generator Full Fix Upgrade',
+    name: 'Content Reaper Full Fix Upgrade',
     price: 200,
     stripeUrl: 'https://buy.stripe.com/9B6cN62sm2IO7lb4SIfnO0o',
     upgradeFrom: 'content-engine',
@@ -31,7 +31,7 @@ export const PRODUCTS = {
   },
   RECOMPETE_CONTRACTS: {
     id: 'recompete-contracts',
-    name: 'Recompete Contracts Tracker',
+    name: 'Recompete Tracker',
     price: 397,
     stripeUrl: 'https://buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k',
   },
@@ -73,7 +73,7 @@ export const PRODUCTS = {
     includes: ['opportunity-hunter-pro', 'recompete-contracts', 'contractor-database'],
     includesDisplay: [
       { name: 'Opportunity Hunter Pro', price: 49 },
-      { name: 'Recompete Contracts Tracker', price: 397 },
+      { name: 'Recompete Tracker', price: 397 },
       { name: 'Federal Contractor Database', price: 497 },
     ],
   },
@@ -85,7 +85,7 @@ export const PRODUCTS = {
     includes: ['contractor-database', 'recompete-contracts', 'market-assassin-standard', 'ai-content-generator'],
     includesDisplay: [
       { name: 'Federal Contractor Database', price: 497 },
-      { name: 'Recompete Contracts Tracker', price: 397 },
+      { name: 'Recompete Tracker', price: 397 },
       { name: 'Market Assassin Standard', price: 297 },
       { name: 'Content Reaper', price: 197 },
     ],
@@ -99,7 +99,7 @@ export const PRODUCTS = {
     includesDisplay: [
       { name: 'Content Reaper (Full Fix)', price: 397 },
       { name: 'Federal Contractor Database', price: 497 },
-      { name: 'Recompete Contracts Tracker', price: 397 },
+      { name: 'Recompete Tracker', price: 397 },
       { name: 'Market Assassin Premium', price: 497 },
     ],
   },

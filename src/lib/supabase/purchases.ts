@@ -271,7 +271,7 @@ export async function getUserProducts(email: string): Promise<{
     'content-generator': { name: 'Content Reaper', url: '/content-generator' },
     'contractor-database': { name: 'Federal Contractor Database', url: '/contractor-database' },
     'opportunity-hunter-pro': { name: 'Opportunity Hunter Pro', url: '/opportunity-hunter' },
-    'recompete': { name: 'Recompete Contracts Tracker', url: '/recompete' },
+    'recompete': { name: 'Recompete Tracker', url: '/recompete' },
     'bundle-starter': { name: 'GovCon Starter Bundle', url: '/dashboard' },
     'bundle-ultimate': { name: 'GovCon Ultimate Bundle', url: '/dashboard' },
     'bundle-complete': { name: 'GovCon Complete Bundle', url: '/dashboard' },
