@@ -325,15 +325,18 @@
             max-width: 250px;
         }
 
-        .prime-name.clickable {
+        tbody tr {
             cursor: pointer;
-            color: #2563eb;
-            transition: color 0.2s;
+            transition: background 0.15s;
         }
 
-        .prime-name.clickable:hover {
-            color: #dc2626;
-            text-decoration: underline;
+        tbody tr:hover {
+            background: #eff6ff !important;
+        }
+
+        .prime-name {
+            color: #2563eb;
+            font-weight: 600;
         }
 
         /* Modal */
@@ -1714,8 +1717,8 @@
                 const globalIdx = (currentPage - 1) * effectivePerPage + idx;
 
                 return `
-                    <tr>
-                        <td class="prime-name clickable" onclick="showContractDetails(${globalIdx})">${contract.Recipient || 'Unknown'}</td>
+                    <tr onclick="showContractDetails(${globalIdx})">
+                        <td class="prime-name">${contract.Recipient || 'Unknown'}</td>
                         <td class="agency-name">${contract.Agency || 'N/A'}${getBudgetBadge(contract.Agency)}${contract.State ? `<span class="state-badge">${contract.State}</span>` : ''}<br><small style="color:#94a3b8">${contract.Office || ''}</small></td>
                         <td class="contract-value ${valueClass}">${formatValueDisplay(contract['Total Value'])}</td>
                         <td><span class="naics-badge">${naicsCode}</span></td>
