@@ -629,6 +629,167 @@
             letter-spacing: 0.5px;
         }
 
+        /* Location Filter */
+        .location-filter {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+        .location-filter-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .location-filter-header label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #475569;
+        }
+        .location-selected-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            flex: 1;
+            margin-left: 8px;
+        }
+        .location-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .location-tag .remove-tag {
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1;
+            opacity: 0.6;
+        }
+        .location-tag .remove-tag:hover { opacity: 1; }
+        .region-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .region-btn {
+            padding: 5px 12px;
+            border-radius: 16px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .region-btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+        .region-btn.active {
+            background: #1e40af;
+            color: white;
+            border-color: #1e40af;
+        }
+        .nearme-btn {
+            padding: 5px 12px;
+            border-radius: 16px;
+            border: 1px solid #059669;
+            background: #ecfdf5;
+            color: #059669;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .nearme-btn:hover {
+            background: #059669;
+            color: white;
+        }
+        .nearme-btn.active {
+            background: #059669;
+            color: white;
+        }
+        .nearme-btn.loading {
+            opacity: 0.6;
+            cursor: wait;
+        }
+        .state-checkboxes-dropdown {
+            position: relative;
+        }
+        .state-dropdown-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #475569;
+            user-select: none;
+        }
+        .state-dropdown-trigger:hover {
+            border-color: #94a3b8;
+        }
+        .state-dropdown-panel {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 280px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            z-index: 100;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        }
+        .state-dropdown-panel.open {
+            display: block;
+        }
+        .state-dropdown-panel label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #334155;
+            cursor: pointer;
+            font-weight: 400;
+        }
+        .state-dropdown-panel label:hover {
+            background: #f1f5f9;
+        }
+        .state-dropdown-panel input[type="checkbox"] {
+            accent-color: #1e40af;
+            width: 14px;
+            height: 14px;
+        }
+        .include-no-location {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #64748b;
+        }
+        .include-no-location input {
+            accent-color: #1e40af;
+        }
+
         /* Responsive — Tablets */
         @media (max-width: 1024px) {
             .stats-grid {
@@ -946,12 +1107,35 @@
                     <label>Contracting Office</label>
                     <input type="text" id="searchOffice" placeholder="Search office name...">
                 </div>
-                <div class="input-group">
-                    <label>State</label>
-                    <select id="searchState">
-                        <option value="">All States</option>
-                    </select>
+            </div>
+
+            <!-- Location Filter -->
+            <div class="location-filter">
+                <div class="location-filter-header">
+                    <label>Location</label>
+                    <div class="location-selected-tags" id="selectedStateTags"></div>
                 </div>
+                <div class="region-buttons">
+                    <button class="nearme-btn" id="nearMeBtn" onclick="handleNearMe()">📍 Near Me</button>
+                    <button class="region-btn" onclick="toggleRegion('dc_metro', this)">DC Metro</button>
+                    <button class="region-btn" onclick="toggleRegion('northeast', this)">Northeast</button>
+                    <button class="region-btn" onclick="toggleRegion('southeast', this)">Southeast</button>
+                    <button class="region-btn" onclick="toggleRegion('mid_atlantic', this)">Mid-Atlantic</button>
+                    <button class="region-btn" onclick="toggleRegion('midwest', this)">Midwest</button>
+                    <button class="region-btn" onclick="toggleRegion('southwest', this)">Southwest</button>
+                    <button class="region-btn" onclick="toggleRegion('west_coast', this)">West Coast</button>
+                </div>
+                <div class="state-checkboxes-dropdown">
+                    <div class="state-dropdown-trigger" id="stateDropdownTrigger" onclick="toggleStateDropdown()">
+                        <span>Select states...</span>
+                        <span>▾</span>
+                    </div>
+                    <div class="state-dropdown-panel" id="stateDropdownPanel"></div>
+                </div>
+                <label class="include-no-location">
+                    <input type="checkbox" id="includeNoLocation" checked onchange="performSearch()">
+                    Include contracts without location data
+                </label>
             </div>
 
             <div class="button-row">
@@ -1088,32 +1272,8 @@
                 agencySelect.appendChild(option);
             });
 
-            // Populate state dropdown (only if State field exists in data)
-            const states = [...new Set(allContracts.map(c => c.State).filter(s => s && s.trim()))].sort();
-            if (states.length > 0) {
-                const stateSelect = document.getElementById('searchState');
-                const STATE_NAMES = {
-                    AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',
-                    CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',
-                    FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',
-                    IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',
-                    ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',
-                    MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',
-                    NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',
-                    NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',
-                    PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',
-                    TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',
-                    WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
-                    PR:'Puerto Rico',GU:'Guam',VI:'Virgin Islands',AS:'American Samoa',
-                    MP:'Northern Mariana Islands'
-                };
-                states.forEach(st => {
-                    const option = document.createElement('option');
-                    option.value = st;
-                    option.textContent = STATE_NAMES[st] ? `${STATE_NAMES[st]} (${st})` : st;
-                    stateSelect.appendChild(option);
-                });
-            }
+            // Populate state checkbox dropdown
+            populateStateCheckboxes();
 
             updateStats();
             filteredResults = [...allContracts];
@@ -1207,6 +1367,235 @@
             });
         }
 
+        // ===== Location Filter Logic =====
+        const STATE_NAMES = {
+            AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',
+            CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',
+            FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',
+            IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',
+            ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',
+            MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',
+            NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',
+            NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',
+            PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',
+            TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',
+            WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
+            PR:'Puerto Rico',GU:'Guam',VI:'Virgin Islands',AS:'American Samoa',
+            MP:'Northern Mariana Islands'
+        };
+
+        const REGIONS = {
+            dc_metro: ['DC', 'MD', 'VA'],
+            northeast: ['CT', 'ME', 'MA', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT'],
+            southeast: ['AL', 'FL', 'GA', 'KY', 'MS', 'NC', 'SC', 'TN'],
+            mid_atlantic: ['DC', 'DE', 'MD', 'NJ', 'NY', 'PA', 'VA', 'WV'],
+            midwest: ['IA', 'IL', 'IN', 'KS', 'MI', 'MN', 'MO', 'NE', 'ND', 'OH', 'SD', 'WI'],
+            southwest: ['AZ', 'NM', 'OK', 'TX'],
+            west_coast: ['CA', 'OR', 'WA']
+        };
+
+        const NEIGHBOR_STATES = {
+            AL:['FL','GA','MS','TN'], AK:[], AZ:['CA','NM','NV','UT'],
+            AR:['LA','MO','MS','OK','TN','TX'], CA:['AZ','NV','OR'],
+            CO:['KS','NE','NM','OK','UT','WY'], CT:['MA','NY','RI'],
+            DE:['MD','NJ','PA'], DC:['MD','VA'],
+            FL:['AL','GA'], GA:['AL','FL','NC','SC','TN'],
+            HI:[], ID:['MT','NV','OR','UT','WA','WY'],
+            IL:['IA','IN','KY','MO','WI'], IN:['IL','KY','MI','OH'],
+            IA:['IL','MN','MO','NE','SD','WI'], KS:['CO','MO','NE','OK'],
+            KY:['IL','IN','MO','OH','TN','VA','WV'], LA:['AR','MS','TX'],
+            ME:['NH'], MD:['DC','DE','PA','VA','WV'],
+            MA:['CT','NH','NY','RI','VT'], MI:['IN','OH','WI'],
+            MN:['IA','ND','SD','WI'], MS:['AL','AR','LA','TN'],
+            MO:['AR','IA','IL','KS','KY','NE','OK','TN'],
+            MT:['ID','ND','SD','WY'], NE:['CO','IA','KS','MO','SD','WY'],
+            NV:['AZ','CA','ID','OR','UT'], NH:['MA','ME','VT'],
+            NJ:['DE','NY','PA'], NM:['AZ','CO','OK','TX','UT'],
+            NY:['CT','MA','NJ','PA','VT'], NC:['GA','SC','TN','VA'],
+            ND:['MN','MT','SD'], OH:['IN','KY','MI','PA','WV'],
+            OK:['AR','CO','KS','MO','NM','TX'], OR:['CA','ID','NV','WA'],
+            PA:['DE','MD','NJ','NY','OH','WV'], RI:['CT','MA'],
+            SC:['GA','NC'], SD:['IA','MN','MT','ND','NE','WY'],
+            TN:['AL','AR','GA','KY','MO','MS','NC','VA'],
+            TX:['AR','LA','NM','OK'], UT:['AZ','CO','ID','NM','NV','WY'],
+            VT:['MA','NH','NY'], VA:['DC','KY','MD','NC','TN','WV'],
+            WA:['ID','OR'], WV:['KY','MD','OH','PA','VA'],
+            WI:['IA','IL','MI','MN'], WY:['CO','ID','MT','NE','SD','UT']
+        };
+
+        // State bounding boxes for reverse geocoding [minLat, maxLat, minLng, maxLng]
+        const STATE_BOUNDS = {
+            AL:[30.2,35.0,-88.5,-84.9], AK:[51.2,71.4,-179.1,-129.9],
+            AZ:[31.3,37.0,-114.8,-109.0], AR:[33.0,36.5,-94.6,-89.6],
+            CA:[32.5,42.0,-124.4,-114.1], CO:[37.0,41.0,-109.1,-102.0],
+            CT:[41.0,42.1,-73.7,-71.8], DE:[38.5,39.8,-75.8,-75.0],
+            DC:[38.8,39.0,-77.1,-76.9], FL:[24.5,31.0,-87.6,-80.0],
+            GA:[30.4,35.0,-85.6,-80.8], HI:[18.9,22.2,-160.2,-154.8],
+            ID:[42.0,49.0,-117.2,-111.0], IL:[37.0,42.5,-91.5,-87.0],
+            IN:[37.8,41.8,-88.1,-84.8], IA:[40.4,43.5,-96.6,-90.1],
+            KS:[37.0,40.0,-102.1,-94.6], KY:[36.5,39.1,-89.6,-81.9],
+            LA:[29.0,33.0,-94.0,-89.0], ME:[43.1,47.5,-71.1,-67.0],
+            MD:[37.9,39.7,-79.5,-75.0], MA:[41.2,42.9,-73.5,-69.9],
+            MI:[41.7,48.3,-90.4,-82.4], MN:[43.5,49.4,-97.2,-89.5],
+            MS:[30.2,35.0,-91.7,-88.1], MO:[36.0,40.6,-95.8,-89.1],
+            MT:[44.4,49.0,-116.0,-104.0], NE:[40.0,43.0,-104.1,-95.3],
+            NV:[35.0,42.0,-120.0,-114.0], NH:[42.7,45.3,-72.6,-70.7],
+            NJ:[38.9,41.4,-75.6,-73.9], NM:[31.3,37.0,-109.1,-103.0],
+            NY:[40.5,45.0,-79.8,-71.9], NC:[33.8,36.6,-84.3,-75.5],
+            ND:[45.9,49.0,-104.0,-96.6], OH:[38.4,42.0,-84.8,-80.5],
+            OK:[33.6,37.0,-103.0,-94.4], OR:[42.0,46.3,-124.6,-116.5],
+            PA:[39.7,42.3,-80.5,-74.7], RI:[41.1,42.0,-71.9,-71.1],
+            SC:[32.0,35.2,-83.4,-78.5], SD:[42.5,46.0,-104.1,-96.4],
+            TN:[35.0,36.7,-90.3,-81.6], TX:[25.8,36.5,-106.6,-93.5],
+            UT:[37.0,42.0,-114.1,-109.0], VT:[42.7,45.0,-73.4,-71.5],
+            VA:[36.5,39.5,-83.7,-75.2], WA:[45.5,49.0,-124.8,-116.9],
+            WV:[37.2,40.6,-82.6,-77.7], WI:[42.5,47.1,-92.9,-86.8],
+            WY:[41.0,45.0,-111.1,-104.1]
+        };
+
+        function populateStateCheckboxes() {
+            const panel = document.getElementById('stateDropdownPanel');
+            const dataStates = [...new Set(allContracts.map(c => c.State).filter(s => s && s.trim()))].sort();
+            // Show all 50 states + DC, mark which have data
+            const allStates = Object.keys(STATE_NAMES).sort();
+            panel.innerHTML = '';
+            allStates.forEach(st => {
+                const hasData = dataStates.includes(st);
+                const count = hasData ? allContracts.filter(c => c.State === st).length : 0;
+                const lbl = document.createElement('label');
+                lbl.innerHTML = `<input type="checkbox" value="${st}" onchange="onStateCheckChange()"> ${STATE_NAMES[st]} (${st})${count ? ` — ${count}` : ''}`;
+                if (!hasData) lbl.style.opacity = '0.5';
+                panel.appendChild(lbl);
+            });
+        }
+
+        function toggleStateDropdown() {
+            document.getElementById('stateDropdownPanel').classList.toggle('open');
+        }
+
+        function getSelectedStates() {
+            return [...document.querySelectorAll('#stateDropdownPanel input[type="checkbox"]:checked')].map(cb => cb.value);
+        }
+
+        function setSelectedStates(states) {
+            document.querySelectorAll('#stateDropdownPanel input[type="checkbox"]').forEach(cb => {
+                cb.checked = states.includes(cb.value);
+            });
+            updateSelectedStateTags();
+            performSearch();
+        }
+
+        function onStateCheckChange() {
+            updateSelectedStateTags();
+            updateRegionButtonStates();
+            performSearch();
+        }
+
+        function updateSelectedStateTags() {
+            const container = document.getElementById('selectedStateTags');
+            const selected = getSelectedStates();
+            if (selected.length === 0) {
+                container.innerHTML = '<span style="color:#94a3b8;font-size:12px;">All locations</span>';
+                document.getElementById('stateDropdownTrigger').querySelector('span').textContent = 'Select states...';
+                return;
+            }
+            container.innerHTML = selected.map(st =>
+                `<span class="location-tag">${st} <span class="remove-tag" onclick="removeState('${st}')">&times;</span></span>`
+            ).join('');
+            document.getElementById('stateDropdownTrigger').querySelector('span').textContent = `${selected.length} state${selected.length > 1 ? 's' : ''} selected`;
+        }
+
+        function removeState(st) {
+            const cb = document.querySelector(`#stateDropdownPanel input[value="${st}"]`);
+            if (cb) cb.checked = false;
+            onStateCheckChange();
+        }
+
+        function toggleRegion(regionKey, btn) {
+            const regionStates = REGIONS[regionKey];
+            const currentSelected = getSelectedStates();
+            const allInRegionSelected = regionStates.every(s => currentSelected.includes(s));
+
+            if (allInRegionSelected) {
+                // Deselect this region's states
+                regionStates.forEach(s => {
+                    const cb = document.querySelector(`#stateDropdownPanel input[value="${s}"]`);
+                    if (cb) cb.checked = false;
+                });
+                btn.classList.remove('active');
+            } else {
+                // Select this region's states (additive)
+                regionStates.forEach(s => {
+                    const cb = document.querySelector(`#stateDropdownPanel input[value="${s}"]`);
+                    if (cb) cb.checked = true;
+                });
+                btn.classList.add('active');
+            }
+            updateSelectedStateTags();
+            updateRegionButtonStates();
+            performSearch();
+        }
+
+        function updateRegionButtonStates() {
+            const selected = getSelectedStates();
+            document.querySelectorAll('.region-btn').forEach(btn => {
+                const regionName = btn.textContent.trim().toLowerCase().replace(/[ -]/g, '_');
+                const regionKey = Object.keys(REGIONS).find(k => k === regionName);
+                if (regionKey) {
+                    const allIn = REGIONS[regionKey].every(s => selected.includes(s));
+                    btn.classList.toggle('active', allIn);
+                }
+            });
+        }
+
+        function handleNearMe() {
+            const btn = document.getElementById('nearMeBtn');
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser. Select states manually.');
+                return;
+            }
+            btn.classList.add('loading');
+            btn.textContent = '📍 Locating...';
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const userState = resolveStateFromCoords(latitude, longitude);
+                    btn.classList.remove('loading');
+                    btn.textContent = '📍 Near Me';
+                    if (userState) {
+                        const neighbors = NEIGHBOR_STATES[userState] || [];
+                        const nearStates = [userState, ...neighbors];
+                        setSelectedStates(nearStates);
+                        btn.classList.add('active');
+                    } else {
+                        alert('Could not determine your state. Select states manually.');
+                    }
+                },
+                (error) => {
+                    btn.classList.remove('loading');
+                    btn.textContent = '📍 Near Me';
+                    alert('Location access denied. Select states manually.');
+                },
+                { timeout: 8000 }
+            );
+        }
+
+        function resolveStateFromCoords(lat, lng) {
+            let bestMatch = null;
+            let bestArea = Infinity;
+            for (const [st, bounds] of Object.entries(STATE_BOUNDS)) {
+                const [minLat, maxLat, minLng, maxLng] = bounds;
+                if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+                    const area = (maxLat - minLat) * (maxLng - minLng);
+                    if (area < bestArea) {
+                        bestArea = area;
+                        bestMatch = st;
+                    }
+                }
+            }
+            return bestMatch;
+        }
+
         function parseExpirationDate(dateStr) {
             if (!dateStr) return null;
             const d = new Date(dateStr);
@@ -1221,7 +1610,8 @@
             const awardSearch = document.getElementById('searchAward').value.toLowerCase();
             const expirationSearch = document.getElementById('searchExpiration').value;
             const officeSearch = document.getElementById('searchOffice').value.toLowerCase();
-            const stateSearch = document.getElementById('searchState').value;
+            const selectedStates = getSelectedStates();
+            const includeNoLocation = document.getElementById('includeNoLocation').checked;
 
             const now = new Date();
 
@@ -1229,9 +1619,18 @@
                 if (primeSearch && !contract.Recipient?.toLowerCase().includes(primeSearch)) return false;
                 if (naicsSearch && !contract.NAICS?.includes(naicsSearch)) return false;
                 if (agencySearch && contract.Agency !== agencySearch) return false;
-                if (stateSearch && contract.State !== stateSearch) return false;
                 if (awardSearch && !contract['Award ID']?.toLowerCase().includes(awardSearch)) return false;
                 if (officeSearch && !contract.Office?.toLowerCase().includes(officeSearch)) return false;
+
+                // Multi-state filter
+                if (selectedStates.length > 0) {
+                    const contractState = contract.State?.trim();
+                    if (!contractState) {
+                        if (!includeNoLocation) return false;
+                    } else {
+                        if (!selectedStates.includes(contractState)) return false;
+                    }
+                }
 
                 if (valueSearch) {
                     const value = parseValue(contract['Total Value']);
@@ -1268,7 +1667,13 @@
             document.getElementById('searchAward').value = '';
             document.getElementById('searchExpiration').value = '';
             document.getElementById('searchOffice').value = '';
-            document.getElementById('searchState').value = '';
+            // Clear all state checkboxes
+            document.querySelectorAll('#stateDropdownPanel input[type="checkbox"]').forEach(cb => cb.checked = false);
+            document.getElementById('includeNoLocation').checked = true;
+            // Clear region button highlights
+            document.querySelectorAll('.region-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('nearMeBtn').classList.remove('active');
+            updateSelectedStateTags();
             filteredResults = [...allContracts];
             sortResults();
             currentPage = 1;
@@ -1613,14 +2018,14 @@
             const naicsVal = document.getElementById('searchNaics').value;
             const agencyVal = document.getElementById('searchAgency').value;
             const valueVal = document.getElementById('searchValue').value;
-            const stateVal = document.getElementById('searchState').value;
+            const statesSelected = getSelectedStates();
             const expVal = document.getElementById('searchExpiration').value;
             const officeVal = document.getElementById('searchOffice').value;
             if (primeVal) activeFilters.push(`Contractor: ${primeVal}`);
             if (naicsVal) activeFilters.push(`NAICS: ${naicsVal}`);
             if (agencyVal) activeFilters.push(`Agency: ${agencyVal}`);
             if (valueVal) activeFilters.push(`Value: ${valueVal}`);
-            if (stateVal) activeFilters.push(`State: ${stateVal}`);
+            if (statesSelected.length > 0) activeFilters.push(`States: ${statesSelected.join(', ')}`);
             if (expVal) activeFilters.push(`Expires: ${expVal} mo`);
             if (officeVal) activeFilters.push(`Office: ${officeVal}`);
 
@@ -1723,8 +2128,16 @@
             });
 
             // Attach instant search to dropdowns
-            ['searchAgency', 'searchValue', 'searchExpiration', 'searchState'].forEach(id => {
+            ['searchAgency', 'searchValue', 'searchExpiration'].forEach(id => {
                 document.getElementById(id).addEventListener('change', performSearch);
+            });
+
+            // Close state dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                const dropdown = document.querySelector('.state-checkboxes-dropdown');
+                if (dropdown && !dropdown.contains(e.target)) {
+                    document.getElementById('stateDropdownPanel').classList.remove('open');
+                }
             });
 
             // Per-page selector
