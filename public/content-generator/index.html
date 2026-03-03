@@ -1400,7 +1400,12 @@
                 // Filter to matching agencies if provided
                 if (agencies && agencies.length > 0) {
                     const agencySet = new Set(agencies.map(a => a.toLowerCase()));
-                    history = history.filter(h => agencySet.has((h.agency || '').toLowerCase()));
+                    history = history.filter(h => {
+                        const stored = (h.agency || '').toLowerCase();
+                        // Handle comma-joined agency strings (e.g. "Army, Navy, Air Force")
+                        const storedAgencies = stored.split(/,\s*/);
+                        return storedAgencies.some(a => agencySet.has(a));
+                    });
                 }
                 return history;
             } catch (e) {
@@ -3218,7 +3223,7 @@
                         const res = await fetch('/api/generate-graphic', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ content: post.content })
+                            body: JSON.stringify({ postContent: post.content })
                         });
                         if (res.ok) {
                             const data = await res.json();
