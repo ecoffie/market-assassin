@@ -46,6 +46,7 @@ import AgencySelectionTable from '@/components/federal-market-assassin/tables/Ag
 import ReportsDisplay from '@/components/federal-market-assassin/reports/ReportsDisplay';
 import KittLoader from '@/components/federal-market-assassin/ui/KittLoader';
 import { MarketAssassinTier } from '@/lib/access-codes';
+import { captureMarketAssassinSearch } from '@/lib/briefings/capture-search';
 
 export default function FederalMarketAssassinPage() {
   const router = useRouter();
@@ -152,6 +153,16 @@ export default function FederalMarketAssassinPage() {
     setNaicsError(null);
     setSuggestedNaicsCodes([]);
     setAlternativeSearches(undefined);
+
+    // Capture search for briefing watchlist (fire and forget)
+    if (userEmail) {
+      captureMarketAssassinSearch(userEmail, {
+        naicsCode: inputs.naicsCode,
+        zipCode: inputs.zipCode,
+        psc: inputs.pscCode,
+        setAside: inputs.businessType,
+      });
+    }
 
     try {
       const response = await fetch('/api/usaspending/find-agencies', {

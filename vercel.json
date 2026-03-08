@@ -1,8 +1,37 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
       "path": "/api/planner/weekly-digest",
       "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/cron/aggregate-profiles",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-opportunities",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-recompetes",
+      "schedule": "15 7 * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-awards",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-contractors",
+      "schedule": "45 7 * * *"
+    },
+    {
+      "path": "/api/cron/web-intelligence",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings",
+      "schedule": "0 9 * * *"
     }
   ]
 }

@@ -32,6 +32,7 @@
 
 import React, { useState, FormEvent, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { captureOpportunityHunterSearch } from '@/lib/briefings/capture-search';
 
 const OPPORTUNITY_HUNTER_PRO_PRODUCT_ID = 'opportunity-scout-pro';
 
@@ -127,6 +128,7 @@ export default function OpportunityHunterPage() {
   const [proCheckComplete, setProCheckComplete] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [accessEmail, setAccessEmail] = useState('');
+  const [userEmail, setUserEmail] = useState<string | null>(null); // For search capture
   const [verifyingAccess, setVerifyingAccess] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
 
@@ -146,12 +148,27 @@ export default function OpportunityHunterPage() {
         const parsed = JSON.parse(savedProAccess);
         if (parsed.hasAccess && parsed.expiresAt > Date.now()) {
           setIsPro(true);
-          if (parsed.email) setAccessEmail(parsed.email);
+          if (parsed.email) {
+            setAccessEmail(parsed.email);
+            setUserEmail(parsed.email); // Store for search capture
+          }
         } else {
           localStorage.removeItem('opportunityHunterPro');
         }
       } catch {
         localStorage.removeItem('opportunityHunterPro');
+      }
+    }
+    // Also check Market Assassin access for email
+    const maAccess = localStorage.getItem('marketAssassinAccess');
+    if (maAccess && !userEmail) {
+      try {
+        const parsed = JSON.parse(maAccess);
+        if (parsed.email) {
+          setUserEmail(parsed.email);
+        }
+      } catch {
+        // ignore
       }
     }
     setProCheckComplete(true);
@@ -181,6 +198,7 @@ export default function OpportunityHunterPage() {
       if (data.hasAccess) {
         setIsPro(true);
         setShowUpgradeModal(false);
+        setUserEmail(data.email); // Store for search capture
         // Cache access for 24 hours
         localStorage.setItem('opportunityHunterPro', JSON.stringify({
           hasAccess: true,
@@ -357,6 +375,15 @@ export default function OpportunityHunterPage() {
     setError(null);
     setResults(null);
     setProgress(0);
+
+    // Capture search for briefing watchlist (fire and forget)
+    if (userEmail) {
+      captureOpportunityHunterSearch(userEmail, {
+        naicsCode: formData.naicsCode,
+        zipCode: formData.zipCode,
+        setAside: formData.businessFormation,
+      });
+    }
 
     let messageIndex = 0;
     const progressInterval = setInterval(() => {
