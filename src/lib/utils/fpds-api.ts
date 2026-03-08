@@ -1,7 +1,216 @@
 // FPDS (Federal Procurement Data System) API Integration
 // Provides command-level contracting office data that USAspending doesn't expose
+//
+// NOTE: FPDS is migrating to SAM.gov. This file includes:
+// 1. Primary: Legacy FPDS ATOM feed (fpds.gov)
+// 2. Fallback: SAM.gov Contract Data API (api.sam.gov)
+// 3. Health monitoring to detect when FPDS goes down
 
 import { translateOfficeName } from './office-names';
+
+// Track FPDS health status
+let fpdsHealthy = true;
+let lastFpdsCheck = 0;
+const HEALTH_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+let consecutiveFailures = 0;
+const MAX_FAILURES_BEFORE_FALLBACK = 3;
+
+// SAM.gov Contract Data API Base URL
+const SAM_CONTRACT_API_URL = 'https://api.sam.gov/opportunities/v2/search';
+
+/**
+ * Check if FPDS API is healthy
+ * Returns true if FPDS is responding, false if we should use fallback
+ */
+async function checkFPDSHealth(): Promise<boolean> {
+  const now = Date.now();
+
+  // Use cached result if recent
+  if (now - lastFpdsCheck < HEALTH_CHECK_INTERVAL) {
+    return fpdsHealthy;
+  }
+
+  lastFpdsCheck = now;
+
+  try {
+    // Simple health check - fetch a small query
+    const response = await fetch(
+      `${FPDS_BASE_URL}?FEEDNAME=PUBLIC&q=PRINCIPAL_NAICS_CODE:541512&start=0&rows=1`,
+      {
+        method: 'GET',
+        headers: { 'Accept': 'application/xml' },
+        signal: AbortSignal.timeout(10000), // 10 second timeout for health check
+      }
+    );
+
+    if (response.ok) {
+      const text = await response.text();
+      // Verify we got valid XML with entries
+      if (text.includes('<feed') || text.includes('<entry>')) {
+        fpdsHealthy = true;
+        consecutiveFailures = 0;
+        console.log('✅ FPDS health check passed');
+        return true;
+      }
+    }
+
+    // Response not OK or invalid content
+    consecutiveFailures++;
+    console.warn(`⚠️ FPDS health check failed (attempt ${consecutiveFailures}): status ${response.status}`);
+
+    if (consecutiveFailures >= MAX_FAILURES_BEFORE_FALLBACK) {
+      fpdsHealthy = false;
+      console.warn('🔄 FPDS marked as unhealthy, will use SAM.gov fallback');
+    }
+
+    return fpdsHealthy;
+  } catch (error) {
+    consecutiveFailures++;
+    console.error(`⚠️ FPDS health check error (attempt ${consecutiveFailures}):`, error);
+
+    if (consecutiveFailures >= MAX_FAILURES_BEFORE_FALLBACK) {
+      fpdsHealthy = false;
+      console.warn('🔄 FPDS marked as unhealthy, will use SAM.gov fallback');
+    }
+
+    return fpdsHealthy;
+  }
+}
+
+/**
+ * Fetch contract data from SAM.gov Contract Data API (fallback)
+ * This is used when FPDS is unavailable
+ */
+async function fetchFromSAMContractAPI(
+  naicsCode: string,
+  options: { maxRecords?: number } = {}
+): Promise<FPDSSearchResult> {
+  const { maxRecords = 100 } = options;
+
+  console.log(`🔄 Using SAM.gov Contract Data API fallback for NAICS: ${naicsCode}`);
+
+  const awards: FPDSAward[] = [];
+  const offices = new Map<string, FPDSContractingOffice>();
+
+  try {
+    // SAM.gov API requires API key
+    const apiKey = process.env.SAM_API_KEY;
+
+    if (!apiKey) {
+      console.warn('⚠️ SAM_API_KEY not configured, cannot use SAM.gov fallback');
+      return { awards: [], totalCount: 0, offices: new Map() };
+    }
+
+    // Query SAM.gov for contract opportunities with this NAICS
+    // Note: SAM.gov opportunities API is different from FPDS awards
+    // This is a best-effort fallback that returns opportunities instead of historical awards
+    const params = new URLSearchParams({
+      api_key: apiKey,
+      naics: naicsCode,
+      postedFrom: getDateMonthsAgo(6), // Last 6 months
+      limit: String(Math.min(maxRecords, 100)),
+    });
+
+    const response = await fetch(`${SAM_CONTRACT_API_URL}?${params}`, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      console.error(`SAM.gov API error: ${response.status}`);
+      return { awards: [], totalCount: 0, offices: new Map() };
+    }
+
+    const data = await response.json();
+    const opportunities = data.opportunitiesData || [];
+
+    // Map SAM.gov opportunity format to FPDS award format (best effort)
+    for (const opp of opportunities) {
+      const officeName = opp.officeAddress?.city
+        ? `${opp.organizationAcronym || opp.organizationName || 'Unknown'} - ${opp.officeAddress.city}`
+        : opp.organizationAcronym || opp.organizationName || 'Unknown Office';
+
+      const award: FPDSAward = {
+        contractingOffice: {
+          officeId: opp.organizationId || '',
+          officeName: cleanOfficeName(officeName),
+          agencyId: opp.organizationHierarchy?.cgac || '',
+          agencyName: opp.organizationHierarchy?.toptierAgencyName || opp.organizationName || '',
+          departmentId: opp.organizationHierarchy?.fpds || '',
+          departmentName: opp.organizationHierarchy?.toptierAgencyName || '',
+          obligatedAmount: parseFloat(opp.award?.amount || '0'),
+          contractCount: 1,
+        },
+        naicsCode: opp.naicsCode || naicsCode,
+        naicsDescription: opp.naicsDescription || '',
+        vendorName: opp.awardee?.name || 'TBD',
+        obligatedAmount: parseFloat(opp.award?.amount || '0'),
+        signedDate: opp.postedDate || '',
+        placeOfPerformanceState: opp.placeOfPerformance?.state?.code || '',
+        setAsideType: opp.setAside,
+        isSmallBusiness: !!opp.setAside?.includes('Small'),
+        isWomenOwned: !!opp.setAside?.includes('WOSB'),
+        isVeteranOwned: !!opp.setAside?.includes('VOSB'),
+        isServiceDisabledVeteranOwned: !!opp.setAside?.includes('SDVOSB'),
+        is8aProgram: !!opp.setAside?.includes('8(a)'),
+        isHubZone: !!opp.setAside?.includes('HUBZone'),
+      };
+
+      awards.push(award);
+
+      // Aggregate by office
+      const officeKey = `${award.contractingOffice.officeId}|${award.contractingOffice.officeName}`;
+      const existing = offices.get(officeKey);
+      if (existing) {
+        existing.obligatedAmount += award.obligatedAmount;
+        existing.contractCount += 1;
+      } else {
+        offices.set(officeKey, { ...award.contractingOffice });
+      }
+    }
+
+    console.log(`📊 SAM.gov fallback returned ${awards.length} records`);
+
+    return {
+      awards,
+      totalCount: awards.length,
+      offices,
+    };
+  } catch (error) {
+    console.error('SAM.gov fallback error:', error);
+    return { awards: [], totalCount: 0, offices: new Map() };
+  }
+}
+
+/**
+ * Get date string for N months ago in YYYY-MM-DD format
+ */
+function getDateMonthsAgo(months: number): string {
+  const date = new Date();
+  date.setMonth(date.getMonth() - months);
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * Force reset FPDS health status (for testing/admin)
+ */
+export function resetFPDSHealth(): void {
+  fpdsHealthy = true;
+  consecutiveFailures = 0;
+  lastFpdsCheck = 0;
+  console.log('🔄 FPDS health status reset');
+}
+
+/**
+ * Get current FPDS health status
+ */
+export function getFPDSHealthStatus(): { healthy: boolean; consecutiveFailures: number; lastCheck: number } {
+  return {
+    healthy: fpdsHealthy,
+    consecutiveFailures,
+    lastCheck: lastFpdsCheck,
+  };
+}
 
 interface FPDSContractingOffice {
   officeId: string;           // e.g., "N68711"
@@ -289,9 +498,19 @@ export async function fetchFPDSByNaics(
   naicsCode: string,
   options: {
     maxRecords?: number;
+    skipHealthCheck?: boolean; // For internal use when we know FPDS is working
   } = {}
 ): Promise<FPDSSearchResult> {
-  const { maxRecords = 100 } = options;
+  const { maxRecords = 100, skipHealthCheck = false } = options;
+
+  // Check FPDS health before making request (unless skipped)
+  if (!skipHealthCheck) {
+    const isHealthy = await checkFPDSHealth();
+    if (!isHealthy) {
+      console.log('⚠️ FPDS unhealthy, using SAM.gov fallback');
+      return fetchFromSAMContractAPI(naicsCode, { maxRecords });
+    }
+  }
 
   // Build query (FPDS returns most recent data first, so no date filter needed)
   const query = buildFPDSQuery({
@@ -368,8 +587,23 @@ export async function fetchFPDSByNaics(
       await new Promise(resolve => setTimeout(resolve, 100));
     } catch (error) {
       console.error(`Error fetching FPDS page ${page + 1}:`, error);
+      consecutiveFailures++;
+
+      // If we're seeing failures mid-request, mark as unhealthy
+      if (consecutiveFailures >= MAX_FAILURES_BEFORE_FALLBACK && awards.length === 0) {
+        fpdsHealthy = false;
+        console.log('⚠️ FPDS failed during fetch, switching to SAM.gov fallback');
+        return fetchFromSAMContractAPI(naicsCode, { maxRecords });
+      }
+
       break;
     }
+  }
+
+  // If we got results, reset failure counter
+  if (awards.length > 0) {
+    consecutiveFailures = 0;
+    fpdsHealthy = true;
   }
 
   return {
