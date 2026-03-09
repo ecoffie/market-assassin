@@ -74291,6 +74291,42 @@ function formatCurrency(value) {
     return '$' + num.toFixed(0);
 }
 
+// Get user email from localStorage (for search capture)
+function getUserEmail() {
+    const sources = ['contractorDbAccess', 'marketAssassinAccess', 'recompeteAccess', 'opportunityScoutPro'];
+    for (const key of sources) {
+        try {
+            const data = JSON.parse(localStorage.getItem(key) || '{}');
+            if (data.email) return data.email;
+        } catch { /* ignore */ }
+    }
+    return null;
+}
+
+// Capture search for briefing watchlist (fire and forget)
+function captureDbSearch(searchValue) {
+    const email = getUserEmail();
+    if (!email || !searchValue || !searchValue.trim()) return;
+
+    // Try to detect what type of search this is
+    let searchType = 'keyword';
+    const val = searchValue.trim();
+    if (/^\d{6}$/.test(val)) searchType = 'naics';
+    else if (val.includes('@')) searchType = 'keyword'; // email search
+    else searchType = 'company';
+
+    fetch('/api/search-capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_email: email,
+            tool: 'contractor_db',
+            search_type: searchType,
+            search_value: val
+        })
+    }).catch(() => {}); // Silent fail
+}
+
 function filterCompanies() {
     const search = document.getElementById('searchBox').value.toLowerCase();
     const contactFilter = document.getElementById('contactFilter').value;
@@ -74298,6 +74334,9 @@ function filterCompanies() {
     const subcontractFilter = document.getElementById('subcontractFilter').value;
     const sizeFilter = document.getElementById('sizeFilter').value;
     const tierFilter = document.getElementById('tierFilter').value;
+
+    // Capture search for briefing watchlist
+    if (search) captureDbSearch(search);
 
     filteredCompanies = companies.filter(company => {
         if (search) {
