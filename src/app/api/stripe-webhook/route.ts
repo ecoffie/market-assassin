@@ -209,5 +209,97 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Handle subscription cancellation - revoke FHC access
+  if (event.type === 'customer.subscription.deleted' ||
+      event.type === 'customer.subscription.updated') {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    // Only process if subscription is canceled/ended
+    if (event.type === 'customer.subscription.updated' &&
+        subscription.status !== 'canceled' &&
+        subscription.status !== 'unpaid' &&
+        subscription.status !== 'past_due') {
+      // Not a cancellation, just a regular update
+      return NextResponse.json({ received: true, action: 'ignored' });
+    }
+
+    // Check if this is an FHC subscription by looking at product metadata
+    const items = subscription.items.data;
+    let isFHCSubscription = false;
+
+    for (const item of items) {
+      const price = item.price;
+      const productId = typeof price.product === 'string' ? price.product : price.product?.id;
+
+      // FHC product IDs
+      if (productId === 'prod_TaiXlKb350EIQs' || productId === 'prod_TMUmxKTtooTx6C') {
+        isFHCSubscription = true;
+        break;
+      }
+
+      // Also check metadata
+      if (price.metadata?.tier === 'fhc_membership') {
+        isFHCSubscription = true;
+        break;
+      }
+    }
+
+    if (!isFHCSubscription) {
+      console.log('Non-FHC subscription event, ignoring');
+      return NextResponse.json({ received: true, action: 'ignored' });
+    }
+
+    // Get customer email
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+
+    if (!customerId) {
+      return NextResponse.json({ error: 'No customer ID' }, { status: 400 });
+    }
+
+    const customer = await stripe.customers.retrieve(customerId);
+    if (customer.deleted || !customer.email) {
+      return NextResponse.json({ error: 'Customer not found or no email' }, { status: 400 });
+    }
+
+    const email = customer.email.toLowerCase();
+    console.log(`🚫 FHC subscription canceled for: ${email}`);
+
+    // Revoke MA Standard + Briefings access
+    if (supabase) {
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({
+          access_assassin_standard: false,
+          access_briefings: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('email', email);
+
+      if (updateError) {
+        console.error('Error revoking access:', updateError);
+      } else {
+        console.log(`✅ Revoked Supabase access for: ${email}`);
+      }
+    }
+
+    // Remove KV access
+    try {
+      await kv.del(`ma:${email}`);
+      await kv.del(`briefings:${email}`);
+      console.log(`✅ Revoked KV access for: ${email}`);
+    } catch (kvError) {
+      console.error('KV error revoking access:', kvError);
+    }
+
+    return NextResponse.json({
+      received: true,
+      action: 'revoked',
+      email,
+      reason: subscription.status,
+    });
+  }
+
   return NextResponse.json({ received: true });
 }
