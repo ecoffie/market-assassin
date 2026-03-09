@@ -590,3 +590,554 @@ Questions? Reply to this email or contact support@govcongiants.com
     return false;
   }
 }
+
+// Email for Content Reaper access
+interface SendContentReaperEmailParams {
+  to: string;
+  customerName?: string;
+  tier?: 'standard' | 'full_fix';
+}
+
+export async function sendContentReaperEmail({
+  to,
+  customerName,
+  tier = 'standard',
+}: SendContentReaperEmailParams): Promise<boolean> {
+  const accessLink = 'https://tools.govcongiants.org/content-generator';
+  const isFullFix = tier === 'full_fix';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">GovCon Giants</h1>
+    <p style="color: #ddd6fe; margin: 10px 0 0 0;">Content Reaper${isFullFix ? ' Full Fix' : ''}</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #7c3aed; margin-top: 0;">Your Content Reaper Access is Ready!</h2>
+
+    <p>Hi${customerName ? ` ${customerName}` : ''},</p>
+
+    <p>Thank you for your purchase! Your <strong>Content Reaper${isFullFix ? ' Full Fix' : ''}</strong> access is now active.</p>
+
+    <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border: 2px solid #7c3aed; border-radius: 12px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #5b21b6; margin: 0 0 15px 0;">🚀 What You Can Do:</h3>
+      <ul style="color: #6d28d9; margin: 0; padding-left: 20px;">
+        <li><strong>Generate up to 30 LinkedIn posts</strong> per click</li>
+        <li><strong>250 federal agencies</strong> with AI-powered pain points</li>
+        <li><strong>Export to .docx</strong> for easy editing</li>
+        <li><strong>Bulk download as .zip</strong> for your content calendar</li>
+        ${isFullFix ? '<li><strong>Advanced AI writing</strong> with enhanced prompts</li>' : ''}
+        ${isFullFix ? '<li><strong>Quote card graphics</strong> for visual posts</li>' : ''}
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${accessLink}" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">Start Creating Content</a>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0;">💡 How to Access:</h3>
+      <ol style="color: #15803d; margin: 0; padding-left: 20px;">
+        <li>Go to <a href="${accessLink}" style="color: #166534;">${accessLink}</a></li>
+        <li>Click "I Have Access" and enter your email: <strong>${to}</strong></li>
+        <li>Select your NAICS code and target agencies</li>
+        <li>Click "Generate Posts" and watch the magic!</li>
+      </ol>
+    </div>
+
+    <p style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 15px; color: #1e40af;">
+      <strong>Your registered email:</strong> ${to}<br>
+      <span style="font-size: 14px;">Use this email to verify your access anytime.</span>
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      Save this email for future reference.<br>
+      Questions? Reply to this email for support.
+    </p>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 12px;">
+      &copy; ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      to,
+      subject: `Your Content Reaper${isFullFix ? ' Full Fix' : ''} Access is Ready! | GovCon Giants`,
+      html: htmlContent,
+      text: `Your Content Reaper${isFullFix ? ' Full Fix' : ''} Access is Ready!
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Thank you for your purchase! Your Content Reaper${isFullFix ? ' Full Fix' : ''} access is now active.
+
+What You Can Do:
+- Generate up to 30 LinkedIn posts per click
+- 250 federal agencies with AI-powered pain points
+- Export to .docx for easy editing
+- Bulk download as .zip for your content calendar
+${isFullFix ? '- Advanced AI writing with enhanced prompts\n- Quote card graphics for visual posts' : ''}
+
+How to Access:
+1. Go to ${accessLink}
+2. Click "I Have Access" and enter your email: ${to}
+3. Select your NAICS code and target agencies
+4. Click "Generate Posts" and watch the magic!
+
+Your registered email: ${to}
+
+Save this email for future reference.
+Questions? Reply to this email for support.
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ Content Reaper email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send Content Reaper email:', error);
+    return false;
+  }
+}
+
+// Email for Recompete Tracker access
+interface SendRecompeteEmailParams {
+  to: string;
+  customerName?: string;
+}
+
+export async function sendRecompeteEmail({
+  to,
+  customerName,
+}: SendRecompeteEmailParams): Promise<boolean> {
+  const accessLink = 'https://tools.govcongiants.org/recompete';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">GovCon Giants</h1>
+    <p style="color: #a7f3d0; margin: 10px 0 0 0;">Recompete Tracker</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #059669; margin-top: 0;">Your Recompete Tracker Access is Ready!</h2>
+
+    <p>Hi${customerName ? ` ${customerName}` : ''},</p>
+
+    <p>Thank you for your purchase! Your <strong>Recompete Tracker</strong> access is now active.</p>
+
+    <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px solid #059669; border-radius: 12px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #065f46; margin: 0 0 15px 0;">📋 What You Can Do:</h3>
+      <ul style="color: #047857; margin: 0; padding-left: 20px;">
+        <li><strong>6,900+ expiring contracts</strong> ready to recompete</li>
+        <li><strong>Filter by NAICS, agency, state, value</strong></li>
+        <li><strong>See incumbent contractors</strong> and contract history</li>
+        <li><strong>Export to CSV</strong> for your BD pipeline</li>
+        <li><strong>AI Win Probability scores</strong> for each opportunity</li>
+        <li><strong>Teaming suggestions</strong> based on your profile</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${accessLink}" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">Find Recompete Opportunities</a>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0;">💡 How to Access:</h3>
+      <ol style="color: #15803d; margin: 0; padding-left: 20px;">
+        <li>Go to <a href="${accessLink}" style="color: #166534;">${accessLink}</a></li>
+        <li>Click "I Have Access" and enter your email: <strong>${to}</strong></li>
+        <li>Use filters to find contracts in your NAICS codes</li>
+        <li>Click any contract to see details and incumbent info</li>
+      </ol>
+    </div>
+
+    <p style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 15px; color: #1e40af;">
+      <strong>Your registered email:</strong> ${to}<br>
+      <span style="font-size: 14px;">Use this email to verify your access anytime.</span>
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      Save this email for future reference.<br>
+      Questions? Reply to this email for support.
+    </p>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 12px;">
+      &copy; ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      to,
+      subject: 'Your Recompete Tracker Access is Ready! | GovCon Giants',
+      html: htmlContent,
+      text: `Your Recompete Tracker Access is Ready!
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Thank you for your purchase! Your Recompete Tracker access is now active.
+
+What You Can Do:
+- 6,900+ expiring contracts ready to recompete
+- Filter by NAICS, agency, state, value
+- See incumbent contractors and contract history
+- Export to CSV for your BD pipeline
+- AI Win Probability scores for each opportunity
+- Teaming suggestions based on your profile
+
+How to Access:
+1. Go to ${accessLink}
+2. Click "I Have Access" and enter your email: ${to}
+3. Use filters to find contracts in your NAICS codes
+4. Click any contract to see details and incumbent info
+
+Your registered email: ${to}
+
+Save this email for future reference.
+Questions? Reply to this email for support.
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ Recompete Tracker email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send Recompete Tracker email:', error);
+    return false;
+  }
+}
+
+// Email for Bundle purchases
+interface SendBundleEmailParams {
+  to: string;
+  customerName?: string;
+  bundle: string;
+}
+
+export async function sendBundleEmail({
+  to,
+  customerName,
+  bundle,
+}: SendBundleEmailParams): Promise<boolean> {
+  const activateUrl = 'https://shop.govcongiants.org/activate';
+
+  // Define what's in each bundle
+  const bundleContents: Record<string, { name: string; tools: { name: string; link: string; description: string }[] }> = {
+    'starter': {
+      name: 'GovCon Starter Bundle',
+      tools: [
+        { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+      ],
+    },
+    'govcon-starter-bundle': {
+      name: 'GovCon Starter Bundle',
+      tools: [
+        { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+      ],
+    },
+    'pro': {
+      name: 'Pro Giant Bundle',
+      tools: [
+        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Standard', link: 'https://tools.govcongiants.org/market-assassin', description: 'Strategic market intelligence reports' },
+        { name: 'Content Reaper', link: 'https://tools.govcongiants.org/content-generator', description: 'AI-powered LinkedIn content generator' },
+      ],
+    },
+    'pro-giant-bundle': {
+      name: 'Pro Giant Bundle',
+      tools: [
+        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Standard', link: 'https://tools.govcongiants.org/market-assassin', description: 'Strategic market intelligence reports' },
+        { name: 'Content Reaper', link: 'https://tools.govcongiants.org/content-generator', description: 'AI-powered LinkedIn content generator' },
+      ],
+    },
+    'ultimate': {
+      name: 'Ultimate GovCon Bundle',
+      tools: [
+        { name: 'Content Reaper Full Fix', link: 'https://tools.govcongiants.org/content-generator', description: 'Advanced AI content with quote graphics' },
+        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Premium', link: 'https://tools.govcongiants.org/market-assassin', description: 'All 8 strategic intelligence reports' },
+        { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+      ],
+    },
+    'ultimate-govcon-bundle': {
+      name: 'Ultimate GovCon Bundle',
+      tools: [
+        { name: 'Content Reaper Full Fix', link: 'https://tools.govcongiants.org/content-generator', description: 'Advanced AI content with quote graphics' },
+        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Premium', link: 'https://tools.govcongiants.org/market-assassin', description: 'All 8 strategic intelligence reports' },
+        { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+      ],
+    },
+  };
+
+  const bundleInfo = bundleContents[bundle] || bundleContents['starter'];
+
+  const toolsHtml = bundleInfo.tools.map(tool => `
+    <tr>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
+        <a href="${tool.link}" style="color: #1e40af; font-weight: 600; text-decoration: none;">${tool.name}</a>
+        <br><span style="color: #6b7280; font-size: 13px;">${tool.description}</span>
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">
+        <a href="${tool.link}" style="background: #3b82f6; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 13px;">Access →</a>
+      </td>
+    </tr>
+  `).join('');
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">GovCon Giants</h1>
+    <p style="color: #c4b5fd; margin: 10px 0 0 0;">${bundleInfo.name}</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #1e3a8a; margin-top: 0;">🎉 Your Bundle is Ready!</h2>
+
+    <p>Hi${customerName ? ` ${customerName}` : ''},</p>
+
+    <p>Thank you for purchasing the <strong>${bundleInfo.name}</strong>! All your tools are now active and ready to use.</p>
+
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0; overflow: hidden;">
+      <div style="background: #1e3a8a; color: white; padding: 12px 15px; font-weight: 600;">
+        Your Included Tools
+      </div>
+      <table style="width: 100%; border-collapse: collapse;">
+        ${toolsHtml}
+      </table>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${activateUrl}" style="background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">Activate All Tools</a>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0;">💡 How to Access Your Tools:</h3>
+      <ol style="color: #15803d; margin: 0; padding-left: 20px;">
+        <li>Click any tool link above to go directly to it</li>
+        <li>Click "I Have Access" and enter your email: <strong>${to}</strong></li>
+        <li>Start using your tools immediately!</li>
+      </ol>
+    </div>
+
+    <p style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 15px; color: #1e40af;">
+      <strong>Your registered email:</strong> ${to}<br>
+      <span style="font-size: 14px;">Use this email to access all your tools.</span>
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      Save this email - it's your receipt and access guide.<br>
+      Questions? Reply to this email for support.
+    </p>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 12px;">
+      &copy; ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      to,
+      subject: `Your ${bundleInfo.name} is Ready! | GovCon Giants`,
+      html: htmlContent,
+      text: `Your ${bundleInfo.name} is Ready!
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Thank you for purchasing the ${bundleInfo.name}! All your tools are now active.
+
+Your Included Tools:
+${bundleInfo.tools.map(t => `- ${t.name}: ${t.link}\n  ${t.description}`).join('\n')}
+
+How to Access:
+1. Click any tool link above
+2. Click "I Have Access" and enter your email: ${to}
+3. Start using your tools immediately!
+
+Your registered email: ${to}
+
+Save this email - it's your receipt and access guide.
+Questions? Reply to this email for support.
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ Bundle email sent to ${to} for ${bundleInfo.name}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send bundle email:', error);
+    return false;
+  }
+}
+
+// Email for Federal Help Center membership
+interface SendFHCWelcomeEmailParams {
+  to: string;
+  customerName?: string;
+}
+
+export async function sendFHCWelcomeEmail({
+  to,
+  customerName,
+}: SendFHCWelcomeEmailParams): Promise<boolean> {
+  const fhcLink = 'https://federalhelpcenter.com';
+  const maLink = 'https://tools.govcongiants.org/market-assassin';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Federal Help Center!</h1>
+    <p style="color: #bfdbfe; margin: 10px 0 0 0;">Your GovCon Success Journey Starts Now</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #1e40af; margin-top: 0;">🎉 You're In!</h2>
+
+    <p>Hi${customerName ? ` ${customerName}` : ''},</p>
+
+    <p>Welcome to the <strong>Federal Help Center</strong> community! Your membership is now active and you have access to everything.</p>
+
+    <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #1e40af; margin: 0 0 15px 0;">🎁 Your Membership Includes:</h3>
+      <ul style="color: #1e3a8a; margin: 0; padding-left: 20px;">
+        <li><strong>Live coaching calls</strong> - Get your questions answered</li>
+        <li><strong>Weekly webinars</strong> - Stay updated on GovCon trends</li>
+        <li><strong>Training vault</strong> - All our courses and resources</li>
+        <li><strong>Community access</strong> - Network with other contractors</li>
+        <li><strong>Market Assassin Standard</strong> - Strategic intelligence tool (FREE bonus!)</li>
+        <li><strong>Daily Briefings</strong> - Personalized intel delivered to your inbox</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${fhcLink}" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px; margin: 5px;">Access Federal Help Center</a>
+    </div>
+
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #92400e; margin: 0 0 10px 0;">🎯 Your FREE Tool Access:</h3>
+      <p style="color: #78350f; margin: 0 0 15px 0;">As a member, you get <strong>Market Assassin Standard</strong> ($297 value) included free!</p>
+      <a href="${maLink}" style="background: #f59e0b; color: #78350f; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Access Market Assassin →</a>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0;">📧 Daily Briefings Starting Soon:</h3>
+      <p style="color: #15803d; margin: 0;">You'll receive personalized daily intelligence briefings with opportunities, recompetes, and market news tailored to your business. Watch your inbox!</p>
+    </div>
+
+    <p style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 15px; color: #1e40af;">
+      <strong>Your registered email:</strong> ${to}<br>
+      <span style="font-size: 14px;">Use this email to access all membership benefits and tools.</span>
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+    <p style="color: #6b7280; font-size: 12px; text-align: center;">
+      Questions? Reply to this email or ask in the community.<br>
+      We're here to help you win federal contracts!
+    </p>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 12px;">
+      &copy; ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      to,
+      subject: 'Welcome to Federal Help Center! Your Membership is Active | GovCon Giants',
+      html: htmlContent,
+      text: `Welcome to Federal Help Center!
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Welcome to the Federal Help Center community! Your membership is now active.
+
+Your Membership Includes:
+- Live coaching calls - Get your questions answered
+- Weekly webinars - Stay updated on GovCon trends
+- Training vault - All our courses and resources
+- Community access - Network with other contractors
+- Market Assassin Standard - Strategic intelligence tool (FREE bonus!)
+- Daily Briefings - Personalized intel delivered to your inbox
+
+Access Federal Help Center: ${fhcLink}
+
+Your FREE Tool Access:
+As a member, you get Market Assassin Standard ($297 value) included free!
+Access it here: ${maLink}
+
+Daily Briefings Starting Soon:
+You'll receive personalized daily intelligence briefings with opportunities, recompetes, and market news tailored to your business.
+
+Your registered email: ${to}
+
+Questions? Reply to this email or ask in the community.
+We're here to help you win federal contracts!
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ FHC Welcome email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send FHC Welcome email:', error);
+    return false;
+  }
+}

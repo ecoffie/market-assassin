@@ -29,6 +29,10 @@ export interface UserProfile {
   access_assassin_premium: boolean;
   access_recompete: boolean;
   access_contractor_db: boolean;
+  access_briefings: boolean;
+
+  // Briefings-specific fields
+  briefings_expires_at?: string; // For time-limited access (Pro Giant = 1 year)
 
   // License
   license_key?: string;
@@ -46,7 +50,8 @@ export type ProductAccessFlag =
   | 'access_assassin_standard'
   | 'access_assassin_premium'
   | 'access_recompete'
-  | 'access_contractor_db';
+  | 'access_contractor_db'
+  | 'access_briefings';
 
 // Tier types matching your purchases table
 export type ProductTier =
@@ -57,6 +62,11 @@ export type ProductTier =
   | 'assassin_premium'
   | 'recompete'
   | 'contractor_db'
+  | 'briefings'
+  | 'briefings_monthly'
+  | 'briefings_annual'
+  | 'briefings_lifetime'
+  | 'fhc_membership'
   // Upgrade tiers
   | 'assassin_premium_upgrade'
   | 'content_full_fix_upgrade';
@@ -115,6 +125,7 @@ export async function getOrCreateProfile(email: string, name?: string): Promise<
       access_assassin_premium: false,
       access_recompete: false,
       access_contractor_db: false,
+      access_briefings: false,
     })
     .select()
     .single();
@@ -186,6 +197,11 @@ export function tierToAccessFlag(tier: ProductTier): ProductAccessFlag {
     'assassin_premium': 'access_assassin_premium',
     'recompete': 'access_recompete',
     'contractor_db': 'access_contractor_db',
+    'briefings': 'access_briefings',
+    'briefings_monthly': 'access_briefings',
+    'briefings_annual': 'access_briefings',
+    'briefings_lifetime': 'access_briefings',
+    'fhc_membership': 'access_assassin_standard', // FHC gets MA Standard + briefings separately
     // Upgrade tiers map to their premium access flags
     'assassin_premium_upgrade': 'access_assassin_premium',
     'content_full_fix_upgrade': 'access_content_full_fix',
@@ -282,14 +298,15 @@ export async function updateAccessFlags(
       updates.access_recompete = true;
       updates.access_contractor_db = true;
     }
-    // Pro Giant Bundle ($997): Contractor DB + Recompete + MA Standard + Content Reaper
+    // Pro Giant Bundle ($997): Contractor DB + Recompete + MA Standard + Content Reaper + 1 Year Briefings
     else if (bundle === 'pro' || bundle === 'pro-giant-bundle') {
       updates.access_contractor_db = true;
       updates.access_recompete = true;
       updates.access_assassin_standard = true;
       updates.access_content_standard = true;
+      updates.access_briefings = true; // 1 year - handled by briefings_expires_at
     }
-    // Ultimate GovCon Bundle ($1497): All products + MA Premium + Content Full Fix
+    // Ultimate GovCon Bundle ($1497): All products + MA Premium + Content Full Fix + Lifetime Briefings
     else if (bundle === 'ultimate' || bundle === 'ultimate-govcon-bundle' || bundle === 'complete') {
       updates.access_hunter_pro = true;
       updates.access_content_standard = true;
@@ -298,6 +315,7 @@ export async function updateAccessFlags(
       updates.access_recompete = true;
       updates.access_assassin_standard = true;
       updates.access_assassin_premium = true;
+      updates.access_briefings = true; // Lifetime
     }
   } else if (tier) {
     // Single tier access grants (only if no bundle)
@@ -308,6 +326,17 @@ export async function updateAccessFlags(
     if (tier === 'assassin_premium') updates.access_assassin_premium = true;
     if (tier === 'recompete') updates.access_recompete = true;
     if (tier === 'contractor_db') updates.access_contractor_db = true;
+
+    // Briefings tiers
+    if (tier === 'briefings' || tier === 'briefings_monthly' || tier === 'briefings_annual' || tier === 'briefings_lifetime') {
+      updates.access_briefings = true;
+    }
+
+    // FHC membership - grants MA Standard + Briefings
+    if (tier === 'fhc_membership') {
+      updates.access_assassin_standard = true;
+      updates.access_briefings = true;
+    }
 
     // Upgrade tiers - grant the higher tier (user already has standard)
     if (tier === 'assassin_premium_upgrade') {
@@ -362,7 +391,7 @@ export async function grantBundleAccess(
 
   // Define what each bundle includes
   const bundleProducts: Record<string, Record<string, unknown>> = {
-    // GovCon Starter Bundle ($697)
+    // GovCon Starter Bundle ($697) - No briefings
     'starter': {
       access_hunter_pro: true,
       access_recompete: true,
@@ -373,20 +402,22 @@ export async function grantBundleAccess(
       access_recompete: true,
       access_contractor_db: true,
     },
-    // Pro Giant Bundle ($997)
+    // Pro Giant Bundle ($997) - 1 Year Briefings
     'pro': {
       access_contractor_db: true,
       access_recompete: true,
       access_assassin_standard: true,
       access_content_standard: true,
+      access_briefings: true,
     },
     'pro-giant-bundle': {
       access_contractor_db: true,
       access_recompete: true,
       access_assassin_standard: true,
       access_content_standard: true,
+      access_briefings: true,
     },
-    // Ultimate GovCon Bundle ($1497)
+    // Ultimate GovCon Bundle ($1497) - Lifetime Briefings
     'ultimate': {
       access_hunter_pro: true,
       access_assassin_standard: true,
@@ -395,6 +426,7 @@ export async function grantBundleAccess(
       access_content_full_fix: true,
       access_contractor_db: true,
       access_recompete: true,
+      access_briefings: true,
     },
     'ultimate-govcon-bundle': {
       access_hunter_pro: true,
@@ -404,6 +436,7 @@ export async function grantBundleAccess(
       access_content_full_fix: true,
       access_contractor_db: true,
       access_recompete: true,
+      access_briefings: true,
     },
     'complete': {
       access_hunter_pro: true,
@@ -413,6 +446,7 @@ export async function grantBundleAccess(
       access_content_full_fix: true,
       access_contractor_db: true,
       access_recompete: true,
+      access_briefings: true,
     },
   };
 

@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { sendLicenseKeyEmail } from '@/lib/send-email';
+import { kv } from '@vercel/kv';
+import {
+  sendLicenseKeyEmail,
+  sendOpportunityHunterProEmail,
+  sendDatabaseAccessEmail,
+  sendAccessCodeEmail,
+  sendContentReaperEmail,
+  sendRecompeteEmail,
+  sendBundleEmail,
+  sendFHCWelcomeEmail,
+} from '@/lib/send-email';
 import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
 
 // Webhook secrets
@@ -127,26 +137,75 @@ export async function POST(request: NextRequest) {
     // Auto-update access flags (always update, user_id is optional)
     await updateAccessFlags(email, tier, bundle);
 
-    // Get/create profile and send license key email
+    // Get/create profile
     const profile = await getOrCreateProfile(email);
-    if (profile?.license_key) {
-      const productName = bundle
-        ? `GovCon ${bundle.charAt(0).toUpperCase() + bundle.slice(1)} Bundle`
-        : lineItems.data[0]?.description || 'GovCon Product';
+    const customerName = session.customer_details?.name || undefined;
+    const productName = lineItems.data[0]?.description || 'GovCon Product';
 
+    // Check if this is a Federal Help Center membership
+    const isFHCMembership = tier === 'fhc_membership' ||
+      productName?.toLowerCase().includes('federal help center') ||
+      productName?.toLowerCase().includes('fhc');
+
+    if (isFHCMembership) {
+      // Grant MA Standard + Briefings for FHC members
+      await updateAccessFlags(email, 'assassin_standard');
+
+      // Set KV access for MA
+      try {
+        await kv.set(`ma:${email.toLowerCase()}`, 'true');
+        await kv.set(`briefings:${email.toLowerCase()}`, 'true');
+        console.log(`✅ KV access set for FHC member: ${email}`);
+      } catch (kvError) {
+        console.error('KV error (non-fatal):', kvError);
+      }
+
+      // Send FHC welcome email
+      await sendFHCWelcomeEmail({ to: email, customerName });
+    } else if (bundle) {
+      // Bundle purchase - send bundle email with all tool links
+      await sendBundleEmail({ to: email, customerName, bundle });
+    } else if (tier === 'hunter_pro') {
+      // Opportunity Hunter Pro
+      await sendOpportunityHunterProEmail({ to: email, customerName });
+    } else if (tier === 'contractor_db') {
+      // Federal Contractor Database
+      const accessLink = `https://tools.govcongiants.org/contractor-database?email=${encodeURIComponent(email)}`;
+      await sendDatabaseAccessEmail({ to: email, customerName, accessLink });
+    } else if (tier === 'assassin_standard' || tier === 'assassin_premium' || tier === 'assassin_premium_upgrade') {
+      // Market Assassin - use access code email with tutorial
+      const accessLink = `https://tools.govcongiants.org/market-assassin?email=${encodeURIComponent(email)}`;
+      await sendAccessCodeEmail({
+        to: email,
+        companyName: customerName,
+        accessCode: profile?.license_key || 'See email for access',
+        accessLink,
+      });
+    } else if (tier === 'content_standard' || tier === 'content_full_fix' || tier === 'content_full_fix_upgrade') {
+      // Content Reaper
+      const contentTier = (tier === 'content_full_fix' || tier === 'content_full_fix_upgrade') ? 'full_fix' : 'standard';
+      await sendContentReaperEmail({ to: email, customerName, tier: contentTier });
+    } else if (tier === 'recompete') {
+      // Recompete Tracker
+      await sendRecompeteEmail({ to: email, customerName });
+    } else if (profile?.license_key) {
+      // Fallback to generic license key email
       await sendLicenseKeyEmail({
         to: email,
-        customerName: session.customer_details?.name || undefined,
+        customerName,
         licenseKey: profile.license_key,
         productName,
       });
     }
+
+    console.log(`✅ Purchase processed: ${email}, tier: ${tier}, bundle: ${bundle}`);
 
     return NextResponse.json({
       received: true,
       email,
       tier,
       bundle,
+      isFHCMembership,
     });
   }
 
