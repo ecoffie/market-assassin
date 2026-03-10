@@ -83,6 +83,21 @@ export async function GET(request: Request) {
             return;
           }
 
+          // Persist briefing to briefing_log (for chatbot + API access)
+          try {
+            await supabase.from('briefing_log').upsert({
+              user_email: subscriber.user_email,
+              briefing_date: briefing.briefingDate,
+              briefing_content: briefing,
+              items_count: briefing.totalItems,
+              tools_included: briefing.sourcesIncluded,
+              delivery_status: 'pending',
+              created_at: new Date().toISOString(),
+            }, { onConflict: 'user_email,briefing_date' });
+          } catch (logErr) {
+            console.error(`[SendBriefings] Failed to log briefing for ${subscriber.user_email}:`, logErr);
+          }
+
           // Get delivery preferences
           // Check both schema columns and JSONB preferences for backwards compatibility
           const preferences = subscriber.preferences as {
@@ -111,9 +126,30 @@ export async function GET(request: Request) {
           if (anySuccess) {
             briefingsSent++;
             console.log(`[SendBriefings] Sent to ${subscriber.user_email}`);
+
+            // Update delivery status to sent
+            try {
+              await supabase.from('briefing_log').update({
+                delivery_status: 'sent',
+                email_sent_at: new Date().toISOString(),
+              }).eq('user_email', subscriber.user_email)
+                .eq('briefing_date', briefing.briefingDate);
+            } catch (updateErr) {
+              console.error(`[SendBriefings] Failed to update log status for ${subscriber.user_email}:`, updateErr);
+            }
           } else {
             briefingsFailed++;
             errors.push(`Failed to deliver to ${subscriber.user_email}`);
+
+            // Update delivery status to failed
+            try {
+              await supabase.from('briefing_log').update({
+                delivery_status: 'failed',
+              }).eq('user_email', subscriber.user_email)
+                .eq('briefing_date', briefing.briefingDate);
+            } catch (updateErr) {
+              console.error(`[SendBriefings] Failed to update log status for ${subscriber.user_email}:`, updateErr);
+            }
           }
         } catch (err) {
           briefingsFailed++;
