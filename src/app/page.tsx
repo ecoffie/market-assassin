@@ -26,8 +26,8 @@ export default function Home() {
             </p>
           </div>
 
-          {/* 4 App Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* App Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Federal Market Assassin */}
             <Link
               href="/federal-market-assassin"
@@ -180,6 +180,37 @@ export default function Home() {
               </ul>
               <span className="text-purple-400 font-semibold text-sm group-hover:text-purple-300 transition-colors">
                 Launch Tool →
+              </span>
+            </Link>
+
+            {/* Daily Briefings */}
+            <Link
+              href="/briefings"
+              className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-cyan-500 hover:shadow-xl"
+            >
+              <div className="text-4xl mb-4">&#128232;</div>
+              <h3 className="text-xl font-bold text-white mb-3">
+                Daily Briefings
+              </h3>
+              <p className="text-slate-400 text-sm mb-5 leading-relaxed">
+                Personalized daily intelligence delivered to your inbox. Contract opportunities, agency news, recompetes, and budget updates — all tailored to your NAICS and agencies.
+              </p>
+              <ul className="text-slate-400 text-sm space-y-2 mb-6">
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> AI-powered daily briefings
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> Email + SMS delivery
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> Web dashboard + API access
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span> Lindy / Zapier integration
+                </li>
+              </ul>
+              <span className="text-cyan-400 font-semibold text-sm group-hover:text-cyan-300 transition-colors">
+                View Briefings →
               </span>
             </Link>
           </div>
