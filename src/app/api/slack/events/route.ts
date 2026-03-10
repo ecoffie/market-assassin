@@ -9,6 +9,28 @@
 
 import { NextResponse } from 'next/server';
 
+// Simple in-memory cache to prevent duplicate event processing
+const processedEvents = new Map<string, number>();
+const EVENT_TTL = 60000; // 1 minute
+
+function isDuplicateEvent(eventId: string): boolean {
+  const now = Date.now();
+
+  // Clean old entries
+  for (const [key, timestamp] of processedEvents.entries()) {
+    if (now - timestamp > EVENT_TTL) {
+      processedEvents.delete(key);
+    }
+  }
+
+  if (processedEvents.has(eventId)) {
+    return true;
+  }
+
+  processedEvents.set(eventId, now);
+  return false;
+}
+
 // Slack event types
 interface SlackEvent {
   type: string;
@@ -17,6 +39,8 @@ interface SlackEvent {
   channel?: string;
   ts?: string;
   event_ts?: string;
+  bot_id?: string;
+  subtype?: string;
 }
 
 interface SlackEventPayload {
@@ -24,6 +48,7 @@ interface SlackEventPayload {
   challenge?: string;
   token?: string;
   team_id?: string;
+  event_id?: string;
   event?: SlackEvent;
 }
 
@@ -39,6 +64,18 @@ export async function POST(request: Request) {
   // Handle events
   if (body.type === 'event_callback' && body.event) {
     const event = body.event;
+    const eventId = body.event_id || `${event.channel}-${event.ts}`;
+
+    // Skip duplicate events
+    if (isDuplicateEvent(eventId)) {
+      console.log(`[Slack] Skipping duplicate event: ${eventId}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Skip bot messages and message subtypes (edits, deletes, etc.)
+    if (event.bot_id || event.subtype) {
+      return NextResponse.json({ ok: true });
+    }
 
     console.log(`[Slack] Event received: ${event.type}`, {
       user: event.user,
@@ -48,15 +85,14 @@ export async function POST(request: Request) {
 
     // Handle app mentions (@GovCon Giants)
     if (event.type === 'app_mention') {
-      await handleMention(event);
+      // Don't await - respond to Slack immediately
+      handleMention(event).catch(console.error);
     }
 
     // Handle direct messages
-    if (event.type === 'message' && !event.text?.includes('subtype')) {
-      // Ignore bot's own messages
-      if (event.user) {
-        await handleDirectMessage(event);
-      }
+    if (event.type === 'message' && event.user) {
+      // Don't await - respond to Slack immediately
+      handleDirectMessage(event).catch(console.error);
     }
   }
 
