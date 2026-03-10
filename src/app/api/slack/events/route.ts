@@ -170,54 +170,17 @@ async function sendSlackMessage(channel: string, text: string) {
 }
 
 /**
- * Generate AI response for briefing-related questions
+ * Generate AI response using shared chat engine
+ * TODO: Resolve Slack userId to email for personalized briefing context.
+ * For now, falls back to generic GovCon advice (no user-specific briefing data).
  */
-async function generateBriefingResponse(query: string, userId?: string): Promise<string> {
-  const groqKey = process.env.GROQ_API_KEY;
-
-  if (!groqKey) {
-    return "I'm having trouble connecting to my AI backend. Please try again later or contact support.";
-  }
-
+async function generateBriefingResponse(query: string, _userId?: string): Promise<string> {
+  // TODO: Look up Slack user → email mapping for personalized responses
+  // For now, use a generic email placeholder so the engine returns general advice
   try {
-    const systemPrompt = `You are the GovCon Giants AI assistant, helping federal contractors with government contracting intelligence.
-
-You help users with:
-- Understanding their daily briefings
-- Finding federal contract opportunities
-- Analyzing agencies and spending patterns
-- Identifying recompete opportunities
-- Teaming and subcontracting strategies
-- NAICS codes and set-aside programs
-
-Be concise, actionable, and specific. Use bullet points for clarity. If you don't know something, say so and suggest where to find the information.
-
-Keep responses under 300 words for Slack readability.`;
-
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: query },
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
-    });
-
-    const result = await response.json();
-
-    if (result.choices?.[0]?.message?.content) {
-      return result.choices[0].message.content;
-    }
-
-    return "I couldn't generate a response. Please try rephrasing your question.";
+    const { generateChatResponse } = await import('@/lib/briefings/chat/engine');
+    const result = await generateChatResponse(query, 'slack-user@unknown');
+    return result.message;
   } catch (error) {
     console.error('[Slack] Error generating AI response:', error);
     return "I encountered an error processing your request. Please try again.";

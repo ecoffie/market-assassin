@@ -730,6 +730,28 @@ export async function getAllRecompeteAccess(): Promise<RecompeteAccess[]> {
   );
 }
 
+// ============================================
+// Briefing Chat Access
+// ============================================
+
+// Check if an email has briefing access
+export async function hasBriefingAccess(email: string): Promise<boolean> {
+  const access = await kv.get(`briefings:${email.toLowerCase()}`);
+  return !!access;
+}
+
+// Grant briefing access to a customer
+export async function grantBriefingAccess(email: string): Promise<void> {
+  await kv.set(`briefings:${email.toLowerCase()}`, 'true');
+  console.log(`✅ Briefing access granted to: ${email}`);
+}
+
+// Revoke briefing access
+export async function revokeBriefingAccess(email: string): Promise<boolean> {
+  const deleted = await kv.del(`briefings:${email.toLowerCase()}`);
+  return deleted > 0;
+}
+
 // Revoke Recompete access
 export async function revokeRecompeteAccess(email: string): Promise<boolean> {
   const deleted = await kv.del(`recompete:${email.toLowerCase()}`);
