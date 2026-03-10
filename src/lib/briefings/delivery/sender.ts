@@ -1,11 +1,12 @@
 /**
  * Briefing Delivery Sender
  *
- * Handles sending briefings via email (and SMS in the future).
- * Uses nodemailer for email delivery.
+ * Handles sending briefings via email and SMS.
+ * Uses nodemailer for email, Twilio for SMS.
  */
 
 import nodemailer from 'nodemailer';
+import twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
 import {
   GeneratedBriefing,
@@ -17,6 +18,20 @@ import { generateEmailTemplate } from './email-template';
 
 const FROM_EMAIL = process.env.SMTP_USER || 'hello@govconedu.com';
 const FROM_NAME = 'GovCon Giants';
+
+/**
+ * Get Twilio client
+ */
+function getTwilioClient() {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+  if (!accountSid || !authToken) {
+    return null;
+  }
+
+  return twilio(accountSid, authToken);
+}
 
 /**
  * Create nodemailer transporter
@@ -125,20 +140,137 @@ export function generateSMSMessage(briefing: GeneratedBriefing): SMSMessage {
 }
 
 /**
- * Send briefing via SMS (placeholder - implement with Twilio later)
+ * Send briefing via SMS using Twilio
  */
 export async function sendBriefingSMS(
   briefing: GeneratedBriefing,
   phoneNumber: string
 ): Promise<DeliveryResult> {
-  // TODO: Implement Twilio integration for SMS
-  console.log(`[BriefingSender] SMS delivery not yet implemented`);
+  const twilioClient = getTwilioClient();
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
 
-  return {
-    success: false,
-    method: 'sms',
-    error: 'SMS delivery not yet implemented',
-  };
+  if (!twilioClient) {
+    console.error('[BriefingSender] Twilio not configured (missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN)');
+    return {
+      success: false,
+      method: 'sms',
+      error: 'SMS service not configured',
+    };
+  }
+
+  if (!fromNumber && !messagingServiceSid) {
+    console.error('[BriefingSender] No TWILIO_PHONE_NUMBER or TWILIO_MESSAGING_SERVICE_SID configured');
+    return {
+      success: false,
+      method: 'sms',
+      error: 'SMS sender not configured',
+    };
+  }
+
+  // Normalize phone number (ensure E.164 format)
+  const normalizedPhone = normalizePhoneNumber(phoneNumber);
+  if (!normalizedPhone) {
+    console.error(`[BriefingSender] Invalid phone number: ${phoneNumber}`);
+    return {
+      success: false,
+      method: 'sms',
+      error: 'Invalid phone number format',
+    };
+  }
+
+  const smsMessage = generateSMSMessage(briefing);
+
+  try {
+    // Use Messaging Service SID if available, otherwise use phone number
+    const messageOptions: {
+      body: string;
+      to: string;
+      from?: string;
+      messagingServiceSid?: string;
+    } = {
+      body: smsMessage.body,
+      to: normalizedPhone,
+    };
+
+    if (messagingServiceSid) {
+      messageOptions.messagingServiceSid = messagingServiceSid;
+    } else {
+      messageOptions.from = fromNumber;
+    }
+
+    const message = await twilioClient.messages.create(messageOptions);
+
+    // Record the delivery
+    await recordDelivery({
+      id: `delivery-${briefing.id}-sms`,
+      userId: briefing.userId,
+      briefingId: briefing.id,
+      deliveryMethod: 'sms',
+      status: 'sent',
+      messageId: message.sid,
+      sentAt: new Date().toISOString(),
+    });
+
+    console.log(`[BriefingSender] SMS sent to ${normalizedPhone}: ${message.sid}`);
+
+    return {
+      success: true,
+      method: 'sms',
+      messageId: message.sid,
+      deliveredAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error(`[BriefingSender] Error sending SMS:`, error);
+
+    // Record failed delivery
+    await recordDelivery({
+      id: `delivery-${briefing.id}-sms`,
+      userId: briefing.userId,
+      briefingId: briefing.id,
+      deliveryMethod: 'sms',
+      status: 'failed',
+      sentAt: new Date().toISOString(),
+      error: String(error),
+    });
+
+    return {
+      success: false,
+      method: 'sms',
+      error: String(error),
+    };
+  }
+}
+
+/**
+ * Normalize phone number to E.164 format
+ * Handles common US formats: (555) 123-4567, 555-123-4567, 5551234567, +15551234567
+ */
+function normalizePhoneNumber(phone: string): string | null {
+  // Remove all non-digit characters except leading +
+  const cleaned = phone.replace(/[^\d+]/g, '');
+
+  // Already in E.164 format
+  if (cleaned.startsWith('+1') && cleaned.length === 12) {
+    return cleaned;
+  }
+
+  // Has + but not +1 (international)
+  if (cleaned.startsWith('+')) {
+    return cleaned.length >= 10 ? cleaned : null;
+  }
+
+  // US number without country code
+  if (cleaned.length === 10) {
+    return `+1${cleaned}`;
+  }
+
+  // US number with leading 1
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    return `+${cleaned}`;
+  }
+
+  return null;
 }
 
 /**

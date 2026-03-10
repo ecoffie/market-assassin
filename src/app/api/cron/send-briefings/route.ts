@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     // For Phase 1, we'll use users who have briefing profiles
     const { data: subscribers, error: subError } = await supabase
       .from('user_briefing_profiles')
-      .select('user_email, aggregated_profile, preferences')
+      .select('user_email, aggregated_profile, preferences, sms_enabled, phone_number')
       .not('aggregated_profile', 'is', null)
       .limit(MAX_USERS_PER_RUN);
 
@@ -83,17 +83,28 @@ export async function GET(request: Request) {
             return;
           }
 
-          // Get delivery preferences (default to email only)
+          // Get delivery preferences
+          // Check both schema columns and JSONB preferences for backwards compatibility
           const preferences = subscriber.preferences as {
             delivery_method?: string;
             phone?: string;
           } | null;
 
+          // SMS enabled if column is true OR preference is set
+          const smsEnabled = subscriber.sms_enabled === true;
+          const phoneNumber = subscriber.phone_number || preferences?.phone;
+
+          // Determine delivery method
+          let deliveryMethod: 'email' | 'sms' | 'both' = 'email';
+          if (smsEnabled && phoneNumber) {
+            deliveryMethod = 'both'; // Always send email + SMS if SMS is enabled
+          }
+
           // Deliver briefing
           const results = await deliverBriefing(briefing, {
             email: subscriber.user_email,
-            phone: preferences?.phone,
-            method: (preferences?.delivery_method as 'email' | 'sms' | 'both') || 'email',
+            phone: phoneNumber,
+            method: deliveryMethod,
           });
 
           const anySuccess = results.some((r) => r.success);
