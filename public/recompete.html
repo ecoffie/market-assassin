@@ -1025,7 +1025,7 @@
         <div class="header-content">
             <div class="logo">GOVCON GIANTS</div>
             <h1>Recompete Tracker</h1>
-            <p>January - February 2026 - Recompete Opportunities</p>
+            <p>Recompete Opportunities</p>
         </div>
     </div>
 
@@ -1056,6 +1056,11 @@
                 <div class="stat-icon">📊</div>
                 <div class="stat-number" id="totalNaics">--</div>
                 <div class="stat-label">NAICS Codes</div>
+            </div>
+            <div class="stat-card" id="lastUpdatedCard" style="display:none;">
+                <div class="stat-icon">🕐</div>
+                <div class="stat-number" id="lastUpdatedDate" style="font-size:16px;">--</div>
+                <div class="stat-label">Last Updated</div>
             </div>
         </div>
 
@@ -1152,6 +1157,12 @@
         </div>
 
         <!-- Results Section -->
+        <!-- Error Banner -->
+        <div id="errorBanner" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#991b1b; font-size:14px;">
+            <strong>⚠ Error:</strong> <span id="errorMessage"></span>
+            <button onclick="document.getElementById('errorBanner').style.display='none'" style="float:right; background:none; border:none; color:#991b1b; cursor:pointer; font-size:16px;">&times;</button>
+        </div>
+
         <div class="results-section">
             <div class="results-header">
                 <div>
@@ -1204,7 +1215,7 @@
     </div>
 
     <div class="footer">
-        <p>Data from USASpending.gov | Built by <a href="https://govcongiants.org">GovCon Giants</a></p>
+        <p>Data from USASpending.gov | Built by <a href="https://govcongiants.org">GovCon Giants AI</a></p>
     </div>
 
     <!-- Contract Details Modal -->
@@ -1230,6 +1241,12 @@
         let currentSort = { field: 'value', direction: 'desc' };
         let perPage = 25;
         let budgetMap = {};
+        const userEmail = new URLSearchParams(window.location.search).get('email') || '';
+
+        function showError(msg) {
+            document.getElementById('errorMessage').textContent = msg;
+            document.getElementById('errorBanner').style.display = 'block';
+        }
 
         function getBudgetBadge(agencyName) {
             if (!agencyName || !budgetMap) return '';
@@ -1252,7 +1269,31 @@
         }
 
         function loadData() {
-            allContracts = expiringContractsData;
+            try {
+                if (typeof expiringContractsData === 'undefined' || !expiringContractsData) {
+                    showError('Failed to load contract data. Please refresh the page or contact support.');
+                    return;
+                }
+                allContracts = expiringContractsData;
+            } catch (e) {
+                showError('Failed to load contract data. Please refresh the page.');
+                return;
+            }
+
+            // Show "Last Updated" based on data timestamps
+            try {
+                const dates = allContracts
+                    .flatMap(c => (c.Contracts || []).map(ct => ct['Start Date']))
+                    .filter(Boolean)
+                    .sort()
+                    .reverse();
+                const latestDate = dates[0] || null;
+                if (latestDate) {
+                    const d = new Date(latestDate);
+                    document.getElementById('lastUpdatedDate').textContent = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    document.getElementById('lastUpdatedCard').style.display = '';
+                }
+            } catch (e) { /* non-critical */ }
 
             // Fetch budget data for agency badges
             fetch('/api/budget-authority?limit=200')
@@ -1263,7 +1304,7 @@
                         renderResults(); // re-render with badges
                     }
                 })
-                .catch(() => {});
+                .catch(() => { /* budget badges are non-critical */ });
 
             // Populate agency dropdown
             const agencies = [...new Set(allContracts.map(c => c.Agency))].filter(a => a).sort();
@@ -1929,7 +1970,9 @@
                 ].map(csvEscape).join(',');
             });
 
-            const csv = [headers.join(','), ...rows].join('\n');
+            // Add watermark header with user email
+            const meta = userEmail ? [`Licensed to: ${userEmail} | Generated: ${new Date().toISOString().split('T')[0]} | GovCon Giants AI`] : [];
+            const csv = [...meta, headers.join(','), ...rows].join('\n');
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -2099,6 +2142,23 @@
                 },
                 margin: { left: 14, right: 14 },
                 didDrawPage: function(data) {
+                    // Diagonal watermark with user email
+                    if (userEmail) {
+                        doc.saveGraphicsState();
+                        doc.setFontSize(36);
+                        doc.setTextColor(200, 200, 200);
+                        doc.setFont('helvetica', 'bold');
+                        const gState = new doc.GState({ opacity: 0.08 });
+                        doc.setGState(gState);
+                        const centerX = pageWidth / 2;
+                        const centerY = pageHeight / 2;
+                        doc.text(userEmail, centerX, centerY, {
+                            align: 'center',
+                            angle: 35,
+                        });
+                        doc.restoreGraphicsState();
+                    }
+
                     // Footer on every page
                     const pageNum = doc.internal.getCurrentPageInfo().pageNumber;
                     const totalPages = doc.internal.getNumberOfPages();
@@ -2106,12 +2166,12 @@
                     doc.setTextColor(148, 163, 184);
                     doc.setFont('helvetica', 'normal');
                     doc.text(
-                        'Data from USASpending.gov | GovCon Giants',
+                        'Data from USASpending.gov | GovCon Giants AI',
                         14,
                         pageHeight - 8
                     );
                     doc.text(
-                        `Page ${pageNum} of ${totalPages}`,
+                        userEmail ? `Licensed to: ${userEmail} | Page ${pageNum} of ${totalPages}` : `Page ${pageNum} of ${totalPages}`,
                         pageWidth - 14,
                         pageHeight - 8,
                         { align: 'right' }
