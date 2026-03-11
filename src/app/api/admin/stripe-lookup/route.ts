@@ -15,9 +15,11 @@ import Stripe from 'stripe';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion,
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion,
+  });
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -39,6 +41,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const stripe = getStripe();
+
     // Find customer
     let customer: Stripe.Customer | null = null;
 
@@ -86,15 +90,19 @@ export async function GET(request: NextRequest) {
       limit: 10,
     });
 
-    const subs = subscriptions.data.map(s => ({
-      id: s.id,
-      status: s.status,
-      currentPeriodEnd: new Date(s.current_period_end * 1000).toISOString(),
-      cancelAtPeriodEnd: s.cancel_at_period_end,
-      plan: s.items.data[0]?.price?.id,
-      productId: s.items.data[0]?.price?.product,
-      metadata: s.metadata,
-    }));
+    const subs = subscriptions.data.map(s => {
+      // Get period end from first item (Stripe API v2024+)
+      const periodEnd = s.items?.data[0]?.current_period_end;
+      return {
+        id: s.id,
+        status: s.status,
+        currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+        cancelAtPeriodEnd: s.cancel_at_period_end,
+        plan: s.items.data[0]?.price?.id,
+        productId: s.items.data[0]?.price?.product,
+        metadata: s.metadata,
+      };
+    });
 
     // Get charges (for refund status)
     const charges = await stripe.charges.list({
