@@ -38,6 +38,7 @@ const FIELDS = [
 interface SearchRequestBody {
   businessFormation?: string;
   naicsCode?: string;
+  pscCode?: string;
   zipCode?: string;
   goodsOrServices?: string;
   veteranStatus?: string;
@@ -196,6 +197,7 @@ export async function POST(request: NextRequest) {
     const {
       businessFormation,
       naicsCode,
+      pscCode,
       zipCode,
       goodsOrServices,
       veteranStatus
@@ -246,6 +248,21 @@ export async function POST(request: NextRequest) {
         }
       } else {
         filters.naics_codes = [trimmedNaics];
+      }
+    }
+
+    // If no NAICS but PSC provided, convert PSC → NAICS via crosswalk
+    if (!filters.naics_codes && pscCode && pscCode.trim()) {
+      const { getNAICSForPSC } = await import('@/lib/utils/psc-crosswalk');
+      const crosswalkMatches = getNAICSForPSC(pscCode.trim().toUpperCase(), 15);
+      const relatedNaics = crosswalkMatches
+        .filter(m => m.confidence !== 'low')
+        .map(m => m.naicsCode);
+
+      if (relatedNaics.length > 0) {
+        filters.naics_codes = relatedNaics;
+        naicsCorrectionMessage = `PSC ${pscCode.trim().toUpperCase()} was converted to ${relatedNaics.length} related NAICS codes via crosswalk.`;
+        console.log(`🎯 PSC ${pscCode} → ${relatedNaics.length} NAICS codes via crosswalk`);
       }
     }
 

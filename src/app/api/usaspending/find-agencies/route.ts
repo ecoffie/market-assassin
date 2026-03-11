@@ -262,18 +262,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Add PSC (Product/Service Code) filter
-    // Priority: NAICS code takes priority - only use PSC if no NAICS provided
-    // If NAICS is provided, PSC code is ignored to avoid over-filtering
+    // If NAICS provided, PSC supplements via crosswalk. If only PSC, convert to NAICS codes.
     const hasNaicsFilter = naicsCode && naicsCode.trim();
 
     if (!hasNaicsFilter && pscCode && pscCode.trim()) {
-      // No NAICS provided, so use PSC code directly
       const trimmedPsc = pscCode.trim().toUpperCase();
-      filters.psc_codes = [trimmedPsc];
-      console.log(`🎯 Filtering by specific PSC code: ${trimmedPsc} (no NAICS provided)`);
+      // Use crosswalk to convert PSC → related NAICS codes for better results
+      const { getNAICSForPSC } = await import('@/lib/utils/psc-crosswalk');
+      const crosswalkMatches = getNAICSForPSC(trimmedPsc, 15);
+
+      if (crosswalkMatches.length > 0) {
+        const relatedNaics = crosswalkMatches
+          .filter(m => m.confidence !== 'low')
+          .map(m => m.naicsCode);
+        if (relatedNaics.length > 0) {
+          filters.naics_codes = relatedNaics;
+          console.log(`🎯 PSC ${trimmedPsc} → ${relatedNaics.length} NAICS codes via crosswalk: ${relatedNaics.slice(0, 5).join(', ')}...`);
+        } else {
+          // All matches were low confidence, use PSC directly
+          filters.psc_codes = [trimmedPsc];
+          console.log(`🎯 Filtering by specific PSC code: ${trimmedPsc} (low-confidence crosswalk)`);
+        }
+      } else {
+        // No crosswalk data, use PSC directly
+        filters.psc_codes = [trimmedPsc];
+        console.log(`🎯 Filtering by specific PSC code: ${trimmedPsc} (no crosswalk data)`);
+      }
     } else if (pscCode && pscCode.trim() && hasNaicsFilter) {
-      // NAICS takes priority - log that PSC is being ignored
-      console.log(`ℹ️ PSC code ${pscCode} ignored - NAICS ${naicsCode} takes priority`);
+      // Both provided — NAICS is primary, add PSC as supplemental filter
+      console.log(`ℹ️ PSC code ${pscCode} noted — NAICS ${naicsCode} is primary filter`);
     }
 
     // Add location filter based on zip code - start with just the user's state (Tier 1)

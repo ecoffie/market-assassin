@@ -46,19 +46,41 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { naicsCodes = [], businessFormation = '' } = body;
+    const { naicsCodes = [], pscCodes = [], businessFormation = '' } = body;
 
-    console.log('[Agencies Lookup] NAICS codes:', naicsCodes, 'Business:', businessFormation);
+    console.log('[Agencies Lookup] NAICS codes:', naicsCodes, 'PSC codes:', pscCodes, 'Business:', businessFormation);
 
-    if (!naicsCodes || naicsCodes.length === 0) {
+    // If PSC codes provided but no NAICS codes, convert via crosswalk
+    let convertedFromPsc = false;
+    let effectiveNaicsCodes = naicsCodes;
+
+    if ((!naicsCodes || naicsCodes.length === 0) && pscCodes && pscCodes.length > 0) {
+      const { getNAICSForPSC } = await import('@/lib/utils/psc-crosswalk');
+      const allNaics = new Set<string>();
+
+      for (const psc of pscCodes) {
+        const matches = getNAICSForPSC(String(psc).trim(), 10);
+        matches
+          .filter(m => m.confidence !== 'low')
+          .forEach(m => allNaics.add(m.naicsCode));
+      }
+
+      if (allNaics.size > 0) {
+        effectiveNaicsCodes = Array.from(allNaics);
+        convertedFromPsc = true;
+        console.log(`[Agencies Lookup] Converted ${pscCodes.length} PSC codes → ${effectiveNaicsCodes.length} NAICS codes via crosswalk`);
+      }
+    }
+
+    if (!effectiveNaicsCodes || effectiveNaicsCodes.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No NAICS codes provided'
+        error: 'No NAICS or PSC codes provided'
       }, { status: 400, headers: corsHeaders });
     }
 
     // Normalize NAICS codes to strings
-    const normalizedCodes = naicsCodes.map((code: string | number) => String(code).trim());
+    const normalizedCodes = effectiveNaicsCodes.map((code: string | number) => String(code).trim());
 
     // Build USAspending API request
     const filters: Record<string, unknown> = {
@@ -236,7 +258,8 @@ export async function POST(request: NextRequest) {
       success: true,
       agencies,
       totalCount: agencies.length,
-      totalSpending
+      totalSpending,
+      ...(convertedFromPsc && { pscCrosswalk: { convertedFromPsc: true, pscCodes, naicsCodesUsed: normalizedCodes } }),
     }, { headers: corsHeaders });
 
   } catch (error) {

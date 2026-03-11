@@ -125,10 +125,12 @@ export function findPrimeByName(primeName: string): PrimeContractor | null {
 }
 
 /**
- * PSC to NAICS mapping for finding relevant primes
- * Maps PSC categories to related NAICS codes
+ * PSC to NAICS mapping for finding relevant primes.
+ * Uses data-driven crosswalk when available, falls back to manual map.
  */
-const pscToNaicsMap: Record<string, string[]> = {
+import { getNAICSForPSC, isCrosswalkLoaded } from '@/lib/utils/psc-crosswalk';
+
+const manualPscToNaicsMap: Record<string, string[]> = {
   // Services
   'D': ['541511', '541512', '541513', '541519', '518210'], // IT & Telecom
   'R': ['541611', '541612', '541613', '541614', '541618', '541620', '541690'], // Professional Services
@@ -152,16 +154,30 @@ const pscToNaicsMap: Record<string, string[]> = {
   '15': ['336411', '336412', '336413'], // Aircraft
 };
 
+function getRelatedNaicsForPSC(pscCode: string): string[] {
+  const trimmed = pscCode.trim().toUpperCase();
+
+  // Try data-driven crosswalk first
+  if (isCrosswalkLoaded()) {
+    const matches = getNAICSForPSC(trimmed, 10);
+    if (matches.length > 0) {
+      return matches.filter(m => m.confidence !== 'low').map(m => m.naicsCode);
+    }
+  }
+
+  // Fallback to manual map
+  const prefix2 = trimmed.substring(0, 2);
+  const prefix1 = trimmed.charAt(0);
+  return manualPscToNaicsMap[prefix2] || manualPscToNaicsMap[prefix1] || [];
+}
+
 /**
  * Find prime contractors by PSC code
  * Maps PSC to related NAICS codes and finds matching primes
  */
 export function getPrimesByPSC(pscCode: string): PrimeContractor[] {
-  const pscPrefix = pscCode.trim().toUpperCase().substring(0, 2);
-  const pscFirstChar = pscCode.trim().toUpperCase().charAt(0);
-
-  // Try to find NAICS codes for this PSC
-  let relatedNaics = pscToNaicsMap[pscPrefix] || pscToNaicsMap[pscFirstChar] || [];
+  // Use crosswalk (data-driven) with manual fallback
+  const relatedNaics = getRelatedNaicsForPSC(pscCode);
 
   if (relatedNaics.length === 0) {
     // Fallback: return diverse primes sorted by contact info, deduplicated
@@ -293,9 +309,7 @@ export function suggestTier2ForAgencies(
 
   // If no NAICS but PSC code provided, map PSC to NAICS and get Tier 2
   if ((!naicsCode || !naicsCode.trim()) && pscCode && pscCode.trim()) {
-    const pscPrefix = pscCode.trim().toUpperCase().substring(0, 2);
-    const pscFirstChar = pscCode.trim().toUpperCase().charAt(0);
-    const relatedNaics = pscToNaicsMap[pscPrefix] || pscToNaicsMap[pscFirstChar] || [];
+    const relatedNaics = getRelatedNaicsForPSC(pscCode);
 
     if (relatedNaics.length > 0) {
       // Get Tier 2 contractors for each related NAICS
