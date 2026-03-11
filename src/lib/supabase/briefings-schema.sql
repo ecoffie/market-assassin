@@ -64,7 +64,10 @@ CREATE TABLE IF NOT EXISTS user_briefing_profile (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_email TEXT UNIQUE NOT NULL,
 
-  -- Auto-aggregated from search history (top items by frequency)
+  -- Aggregated profile as JSONB (used by generator)
+  aggregated_profile JSONB DEFAULT '{}',
+
+  -- DEPRECATED: Individual arrays (kept for backwards compat, use aggregated_profile)
   naics_codes TEXT[] DEFAULT '{}',
   agencies TEXT[] DEFAULT '{}',
   zip_codes TEXT[] DEFAULT '{}',
@@ -78,6 +81,7 @@ CREATE TABLE IF NOT EXISTS user_briefing_profile (
   company_weights JSONB DEFAULT '{}',
 
   -- User preferences
+  preferences JSONB DEFAULT '{}', -- JSONB for flexible delivery preferences
   timezone TEXT DEFAULT 'America/New_York',
   email_frequency TEXT DEFAULT 'daily', -- 'daily' | 'weekly' | 'none'
   sms_enabled BOOLEAN DEFAULT FALSE,
@@ -265,7 +269,7 @@ CREATE TABLE IF NOT EXISTS briefing_snapshots (
   tool TEXT NOT NULL, -- 'opportunity_hunter' | 'market_assassin' | 'recompete' | 'contractor_db'
 
   -- Raw data from source
-  snapshot_data JSONB NOT NULL,
+  raw_data JSONB NOT NULL,
 
   -- Diff vs previous day (computed)
   diff_data JSONB, -- {new: [], changed: [], removed: []}
