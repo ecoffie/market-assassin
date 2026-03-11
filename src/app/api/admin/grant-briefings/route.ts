@@ -20,6 +20,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Quick grant for a single email: ?grant=user@example.com
+  const grantEmail = searchParams.get('grant')?.toLowerCase().trim();
+  if (grantEmail) {
+    try {
+      await kv.set(`briefings:${grantEmail}`, 'true');
+      return NextResponse.json({
+        success: true,
+        message: `Briefing access granted to ${grantEmail}`,
+        email: grantEmail,
+      });
+    } catch (err) {
+      return NextResponse.json({ error: `KV error: ${err}` }, { status: 500 });
+    }
+  }
+
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
