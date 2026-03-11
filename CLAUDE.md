@@ -275,6 +275,18 @@ OPENAI_API_KEY=sk-...
 
 > Full session history (Sessions 1-18) is in MEMORY.md.
 
+### Session 20 (Mar 11, 2026)
+- **Briefing Log Persistence Fix** — `send-briefings` cron now upserts to `briefing_log` after generation + updates delivery status
+- **Public Briefing API** — `GET /api/briefings/latest?email=X&days=N` returns briefing JSON, gated by KV
+- **Briefing Dashboard** at `/briefings` — email gate, date sidebar, expandable item cards, empty/denied states
+- **Lindy Setup Guide** at `/briefings/lindy-setup` — instructions for API polling or email forwarding to Lindy/Zapier/Make
+- **Admin endpoints:**
+  - `/api/admin/grant-briefings?grant=EMAIL` — quick single-email KV grant
+  - `/api/admin/test-briefing?email=EMAIL` — generate + save one briefing (no delivery)
+  - `/api/briefings/verify` — lightweight access check
+- **Homepage** — added Daily Briefings card (6 cards, 3-col grid)
+- **Branding** — all briefing footers updated to "GovCon Giants AI"
+
 ### Session 19 (Mar 8, 2026)
 - **Daily Briefings System** — personalized daily GovCon intel emails
   - Web intelligence pipeline: FPDS health monitoring + SAM.gov fallback
@@ -306,4 +318,4 @@ OPENAI_API_KEY=sk-...
 - Opportunity Hunter: blurred SAT teaser with Market Assassin upgrade CTA
 - FY2026 budget data expanded: 23 → 47 toptier agencies, 175-entry sub-agency parent map
 
-*Last Updated: March 8, 2026*
+*Last Updated: March 11, 2026*
