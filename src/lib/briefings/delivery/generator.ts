@@ -79,7 +79,7 @@ export async function generateBriefing(
   try {
     // Step 1: Get user profile
     const { data: profileData } = await supabase
-      .from('user_briefing_profiles')
+      .from('user_briefing_profile')
       .select('aggregated_profile')
       .eq('user_email', userEmail)
       .single();

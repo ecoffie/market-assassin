@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 
   // 4. Check briefing profile
   const { data: briefingProfile } = await supabase
-    .from('user_briefing_profiles')
+    .from('user_briefing_profile')
     .select('user_email, created_at, updated_at')
     .eq('user_email', email)
     .single();

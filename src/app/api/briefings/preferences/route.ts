@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   );
 
   const { data, error } = await supabase
-    .from('user_briefing_profiles')
+    .from('user_briefing_profile')
     .select('timezone, email_frequency, preferred_delivery_hour, sms_enabled, phone_number')
     .eq('user_email', email)
     .single();
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
 
   // Upsert user briefing profile
   const { data, error } = await supabase
-    .from('user_briefing_profiles')
+    .from('user_briefing_profile')
     .upsert(
       {
         user_email: email,

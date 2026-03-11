@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     // Step 1: Get active subscribers
     // For Phase 1, we'll use users who have briefing profiles
     const { data: subscribers, error: subError } = await supabase
-      .from('user_briefing_profiles')
+      .from('user_briefing_profile')
       .select('user_email, aggregated_profile, preferences, sms_enabled, phone_number')
       .not('aggregated_profile', 'is', null)
       .limit(MAX_USERS_PER_RUN);

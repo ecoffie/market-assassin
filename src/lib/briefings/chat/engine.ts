@@ -91,7 +91,7 @@ async function fetchUserContext(email: string): Promise<ChatContext> {
   // Fetch profile and recent briefings in parallel
   const [profileResult, briefingsResult] = await Promise.all([
     supabase
-      .from('user_briefing_profiles')
+      .from('user_briefing_profile')
       .select('naics_codes, agencies, keywords, watched_companies, aggregated_profile')
       .eq('user_email', email)
       .single(),

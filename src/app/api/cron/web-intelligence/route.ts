@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 
     // Step 2: Get active briefing profiles
     const { data: profiles, error: profileError } = await supabase
-      .from('user_briefing_profiles')
+      .from('user_briefing_profile')
       .select('user_email, aggregated_profile')
       .not('aggregated_profile', 'is', null)
       .limit(MAX_USERS_PER_RUN);

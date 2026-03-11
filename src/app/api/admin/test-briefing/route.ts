@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   try {
     // Ensure user has a briefing profile (auto-create default if missing)
     const { data: existingProfile } = await supabase
-      .from('user_briefing_profiles')
+      .from('user_briefing_profile')
       .select('user_email')
       .eq('user_email', email)
       .single();
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         watched_contracts: [],
       };
 
-      await supabase.from('user_briefing_profiles').upsert({
+      await supabase.from('user_briefing_profile').upsert({
         user_email: email,
         aggregated_profile: defaultProfile,
         naics_codes: defaultProfile.naics_codes,
