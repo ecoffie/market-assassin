@@ -6539,7 +6539,7 @@
                     stopLoadingAnimation();
                     document.getElementById('loading-state').classList.add('hidden');
                     document.getElementById('generator-form').classList.remove('hidden');
-                    displayFoundAgencies(result.agencies, result.totalContracts);
+                    displayFoundAgencies(result.agencies, result.totalContracts, result.pscCrosswalk);
 
                     // Store flag for showing welcome modal when user clicks Generate
                     if (shouldShowWelcome) {
@@ -6565,7 +6565,7 @@
         }
 
         // Display found agencies
-        function displayFoundAgencies(agencies, totalContracts) {
+        function displayFoundAgencies(agencies, totalContracts, pscCrosswalk) {
             const section = document.getElementById('agencies-section');
             const container = document.getElementById('target-agencies-container');
             const badge = document.getElementById('agency-count-badge');
@@ -6579,7 +6579,14 @@
 
             badge.textContent = `${agencies.length} agencies`;
 
-            container.innerHTML = agencies.map((agency, idx) => `
+            // Show PSC crosswalk banner if applicable
+            const crosswalkBanner = pscCrosswalk?.convertedFromPsc
+                ? `<div class="col-span-full mb-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <p class="text-sm text-purple-800"><strong>PSC Crosswalk:</strong> Your PSC codes were converted to ${pscCrosswalk.naicsCodesUsed?.length || 0} related NAICS codes to find matching agencies.</p>
+                   </div>`
+                : '';
+
+            container.innerHTML = crosswalkBanner + agencies.map((agency, idx) => `
                 <label class="flex items-start gap-3 p-3 bg-white border-2 border-green-200 rounded-lg cursor-pointer hover:border-green-400 transition">
                     <input type="checkbox" name="selected-agency" value="${agency.name}" ${idx < 5 ? 'checked' : ''} class="mt-1 w-4 h-4 text-green-600">
                     <div class="flex-1 min-w-0">

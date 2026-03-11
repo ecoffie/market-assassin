@@ -38,6 +38,7 @@ const OPPORTUNITY_HUNTER_PRO_PRODUCT_ID = 'opportunity-scout-pro';
 interface SearchCriteria {
   businessFormation: string;
   naicsCode: string;
+  pscCode: string;
   zipCode: string;
   goodsOrServices: string;
   veteranStatus: string;
@@ -123,6 +124,7 @@ export default function OpportunityHunterPage() {
   const [formData, setFormData] = useState<SearchCriteria>({
     businessFormation: '',
     naicsCode: '',
+    pscCode: '',
     zipCode: '',
     goodsOrServices: '',
     veteranStatus: '',
@@ -524,6 +526,20 @@ export default function OpportunityHunterPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  PSC Code <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.pscCode}
+                  onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
+                  placeholder="e.g., D306, R425"
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-400 mt-0.5">Product/Service Code — auto-converts to NAICS if no NAICS entered</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Zip Code
                 </label>
                 <input
@@ -654,9 +670,9 @@ export default function OpportunityHunterPage() {
                 )}
 
                 {results.naicsCorrectionMessage && (
-                  <div className="mt-3 p-3 bg-blue-100 border border-blue-300 rounded-lg">
-                    <p className="text-sm text-blue-900">
-                      <strong>Search Info:</strong> {results.naicsCorrectionMessage}
+                  <div className={`mt-3 p-3 rounded-lg border ${results.naicsCorrectionMessage.includes('crosswalk') ? 'bg-purple-50 border-purple-300' : 'bg-blue-100 border-blue-300'}`}>
+                    <p className={`text-sm ${results.naicsCorrectionMessage.includes('crosswalk') ? 'text-purple-900' : 'text-blue-900'}`}>
+                      <strong>{results.naicsCorrectionMessage.includes('crosswalk') ? 'PSC Crosswalk:' : 'Search Info:'}</strong> {results.naicsCorrectionMessage}
                     </p>
                   </div>
                 )}
