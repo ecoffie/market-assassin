@@ -108,13 +108,6 @@ export async function generateBriefing(
     // Organize snapshots by tool and date
     const snapshotsByTool = organizeSnapshots(snapshots || []);
 
-    // Debug: log what we found
-    console.log(`[BriefingGen] Snapshots found: ${snapshots?.length || 0}`);
-    console.log(`[BriefingGen] Opportunities today: ${(snapshotsByTool.opportunities?.today || []).length}`);
-    console.log(`[BriefingGen] Recompetes today: ${(snapshotsByTool.recompetes?.today || []).length}`);
-    console.log(`[BriefingGen] Awards today: ${(snapshotsByTool.awards?.today || []).length}`);
-    console.log(`[BriefingGen] Web signals today: ${(snapshotsByTool.webSignals?.today || []).length}`);
-
     // Step 3: Run diff engine
     const diffResult = generateBriefingDiff(
       {
@@ -138,11 +131,6 @@ export async function generateBriefing(
         ? (snapshotsByTool.webSignals?.today as WebSignal[] | undefined)
         : undefined
     );
-
-    // Debug: log diff result
-    console.log(`[BriefingGen] Diff result items: ${diffResult.items.length}`);
-    console.log(`[BriefingGen] Diff by source:`, diffResult.summary.bySource);
-    console.log(`[BriefingGen] Diff by category:`, diffResult.summary.byCategory);
 
     // Step 4: Format the briefing
     const maxItems = options.maxItems || 15;
