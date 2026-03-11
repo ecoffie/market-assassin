@@ -1847,7 +1847,9 @@
                                 <tbody>
                                     ${contract.Contracts.map(c => `
                                         <tr style="border-bottom:1px solid #f1f5f9;">
-                                            <td style="padding:10px;font-family:monospace;color:#1e293b;">${c['Award ID'] || 'N/A'}</td>
+                                            <td style="padding:10px;font-family:monospace;">
+                                                ${c['Award ID'] ? `<a href="https://www.usaspending.gov/keyword_search/${encodeURIComponent(c['Award ID'])}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:none;font-weight:500;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${c['Award ID']} ↗</a>` : 'N/A'}
+                                            </td>
                                             <td style="padding:10px;color:#0369a1;">${c['Start Date'] || 'N/A'}</td>
                                             <td style="padding:10px;color:#dc2626;font-weight:600;">${c['Expiration'] || 'N/A'}</td>
                                             <td style="padding:10px;text-align:right;color:#059669;font-weight:600;">${formatValueDisplay(c['Value'])}</td>
@@ -1908,6 +1910,17 @@
                     <div class="detail-value">${contract.NAICS || 'N/A'}</div>
                 </div>
                 ${contractsTable}
+                <div style="margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;text-align:center;">
+                    <a href="https://www.usaspending.gov/keyword_search/${encodeURIComponent(contract.Recipient || '')}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;transition:transform 0.2s,box-shadow 0.2s;"
+                       onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(37,99,235,0.4)'"
+                       onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                        <span>View on USASpending</span>
+                        <span style="font-size:16px;">↗</span>
+                    </a>
+                </div>
             `;
 
             document.getElementById('contractModal').classList.add('active');
