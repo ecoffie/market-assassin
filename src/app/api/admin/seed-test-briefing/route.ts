@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateBriefing } from '@/lib/briefings/delivery';
+import { generateBriefingDiff } from '@/lib/briefings/diff-engine';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -337,20 +338,76 @@ export async function GET(request: NextRequest) {
       readError: readError?.message,
     };
 
-    // 4. Now generate the briefing
+    // 4. Now generate the briefing with manual debugging
     console.log(`[SeedTestBriefing] Generating briefing for ${email}...`);
+
+    // Debug: Check user profile manually
+    const { data: profileCheck } = await supabase
+      .from('user_briefing_profile')
+      .select('aggregated_profile')
+      .eq('user_email', email)
+      .single();
+
+    const profileDebug = {
+      hasProfile: !!profileCheck,
+      hasAggregatedProfile: !!profileCheck?.aggregated_profile,
+      profileKeys: profileCheck?.aggregated_profile ? Object.keys(profileCheck.aggregated_profile) : [],
+    };
+
     const briefing = await generateBriefing(email, {
       includeWebIntel: true,
       maxItems: 15,
     });
 
     if (!briefing || briefing.totalItems === 0) {
+      // Manual diff test
+      const userProfile = {
+        naics_codes: (profileCheck?.aggregated_profile as Record<string, string[]>)?.naics_codes || [],
+        agencies: (profileCheck?.aggregated_profile as Record<string, string[]>)?.agencies || [],
+        keywords: (profileCheck?.aggregated_profile as Record<string, string[]>)?.keywords || [],
+        zip_codes: [],
+        watched_companies: (profileCheck?.aggregated_profile as Record<string, string[]>)?.watched_companies || [],
+        watched_contracts: [],
+      };
+
+      // Read and organize snapshots manually
+      const oppData = readSnapshots?.find(s => s.tool === 'opportunity_hunter')?.raw_data as { items?: unknown[] } | null;
+      const recompData = readSnapshots?.find(s => s.tool === 'recompete')?.raw_data as { items?: unknown[] } | null;
+      const awardData = readSnapshots?.find(s => s.tool === 'usaspending')?.raw_data as { items?: unknown[] } | null;
+      const webData = readSnapshots?.find(s => s.tool === 'web_intelligence')?.raw_data as { signals?: unknown[] } | null;
+
+      const manualDiffResult = generateBriefingDiff(
+        { today: (oppData?.items || []) as never[], yesterday: [] },
+        { today: (recompData?.items || []) as never[], yesterday: [] },
+        { today: (awardData?.items || []) as never[], yesterday: [] },
+        { today: [], yesterday: [] },
+        userProfile,
+        (webData?.signals || []) as never[]
+      );
+
       return NextResponse.json({
         success: false,
         message: 'Snapshots seeded but briefing generation returned 0 items. Check generator logic.',
         email,
         seedResults: results,
-        debug: debugInfo,
+        debug: {
+          ...debugInfo,
+          profileDebug,
+          briefingReturned: briefing ? 'object' : 'null',
+          briefingTotalItems: briefing?.totalItems,
+          manualDiff: {
+            itemCount: manualDiffResult.items.length,
+            bySource: manualDiffResult.summary.bySource,
+            byCategory: manualDiffResult.summary.byCategory,
+            firstItems: manualDiffResult.items.slice(0, 2).map(i => ({ id: i.id, title: i.title, category: i.category })),
+          },
+          rawDataCounts: {
+            opportunities: oppData?.items?.length || 0,
+            recompetes: recompData?.items?.length || 0,
+            awards: awardData?.items?.length || 0,
+            webSignals: webData?.signals?.length || 0,
+          },
+        },
       });
     }
 
