@@ -254,6 +254,52 @@ OPENAI_API_KEY=sk-...
 
 ---
 
+## Bug Prevention Rules
+
+These patterns have caused production bugs. Follow them strictly:
+
+1. **Never `continue` after Supabase failure** — always run KV operations unconditionally. Supabase FK constraints fail for users without auth accounts, but KV is the primary access system and must always execute.
+2. **Never match comma-joined strings directly** — when filtering arrays of strings (agencies, tags, etc.), split on delimiters first then check set membership. Exact-match on `"Agency A, Agency B"` will never match individual entries.
+3. **Formatting must be consistent server + client** — if the API preserves `**bold**`/`*italic*` markdown, the frontend must render it. If stripping whitespace, do it in BOTH the API route AND the display function.
+4. **Always persist state after generation** — if you generate a briefing, report, or content, upsert it to the database immediately. Don't rely on downstream steps to save it. The chatbot/dashboard will try to read it later.
+5. **Arrays must be `.join(' ')` not interpolated** — `${post.hashtags}` produces `"tag1,tag2"`. Always use `.join(' ')` or `.join(', ')`.
+6. **Never `.slice()` user data silently** — if capping a list (agencies, results), make it explicit or configurable. Hidden `.slice(0, 15)` caps lose user data.
+
+---
+
+## Admin Endpoint Standard
+
+All admin endpoints follow this pattern:
+- **Auth:** `?password=galata-assassin-2026` (or `ADMIN_PASSWORD` env var)
+- **GET** = read/preview (safe, no side effects)
+- **POST** = execute (writes data)
+- **Preview mode:** `?mode=preview` (default) shows what WOULD happen
+- **Execute mode:** `?mode=execute` actually performs the operation
+- **Response shape:** `{ success: boolean, message: string, data?: any, errors?: string[] }`
+- **Location:** `/src/app/api/admin/{endpoint-name}/route.ts`
+
+---
+
+## Email Template Standard
+
+- **Footer branding:** "GovCon Giants AI" (not "GovCon Giants")
+- **From address:** `hello@govconedu.com`
+- **Support email:** `service@govcongiants.com` (watch for missing 's' typo: `govcongiant.com`)
+- **Phone:** 786-477-0477
+- **Include:** activation link to `/activate`, "Manage preferences" link, "Unsubscribe" link
+- **Product-specific templates:** each product gets its own `send{Product}Email` function in `send-email.ts`
+
+---
+
+## Data Sourcing Standards
+
+- Government data must cite authoritative sources: GAO reports, IG audits, CRS analyses, USASpending API, SAM.gov, OMB budget documents
+- Never use generic/unverified sources for agency-specific claims
+- Document coverage percentage when expanding databases (e.g., "218/250 agencies = 87%")
+- All agency data stored in `src/data/` as JSON, built via admin endpoints
+
+---
+
 ## Common Development Tasks
 
 ### Adding a New Tool
