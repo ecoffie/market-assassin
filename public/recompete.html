@@ -1060,7 +1060,7 @@
             <div class="stat-card" id="lastUpdatedCard" style="display:none;">
                 <div class="stat-icon">🕐</div>
                 <div class="stat-number" id="lastUpdatedDate" style="font-size:16px;">--</div>
-                <div class="stat-label">Last Updated</div>
+                <div class="stat-label">Data Through</div>
             </div>
         </div>
 
@@ -1280,17 +1280,17 @@
                 return;
             }
 
-            // Show "Last Updated" based on data timestamps
+            // Show "Data Through" based on most recent contract start date in dataset
             try {
                 const dates = allContracts
                     .flatMap(c => (c.Contracts || []).map(ct => ct['Start Date']))
                     .filter(Boolean)
-                    .sort()
-                    .reverse();
+                    .map(d => new Date(d))
+                    .filter(d => !isNaN(d.getTime()))
+                    .sort((a, b) => b - a); // Sort descending (newest first)
                 const latestDate = dates[0] || null;
                 if (latestDate) {
-                    const d = new Date(latestDate);
-                    document.getElementById('lastUpdatedDate').textContent = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    document.getElementById('lastUpdatedDate').textContent = latestDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
                     document.getElementById('lastUpdatedCard').style.display = '';
                 }
             } catch (e) { /* non-critical */ }

@@ -321,6 +321,24 @@ All admin endpoints follow this pattern:
 
 > Full session history (Sessions 1-18) is in MEMORY.md.
 
+### Session 21 (Mar 11, 2026)
+- **Daily Briefings E2E Testing** — debugged and fixed briefing generation returning 0 items
+  - Fixed mock data field names to match TypeScript interfaces (`incumbent` → `incumbentName`, `currentValue` → `obligatedAmount`)
+  - Updated seed endpoint with real USASpending contract numbers (W91RUS18C0024, W91QVN19F0222)
+- **Recompete Action URLs** — changed from SAM.gov search to USASpending keyword search
+  - `src/lib/briefings/diff-engine.ts` now links to `usaspending.gov/keyword_search/{contractNumber}`
+- **Recompete Tracker USASpending Links** — `public/recompete.html`
+  - Made Award IDs clickable links to USASpending
+  - Added "View on USASpending" button at bottom of contract modal
+- **"Last Updated" Bug Fix** — fixed misleading date display in Recompete Tracker
+  - Was showing "Sep 2021" due to broken string-based date sorting
+  - Fixed to properly sort Date objects and show newest contract start date
+  - Renamed label from "Last Updated" to "Data Through" (more accurate)
+  - Verified data is real: 554 contracts with 2025 start dates, all verified against USASpending API
+- **Admin endpoints:**
+  - `/api/admin/debug-snapshots?email=X` — inspect raw snapshot data for debugging
+  - `/api/admin/seed-test-briefing?email=X` — seed mock data and generate briefing for testing
+
 ### Session 20 (Mar 11, 2026)
 - **Briefing Log Persistence Fix** — `send-briefings` cron now upserts to `briefing_log` after generation + updates delivery status
 - **Public Briefing API** — `GET /api/briefings/latest?email=X&days=N` returns briefing JSON, gated by KV
