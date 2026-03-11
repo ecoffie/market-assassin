@@ -231,10 +231,8 @@ export function processRecompeteDiffs(
       changeType: 'entered_90_day_window',
       signals: factors,
 
-      actionUrl: contract.contractNumber
-        ? `https://sam.gov/search/?keywords=${encodeURIComponent(contract.contractNumber)}&sort=-modifiedDate&index=opp&is_active=true&page=1`
-        : `https://sam.gov/search/?keywords=${encodeURIComponent(contract.incumbentName)}&sort=-modifiedDate&index=opp&is_active=true&page=1`,
-      actionLabel: 'Research Recompete',
+      actionUrl: `https://www.usaspending.gov/keyword_search/${encodeURIComponent(contract.contractNumber || contract.piid || contract.incumbentName)}`,
+      actionLabel: 'View Contract',
 
       rawData: contract,
     });
@@ -265,10 +263,8 @@ export function processRecompeteDiffs(
       changeType: 'timeline',
       signals: [...factors, ...changes],
 
-      actionUrl: contract.contractNumber
-        ? `https://sam.gov/search/?keywords=${encodeURIComponent(contract.contractNumber)}&sort=-modifiedDate&index=opp&is_active=true&page=1`
-        : `https://sam.gov/search/?keywords=${encodeURIComponent(contract.incumbentName)}&sort=-modifiedDate&index=opp&is_active=true&page=1`,
-      actionLabel: 'View on SAM.gov',
+      actionUrl: `https://www.usaspending.gov/keyword_search/${encodeURIComponent(contract.contractNumber || contract.piid || contract.incumbentName)}`,
+      actionLabel: 'View Contract',
 
       rawData: contract,
     });
@@ -299,10 +295,8 @@ export function processRecompeteDiffs(
       changeType: 'new_recompete',
       signals: factors,
 
-      actionUrl: contract.contractNumber
-        ? `https://sam.gov/search/?keywords=${encodeURIComponent(contract.contractNumber)}&sort=-modifiedDate&index=opp&is_active=true&page=1`
-        : `https://sam.gov/search/?keywords=${encodeURIComponent(contract.incumbentName)}&sort=-modifiedDate&index=opp&is_active=true&page=1`,
-      actionLabel: 'Find Solicitation',
+      actionUrl: `https://www.usaspending.gov/keyword_search/${encodeURIComponent(contract.contractNumber || contract.piid || contract.incumbentName)}`,
+      actionLabel: 'View Contract',
 
       rawData: contract,
     });
