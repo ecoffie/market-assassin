@@ -241,7 +241,21 @@ export async function GET(request: NextRequest) {
       results[snap.tool] = error ? { error: error.message } : { success: true };
     }
 
-    // 3. Now generate the briefing
+    // 3. Debug: read back what we just wrote
+    const { data: readSnapshots, error: readError } = await supabase
+      .from('briefing_snapshots')
+      .select('tool, raw_data, snapshot_date')
+      .eq('user_email', email)
+      .eq('snapshot_date', today);
+
+    const debugInfo = {
+      snapshotsFound: readSnapshots?.length || 0,
+      snapshotTools: readSnapshots?.map(s => s.tool) || [],
+      rawDataSample: readSnapshots?.[0]?.raw_data ? 'present' : 'null',
+      readError: readError?.message,
+    };
+
+    // 4. Now generate the briefing
     console.log(`[SeedTestBriefing] Generating briefing for ${email}...`);
     const briefing = await generateBriefing(email, {
       includeWebIntel: true,
@@ -254,6 +268,7 @@ export async function GET(request: NextRequest) {
         message: 'Snapshots seeded but briefing generation returned 0 items. Check generator logic.',
         email,
         seedResults: results,
+        debug: debugInfo,
       });
     }
 
