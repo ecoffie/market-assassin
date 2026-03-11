@@ -231,7 +231,9 @@ export function processRecompeteDiffs(
       changeType: 'entered_90_day_window',
       signals: factors,
 
-      actionUrl: `https://sam.gov/search?keywords=${encodeURIComponent(contract.incumbentName)}`,
+      actionUrl: contract.contractNumber
+        ? `https://sam.gov/search/?keywords=${encodeURIComponent(contract.contractNumber)}&sort=-modifiedDate&index=opp&is_active=true&page=1`
+        : `https://sam.gov/search/?keywords=${encodeURIComponent(contract.incumbentName)}&sort=-modifiedDate&index=opp&is_active=true&page=1`,
       actionLabel: 'Research Recompete',
 
       rawData: contract,
@@ -263,8 +265,10 @@ export function processRecompeteDiffs(
       changeType: 'timeline',
       signals: [...factors, ...changes],
 
-      actionUrl: `https://fpds.gov`,
-      actionLabel: 'View in FPDS',
+      actionUrl: contract.contractNumber
+        ? `https://sam.gov/search/?keywords=${encodeURIComponent(contract.contractNumber)}&sort=-modifiedDate&index=opp&is_active=true&page=1`
+        : `https://sam.gov/search/?keywords=${encodeURIComponent(contract.incumbentName)}&sort=-modifiedDate&index=opp&is_active=true&page=1`,
+      actionLabel: 'View on SAM.gov',
 
       rawData: contract,
     });
@@ -295,8 +299,10 @@ export function processRecompeteDiffs(
       changeType: 'new_recompete',
       signals: factors,
 
-      actionUrl: `https://sam.gov/search?keywords=${encodeURIComponent(contract.incumbentName)}`,
-      actionLabel: 'Add to Watchlist',
+      actionUrl: contract.contractNumber
+        ? `https://sam.gov/search/?keywords=${encodeURIComponent(contract.contractNumber)}&sort=-modifiedDate&index=opp&is_active=true&page=1`
+        : `https://sam.gov/search/?keywords=${encodeURIComponent(contract.incumbentName)}&sort=-modifiedDate&index=opp&is_active=true&page=1`,
+      actionLabel: 'Find Solicitation',
 
       rawData: contract,
     });
