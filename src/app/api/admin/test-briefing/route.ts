@@ -32,6 +32,41 @@ export async function GET(request: NextRequest) {
   );
 
   try {
+    // Ensure user has a briefing profile (auto-create default if missing)
+    const { data: existingProfile } = await supabase
+      .from('user_briefing_profiles')
+      .select('user_email')
+      .eq('user_email', email)
+      .single();
+
+    if (!existingProfile) {
+      console.log(`[TestBriefing] Creating default briefing profile for ${email}`);
+      const defaultProfile = {
+        naics_codes: ['541512', '541511', '541519', '541513', '541330'],
+        agencies: [
+          'Department of Defense',
+          'Department of Homeland Security',
+          'Department of Veterans Affairs',
+          'General Services Administration',
+          'Department of Health and Human Services',
+        ],
+        keywords: ['cybersecurity', 'IT modernization', 'cloud', 'data analytics', 'small business'],
+        zip_codes: [],
+        watched_companies: [],
+        watched_contracts: [],
+      };
+
+      await supabase.from('user_briefing_profiles').upsert({
+        user_email: email,
+        aggregated_profile: defaultProfile,
+        naics_codes: defaultProfile.naics_codes,
+        agencies: defaultProfile.agencies,
+        keywords: defaultProfile.keywords,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_email' });
+    }
+
     console.log(`[TestBriefing] Generating briefing for ${email}...`);
 
     const briefing = await generateBriefing(email, {
@@ -42,8 +77,9 @@ export async function GET(request: NextRequest) {
     if (!briefing || briefing.totalItems === 0) {
       return NextResponse.json({
         success: false,
-        message: 'No briefing items generated. User may need a briefing profile (run aggregate-profiles cron first).',
+        message: 'Briefing profile exists but no items generated. Data snapshot crons may not have run yet (opportunities, recompetes, awards run 7-7:45 AM UTC daily).',
         email,
+        hint: 'The generator needs snapshot data in briefing_snapshots table. Wait for crons to run, or this is a fresh install with no data.',
       });
     }
 
