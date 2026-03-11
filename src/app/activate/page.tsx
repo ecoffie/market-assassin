@@ -7,6 +7,7 @@ interface Tool {
   name: string;
   key: string;
   active: boolean;
+  url: string;
 }
 
 export default function ActivatePage() {
@@ -39,7 +40,10 @@ export default function ActivatePage() {
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
       <div className="max-w-md w-full p-8 bg-gray-800 rounded-2xl">
-        <h2 className="text-3xl font-bold mb-6 text-white">Activate Your Access</h2>
+        <div className="flex items-center justify-center mb-6">
+          <span className="text-4xl mr-3">🚀</span>
+          <h2 className="text-3xl font-bold text-white">Activate Your Access</h2>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <label className="block mb-2 text-gray-300">Email (from receipt)</label>
@@ -76,26 +80,38 @@ export default function ActivatePage() {
           {result && (
             result.success ? (
               <div>
-                <p className="text-green-400 mb-4">
-                  Access unlocked! You have: {result.tools?.map(t => t.name).join(', ')}
-                </p>
-                <div className="space-y-2">
+                <div className="bg-green-900/30 border border-green-500/50 rounded-xl p-4 mb-4">
+                  <p className="text-green-400 font-medium flex items-center">
+                    <span className="mr-2">✅</span>
+                    Access unlocked! You have {result.tools?.length} tool{result.tools?.length !== 1 ? 's' : ''}:
+                  </p>
+                </div>
+                <div className="space-y-3">
                   {result.tools?.map((tool) => (
-                    <div key={tool.key} className="flex items-center justify-between bg-gray-900 p-3 rounded-lg">
-                      <span className="text-white">{tool.name}</span>
-                      <span className="text-green-400 text-sm">Active</span>
-                    </div>
+                    <Link
+                      key={tool.key}
+                      href={tool.url}
+                      className="flex items-center justify-between bg-gray-900 hover:bg-gray-700 p-4 rounded-xl transition-colors group"
+                    >
+                      <div>
+                        <span className="text-white font-medium">{tool.name}</span>
+                        <span className="block text-gray-500 text-sm">{tool.url}</span>
+                      </div>
+                      <span className="text-indigo-400 group-hover:translate-x-1 transition-transform">→</span>
+                    </Link>
                   ))}
                 </div>
                 <Link
                   href="/"
                   className="block mt-6 text-center bg-gray-700 hover:bg-gray-600 py-3 rounded-xl text-white font-medium transition-colors"
                 >
-                  Go to Dashboard
+                  Go to Homepage
                 </Link>
               </div>
             ) : (
-              <p className="text-red-400">Error: {result.error}</p>
+              <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-4">
+                <p className="text-red-400">{result.error}</p>
+              </div>
             )
           )}
         </div>
