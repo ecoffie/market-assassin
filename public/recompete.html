@@ -1296,7 +1296,13 @@
                     .sort((a, b) => b - a); // Sort descending (newest first)
                 const latestDate = dates[0] || null;
                 if (latestDate) {
-                    document.getElementById('lastUpdatedDate').textContent = latestDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    const dateStr = latestDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    const daysSince = Math.floor((Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24));
+                    let freshness = '';
+                    if (daysSince <= 30) freshness = '<span style="color:#22c55e;font-size:10px;display:block;margin-top:2px">Fresh</span>';
+                    else if (daysSince <= 90) freshness = '<span style="color:#eab308;font-size:10px;display:block;margin-top:2px">Updated monthly</span>';
+                    else freshness = '<span style="color:#f97316;font-size:10px;display:block;margin-top:2px">Refresh pending</span>';
+                    document.getElementById('lastUpdatedDate').innerHTML = dateStr + freshness;
                     document.getElementById('lastUpdatedCard').style.display = '';
                 }
             } catch (e) { /* non-critical */ }
