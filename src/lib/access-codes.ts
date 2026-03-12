@@ -740,10 +740,47 @@ export async function hasBriefingAccess(email: string): Promise<boolean> {
   return !!access;
 }
 
-// Grant briefing access to a customer
+// Grant briefing access to a customer and seed a briefing profile if none exists
 export async function grantBriefingAccess(email: string): Promise<void> {
   await kv.set(`briefings:${email.toLowerCase()}`, 'true');
   console.log(`✅ Briefing access granted to: ${email}`);
+
+  // Seed a briefing profile so user gets briefings even before searching
+  // Uses generic GovCon terms — will be overwritten by aggregate-profiles cron once user searches
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const defaultProfile = {
+        naics_codes: ['541512', '541611'], // IT + consulting (most common GovCon)
+        agencies: [],
+        keywords: ['small business', 'set-aside'],
+        zip_codes: [],
+        watched_companies: [],
+        watched_contracts: [],
+      };
+      await supabase.from('user_briefing_profile').upsert({
+        user_email: email.toLowerCase(),
+        naics_codes: defaultProfile.naics_codes,
+        agencies: defaultProfile.agencies,
+        keywords: defaultProfile.keywords,
+        zip_codes: defaultProfile.zip_codes,
+        watched_companies: defaultProfile.watched_companies,
+        watched_contracts: defaultProfile.watched_contracts,
+        aggregated_profile: defaultProfile,
+        timezone: 'America/New_York',
+        email_frequency: 'daily',
+        sms_enabled: false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_email' });
+      console.log(`✅ Briefing profile seeded for: ${email}`);
+    }
+  } catch (err) {
+    // Non-fatal — profile will be created by aggregate-profiles cron later
+    console.error(`⚠️ Failed to seed briefing profile (non-fatal):`, err);
+  }
 }
 
 // Revoke briefing access

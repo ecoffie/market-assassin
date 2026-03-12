@@ -43,11 +43,10 @@ export async function GET(request: Request) {
 
   try {
     // Step 1: Get active subscribers
-    // For Phase 1, we'll use users who have briefing profiles
+    // Include users with aggregated_profile OR individual column data (naics_codes not empty)
     const { data: subscribers, error: subError } = await supabase
       .from('user_briefing_profile')
-      .select('user_email, aggregated_profile, preferences, sms_enabled, phone_number')
-      .not('aggregated_profile', 'is', null)
+      .select('user_email, aggregated_profile, naics_codes, agencies, preferences, sms_enabled, phone_number')
       .limit(MAX_USERS_PER_RUN);
 
     if (subError) {
@@ -64,11 +63,30 @@ export async function GET(request: Request) {
       });
     }
 
-    console.log(`[SendBriefings] Processing ${subscribers.length} subscribers`);
+    // Filter out users with truly empty profiles (no NAICS, no agencies in either JSONB or columns)
+    const activeSubscribers = subscribers.filter((s) => {
+      const jsonb = s.aggregated_profile as Record<string, unknown> | null;
+      const hasJsonb = jsonb && typeof jsonb === 'object' && Array.isArray(jsonb.naics_codes) && (jsonb.naics_codes as string[]).length > 0;
+      const hasColumns = (Array.isArray(s.naics_codes) && s.naics_codes.length > 0) || (Array.isArray(s.agencies) && s.agencies.length > 0);
+      return hasJsonb || hasColumns;
+    });
+
+    if (activeSubscribers.length === 0) {
+      console.log('[SendBriefings] No subscribers with profile data');
+      return NextResponse.json({
+        success: true,
+        message: 'No subscribers with profile data',
+        briefingsSent: 0,
+        totalProfiles: subscribers.length,
+        elapsed: Date.now() - startTime,
+      });
+    }
+
+    console.log(`[SendBriefings] Processing ${activeSubscribers.length} subscribers (${subscribers.length - activeSubscribers.length} skipped — empty profiles)`);
 
     // Step 2: Process in batches
-    for (let i = 0; i < subscribers.length; i += BATCH_SIZE) {
-      const batch = subscribers.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < activeSubscribers.length; i += BATCH_SIZE) {
+      const batch = activeSubscribers.slice(i, i + BATCH_SIZE);
 
       const batchPromises = batch.map(async (subscriber) => {
         try {
@@ -171,7 +189,8 @@ export async function GET(request: Request) {
       success: true,
       briefingsSent,
       briefingsFailed,
-      totalSubscribers: subscribers.length,
+      totalSubscribers: activeSubscribers.length,
+      skippedEmpty: subscribers.length - activeSubscribers.length,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       elapsed,
     });

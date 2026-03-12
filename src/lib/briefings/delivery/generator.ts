@@ -77,19 +77,42 @@ export async function generateBriefing(
   const briefingDate = new Date().toISOString().split('T')[0];
 
   try {
-    // Step 1: Get user profile
+    // Step 1: Get user profile (check JSONB first, fallback to individual columns)
     const { data: profileData } = await supabase
       .from('user_briefing_profile')
-      .select('aggregated_profile')
+      .select('aggregated_profile, naics_codes, agencies, keywords, zip_codes, watched_companies, watched_contracts')
       .eq('user_email', userEmail)
       .single();
 
-    if (!profileData?.aggregated_profile) {
+    if (!profileData) {
       console.log(`[BriefingGen] No profile for ${userEmail}`);
       return null;
     }
 
-    const userProfile = buildUserProfile(profileData.aggregated_profile);
+    // Use aggregated_profile JSONB if populated, otherwise build from individual columns
+    const hasJsonb = profileData.aggregated_profile
+      && typeof profileData.aggregated_profile === 'object'
+      && Object.keys(profileData.aggregated_profile).length > 0
+      && (profileData.aggregated_profile as Record<string, unknown>).naics_codes;
+
+    const profileSource = hasJsonb
+      ? profileData.aggregated_profile
+      : {
+          naics_codes: profileData.naics_codes || [],
+          agencies: profileData.agencies || [],
+          keywords: profileData.keywords || [],
+          zip_codes: profileData.zip_codes || [],
+          watched_companies: profileData.watched_companies || [],
+          watched_contracts: profileData.watched_contracts || [],
+        };
+
+    const userProfile = buildUserProfile(profileSource as Record<string, unknown>);
+
+    // Check if profile has any meaningful data
+    if (userProfile.naics_codes.length === 0 && userProfile.agencies.length === 0 && userProfile.keywords.length === 0) {
+      console.log(`[BriefingGen] Empty profile for ${userEmail} — no NAICS, agencies, or keywords`);
+      return null;
+    }
 
     // Step 2: Get today's and yesterday's snapshots
     const today = new Date();
@@ -132,9 +155,33 @@ export async function generateBriefing(
         : undefined
     );
 
-    // Step 4: Format the briefing
+    // Step 4: Filter out low-relevance noise and apply urgency flagging
+    const MIN_RELEVANCE_SCORE = 20; // Items below this are generic noise
+    const URGENCY_DEADLINE_DAYS = 7; // Flag items with deadlines within this many days
+
+    const filteredItems = diffResult.items.filter((item) => {
+      // Keep items with decent relevance OR high urgency (deadlines matter even if low relevance)
+      return item.relevanceScore >= MIN_RELEVANCE_SCORE || item.urgencyScore >= 80;
+    });
+
+    // Boost urgency score for items with near-term deadlines
+    for (const item of filteredItems) {
+      if (item.deadline) {
+        const daysUntil = Math.ceil((new Date(item.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        if (daysUntil >= 0 && daysUntil <= URGENCY_DEADLINE_DAYS) {
+          item.urgencyScore = Math.max(item.urgencyScore, 90); // Ensure URGENT badge
+          if (!item.signals.includes('deadline_within_7_days')) {
+            item.signals.push('deadline_within_7_days');
+          }
+        }
+      }
+    }
+
+    // Re-sort after urgency boost (urgent items bubble up)
+    filteredItems.sort((a, b) => b.overallScore - a.overallScore);
+
     const maxItems = options.maxItems || 15;
-    const items = diffResult.items.slice(0, maxItems);
+    const items = filteredItems.slice(0, maxItems);
 
     const briefing = formatBriefing(
       userEmail,

@@ -119,6 +119,54 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Real-time profile update: if this user has a briefing profile,
+    // immediately add the new search value to it (don't wait for nightly cron)
+    try {
+      const email = body.user_email.toLowerCase().trim();
+      const searchType = body.search_type || 'keyword';
+
+      // Map search type to profile column
+      const columnMap: Record<string, string> = {
+        naics: 'naics_codes',
+        agency: 'agencies',
+        keyword: 'keywords',
+        zip: 'zip_codes',
+        company: 'watched_companies',
+        contract: 'watched_contracts',
+        psc: 'keywords',
+        set_aside: 'keywords',
+      };
+
+      const column = columnMap[searchType];
+      if (column) {
+        const { data: profile } = await supabase
+          .from('user_briefing_profile')
+          .select(`${column}, aggregated_profile`)
+          .eq('user_email', email)
+          .single();
+
+        if (profile) {
+          const currentValues: string[] = Array.isArray(profile[column]) ? profile[column] : [];
+          if (!currentValues.includes(normalizedValue)) {
+            const updatedValues = [...currentValues, normalizedValue];
+            // Also update aggregated_profile JSONB to stay in sync
+            const currentJsonb = (profile.aggregated_profile && typeof profile.aggregated_profile === 'object')
+              ? profile.aggregated_profile as Record<string, unknown>
+              : {};
+            const updatedJsonb = { ...currentJsonb, [column]: updatedValues };
+
+            await supabase
+              .from('user_briefing_profile')
+              .update({ [column]: updatedValues, aggregated_profile: updatedJsonb, updated_at: new Date().toISOString() })
+              .eq('user_email', email);
+          }
+        }
+      }
+    } catch (profileErr) {
+      // Non-fatal — nightly cron will catch up
+      console.error('Profile update error (non-fatal):', profileErr);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Search captured'

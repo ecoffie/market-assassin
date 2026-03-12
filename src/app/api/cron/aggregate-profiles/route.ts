@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
           .single();
 
         if (existing) {
-          // Update existing profile
+          // Update existing profile — write BOTH individual columns AND aggregated_profile JSONB
           const { error: updateError } = await supabase
             .from('user_briefing_profile')
             .update({
@@ -118,6 +118,7 @@ export async function GET(request: NextRequest) {
               zip_codes: aggregated.zip_codes,
               watched_companies: aggregated.watched_companies,
               watched_contracts: aggregated.watched_contracts,
+              aggregated_profile: aggregated,
               last_search_sync: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
@@ -130,7 +131,7 @@ export async function GET(request: NextRequest) {
             updated++;
           }
         } else {
-          // Create new profile
+          // Create new profile — write BOTH individual columns AND aggregated_profile JSONB
           const { error: insertError } = await supabase
             .from('user_briefing_profile')
             .insert({
@@ -141,6 +142,7 @@ export async function GET(request: NextRequest) {
               zip_codes: aggregated.zip_codes,
               watched_companies: aggregated.watched_companies,
               watched_contracts: aggregated.watched_contracts,
+              aggregated_profile: aggregated,
               timezone: 'America/New_York', // Default
               email_frequency: 'daily',
               sms_enabled: false,
