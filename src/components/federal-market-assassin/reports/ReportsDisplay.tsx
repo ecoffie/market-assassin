@@ -1714,9 +1714,15 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   />
                   <GeographicDistributionChart agencies={reports.governmentBuyers.agencies} />
                 </div>
+                <SourceFooter source="USASpending.gov" period="FY2022–2025" url="https://www.usaspending.gov" />
               </div>
             )}
-            {activeTab === 'buyers' && <GovernmentBuyersReport data={reports.governmentBuyers} onAgencyClick={openAgencyModal} />}
+            {activeTab === 'buyers' && (
+              <>
+                <GovernmentBuyersReport data={reports.governmentBuyers} onAgencyClick={openAgencyModal} />
+                <SourceFooter source="USASpending.gov" detail="Office IDs searchable on SAM.gov" period="FY2022–2025" url="https://www.usaspending.gov" />
+              </>
+            )}
             {activeTab === 'subcontracting' && (
               isSectionLocked('subcontracting') ? (
                 <LockedSectionOverlay
@@ -1724,7 +1730,10 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   onUpgrade={() => setShowUpgradeModal(true)}
                 />
               ) : (
-                <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />
+                <>
+                  <SubcontractingReport tier2Data={reports.tier2Subcontracting} primeData={reports.primeContractor} />
+                  <SourceFooter source="USASpending.gov & SAM.gov" detail="Prime contractor data from federal award records" period="FY2022–2025" url="https://www.usaspending.gov" />
+                </>
               )
             )}
             {activeTab === 'idvContracts' && (
@@ -1734,10 +1743,18 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   onUpgrade={() => setShowUpgradeModal(true)}
                 />
               ) : (
-                <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />
+                <>
+                  <IDVContractsReport data={reports.idvContracts} inputs={reports.metadata.inputs} />
+                  <SourceFooter source="USASpending.gov" detail="Indefinite Delivery Vehicle contract awards" period="FY2022–2025" url="https://www.usaspending.gov" />
+                </>
               )
             )}
-            {activeTab === 'osbpContacts' && <OSBPContactsReport data={reports.governmentBuyers} />}
+            {activeTab === 'osbpContacts' && (
+              <>
+                <OSBPContactsReport data={reports.governmentBuyers} />
+                <SourceFooter source="SBA.gov & Agency OSBP Offices" detail="Small business office contacts from federal directories" url="https://www.sba.gov/federal-contracting" />
+              </>
+            )}
             {activeTab === 'december' && (
               isSectionLocked('december') ? (
                 <LockedSectionOverlay
@@ -1745,11 +1762,17 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   onUpgrade={() => setShowUpgradeModal(true)}
                 />
               ) : (
-                <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />
+                <>
+                  <DecemberSpendReport data={reports.decemberSpend} inputs={reports.metadata.inputs} />
+                  <SourceFooter source="USASpending.gov" detail="Historical contract awards in your NAICS category" period="FY2022–2025" url="https://www.usaspending.gov" />
+                </>
               )
             )}
             {activeTab === 'budget' && (
-              <BudgetCheckupTab report={reports} />
+              <>
+                <BudgetCheckupTab report={reports} />
+                <SourceFooter source="USASpending.gov Budgetary Resources API" detail="Agency budget authority comparison" period="FY2025 vs FY2026" url="https://www.usaspending.gov" />
+              </>
             )}
             {activeTab === 'entryPoints' && (
               isSectionLocked('entryPoints') ? (
@@ -1758,7 +1781,10 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   onUpgrade={() => setShowUpgradeModal(true)}
                 />
               ) : (
-                <EntryPointsTab report={reports} />
+                <>
+                  <EntryPointsTab report={reports} />
+                  <SourceFooter source="USASpending.gov" detail="Simplified acquisition and micro-purchase data from contract awards" period="FY2022–2025" url="https://www.usaspending.gov" />
+                </>
               )
             )}
             {activeTab === 'tribal' && (
@@ -1768,7 +1794,10 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                   onUpgrade={() => setShowUpgradeModal(true)}
                 />
               ) : (
-                <TribalReport data={reports.tribalContracting} />
+                <>
+                  <TribalReport data={reports.tribalContracting} />
+                  <SourceFooter source="SBA.gov & Tribal 8(a) Directory" detail="Tribal-owned business data from federal registries" url="https://www.sba.gov/federal-contracting" />
+                </>
               )
             )}
             {activeTab === 'pricingIntel' && (
@@ -3599,6 +3628,19 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+function SourceFooter({ source, detail, period, url }: { source: string; detail?: string; period?: string; url?: string }) {
+  return (
+    <div className="mt-6 pt-4 border-t border-slate-700/50 flex items-center gap-2 text-xs text-slate-500">
+      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      <span>
+        Source: {url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-400/70 hover:text-blue-400 underline underline-offset-2">{source}</a> : <span className="text-slate-400">{source}</span>}
+        {detail && <span className="ml-1">— {detail}</span>}
+        {period && <span className="ml-1 text-slate-600">({period})</span>}
+      </span>
     </div>
   );
 }
