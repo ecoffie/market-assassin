@@ -130,6 +130,50 @@ export default function OpportunityHunterPage() {
     veteranStatus: '',
   });
 
+  // Search history
+  interface SavedSearch {
+    criteria: SearchCriteria;
+    label: string;
+    date: string;
+    resultCount: number;
+  }
+  const [searchHistory, setSearchHistory] = useState<SavedSearch[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Load search history from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('oh_search_history');
+      if (saved) setSearchHistory(JSON.parse(saved));
+    } catch { /* ignore */ }
+  }, []);
+
+  const saveSearchToHistory = (criteria: SearchCriteria, resultCount: number) => {
+    const label = formatSearchCriteria(criteria);
+    if (!label || label === 'All contracts') return;
+    const entry: SavedSearch = {
+      criteria: { ...criteria },
+      label,
+      date: new Date().toISOString(),
+      resultCount,
+    };
+    // Dedupe by label, keep max 10
+    const updated = [entry, ...searchHistory.filter(s => s.label !== label)].slice(0, 10);
+    setSearchHistory(updated);
+    try { localStorage.setItem('oh_search_history', JSON.stringify(updated)); } catch { /* ignore */ }
+  };
+
+  const loadSearchFromHistory = (saved: SavedSearch) => {
+    setFormData(saved.criteria);
+    setShowHistory(false);
+    // Auto-submit after state update
+    setTimeout(() => {
+      document.getElementById('search-form')?.dispatchEvent(
+        new Event('submit', { bubbles: true, cancelable: true })
+      );
+    }, 100);
+  };
+
   // Check for Pro access on mount (from localStorage)
   useEffect(() => {
     const savedProAccess = localStorage.getItem('opportunityHunterPro');
@@ -333,6 +377,8 @@ export default function OpportunityHunterPage() {
       setTimeout(() => {
         setLoading(false);
         setResults(result);
+        // Save to search history
+        saveSearchToHistory(formData, result?.agencies?.length || 0);
       }, 500);
 
     } catch (err) {
@@ -492,6 +538,36 @@ export default function OpportunityHunterPage() {
 
         {/* Search Form */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          {/* Recent Searches */}
+          {searchHistory.length > 0 && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setShowHistory(!showHistory)}
+                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Recent Searches ({searchHistory.length})
+                <svg className={`w-4 h-4 transition-transform ${showHistory ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {showHistory && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {searchHistory.map((saved, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => loadSearchFromHistory(saved)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-blue-100 text-slate-700 text-xs rounded-full border border-slate-200 hover:border-blue-300 transition-colors"
+                      title={`${saved.resultCount} results — ${new Date(saved.date).toLocaleDateString()}`}
+                    >
+                      <span>{saved.label}</span>
+                      <span className="text-slate-400">({saved.resultCount})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <form id="search-form" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
