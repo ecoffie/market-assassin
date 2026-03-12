@@ -145,7 +145,7 @@ async function queryCalcAPI(params: {
   url.searchParams.set('sort', 'asc');
 
   const response = await fetch(url.toString(), {
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!response.ok) {
@@ -205,48 +205,54 @@ function computePercentile(sorted: number[], p: number): number {
  */
 export async function fetchPricingIntel(naicsCode: string): Promise<PricingIntelData | null> {
   const searchTerms = getSearchTermsForNAICS(naicsCode);
+  console.log(`[CALC+] Fetching pricing intel for NAICS ${naicsCode}, terms: ${searchTerms.join(', ')}`);
 
-  // Query for each search term, combine results
+  // Run ALL queries in parallel for speed (avoid sequential timeout issues)
+  const termQueries = searchTerms.slice(0, 3).map(term =>
+    queryCalcAPI({ keyword: term, pageSize: 100 })
+      .then(result => ({ term, result, error: null as string | null }))
+      .catch(err => ({ term, result: null as CalcApiResponse | null, error: String(err) }))
+  );
+
+  const sbQuery = queryCalcAPI({ keyword: searchTerms[0], businessSize: 'S', pageSize: 100 })
+    .then(r => ({ results: r.results.map(h => h._source), error: null as string | null }))
+    .catch(err => ({ results: [] as CalcRateRecord[], error: String(err) }));
+
+  const lgQuery = queryCalcAPI({ keyword: searchTerms[0], businessSize: 'O', pageSize: 100 })
+    .then(r => ({ results: r.results.map(h => h._source), error: null as string | null }))
+    .catch(err => ({ results: [] as CalcRateRecord[], error: String(err) }));
+
+  const [termResults, sbResult, lgResult] = await Promise.all([
+    Promise.all(termQueries),
+    sbQuery,
+    lgQuery,
+  ]);
+
+  // Combine search term results
   const allRecords: CalcRateRecord[] = [];
   const seenIds = new Set<string>();
-  let totalFromApi = 0;
 
-  for (const term of searchTerms.slice(0, 4)) {
-    try {
-      const result = await queryCalcAPI({ keyword: term, pageSize: 100 });
-      totalFromApi += result.count;
-
-      for (const hit of result.results) {
-        const rec = hit._source;
-        const key = `${rec.vendor_name}:${rec.labor_category}:${rec.current_price}`;
-        if (!seenIds.has(key)) {
-          seenIds.add(key);
-          allRecords.push(rec);
-        }
+  for (const { term, result, error } of termResults) {
+    if (error || !result) {
+      console.error(`[CALC+] Error querying "${term}": ${error}`);
+      continue;
+    }
+    console.log(`[CALC+] "${term}": ${result.count} total, ${result.results.length} returned`);
+    for (const hit of result.results) {
+      const rec = hit._source;
+      const key = `${rec.vendor_name}:${rec.labor_category}:${rec.current_price}`;
+      if (!seenIds.has(key)) {
+        seenIds.add(key);
+        allRecords.push(rec);
       }
-
-      // Small delay between calls
-      await new Promise(r => setTimeout(r, 200));
-    } catch (err) {
-      console.error(`[CALC+] Error querying "${term}":`, err);
     }
   }
 
+  console.log(`[CALC+] Total unique records: ${allRecords.length}`);
   if (allRecords.length === 0) return null;
 
-  // Also fetch a comparison for small vs large business
-  let smallBizRecords: CalcRateRecord[] = [];
-  let largeBizRecords: CalcRateRecord[] = [];
-
-  try {
-    const sbResult = await queryCalcAPI({ keyword: searchTerms[0], businessSize: 'S', pageSize: 100 });
-    smallBizRecords = sbResult.results.map(r => r._source);
-    await new Promise(r => setTimeout(r, 200));
-    const lgResult = await queryCalcAPI({ keyword: searchTerms[0], businessSize: 'O', pageSize: 100 });
-    largeBizRecords = lgResult.results.map(r => r._source);
-  } catch {
-    // Non-critical
-  }
+  const smallBizRecords = sbResult.results;
+  const largeBizRecords = lgResult.results;
 
   // Aggregate by labor category
   const categoryMap = new Map<string, number[]>();
