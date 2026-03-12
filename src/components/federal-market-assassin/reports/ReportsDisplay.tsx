@@ -327,18 +327,36 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
     return `https://sam.gov/search/?index=opp&page=1&pageSize=25&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&q=${encoded}`;
   };
 
-  const tabs = [
-    { id: 'analytics' as ReportTab, label: '📈 Analytics', icon: '📈' },
-    { id: 'budget' as ReportTab, label: '💰 Budget Checkup', icon: '💰' },
-    { id: 'entryPoints' as ReportTab, label: '🚪 Entry Points', icon: '🚪' },
-    { id: 'buyers' as ReportTab, label: '👥 Government Buyers', icon: '👥' },
-    { id: 'osbpContacts' as ReportTab, label: '📞 OSBP Contacts', icon: '📞' },
-    { id: 'subcontracting' as ReportTab, label: '🔗 Subcontracting', icon: '🔗' },
-    { id: 'idvContracts' as ReportTab, label: '📋 IDV Contracts', icon: '📋' },
-    { id: 'december' as ReportTab, label: '📊 Similar Awards', icon: '📊' },
-    { id: 'tribal' as ReportTab, label: '🏛️ Tribal Contracting', icon: '🏛️' },
-    { id: 'pricingIntel' as ReportTab, label: '💵 Pricing Intel', icon: '💵' },
+  const tabGroups = [
+    {
+      label: 'Market Intelligence',
+      tabs: [
+        { id: 'analytics' as ReportTab, label: 'Analytics', icon: '📈' },
+        { id: 'budget' as ReportTab, label: 'Budget', icon: '💰' },
+        { id: 'entryPoints' as ReportTab, label: 'Entry Points', icon: '🚪' },
+        { id: 'pricingIntel' as ReportTab, label: 'Pricing Intel', icon: '💵' },
+      ],
+    },
+    {
+      label: 'Contacts & Partners',
+      tabs: [
+        { id: 'buyers' as ReportTab, label: 'Gov Buyers', icon: '👥' },
+        { id: 'osbpContacts' as ReportTab, label: 'OSBP', icon: '📞' },
+        { id: 'subcontracting' as ReportTab, label: 'Subcontracting', icon: '🔗' },
+        { id: 'tribal' as ReportTab, label: 'Tribal', icon: '🏛️' },
+      ],
+    },
+    {
+      label: 'Contract Research',
+      tabs: [
+        { id: 'idvContracts' as ReportTab, label: 'IDV Contracts', icon: '📋' },
+        { id: 'december' as ReportTab, label: 'Similar Awards', icon: '📊' },
+      ],
+    },
   ];
+
+  // Flat list for mobile dropdown and iteration
+  const tabs = tabGroups.flatMap(g => g.tabs);
 
   const handleExportPDF = () => {
     // Show all reports for printing
@@ -1573,46 +1591,47 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
             </div>
           </div>
 
-          {/* Desktop: Horizontal tabs */}
-          <div className="hidden md:block border-b border-slate-700/50 overflow-x-auto print:hidden bg-slate-900/30">
-            <div className="flex px-4 gap-1">
-              {tabs.map((tab) => {
-                const locked = isSectionLocked(tab.id);
-                const isActive = activeTab === tab.id && !locked;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      if (locked) {
-                        setShowUpgradeModal(true);
-                      } else {
-                        setActiveTab(tab.id);
-                      }
-                    }}
-                    className={`relative px-4 py-3 font-medium text-sm whitespace-nowrap transition-all duration-200 flex items-center gap-2 rounded-t-lg ${
-                      isActive
-                        ? 'bg-slate-800/80 text-cyan-400 border-t-2 border-x border-cyan-400 border-slate-700/50 -mb-px'
-                        : locked
-                          ? 'text-slate-500 hover:text-slate-400 hover:bg-slate-800/30 cursor-pointer group'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
-                    }`}
-                  >
-                    <span className="text-base">{tab.icon}</span>
-                    <span>{tab.label.replace(/^[^\s]+\s/, '')}</span>
-                    {locked && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 rounded-full border border-amber-500/30 group-hover:bg-amber-500/30 transition-colors">
-                        <svg className="w-3 h-3 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-xs text-amber-400 font-semibold">PRO</span>
-                      </span>
-                    )}
-                    {isActive && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
-                    )}
-                  </button>
-                );
-              })}
+          {/* Desktop: Grouped tab navigation */}
+          <div className="hidden md:block border-b border-slate-700/50 print:hidden bg-slate-900/30 px-6 py-4">
+            <div className="flex gap-6">
+              {tabGroups.map((group) => (
+                <div key={group.label} className="flex-shrink-0">
+                  <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">{group.label}</p>
+                  <div className="flex gap-1">
+                    {group.tabs.map((tab) => {
+                      const locked = isSectionLocked(tab.id);
+                      const isActive = activeTab === tab.id && !locked;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            if (locked) {
+                              setShowUpgradeModal(true);
+                            } else {
+                              setActiveTab(tab.id);
+                            }
+                          }}
+                          className={`relative px-3 py-2 font-medium text-xs transition-all duration-200 flex items-center gap-1.5 rounded-lg ${
+                            isActive
+                              ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500/40'
+                              : locked
+                                ? 'text-slate-500 hover:text-slate-400 hover:bg-slate-800/50 cursor-pointer group'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                          }`}
+                        >
+                          <span className="text-sm">{tab.icon}</span>
+                          <span>{tab.label}</span>
+                          {locked && (
+                            <svg className="w-3 h-3 text-amber-400/70" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </>
