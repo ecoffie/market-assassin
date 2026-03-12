@@ -51,6 +51,7 @@ import {
 } from '@/lib/utils/december-hit-list';
 
 import { MarketAssassinTier, MARKET_ASSASSIN_TIER_FEATURES } from '@/lib/access-codes';
+import PricingIntelTab from './PricingIntelTab';
 
 interface ReportsDisplayProps {
   reports: ComprehensiveReport;
@@ -95,7 +96,8 @@ type ReportTab =
   | 'december'
   | 'tribal'
   | 'budget'
-  | 'entryPoints';
+  | 'entryPoints'
+  | 'pricingIntel';
 
 // Helper function to format currency values intelligently
 function formatCurrency(value: number): string {
@@ -158,7 +160,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
   const [additionalCommands, setAdditionalCommands] = useState<Array<{command: string, painPoints: PainPointsApiResponse}>>([]);
 
   // Premium sections that are blocked for standard tier
-  const premiumSections: ReportTab[] = ['idvContracts', 'december', 'subcontracting', 'tribal', 'entryPoints'];
+  const premiumSections: ReportTab[] = ['idvContracts', 'december', 'subcontracting', 'tribal', 'entryPoints', 'pricingIntel'];
   const isSectionLocked = (tabId: ReportTab) => tier === 'standard' && premiumSections.includes(tabId);
 
   // Helper to extract DoD command abbreviations from agency names
@@ -335,6 +337,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
     { id: 'idvContracts' as ReportTab, label: '📋 IDV Contracts', icon: '📋' },
     { id: 'december' as ReportTab, label: '📊 Similar Awards', icon: '📊' },
     { id: 'tribal' as ReportTab, label: '🏛️ Tribal Contracting', icon: '🏛️' },
+    { id: 'pricingIntel' as ReportTab, label: '💵 Pricing Intel', icon: '💵' },
   ];
 
   const handleExportPDF = () => {
@@ -568,6 +571,7 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
         tribe.contactInfo?.phone || ''
       ]);
       tribalCSV = createCSV(tribalHeaders, tribalRows);
+
     }
 
     // Create and download each CSV
@@ -595,6 +599,24 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
       setTimeout(() => downloadCSV(idvCSV, `idv-contracts-${date}.csv`), 400);
       setTimeout(() => downloadCSV(similarAwardsCSV, `similar-awards-${date}.csv`), 500);
       setTimeout(() => downloadCSV(tribalCSV, `tribal-contracting-${date}.csv`), 600);
+
+      // 8. Pricing Intel CSV
+      if (reports.pricingIntel?.laborCategories?.length) {
+        const pricingHeaders = ['Labor Category', 'Records', 'Min Rate', '25th Pctl', 'Median', '75th Pctl', 'Max Rate', 'Avg Rate', 'Next Year Median'];
+        const pricingRows = reports.pricingIntel.laborCategories.map((cat: any) => [
+          cat.category,
+          cat.recordCount,
+          `$${cat.min.toFixed(2)}`,
+          `$${cat.percentile25.toFixed(2)}`,
+          `$${cat.median.toFixed(2)}`,
+          `$${cat.percentile75.toFixed(2)}`,
+          `$${cat.max.toFixed(2)}`,
+          `$${cat.avg.toFixed(2)}`,
+          cat.nextYearMedian ? `$${cat.nextYearMedian.toFixed(2)}` : ''
+        ]);
+        const pricingIntelCSV = createCSV(pricingHeaders, pricingRows);
+        setTimeout(() => downloadCSV(pricingIntelCSV, `pricing-intel-${reports.metadata.inputs.naicsCode || 'rates'}.csv`), 700);
+      }
     }
 
     setExportingCSV(false);
@@ -1728,6 +1750,16 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                 />
               ) : (
                 <TribalReport data={reports.tribalContracting} />
+              )
+            )}
+            {activeTab === 'pricingIntel' && (
+              isSectionLocked('pricingIntel') ? (
+                <LockedSectionOverlay
+                  sectionName="Pricing Intel"
+                  onUpgrade={() => setShowUpgradeModal(true)}
+                />
+              ) : (
+                <PricingIntelTab report={reports} />
               )
             )}
           </>

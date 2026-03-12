@@ -8,6 +8,7 @@ import { searchIDVContracts } from '@/lib/idv-search';
 import { getEnhancedAgencyInfo, isDoDAgency } from '@/lib/utils/command-info';
 import { ComprehensiveReport, CoreInputs, Agency, SimplifiedAcquisitionReport, SimplifiedAcquisitionAgency } from '@/types/federal-market-assassin';
 import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget-authority';
+import { fetchPricingIntel } from '@/lib/utils/calc-rates';
 import { checkReportRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { getEmailFromRequest, verifyMAAccess } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
@@ -806,6 +807,19 @@ export async function POST(request: NextRequest) {
           },
           recommendations,
         } as SimplifiedAcquisitionReport;
+      })(),
+      pricingIntel: await (async () => {
+        try {
+          const naics = inputs.naicsCode?.trim();
+          if (!naics) return undefined;
+          console.log(`[generate-all] Fetching pricing intel for NAICS ${naics}...`);
+          const data = await fetchPricingIntel(naics);
+          if (!data || data.laborCategories.length === 0) return undefined;
+          return data;
+        } catch (error) {
+          console.error('[generate-all] Pricing intel error:', error);
+          return undefined;
+        }
       })(),
       metadata: {
         generatedAt: new Date().toISOString(),

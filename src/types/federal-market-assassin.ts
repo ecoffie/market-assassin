@@ -405,6 +405,43 @@ export interface SimplifiedAcquisitionReport {
   recommendations: string[];
 }
 
+// Pricing Intel (GSA CALC+ labor rates)
+export interface PricingIntelReport {
+  laborCategories: Array<{
+    category: string;
+    recordCount: number;
+    median: number;
+    percentile25: number;
+    percentile75: number;
+    min: number;
+    max: number;
+    avg: number;
+    nextYearMedian: number | null;
+  }>;
+  businessSizeComparison: {
+    smallBusiness: { median: number; count: number; avg: number };
+    largeBusiness: { median: number; count: number; avg: number };
+    gapPercent: number;
+  };
+  rateDistribution: Array<{ range: string; count: number }>;
+  priceToWinGuidance: {
+    aggressiveRate: number;
+    competitiveRate: number;
+    premiumRate: number;
+  };
+  topVendors: Array<{
+    name: string;
+    avgRate: number;
+    recordCount: number;
+    businessSize: string;
+  }>;
+  naicsCode: string;
+  naicsDescription: string;
+  searchTermsUsed: string[];
+  totalRecordsAnalyzed: number;
+  queryDate: string;
+}
+
 // All Reports Combined
 export interface ComprehensiveReport {
   governmentBuyers: GovernmentBuyersReport;
@@ -418,6 +455,7 @@ export interface ComprehensiveReport {
   idvContracts?: IDVContractsReport;  // IDV Indefinite Delivery contracts for subcontracting
   budgetCheckup?: BudgetCheckupReport;  // FY2025 vs FY2026 budget comparison
   simplifiedAcquisition?: SimplifiedAcquisitionReport;  // SAT & micro-purchase entry point analysis
+  pricingIntel?: PricingIntelReport;  // GSA CALC+ labor rate analysis
   metadata: {
     generatedAt: string;
     inputs: CoreInputs;
