@@ -474,6 +474,36 @@ Output ONLY the post text, followed by hashtags on separate lines.`;
 
     console.log(`[Content Reaper] Generated ${posts.length} posts`);
 
+    // Auto-persist generated posts to content_library (non-blocking)
+    if (userEmail && posts.length > 0) {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          const rows = posts.map((post) => ({
+            user_email: userEmail.toLowerCase().trim(),
+            title: post.template,
+            content: post.content,
+            post_type: 'linkedin',
+            tags: post.hashtags,
+            template_key: post.templateKey,
+            angle: post.angle,
+            pain_point: post.painPointAddressed,
+            target_agencies: targetAgencies,
+            created_at: new Date().toISOString(),
+          }));
+          supabase.from('content_library').insert(rows).then(({ error }) => {
+            if (error) console.error('[Content Reaper] Auto-save error:', error.message);
+            else console.log(`[Content Reaper] Auto-saved ${rows.length} posts for ${userEmail}`);
+          });
+        }
+      } catch (saveErr) {
+        console.error('[Content Reaper] Auto-save failed (non-fatal):', saveErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       posts: posts,

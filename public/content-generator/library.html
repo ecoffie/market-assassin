@@ -643,14 +643,30 @@
             }
 
             try {
-                // All users now have Supabase sessions - use direct query
-                console.log('[Library] Fetching content_library for user:', user.id);
-                const result = await SupabaseAuth.client
-                    .from('content_library')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false });
-                const { data, error } = result;
+                // Query by user_id (manual saves) and user_email (auto-saves) to get all posts
+                console.log('[Library] Fetching content_library for user:', user.id, user.email);
+                const [byId, byEmail] = await Promise.all([
+                    SupabaseAuth.client
+                        .from('content_library')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .order('created_at', { ascending: false }),
+                    user.email ? SupabaseAuth.client
+                        .from('content_library')
+                        .select('*')
+                        .eq('user_email', user.email.toLowerCase())
+                        .is('user_id', null)
+                        .order('created_at', { ascending: false }) : { data: [], error: null },
+                ]);
+                // Merge results, deduplicate by id
+                const allData = [...(byId.data || []), ...(byEmail.data || [])];
+                const seen = new Set();
+                const data = allData.filter(item => {
+                    if (seen.has(item.id)) return false;
+                    seen.add(item.id);
+                    return true;
+                }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                const error = byId.error || byEmail.error;
 
                 console.log('[Library] Query result:', { data: data?.length || 0, error });
 
