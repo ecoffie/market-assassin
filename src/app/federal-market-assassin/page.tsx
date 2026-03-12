@@ -37,8 +37,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CoreInputs, Agency, ComprehensiveReport, AlternativeSearchOption } from '@/types/federal-market-assassin';
 import CoreInputForm from '@/components/federal-market-assassin/forms/CoreInputForm';
@@ -50,6 +50,31 @@ import { captureMarketAssassinSearch } from '@/lib/briefings/capture-search';
 
 export default function FederalMarketAssassinPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Pre-fill from URL params (e.g., from Opportunity Hunter "Run Full MA Report" link)
+  const initialValues = useMemo(() => {
+    const naics = searchParams.get('naics');
+    const type = searchParams.get('type');
+    const zip = searchParams.get('zip');
+    const psc = searchParams.get('psc');
+    if (!naics && !type && !zip && !psc) return undefined;
+
+    const businessTypeMap: Record<string, string> = {
+      'women-owned': 'Women Owned',
+      'hubzone': 'HUBZone',
+      '8a': '8(a) Certified',
+      'small-business': 'Small Business',
+    };
+
+    return {
+      naicsCode: naics || '',
+      businessType: (type ? businessTypeMap[type] : undefined) as CoreInputs['businessType'] | undefined,
+      zipCode: zip || '',
+      pscCode: psc || '',
+    };
+  }, [searchParams]);
+
   const [step, setStep] = useState<'inputs' | 'agencies' | 'reports'>('inputs');
   const [coreInputs, setCoreInputs] = useState<CoreInputs | null>(null);
   const [agencies, setAgencies] = useState<Agency[]>([]);
@@ -768,6 +793,7 @@ export default function FederalMarketAssassinPage() {
               <CoreInputForm
                 onSubmit={handleFindAgencies}
                 loading={loading}
+                initialValues={initialValues}
               />
 
               {/* NAICS Validation Error */}

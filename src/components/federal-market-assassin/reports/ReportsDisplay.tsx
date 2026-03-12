@@ -1490,6 +1490,12 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
             >
               New Report
             </button>
+            <a
+              href={`/content-generator/?agencies=${encodeURIComponent(reports.metadata.selectedAgencies.slice(0, 5).join(','))}`}
+              className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 font-semibold rounded-lg transition-colors border border-green-500/30"
+            >
+              Generate LinkedIn Posts
+            </a>
           </div>
         </div>
       </div>

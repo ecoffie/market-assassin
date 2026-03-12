@@ -6,17 +6,18 @@ import { CoreInputs, BusinessType, VeteranStatus } from '@/types/federal-market-
 interface CoreInputFormProps {
   onSubmit: (inputs: CoreInputs) => void;
   loading: boolean;
+  initialValues?: Partial<CoreInputs>;
 }
 
-export default function CoreInputForm({ onSubmit, loading }: CoreInputFormProps) {
+export default function CoreInputForm({ onSubmit, loading, initialValues }: CoreInputFormProps) {
   const [formData, setFormData] = useState<Partial<CoreInputs>>({
-    businessType: undefined,
-    naicsCode: '',
-    zipCode: '',
-    veteranStatus: 'Not Applicable',
-    pscCode: '',
-    companyName: '',
-    excludeDOD: false,
+    businessType: initialValues?.businessType || undefined,
+    naicsCode: initialValues?.naicsCode || '',
+    zipCode: initialValues?.zipCode || '',
+    veteranStatus: initialValues?.veteranStatus || 'Not Applicable',
+    pscCode: initialValues?.pscCode || '',
+    companyName: initialValues?.companyName || '',
+    excludeDOD: initialValues?.excludeDOD || false,
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
