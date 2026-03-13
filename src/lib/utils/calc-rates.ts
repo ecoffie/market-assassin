@@ -27,10 +27,10 @@ export interface CalcRateRecord {
 }
 
 interface CalcApiResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Array<{ _source: CalcRateRecord }>;
+  hits: {
+    total: { value: number; relation: string };
+    hits: Array<{ _source: CalcRateRecord }>;
+  };
   aggregations?: {
     wage_stats?: {
       count: number;
@@ -215,11 +215,11 @@ export async function fetchPricingIntel(naicsCode: string): Promise<PricingIntel
   );
 
   const sbQuery = queryCalcAPI({ keyword: searchTerms[0], businessSize: 'S', pageSize: 100 })
-    .then(r => ({ results: r.results.map(h => h._source), error: null as string | null }))
+    .then(r => ({ results: r.hits.hits.map(h => h._source), error: null as string | null }))
     .catch(err => ({ results: [] as CalcRateRecord[], error: String(err) }));
 
   const lgQuery = queryCalcAPI({ keyword: searchTerms[0], businessSize: 'O', pageSize: 100 })
-    .then(r => ({ results: r.results.map(h => h._source), error: null as string | null }))
+    .then(r => ({ results: r.hits.hits.map(h => h._source), error: null as string | null }))
     .catch(err => ({ results: [] as CalcRateRecord[], error: String(err) }));
 
   const [termResults, sbResult, lgResult] = await Promise.all([
@@ -237,8 +237,9 @@ export async function fetchPricingIntel(naicsCode: string): Promise<PricingIntel
       console.error(`[CALC+] Error querying "${term}": ${error}`);
       continue;
     }
-    console.log(`[CALC+] "${term}": ${result.count} total, ${result.results.length} returned`);
-    for (const hit of result.results) {
+    const hits = result.hits.hits;
+    console.log(`[CALC+] "${term}": ${result.hits.total.value} total, ${hits.length} returned`);
+    for (const hit of hits) {
       const rec = hit._source;
       const key = `${rec.vendor_name}:${rec.labor_category}:${rec.current_price}`;
       if (!seenIds.has(key)) {
