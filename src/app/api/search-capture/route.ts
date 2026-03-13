@@ -146,13 +146,14 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (profile) {
-          const profileData = profile as Record<string, unknown>;
-          const currentValues: string[] = Array.isArray(profileData[column]) ? profileData[column] as string[] : [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const profileData = profile as any;
+          const currentValues: string[] = Array.isArray(profileData[column]) ? profileData[column] : [];
           if (!currentValues.includes(normalizedValue)) {
             const updatedValues = [...currentValues, normalizedValue];
             // Also update aggregated_profile JSONB to stay in sync
-            const currentJsonb = (profile.aggregated_profile && typeof profile.aggregated_profile === 'object')
-              ? profile.aggregated_profile as Record<string, unknown>
+            const currentJsonb = (profileData.aggregated_profile && typeof profileData.aggregated_profile === 'object')
+              ? profileData.aggregated_profile as Record<string, unknown>
               : {};
             const updatedJsonb = { ...currentJsonb, [column]: updatedValues };
 
