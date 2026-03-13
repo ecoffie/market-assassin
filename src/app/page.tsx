@@ -213,6 +213,40 @@ export default function Home() {
                 View Briefings →
               </span>
             </Link>
+
+            {/* DSBS Profile Scorer */}
+            <Link
+              href="/dsbs-scorer"
+              className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-cyan-500 hover:shadow-xl"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="text-4xl">&#128202;</div>
+                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-bold rounded-full border border-green-500/30">FREE</span>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">
+                DSBS Profile Scorer
+              </h3>
+              <p className="text-slate-400 text-sm mb-5 leading-relaxed">
+                Rate your Dynamic Small Business Search profile in 2 minutes. Get a score, section breakdowns, and see how you compare to competitors in your NAICS.
+              </p>
+              <ul className="text-slate-400 text-sm space-y-2 mb-6">
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">&#10003;</span> 8-section profile assessment
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">&#10003;</span> NAICS competitor benchmarking
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">&#10003;</span> Actionable improvement recommendations
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-500">&#10003;</span> Instant results — no signup required
+                </li>
+              </ul>
+              <span className="text-cyan-400 font-semibold text-sm group-hover:text-cyan-300 transition-colors">
+                Score My Profile →
+              </span>
+            </Link>
           </div>
         </div>
       </main>

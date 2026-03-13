@@ -59,6 +59,11 @@ export const FREE_RESOURCES = {
     description: 'Comprehensive proposal compliance checklist',
     file: '/templates/proposal-checklist.html',
   },
+  'dsbs-scorer': {
+    name: 'DSBS Profile Scorer',
+    description: 'Rate and improve your Dynamic Small Business Search profile',
+    file: '/dsbs-scorer',
+  },
 } as const;
 
 export type ResourceId = keyof typeof FREE_RESOURCES;
