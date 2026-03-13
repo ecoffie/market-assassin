@@ -1598,12 +1598,12 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
           </div>
 
           {/* Desktop: Grouped tab navigation */}
-          <div className="hidden md:block border-b border-slate-700/50 print:hidden bg-slate-900/30 px-6 py-4">
-            <div className="flex gap-6">
+          <div className="hidden md:block print:hidden bg-slate-900/50 px-6 py-5 border-b border-slate-700/50">
+            <div className="grid grid-cols-3 gap-4">
               {tabGroups.map((group) => (
-                <div key={group.label} className="flex-shrink-0">
-                  <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">{group.label}</p>
-                  <div className="flex gap-1">
+                <div key={group.label} className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/40">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-1">{group.label}</p>
+                  <div className="grid grid-cols-2 gap-1.5">
                     {group.tabs.map((tab) => {
                       const locked = isSectionLocked(tab.id);
                       const isActive = activeTab === tab.id && !locked;
@@ -1617,18 +1617,18 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
                               setActiveTab(tab.id);
                             }
                           }}
-                          className={`relative px-3 py-2 font-medium text-xs transition-all duration-200 flex items-center gap-1.5 rounded-lg ${
+                          className={`relative px-3 py-2.5 font-semibold text-sm transition-all duration-200 flex items-center gap-2 rounded-lg ${
                             isActive
-                              ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500/40'
+                              ? 'bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/50 shadow-lg shadow-cyan-500/10'
                               : locked
-                                ? 'text-slate-500 hover:text-slate-400 hover:bg-slate-800/50 cursor-pointer group'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                                ? 'text-slate-500 hover:text-slate-400 hover:bg-slate-700/50 cursor-pointer'
+                                : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
                           }`}
                         >
-                          <span className="text-sm">{tab.icon}</span>
-                          <span>{tab.label}</span>
+                          <span className="text-base leading-none">{tab.icon}</span>
+                          <span className="truncate">{tab.label}</span>
                           {locked && (
-                            <svg className="w-3 h-3 text-amber-400/70" fill="currentColor" viewBox="0 0 20 20">
+                            <svg className="w-3.5 h-3.5 text-amber-400/60 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                             </svg>
                           )}
