@@ -495,8 +495,23 @@ Output ONLY the post text, followed by hashtags on separate lines.`;
             created_at: new Date().toISOString(),
           }));
           supabase.from('content_library').insert(rows).then(({ error }) => {
-            if (error) console.error('[Content Reaper] Auto-save error:', error.message);
-            else console.log(`[Content Reaper] Auto-saved ${rows.length} posts for ${userEmail}`);
+            if (error) {
+              console.warn('[Content Reaper] Full auto-save failed, trying basic columns:', error.message);
+              const basicRows = posts.map((post) => ({
+                user_email: userEmail.toLowerCase().trim(),
+                title: post.template,
+                content: post.content,
+                post_type: 'linkedin',
+                tags: post.hashtags,
+                created_at: new Date().toISOString(),
+              }));
+              supabase.from('content_library').insert(basicRows).then(({ error: err2 }) => {
+                if (err2) console.error('[Content Reaper] Basic auto-save also failed:', err2.message);
+                else console.log(`[Content Reaper] Auto-saved ${basicRows.length} posts (basic columns) for ${userEmail}`);
+              });
+            } else {
+              console.log(`[Content Reaper] Auto-saved ${rows.length} posts for ${userEmail}`);
+            }
           });
         }
       } catch (saveErr) {

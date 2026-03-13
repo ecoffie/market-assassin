@@ -43,6 +43,12 @@ export async function GET(request: NextRequest) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
+  // Try full query first (with new columns), fall back to basic columns if table hasn't been migrated
+  let data: Record<string, unknown>[] | null = null;
+  let error: { message: string } | null = null;
+  let count: number | null = null;
+
+  // First try with all columns
   let query = supabase
     .from('content_library')
     .select('id, title, content, tags, template_key, angle, pain_point, target_agencies, created_at', { count: 'exact' })
@@ -50,17 +56,34 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
-  // Filter by agency if specified (check if target_agencies array contains the value)
   if (agency) {
     query = query.contains('target_agencies', [agency]);
   }
-
-  // Filter by template
   if (template) {
     query = query.eq('template_key', template);
   }
 
-  const { data, error, count } = await query;
+  const fullResult = await query;
+
+  if (fullResult.error) {
+    // Fall back to basic columns (table may not have new columns yet)
+    console.warn('[Library] Full query failed, trying basic columns:', fullResult.error.message);
+    const basicQuery = supabase
+      .from('content_library')
+      .select('id, title, content, tags, created_at', { count: 'exact' })
+      .eq('user_email', email.toLowerCase().trim())
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    const basicResult = await basicQuery;
+    data = basicResult.data;
+    error = basicResult.error;
+    count = basicResult.count;
+  } else {
+    data = fullResult.data;
+    error = fullResult.error;
+    count = fullResult.count;
+  }
 
   if (error) {
     console.error('[Library] Query error:', error.message);
