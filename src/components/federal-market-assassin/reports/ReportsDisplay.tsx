@@ -1529,13 +1529,9 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
               PSC: {reports.metadata.inputs.pscCode}
             </span>
           )}
-          {reports.pricingIntel?.laborCategories?.length ? (
+          {!isSectionLocked('pricingIntel') && reports.pricingIntel?.laborCategories?.length ? (
             <span className="px-3 py-1.5 bg-green-500/20 text-green-400 text-sm font-medium rounded-full border border-green-500/30">
               Pricing Intel: {reports.pricingIntel.laborCategories.length} labor categories
-            </span>
-          ) : reports.pricingIntel ? (
-            <span className="px-3 py-1.5 bg-slate-600/20 text-slate-500 text-sm font-medium rounded-full border border-slate-600/30">
-              Pricing Intel: No data
             </span>
           ) : null}
         </div>
