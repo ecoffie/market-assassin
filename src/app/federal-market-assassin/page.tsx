@@ -37,7 +37,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CoreInputs, Agency, ComprehensiveReport, AlternativeSearchOption } from '@/types/federal-market-assassin';
@@ -49,6 +49,14 @@ import { MarketAssassinTier } from '@/lib/access-codes';
 import { captureMarketAssassinSearch } from '@/lib/briefings/capture-search';
 
 export default function FederalMarketAssassinPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="text-slate-400">Loading...</div></div>}>
+      <FederalMarketAssassinContent />
+    </Suspense>
+  );
+}
+
+function FederalMarketAssassinContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
