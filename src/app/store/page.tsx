@@ -441,6 +441,33 @@ export default function Home() {
                 </div>
               </div>
             </Link>
+
+            {/* DSBS Profile Scorer - FREE */}
+            <Link href="/dsbs-scorer" className="block bg-white border border-gray-200 rounded-xl overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500 cursor-pointer">
+              <div className="h-48 bg-gradient-to-br from-cyan-600 to-blue-700 relative overflow-hidden flex items-center justify-center">
+                <span className="text-8xl">&#128202;</span>
+              </div>
+              <div className="p-6">
+                <span className="inline-block bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">FREE</span>
+                <h3 className="text-xl font-bold mb-2 text-gray-900">DSBS Profile Scorer</h3>
+                <p className="text-gray-500 text-sm mb-4">Rate your Dynamic Small Business Search profile and get actionable recommendations to improve your visibility.</p>
+                <ul className="text-sm mb-5 space-y-1">
+                  <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">&#10003;</span> 8-Section Assessment</li>
+                  <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">&#10003;</span> NAICS Competitor Benchmarking</li>
+                  <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">&#10003;</span> Priority Recommendations</li>
+                  <li className="flex items-center gap-2 text-gray-700"><span className="text-emerald-500 font-bold">&#10003;</span> Instant Results</li>
+                </ul>
+                <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                  <div>
+                    <div className="text-2xl font-bold text-blue-800">FREE</div>
+                    <div className="text-xs text-gray-500">2-Minute Assessment</div>
+                  </div>
+                  <span className="px-5 py-2 bg-blue-800 text-white rounded-md font-semibold text-sm">
+                    Score My Profile
+                  </span>
+                </div>
+              </div>
+            </Link>
           </div>
         </div>
       </section>
