@@ -146,7 +146,8 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (profile) {
-          const currentValues: string[] = Array.isArray(profile[column]) ? profile[column] : [];
+          const profileData = profile as Record<string, unknown>;
+          const currentValues: string[] = Array.isArray(profileData[column]) ? profileData[column] as string[] : [];
           if (!currentValues.includes(normalizedValue)) {
             const updatedValues = [...currentValues, normalizedValue];
             // Also update aggregated_profile JSONB to stay in sync
