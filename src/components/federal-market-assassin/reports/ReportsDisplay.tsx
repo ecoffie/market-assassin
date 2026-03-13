@@ -1606,48 +1606,52 @@ export default function ReportsDisplay({ reports, onReset, tier = 'premium', onU
             </div>
           </div>
 
-          {/* Desktop: Grouped tab navigation */}
-          <div className="hidden md:block border-b border-slate-700/50 print:hidden bg-slate-900/30 px-6 py-4">
-            <div className="flex gap-6">
-              {tabGroups.map((group) => (
-                <div key={group.label} className="flex-shrink-0">
-                  <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">{group.label}</p>
-                  <div className="flex gap-1">
-                    {group.tabs.map((tab) => {
-                      const locked = isSectionLocked(tab.id);
-                      const isActive = activeTab === tab.id && !locked;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => {
-                            if (locked) {
-                              setShowUpgradeModal(true);
-                            } else {
-                              setActiveTab(tab.id);
-                            }
-                          }}
-                          className={`relative px-3 py-2 font-medium text-xs transition-all duration-200 flex items-center gap-1.5 rounded-lg ${
-                            isActive
-                              ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500/40'
-                              : locked
-                                ? 'text-slate-500 hover:text-slate-400 hover:bg-slate-800/50 cursor-pointer group'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                          }`}
-                        >
-                          <span className="text-sm">{tab.icon}</span>
-                          <span>{tab.label}</span>
-                          {locked && (
-                            <svg className="w-3 h-3 text-amber-400/70" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+          {/* Desktop: Two-row tab navigation (Standard / Premium) */}
+          <div className="hidden md:block border-b border-slate-700/50 print:hidden bg-slate-900/80 px-6 py-5 space-y-3">
+            {/* Row 1: Standard tabs */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest w-20 flex-shrink-0">Standard</span>
+              <div className="flex gap-2 flex-wrap">
+                {tabs.filter(tab => !isSectionLocked(tab.id)).map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`px-4 py-2.5 font-semibold text-sm flex items-center gap-2 rounded-lg transition-all duration-200 ${
+                        isActive
+                          ? 'bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-500/50 shadow-lg shadow-cyan-500/10'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <span className="text-base">{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            {/* Row 2: Premium tabs (only show if any are locked) */}
+            {tabs.some(tab => isSectionLocked(tab.id)) && (
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-bold text-amber-500/70 uppercase tracking-widest w-20 flex-shrink-0">Premium</span>
+                <div className="flex gap-2 flex-wrap">
+                  {tabs.filter(tab => isSectionLocked(tab.id)).map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="px-4 py-2.5 text-slate-500 hover:text-slate-400 hover:bg-slate-800/50 font-semibold text-sm flex items-center gap-2 rounded-lg transition-all duration-200 border border-amber-500/20 cursor-pointer"
+                    >
+                      <span className="text-base">{tab.icon}</span>
+                      <span>{tab.label}</span>
+                      <svg className="w-3.5 h-3.5 text-amber-400/60" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
