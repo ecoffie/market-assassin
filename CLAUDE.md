@@ -321,6 +321,18 @@ All admin endpoints follow this pattern:
 
 > Full session history (Sessions 1-18) is in MEMORY.md.
 
+### Session 22 (Mar 13, 2026)
+- **Test Protocol Page** — password-protected QA dashboard at `/test-protocol`
+  - 18 automated API smoke tests across 5 categories: health checks, access denial, data endpoints, lead capture, content library
+  - 28-item manual QA checklist across 12 sections with localStorage persistence
+  - Deploy health monitor: git commit SHA, hostname, last test run timestamp
+  - Dark theme, summary bar, sequential test runner with 200ms delay, collapsible response previews
+  - Reuses `/api/admin/verify-password` — no new API routes or dependencies
+  - Files: `src/app/test-protocol/page.tsx` (server), `src/app/test-protocol/TestProtocolClient.tsx` (client)
+- **GovCon Funnels Hydration Fix** — fixed `BootcampBanner.tsx` countdown timer hydration mismatch
+  - `useState(Date.now())` caused server/client mismatch
+  - Fixed: defer render until after mount (`mounted` state flag)
+
 ### Session 21 (Mar 11, 2026)
 - **Daily Briefings E2E Testing** — debugged and fixed briefing generation returning 0 items
   - Fixed mock data field names to match TypeScript interfaces (`incumbent` → `incumbentName`, `currentValue` → `obligatedAmount`)
@@ -382,4 +394,4 @@ All admin endpoints follow this pattern:
 - Opportunity Hunter: blurred SAT teaser with Market Assassin upgrade CTA
 - FY2026 budget data expanded: 23 → 47 toptier agencies, 175-entry sub-agency parent map
 
-*Last Updated: March 11, 2026*
+*Last Updated: March 13, 2026*
