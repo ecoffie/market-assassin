@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
         destination: '/content-generator/calendar.html',
         permanent: false,
       },
+      // Redirect store to production shop site
+      {
+        source: '/store',
+        destination: 'https://shop.govcongiants.org',
+        permanent: false,
+      },
     ];
   },
 };
