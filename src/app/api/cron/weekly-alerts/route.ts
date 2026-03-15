@@ -29,6 +29,75 @@ const businessTypeToSetAside: Record<string, string> = {
   'Small Business': 'SBP',
 };
 
+// Alert tier limits
+const ALERT_LIMITS = {
+  free: 5,      // Free tier: 5 opps/week
+  pro: 15,      // Any paid product: 15 opps/week
+};
+
+// Products that grant Pro tier (15 opps)
+const PRO_TIER_PRODUCTS = [
+  'opportunity-hunter-pro',
+  'market-assassin-standard',
+  'market-assassin-premium',
+  'ultimate-govcon-bundle',
+  'contractor-database',
+  'recompete-contracts',
+  'ai-content-generator',
+  'starter-govcon-bundle',
+  'pro-giant-bundle',
+];
+
+// Cache for buyer emails (refreshed on each cron run)
+let buyerEmailsCache: Set<string> | null = null;
+
+/**
+ * Fetch buyer emails from shop.govcongiants.org purchases
+ */
+async function fetchBuyerEmails(): Promise<Set<string>> {
+  if (buyerEmailsCache) return buyerEmailsCache;
+
+  try {
+    const res = await fetch('https://shop.govcongiants.org/api/admin/purchases-report?days=365', {
+      headers: { 'x-admin-password': 'admin123' },
+    });
+    if (!res.ok) {
+      console.log('[Weekly Alerts] Could not fetch buyer list, defaulting to free tier');
+      return new Set();
+    }
+    const data = await res.json();
+    const purchases = data.purchases || [];
+
+    // Build set of emails who bought pro-tier products
+    const proEmails = new Set<string>();
+    for (const p of purchases) {
+      const productId = (p.productId || '').toLowerCase();
+      if (PRO_TIER_PRODUCTS.some(tier => productId.includes(tier))) {
+        proEmails.add(p.email.toLowerCase());
+      }
+    }
+    buyerEmailsCache = proEmails;
+    console.log(`[Weekly Alerts] Loaded ${proEmails.size} pro tier buyers`);
+    return proEmails;
+  } catch (err) {
+    console.error('[Weekly Alerts] Error fetching buyers:', err);
+    return new Set();
+  }
+}
+
+/**
+ * Get alert limit for a user based on purchase history
+ */
+async function getAlertLimit(email: string): Promise<{ limit: number; tier: 'free' | 'pro' }> {
+  const buyerEmails = await fetchBuyerEmails();
+  const normalizedEmail = email.toLowerCase();
+
+  if (buyerEmails.has(normalizedEmail)) {
+    return { limit: ALERT_LIMITS.pro, tier: 'pro' };
+  }
+  return { limit: ALERT_LIMITS.free, tier: 'free' };
+}
+
 interface AlertUser {
   user_email: string;
   naics_codes: string[];
@@ -89,9 +158,15 @@ export async function POST(request: NextRequest) {
       errors: [] as string[],
     };
 
+    // Clear buyer cache for fresh data
+    buyerEmailsCache = null;
+
     // Process each user
     for (const user of users as AlertUser[]) {
       try {
+        // Determine user's alert tier based on purchase history
+        const { limit: alertLimit, tier } = await getAlertLimit(user.user_email);
+
         // Build search params from user profile
         const setAsides = user.business_type
           ? [businessTypeToSetAside[user.business_type] || user.business_type]
@@ -120,8 +195,9 @@ export async function POST(request: NextRequest) {
           }),
         })).sort((a, b) => b.score - a.score);
 
-        // Take top 15
-        const topOpps = scoredOpps.slice(0, 15);
+        // Apply tier-based limit (5 for free, 15 for paid)
+        const topOpps = scoredOpps.slice(0, alertLimit);
+        console.log(`[Weekly Alerts] ${user.user_email}: tier=${tier}, limit=${alertLimit}, found=${scoredOpps.length}`);
 
         if (topOpps.length === 0) {
           console.log(`[Weekly Alerts] No opportunities found for ${user.user_email}`);
@@ -129,8 +205,8 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Send email
-        await sendAlertEmail(user.user_email, topOpps, user);
+        // Send email with tier info
+        await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
 
         // Log the alert
         await supabase.from('alert_log').upsert({
@@ -255,11 +331,16 @@ function getDaysUntil(dateString: string): number {
 async function sendAlertEmail(
   email: string,
   opportunities: (SAMOpportunity & { score: number })[],
-  user: AlertUser
+  user: AlertUser,
+  tier: 'free' | 'pro' = 'free',
+  totalAvailable: number = 0
 ) {
   const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/alerts/preferences?email=${encodeURIComponent(email)}`;
   const briefingsUpgradeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/briefings`;
+  const ohProUpgradeUrl = 'https://buy.stripe.com/7sIaGqevYeIcdri147'; // OH Pro payment link
+
+  const showUpgradeToOHPro = tier === 'free' && totalAvailable > 5;
 
   const opportunitiesHtml = opportunities.map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
@@ -318,6 +399,20 @@ async function sendAlertEmail(
     <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb;">
       ${opportunitiesHtml}
     </table>
+
+    ${showUpgradeToOHPro ? `
+    <!-- OH Pro Upgrade CTA (for free tier with more opps available) -->
+    <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
+      <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">You're Missing ${totalAvailable - 5} More Opportunities!</h3>
+      <p style="color: #d1fae5; margin: 0 0 16px 0; font-size: 14px;">
+        Free tier shows 5 opps/week. We found <strong>${totalAvailable}</strong> matches for your profile.<br>
+        Upgrade to Pro for <strong>15 opps/week</strong> + priority ranking.
+      </p>
+      <a href="${ohProUpgradeUrl}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+        Upgrade to OH Pro - $49 one-time
+      </a>
+    </div>
+    ` : ''}
 
     <!-- Briefings Upsell CTA -->
     <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
