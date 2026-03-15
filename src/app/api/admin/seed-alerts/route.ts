@@ -113,9 +113,6 @@ export async function GET(request: NextRequest) {
           location_state: null,
           is_active: true,
           alert_frequency: 'weekly',
-          source: 'admin-seed',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         }, {
           onConflict: 'user_email',
         });
