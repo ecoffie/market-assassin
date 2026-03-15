@@ -16,7 +16,7 @@ import {
 } from './types';
 import { generateEmailTemplate } from './email-template';
 
-const FROM_EMAIL = process.env.SMTP_USER || 'hello@govconedu.com';
+const FROM_EMAIL = process.env.SMTP_USER || 'alerts@govcongiants.com';
 const FROM_NAME = 'GovCon Giants';
 
 /**
@@ -38,9 +38,11 @@ function getTwilioClient() {
  */
 function getTransporter() {
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.SMTP_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
     auth: {
-      user: process.env.SMTP_USER || 'hello@govconedu.com',
+      user: process.env.SMTP_USER || 'alerts@govcongiants.com',
       pass: process.env.SMTP_PASSWORD,
     },
   });

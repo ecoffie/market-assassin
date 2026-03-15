@@ -9,9 +9,11 @@ const supabase = createClient(
 );
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.SMTP_HOST || 'smtp.office365.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false,
   auth: {
-    user: process.env.SMTP_USER || 'hello@govconedu.com',
+    user: process.env.SMTP_USER || 'alerts@govcongiants.com',
     pass: process.env.SMTP_PASSWORD,
   },
 });

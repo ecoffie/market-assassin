@@ -150,16 +150,18 @@ async function sendVerificationEmail(email: string, code: string): Promise<boole
   }
 
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.SMTP_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
     auth: {
-      user: process.env.SMTP_USER || 'hello@govconedu.com',
+      user: process.env.SMTP_USER || 'alerts@govcongiants.com',
       pass: smtpPassword,
     },
   });
 
   try {
     await transporter.sendMail({
-      from: '"GovCon Giants" <hello@govconedu.com>',
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
       to: email,
       subject: `Your GovCon Briefing Bot Code: ${code}`,
       text: `Your verification code is: ${code}\n\nText this code back to the GovCon Giants number to link your account.\n\nThis code expires in 15 minutes.\n\nIf you didn't request this, ignore this email.`,
