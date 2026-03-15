@@ -857,6 +857,10 @@ export async function POST(request: NextRequest) {
 /**
  * Save alert profile for MA Premium users
  * Called after report generation to enable weekly alerts
+ *
+ * Supports:
+ * - NAICS code input (single or comma-separated prefixes like "236, 238")
+ * - PSC code input (will be expanded to related NAICS codes)
  */
 async function saveAlertProfile(
   email: string,
@@ -864,14 +868,23 @@ async function saveAlertProfile(
   selectedAgencies: string[]
 ): Promise<void> {
   try {
+    // Build NAICS codes array - handle comma-separated input
+    const naicsCodes: string[] = [];
+    if (inputs.naicsCode) {
+      // Support comma-separated NAICS codes/prefixes (e.g., "236, 238320, 541")
+      const codes = inputs.naicsCode.split(/[,;\s]+/).map(c => c.trim()).filter(c => c);
+      naicsCodes.push(...codes);
+    }
+
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/api/alerts/save-profile`,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org'}/api/alerts/save-profile`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          naicsCodes: inputs.naicsCode ? [inputs.naicsCode] : [],
+          naicsCodes,
+          pscCode: inputs.pscCode || null, // PSC code will be expanded to related NAICS
           businessType: inputs.businessType || null,
           targetAgencies: selectedAgencies.slice(0, 10), // Top 10 agencies
           locationZip: inputs.zipCode || null,
@@ -880,7 +893,8 @@ async function saveAlertProfile(
     );
 
     if (response.ok) {
-      console.log(`[Alerts] Saved alert profile for ${email}`);
+      const result = await response.json();
+      console.log(`[Alerts] Saved alert profile for ${email}: ${result.data?.naicsCount || 0} NAICS codes`);
     }
   } catch (error) {
     // Non-blocking, just log
