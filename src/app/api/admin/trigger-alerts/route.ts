@@ -187,10 +187,12 @@ export async function GET(request: NextRequest) {
         : [];
 
       // Fetch opportunities from SAM.gov
+      // Note: Don't filter by state - too restrictive, reduces matches significantly
+      // Users can still see their location but we search nationwide for their NAICS
       const searchResult = await fetchSamOpportunities({
         naicsCodes: user.naics_codes,
         setAsides,
-        state: user.location_state || undefined,
+        // state: user.location_state || undefined, // Disabled - too restrictive
         noticeTypes: ['p', 'r', 'k', 'o'],
         postedFrom: getDateDaysAgo(7),
         limit: 50,
