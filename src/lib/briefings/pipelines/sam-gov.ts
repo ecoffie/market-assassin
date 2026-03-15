@@ -108,9 +108,9 @@ export async function fetchSamOpportunities(
   queryParams.set('postedFrom', postedFrom || getDefaultPostedFrom());
   queryParams.set('postedTo', postedTo || getTodayDate());
 
-  // Add NAICS codes
+  // Add NAICS codes (SAM.gov uses 'ncode' parameter, not 'naics')
   if (naicsCodes.length > 0) {
-    queryParams.set('naics', naicsCodes.join(','));
+    queryParams.set('ncode', naicsCodes.join(','));
   }
 
   // Add keywords (will be OR'd together)
