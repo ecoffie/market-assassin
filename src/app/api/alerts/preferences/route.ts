@@ -1,0 +1,157 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+/**
+ * GET /api/alerts/preferences?email=xxx
+ * Get alert preferences for a user
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const email = request.nextUrl.searchParams.get('email');
+
+    if (!email) {
+      return NextResponse.json(
+        { success: false, error: 'Email is required' },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('user_alert_settings')
+      .select('*')
+      .eq('user_email', email.toLowerCase())
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({
+        success: true,
+        data: null,
+        message: 'No alert settings found',
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        email: data.user_email,
+        naicsCodes: data.naics_codes,
+        businessType: data.business_type,
+        targetAgencies: data.target_agencies,
+        locationState: data.location_state,
+        frequency: data.alert_frequency,
+        isActive: data.is_active,
+        lastAlertSent: data.last_alert_sent,
+        totalAlertsSent: data.total_alerts_sent,
+      },
+    });
+  } catch (error) {
+    console.error('[Alert Preferences] Error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/alerts/preferences
+ * Update alert preferences
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { email, frequency, isActive, naicsCodes, businessType, targetAgencies, locationState } = body;
+
+    if (!email) {
+      return NextResponse.json(
+        { success: false, error: 'Email is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if user exists
+    const { data: existing } = await supabase
+      .from('user_alert_settings')
+      .select('user_email')
+      .eq('user_email', email.toLowerCase())
+      .single();
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: 'No alert profile found for this email' },
+        { status: 404 }
+      );
+    }
+
+    // Build update object with only provided fields
+    const updates: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (frequency !== undefined) {
+      if (!['weekly', 'paused'].includes(frequency)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid frequency. Use "weekly" or "paused"' },
+          { status: 400 }
+        );
+      }
+      updates.alert_frequency = frequency;
+    }
+
+    if (isActive !== undefined) {
+      updates.is_active = Boolean(isActive);
+    }
+
+    if (naicsCodes !== undefined) {
+      updates.naics_codes = Array.isArray(naicsCodes) ? naicsCodes : [];
+    }
+
+    if (businessType !== undefined) {
+      updates.business_type = businessType || null;
+    }
+
+    if (targetAgencies !== undefined) {
+      updates.target_agencies = Array.isArray(targetAgencies) ? targetAgencies : [];
+    }
+
+    if (locationState !== undefined) {
+      updates.location_state = locationState || null;
+    }
+
+    const { data, error } = await supabase
+      .from('user_alert_settings')
+      .update(updates)
+      .eq('user_email', email.toLowerCase())
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[Alert Preferences] Update error:', error);
+      return NextResponse.json(
+        { success: false, error: 'Failed to update preferences' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Preferences updated',
+      data: {
+        email: data.user_email,
+        frequency: data.alert_frequency,
+        isActive: data.is_active,
+      },
+    });
+  } catch (error) {
+    console.error('[Alert Preferences] Error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

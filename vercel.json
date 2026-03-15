@@ -32,6 +32,10 @@
     {
       "path": "/api/cron/send-briefings",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-alerts",
+      "schedule": "0 23 * * 0"
     }
   ]
 }

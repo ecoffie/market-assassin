@@ -830,6 +830,13 @@ export async function POST(request: NextRequest) {
       },
     };
 
+    // Save alert profile for MA Premium users (non-blocking)
+    if (email && auth.tier === 'premium') {
+      saveAlertProfile(email, inputs, selectedAgencies).catch(err => {
+        console.error('[Alerts] Failed to save profile:', err);
+      });
+    }
+
     return NextResponse.json({
       success: true,
       report,
@@ -840,5 +847,39 @@ export async function POST(request: NextRequest) {
       { success: false, error: 'Failed to generate reports' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Save alert profile for MA Premium users
+ * Called after report generation to enable weekly alerts
+ */
+async function saveAlertProfile(
+  email: string,
+  inputs: CoreInputs,
+  selectedAgencies: string[]
+): Promise<void> {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/api/alerts/save-profile`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          naicsCodes: inputs.naicsCode ? [inputs.naicsCode] : [],
+          businessType: inputs.businessType || null,
+          targetAgencies: selectedAgencies.slice(0, 10), // Top 10 agencies
+          locationZip: inputs.zipCode || null,
+        }),
+      }
+    );
+
+    if (response.ok) {
+      console.log(`[Alerts] Saved alert profile for ${email}`);
+    }
+  } catch (error) {
+    // Non-blocking, just log
+    console.error('[Alerts] Error saving profile:', error);
   }
 }

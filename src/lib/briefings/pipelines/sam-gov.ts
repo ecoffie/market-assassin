@@ -55,6 +55,9 @@ interface SAMSearchParams {
   postedFrom?: string; // ISO date
   postedTo?: string;
   limit?: number;
+  // Opportunity types: p=presolicitation, r=sources sought, k=combined, o=solicitation
+  noticeTypes?: string[];
+  state?: string; // State code for location filtering
 }
 
 interface SAMSearchResult {
@@ -94,6 +97,8 @@ export async function fetchSamOpportunities(
     postedFrom,
     postedTo,
     limit = 100,
+    noticeTypes = [], // p=presolicitation, r=sources sought, k=combined, o=solicitation
+    state,
   } = params;
 
   // Build query parameters
@@ -127,6 +132,16 @@ export async function fetchSamOpportunities(
     // We'll need to expand this later with a zip-to-state map
     // For now, pass as-is
     queryParams.set('poplace', zipCodes.join(','));
+  }
+
+  // Add state filter for location-based alerts
+  if (state) {
+    queryParams.set('state', state);
+  }
+
+  // Add notice types filter (p=presolicitation, r=sources sought, k=combined, o=solicitation)
+  if (noticeTypes.length > 0) {
+    queryParams.set('ptype', noticeTypes.join(','));
   }
 
   const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
