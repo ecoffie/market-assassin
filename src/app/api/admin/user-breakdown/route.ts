@@ -9,12 +9,37 @@
  * - user_briefing_profile (alert configs)
  * - user_alert_settings (MA Premium alerts)
  * - user_search_history (OH searches)
+ * - purchases from SHOP database (shop.govcongiants.org)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const SHOP_ADMIN_PASSWORD = 'admin123'; // shop uses different password
+
+interface ShopPurchase {
+  id: string;
+  email: string;
+  productId: string;
+  productName: string;
+  amountPaid: number;
+  createdAt: string;
+}
+
+async function fetchShopPurchases(): Promise<ShopPurchase[]> {
+  try {
+    const res = await fetch('https://shop.govcongiants.org/api/admin/purchases-report?days=365', {
+      headers: { 'x-admin-password': SHOP_ADMIN_PASSWORD },
+      next: { revalidate: 0 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.purchases || [];
+  } catch {
+    return [];
+  }
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -29,6 +54,9 @@ export async function GET(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // Fetch shop purchases in parallel with local queries
+  const shopPurchasesPromise = fetchShopPurchases();
+
   // Get leads (free users)
   const { data: leads, error: leadsError } = await supabase
     .from('leads')
@@ -41,11 +69,18 @@ export async function GET(request: NextRequest) {
     .select('email, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_briefings, created_at')
     .order('created_at', { ascending: false });
 
-  // Get purchases table (actual Stripe transactions)
-  const { data: purchases, error: purchasesError } = await supabase
-    .from('purchases')
-    .select('email, product_name, product_id, amount, stripe_session_id, created_at')
-    .order('created_at', { ascending: false });
+  // Get shop purchases (actual Stripe transactions from SHOP database)
+  const shopPurchases = await shopPurchasesPromise;
+
+  // Convert shop purchases to standard format
+  const purchases = shopPurchases.map(p => ({
+    email: p.email,
+    product_name: p.productName,
+    product_id: p.productId,
+    amount: p.amountPaid,
+    created_at: p.createdAt,
+  }));
+  const purchasesError = shopPurchases.length === 0 ? { message: 'No purchases from shop or fetch failed' } : null;
 
   // Get user_briefing_profile (alert configurations)
   const { data: briefingProfiles, error: bpError } = await supabase
@@ -84,7 +119,7 @@ export async function GET(request: NextRequest) {
   const searchEmails = new Set([...uniqueSearchUsers.keys()].map(e => e.toLowerCase()));
 
   // Group purchases by email
-  const purchasesByEmail = new Map<string, Array<{ product: string; amount: number; date: string }>>();
+  const purchasesByEmail = new Map<string, Array<{ product: string; productId: string; amount: number; date: string }>>();
   purchases?.forEach(p => {
     if (!p.email) return;
     const email = p.email.toLowerCase();
@@ -93,6 +128,7 @@ export async function GET(request: NextRequest) {
     }
     purchasesByEmail.get(email)!.push({
       product: p.product_name || p.product_id,
+      productId: p.product_id,
       amount: p.amount || 0,
       date: p.created_at,
     });
@@ -104,7 +140,61 @@ export async function GET(request: NextRequest) {
   // OH users = searched but not purchased
   const ohFreeUsers = [...searchEmails].filter(e => !purchaseEmails.has(e));
 
-  // Paying customers breakdown
+  // Alert tier logic based on ACTUAL purchases
+  // Tier mapping:
+  // - OH Free: 5 SAM opps/week (no purchases, just used free search)
+  // - OH Pro / Any Paid: 15 SAM opps/week (bought any tool)
+  // - MA Premium: 15 SAM opps + Free Briefings + AI Recs upsell ($49/mo)
+
+  // Products that grant 15 opps tier (any paid product)
+  const PRO_TIER_PRODUCTS = [
+    'opportunity-hunter-pro',
+    'market-assassin-standard',
+    'market-assassin-premium',
+    'ultimate-govcon-bundle',
+    'contractor-database',
+    'recompete-contracts',
+    'ai-content-generator',
+    'starter-govcon-bundle',
+    'pro-giant-bundle',
+  ];
+
+  // Products that include MA Standard or Premium (briefings eligible)
+  const MA_PRODUCTS = [
+    'market-assassin-standard',
+    'market-assassin-premium',
+    'ultimate-govcon-bundle',
+    'pro-giant-bundle',
+  ];
+
+  // Products that include MA Premium (briefings + AI recs)
+  const MA_PREMIUM_PRODUCTS = [
+    'market-assassin-premium',
+    'ultimate-govcon-bundle',
+  ];
+
+  // Categorize buyers by tier based on purchases
+  const proTierBuyers: string[] = [];
+  const maBuyers: string[] = [];
+  const maPremiumBuyers: string[] = [];
+  const ohProBuyers: string[] = [];
+
+  purchasesByEmail.forEach((userPurchases, email) => {
+    const productIds = userPurchases.map(p => p.productId.toLowerCase());
+
+    // Check highest tier first
+    if (productIds.some(id => MA_PREMIUM_PRODUCTS.some(p => id.includes(p)))) {
+      maPremiumBuyers.push(email);
+    } else if (productIds.some(id => MA_PRODUCTS.some(p => id.includes(p)))) {
+      maBuyers.push(email);
+    } else if (productIds.some(id => id.includes('opportunity-hunter-pro'))) {
+      ohProBuyers.push(email);
+    } else if (productIds.some(id => PRO_TIER_PRODUCTS.some(p => id.includes(p)))) {
+      proTierBuyers.push(email);
+    }
+  });
+
+  // Legacy: Paying customers breakdown from profiles (may be outdated)
   const withHunterPro = profiles?.filter(p => p.access_hunter_pro) || [];
   const withMAStandard = profiles?.filter(p => p.access_assassin_standard) || [];
   const withMAPremium = profiles?.filter(p => p.access_assassin_premium) || [];
@@ -141,33 +231,47 @@ export async function GET(request: NextRequest) {
     },
     tier_assignment: {
       oh_free: {
+        tier: 'free',
         description: 'Free users - 5 SAM opps/week',
+        alert_limit: 5,
         count: ohFreeUsers.length,
         emails: ohFreeUsers.slice(0, 20),
       },
-      oh_pro_eligible: {
-        description: 'Hunter Pro buyers - 15 SAM opps/week',
-        count: withHunterPro.length,
-        emails: withHunterPro.map(p => p.email),
+      oh_pro: {
+        tier: 'pro',
+        description: 'OH Pro buyers - 15 SAM opps/week',
+        alert_limit: 15,
+        count: ohProBuyers.length,
+        emails: ohProBuyers,
+      },
+      any_paid_tool: {
+        tier: 'pro',
+        description: 'Other paid tools (Recompete, ContractorDB, etc) - 15 SAM opps/week',
+        alert_limit: 15,
+        count: proTierBuyers.length,
+        emails: proTierBuyers,
       },
       ma_standard: {
-        description: 'MA Standard - Free 15 SAM opps, $29/mo briefings available',
-        count: withMAStandard.length,
-        emails: withMAStandard.map(p => p.email),
+        tier: 'ma_standard',
+        description: 'MA Standard buyers - 15 SAM opps/week, briefings $29/mo',
+        alert_limit: 15,
+        briefings_included: false,
+        count: maBuyers.length,
+        emails: maBuyers,
       },
       ma_premium: {
-        description: 'MA Premium - Free 15 SAM opps + briefings, $49/mo AI recs available',
-        count: withMAPremium.length,
-        emails: withMAPremium.map(p => p.email),
-      },
-      other_paid: {
-        description: 'Other paid tools (Recompete, ContractorDB, Content) - 15 SAM opps/week',
-        count: withAnyPaidTool.length - withHunterPro.length - withMAStandard.length - withMAPremium.length,
-        emails: withAnyPaidTool
-          .filter(p => !p.access_hunter_pro && !p.access_assassin_standard && !p.access_assassin_premium)
-          .map(p => p.email),
+        tier: 'ma_premium',
+        description: 'MA Premium / Ultimate Bundle - 15 SAM opps + FREE briefings, AI recs $49/mo',
+        alert_limit: 15,
+        briefings_included: true,
+        count: maPremiumBuyers.length,
+        emails: maPremiumBuyers,
       },
     },
+    // Total paying customers (from actual purchases)
+    total_paying_customers: purchaseEmails.size,
+    // All customers who get 15 opps (any purchase)
+    pro_tier_total: ohProBuyers.length + proTierBuyers.length + maBuyers.length + maPremiumBuyers.length,
     purchases_by_product: (() => {
       const byProduct: Record<string, string[]> = {};
       purchases?.forEach(p => {
