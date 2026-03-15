@@ -138,17 +138,17 @@ export default function CoreInputForm({ onSubmit, loading, initialValues }: Core
             {/* NAICS Code */}
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-1">
-                2. NAICS Code <span className="text-slate-500 text-xs">(or use PSC)</span>
+                2. NAICS Code(s) <span className="text-slate-500 text-xs">(or use PSC)</span>
               </label>
               <input
                 type="text"
                 value={formData.naicsCode || ''}
                 onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
-                placeholder="e.g., 541330"
+                placeholder="e.g., 236, 238320, 541511"
                 className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="mt-1 text-xs text-slate-500">
-                Industry code (e.g., 541330 for Engineering)
+                Multiple codes OK: <span className="text-blue-400">236, 238</span> = all construction
               </p>
             </div>
 

@@ -16,6 +16,7 @@ import {
 } from '@/lib/utils/usaspending-helpers';
 import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
 import { expandGenericDoDAgency } from '@/lib/utils/command-info';
+import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,8 +62,21 @@ export async function POST(request: NextRequest) {
     let suggestedNaicsCodes: Array<{ code: string; name: string; }> = [];
 
     // Add NAICS filter if provided
+    // Supports comma-separated input: "236, 238, 541511"
     if (naicsCode && naicsCode.trim()) {
-      let trimmedNaics = naicsCode.trim();
+      // Check if user entered multiple NAICS codes (comma-separated)
+      const inputCodes = parseNAICSInput(naicsCode);
+
+      if (inputCodes.length > 1) {
+        // MULTI-NAICS MODE: Expand all codes and merge
+        console.log(`📋 Multi-NAICS input detected: ${inputCodes.join(', ')}`);
+        const expandedCodes = expandNAICSCodes(inputCodes);
+        filters.naics_codes = expandedCodes;
+        console.log(`   Expanded ${inputCodes.length} inputs to ${expandedCodes.length} NAICS codes`);
+        naicsCorrectionMessage = `Searching ${inputCodes.length} NAICS codes/sectors: ${inputCodes.join(', ')} (${expandedCodes.length} total codes)`;
+      } else {
+        // SINGLE NAICS MODE: Use existing validation and expansion logic
+        let trimmedNaics = naicsCode.trim();
 
       // Validate the NAICS code first
       const validation = validateNaicsCode(trimmedNaics);
@@ -254,6 +268,7 @@ export async function POST(request: NextRequest) {
         console.log(`📋 Using exact 6-digit NAICS code: ${trimmedNaics}`);
         filters.naics_codes = [trimmedNaics];
       }
+      } // End single NAICS mode
     }
 
     // Add set-aside filter
