@@ -77,10 +77,14 @@ async function fetchBuyerEmails(): Promise<Set<string>> {
   }
 }
 
+// SAM.gov API requires MM/dd/yyyy format
 function getDateDaysAgo(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().split('T')[0];
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}/${day}/${year}`;
 }
 
 function formatDate(dateString: string): string {

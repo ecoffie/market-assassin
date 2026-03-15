@@ -353,8 +353,16 @@ export function scoreOpportunity(
 }
 
 // Helper functions
+// SAM.gov API requires MM/dd/yyyy format
+function formatDateForSAM(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}/${day}/${year}`;
+}
+
 function getTodayDate(): string {
-  return new Date().toISOString().split('T')[0];
+  return formatDateForSAM(new Date());
 }
 
 function getDefaultPostedFrom(): string {
@@ -365,7 +373,7 @@ function getDefaultPostedFrom(): string {
 function getDateDaysAgo(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().split('T')[0];
+  return formatDateForSAM(date);
 }
 
 function getDaysUntil(dateString: string): number {
