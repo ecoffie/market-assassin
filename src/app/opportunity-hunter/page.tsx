@@ -132,6 +132,12 @@ export default function OpportunityHunterPage() {
   const [verifyingAccess, setVerifyingAccess] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
 
+  // Email gate for free users (to capture for weekly alerts)
+  const [showEmailGate, setShowEmailGate] = useState(false);
+  const [emailGateInput, setEmailGateInput] = useState('');
+  const [emailGateError, setEmailGateError] = useState<string | null>(null);
+  const [pendingResults, setPendingResults] = useState<SearchResult | null>(null);
+
   const [formData, setFormData] = useState<SearchCriteria>({
     businessFormation: '',
     naicsCode: '',
@@ -412,7 +418,13 @@ export default function OpportunityHunterPage() {
 
       setTimeout(() => {
         setLoading(false);
-        setResults(result);
+        // If free user (no email captured), show email gate before results
+        if (!userEmail && !isPro && result.agencies?.length > 0) {
+          setPendingResults(result);
+          setShowEmailGate(true);
+        } else {
+          setResults(result);
+        }
       }, 500);
 
     } catch (err) {
@@ -453,6 +465,57 @@ export default function OpportunityHunterPage() {
       );
     }, 100);
   };
+
+  // Handle email gate submission - save user for weekly alerts
+  const handleEmailGateSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setEmailGateError(null);
+
+    const email = emailGateInput.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      setEmailGateError('Please enter a valid email address');
+      return;
+    }
+
+    try {
+      // Save to user_alert_settings for weekly SAM alerts
+      await fetch('/api/alerts/save-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          naicsCodes: formData.naicsCode ? [formData.naicsCode] : [],
+          businessType: formData.businessFormation || null,
+          locationState: formData.zipCode ? formData.zipCode.substring(0, 2) : null,
+          source: 'opportunity-hunter-free',
+        }),
+      });
+
+      // Also capture search for briefings
+      captureOpportunityHunterSearch(email, {
+        naicsCode: formData.naicsCode,
+        zipCode: formData.zipCode,
+        setAside: formData.businessFormation,
+      });
+
+      // Store email and show results
+      setUserEmail(email);
+      localStorage.setItem('ohFreeEmail', email);
+      setShowEmailGate(false);
+      setResults(pendingResults);
+      setPendingResults(null);
+    } catch (err) {
+      setEmailGateError('Failed to save. Please try again.');
+    }
+  };
+
+  // Check for saved free user email on mount
+  useEffect(() => {
+    const savedFreeEmail = localStorage.getItem('ohFreeEmail');
+    if (savedFreeEmail && !userEmail) {
+      setUserEmail(savedFreeEmail);
+    }
+  }, [userEmail]);
 
   const formatSearchCriteria = (criteria: SearchCriteria): string => {
     const parts: string[] = [];
@@ -1369,6 +1432,64 @@ export default function OpportunityHunterPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Gate Modal (for free users to get results + weekly alerts) */}
+      {showEmailGate && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
+              <h2 className="text-xl font-bold text-white">Your Results Are Ready!</h2>
+              <p className="text-blue-100 text-sm mt-1">
+                Found {pendingResults?.summary?.totalAgencies || 0} agencies matching your search
+              </p>
+            </div>
+
+            {/* Content */}
+            <form onSubmit={handleEmailGateSubmit} className="p-6 space-y-4">
+              <div>
+                <p className="text-gray-700 mb-4">
+                  Enter your email to see your results and get <strong>weekly opportunity alerts</strong> delivered to your inbox.
+                </p>
+
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={emailGateInput}
+                  onChange={(e) => setEmailGateInput(e.target.value)}
+                  autoFocus
+                  style={{ color: '#000000', backgroundColor: '#ffffff' }}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                />
+
+                {emailGateError && (
+                  <p className="text-sm text-red-600 mt-2">{emailGateError}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all"
+              >
+                Show My Results
+              </button>
+
+              <div className="bg-green-50 rounded-lg p-3 text-sm text-green-800">
+                <strong>Bonus:</strong> You&apos;ll receive 5 SAM.gov opportunities matching your profile every week. Free!
+              </div>
+
+              <p className="text-xs text-gray-500 text-center">
+                Unsubscribe anytime. We respect your inbox.
+              </p>
+            </form>
           </div>
         </div>
       )}

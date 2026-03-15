@@ -14,9 +14,10 @@ interface AlertProfileRequest {
   naicsInput?: string;        // Alternative: comma-separated string (e.g., "541511, 236, 238320")
   pscCode?: string;           // If provided, will expand to related NAICS codes
   businessType: string;
-  targetAgencies: string[];
+  targetAgencies?: string[];
   locationState?: string;
   locationZip?: string;
+  source?: string;            // e.g., "opportunity-hunter-free" for free tier
 }
 
 /**
@@ -27,7 +28,7 @@ interface AlertProfileRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: AlertProfileRequest = await request.json();
-    const { email, naicsCodes, naicsInput, pscCode, businessType, targetAgencies, locationState, locationZip } = body;
+    const { email, naicsCodes, naicsInput, pscCode, businessType, targetAgencies, locationState, locationZip, source } = body;
 
     if (!email) {
       return NextResponse.json(
@@ -35,6 +36,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Free tier from OH doesn't require NAICS (optional)
+    const isFreeSource = source === 'opportunity-hunter-free';
 
     // Collect all NAICS codes from various inputs
     let allNaicsCodes: string[] = [];
@@ -58,7 +62,8 @@ export async function POST(request: NextRequest) {
       allNaicsCodes.push(...pscNaics);
     }
 
-    if (allNaicsCodes.length === 0) {
+    // Free tier can register without NAICS (they'll get general alerts)
+    if (allNaicsCodes.length === 0 && !isFreeSource) {
       return NextResponse.json(
         { success: false, error: 'At least one NAICS code or PSC code is required' },
         { status: 400 }
@@ -66,34 +71,41 @@ export async function POST(request: NextRequest) {
     }
 
     // Expand prefixes to full 6-digit codes (e.g., "236" → all 236xxx codes)
-    const expandedNaics = expandNAICSCodes(allNaicsCodes);
-    console.log(`[Alerts] Expanded ${allNaicsCodes.length} input codes to ${expandedNaics.length} NAICS codes`);
-
-    // Verify user has MA Premium access
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('access_assassin_premium')
-      .eq('email', email.toLowerCase())
-      .single();
-
-    if (!profile?.access_assassin_premium) {
-      return NextResponse.json(
-        { success: false, error: 'MA Premium access required for alerts' },
-        { status: 403 }
-      );
+    const expandedNaics = allNaicsCodes.length > 0 ? expandNAICSCodes(allNaicsCodes) : [];
+    if (allNaicsCodes.length > 0) {
+      console.log(`[Alerts] Expanded ${allNaicsCodes.length} input codes to ${expandedNaics.length} NAICS codes`);
     }
 
-    // Upsert alert settings with expanded NAICS codes
+    // For paid features (Pro), verify MA Premium access
+    // Free tier from OH can register without paid access
+    if (!isFreeSource) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('access_assassin_premium')
+        .eq('email', email.toLowerCase())
+        .single();
+
+      if (!profile?.access_assassin_premium) {
+        return NextResponse.json(
+          { success: false, error: 'MA Premium access required for alerts' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Upsert alert settings
     const { data, error } = await supabase
       .from('user_alert_settings')
       .upsert({
         user_email: email.toLowerCase(),
-        naics_codes: expandedNaics,
+        naics_codes: expandedNaics.length > 0 ? expandedNaics : null,
         business_type: businessType || null,
         target_agencies: targetAgencies || [],
         location_state: locationState || null,
         location_zip: locationZip || null,
         is_active: true,
+        alert_frequency: 'weekly',
+        source: source || null,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_email',
