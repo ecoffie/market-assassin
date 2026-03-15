@@ -13,6 +13,7 @@ import { checkReportRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse 
 import { getEmailFromRequest, verifyMAAccess } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration } from '@/lib/abuse-detection';
+import { getMarketAssassinTier } from '@/lib/access-codes';
 
 export async function POST(request: NextRequest) {
   try {
@@ -831,10 +832,13 @@ export async function POST(request: NextRequest) {
     };
 
     // Save alert profile for MA Premium users (non-blocking)
-    if (email && auth.tier === 'premium') {
-      saveAlertProfile(email, inputs, selectedAgencies).catch(err => {
-        console.error('[Alerts] Failed to save profile:', err);
-      });
+    if (email) {
+      const userTier = await getMarketAssassinTier(email);
+      if (userTier === 'premium') {
+        saveAlertProfile(email, inputs, selectedAgencies).catch(err => {
+          console.error('[Alerts] Failed to save profile:', err);
+        });
+      }
     }
 
     return NextResponse.json({
