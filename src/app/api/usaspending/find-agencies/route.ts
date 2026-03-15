@@ -61,6 +61,9 @@ export async function POST(request: NextRequest) {
     let naicsValidationError: string | null = null;
     let suggestedNaicsCodes: Array<{ code: string; name: string; }> = [];
 
+    // Track if this is a multi-NAICS search (for expanded fetch limits)
+    let isMultiNaicsSearch = false;
+
     // Add NAICS filter if provided
     // Supports comma-separated input: "236, 238, 541511"
     if (naicsCode && naicsCode.trim()) {
@@ -69,6 +72,7 @@ export async function POST(request: NextRequest) {
 
       if (inputCodes.length > 1) {
         // MULTI-NAICS MODE: Expand all codes and merge
+        isMultiNaicsSearch = true;
         console.log(`📋 Multi-NAICS input detected: ${inputCodes.join(', ')}`);
         const expandedCodes = expandNAICSCodes(inputCodes);
         filters.naics_codes = expandedCodes;
@@ -345,76 +349,107 @@ export async function POST(request: NextRequest) {
       'Number of Offers Received'
     ];
 
-    // Determine number of pages based on filter restrictiveness
+    // Determine number of pages based on filter restrictiveness and search type
     const filterCount = [
       naicsCode && naicsCode.trim(),
       setAsideTypeCodes.length > 0,
       zipCode && zipCode.trim()
     ].filter(Boolean).length;
 
-    let maxPages = 10;
-    if (filterCount >= 3) {
-      maxPages = 50; // Very restrictive: fetch 5000 contracts
+    // Smart sampling strategy:
+    // - Multi-NAICS searches get 10,000 contracts (broader coverage needed)
+    // - We fetch in two passes: by $ amount (biggest) + by date (newest)
+    // - This ensures we catch both major contracts AND recent small awards
+
+    let maxPagesPerSort = 10;
+    if (isMultiNaicsSearch) {
+      maxPagesPerSort = 50; // 5000 per sort = 10,000 total for multi-NAICS
+      console.log('🔍 Multi-NAICS search: using expanded 10,000 contract limit');
+    } else if (filterCount >= 3) {
+      maxPagesPerSort = 25; // Very restrictive: 2500 per sort = 5000 total
       console.log('🔍 Highly restrictive search detected');
     } else if (filterCount === 2) {
-      maxPages = 25; // Moderately restrictive: fetch 2500 contracts
+      maxPagesPerSort = 15; // Moderately restrictive: 1500 per sort = 3000 total
       console.log('🔍 Moderately restrictive search');
     }
 
     const limit = 100;
-    console.log(`📊 Fetching up to ${maxPages * limit} contracts from USAspending API...`);
 
-    // Fetch contracts from USAspending API
-    const allAwards: any[] = [];
+    // Helper to fetch a batch of contracts with a specific sort
+    async function fetchBatch(sortField: string, sortOrder: string, maxPgs: number): Promise<any[]> {
+      const results: any[] = [];
+      for (let page = 1; page <= maxPgs; page++) {
+        try {
+          const response = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filters,
+              fields,
+              page,
+              limit,
+              order: sortOrder,
+              sort: sortField
+            }),
+            signal: AbortSignal.timeout(30000)
+          });
 
-    for (let page = 1; page <= maxPages; page++) {
-      try {
-        const response = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            filters,
-            fields,
-            page,
-            limit,
-            order: 'desc',
-            sort: 'Award Amount'
-          }),
-          signal: AbortSignal.timeout(30000)
-        });
+          if (!response.ok) break;
+          const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(`API returned ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data && data.results) {
-          allAwards.push(...data.results);
-          console.log(`   Page ${page}: Retrieved ${data.results.length} contracts`);
-
-          // Stop if we got fewer results than the limit (last page)
-          if (data.results.length < limit) {
-            console.log(`   Reached last page at page ${page}`);
+          if (data?.results) {
+            results.push(...data.results);
+            if (data.results.length < limit) break;
+          } else {
             break;
           }
-        } else {
+
+          if (page < maxPgs) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+        } catch (error) {
+          console.error(`Error fetching page ${page} (${sortField}):`, error);
           break;
         }
-      } catch (error) {
-        console.error(`Error fetching page ${page}:`, error);
-        break;
       }
-
-      // Small delay between requests
-      if (page < maxPages) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      return results;
     }
 
-    console.log(`✅ Retrieved ${allAwards.length} total contracts from USAspending`);
+    console.log(`📊 Smart sampling: fetching up to ${maxPagesPerSort * limit * 2} contracts (${maxPagesPerSort * limit} by $ + ${maxPagesPerSort * limit} by date)...`);
+
+    // PASS 1: Fetch by Award Amount (biggest contracts first)
+    console.log('   Pass 1: Fetching by Award Amount (largest contracts)...');
+    const byAmount = await fetchBatch('Award Amount', 'desc', maxPagesPerSort);
+    console.log(`   ✓ Retrieved ${byAmount.length} contracts by amount`);
+
+    // PASS 2: Fetch by Award Date (most recent contracts)
+    console.log('   Pass 2: Fetching by Award Date (most recent)...');
+    const byDate = await fetchBatch('Award Date', 'desc', maxPagesPerSort);
+    console.log(`   ✓ Retrieved ${byDate.length} contracts by date`);
+
+    // Deduplicate by Award ID
+    const seenAwardIds = new Set<string>();
+    const allAwards: any[] = [];
+
+    for (const award of byAmount) {
+      const awardId = award['Award ID'];
+      if (awardId && !seenAwardIds.has(awardId)) {
+        seenAwardIds.add(awardId);
+        allAwards.push(award);
+      }
+    }
+    const amountOnlyCount = allAwards.length;
+
+    for (const award of byDate) {
+      const awardId = award['Award ID'];
+      if (awardId && !seenAwardIds.has(awardId)) {
+        seenAwardIds.add(awardId);
+        allAwards.push(award);
+      }
+    }
+    const uniqueFromDate = allAwards.length - amountOnlyCount;
+
+    console.log(`✅ Smart sampling complete: ${allAwards.length} unique contracts (${amountOnlyCount} by $, +${uniqueFromDate} unique from recent)`);
 
     // Track if we applied a fallback to show users what changed
     let wasAutoAdjusted = false;
