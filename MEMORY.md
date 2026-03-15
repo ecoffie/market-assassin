@@ -4,6 +4,46 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 23 (Mar 14, 2026)
+
+### Multi-NAICS Support & Smart Sampling
+- **Multi-NAICS input** — users can now enter comma-separated NAICS codes (e.g., "236, 238, 541511")
+- Created `src/lib/utils/naics-expansion.ts`:
+  - `parseNAICSInput()` — parse comma/space-separated input
+  - `expandNAICSCode()` — expand prefix to all matching 6-digit codes (e.g., "236" → all 236xxx)
+  - `expandNAICSCodes()` — batch expansion with deduplication
+  - NAICS_DATABASE covers construction (23x), IT (51x), professional services (54x), admin (56x)
+- Updated agency finder (`find-agencies/route.ts`) with smart sampling:
+  - Two-pass fetch: 5K by Award Amount + 5K by Award Date
+  - Deduplication by Award ID prevents double-counting
+  - Multi-NAICS searches get 10,000 contracts total (vs 5,000 single)
+- Updated `CoreInputForm.tsx` placeholder: "e.g., 236, 238320, 541511"
+
+### Alert Profile Multi-NAICS
+- Updated `save-profile/route.ts` to accept:
+  - `naicsCodes[]` — direct array
+  - `naicsInput` — comma-separated string
+  - `pscCode` — expands via PSC→NAICS crosswalk
+- All inputs merged and expanded before saving to `user_alert_settings`
+
+### TypeScript Fix
+- Fixed `auth.tier` error in `generate-all/route.ts`
+- Changed to use `getMarketAssassinTier(email)` function instead
+
+### Contract Query Analysis
+- 541511 (IT): 12,795 total contracts → 39% coverage with 5K sample
+- 8(a) set-aside: 729 contracts → 100% coverage
+- Construction SB (multi-NAICS): 8,004 contracts → 62% coverage with 5K
+- Smart sampling ensures both big contracts AND recent small awards captured
+
+### Commits
+- `db482e2` — Fix TypeScript error: use getMarketAssassinTier instead of auth.tier
+- `edec40a` — Add multi-NAICS support with prefix expansion and PSC crosswalk
+- `4f661e0` — Add multi-NAICS support to Market Assassin agency lookup
+- `6e61cad` — Add smart sampling for agency recommendations
+
+---
+
 ## Session 19 (Mar 8, 2026)
 
 ### Daily GovCon Intelligence Briefings
@@ -156,4 +196,4 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
-*Last Updated: March 8, 2026*
+*Last Updated: March 14, 2026*

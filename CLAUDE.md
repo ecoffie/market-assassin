@@ -321,6 +321,31 @@ All admin endpoints follow this pattern:
 
 > Full session history (Sessions 1-18) is in MEMORY.md.
 
+### Session 24 (Mar 15, 2026)
+- **Lindy Intelligence API** — unified endpoint for Lindy AI automation
+  - `/api/lindy/intelligence?email=X` — returns briefings, recompetes, contractor activity, recommended actions
+  - `/api/lindy` — API documentation endpoint
+  - `/api/admin/send-test-briefing?email=X` — generates AND sends briefing email (not just saves)
+  - Recommended actions include: deadline alerts, content angles, competitor watch, outreach suggestions
+  - Data freshness metadata for polling optimization
+- **Commit:** `c09f164`
+
+### Session 23 (Mar 14, 2026)
+- **Multi-NAICS Support** — users can enter comma-separated NAICS codes (e.g., "236, 238, 541511")
+  - New utility: `src/lib/utils/naics-expansion.ts` with `parseNAICSInput()`, `expandNAICSCode()`, `expandNAICSCodes()`
+  - Prefix expansion: "236" → all 236xxx codes, "23" → all construction codes
+  - Updated `CoreInputForm.tsx` placeholder: "e.g., 236, 238320, 541511"
+- **Smart Sampling for Agency Recommendations** — two-pass fetch strategy
+  - Pass 1: 5K contracts by Award Amount (biggest contracts)
+  - Pass 2: 5K contracts by Award Date (most recent)
+  - Deduplication by Award ID prevents double-counting
+  - Multi-NAICS searches get 10K total vs 5K for single NAICS
+- **Alert Profile Multi-NAICS** — `save-profile/route.ts` now accepts:
+  - `naicsCodes[]` array, `naicsInput` string, or `pscCode` (expands via crosswalk)
+  - All inputs merged and expanded before saving
+- **TypeScript Fix** — `generate-all/route.ts` now uses `getMarketAssassinTier(email)` instead of `auth.tier`
+- **Commits:** `db482e2`, `edec40a`, `4f661e0`, `6e61cad`
+
 ### Session 22 (Mar 13, 2026)
 - **Test Protocol Page** — password-protected QA dashboard at `/test-protocol`
   - 18 automated API smoke tests across 5 categories: health checks, access denial, data endpoints, lead capture, content library
@@ -394,4 +419,4 @@ All admin endpoints follow this pattern:
 - Opportunity Hunter: blurred SAT teaser with Market Assassin upgrade CTA
 - FY2026 budget data expanded: 23 → 47 toptier agencies, 175-entry sub-agency parent map
 
-*Last Updated: March 13, 2026*
+*Last Updated: March 15, 2026*
