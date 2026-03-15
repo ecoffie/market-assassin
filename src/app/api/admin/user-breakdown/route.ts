@@ -41,6 +41,12 @@ export async function GET(request: NextRequest) {
     .select('email, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_briefings, created_at')
     .order('created_at', { ascending: false });
 
+  // Get purchases table (actual Stripe transactions)
+  const { data: purchases, error: purchasesError } = await supabase
+    .from('purchases')
+    .select('email, product_name, product_id, amount, stripe_session_id, created_at')
+    .order('created_at', { ascending: false });
+
   // Get user_briefing_profile (alert configurations)
   const { data: briefingProfiles, error: bpError } = await supabase
     .from('user_briefing_profile')
@@ -74,13 +80,29 @@ export async function GET(request: NextRequest) {
   // Build summary
   const leadEmails = new Set(leads?.map(l => l.email?.toLowerCase()).filter(Boolean) || []);
   const profileEmails = new Set(profiles?.map(p => p.email?.toLowerCase()).filter(Boolean) || []);
+  const purchaseEmails = new Set(purchases?.map(p => p.email?.toLowerCase()).filter(Boolean) || []);
   const searchEmails = new Set([...uniqueSearchUsers.keys()].map(e => e.toLowerCase()));
 
-  // Free users = leads who are NOT in profiles (haven't purchased)
-  const freeUsers = [...leadEmails].filter(e => !profileEmails.has(e));
+  // Group purchases by email
+  const purchasesByEmail = new Map<string, Array<{ product: string; amount: number; date: string }>>();
+  purchases?.forEach(p => {
+    if (!p.email) return;
+    const email = p.email.toLowerCase();
+    if (!purchasesByEmail.has(email)) {
+      purchasesByEmail.set(email, []);
+    }
+    purchasesByEmail.get(email)!.push({
+      product: p.product_name || p.product_id,
+      amount: p.amount || 0,
+      date: p.created_at,
+    });
+  });
+
+  // Free users = leads who are NOT in purchases (haven't purchased)
+  const freeUsers = [...leadEmails].filter(e => !purchaseEmails.has(e));
 
   // OH users = searched but not purchased
-  const ohFreeUsers = [...searchEmails].filter(e => !profileEmails.has(e));
+  const ohFreeUsers = [...searchEmails].filter(e => !purchaseEmails.has(e));
 
   // Paying customers breakdown
   const withHunterPro = profiles?.filter(p => p.access_hunter_pro) || [];
@@ -99,6 +121,8 @@ export async function GET(request: NextRequest) {
     summary: {
       total_leads: leads?.length || 0,
       total_profiles: profiles?.length || 0,
+      total_purchases: purchases?.length || 0,
+      unique_buyers: purchaseEmails.size,
       free_users: freeUsers.length,
       oh_free_users: ohFreeUsers.length,
       users_with_searches: uniqueSearchUsers.size,
@@ -144,9 +168,30 @@ export async function GET(request: NextRequest) {
           .map(p => p.email),
       },
     },
+    purchases_by_product: (() => {
+      const byProduct: Record<string, string[]> = {};
+      purchases?.forEach(p => {
+        const product = p.product_name || p.product_id || 'unknown';
+        if (!byProduct[product]) byProduct[product] = [];
+        if (p.email && !byProduct[product].includes(p.email.toLowerCase())) {
+          byProduct[product].push(p.email.toLowerCase());
+        }
+      });
+      return Object.entries(byProduct).map(([product, emails]) => ({
+        product,
+        count: emails.length,
+        emails,
+      }));
+    })(),
+    all_buyers: [...purchasesByEmail.entries()].map(([email, purchases]) => ({
+      email,
+      total_spent: purchases.reduce((sum, p) => sum + p.amount, 0),
+      purchases: purchases.map(p => p.product),
+    })),
     raw: {
       leads: leads?.slice(0, 50),
       profiles: profiles?.slice(0, 50),
+      purchases: purchases?.slice(0, 50),
       briefing_profiles: briefingProfiles?.slice(0, 20),
       alert_settings: alertSettings,
       search_users: [...uniqueSearchUsers.entries()].slice(0, 30).map(([email, data]) => ({
@@ -158,6 +203,7 @@ export async function GET(request: NextRequest) {
     errors: {
       leads: leadsError?.message,
       profiles: profilesError?.message,
+      purchases: purchasesError?.message,
       briefing_profiles: bpError?.message,
       alert_settings: asError?.message,
       search_history: suError?.message,
