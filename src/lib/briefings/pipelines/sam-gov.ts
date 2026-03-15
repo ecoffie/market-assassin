@@ -82,7 +82,73 @@ const setAsideMapping: Record<string, string> = {
 };
 
 /**
+ * Fetch opportunities for a single NAICS code from SAM.gov API
+ */
+async function fetchSingleNaicsOpportunities(
+  naicsCode: string,
+  baseParams: URLSearchParams,
+  apiKey: string
+): Promise<SAMOpportunity[]> {
+  const queryParams = new URLSearchParams(baseParams);
+  queryParams.set('api_key', apiKey);
+  queryParams.set('ncode', naicsCode);
+
+  const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      console.error(`[SAM.gov] Error for NAICS ${naicsCode}: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
+  } catch (error) {
+    console.error(`[SAM.gov] Error fetching NAICS ${naicsCode}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Parse raw SAM.gov opportunity into our interface
+ */
+function parseOpportunity(opp: any): SAMOpportunity {
+  return {
+    noticeId: opp.noticeId || '',
+    title: opp.title || '',
+    solicitationNumber: opp.solicitationNumber || '',
+    naicsCode: opp.naicsCode || '',
+    classificationCode: opp.classificationCode || '',
+    description: opp.description || '',
+    department: opp.department?.name || opp.fullParentPathName?.split('.')[0] || '',
+    subTier: opp.subtierAgency?.name || '',
+    office: opp.office?.name || opp.officeAddress?.city || '',
+    postedDate: opp.postedDate || '',
+    responseDeadline: opp.responseDeadLine || opp.responseDeadline || '',
+    archiveDate: opp.archiveDate || '',
+    setAside: opp.typeOfSetAside || null,
+    setAsideDescription: opp.typeOfSetAsideDescription || null,
+    noticeType: opp.type || opp.noticeType || '',
+    active: opp.active === 'Yes' || opp.active === true,
+    placeOfPerformance: opp.placeOfPerformance ? {
+      city: opp.placeOfPerformance.city?.name,
+      state: opp.placeOfPerformance.state?.code,
+      zip: opp.placeOfPerformance.zip,
+      country: opp.placeOfPerformance.country?.code,
+    } : null,
+    uiLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
+    lastModifiedDate: opp.lastModifiedDate || opp.postedDate || '',
+  };
+}
+
+/**
  * Fetch opportunities from SAM.gov API
+ * Handles multiple NAICS codes by making parallel requests and merging results
  */
 export async function fetchSamOpportunities(
   params: SAMSearchParams,
@@ -90,124 +156,106 @@ export async function fetchSamOpportunities(
 ): Promise<SAMSearchResult> {
   const {
     naicsCodes = [],
-    agencies = [],
     keywords = [],
     zipCodes = [],
     setAsides = [],
     postedFrom,
     postedTo,
     limit = 100,
-    noticeTypes = [], // p=presolicitation, r=sources sought, k=combined, o=solicitation
+    noticeTypes = [],
     state,
   } = params;
 
-  // Build query parameters
-  const queryParams = new URLSearchParams();
-  queryParams.set('api_key', apiKey);
-  queryParams.set('limit', String(limit));
-  queryParams.set('postedFrom', postedFrom || getDefaultPostedFrom());
-  queryParams.set('postedTo', postedTo || getTodayDate());
+  // Build base query parameters (without NAICS - we'll add per-request)
+  const baseParams = new URLSearchParams();
+  baseParams.set('limit', String(Math.min(limit, 50))); // Cap per-request to 50
+  baseParams.set('postedFrom', postedFrom || getDefaultPostedFrom());
+  baseParams.set('postedTo', postedTo || getTodayDate());
 
-  // Add NAICS codes (SAM.gov uses 'ncode' parameter, not 'naics')
-  if (naicsCodes.length > 0) {
-    queryParams.set('ncode', naicsCodes.join(','));
-  }
-
-  // Add keywords (will be OR'd together)
+  // Add keywords
   if (keywords.length > 0) {
-    queryParams.set('q', keywords.join(' OR '));
+    baseParams.set('q', keywords.join(' OR '));
   }
 
   // Add set-asides
   if (setAsides.length > 0) {
-    const samSetAsides = setAsides
-      .map(s => setAsideMapping[s] || s)
-      .join(',');
-    queryParams.set('typeOfSetAside', samSetAsides);
+    const samSetAsides = setAsides.map(s => setAsideMapping[s] || s).join(',');
+    baseParams.set('typeOfSetAside', samSetAsides);
   }
 
-  // Add place of performance (state from zip)
+  // Add place of performance
   if (zipCodes.length > 0) {
-    // SAM.gov uses state codes for location filtering
-    // We'll need to expand this later with a zip-to-state map
-    // For now, pass as-is
-    queryParams.set('poplace', zipCodes.join(','));
+    baseParams.set('poplace', zipCodes.join(','));
   }
 
-  // Add state filter for location-based alerts
+  // Add state filter
   if (state) {
-    queryParams.set('state', state);
+    baseParams.set('state', state);
   }
 
-  // Add notice types filter (p=presolicitation, r=sources sought, k=combined, o=solicitation)
+  // Add notice types
   if (noticeTypes.length > 0) {
-    queryParams.set('ptype', noticeTypes.join(','));
+    baseParams.set('ptype', noticeTypes.join(','));
   }
 
-  const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
+  console.log(`[SAM.gov] Fetching opportunities for ${naicsCodes.length} NAICS codes: ${naicsCodes.join(', ')}`);
 
-  console.log(`[SAM.gov] Fetching opportunities: ${naicsCodes.join(', ') || 'all NAICS'}`);
+  // If no NAICS codes, make a single request
+  if (naicsCodes.length === 0) {
+    try {
+      const queryParams = new URLSearchParams(baseParams);
+      queryParams.set('api_key', apiKey);
+      const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(30000),
-    });
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(30000),
+      });
 
-    if (!response.ok) {
-      throw new Error(`SAM.gov API error: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`SAM.gov API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const opportunities = (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
+
+      return {
+        opportunities,
+        totalRecords: data.totalRecords || opportunities.length,
+        fetchedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('[SAM.gov] Error fetching opportunities:', error);
+      throw error;
     }
-
-    const data = await response.json();
-
-    // Parse opportunities from response
-    const opportunities: SAMOpportunity[] = (data.opportunitiesData || []).map((opp: any) => ({
-      noticeId: opp.noticeId || '',
-      title: opp.title || '',
-      solicitationNumber: opp.solicitationNumber || '',
-      naicsCode: opp.naicsCode || '',
-      classificationCode: opp.classificationCode || '',
-      description: opp.description || '',
-
-      department: opp.department?.name || opp.fullParentPathName?.split('.')[0] || '',
-      subTier: opp.subtierAgency?.name || '',
-      office: opp.office?.name || opp.officeAddress?.city || '',
-
-      postedDate: opp.postedDate || '',
-      responseDeadline: opp.responseDeadLine || opp.responseDeadline || '',
-      archiveDate: opp.archiveDate || '',
-
-      setAside: opp.typeOfSetAside || null,
-      setAsideDescription: opp.typeOfSetAsideDescription || null,
-
-      noticeType: opp.type || opp.noticeType || '',
-      active: opp.active === 'Yes' || opp.active === true,
-
-      placeOfPerformance: opp.placeOfPerformance ? {
-        city: opp.placeOfPerformance.city?.name,
-        state: opp.placeOfPerformance.state?.code,
-        zip: opp.placeOfPerformance.zip,
-        country: opp.placeOfPerformance.country?.code,
-      } : null,
-
-      uiLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
-
-      lastModifiedDate: opp.lastModifiedDate || opp.postedDate || '',
-    }));
-
-    console.log(`[SAM.gov] Retrieved ${opportunities.length} opportunities`);
-
-    return {
-      opportunities,
-      totalRecords: data.totalRecords || opportunities.length,
-      fetchedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error('[SAM.gov] Error fetching opportunities:', error);
-    throw error;
   }
+
+  // Make parallel requests for each NAICS code (max 5 concurrent)
+  const naicsToFetch = naicsCodes.slice(0, 5); // Limit to 5 NAICS codes
+  const results = await Promise.all(
+    naicsToFetch.map(naics => fetchSingleNaicsOpportunities(naics, baseParams, apiKey))
+  );
+
+  // Merge and deduplicate by noticeId
+  const seenIds = new Set<string>();
+  const allOpportunities: SAMOpportunity[] = [];
+
+  for (const opps of results) {
+    for (const opp of opps) {
+      if (!seenIds.has(opp.noticeId)) {
+        seenIds.add(opp.noticeId);
+        allOpportunities.push(opp);
+      }
+    }
+  }
+
+  console.log(`[SAM.gov] Retrieved ${allOpportunities.length} unique opportunities across ${naicsToFetch.length} NAICS codes`);
+
+  return {
+    opportunities: allOpportunities.slice(0, limit),
+    totalRecords: allOpportunities.length,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 /**
