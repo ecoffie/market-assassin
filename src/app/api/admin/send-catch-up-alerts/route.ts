@@ -288,16 +288,28 @@ async function sendCatchUpEmail(
       ${opportunitiesHtml}
     </table>
 
-    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; margin-top: 20px;">
+    <!-- How to Update Preferences -->
+    <div style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 20px; margin-top: 20px;">
+      <h3 style="margin: 0 0 12px 0; color: #1e40af; font-size: 16px;">⚙️ How to Update Your Alert Preferences</h3>
+      <p style="margin: 0 0 12px 0; color: #1e3a8a; font-size: 14px;">
+        Getting opportunities that don't match your business? Here's how to fix it:
+      </p>
+      <ol style="margin: 0; padding-left: 20px; color: #1e3a8a; font-size: 14px;">
+        <li style="margin-bottom: 8px;"><strong>Automatic:</strong> Run a Market Assassin report with your specific NAICS codes — your alert preferences will auto-update!</li>
+        <li style="margin-bottom: 8px;"><strong>Manual:</strong> <a href="${preferencesUrl}" style="color: #2563eb; font-weight: 600;">Click here to manage your preferences</a> and set your exact NAICS codes, set-aside type, and location.</li>
+      </ol>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; margin-top: 16px;">
       <p style="margin: 0; color: #166534; font-size: 14px;">
-        <strong>💡 Tip:</strong> Run a Market Assassin report with your actual NAICS codes to get more personalized alerts. Your filters will auto-update based on your searches!
+        <strong>💡 Pro Tip:</strong> The more specific your NAICS codes, the better your matches. Use your primary 6-digit NAICS instead of broad categories!
       </p>
     </div>
   </div>
 
   <div style="background: #f8fafc; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; text-align: center;">
     <p style="color: #6b7280; font-size: 12px; margin: 0;">
-      <a href="${preferencesUrl}" style="color: #6b7280;">Manage Preferences</a> &nbsp;|&nbsp;
+      <a href="${preferencesUrl}" style="color: #1e40af; font-weight: 600;">Manage Preferences</a> &nbsp;|&nbsp;
       <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
