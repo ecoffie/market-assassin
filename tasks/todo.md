@@ -1,15 +1,38 @@
 # GovCon Giants - Current Tasks
 
-## Session State (March 12, 2026)
+## Session State (March 16, 2026)
 
 ### Just Completed
-- [x] Fixed Activate License flow - now checks all 3 sources (user_profiles, purchases, KV)
-- [x] Added clickable tool links to activation page on govcon-shop
-- [x] Fixed Market Assassin URL (/federal-market-assassin)
-- [x] Created AUTH-STRATEGY.md - CMMC-compliant unified auth plan
-- [x] Created PRODUCT-ROADMAP.md - compete with $50K GovWin
+- [x] OH Pro now included with Alert Pro ($19/mo) purchase
+- [x] Synced tools OH with shop version (email gate first)
+- [x] Added weekly alerts auto-signup on email capture
+- [x] Added dual upgrade options (Alert Pro $19/mo vs Tool Only $49)
+- [x] Redesigned /opp landing page with visual storytelling
+- [x] Deployed /opp to govcongiants.org (commit 9da94d7)
+- [x] SMTP alerts@govcongiants.com working (security policy fixed)
 
-### Next Up: Labor Rate Analytics MVP
+### Key Product Info
+| Product | Price | Stripe ID | Payment Link |
+|---------|-------|-----------|--------------|
+| Alert Pro | $19/mo | `prod_U9rOClXY6MFcRu` | `https://buy.stripe.com/8x24gA1oifvAcFv3OEfnO0y` |
+| Tool Pro | $49 | - | `https://buy.stripe.com/7sIaGqevYeIcdri147` |
+
+### Product Hierarchy
+| Tier | Price | Features |
+|------|-------|----------|
+| Free | $0 | 10 agencies, 5 opps/week |
+| Tool Pro | $49 one-time | All agencies, pain points, export, weekly alerts |
+| Alert Pro | $19/mo | All agencies + unlimited daily alerts (includes Tool Pro) |
+
+---
+
+## Backlog
+
+### Video Demo
+- [ ] Record 2-minute demo video for /opp page
+- [ ] Embed actual video (currently placeholder)
+
+### Labor Rate Analytics MVP
 **Goal:** Build a labor rate search tool using GSA CALC+ data
 
 **Data Source:** https://calc.gsa.gov/ (free public data)
@@ -33,8 +56,6 @@
 
 ---
 
-## Backlog (Auth & Features)
-
 ### Auth System (CMMC Compliance)
 - [ ] Build /login, /register, /forgot-password pages
 - [ ] Add auth middleware to protect tool routes
@@ -55,7 +76,8 @@
 **Projects:**
 - Market Assassin (tools): `~/Market Assasin/market-assassin`
 - GovCon Shop (production): `~/govcon-shop`
+- GovCon Funnels (marketing): `~/govcon-funnels`
 
 **Resume command:** `/continue`
 
-**Last updated:** March 12, 2026
+**Last updated:** March 16, 2026

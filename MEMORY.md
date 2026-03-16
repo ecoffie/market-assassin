@@ -4,6 +4,68 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 25 (Mar 16, 2026)
+
+### Opportunity Hunter Redesign & Alert Pro Integration
+- **OH Pro now included with Alert Pro** — purchasing $19/mo Alert Pro automatically grants OH Pro access
+- Updated webhook (`stripe-webhook/route.ts`):
+  - Sets `ospro:{email}` KV flag when Alert Pro purchased
+  - Calls `updateAccessFlags(email, 'hunter_pro')` for Supabase
+  - Alert Pro Product ID: `prod_U9rOClXY6MFcRu`
+  - Alert Pro Price ID: `price_1TBXfuK5zyiZ50PBWbdLfZ3F`
+  - Payment Link: `https://buy.stripe.com/8x24gA1oifvAcFv3OEfnO0y`
+
+### Tools OH Synced with Shop Version
+- Copied shop's email-gate-first flow to tools.govcongiants.org
+- Flow: Show 3 agencies → email capture → show 10 agencies
+- Added weekly alerts auto-signup on email gate submission
+- Added dual upgrade options after email gate:
+  - Alert Pro ($19/mo): Unlimited daily alerts + all agencies
+  - Tool Only ($49): All agencies, weekly alerts only
+- Alert confirmation banner shows "Weekly Alerts Activated"
+
+### /opp Landing Page Visual Redesign
+- Complete overhaul of govcongiants.org/opp
+- Hero with browser chrome tool mockup showing interface preview
+- "See It In Action" video demo section with placeholder
+- Before/After comparison showing 4 pain points solved
+- Sample alert email preview (realistic inbox look)
+- Pricing comparison: Free tier vs Alert Pro ($19/mo)
+- Market Assassin upsell section at bottom
+- Deployed: commit `9da94d7`
+
+### Key Stripe/Product Info
+| Item | ID/URL |
+|------|--------|
+| Alert Pro Product | `prod_U9rOClXY6MFcRu` |
+| Alert Pro Price | `price_1TBXfuK5zyiZ50PBWbdLfZ3F` |
+| Alert Pro Payment Link | `https://buy.stripe.com/8x24gA1oifvAcFv3OEfnO0y` |
+| OH Pro Payment Link | `https://buy.stripe.com/7sIaGqevYeIcdri147` |
+
+### Product Hierarchy (Updated)
+| Tier | Price | Features |
+|------|-------|----------|
+| Free | $0 | 10 agencies, 5 opps/week alerts |
+| Tool Pro | $49 one-time | All agencies, pain points, export, weekly alerts |
+| Alert Pro | $19/mo | All agencies + unlimited daily alerts (includes Tool Pro) |
+
+---
+
+## Session 24 (Mar 15, 2026)
+
+### Lindy Intelligence API
+- Unified endpoint for Lindy AI automation
+- `/api/lindy/intelligence?email=X` — returns briefings, recompetes, contractor activity, recommended actions
+- `/api/lindy` — API documentation endpoint
+- `/api/admin/send-test-briefing?email=X` — generates AND sends briefing email
+- Recommended actions include: deadline alerts, content angles, competitor watch, outreach suggestions
+- Data freshness metadata for polling optimization
+
+### Commits
+- `c09f164` — Lindy Intelligence API
+
+---
+
 ## Session 23 (Mar 14, 2026)
 
 ### Multi-NAICS Support & Smart Sampling
@@ -196,4 +258,4 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
-*Last Updated: March 14, 2026*
+*Last Updated: March 16, 2026*
