@@ -86,7 +86,6 @@ export async function GET(request: NextRequest) {
         target_agencies: [],
         alert_frequency: 'weekly',
         is_active: true,
-        source: 'lead-enrollment',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_email',
