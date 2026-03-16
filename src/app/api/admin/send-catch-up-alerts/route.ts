@@ -140,8 +140,23 @@ export async function GET(request: NextRequest) {
       const topOpps = scoredOpps.slice(0, 15);
 
       if (topOpps.length === 0) {
-        console.log(`[Catch-up] No opportunities for ${user.user_email}`);
-        results.skipped++;
+        console.log(`[Catch-up] No opportunities for ${user.user_email} (NAICS: ${user.naics_codes?.slice(0,3).join(', ')})`);
+        // Still send a welcome email with instructions on how to update preferences
+        await sendWelcomeOnlyEmail(user.user_email, user);
+
+        // Mark as sent so they don't get another catch-up
+        await supabase
+          .from('user_alert_settings')
+          .update({
+            last_alert_sent: new Date().toISOString(),
+            last_alert_count: 0,
+            total_alerts_sent: 1,
+          })
+          .eq('user_email', user.user_email);
+
+        results.sent++;
+        results.sent_to.push(user.user_email + ' (welcome only)');
+        await new Promise(r => setTimeout(r, 500));
         continue;
       }
 
@@ -219,6 +234,77 @@ function getDaysUntil(dateString: string): number {
   const today = new Date();
   const diff = target.getTime() - today.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+async function sendWelcomeOnlyEmail(email: string, user: AlertUser) {
+  const preferencesUrl = `https://shop.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `https://shop.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const maUrl = 'https://tools.govcongiants.org/market-assassin';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 20px; background: #f3f4f6;">
+  <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">🎯 Welcome to Market Assassin Alerts!</h1>
+    <p style="color: #c4b5fd; margin: 8px 0 0 0; font-size: 16px;">Let's get your profile set up</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none;">
+    <p style="margin: 0 0 20px 0; font-size: 16px;">
+      You're now signed up for weekly opportunity alerts! However, we need your specific NAICS codes to find relevant opportunities.
+    </p>
+
+    <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <p style="margin: 0; color: #92400e; font-size: 14px;">
+        <strong>⚠️ Action Needed:</strong> Your current filters are set to general defaults. Update them to get personalized opportunities!
+      </p>
+    </div>
+
+    <div style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+      <h3 style="margin: 0 0 12px 0; color: #1e40af; font-size: 16px;">⚙️ Two Ways to Update Your Preferences</h3>
+      <ol style="margin: 0; padding-left: 20px; color: #1e3a8a; font-size: 14px;">
+        <li style="margin-bottom: 12px;">
+          <strong>Automatic (Recommended):</strong><br>
+          <a href="${maUrl}" style="color: #2563eb; font-weight: 600;">Run a Market Assassin report</a> with your specific NAICS codes. Your alert preferences will auto-update!
+        </li>
+        <li style="margin-bottom: 8px;">
+          <strong>Manual:</strong><br>
+          <a href="${preferencesUrl}" style="color: #2563eb; font-weight: 600;">Click here to manage your preferences</a> and set your exact NAICS codes, set-aside type, and location.
+        </li>
+      </ol>
+    </div>
+
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px;">
+      <p style="margin: 0; color: #166534; font-size: 14px;">
+        <strong>💡 Pro Tip:</strong> Use your primary 6-digit NAICS code for the best matches. For example: "541511" (Custom Software) is better than just "541" (Professional Services).
+      </p>
+    </div>
+  </div>
+
+  <div style="background: #f8fafc; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; text-align: center;">
+    <p style="color: #6b7280; font-size: 12px; margin: 0;">
+      <a href="${preferencesUrl}" style="color: #1e40af; font-weight: 600;">Manage Preferences</a> &nbsp;|&nbsp;
+      <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
+    </p>
+    <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
+      &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.org
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  await transporter.sendMail({
+    from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+    to: email,
+    subject: `🎯 Welcome to Market Assassin Alerts - Set Up Your Preferences`,
+    html: htmlContent,
+  });
 }
 
 async function sendCatchUpEmail(
