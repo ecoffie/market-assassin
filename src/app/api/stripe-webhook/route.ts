@@ -166,13 +166,17 @@ export async function POST(request: NextRequest) {
           .eq('user_email', email.toLowerCase());
       }
 
-      // Set KV access
+      // Set KV access for Alert Pro + Opportunity Hunter Pro (Alert Pro includes OH Pro)
       try {
         await kv.set(`alertpro:${email.toLowerCase()}`, 'true');
-        console.log(`✅ Alert Pro activated for: ${email}`);
+        await kv.set(`ospro:${email.toLowerCase()}`, 'true');
+        console.log(`✅ Alert Pro + OH Pro activated for: ${email}`);
       } catch (kvError) {
         console.error('KV error (non-fatal):', kvError);
       }
+
+      // Also update Supabase access flags for OH Pro
+      await updateAccessFlags(email, 'hunter_pro');
 
       // Send welcome email
       await sendAlertProWelcomeEmail({ to: email, customerName });

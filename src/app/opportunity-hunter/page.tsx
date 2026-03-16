@@ -851,16 +851,20 @@ export default function OpportunityHunterPage() {
 
                 {/* Upgrade Options */}
                 <div className="grid md:grid-cols-2 gap-4">
-                  {/* Alert Pro - Daily Alerts */}
-                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-5 text-white">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xl">📧</span>
-                      <h4 className="font-bold">Alert Pro</h4>
-                      <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">BEST VALUE</span>
+                  {/* Alert Pro - Daily Alerts + Full Tool */}
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-5 text-white relative">
+                    <div className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                      BEST VALUE
                     </div>
-                    <p className="text-blue-100 text-sm mb-3">
-                      <strong className="text-white">Unlimited daily alerts</strong> delivered every morning
-                    </p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">⚡</span>
+                      <h4 className="font-bold">Alert Pro</h4>
+                    </div>
+                    <ul className="text-blue-100 text-sm mb-3 space-y-1">
+                      <li>✓ <strong className="text-white">Unlimited daily alerts</strong></li>
+                      <li>✓ All {results.summary.totalAgencies} agencies unlocked</li>
+                      <li>✓ Pain points + CSV export</li>
+                    </ul>
                     <a
                       href="https://buy.stripe.com/8x24gA1oifvAcFv3OEfnO0y"
                       className="block text-center bg-white text-blue-700 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors text-sm"
@@ -869,20 +873,22 @@ export default function OpportunityHunterPage() {
                     </a>
                   </div>
 
-                  {/* Tool Pro - Unlock Features */}
-                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-5 text-white">
+                  {/* Tool Pro - Unlock Features Only */}
+                  <div className="bg-gradient-to-r from-slate-600 to-slate-700 rounded-xl p-5 text-white">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xl">🔓</span>
-                      <h4 className="font-bold">Unlock Full Tool</h4>
+                      <h4 className="font-bold">Tool Access Only</h4>
                     </div>
-                    <p className="text-amber-100 text-sm mb-3">
-                      All {results.summary.totalAgencies} agencies + pain points + CSV export
-                    </p>
+                    <ul className="text-slate-300 text-sm mb-3 space-y-1">
+                      <li>✓ All {results.summary.totalAgencies} agencies unlocked</li>
+                      <li>✓ Pain points + CSV export</li>
+                      <li className="text-slate-400">✗ Weekly alerts only (5/week)</li>
+                    </ul>
                     <a
                       href="https://buy.stripe.com/7sIaGqevYeIcdri147"
-                      className="block text-center bg-white text-amber-700 px-4 py-2 rounded-lg font-semibold hover:bg-amber-50 transition-colors text-sm"
+                      className="block text-center bg-white text-slate-700 px-4 py-2 rounded-lg font-semibold hover:bg-slate-50 transition-colors text-sm"
                     >
-                      Unlock Tool - $49
+                      One-Time - $49
                     </a>
                   </div>
                 </div>
