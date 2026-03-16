@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { kv } from '@vercel/kv';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -10,6 +11,13 @@ const DEFAULT_NAICS = [
   '541611', '541612', '541613', '541614', '541618', // Management consulting
   '541990', // Other professional services
 ];
+
+interface MAAccessRecord {
+  email: string;
+  tier: 'standard' | 'premium';
+  customerName?: string;
+  createdAt: string;
+}
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -32,15 +40,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
   }
 
-  // Get all MA users (Standard or Premium)
-  const { data: maUsers, error: maError } = await supabase
-    .from('user_profiles')
-    .select('email, access_assassin_standard, access_assassin_premium')
-    .or('access_assassin_standard.eq.true,access_assassin_premium.eq.true')
-    .order('created_at', { ascending: false });
+  // Get all MA users from KV store (ma:all list)
+  const allEmails = await kv.lrange('ma:all', 0, -1) as string[];
+  const uniqueEmails = [...new Set(allEmails || [])];
 
-  if (maError) {
-    return NextResponse.json({ error: 'Failed to fetch MA users', details: maError.message }, { status: 500 });
+  // Fetch full records for each MA user
+  const maUsers: MAAccessRecord[] = [];
+  for (const email of uniqueEmails) {
+    const access = await kv.get<MAAccessRecord>(`ma:${email}`);
+    if (access) {
+      maUsers.push(access);
+    }
   }
 
   // Get existing alert subscribers
@@ -51,17 +61,18 @@ export async function GET(request: NextRequest) {
   const existingEmails = new Set((existingAlerts || []).map(a => a.user_email.toLowerCase()));
 
   // Find MA users not yet enrolled
-  const toEnroll = (maUsers || []).filter(u => !existingEmails.has(u.email.toLowerCase()));
+  const toEnroll = maUsers.filter(u => !existingEmails.has(u.email.toLowerCase()));
 
   if (mode === 'preview') {
     return NextResponse.json({
       mode: 'preview',
-      total_ma_users: maUsers?.length || 0,
+      total_ma_users: maUsers.length,
       already_enrolled: existingEmails.size,
       to_enroll: toEnroll.length,
       users_to_add: toEnroll.map(u => ({
         email: u.email,
-        tier: u.access_assassin_premium ? 'Premium' : 'Standard',
+        name: u.customerName,
+        tier: u.tier,
       })),
       instructions: 'Add ?mode=execute to enroll these users',
     });
