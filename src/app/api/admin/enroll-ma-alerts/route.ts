@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   // Get all MA users (Standard or Premium)
   const { data: maUsers, error: maError } = await supabase
     .from('user_profiles')
-    .select('email, full_name, access_assassin_standard, access_assassin_premium')
+    .select('email, name, access_assassin_standard, access_assassin_premium')
     .or('access_assassin_standard.eq.true,access_assassin_premium.eq.true')
     .order('created_at', { ascending: false });
 
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       to_enroll: toEnroll.length,
       users_to_add: toEnroll.map(u => ({
         email: u.email,
-        name: u.full_name,
+        name: u.name,
         tier: u.access_assassin_premium ? 'Premium' : 'Standard',
       })),
       instructions: 'Add ?mode=execute to enroll these users',
