@@ -253,9 +253,8 @@ export default function OpportunityHunterPage() {
         body: JSON.stringify({
           email: email,
           naicsCodes: results?.searchCriteria.naicsCode ? [results.searchCriteria.naicsCode] : [],
-          setAsideTypes: results?.searchCriteria.businessFormation ? [results.searchCriteria.businessFormation] : [],
-          states: results?.searchCriteria.zipCode ? [] : [], // Could map zip to state later
-          alertFrequency: 'weekly',
+          businessType: results?.searchCriteria.businessFormation || 'Small Business',
+          source: 'opportunity-hunter-free',
         }),
       }).catch(() => {}); // Silently ignore errors
     } catch {
@@ -417,6 +416,26 @@ export default function OpportunityHunterPage() {
       setTimeout(() => {
         setLoading(false);
         setResults(result);
+
+        // Auto-save NAICS to alerts if user already passed email gate
+        const storedEmail = localStorage.getItem('opportunityHunterEmail');
+        if (storedEmail) {
+          try {
+            const { email } = JSON.parse(storedEmail);
+            if (email && result?.searchCriteria?.naicsCode) {
+              fetch('/api/alerts/save-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: email,
+                  naicsCodes: [result.searchCriteria.naicsCode],
+                  businessType: result.searchCriteria.businessFormation || 'Small Business',
+                  source: 'opportunity-hunter-free',
+                }),
+              }).catch(() => {}); // Silent - don't interrupt user experience
+            }
+          } catch { /* ignore parse errors */ }
+        }
       }, 500);
 
     } catch (err) {
