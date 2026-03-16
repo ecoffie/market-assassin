@@ -831,10 +831,11 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Save alert profile for MA Premium users (non-blocking)
+    // Save alert profile for ALL MA users (non-blocking)
+    // This updates their alert preferences with the NAICS/PSC codes they actually use
     if (email) {
       const userTier = await getMarketAssassinTier(email);
-      if (userTier === 'premium') {
+      if (userTier) {
         saveAlertProfile(email, inputs, selectedAgencies).catch(err => {
           console.error('[Alerts] Failed to save profile:', err);
         });
