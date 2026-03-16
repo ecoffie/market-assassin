@@ -266,6 +266,7 @@ async function sendAlertEmail(
   totalAvailable: number
 ) {
   const unsubscribeUrl = `https://tools.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const preferencesUrl = `https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
   const ohProUpgradeUrl = 'https://buy.stripe.com/7sIaGqevYeIcdri147';
 
   const showUpgrade = tier === 'free' && totalAvailable > 5;
@@ -334,6 +335,8 @@ async function sendAlertEmail(
 
   <div style="background: #f8fafc; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; text-align: center;">
     <p style="color: #6b7280; font-size: 12px; margin: 0;">
+      <a href="${preferencesUrl}" style="color: #1e40af;">Manage Preferences</a>
+      &nbsp;|&nbsp;
       <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">

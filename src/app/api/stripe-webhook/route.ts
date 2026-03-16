@@ -11,6 +11,7 @@ import {
   sendRecompeteEmail,
   sendBundleEmail,
   sendFHCWelcomeEmail,
+  sendAlertProWelcomeEmail,
 } from '@/lib/send-email';
 import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
 
@@ -142,12 +143,40 @@ export async function POST(request: NextRequest) {
     const customerName = session.customer_details?.name || undefined;
     const productName = lineItems.data[0]?.description || 'GovCon Product';
 
+    // Check if this is an Alert Pro subscription
+    const isAlertPro = tier === 'alert_pro' ||
+      productName?.toLowerCase().includes('alert pro') ||
+      lineItems.data.some(item => (item.price?.product as string) === 'prod_U9rOClXY6MFcRu');
+
     // Check if this is a Federal Help Center membership
     const isFHCMembership = tier === 'fhc_membership' ||
       productName?.toLowerCase().includes('federal help center') ||
       productName?.toLowerCase().includes('fhc');
 
-    if (isFHCMembership) {
+    if (isAlertPro) {
+      // Alert Pro subscription - set user to daily frequency
+      if (supabase) {
+        await supabase
+          .from('user_alert_settings')
+          .update({
+            alert_frequency: 'daily',
+            subscription_status: 'active',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_email', email.toLowerCase());
+      }
+
+      // Set KV access
+      try {
+        await kv.set(`alertpro:${email.toLowerCase()}`, 'true');
+        console.log(`✅ Alert Pro activated for: ${email}`);
+      } catch (kvError) {
+        console.error('KV error (non-fatal):', kvError);
+      }
+
+      // Send welcome email
+      await sendAlertProWelcomeEmail({ to: email, customerName });
+    } else if (isFHCMembership) {
       // Grant MA Standard + Briefings for FHC members
       await updateAccessFlags(email, 'assassin_standard');
 
@@ -244,9 +273,65 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!isFHCSubscription) {
-      console.log('Non-FHC subscription event, ignoring');
+    // Check if this is an Alert Pro subscription
+    let isAlertProSubscription = false;
+    for (const item of items) {
+      const price = item.price;
+      const productId = typeof price.product === 'string' ? price.product : price.product?.id;
+      if (productId === 'prod_U9rOClXY6MFcRu') {
+        isAlertProSubscription = true;
+        break;
+      }
+      if (price.metadata?.tier === 'alert_pro') {
+        isAlertProSubscription = true;
+        break;
+      }
+    }
+
+    if (!isFHCSubscription && !isAlertProSubscription) {
+      console.log('Non-FHC/AlertPro subscription event, ignoring');
       return NextResponse.json({ received: true, action: 'ignored' });
+    }
+
+    // Handle Alert Pro cancellation
+    if (isAlertProSubscription) {
+      const customerId = typeof subscription.customer === 'string'
+        ? subscription.customer
+        : subscription.customer?.id;
+
+      if (customerId) {
+        const customer = await stripe.customers.retrieve(customerId);
+        if (!customer.deleted && customer.email) {
+          const email = customer.email.toLowerCase();
+          console.log(`🚫 Alert Pro subscription canceled for: ${email}`);
+
+          // Revert to weekly/free tier
+          if (supabase) {
+            await supabase
+              .from('user_alert_settings')
+              .update({
+                alert_frequency: 'weekly',
+                subscription_status: 'canceled',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_email', email);
+          }
+
+          // Remove KV access
+          try {
+            await kv.del(`alertpro:${email}`);
+            console.log(`✅ Revoked Alert Pro for: ${email}`);
+          } catch (kvError) {
+            console.error('KV error:', kvError);
+          }
+        }
+      }
+
+      return NextResponse.json({
+        received: true,
+        action: 'alert_pro_revoked',
+        reason: subscription.status,
+      });
     }
 
     // Get customer email

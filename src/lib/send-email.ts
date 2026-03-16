@@ -1143,3 +1143,116 @@ We're here to help you win federal contracts!
     return false;
   }
 }
+
+// ============ Alert Pro Welcome Email ============
+
+interface SendAlertProWelcomeEmailParams {
+  to: string;
+  customerName?: string;
+}
+
+export async function sendAlertProWelcomeEmail({
+  to,
+  customerName,
+}: SendAlertProWelcomeEmailParams): Promise<boolean> {
+  const preferencesLink = `https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}`;
+  const maLink = 'https://tools.govcongiants.org/market-assassin';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc;">
+
+  <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 26px;">🎯 Alert Pro Activated!</h1>
+    <p style="color: #d1fae5; margin: 10px 0 0 0; font-size: 16px;">Daily Unlimited Opportunities Start Tomorrow</p>
+  </div>
+
+  <div style="background: #ffffff; padding: 28px; border: 1px solid #e2e8f0; border-top: none;">
+    <p style="font-size: 16px; margin-top: 0;">Hi${customerName ? ` ${customerName}` : ''},</p>
+
+    <p>Welcome to <strong>Alert Pro</strong>! Starting tomorrow morning, you'll receive daily emails with <em>every</em> SAM.gov opportunity that matches your profile.</p>
+
+    <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px solid #10b981; border-radius: 10px; padding: 20px; margin: 24px 0;">
+      <h3 style="color: #065f46; margin: 0 0 14px 0; font-size: 17px;">✅ Your Alert Pro Benefits:</h3>
+      <ul style="color: #047857; margin: 0; padding-left: 20px; line-height: 1.8;">
+        <li><strong>Daily alerts</strong> — Fresh opportunities every morning</li>
+        <li><strong>Unlimited opportunities</strong> — No artificial caps</li>
+        <li><strong>Priority scoring</strong> — Best matches ranked first</li>
+        <li><strong>Deadline tracking</strong> — Never miss a due date</li>
+      </ul>
+    </div>
+
+    <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 18px; margin: 24px 0;">
+      <h4 style="color: #92400e; margin: 0 0 10px 0;">⚙️ Customize Your Alerts</h4>
+      <p style="color: #78350f; margin: 0 0 12px 0; font-size: 14px;">Update your NAICS codes, business type, and location to get the most relevant opportunities.</p>
+      <a href="${preferencesLink}" style="background: #f59e0b; color: #78350f; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 14px;">Manage Preferences →</a>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 1px solid #fca5a5; border-radius: 8px; padding: 18px; margin: 24px 0;">
+      <h4 style="color: #991b1b; margin: 0 0 10px 0;">🎯 Ready to Win? Try Market Assassin</h4>
+      <p style="color: #7f1d1d; margin: 0 0 12px 0; font-size: 14px;">Finding opportunities is step one. Market Assassin shows you exactly how to win them with agency intelligence, competitor analysis, and strategic positioning reports.</p>
+      <a href="${maLink}" style="background: #dc2626; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 14px;">Explore Market Assassin →</a>
+    </div>
+
+    <p style="background: #f1f5f9; border-radius: 8px; padding: 14px; color: #475569; font-size: 14px;">
+      <strong>Your email:</strong> ${to}<br>
+      <strong>Subscription:</strong> $19/month • Cancel anytime
+    </p>
+  </div>
+
+  <div style="background: #f1f5f9; padding: 18px; border-radius: 0 0 12px 12px; text-align: center;">
+    <p style="color: #64748b; font-size: 12px; margin: 0;">
+      Questions? Reply to this email or contact <a href="mailto:service@govcongiants.com" style="color: #059669;">service@govcongiants.com</a>
+    </p>
+    <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
+      © ${new Date().getFullYear()} GovCon Giants • tools.govcongiants.org
+    </p>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await transporter.sendMail({
+      from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+      to,
+      subject: '🎯 Alert Pro Activated - Daily Opportunities Start Tomorrow!',
+      html: htmlContent,
+      text: `Alert Pro Activated!
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Welcome to Alert Pro! Starting tomorrow morning, you'll receive daily emails with every SAM.gov opportunity that matches your profile.
+
+Your Alert Pro Benefits:
+- Daily alerts - Fresh opportunities every morning
+- Unlimited opportunities - No artificial caps
+- Priority scoring - Best matches ranked first
+- Deadline tracking - Never miss a due date
+
+Manage your preferences: ${preferencesLink}
+
+Ready to Win? Try Market Assassin:
+Finding opportunities is step one. Market Assassin shows you exactly how to win them.
+${maLink}
+
+Your email: ${to}
+Subscription: $19/month • Cancel anytime
+
+Questions? Reply to this email or contact service@govcongiants.com
+
+- GovCon Giants Team`,
+    });
+
+    console.log(`✅ Alert Pro Welcome email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send Alert Pro Welcome email:', error);
+    return false;
+  }
+}

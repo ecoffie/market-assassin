@@ -825,40 +825,64 @@ export default function OpportunityHunterPage() {
               </div>
             </div>
 
-            {/* Free User Alert Confirmation + Upgrade CTA */}
+            {/* Free User Alert Confirmation + Upgrade CTAs */}
             {!isPro && userEmail && (
-              <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-6 text-white">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-6 h-6 text-green-200" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <h3 className="font-bold text-lg">Weekly Alerts Activated!</h3>
+              <div className="space-y-4">
+                {/* Current Plan Status */}
+                <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-6 text-white">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-6 h-6 text-green-200" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <h3 className="font-bold text-lg">Weekly Alerts Activated!</h3>
+                      </div>
+                      <p className="text-green-100 text-sm">
+                        You&apos;ll receive <strong>5 SAM.gov opportunities</strong> matching your search every Sunday at {userEmail}.
+                      </p>
                     </div>
-                    <p className="text-green-100 text-sm">
-                      You&apos;ll receive <strong>5 SAM.gov opportunities</strong> matching your search every Sunday at {userEmail}.
-                    </p>
-                  </div>
-                  <div className="bg-white/10 rounded-lg p-3 text-center min-w-[100px]">
-                    <div className="text-3xl font-bold">5</div>
-                    <div className="text-xs text-green-200">opps/week</div>
+                    <div className="bg-white/10 rounded-lg p-3 text-center min-w-[100px]">
+                      <div className="text-3xl font-bold">5</div>
+                      <div className="text-xs text-green-200">opps/week</div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Upgrade teaser */}
-                <div className="mt-4 pt-4 border-t border-white/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-100 text-sm">
-                        <strong className="text-white">Want 15 opportunities</strong> + all {results.summary.totalAgencies} agencies + pain points?
-                      </p>
+                {/* Upgrade Options */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* Alert Pro - Daily Alerts */}
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-5 text-white">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">📧</span>
+                      <h4 className="font-bold">Alert Pro</h4>
+                      <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full">BEST VALUE</span>
                     </div>
+                    <p className="text-blue-100 text-sm mb-3">
+                      <strong className="text-white">Unlimited daily alerts</strong> delivered every morning
+                    </p>
+                    <a
+                      href="https://buy.stripe.com/8x24gA1oifvAcFv3OEfnO0y"
+                      className="block text-center bg-white text-blue-700 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors text-sm"
+                    >
+                      Go Pro - $19/mo
+                    </a>
+                  </div>
+
+                  {/* Tool Pro - Unlock Features */}
+                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-5 text-white">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">🔓</span>
+                      <h4 className="font-bold">Unlock Full Tool</h4>
+                    </div>
+                    <p className="text-amber-100 text-sm mb-3">
+                      All {results.summary.totalAgencies} agencies + pain points + CSV export
+                    </p>
                     <a
                       href="https://buy.stripe.com/7sIaGqevYeIcdri147"
-                      className="bg-white text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-50 transition-colors text-sm whitespace-nowrap"
+                      className="block text-center bg-white text-amber-700 px-4 py-2 rounded-lg font-semibold hover:bg-amber-50 transition-colors text-sm"
                     >
-                      Upgrade to Pro - $49
+                      Unlock Tool - $49
                     </a>
                   </div>
                 </div>
