@@ -93,13 +93,11 @@ export async function generateMABriefing(
     }
 
     // Full briefing
-    const agenciesCovered = [
-      ...new Set([
-        ...rawData.budgetShifts.map(b => b.agencyAcronym),
-        ...rawData.painPointUpdates.map(p => p.agencyAcronym),
-        ...rawData.captureSignals.map(s => s.agencyAcronym),
-      ]),
-    ].filter(Boolean);
+    const agenciesCovered = Array.from(new Set([
+      ...rawData.budgetShifts.map(b => b.agencyAcronym),
+      ...rawData.painPointUpdates.map(p => p.agencyAcronym),
+      ...rawData.captureSignals.map(s => s.agencyAcronym),
+    ])).filter(Boolean);
 
     const fullBriefing: MABriefing = {
       id: `ma-${userEmail}-${Date.now()}`,
