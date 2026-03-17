@@ -23,6 +23,7 @@ import {
   generateFullBriefingEmail,
   generateCondensedBriefingEmail,
 } from './email-templates';
+import { getBriefingProfile } from '@/lib/smart-profile';
 
 /**
  * Generate a full weekly recompete briefing
@@ -155,52 +156,72 @@ export async function generateRecompeteBriefing(
 }
 
 /**
- * Get user profile from database
+ * Get user profile from database (uses smart profile service)
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getUserProfile(
   supabase: any,
   email: string
 ): Promise<RecompeteUserProfile | null> {
-  // Try user_briefing_profile first
-  const { data: briefingProfile } = await supabase
-    .from('user_briefing_profile')
-    .select('naics_codes, agencies, watched_companies, keywords')
-    .eq('user_email', email)
-    .single();
+  try {
+    // Get smart profile first (includes learned preferences)
+    const smartProfile = await getBriefingProfile(email);
 
-  const bp = briefingProfile as { naics_codes?: string[]; agencies?: string[]; watched_companies?: string[] } | null;
+    if (smartProfile && smartProfile.naicsCodes.length > 0) {
+      return {
+        email,
+        // Use topNaics (weighted by clicks) if available, otherwise explicit NAICS
+        naicsCodes: smartProfile.topNaics.length > 0 ? smartProfile.topNaics : smartProfile.naicsCodes,
+        agencies: smartProfile.topAgencies.length > 0 ? smartProfile.topAgencies : smartProfile.targetAgencies,
+        watchedCompanies: smartProfile.topCompanies.length > 0 ? smartProfile.topCompanies : smartProfile.watchedCompanies,
+        businessType: smartProfile.certifications[0] || 'Small Business',
+      };
+    }
 
-  if (bp && bp.naics_codes && bp.naics_codes.length > 0) {
-    return {
-      email,
-      naicsCodes: bp.naics_codes || [],
-      agencies: bp.agencies || [],
-      watchedCompanies: bp.watched_companies || [],
-      businessType: 'Small Business',
-    };
+    // Fallback to database queries if no smart profile
+    // Try user_briefing_profile first
+    const { data: briefingProfile } = await supabase
+      .from('user_briefing_profile')
+      .select('naics_codes, agencies, watched_companies, keywords')
+      .eq('user_email', email)
+      .single();
+
+    const bp = briefingProfile as { naics_codes?: string[]; agencies?: string[]; watched_companies?: string[] } | null;
+
+    if (bp && bp.naics_codes && bp.naics_codes.length > 0) {
+      return {
+        email,
+        naicsCodes: bp.naics_codes || [],
+        agencies: bp.agencies || [],
+        watchedCompanies: bp.watched_companies || [],
+        businessType: 'Small Business',
+      };
+    }
+
+    // Try user_alert_settings as fallback
+    const { data: alertSettings } = await supabase
+      .from('user_alert_settings')
+      .select('naics_codes, business_type, target_agencies')
+      .eq('user_email', email)
+      .single();
+
+    const as_ = alertSettings as { naics_codes?: string[]; business_type?: string; target_agencies?: string[] } | null;
+
+    if (as_ && as_.naics_codes && as_.naics_codes.length > 0) {
+      return {
+        email,
+        naicsCodes: as_.naics_codes || [],
+        agencies: as_.target_agencies || [],
+        watchedCompanies: [],
+        businessType: as_.business_type || 'Small Business',
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[RecompeteGen] Error getting profile:', error);
+    return null;
   }
-
-  // Try user_alert_settings as fallback
-  const { data: alertSettings } = await supabase
-    .from('user_alert_settings')
-    .select('naics_codes, business_type, target_agencies')
-    .eq('user_email', email)
-    .single();
-
-  const as_ = alertSettings as { naics_codes?: string[]; business_type?: string; target_agencies?: string[] } | null;
-
-  if (as_ && as_.naics_codes && as_.naics_codes.length > 0) {
-    return {
-      email,
-      naicsCodes: as_.naics_codes || [],
-      agencies: as_.target_agencies || [],
-      watchedCompanies: [],
-      businessType: as_.business_type || 'Small Business',
-    };
-  }
-
-  return null;
 }
 
 /**

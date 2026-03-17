@@ -14,6 +14,7 @@ import {
 } from './types';
 import { aggregateMABriefingData } from './data-aggregator';
 import { generateMABriefingEmail, generateCondensedMABriefingEmail } from './email-templates';
+import { getBriefingProfile } from '@/lib/smart-profile';
 
 /**
  * Generate a full MA briefing
@@ -157,12 +158,9 @@ export async function generateMABriefing(
 }
 
 /**
- * Get MA user profile
+ * Get MA user profile (uses smart profile service)
  */
 async function getMAUserProfile(email: string): Promise<MAUserProfile | null> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return null;
-
   try {
     // Check MA access via KV
     const maAccess = await kv.get(`ma:${email.toLowerCase()}`);
@@ -173,6 +171,27 @@ async function getMAUserProfile(email: string): Promise<MAUserProfile | null> {
     if (typeof maAccess === 'object' && maAccess !== null && 'tier' in maAccess) {
       maTier = (maAccess as { tier: string }).tier === 'premium' ? 'premium' : 'standard';
     }
+
+    // Get smart profile first (includes learned preferences)
+    const smartProfile = await getBriefingProfile(email);
+
+    if (smartProfile && smartProfile.naicsCodes.length > 0) {
+      return {
+        email,
+        // Use topNaics (weighted by clicks) if available, otherwise explicit NAICS
+        naicsCodes: smartProfile.topNaics.length > 0 ? smartProfile.topNaics : smartProfile.naicsCodes,
+        targetAgencies: smartProfile.topAgencies.length > 0 ? smartProfile.topAgencies : smartProfile.targetAgencies,
+        watchedCompetitors: smartProfile.topCompanies.length > 0 ? smartProfile.topCompanies : smartProfile.watchedCompanies,
+        capabilities: smartProfile.capabilityKeywords,
+        setAsideTypes: smartProfile.certifications,
+        hasMAAccess,
+        maTier,
+      };
+    }
+
+    // Fallback to database queries if no smart profile
+    const supabase = getSupabaseClient();
+    if (!supabase) return hasMAAccess ? getDefaultMAProfile(email, hasMAAccess, maTier) : null;
 
     // Try user_briefing_profile first
     const { data: briefingProfile } = await supabase
@@ -206,7 +225,7 @@ async function getMAUserProfile(email: string): Promise<MAUserProfile | null> {
         email,
         naicsCodes: alertSettings.naics_codes,
         targetAgencies: alertSettings.target_agencies || [],
-        watchedCompetitors: ['Leidos', 'CACI', 'Booz Allen', 'Peraton', 'SAIC'], // Default competitors
+        watchedCompetitors: ['Leidos', 'CACI', 'Booz Allen', 'Peraton', 'SAIC'],
         capabilities: [],
         setAsideTypes: alertSettings.business_type ? [alertSettings.business_type] : [],
         hasMAAccess,
@@ -215,24 +234,27 @@ async function getMAUserProfile(email: string): Promise<MAUserProfile | null> {
     }
 
     // Return default profile if user has MA access but no profile
-    if (hasMAAccess) {
-      return {
-        email,
-        naicsCodes: ['541511', '541512', '541519'],
-        targetAgencies: ['DHS', 'DOD', 'VA'],
-        watchedCompetitors: ['Leidos', 'CACI', 'Booz Allen', 'Peraton', 'SAIC'],
-        capabilities: [],
-        setAsideTypes: [],
-        hasMAAccess,
-        maTier,
-      };
-    }
-
-    return null;
+    return hasMAAccess ? getDefaultMAProfile(email, hasMAAccess, maTier) : null;
   } catch (error) {
     console.error('[MABriefingGen] Error getting profile:', error);
     return null;
   }
+}
+
+/**
+ * Get default MA profile for users with access but no profile
+ */
+function getDefaultMAProfile(email: string, hasMAAccess: boolean, maTier: 'standard' | 'premium'): MAUserProfile {
+  return {
+    email,
+    naicsCodes: ['541511', '541512', '541519'],
+    targetAgencies: ['DHS', 'DOD', 'VA'],
+    watchedCompetitors: ['Leidos', 'CACI', 'Booz Allen', 'Peraton', 'SAIC'],
+    capabilities: [],
+    setAsideTypes: [],
+    hasMAAccess,
+    maTier,
+  };
 }
 
 /**
