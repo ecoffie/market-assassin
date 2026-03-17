@@ -176,17 +176,22 @@ export async function GET(request: NextRequest) {
 
     // Fetch briefing if requested
     if (includeSections.includes('briefing')) {
+      // Try to get both recompete and MA briefings
       const { data: briefings } = await supabase
         .from('briefing_log')
-        .select('briefing_date, briefing_data, generated_at')
+        .select('briefing_date, briefing_type, briefing_data, generated_at')
         .eq('user_email', email)
         .order('briefing_date', { ascending: false })
-        .limit(days);
+        .limit(days * 2); // Get more in case of mixed types
 
       if (briefings && briefings.length > 0) {
-        const latestBriefing = briefings[0].briefing_data as Record<string, unknown> | null;
-        if (latestBriefing) {
-          // Handle new recompete briefing format
+        // Find most recent recompete briefing
+        const recompeteBriefing = briefings.find(b => b.briefing_type === 'recompete' || !b.briefing_type);
+        const maBriefing = briefings.find(b => b.briefing_type === 'market_assassin');
+
+        // Handle recompete briefing format
+        if (recompeteBriefing?.briefing_data) {
+          const latestBriefing = recompeteBriefing.briefing_data as Record<string, unknown>;
           const opportunities = latestBriefing.opportunities as Array<{
             rank?: number;
             contractName?: string;
@@ -210,7 +215,7 @@ export async function GET(request: NextRequest) {
           }> || [];
 
           intelligence.briefing = {
-            date: briefings[0].briefing_date,
+            date: recompeteBriefing.briefing_date,
             headline: `${opportunities.length} Recompete Opportunities`,
             subheadline: `${teamingPlays.length} Teaming Plays • ${marketIntel.length} Market Intel Items`,
             total_items: opportunities.length,
@@ -233,7 +238,57 @@ export async function GET(request: NextRequest) {
               action_url: `https://www.usaspending.gov/search`,
             })),
           };
-          intelligence.meta.data_freshness.briefing = briefings[0].generated_at;
+          intelligence.meta.data_freshness.briefing = recompeteBriefing.generated_at;
+        }
+
+        // Handle MA briefing format (add as separate section)
+        if (maBriefing?.briefing_data) {
+          const maData = maBriefing.briefing_data as {
+            budgetShifts?: Array<{ agency: string; amount: string; shiftType: string; impactOnUser: string }>;
+            painPointUpdates?: Array<{ agency: string; painPoint: string; opportunityAngle: string }>;
+            competitorActivity?: Array<{ companyName: string; activityType: string; description: string; implication: string }>;
+            captureSignals?: Array<{ title: string; agency: string; signalType: string; fitScore: number; actionRequired: string }>;
+            summary?: { totalAlerts: number; urgentItems: number; newOpportunities: number };
+          };
+
+          // Merge MA intel into contractor activity (competitor moves)
+          if (maData.competitorActivity && maData.competitorActivity.length > 0) {
+            const maCompetitorMoves = maData.competitorActivity.map(c => ({
+              companyName: c.companyName,
+              activityType: c.activityType as 'new_award' | 'recompete_win' | 'teaming_announcement' | 'new_contract',
+              details: c.description,
+              date: maBriefing.briefing_date,
+              relevance: c.implication,
+            }));
+            intelligence.contractor_activity.tier1_moves.push(...maCompetitorMoves);
+          }
+
+          // Add capture signals to recommended actions
+          if (maData.captureSignals && maData.captureSignals.length > 0) {
+            for (const signal of maData.captureSignals.slice(0, 3)) {
+              intelligence.recommended_actions.push({
+                id: `ma-signal-${signal.title.substring(0, 10)}`,
+                type: 'opportunity',
+                priority: signal.fitScore >= 70 ? 'high' : 'medium',
+                title: signal.title,
+                description: `${signal.agency} - ${signal.signalType.replace('_', ' ')}`,
+                reason: `Fit score: ${signal.fitScore}%. ${signal.actionRequired}`,
+              });
+            }
+          }
+
+          // Add budget shifts as intelligence
+          if (maData.budgetShifts && maData.budgetShifts.length > 0) {
+            const budgetAlert = maData.budgetShifts[0];
+            intelligence.recommended_actions.push({
+              id: `ma-budget-${budgetAlert.agency}`,
+              type: 'opportunity',
+              priority: 'medium',
+              title: `Budget Alert: ${budgetAlert.agency}`,
+              description: `${budgetAlert.amount} - ${budgetAlert.shiftType}`,
+              reason: budgetAlert.impactOnUser,
+            });
+          }
         }
       }
     }
