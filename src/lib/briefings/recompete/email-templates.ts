@@ -360,49 +360,111 @@ function generateCondensedHtmlBody(briefing: CondensedBriefing, dateStr: string,
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Recompete Alerts</title>
+  <title>Daily Recompete Intel</title>
   <style>
-    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: #f5f5f5; }
-    .container { max-width: 650px; margin: 0 auto; background: #ffffff; }
-    .header { background: #1a365d; color: white; padding: 20px 24px; }
-    .header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-    .header .date { margin: 6px 0 0; font-size: 12px; opacity: 0.8; }
-    .section { padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
-    .section-title { margin: 0 0 14px; font-size: 13px; font-weight: 700; color: #1a365d; text-transform: uppercase; }
-    .opp-line { font-size: 13px; color: #2d3748; margin: 0 0 10px; line-height: 1.5; }
-    .opp-line strong { color: #1a365d; }
-    .opp-line em { color: #718096; font-style: normal; }
-    .play-line { font-size: 13px; color: #2d3748; margin: 0 0 8px; line-height: 1.5; }
-    .footer { background: #f7fafc; padding: 16px 24px; text-align: center; }
-    .footer p { margin: 0; font-size: 11px; color: #718096; }
-    .footer a { color: #3182ce; text-decoration: none; }
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: #0f172a; }
+    .container { max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; margin-top: 20px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+
+    .header { background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); color: white; padding: 28px 32px; }
+    .header-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
+    .header .subtitle { margin: 8px 0 0; font-size: 14px; opacity: 0.9; }
+    .header .date { margin: 4px 0 0; font-size: 12px; opacity: 0.7; }
+
+    .stats-bar { background: #f8fafc; padding: 16px 32px; display: flex; gap: 32px; border-bottom: 1px solid #e2e8f0; }
+    .stat { text-align: center; }
+    .stat-value { font-size: 28px; font-weight: 700; color: #7c3aed; }
+    .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .section { padding: 24px 32px; }
+    .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .section-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .section-title { margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .opp-card { display: flex; margin-bottom: 16px; background: #f8fafc; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .opp-rank { width: 48px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; }
+    .opp-content { flex: 1; padding: 14px 16px; }
+    .opp-name { font-size: 14px; font-weight: 600; color: #1e293b; margin: 0 0 4px; }
+    .opp-meta { font-size: 12px; color: #64748b; margin: 0 0 8px; }
+    .opp-meta .value { color: #059669; font-weight: 600; }
+    .opp-angle { font-size: 12px; color: #475569; margin: 0; line-height: 1.5; }
+
+    .play-card { background: #fef3c7; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; border-left: 4px solid #f59e0b; }
+    .play-theme { font-size: 13px; font-weight: 600; color: #92400e; margin: 0 0 6px; }
+    .play-detail { font-size: 12px; color: #78350f; margin: 0; line-height: 1.5; }
+
+    .cta-section { background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 20px 32px; text-align: center; }
+    .cta-text { color: white; font-size: 13px; margin: 0 0 12px; opacity: 0.9; }
+    .cta-button { display: inline-block; background: white; color: #7c3aed; padding: 10px 24px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; }
+
+    .footer { background: #1e293b; padding: 20px 32px; text-align: center; }
+    .footer p { margin: 0; font-size: 11px; color: #94a3b8; }
+    .footer a { color: #a5b4fc; text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>Daily Recompete Alerts — Displacement Intel</h1>
-      <p class="date">As of: ${dateStr}, ${timeStr}</p>
+      <span class="header-badge">Daily Intel</span>
+      <h1>Displacement Briefing</h1>
+      <p class="subtitle">Top recompete opportunities ranked by vulnerability</p>
+      <p class="date">${dateStr} • ${timeStr} ET</p>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat">
+        <div class="stat-value">${briefing.opportunities.length}</div>
+        <div class="stat-label">Opportunities</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">${briefing.teamingPlays.length}</div>
+        <div class="stat-label">Teaming Plays</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">${briefing.opportunities.reduce((sum, o) => { const match = o.value.match(/\\d+/); return sum + (match ? parseInt(match[0]) : 0); }, 0)}M+</div>
+        <div class="stat-label">Total Value</div>
+      </div>
     </div>
 
     <div class="section">
-      <h2 class="section-title">Top ${briefing.opportunities.length} recompete opportunities (ranked)</h2>
+      <div class="section-header">
+        <span class="section-icon" style="background: #dbeafe;">🎯</span>
+        <h2 class="section-title">Top ${briefing.opportunities.length} Recompete Targets</h2>
+      </div>
       ${briefing.opportunities.map((opp, idx) => `
-        <p class="opp-line"><strong>${opp.name}</strong> (${opp.incumbent}) — <em>${opp.value}</em>; ${opp.displacementAngle}</p>
+        <div class="opp-card">
+          <div class="opp-rank">${idx + 1}</div>
+          <div class="opp-content">
+            <p class="opp-name">${escapeHtml(opp.name)}</p>
+            <p class="opp-meta"><span class="value">${escapeHtml(opp.value)}</span> • ${escapeHtml(opp.incumbent)}</p>
+            <p class="opp-angle">${escapeHtml(opp.displacementAngle.substring(0, 120))}...</p>
+          </div>
+        </div>
       `).join('')}
     </div>
 
-    <div class="section">
-      <h2 class="section-title">${briefing.teamingPlays.length} ghosting/teaming plays</h2>
+    <div class="section" style="background: #fffbeb; padding-top: 24px; padding-bottom: 24px;">
+      <div class="section-header">
+        <span class="section-icon" style="background: #fef3c7;">🤝</span>
+        <h2 class="section-title">Teaming Plays</h2>
+      </div>
       ${briefing.teamingPlays.map(play => `
-        <p class="play-line"><strong>${play.theme}:</strong> approach ${play.primes.join('/')} with ${play.whatYouBring}.</p>
+        <div class="play-card">
+          <p class="play-theme">${escapeHtml(play.theme)}</p>
+          <p class="play-detail">Approach <strong>${play.primes.join(', ')}</strong> with ${escapeHtml(play.whatYouBring)}</p>
+        </div>
       `).join('')}
+    </div>
+
+    <div class="cta-section">
+      <p class="cta-text">Want full displacement analysis with action plans?</p>
+      <a href="https://tools.govcongiants.org/briefings" class="cta-button">View Full Briefing →</a>
     </div>
 
     <div class="footer">
       <p>
-        GovCon Giants AI<br>
-        <a href="https://tools.govcongiants.org/briefings/settings">Settings</a> |
+        <strong>GovCon Giants AI</strong><br>
+        <a href="https://tools.govcongiants.org/briefings/settings">Settings</a> •
         <a href="https://tools.govcongiants.org/briefings/unsubscribe">Unsubscribe</a>
       </p>
     </div>

@@ -365,63 +365,129 @@ Manage: https://tools.govcongiants.org/briefings/settings
  * Generate condensed HTML body
  */
 function generateCondensedHtmlBody(briefing: CondensedMABriefing, dateStr: string): string {
+  const hasContent = briefing.topBudgetShift || briefing.topPainPoint || briefing.topCompetitorMove || briefing.topCaptureSignal;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quick Market Intel</title>
+  <title>Market Intel Snapshot</title>
   <style>
-    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: #f5f5f5; }
-    .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-    .header { background: #4f46e5; color: white; padding: 16px 24px; }
-    .header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-    .header .date { margin: 4px 0 0; font-size: 12px; opacity: 0.8; }
-    .section { padding: 16px 24px; border-bottom: 1px solid #e2e8f0; }
-    .section-title { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; margin: 0 0 8px; }
-    .item { font-size: 14px; color: #1e293b; margin: 0; line-height: 1.5; }
-    .footer { background: #f8fafc; padding: 12px 24px; text-align: center; }
-    .footer p { margin: 0; font-size: 11px; color: #64748b; }
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background: #0f172a; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; margin-top: 20px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+
+    .header { background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); color: white; padding: 24px 28px; text-align: center; }
+    .header-badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+    .header .date { margin: 6px 0 0; font-size: 13px; opacity: 0.85; }
+
+    .stats-row { display: flex; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+    .stat-box { flex: 1; padding: 16px 20px; text-align: center; border-right: 1px solid #e2e8f0; }
+    .stat-box:last-child { border-right: none; }
+    .stat-value { font-size: 28px; font-weight: 700; color: #7c3aed; }
+    .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+    .intel-card { margin: 16px; padding: 16px 18px; border-radius: 10px; }
+    .intel-card .icon { font-size: 20px; margin-bottom: 8px; }
+    .intel-card .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .intel-card .agency { font-size: 15px; font-weight: 600; color: #1e293b; margin: 0 0 4px; }
+    .intel-card .summary { font-size: 13px; color: #475569; margin: 0; line-height: 1.5; }
+
+    .card-budget { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-left: 4px solid #059669; }
+    .card-budget .label { color: #059669; }
+    .card-pain { background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%); border-left: 4px solid #dc2626; }
+    .card-pain .label { color: #dc2626; }
+    .card-competitor { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-left: 4px solid #f59e0b; }
+    .card-competitor .label { color: #d97706; }
+    .card-signal { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid #3b82f6; }
+    .card-signal .label { color: #2563eb; }
+
+    .cta-section { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 20px 28px; text-align: center; }
+    .cta-text { color: rgba(255,255,255,0.9); font-size: 13px; margin: 0 0 12px; }
+    .cta-button { display: inline-block; background: white; color: #1e3a8a; padding: 10px 24px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; }
+
+    .footer { background: #1e293b; padding: 16px 28px; text-align: center; }
+    .footer p { margin: 0; font-size: 11px; color: #94a3b8; }
+    .footer a { color: #a5b4fc; text-decoration: none; }
+
+    .empty-state { padding: 40px 28px; text-align: center; }
+    .empty-state p { color: #64748b; font-size: 14px; margin: 0; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>Quick Market Intel</h1>
-      <p class="date">${dateStr} • ${briefing.newSignalsCount} signals, ${briefing.competitorMovesCount} competitor moves</p>
+      <span class="header-badge">Daily Snapshot</span>
+      <h1>Market Intel</h1>
+      <p class="date">${dateStr}</p>
     </div>
 
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-value">${briefing.newSignalsCount}</div>
+        <div class="stat-label">Signals</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${briefing.competitorMovesCount}</div>
+        <div class="stat-label">Competitor Moves</div>
+      </div>
+    </div>
+
+    ${!hasContent ? `
+    <div class="empty-state">
+      <p>No significant market activity today. Check back tomorrow!</p>
+    </div>
+    ` : ''}
+
     ${briefing.topBudgetShift ? `
-    <div class="section">
-      <p class="section-title">💰 Budget Alert</p>
-      <p class="item"><strong>${briefing.topBudgetShift.agency}:</strong> ${briefing.topBudgetShift.summary}</p>
+    <div class="intel-card card-budget">
+      <div class="icon">💰</div>
+      <div class="label">Budget Alert</div>
+      <p class="agency">${escapeHtml(briefing.topBudgetShift.agency)}</p>
+      <p class="summary">${escapeHtml(briefing.topBudgetShift.summary)}</p>
     </div>
     ` : ''}
 
     ${briefing.topPainPoint ? `
-    <div class="section">
-      <p class="section-title">🎯 Pain Point</p>
-      <p class="item"><strong>${briefing.topPainPoint.agency}:</strong> ${briefing.topPainPoint.summary}</p>
+    <div class="intel-card card-pain">
+      <div class="icon">🎯</div>
+      <div class="label">Pain Point</div>
+      <p class="agency">${escapeHtml(briefing.topPainPoint.agency)}</p>
+      <p class="summary">${escapeHtml(briefing.topPainPoint.summary)}</p>
     </div>
     ` : ''}
 
     ${briefing.topCompetitorMove ? `
-    <div class="section">
-      <p class="section-title">👀 Competitor</p>
-      <p class="item"><strong>${briefing.topCompetitorMove.company}:</strong> ${briefing.topCompetitorMove.summary}</p>
+    <div class="intel-card card-competitor">
+      <div class="icon">👀</div>
+      <div class="label">Competitor Watch</div>
+      <p class="agency">${escapeHtml(briefing.topCompetitorMove.company)}</p>
+      <p class="summary">${escapeHtml(briefing.topCompetitorMove.summary)}</p>
     </div>
     ` : ''}
 
     ${briefing.topCaptureSignal ? `
-    <div class="section">
-      <p class="section-title">📡 Capture Signal</p>
-      <p class="item"><strong>${briefing.topCaptureSignal.agency}:</strong> ${briefing.topCaptureSignal.title}${briefing.topCaptureSignal.deadline ? ` (Due: ${briefing.topCaptureSignal.deadline})` : ''}</p>
+    <div class="intel-card card-signal">
+      <div class="icon">📡</div>
+      <div class="label">Capture Signal</div>
+      <p class="agency">${escapeHtml(briefing.topCaptureSignal.agency)}</p>
+      <p class="summary">${escapeHtml(briefing.topCaptureSignal.title)}${briefing.topCaptureSignal.deadline ? ` • Due: ${briefing.topCaptureSignal.deadline}` : ''}</p>
     </div>
     ` : ''}
 
+    <div class="cta-section">
+      <p class="cta-text">Get detailed analysis, action items, and more intel</p>
+      <a href="https://tools.govcongiants.org/briefings" class="cta-button">View Full Briefing →</a>
+    </div>
+
     <div class="footer">
-      <p>GovCon Giants AI • <a href="https://tools.govcongiants.org/briefings" style="color: #4f46e5;">View Full Briefing</a></p>
+      <p>
+        <strong>GovCon Giants AI</strong><br>
+        <a href="https://tools.govcongiants.org/briefings/settings">Settings</a> •
+        <a href="https://tools.govcongiants.org/briefings/unsubscribe">Unsubscribe</a>
+      </p>
     </div>
   </div>
 </body>
