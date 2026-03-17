@@ -1,8 +1,17 @@
 /**
  * Post-generation humanizer — strips common AI writing patterns
  * that make LinkedIn posts sound robotic or AI-generated.
+ * Also enforces LinkedIn optimal post length (1,200-1,700 chars).
  * Runs as a text transform after Grok generates content.
  */
+
+// LinkedIn optimal length parameters (based on 2026 engagement research)
+export const POST_LENGTH_LIMITS = {
+  MIN_CHARS: 800,
+  TARGET_CHARS: 1400,
+  MAX_CHARS: 1700,
+  WARNING_CHARS: 1900, // Above this = significant engagement drop
+};
 
 // Phrases that AI models overuse — matched case-insensitively at line start or after newlines
 const AI_OPENER_PATTERNS: [RegExp, string][] = [
@@ -38,6 +47,30 @@ const AI_FILLER_PATTERNS: [RegExp, string][] = [
   [/\bPeriod[.!]?\s*/gi, ''],
   [/\bGame[- ]changer[.!]?\s*/gi, ''],
   [/\bThis is huge[.!]?\s*/gi, ''],
+  // Additional filler patterns that add wordiness
+  [/\bFurthermore,?\s*/gi, ''],
+  [/\bAdditionally,?\s*/gi, ''],
+  [/\bMoreover,?\s*/gi, ''],
+  [/\bIn conclusion,?\s*/gi, ''],
+  [/\bTo sum (?:it )?up,?\s*/gi, ''],
+  [/\bAll in all,?\s*/gi, ''],
+  [/\bWhen it comes to\b/gi, 'For'],
+  [/\bIn order to\b/gi, 'To'],
+  [/\bDue to the fact that\b/gi, 'Because'],
+  [/\bFor the purpose of\b/gi, 'To'],
+  [/\bIn the event that\b/gi, 'If'],
+  [/\bWith regard to\b/gi, 'About'],
+  [/\bIt is important to note that\b/gi, ''],
+  [/\bIt is worth mentioning that\b/gi, ''],
+  [/\bAs a matter of fact,?\s*/gi, ''],
+  [/\bIn point of fact,?\s*/gi, ''],
+  [/\bThe fact of the matter is,?\s*/gi, ''],
+  [/\bHaving said that,?\s*/gi, ''],
+  [/\bTo be honest,?\s*/gi, ''],
+  [/\bHonestly,?\s*/gi, ''],
+  [/\bQuite frankly,?\s*/gi, ''],
+  [/\bBasically,?\s*/gi, ''],
+  [/\bEssentially,?\s*/gi, ''],
 ];
 
 // Overused AI adjective clusters
@@ -105,4 +138,68 @@ export function humanizePost(text: string): string {
   }
 
   return result;
+}
+
+/**
+ * Trim a post to the target length while preserving readability.
+ * Cuts at paragraph/sentence boundaries when possible.
+ */
+export function trimPost(text: string, maxChars: number = POST_LENGTH_LIMITS.MAX_CHARS): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  // Split into paragraphs
+  const paragraphs = text.split(/\n\n+/);
+  let result = '';
+
+  for (const para of paragraphs) {
+    const candidate = result ? `${result}\n\n${para}` : para;
+    if (candidate.length <= maxChars) {
+      result = candidate;
+    } else {
+      // If first paragraph is too long, try sentence-level trimming
+      if (!result) {
+        const sentences = para.match(/[^.!?]+[.!?]+/g) || [para];
+        for (const sentence of sentences) {
+          const candidateSentence = result ? `${result} ${sentence.trim()}` : sentence.trim();
+          if (candidateSentence.length <= maxChars) {
+            result = candidateSentence;
+          } else {
+            break;
+          }
+        }
+      }
+      break;
+    }
+  }
+
+  return result.trim() || text.slice(0, maxChars - 3) + '...';
+}
+
+/**
+ * Get post length metrics for validation/display.
+ */
+export function getPostMetrics(text: string): {
+  chars: number;
+  words: number;
+  isWithinLimits: boolean;
+  isTooShort: boolean;
+  isTooLong: boolean;
+  status: 'optimal' | 'short' | 'long' | 'too_long';
+} {
+  const chars = text.length;
+  const words = text.split(/\s+/).filter(w => w.length > 0).length;
+
+  const isTooShort = chars < POST_LENGTH_LIMITS.MIN_CHARS;
+  const isTooLong = chars > POST_LENGTH_LIMITS.WARNING_CHARS;
+  const isLong = chars > POST_LENGTH_LIMITS.MAX_CHARS;
+  const isWithinLimits = !isTooShort && !isLong;
+
+  let status: 'optimal' | 'short' | 'long' | 'too_long' = 'optimal';
+  if (isTooShort) status = 'short';
+  else if (isTooLong) status = 'too_long';
+  else if (isLong) status = 'long';
+
+  return { chars, words, isWithinLimits, isTooShort, isTooLong: isLong, status };
 }

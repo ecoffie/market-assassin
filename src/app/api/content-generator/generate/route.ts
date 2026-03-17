@@ -3,7 +3,7 @@ import { getPainPointsForAgency, getPrioritiesForAgency, categorizePainPoints } 
 import { getBudgetForAgency } from '@/lib/utils/budget-authority';
 import { checkContentRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { trackGeneration } from '@/lib/abuse-detection';
-import { humanizePost } from '@/lib/utils/humanize-post';
+import { humanizePost, trimPost, getPostMetrics, POST_LENGTH_LIMITS } from '@/lib/utils/humanize-post';
 
 // Fisher-Yates shuffle — returns a new array in random order
 function shuffleArray<T>(arr: T[]): T[] {
@@ -56,184 +56,162 @@ const GROK_API_KEY = process.env.GROK_API_KEY;
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
 const GROK_MODEL = process.env.GROK_MODEL || 'grok-3';
 
-// Post Templates
+// LinkedIn optimal post length (based on 2026 engagement research):
+// - Sweet spot: 1,200-1,600 characters (~200-270 words)
+// - First 210 chars are critical (visible before "See more")
+// - Under 500 chars = flagged as low-effort
+// - Over 1,900 chars = completion rate drops significantly
+const POST_LENGTH = {
+  MIN_CHARS: 800,
+  TARGET_CHARS: 1400,
+  MAX_CHARS: 1700,
+  MIN_WORDS: 140,
+  TARGET_WORDS: 230,
+  MAX_WORDS: 280,
+  HOOK_CHARS: 200, // First 200 chars must be compelling
+};
+
+// Post Templates - ALL updated with strict character/word limits
 const POST_TEMPLATES: Record<string, { name: string; description: string; prompt: string }> = {
   'story-driven': {
     name: 'Story-Driven',
     description: 'Personal narrative connecting your experience to agency challenges',
     prompt: `Write a story-based LinkedIn post that:
-- Opens with a relatable scenario or personal anecdote
-- Connects to the agency pain point naturally
-- Shows empathy and deep understanding of the challenge
-- Shares a lesson learned or insight that demonstrates expertise
-- Ends with a thought-provoking question that invites discussion
-- Uses conversational, authentic tone
-- 200-300 words`
+- Opens with ONE relatable scenario in 1-2 sentences (max 50 words)
+- Connects to the agency pain point in the next 2-3 sentences
+- Shares ONE clear lesson or insight (not multiple)
+- Ends with ONE thought-provoking question
+- TOTAL: 180-240 words / 1,100-1,500 characters
+- BE CONCISE: Every sentence must earn its place`
   },
   'stat-heavy': {
     name: 'Data-Driven',
     description: 'Statistics-focused post with hard numbers and sources',
     prompt: `Write a data-heavy LinkedIn post that:
-- Opens with a striking statistic
-- Lists 3-4 key data points with sources
-- Uses bullet points for scannability
-- Cites authoritative sources (GAO, agency reports)
-- Connects numbers to real-world impact
-- Ends with an expert observation about what the data means for the market
-- Professional, authoritative tone
-- 150-250 words`
+- Opens with ONE striking statistic (hook in under 15 words)
+- Provides 3 key data points (not 4+)
+- Uses short bullet points (8-12 words each)
+- ONE sentence connecting numbers to impact
+- Ends with a brief observation (1 sentence)
+- TOTAL: 150-200 words / 900-1,300 characters
+- NO fluff or filler words`
   },
   'question-based': {
     name: 'Question-Based',
     description: 'Starts with provocative question (GEO optimized)',
     prompt: `Write a question-based LinkedIn post that:
-- Opens with a thought-provoking question related to the pain point
-- Provides 2-3 insights that answer the question
-- Uses "What if..." or "Why do..." or "How can..." format
-- Optimized for AI search engines (clear Q&A structure)
-- Includes supporting statistics
-- Ends with a call to discuss or share thoughts
-- Engaging, conversational tone
-- 150-200 words`
+- Opens with ONE provocative question (under 20 words)
+- Provides 2-3 brief insights (2-3 sentences each)
+- Ends with call to discuss
+- TOTAL: 140-180 words / 850-1,150 characters
+- Keep answers punchy, not exhaustive`
   },
   'case-study': {
     name: 'Case Study',
     description: 'Problem -> Approach -> Impact analysis format',
     prompt: `Write a case study-style LinkedIn post that:
-- Challenge: Describe the agency's specific challenge with real data
-- Approach: Explain what smart contractors are doing to address it (industry perspective, not a pitch)
-- Impact: Share what outcomes agencies are seeing or could see
-- Uses clear section headers or emojis
-- Includes relevant statistics
-- Demonstrates deep knowledge of the problem space
-- Professional, analytical tone
-- 200-250 words`
+- Challenge: 2 sentences with one key stat
+- Approach: 2-3 sentences on what works
+- Impact: 1-2 sentences on outcomes
+- TOTAL: 160-220 words / 1,000-1,400 characters
+- NO long preambles or conclusions`
   },
   'thought-leadership': {
     name: 'Thought Leadership',
     description: 'Industry insight with forward-looking perspective',
     prompt: `Write a thought leadership LinkedIn post that:
-- Provides unique industry perspective on the pain point
-- Discusses trends and future implications
-- Positions you as an expert/advisor
-- References current events or recent reports
-- Offers actionable insights
-- Avoids sales pitch, focuses on value
-- Ends with invitation to connect or discuss
-- Authoritative, visionary tone
-- 250-300 words`
+- Opens with a bold claim or observation (1 sentence)
+- Provides 2-3 supporting points
+- Offers ONE actionable insight
+- Ends with invitation to discuss
+- TOTAL: 180-250 words / 1,100-1,600 characters
+- Authoritative but concise`
   },
   'list-tips': {
     name: 'List/Tips',
     description: 'Numbered insights or actionable recommendations',
-    prompt: `Write a list-based LinkedIn post that:
-- Opens with context for why this matters (1-2 lines)
-- Provides 3-5 numbered tips or insights
-- CRITICAL MOBILE FORMATTING: Each numbered item must be ONE single line only (no sub-bullets, no multi-line items)
-- Keep each tip to 10-15 words max
-- Relates to agency pain points and priorities
-- Easy to scan and share on mobile
-- Ends with "Which resonates with you?" or similar
-- Clear, helpful tone
-- 150-200 words
+    prompt: `Write a list-based LinkedIn post:
+- Hook: 1 sentence (under 20 words)
+- Context: 1 sentence
+- 4-5 tips (ONE line each, 8-12 words max per tip)
+- Closing question: 1 sentence
+- TOTAL: 130-170 words / 800-1,100 characters
 
-FORMATTING EXAMPLE:
-[Hook statement about the topic]
+EXACT FORMAT:
+[Hook - one punchy line]
 
-[Brief context - 1 sentence]
+[One sentence of context]
 
-1. [Tip in one line]
-2. [Tip in one line]
-3. [Tip in one line]
-4. [Tip in one line]
-5. [Tip in one line]
+1. [Tip in 8-12 words]
+2. [Tip in 8-12 words]
+3. [Tip in 8-12 words]
+4. [Tip in 8-12 words]
 
-[Closing question or call-to-action]`
+[Closing question]`
   },
   'contrarian': {
     name: 'Contrarian Take',
     description: 'Challenges common assumptions with fresh perspective',
     prompt: `Write a contrarian LinkedIn post that:
-- Starts by challenging a common belief or approach
-- Uses "Everyone says X, but..." or "Unpopular opinion:" format
-- Backs up the contrarian view with data
-- Shows alternative perspective on agency challenges
-- Remains respectful and professional
-- Sparks discussion and engagement
-- Ends with "Change my mind" or "Agree or disagree?"
-- Bold, confident tone
-- 150-250 words`
+- Opens with "Unpopular opinion:" or "Everyone says X, but..."
+- States the contrarian view clearly (1-2 sentences)
+- Backs it up with 2-3 points (brief)
+- Ends with "Change my mind?" or similar
+- TOTAL: 140-200 words / 850-1,300 characters
+- Be bold but not verbose`
   },
   'actionable': {
     name: 'Actionable How-To',
     description: 'Step-by-step guide showing how to do something specific',
-    prompt: `Write an actionable how-to LinkedIn post that:
-- Opens with a compelling hook statistic or statement
-- Follow with "Here's how to [solve it]:" on its own line
-- Provides 3-5 numbered steps
-- CRITICAL MOBILE FORMATTING: Each numbered item must be ONE single line only (no sub-bullets or multiple lines per step)
-- Keep each step to 10-15 words max
-- Use action verbs (Choose, Implement, Leverage, Plan, Focus, etc.)
-- After all steps, add a blank line then a short conclusion (1-2 sentences)
-- End with a question or call-to-action
-- Helpful, empowering tone
-- 150-200 words
+    prompt: `Write an actionable how-to LinkedIn post:
+- Hook stat/statement: 1 sentence (under 20 words)
+- "Here's how:" on its own line
+- 4-5 steps (ONE line each, 10-15 words max)
+- Result statement: 1-2 sentences
+- TOTAL: 140-180 words / 850-1,150 characters
 
-FORMATTING EXAMPLE (follow this exactly):
-70% of [X] contracts face [problem].
+EXACT FORMAT:
+[Stat or bold claim - one line]
 
-Here's how to avoid them.
+Here's how to fix it:
 
-1. [Action verb] [brief tip] - [why it works]
-2. [Action verb] [brief tip] - [why it works]
-3. [Action verb] [brief tip] - [why it works]
-4. [Action verb] [brief tip] - [why it works]
-5. [Action verb] [brief tip] - [why it works]
+1. [Action verb] [brief tip]
+2. [Action verb] [brief tip]
+3. [Action verb] [brief tip]
+4. [Action verb] [brief tip]
 
-The result? [Benefit]. [Benefit]. [Benefit].
-
-Want to learn more about our approach?`
+[One sentence on the result]`
   },
   'observation': {
     name: 'Observation & Insight',
     description: "Share something interesting you've noticed",
-    prompt: `Write an observation-based LinkedIn post that:
-- Opens with "I've noticed something interesting..."
-- Describes a trend, pattern, or phenomenon you've observed
-- Provides 2-3 specific examples
-- Explains why this matters for government contractors
-- Relates to agency behaviors or market trends
-- Connects to broader implications
-- Ends with question or food for thought
-- Observant, curious, insightful tone
-- 200-250 words`
+    prompt: `Write an observation LinkedIn post that:
+- Opens with "I've noticed..." or similar (1 sentence)
+- Describes the pattern/trend (2-3 sentences)
+- Provides 2 specific examples (brief)
+- Ends with why it matters + question
+- TOTAL: 160-220 words / 1,000-1,400 characters
+- Observant and curious, not preachy`
   },
   'x-vs-y': {
     name: 'X vs. Y Comparison',
     description: 'Compare two situations for interesting insights',
-    prompt: `Write a comparison LinkedIn post that:
-- Opens by setting up the comparison (X vs. Y)
-- Uses side-by-side structure or clear sections
-- Compares 3-4 key differences or similarities
-- Provides unexpected insights from the comparison
-- Relates to agency contracting or business strategies
-- Uses specific examples for each side
+    prompt: `Write a comparison LinkedIn post:
+- Sets up comparison in 1-2 sentences
+- 3 key differences (2-3 sentences each, not more)
 - Ends with which is better or key lesson
-- Analytical, balanced, insightful tone
-- 250-300 words`
+- TOTAL: 180-240 words / 1,100-1,500 characters
+- Analytical but tight`
   },
   'listicle': {
     name: 'Listicle',
     description: 'Curated list of resources, tools, or recommendations',
-    prompt: `Write a listicle LinkedIn post that:
-- Opens with context for the list
-- Provides 3-7 items in numbered format
-- Each item has brief but specific description
-- Items are genuinely valuable and relevant
-- Mix of well-known and lesser-known items
-- Ends with invitation to add to the list
-- Helpful, generous tone
-- 200-300 words`
+    prompt: `Write a listicle LinkedIn post:
+- Context: 1-2 sentences
+- 4-6 items (2-3 sentences each, max)
+- Ends with "What would you add?"
+- TOTAL: 170-230 words / 1,050-1,450 characters
+- Helpful and generous, not exhaustive`
   }
 };
 
@@ -524,8 +502,16 @@ THOUGHT LEADERSHIP TONE:
 - NEVER say "we can help" or "our services" or "contact us" — instead, share knowledge that makes the reader want to connect
 - Use a professional, conversational tone — like a real person writing on LinkedIn, not an AI
 - Use line breaks for readability
-- Start with a COMPELLING HOOK that captures attention
+- Start with a COMPELLING HOOK that captures attention (first 200 characters are critical!)
 - The hook should be the FIRST LINE and must be engaging
+
+**STRICT LENGTH REQUIREMENTS** (LinkedIn algorithm penalizes too-short AND too-long posts):
+- TOTAL POST: 150-250 words / 900-1,600 characters (including hashtags)
+- First line (hook): Under 20 words, compelling enough to stop scrolling
+- Every sentence must add value — cut fluff ruthlessly
+- If you find yourself writing "Furthermore," "Additionally," or "Moreover" — DELETE that sentence
+- Numbered lists: 4-5 items MAX, each item ONE line only
+- NO long preambles, NO lengthy conclusions — get in, make the point, get out
 
 SOUND HUMAN — AVOID THESE AI PATTERNS:
 - NEVER start with "In today's landscape/world/environment" or "In the ever-changing world of"
@@ -556,7 +542,8 @@ CRITICAL MOBILE FORMATTING RULES (LinkedIn mobile breaks multi-line list items):
 
 Output ONLY the post text, followed by hashtags on separate lines (separated by spaces not commas).`;
 
-      const postContent = await callGrokAPI(step3Prompt, null);
+      // Use lower max_tokens to encourage concise output (target ~250 words = ~350 tokens)
+      const postContent = await callGrokAPI(step3Prompt, null, 600, 0.7);
 
       // Extract hashtags (handles both comma and space separated)
       const hashtagMatch = postContent.match(/#[\w]+/g);
@@ -571,7 +558,15 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
         .trim();
 
       // Humanize: strip AI patterns (filler openers, buzzwords, robotic phrases)
-      const postText = humanizePost(rawText);
+      let postText = humanizePost(rawText);
+
+      // Trim if too long (preserve readability by cutting at sentence/paragraph boundaries)
+      if (postText.length > POST_LENGTH_LIMITS.MAX_CHARS) {
+        postText = trimPost(postText, POST_LENGTH_LIMITS.MAX_CHARS);
+      }
+
+      // Get metrics for the post
+      const metrics = getPostMetrics(postText);
 
       return {
         angle: angle.angle,
@@ -580,7 +575,12 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
         content: postText,
         hashtags: hashtags,
         painPointAddressed: angle.painPoint,
-        talkingPoints: angle.talkingPoints
+        talkingPoints: angle.talkingPoints,
+        metrics: {
+          chars: metrics.chars,
+          words: metrics.words,
+          status: metrics.status
+        }
       };
     };
 
@@ -594,6 +594,7 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       hashtags: string[];
       painPointAddressed: string;
       talkingPoints: string[];
+      metrics: { chars: number; words: number; status: string };
     }[] = [];
 
     for (let batchStart = 0; batchStart < postCount; batchStart += BATCH_SIZE) {
