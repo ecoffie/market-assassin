@@ -14,6 +14,9 @@ export default function ExpiringContractsPage() {
       checkoutUrl="https://buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k"
       videoTitle="Recompete Tracker Demo"
       videoSubtitle="See how to find recompete opportunities 3-6 months early"
+      videos={[
+        { url: 'https://vimeo.com/1172587347', title: 'Recompete Tracker Overview' },
+      ]}
       screenshots={[
         '/images/products/expiring-contracts/home page expiring contracts.png',
         '/images/products/expiring-contracts/filter contacts.png',
