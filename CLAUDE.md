@@ -323,6 +323,34 @@ All admin endpoints follow this pattern:
 
 > Full session history (Sessions 1-18) is in MEMORY.md.
 
+### Session 28 (Mar 17, 2026)
+- **Alerts Signup Bug Fix** — fixed "Failed to save alert profile" error
+  - Added `'free-signup'` to `isFreeSource` check in `save-profile/route.ts`
+  - Removed invalid `source` column from upsert
+  - Added lazy Supabase initialization
+  - Commits: `97f99eb`, `63eeb92`
+- **Daily Health Check System** — automated API testing at `/api/cron/health-check`
+  - 12 tests across 5 categories (Critical Flows, Page Health, Data APIs, Access Control, Lead Capture)
+  - Email alerts on failures, JSON/HTML output formats
+  - Added to `vercel.json` cron (daily at 12:00 UTC)
+  - All tests passing: 12/12 (100% pass rate)
+  - Commit: `d2875bf`, `da554fe`, `89a9ab9`
+- **Health Check URL:** `https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html`
+
+### Session 27 (Mar 17, 2026)
+- **Smart User Profile System** — personalized briefing system that learns from user behavior
+  - 40+ profile fields: location, business, certifications, capabilities, engagement
+  - Engagement scoring (0-100): +2/open, +5/click, -2/day inactivity
+  - Profile service: `src/lib/smart-profile/`
+  - API endpoints: `/api/profile`, `/api/profile/track`
+  - Profile onboarding UI: `/profile/setup`, `/profile/complete`
+  - Commits: `d170aec`, `c396fca`, `8070d6f`, `e74fb7f`, `393464b`
+
+### Session 26 (Mar 16, 2026)
+- **Contractor DB Briefing System** — full briefing module at `/src/lib/briefings/contractor-db/`
+- **Admin endpoint:** `/api/admin/generate-contractor-db-briefing`
+- Full and condensed email formats
+
 ### Session 25 (Mar 16, 2026)
 - **Alert Pro Subscription** — new $19/mo tier that includes OH Pro access
   - Alert Pro Product: `prod_U9rOClXY6MFcRu`, Price: `price_1TBXfuK5zyiZ50PBWbdLfZ3F`
@@ -479,4 +507,4 @@ All admin endpoints follow this pattern:
 - Opportunity Hunter: blurred SAT teaser with Market Assassin upgrade CTA
 - FY2026 budget data expanded: 23 → 47 toptier agencies, 175-entry sub-agency parent map
 
-*Last Updated: March 16, 2026*
+*Last Updated: March 17, 2026*

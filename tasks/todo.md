@@ -2,7 +2,29 @@
 
 ## Session State (March 17, 2026)
 
-### Just Completed - Smart Profile System ✅
+### Just Completed - Daily Health Check System ✅
+- [x] Fixed alerts signup bug ("Failed to save alert profile")
+  - Added `'free-signup'` to `isFreeSource` check
+  - Removed invalid `source` column from upsert
+  - Added lazy Supabase initialization
+  - Commits: `97f99eb`, `63eeb92`
+- [x] Built automated daily health check system
+  - 12 tests across 5 categories (Critical Flows, Page Health, Data APIs, Access Control, Lead Capture)
+  - Email alerts on failures
+  - JSON/HTML output formats
+  - Added to vercel.json cron (daily at 12:00 UTC)
+  - Commit: `d2875bf`
+- [x] Fixed Lead Capture test (invalid resourceId → `ai-prompts`)
+  - Commits: `da554fe`, `89a9ab9`
+- [x] **All tests passing: 12/12 (100% pass rate)**
+
+### Health Check Access
+```
+HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html
+JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
+```
+
+### Smart Profile System ✅ (Previous Session)
 - [x] Designed smart user profile schema (40+ fields)
 - [x] Created SQL migration for user_briefing_profile enhancements
 - [x] Built SmartUserProfile TypeScript types and service
@@ -13,18 +35,13 @@
 - [x] **Built profile complete page** (`/profile/complete`)
 - [x] **Created evaluation criteria** (`tasks/evaluation-criteria.md`)
 - [x] **Fixed TypeScript build error** (added capabilityKeywords to BriefingUserProfile)
-- [x] Pushed all fixes (commits: 8070d6f, e74fb7f)
+- [x] Pushed all fixes (commits: 8070d6f, e74fb7f, 393464b)
 
 ### Vercel Build Status ✅
-- **Build succeeded** (commit `393464b`)
+- **Build succeeded**
 - Pages live at:
   - `/profile/setup?email=test@example.com`
   - `/profile/complete?email=test@example.com`
-
-### Fixes Applied
-- Lazy initialization for Stripe/Supabase/nodemailer in daily-alerts cron
-- Suspense boundaries for useSearchParams in profile pages
-- TypeScript error resolved (capabilityKeywords)
 
 ### Next Tasks
 1. **Test profile tracking** with real click interactions
@@ -135,4 +152,4 @@ Briefing generators use weighted preferences for personalization
 
 **Resume command:** `/continue`
 
-**Last updated:** March 17, 2026
+**Last updated:** March 17, 2026 (Session 28)

@@ -4,6 +4,100 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 28 (Mar 17, 2026)
+
+### Alerts Signup Bug Fix
+- User reported "Failed to save alert profile" error from `/alerts/signup`
+- **Root causes identified:**
+  1. `source: 'free-signup'` wasn't recognized as free tier (only `'opportunity-hunter-free'` was)
+  2. Upsert attempted to insert `source` column which doesn't exist in `user_alert_settings` table
+- **Fixes applied to `src/app/api/alerts/save-profile/route.ts`:**
+  - Added `|| source === 'free-signup'` to `isFreeSource` check
+  - Removed `source` field from database upsert
+  - Added lazy initialization for Supabase
+- Commits: `97f99eb`, `63eeb92`
+- Tested and confirmed working
+
+### Daily Health Check System
+- Built automated health check at `/api/cron/health-check`
+- **12 tests across 5 categories:**
+  - Critical Flows: Alerts Signup (Free), Profile API (GET), Profile Setup Page, Alerts Signup Page
+  - Page Health: Homepage, Store, Opportunity Hunter
+  - Data APIs: USASpending Proxy, Pain Points, Contractors
+  - Access Control: Content Generator Access Denied
+  - Lead Capture: Lead Capture API
+- **Features:**
+  - Password auth (`galata-assassin-2026`) or CRON_SECRET bearer token
+  - JSON and HTML output formats
+  - Email alerts on failures (to `service@govcongiants.com`)
+  - Response time tracking
+  - Critical vs non-critical test classification
+- Added to `vercel.json` cron: `0 12 * * *` (daily at 12:00 UTC with `?email=true`)
+- Commit: `d2875bf`
+
+### Lead Capture Test Fix
+- Initial test failed with "Invalid resource ID"
+- Investigation revealed `/api/capture-lead` requires valid `resourceId` from `FREE_RESOURCES` list
+- Fixed test to use `resourceId: 'ai-prompts'` instead of `source: 'health-check'`
+- Commits: `da554fe`, `89a9ab9`
+- **Final result: 12/12 tests passing (100% pass rate)**
+
+### Health Check Access URLs
+```
+HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html
+JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
+```
+
+### Key Files
+| File | Change |
+|------|--------|
+| `src/app/api/alerts/save-profile/route.ts` | Fixed free-signup recognition, removed invalid column |
+| `src/app/api/cron/health-check/route.ts` | NEW: Automated health check system |
+| `vercel.json` | Added health-check cron job |
+
+---
+
+## Session 27 (Mar 17, 2026)
+
+### Smart User Profile System
+- Built personalized briefing system that learns from user behavior
+- **40+ profile fields:** location, business, certifications, capabilities, engagement
+- **Engagement scoring (0-100):** +2/open, +5/click, -2/day inactivity after 7 days
+- **Learned preferences:** clicked_naics[], clicked_agencies[], clicked_companies[]
+- **Weighted preference calculation:** topNaics, topAgencies, topCompanies
+
+### Profile Service (`src/lib/smart-profile/`)
+- `types.ts` — SmartUserProfile, BriefingUserProfile, ProfileUpdatePayload
+- `service.ts` — getSmartProfile, updateProfile, getBriefingProfile, recordInteraction
+- `index.ts` — exports
+
+### API Endpoints
+- `GET/POST /api/profile` — profile CRUD with completeness breakdown
+- `GET/POST /api/profile/track` — interaction tracking + email open pixel
+
+### UI Components
+- `/profile/setup` — 5-step onboarding wizard
+- `/profile/complete` — completion confirmation page
+
+### Briefing Generator Integration
+- Contractor DB, Market Assassin, Recompete generators now use smart profiles
+- Fall back to explicit preferences if no click history
+
+### Commits
+- `d170aec`, `c396fca`, `8070d6f`, `e74fb7f`, `393464b`
+
+---
+
+## Session 26 (Mar 16, 2026)
+
+### Contractor DB Briefing System
+- Built full Contractor Database briefing matching Eric's intel format
+- Module: `/src/lib/briefings/contractor-db/`
+- Admin endpoint: `/api/admin/generate-contractor-db-briefing`
+- Full and condensed formats
+
+---
+
 ## Session 25 (Mar 16, 2026)
 
 ### Opportunity Hunter Redesign & Alert Pro Integration
@@ -258,4 +352,4 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
-*Last Updated: March 16, 2026*
+*Last Updated: March 17, 2026*
