@@ -50,7 +50,8 @@ export async function generateRecompeteBriefing(
 
   try {
     // Step 1: Get user profile
-    const profile = await getUserProfile(supabase, userEmail);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const profile = await getUserProfile(supabase as any, userEmail);
     if (!profile) {
       console.log(`[RecompeteGen] No profile found for ${userEmail}, using defaults`);
     }
@@ -142,7 +143,8 @@ export async function generateRecompeteBriefing(
 
     // Step 6: Save to database (unless test mode)
     if (!testMode) {
-      await saveBriefing(supabase, userEmail, fullBriefing);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await saveBriefing(supabase as any, userEmail, fullBriefing);
     }
 
     return { briefing: fullBriefing, email };
@@ -155,8 +157,9 @@ export async function generateRecompeteBriefing(
 /**
  * Get user profile from database
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getUserProfile(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   email: string
 ): Promise<RecompeteUserProfile | null> {
   // Try user_briefing_profile first
@@ -166,12 +169,14 @@ async function getUserProfile(
     .eq('user_email', email)
     .single();
 
-  if (briefingProfile && briefingProfile.naics_codes?.length > 0) {
+  const bp = briefingProfile as { naics_codes?: string[]; agencies?: string[]; watched_companies?: string[] } | null;
+
+  if (bp && bp.naics_codes && bp.naics_codes.length > 0) {
     return {
       email,
-      naicsCodes: briefingProfile.naics_codes || [],
-      agencies: briefingProfile.agencies || [],
-      watchedCompanies: briefingProfile.watched_companies || [],
+      naicsCodes: bp.naics_codes || [],
+      agencies: bp.agencies || [],
+      watchedCompanies: bp.watched_companies || [],
       businessType: 'Small Business',
     };
   }
@@ -183,13 +188,15 @@ async function getUserProfile(
     .eq('user_email', email)
     .single();
 
-  if (alertSettings && alertSettings.naics_codes?.length > 0) {
+  const as_ = alertSettings as { naics_codes?: string[]; business_type?: string; target_agencies?: string[] } | null;
+
+  if (as_ && as_.naics_codes && as_.naics_codes.length > 0) {
     return {
       email,
-      naicsCodes: alertSettings.naics_codes || [],
-      agencies: alertSettings.target_agencies || [],
+      naicsCodes: as_.naics_codes || [],
+      agencies: as_.target_agencies || [],
       watchedCompanies: [],
-      businessType: alertSettings.business_type || 'Small Business',
+      businessType: as_.business_type || 'Small Business',
     };
   }
 
@@ -199,8 +206,9 @@ async function getUserProfile(
 /**
  * Save briefing to database
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function saveBriefing(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   email: string,
   briefing: RecompeteBriefing
 ): Promise<void> {
