@@ -16,7 +16,7 @@ import { aggregateRecompeteData } from './data-aggregator';
 import {
   transformToOpportunities,
   generateTeamingPlays,
-  generateContentHooks,
+  generateMarketIntel,
   generatePriorityScorecard,
 } from './ai-generator';
 import {
@@ -82,11 +82,11 @@ export async function generateRecompeteBriefing(
       return null;
     }
 
-    // Step 4: Generate teaming plays, content hooks, scorecard
+    // Step 4: Generate teaming plays, market intel, scorecard
     console.log('[RecompeteGen] Generating strategic content...');
-    const [teamingPlays, contentHooks, priorityScorecard] = await Promise.all([
+    const [teamingPlays, marketIntel, priorityScorecard] = await Promise.all([
       generateTeamingPlays(opportunities),
-      generateContentHooks(opportunities),
+      Promise.resolve(generateMarketIntel(rawData.newsItems, userProfile)),
       Promise.resolve(generatePriorityScorecard(opportunities)),
     ]);
 
@@ -128,7 +128,7 @@ export async function generateRecompeteBriefing(
       timezone: 'ET',
       opportunities,
       teamingPlays,
-      contentHooks,
+      marketIntel,
       priorityScorecard,
       sourcesUsed: ['USASpending', 'GovConWire', 'ExecutiveBiz', 'SAM.gov'],
       processingTimeMs: processingTime,
@@ -139,7 +139,7 @@ export async function generateRecompeteBriefing(
     const email = generateFullBriefingEmail(fullBriefing);
 
     console.log(`[RecompeteGen] Full briefing generated in ${processingTime}ms`);
-    console.log(`[RecompeteGen] ${opportunities.length} opportunities, ${teamingPlays.length} plays, ${contentHooks.length} hooks`);
+    console.log(`[RecompeteGen] ${opportunities.length} opportunities, ${teamingPlays.length} plays, ${marketIntel.length} intel items`);
 
     // Step 6: Save to database (unless test mode)
     if (!testMode) {

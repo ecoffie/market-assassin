@@ -67,13 +67,17 @@ export interface TeamingPlay {
 }
 
 /**
- * A content hook for Eric's LinkedIn
+ * Market intel item from RSS/news
  */
-export interface ContentHook {
+export interface MarketIntel {
   id: string;
-  title: string; // LinkedIn post title
-  cta: string; // "Comment 'MAP' and I'll send..."
-  ctaKeyword: string; // "MAP", "TRAP", "FLIP"
+  headline: string;
+  source: string; // "GovConWire", "ExecutiveBiz", "FCW"
+  publishedDate?: string;
+  summary: string; // 1-2 sentence summary
+  relevance: string; // Why this matters to the user
+  url: string;
+  category: 'award' | 'policy' | 'budget' | 'personnel' | 'acquisition' | 'other';
 }
 
 /**
@@ -102,8 +106,8 @@ export interface RecompeteBriefing {
   // Section 2: Teaming Plays
   teamingPlays: TeamingPlay[];
 
-  // Section 3: Content Hooks
-  contentHooks: ContentHook[];
+  // Section 3: Market Intel
+  marketIntel: MarketIntel[];
 
   // Section 4: Priority Scorecard
   priorityScorecard: PriorityScorecardEntry[];

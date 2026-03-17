@@ -10,7 +10,7 @@ export { aggregateRecompeteData, formatContractValue, getAgencyAcronym } from '.
 export {
   transformToOpportunities,
   generateTeamingPlays,
-  generateContentHooks,
+  generateMarketIntel,
   generatePriorityScorecard,
 } from './ai-generator';
 export { generateFullBriefingEmail, generateCondensedBriefingEmail } from './email-templates';

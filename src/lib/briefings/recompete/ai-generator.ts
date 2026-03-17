@@ -8,7 +8,7 @@
 import {
   RecompeteOpportunity,
   TeamingPlay,
-  ContentHook,
+  MarketIntel,
   PriorityScorecardEntry,
   RawRecompeteData,
   RecompeteUserProfile,
@@ -246,47 +246,97 @@ async function generateTeamingPlays(
 }
 
 /**
- * Generate content hooks for Eric's LinkedIn
+ * Generate market intel from RSS news items
  */
-async function generateContentHooks(
-  opportunities: RecompeteOpportunity[]
-): Promise<ContentHook[]> {
-  const hooks: ContentHook[] = [];
+function generateMarketIntel(
+  newsItems: RawRecompeteData['newsItems'],
+  profile: RecompeteUserProfile
+): MarketIntel[] {
+  const intel: MarketIntel[] = [];
 
-  // Calculate total value
-  const totalValue = opportunities.reduce((sum, o) => sum + (o.contractValueNumeric || 0), 0);
-  const totalValueStr = formatContractValue(totalValue);
+  // Keywords to categorize news
+  const categoryKeywords: Record<MarketIntel['category'], string[]> = {
+    award: ['award', 'wins', 'contract', 'selected', 'chosen', 'wins'],
+    policy: ['policy', 'regulation', 'rule', 'guidance', 'executive order', 'memo'],
+    budget: ['budget', 'funding', 'appropriation', 'spending', 'billion', 'million'],
+    personnel: ['appoint', 'resign', 'hire', 'leadership', 'director', 'secretary'],
+    acquisition: ['rfp', 'rfi', 'solicitation', 'sources sought', 'procurement', 'bid'],
+    other: [],
+  };
 
-  // Get unique agencies
-  const agencies = [...new Set(opportunities.map(o => o.agencyAcronym))];
-  const topAgency = agencies[0] || 'Federal';
+  // Relevance templates based on category
+  const relevanceTemplates: Record<MarketIntel['category'], string[]> = {
+    award: [
+      'Watch for subcontracting opportunities or teaming positions.',
+      'May signal upcoming task orders or follow-on work in same agency.',
+      'Study this winner\'s approach for future capture strategy.',
+    ],
+    policy: [
+      'May impact proposal requirements or evaluation criteria.',
+      'Update your compliance posture before next solicitation.',
+      'Position for upcoming policy-aligned opportunities.',
+    ],
+    budget: [
+      'Indicates funding priority for your NAICS codes.',
+      'Anticipate increased solicitation activity in this area.',
+      'Align BD focus with agency spending trajectory.',
+    ],
+    personnel: [
+      'New leadership often triggers recompete activity.',
+      'Track for shifts in acquisition priorities.',
+      'Consider outreach once transition settles.',
+    ],
+    acquisition: [
+      'Early positioning opportunity—begin capture now.',
+      'Review requirements and assess fit for your capabilities.',
+      'Time to activate teaming conversations.',
+    ],
+    other: [
+      'Monitor for business development implications.',
+      'May create downstream opportunities.',
+    ],
+  };
 
-  // Hook 1: Dollar value hook
-  hooks.push({
-    id: 'hook-value',
-    title: `${totalValueStr}+ in Recompetes Opening in the Next 120 Days (And Who's Actually Vulnerable)`,
-    cta: `Comment 'MAP' and I'll send the quick-score worksheet + training on displacement capture in 30 minutes/day.`,
-    ctaKeyword: 'MAP',
-  });
+  for (const news of newsItems.slice(0, 10)) {
+    // Categorize by keywords
+    let category: MarketIntel['category'] = 'other';
+    const lowerTitle = news.title.toLowerCase();
+    const lowerSnippet = news.snippet.toLowerCase();
 
-  // Hook 2: Incumbent trap hook
-  hooks.push({
-    id: 'hook-trap',
-    title: `The Incumbent Trap: Why Long-Running ${topAgency} Programs Lose at Recompete`,
-    cta: `DM 'TRAP' for Eric's transition-risk checklist and a short masterclass on replacing incumbents without protest drama.`,
-    ctaKeyword: 'TRAP',
-  });
+    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(k => lowerTitle.includes(k) || lowerSnippet.includes(k))) {
+        category = cat as MarketIntel['category'];
+        break;
+      }
+    }
 
-  // Hook 3: Timing hook
-  const quarterNow = Math.ceil((new Date().getMonth() + 1) / 3);
-  hooks.push({
-    id: 'hook-timing',
-    title: `Top ${opportunities.length} ${topAgency} Recompetes to Watch Before Q${quarterNow + 1} (Timing + Vulnerability Breakdown)`,
-    cta: `Reply 'TRACKER' and I'll send the weekly displacement watchlist + pursuit triggers.`,
-    ctaKeyword: 'TRACKER',
-  });
+    // Check relevance to user's agencies
+    const userAgencyMatch = profile.agencies.some(a =>
+      lowerTitle.includes(a.toLowerCase()) || lowerSnippet.includes(a.toLowerCase())
+    );
 
-  return hooks;
+    // Skip if not relevant and we already have enough
+    if (!userAgencyMatch && intel.length >= 5) continue;
+
+    // Generate relevance statement
+    const templates = relevanceTemplates[category];
+    const relevance = templates[Math.floor(Math.random() * templates.length)];
+
+    intel.push({
+      id: `intel-${intel.length + 1}`,
+      headline: news.title,
+      source: news.source,
+      publishedDate: news.publishedDate,
+      summary: news.snippet.substring(0, 200) + (news.snippet.length > 200 ? '...' : ''),
+      relevance: userAgencyMatch ? `Your tracked agency: ${relevance}` : relevance,
+      url: news.url,
+      category,
+    });
+
+    if (intel.length >= 5) break;
+  }
+
+  return intel;
 }
 
 /**
@@ -427,6 +477,6 @@ export {
   generateDisplacementAngle,
   generateTimingSignal,
   generateTeamingPlays,
-  generateContentHooks,
+  generateMarketIntel,
   generatePriorityScorecard,
 };

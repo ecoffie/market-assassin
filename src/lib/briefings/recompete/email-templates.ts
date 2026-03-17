@@ -13,7 +13,7 @@ import {
   CondensedBriefing,
   RecompeteOpportunity,
   TeamingPlay,
-  ContentHook,
+  MarketIntel,
   PriorityScorecardEntry,
   RecompeteEmailTemplate,
 } from './types';
@@ -105,10 +105,13 @@ function generateFullHtmlBody(briefing: RecompeteBriefing, dateStr: string, time
     .play-primes strong { color: #2d3748; }
     .play-opener { font-size: 13px; color: #2d3748; background: #edf2f7; padding: 12px; border-radius: 6px; line-height: 1.6; font-style: italic; }
 
-    .hook { margin-bottom: 16px; padding: 14px 16px; background: #f0fff4; border-left: 3px solid #38a169; }
-    .hook:last-child { margin-bottom: 0; }
-    .hook-title { font-size: 14px; font-weight: 600; color: #22543d; margin: 0 0 6px; }
-    .hook-cta { font-size: 13px; color: #276749; margin: 0; }
+    .intel { margin-bottom: 16px; padding: 14px 16px; background: #f0f9ff; border-left: 3px solid #0284c7; }
+    .intel:last-child { margin-bottom: 0; }
+    .intel-headline { font-size: 14px; font-weight: 600; color: #0c4a6e; margin: 0 0 6px; }
+    .intel-headline a { color: #0284c7; text-decoration: none; }
+    .intel-meta { font-size: 11px; color: #64748b; margin: 0 0 6px; }
+    .intel-summary { font-size: 13px; color: #334155; margin: 0 0 4px; line-height: 1.5; }
+    .intel-relevance { font-size: 12px; color: #0369a1; font-style: italic; margin: 0; }
 
     .scorecard-item { display: flex; margin-bottom: 16px; padding: 14px 16px; background: #fffbeb; border-radius: 8px; }
     .scorecard-item:last-child { margin-bottom: 0; }
@@ -145,10 +148,13 @@ function generateFullHtmlBody(briefing: RecompeteBriefing, dateStr: string, time
       ${briefing.teamingPlays.map((play, idx) => renderTeamingPlay(play, idx)).join('')}
     </div>
 
-    <!-- Section 3: Content Hooks -->
+    <!-- Section 3: Market Intel -->
     <div class="section">
-      <h2 class="section-title">3) ${briefing.contentHooks.length} Content Hooks for Eric</h2>
-      ${briefing.contentHooks.map(hook => renderContentHook(hook)).join('')}
+      <h2 class="section-title">3) Market Intel — What's Moving This Week</h2>
+      ${briefing.marketIntel.length > 0
+        ? briefing.marketIntel.map(intel => renderMarketIntel(intel)).join('')
+        : '<p style="font-size: 13px; color: #64748b;">No significant market news this period.</p>'
+      }
     </div>
 
     <!-- Section 4: Priority Scorecard -->
@@ -217,13 +223,23 @@ function renderTeamingPlay(play: TeamingPlay, idx: number): string {
 }
 
 /**
- * Render a content hook
+ * Render a market intel item
  */
-function renderContentHook(hook: ContentHook): string {
+function renderMarketIntel(intel: MarketIntel): string {
+  const categoryIcon: Record<string, string> = {
+    award: '🏆',
+    policy: '📋',
+    budget: '💰',
+    personnel: '👤',
+    acquisition: '📑',
+    other: '📰',
+  };
   return `
-    <div class="hook">
-      <p class="hook-title"><strong>Title:</strong> "${escapeHtml(hook.title)}"</p>
-      <p class="hook-cta"><strong>CTA:</strong> "${escapeHtml(hook.cta)}"</p>
+    <div class="intel">
+      <p class="intel-headline">${categoryIcon[intel.category] || '📰'} <a href="${escapeHtml(intel.url)}" target="_blank">${escapeHtml(intel.headline)}</a></p>
+      <p class="intel-meta">${escapeHtml(intel.source)}${intel.publishedDate ? ` • ${intel.publishedDate}` : ''}</p>
+      <p class="intel-summary">${escapeHtml(intel.summary)}</p>
+      <p class="intel-relevance">→ ${escapeHtml(intel.relevance)}</p>
     </div>
   `;
 }
@@ -287,16 +303,23 @@ As of ${dateStr}, ${timeStr}
   }
 
   text += `================================================================================
-3) ${briefing.contentHooks.length} CONTENT HOOKS FOR ERIC
+3) MARKET INTEL — WHAT'S MOVING THIS WEEK
 ================================================================================
 
 `;
 
-  for (const hook of briefing.contentHooks) {
-    text += `Title: "${hook.title}"
-CTA: "${hook.cta}"
+  if (briefing.marketIntel.length > 0) {
+    for (const intel of briefing.marketIntel) {
+      text += `${intel.headline}
+   Source: ${intel.source}${intel.publishedDate ? ` (${intel.publishedDate})` : ''}
+   ${intel.summary}
+   → ${intel.relevance}
+   ${intel.url}
 
 `;
+    }
+  } else {
+    text += `No significant market news this period.\n\n`;
   }
 
   text += `================================================================================
