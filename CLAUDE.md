@@ -406,6 +406,29 @@ All admin endpoints follow this pattern:
 - **Homepage** — added Daily Briefings card (6 cards, 3-col grid)
 - **Branding** — all briefing footers updated to "GovCon Giants AI"
 
+### Session 26 (Mar 16, 2026)
+- **Recompete Briefing System** — full recompete briefing matching Eric's "Daily Displacement Intel" format
+  - Module: `/src/lib/briefings/recompete/` (types, data-aggregator, ai-generator, email-templates, generator)
+  - USASpending API for expiring contracts by NAICS
+  - RSS feeds + Serper for market intel
+  - Groq API for AI-generated displacement angles
+  - Admin endpoint: `/api/admin/generate-recompete-briefing?email=X&format=full|condensed&send=true&preview=html`
+- **Briefing Sections:**
+  1. Top 10 Recompete Opportunities (ranked by displacement score)
+  2. Teaming Plays with prime openers
+  3. Market Intel — What's Moving This Week (replaced Content Hooks)
+  4. Priority Scorecard with scores and immediate actions
+- **Lindy Integration API** — three endpoints for AI assistant integration:
+  - `GET /api/lindy/intelligence?email=X` — pull briefings, recompetes, competitor activity, actions
+  - `POST /api/lindy/match` — match user KB against opportunities and agency pain points
+  - `GET /api/lindy/docs` — API documentation with use cases
+- **Match API Features:**
+  - Fit scoring 0-100 based on capabilities, NAICS, set-asides, past performance
+  - Agency pain point matching from 250-agency database
+  - Teaming synergies and suggested primes
+  - Talking points and positioning statements
+- **Commits:** `c9ebbd1`, `0648301`, `3e56b9c`
+
 ### Session 19 (Mar 8, 2026)
 - **Daily Briefings System** — personalized daily GovCon intel emails
   - Web intelligence pipeline: FPDS health monitoring + SAM.gov fallback
@@ -437,4 +460,4 @@ All admin endpoints follow this pattern:
 - Opportunity Hunter: blurred SAT teaser with Market Assassin upgrade CTA
 - FY2026 budget data expanded: 23 → 47 toptier agencies, 175-entry sub-agency parent map
 
-*Last Updated: March 16, 2026*
+*Last Updated: March 17, 2026*
