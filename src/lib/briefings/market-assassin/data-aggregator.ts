@@ -47,6 +47,22 @@ const CAPTURE_KEYWORDS = [
 ];
 
 /**
+ * Format contract amount with proper B/M suffix
+ */
+function formatContractAmount(amount: number): string {
+  if (!amount || amount <= 0) return '$0';
+
+  if (amount >= 1_000_000_000) {
+    return `$${(amount / 1_000_000_000).toFixed(1)}B`;
+  } else if (amount >= 1_000_000) {
+    return `$${(amount / 1_000_000).toFixed(1)}M`;
+  } else if (amount >= 1_000) {
+    return `$${(amount / 1_000).toFixed(0)}K`;
+  }
+  return `$${amount.toLocaleString()}`;
+}
+
+/**
  * Fetch budget shifts for user's target agencies
  */
 export async function fetchBudgetShifts(
@@ -255,12 +271,13 @@ export async function fetchCompetitorActivity(
           );
 
           if (competitor && !activities.some(a => a.companyName === competitor && a.activityType === 'award')) {
+            const amountStr = formatContractAmount(award['Award Amount']);
             activities.push({
               id: `comp-award-${activities.length}`,
               companyName: competitor,
               activityType: 'award',
-              description: `Won $${(award['Award Amount'] / 1_000_000).toFixed(1)}M contract from ${award['Awarding Agency'] || 'Unknown Agency'}`,
-              amount: `$${(award['Award Amount'] / 1_000_000).toFixed(1)}M`,
+              description: `Won ${amountStr} contract from ${award['Awarding Agency'] || 'Unknown Agency'}`,
+              amount: amountStr,
               agency: award['Awarding Agency'],
               naicsCode: award['NAICS Code'],
               date: award['Start Date'] || new Date().toISOString(),

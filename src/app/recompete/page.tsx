@@ -139,7 +139,6 @@ export default function RecompeteLockedPage() {
           <h3 className="text-amber-800 mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
           <ul className="text-amber-700 m-0 pl-5 leading-loose text-sm">
             <li><strong>6,900+</strong> expiring contracts</li>
-            <li><strong>$77T+</strong> total contract value</li>
             <li><strong>36</strong> federal agencies</li>
             <li><strong>435</strong> NAICS codes</li>
             <li>Filter by agency, NAICS, prime contractor</li>
