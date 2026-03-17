@@ -3,10 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
 import { getNAICSForPSC } from '@/lib/utils/psc-crosswalk';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization to avoid build-time errors
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 interface AlertProfileRequest {
   email: string;
@@ -37,8 +40,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Free tier from OH doesn't require NAICS (optional)
-    const isFreeSource = source === 'opportunity-hunter-free';
+    // Free tier sources don't require MA Premium access
+    const isFreeSource = source === 'opportunity-hunter-free' || source === 'free-signup';
 
     // Collect all NAICS codes from various inputs
     let allNaicsCodes: string[] = [];
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
     // For paid features (Pro), verify MA Premium access
     // Free tier from OH can register without paid access
     if (!isFreeSource) {
-      const { data: profile } = await supabase
+      const { data: profile } = await getSupabase()
         .from('user_profiles')
         .select('access_assassin_premium')
         .eq('email', email.toLowerCase())
@@ -94,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert alert settings
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_alert_settings')
       .upsert({
         user_email: email.toLowerCase(),
@@ -161,7 +164,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_alert_settings')
       .select('*')
       .eq('user_email', email.toLowerCase())
