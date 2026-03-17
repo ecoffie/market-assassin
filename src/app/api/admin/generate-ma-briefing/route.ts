@@ -39,10 +39,11 @@ export async function GET(request: NextRequest) {
   try {
     console.log(`[AdminMABriefing] Generating ${format} briefing for ${email}...`);
 
-    // Generate briefing
+    // Generate briefing - admin route bypasses access check
     const result = await generateMABriefing(email, {
       format,
       testMode: !send, // If not sending, run in test mode (no DB save)
+      adminBypass: true, // Skip access check for admin preview
     });
 
     if (!result) {

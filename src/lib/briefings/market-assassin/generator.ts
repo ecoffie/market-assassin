@@ -23,25 +23,43 @@ export async function generateMABriefing(
   options: {
     format?: 'full' | 'condensed';
     testMode?: boolean;
+    adminBypass?: boolean;
   } = {}
 ): Promise<{
   briefing: MABriefing | CondensedMABriefing;
   email: MAEmailTemplate;
 } | null> {
-  const { format = 'full', testMode = false } = options;
+  const { format = 'full', testMode = false, adminBypass = false } = options;
   const startTime = Date.now();
 
   console.log(`[MABriefingGen] Starting briefing for ${userEmail} (format: ${format})...`);
 
   try {
     // Step 1: Get user profile and check MA access
-    const profile = await getMAUserProfile(userEmail);
+    let profile = await getMAUserProfile(userEmail);
+
+    // Admin bypass: create default profile if none exists
+    if (adminBypass && !profile) {
+      console.log(`[MABriefingGen] Admin bypass: creating default profile for ${userEmail}`);
+      profile = {
+        email: userEmail,
+        naicsCodes: ['541511', '541512', '541519'],
+        targetAgencies: ['DHS', 'DOD', 'VA'],
+        watchedCompetitors: ['Leidos', 'CACI', 'Booz Allen', 'Peraton', 'SAIC'],
+        capabilities: [],
+        setAsideTypes: [],
+        hasMAAccess: true,
+        maTier: 'premium',
+      };
+    }
+
     if (!profile) {
       console.log(`[MABriefingGen] No profile found for ${userEmail}`);
       return null;
     }
 
-    if (!profile.hasMAAccess) {
+    // Admin bypass skips access check
+    if (!adminBypass && !profile.hasMAAccess) {
       console.log(`[MABriefingGen] User ${userEmail} does not have MA access`);
       return null;
     }
