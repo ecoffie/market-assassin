@@ -62,6 +62,31 @@ function formatContractAmount(amount: number): string {
   return `$${amount.toLocaleString()}`;
 }
 
+// Map acronyms to full agency names for matching
+const AGENCY_ACRONYM_MAP: Record<string, string> = {
+  'DHS': 'Homeland Security',
+  'DOD': 'Defense',
+  'VA': 'Veterans Affairs',
+  'HHS': 'Health and Human Services',
+  'DOE': 'Energy',
+  'DOT': 'Transportation',
+  'DOJ': 'Justice',
+  'DOL': 'Labor',
+  'ED': 'Education',
+  'HUD': 'Housing and Urban Development',
+  'State': 'State',
+  'Treasury': 'Treasury',
+  'USDA': 'Agriculture',
+  'Interior': 'Interior',
+  'Commerce': 'Commerce',
+  'EPA': 'Environmental Protection',
+  'NASA': 'National Aeronautics',
+  'GSA': 'General Services',
+  'OPM': 'Office of Personnel',
+  'SBA': 'Small Business',
+  'SSA': 'Social Security',
+};
+
 /**
  * Fetch budget shifts for user's target agencies
  */
@@ -69,54 +94,73 @@ export async function fetchBudgetShifts(
   profile: MAUserProfile
 ): Promise<BudgetShift[]> {
   const shifts: BudgetShift[] = [];
-  const budgetData = agencyBudgetData as Record<string, {
-    agency_name?: string;
-    toptier_code?: string;
-    fy26_budget?: number;
-    fy25_budget?: number;
-    budget_change_pct?: number;
-    total_obligations?: number;
-  }>;
 
-  // Get agencies matching user profile
+  // Parse the actual budget data structure
+  const rawBudgetData = agencyBudgetData as {
+    agencies?: Record<string, {
+      toptierCode?: string;
+      fy2025?: { budgetAuthority?: number };
+      fy2026?: { budgetAuthority?: number };
+      change?: { amount?: number; percent?: number; trend?: string };
+    }>;
+  };
+
+  const agencies = rawBudgetData.agencies || {};
+
+  // Get agencies matching user profile - expand acronyms
   const targetAgencies = profile.targetAgencies.length > 0
     ? profile.targetAgencies
     : ['DHS', 'DOD', 'VA', 'HHS', 'DOE'];
 
-  for (const [agencyCode, data] of Object.entries(budgetData)) {
+  // Build search patterns from acronyms
+  const searchPatterns = targetAgencies.map(t => {
+    const expanded = AGENCY_ACRONYM_MAP[t.toUpperCase()];
+    return expanded ? expanded.toLowerCase() : t.toLowerCase();
+  });
+
+  for (const [agencyName, data] of Object.entries(agencies)) {
     // Check if this agency matches user's targets
-    const isTarget = targetAgencies.some(t =>
-      agencyCode.toLowerCase().includes(t.toLowerCase()) ||
-      data.agency_name?.toLowerCase().includes(t.toLowerCase())
-    );
+    const agencyLower = agencyName.toLowerCase();
+    const isTarget = searchPatterns.some(pattern => agencyLower.includes(pattern));
 
     if (!isTarget) continue;
 
-    const fy26 = data.fy26_budget || 0;
-    const fy25 = data.fy25_budget || 0;
-    const changePct = data.budget_change_pct || ((fy26 - fy25) / fy25 * 100);
+    const fy26 = data.fy2026?.budgetAuthority || 0;
+    const fy25 = data.fy2025?.budgetAuthority || 0;
+
+    if (fy25 === 0) continue; // Skip if no baseline
+
+    // Use change.percent if available, otherwise calculate
+    // Note: change.percent in data is ratio like 1.13, not percentage
+    const changeRatio = data.change?.percent || (fy26 / fy25);
+    const changePct = (changeRatio - 1) * 100;
 
     if (Math.abs(changePct) < 3) continue; // Skip minor changes
 
     const shiftType: BudgetShift['shiftType'] = changePct > 0 ? 'increase' : 'decrease';
+    const changeAmount = data.change?.amount || (fy26 - fy25);
+
     const amount = changePct > 0
-      ? `+${changePct.toFixed(1)}% YoY ($${((fy26 - fy25) / 1_000_000_000).toFixed(1)}B)`
-      : `${changePct.toFixed(1)}% YoY (-$${Math.abs((fy26 - fy25) / 1_000_000_000).toFixed(1)}B)`;
+      ? `+${changePct.toFixed(1)}% YoY (+$${(changeAmount / 1_000_000_000).toFixed(1)}B)`
+      : `${changePct.toFixed(1)}% YoY (-$${Math.abs(changeAmount / 1_000_000_000).toFixed(1)}B)`;
+
+    // Extract acronym from agency name
+    const acronym = agencyName.replace('Department of ', '').split(' ').map(w => w[0]).join('');
 
     shifts.push({
-      id: `budget-${agencyCode}`,
-      agency: data.agency_name || agencyCode,
-      agencyAcronym: agencyCode,
+      id: `budget-${acronym}`,
+      agency: agencyName,
+      agencyAcronym: acronym,
       shiftType,
       amount,
-      amountNumeric: fy26 - fy25,
-      description: `${data.agency_name || agencyCode} FY26 budget ${shiftType === 'increase' ? 'increases' : 'decreases'} ${Math.abs(changePct).toFixed(1)}% compared to FY25.`,
+      amountNumeric: changeAmount,
+      description: `${agencyName} FY26 budget ${shiftType === 'increase' ? 'increases' : 'decreases'} ${Math.abs(changePct).toFixed(1)}% compared to FY25.`,
       source: 'FY26 Budget Request',
       impactOnUser: shiftType === 'increase'
-        ? `Potential for expanded contracting activity in ${agencyCode}. Position for new opportunities.`
+        ? `Potential for expanded contracting activity. Position for new opportunities.`
         : `Tighter budgets may mean incumbents are more vulnerable. Focus on cost-efficiency narratives.`,
       relevantNaics: profile.naicsCodes,
-      actionUrl: `https://www.usaspending.gov/agency/${data.toptier_code || agencyCode}`,
+      actionUrl: `https://www.usaspending.gov/agency/${data.toptierCode || ''}`,
     });
   }
 
@@ -133,33 +177,49 @@ export async function fetchPainPointUpdates(
   profile: MAUserProfile
 ): Promise<PainPointUpdate[]> {
   const updates: PainPointUpdate[] = [];
-  const painData = agencyPainPoints as Record<string, {
-    painPoints?: string[];
-    priorities?: string[];
-    acronym?: string;
-  }>;
+
+  // Parse the actual pain points data structure
+  const rawPainData = agencyPainPoints as {
+    agencies?: Record<string, {
+      painPoints?: string[];
+      priorities?: string[];
+    }>;
+  };
+
+  const agencies = rawPainData.agencies || {};
 
   const targetAgencies = profile.targetAgencies.length > 0
     ? profile.targetAgencies
     : ['DHS', 'DOD', 'VA', 'HHS'];
 
-  for (const [agencyName, data] of Object.entries(painData)) {
+  // Build search patterns from acronyms
+  const searchPatterns = targetAgencies.map(t => {
+    const expanded = AGENCY_ACRONYM_MAP[t.toUpperCase()];
+    return expanded ? expanded.toLowerCase() : t.toLowerCase();
+  });
+
+  for (const [agencyName, data] of Object.entries(agencies)) {
     // Check if matches target
-    const isTarget = targetAgencies.some(t =>
-      agencyName.toLowerCase().includes(t.toLowerCase()) ||
-      data.acronym?.toLowerCase() === t.toLowerCase()
-    );
+    const agencyLower = agencyName.toLowerCase();
+    const isTarget = searchPatterns.some(pattern => agencyLower.includes(pattern));
 
     if (!isTarget) continue;
 
-    // Get pain points that match user capabilities
-    const matchingPainPoints = (data.painPoints || []).filter(pp => {
-      const ppLower = pp.toLowerCase();
-      return profile.capabilities.some(cap =>
-        ppLower.includes(cap.toLowerCase()) ||
-        cap.toLowerCase().split(' ').some(w => ppLower.includes(w))
-      );
-    });
+    // Get pain points - if user has capabilities, filter by them; otherwise return top pain points
+    let matchingPainPoints: string[];
+
+    if (profile.capabilities.length > 0) {
+      matchingPainPoints = (data.painPoints || []).filter(pp => {
+        const ppLower = pp.toLowerCase();
+        return profile.capabilities.some(cap =>
+          ppLower.includes(cap.toLowerCase()) ||
+          cap.toLowerCase().split(' ').some(w => ppLower.includes(w))
+        );
+      });
+    } else {
+      // No capabilities set - return top pain points for the agency
+      matchingPainPoints = (data.painPoints || []).slice(0, 3);
+    }
 
     for (const painPoint of matchingPainPoints.slice(0, 2)) {
       // Find matching capability
@@ -168,10 +228,13 @@ export async function fetchPainPointUpdates(
         cap.toLowerCase().split(' ').some(w => painPoint.toLowerCase().includes(w))
       );
 
+      // Extract acronym from agency name
+      const acronym = agencyName.replace('Department of ', '').replace('the ', '').split(' ').map(w => w[0]).join('');
+
       updates.push({
-        id: `pain-${data.acronym || agencyName}-${updates.length}`,
+        id: `pain-${acronym}-${updates.length}`,
         agency: agencyName,
-        agencyAcronym: data.acronym || agencyName.split(' ').map(w => w[0]).join(''),
+        agencyAcronym: acronym,
         painPoint,
         updateType: 'mentioned',
         source: 'Agency Pain Points Database',
