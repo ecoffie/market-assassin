@@ -233,24 +233,24 @@ const tests = [
     },
   },
 
-  // Lead Capture (third-party Beehiiv dependency - non-critical)
+  // Lead Capture
   {
     name: 'Lead Capture API',
     category: 'Lead Capture',
-    critical: false,
+    critical: true,
     fn: async () => {
       const res = await fetch(`${BASE_URL}/api/capture-lead`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: `healthcheck-lead-${Date.now()}@test.govcongiants.org`,
-          source: 'health-check',
+          resourceId: 'ai-prompts', // Valid resource ID from FREE_RESOURCES
         }),
       });
       const data = await res.json();
       return {
-        passed: data.success === true || data.message?.includes('already'),
-        message: data.success ? 'Lead captured' : data.message || 'Failed',
+        passed: data.success === true,
+        message: data.success ? 'Lead captured' : data.error || 'Failed',
       };
     },
   },
