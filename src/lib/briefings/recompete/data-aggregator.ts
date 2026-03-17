@@ -79,6 +79,10 @@ async function fetchExpiringContracts(
 
   try {
     // Search by NAICS codes from user profile
+    // Get contracts signed in last 5 years that end in the future
+    const pastDate = new Date();
+    pastDate.setFullYear(pastDate.getFullYear() - 5);
+
     const naicsCodes = profile.naicsCodes.length > 0 ? profile.naicsCodes.slice(0, 5) : ['541511', '541512', '541519'];
 
     for (const naics of naicsCodes) {
@@ -89,57 +93,68 @@ async function fetchExpiringContracts(
           filters: {
             time_period: [
               {
-                start_date: today.toISOString().split('T')[0],
-                end_date: futureDate.toISOString().split('T')[0],
-                date_type: 'date_signed', // Will need to filter by period of performance end
+                start_date: pastDate.toISOString().split('T')[0],
+                end_date: today.toISOString().split('T')[0],
+                date_type: 'date_signed',
               },
             ],
             award_type_codes: ['A', 'B', 'C', 'D'], // Contracts only
             naics_codes: [naics],
+            award_amounts: [{ lower_bound: 1000000 }], // $1M+ contracts only
           },
           fields: [
             'Award ID',
             'Recipient Name',
             'Award Amount',
-            'Period of Performance Current End Date',
+            'End Date',
+            'Start Date',
             'Awarding Agency',
             'Awarding Sub Agency',
-            'NAICS Code',
-            'NAICS Description',
-            'Type of Set Aside',
-            'Place of Performance State Code',
-            'Contract Award Type',
+            'naics_code',
+            'naics_description',
+            'pop_state_code',
+            'Description',
           ],
           page: 1,
           limit: 50,
-          sort: '-Award Amount',
         }),
         signal: AbortSignal.timeout(30000),
       });
 
       if (!response.ok) {
-        console.error(`[DataAggregator] USASpending error for NAICS ${naics}: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`[DataAggregator] USASpending error for NAICS ${naics}: ${response.status}`, errorText.substring(0, 200));
         continue;
       }
 
       const data = await response.json();
 
       for (const award of data.results || []) {
+        // Filter: only include contracts ending within the next 18 months
+        const endDateStr = award['End Date'];
+        if (!endDateStr) continue;
+
+        const endDate = new Date(endDateStr);
+        const daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Skip contracts that already ended or end more than 18 months from now
+        if (daysUntilEnd < 0 || daysUntilEnd > monthsAhead * 30) continue;
+
         contracts.push({
           piid: award['Award ID'] || '',
           agency: award['Awarding Agency'] || '',
           agencyCode: '',
           vendorName: award['Recipient Name'] || 'Unknown',
           obligatedAmount: parseFloat(award['Award Amount']) || 0,
-          currentEndDate: award['Period of Performance Current End Date'] || '',
-          naicsCode: award['NAICS Code'] || naics,
-          naicsDescription: award['NAICS Description'] || '',
-          setAsideType: award['Type of Set Aside'] || undefined,
-          placeOfPerformanceState: award['Place of Performance State Code'] || undefined,
+          currentEndDate: endDateStr,
+          naicsCode: award['naics_code'] || naics,
+          naicsDescription: award['naics_description'] || award['Description'] || '',
+          setAsideType: undefined, // Not available in this endpoint
+          placeOfPerformanceState: award['pop_state_code'] || undefined,
         });
       }
 
-      console.log(`[DataAggregator] NAICS ${naics}: ${data.results?.length || 0} contracts`);
+      console.log(`[DataAggregator] NAICS ${naics}: ${contracts.length} expiring contracts found`);
     }
 
     // Sort by value descending
