@@ -408,7 +408,7 @@ function generateCondensedHtmlBody(briefing: CondensedBriefing, dateStr: string,
       <span class="header-badge">Daily Intel</span>
       <h1>Displacement Briefing</h1>
       <p class="subtitle">Top recompete opportunities ranked by vulnerability</p>
-      <p class="date">${dateStr} • ${timeStr} ET</p>
+      <p class="date">${dateStr} • ${timeStr}</p>
     </div>
 
     <div class="stats-bar">
@@ -421,7 +421,7 @@ function generateCondensedHtmlBody(briefing: CondensedBriefing, dateStr: string,
         <div class="stat-label">Teaming Plays</div>
       </div>
       <div class="stat">
-        <div class="stat-value">${briefing.opportunities.reduce((sum, o) => { const match = o.value.match(/\\d+/); return sum + (match ? parseInt(match[0]) : 0); }, 0)}M+</div>
+        <div class="stat-value">$${calculateTotalValue(briefing.opportunities)}</div>
         <div class="stat-label">Total Value</div>
       </div>
     </div>
@@ -437,7 +437,7 @@ function generateCondensedHtmlBody(briefing: CondensedBriefing, dateStr: string,
           <div class="opp-content">
             <p class="opp-name">${escapeHtml(opp.name)}</p>
             <p class="opp-meta"><span class="value">${escapeHtml(opp.value)}</span> • ${escapeHtml(opp.incumbent)}</p>
-            <p class="opp-angle">${escapeHtml(opp.displacementAngle.substring(0, 120))}...</p>
+            <p class="opp-angle">${escapeHtml(truncateToSentence(opp.displacementAngle, 180))}</p>
           </div>
         </div>
       `).join('')}
@@ -497,6 +497,60 @@ Top ${briefing.opportunities.length} recompete opportunities (ranked)
   text += `\n---\nGovCon Giants AI\nSettings: https://tools.govcongiants.org/briefings/settings\n`;
 
   return text;
+}
+
+/**
+ * Truncate text to nearest sentence ending within limit
+ */
+function truncateToSentence(text: string, maxLength: number): string {
+  if (!text) return '';
+  // Remove leading quotes/special chars
+  let cleaned = text.replace(/^["'"\s]+/, '');
+
+  if (cleaned.length <= maxLength) return cleaned;
+
+  // Find the last sentence-ending punctuation within the limit
+  const truncated = cleaned.substring(0, maxLength);
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastComma = truncated.lastIndexOf(',');
+
+  // Prefer ending at a period, then comma, then just cut
+  if (lastPeriod > maxLength * 0.6) {
+    return truncated.substring(0, lastPeriod + 1);
+  } else if (lastComma > maxLength * 0.6) {
+    return truncated.substring(0, lastComma) + '...';
+  }
+
+  return truncated + '...';
+}
+
+/**
+ * Calculate total value from opportunities
+ */
+function calculateTotalValue(opportunities: { value: string }[]): string {
+  let totalMillions = 0;
+
+  for (const opp of opportunities) {
+    // Extract number from strings like "~$48M", "$30M", ">$100M", "$56M-$106M"
+    const matches = opp.value.match(/\$?([\d.]+)M/gi);
+    if (matches) {
+      for (const match of matches) {
+        const num = parseFloat(match.replace(/[^\d.]/g, ''));
+        if (!isNaN(num)) totalMillions += num;
+      }
+    }
+    // Check for billions
+    const billionMatch = opp.value.match(/\$?([\d.]+)B/i);
+    if (billionMatch) {
+      const num = parseFloat(billionMatch[1]);
+      if (!isNaN(num)) totalMillions += num * 1000;
+    }
+  }
+
+  if (totalMillions >= 1000) {
+    return `${(totalMillions / 1000).toFixed(1)}B+`;
+  }
+  return `${Math.round(totalMillions)}M+`;
 }
 
 /**

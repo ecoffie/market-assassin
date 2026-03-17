@@ -97,7 +97,7 @@ export async function generateMABriefing(
           ? { company: rawData.competitorActivity[0].companyName, summary: rawData.competitorActivity[0].description.substring(0, 80) }
           : null,
         topCaptureSignal: rawData.captureSignals[0]
-          ? { title: rawData.captureSignals[0].title.substring(0, 60), agency: rawData.captureSignals[0].agency, deadline: rawData.captureSignals[0].responseDeadline }
+          ? { title: rawData.captureSignals[0].title, agency: rawData.captureSignals[0].agency, deadline: rawData.captureSignals[0].responseDeadline }
           : null,
         newSignalsCount: rawData.captureSignals.length,
         competitorMovesCount: rawData.competitorActivity.length,
