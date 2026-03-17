@@ -335,6 +335,14 @@ All admin endpoints follow this pattern:
   - Added to `vercel.json` cron (daily at 12:00 UTC)
   - All tests passing: 12/12 (100% pass rate)
   - Commit: `d2875bf`, `da554fe`, `89a9ab9`
+- **Content Reaper Length Optimization** — posts now optimized for LinkedIn engagement
+  - Researched LinkedIn 2026 best practices (1,200-1,700 chars optimal)
+  - Updated all 11 templates with strict char/word limits
+  - Added 25+ AI filler patterns to strip
+  - Added `trimPost()` and `getPostMetrics()` functions
+  - Reduced Grok max_tokens from 2000 to 600
+  - Posts now 1,100-1,200 chars (status: `optimal`)
+  - Commit: `089537c`
 - **Health Check URL:** `https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html`
 
 ### Session 27 (Mar 17, 2026)

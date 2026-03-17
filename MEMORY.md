@@ -48,12 +48,24 @@ HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
 ```
 
+### Content Reaper Length Optimization
+- Researched LinkedIn 2026 best practices (1,200-1,700 chars optimal)
+- Updated all 11 templates with strict character/word limits
+- Added 25+ additional AI filler patterns to strip
+- Added `trimPost()` function for oversized posts
+- Added `getPostMetrics()` for char/word counts
+- Reduced Grok max_tokens from 2000 to 600
+- Tested: Posts now 1,100-1,200 chars (status: `optimal`)
+- Commit: `089537c`
+
 ### Key Files
 | File | Change |
 |------|--------|
 | `src/app/api/alerts/save-profile/route.ts` | Fixed free-signup recognition, removed invalid column |
 | `src/app/api/cron/health-check/route.ts` | NEW: Automated health check system |
 | `vercel.json` | Added health-check cron job |
+| `src/app/api/content-generator/generate/route.ts` | Updated templates with strict length limits |
+| `src/lib/utils/humanize-post.ts` | Added trimPost(), getPostMetrics(), expanded filler patterns |
 
 ---
 
