@@ -9,10 +9,21 @@ import { RSSItem, SearchResult } from './types';
 
 // GovCon RSS feed sources
 export const RSS_FEEDS = {
+  // Primary GovCon Trade Press
   govconwire: {
     url: 'https://www.govconwire.com/feed/',
     name: 'GovConWire',
   },
+  executivebiz: {
+    url: 'https://blog.executivebiz.com/feed/',
+    name: 'ExecutiveBiz',
+  },
+  washingtontechnology: {
+    url: 'https://washingtontechnology.com/rss-feeds/all.aspx',
+    name: 'Washington Technology',
+  },
+
+  // Federal IT & Tech News
   fcw: {
     url: 'https://fcw.com/rss-feeds/all.aspx',
     name: 'Federal Computer Week',
@@ -21,13 +32,47 @@ export const RSS_FEEDS = {
     url: 'https://www.nextgov.com/rss/all/',
     name: 'NextGov',
   },
-  executivebiz: {
-    url: 'https://blog.executivebiz.com/feed/',
-    name: 'ExecutiveBiz',
+  fedscoop: {
+    url: 'https://fedscoop.com/feed/',
+    name: 'FedScoop',
   },
+  meritalk: {
+    url: 'https://www.meritalk.com/feed/',
+    name: 'MeriTalk',
+  },
+
+  // Defense & National Security
+  defenseone: {
+    url: 'https://www.defenseone.com/rss/all/',
+    name: 'Defense One',
+  },
+  defensenews: {
+    url: 'https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml',
+    name: 'Defense News',
+  },
+  c4isrnet: {
+    url: 'https://www.c4isrnet.com/arc/outboundfeeds/rss/?outputType=xml',
+    name: 'C4ISRNET',
+  },
+
+  // Government & Policy
+  federaltimes: {
+    url: 'https://www.federaltimes.com/arc/outboundfeeds/rss/?outputType=xml',
+    name: 'Federal Times',
+  },
+  govexec: {
+    url: 'https://www.govexec.com/rss/all/',
+    name: 'Government Executive',
+  },
+
+  // Official Government Sources
   gao_protests: {
     url: 'https://www.gao.gov/rss/bid-protest-decisions.xml',
     name: 'GAO Bid Protests',
+  },
+  gao_reports: {
+    url: 'https://www.gao.gov/rss/reports.xml',
+    name: 'GAO Reports',
   },
 } as const;
 
