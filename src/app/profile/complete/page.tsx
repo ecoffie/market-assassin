@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function ProfileCompletePage() {
+function ProfileCompleteContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email');
   const [completeness, setCompleteness] = useState(0);
@@ -168,5 +168,29 @@ export default function ProfileCompletePage() {
         </p>
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] flex items-center justify-center p-4">
+      <div className="max-w-lg w-full">
+        <div className="bg-white rounded-xl shadow-xl p-8 text-center">
+          <div className="animate-pulse">
+            <div className="w-20 h-20 mx-auto mb-6 bg-gray-200 rounded-full"></div>
+            <div className="h-6 bg-gray-200 rounded w-3/4 mx-auto mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-full mb-6"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ProfileCompletePage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ProfileCompleteContent />
+    </Suspense>
   );
 }

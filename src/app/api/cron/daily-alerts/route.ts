@@ -4,22 +4,29 @@ import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/b
 import nodemailer from 'nodemailer';
 import Stripe from 'stripe';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization to avoid build-time errors
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!);
+}
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.office365.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
+function getTransporter() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER || 'alerts@govcongiants.com',
+      pass: process.env.SMTP_PASSWORD,
+    },
+  });
+}
 
 // Map business type to SAM.gov set-aside code
 const businessTypeToSetAside: Record<string, string> = {
@@ -51,13 +58,13 @@ async function hasActiveSubscription(email: string): Promise<boolean> {
 
   try {
     // Search for customer by email
-    const customers = await stripe.customers.list({ email: email.toLowerCase(), limit: 1 });
+    const customers = await getStripe().customers.list({ email: email.toLowerCase(), limit: 1 });
     if (customers.data.length === 0) return false;
 
     const customer = customers.data[0];
 
     // Check for active subscription to Alert Pro
-    const subscriptions = await stripe.subscriptions.list({
+    const subscriptions = await getStripe().subscriptions.list({
       customer: customer.id,
       status: 'active',
       limit: 10,
@@ -86,7 +93,7 @@ async function loadActiveSubscribers(): Promise<Set<string>> {
 
   try {
     // Get all active subscriptions for Alert Pro product
-    const subscriptions = await stripe.subscriptions.list({
+    const subscriptions = await getStripe().subscriptions.list({
       status: 'active',
       limit: 100,
       expand: ['data.customer'],
@@ -142,7 +149,7 @@ export async function POST(request: NextRequest) {
     activeSubscriptionsCache = await loadActiveSubscribers();
 
     // Get all active daily alert users
-    const { data: users, error: usersError } = await supabase
+    const { data: users, error: usersError } = await getSupabase()
       .from('user_alert_settings')
       .select('*')
       .eq('is_active', true)
@@ -220,7 +227,7 @@ export async function POST(request: NextRequest) {
         await sendDailyAlertEmail(user.user_email, scoredOpps, user);
 
         // Log the alert
-        await supabase.from('alert_log').upsert({
+        await getSupabase().from('alert_log').upsert({
           user_email: user.user_email,
           alert_date: new Date().toISOString().split('T')[0],
           opportunities_count: scoredOpps.length,
@@ -238,7 +245,7 @@ export async function POST(request: NextRequest) {
         });
 
         // Update user stats
-        await supabase
+        await getSupabase()
           .from('user_alert_settings')
           .update({
             last_alert_sent: new Date().toISOString(),
@@ -431,7 +438,7 @@ async function sendDailyAlertEmail(
 </html>
 `;
 
-  await transporter.sendMail({
+  await getTransporter().sendMail({
     from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
     subject: `🎯 ${opportunities.length} New Opportunities - ${formatDate(new Date().toISOString())}`,

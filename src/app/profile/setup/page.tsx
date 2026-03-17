@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   CERTIFICATION_OPTIONS,
@@ -56,7 +56,7 @@ const STEPS = [
   { id: 5, title: 'Location', description: 'Where do you operate?' },
 ];
 
-export default function ProfileSetupPage() {
+function ProfileSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailParam = searchParams.get('email');
@@ -621,5 +621,29 @@ export default function ProfileSetupPage() {
         )}
       </main>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full">
+        <div className="bg-white rounded-xl shadow-xl p-8 text-center">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-full"></div>
+            <div className="h-8 bg-gray-200 rounded w-3/4 mx-auto"></div>
+            <div className="h-4 bg-gray-200 rounded w-full"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ProfileSetupPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ProfileSetupContent />
+    </Suspense>
   );
 }
