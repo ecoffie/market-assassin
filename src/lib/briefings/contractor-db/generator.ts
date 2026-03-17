@@ -14,6 +14,7 @@ import {
 } from './types';
 import { aggregateContractorDBData } from './data-aggregator';
 import { generateContractorDBBriefingEmail, generateCondensedContractorDBBriefingEmail } from './email-templates';
+import { getBriefingProfile } from '@/lib/smart-profile';
 
 /**
  * Generate a Contractor DB briefing
@@ -172,21 +173,37 @@ export async function generateContractorDBBriefing(
 }
 
 /**
- * Get Contractor DB user profile
+ * Get Contractor DB user profile (uses smart profile service)
  */
 async function getContractorDBUserProfile(email: string): Promise<ContractorDBUserProfile | null> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return null;
-
   try {
     // Check DB access via KV
     const dbAccess = await kv.get(`dbaccess:${email.toLowerCase()}`);
     const hasDBAccess = !!dbAccess;
 
-    // Try user_briefing_profile first
+    // Get smart profile first (includes learned preferences)
+    const smartProfile = await getBriefingProfile(email);
+
+    if (smartProfile && smartProfile.naicsCodes.length > 0) {
+      return {
+        email,
+        // Use topNaics (weighted by clicks) if available, otherwise explicit NAICS
+        naicsCodes: smartProfile.topNaics.length > 0 ? smartProfile.topNaics : smartProfile.naicsCodes,
+        targetAgencies: smartProfile.topAgencies.length > 0 ? smartProfile.topAgencies : smartProfile.targetAgencies,
+        watchedCompanies: smartProfile.topCompanies.length > 0 ? smartProfile.topCompanies : smartProfile.watchedCompanies,
+        certifications: smartProfile.certifications,
+        hasDBAccess,
+      };
+    }
+
+    // Fallback to database queries if no smart profile
+    const supabase = getSupabaseClient();
+    if (!supabase) return hasDBAccess ? getDefaultProfile(email, hasDBAccess) : null;
+
+    // Try user_briefing_profile
     const { data: briefingProfile } = await supabase
       .from('user_briefing_profile')
-      .select('naics_codes, agencies, watched_companies, keywords')
+      .select('naics_codes, agencies, watched_companies, certifications, keywords')
       .eq('user_email', email)
       .single();
 
@@ -196,7 +213,7 @@ async function getContractorDBUserProfile(email: string): Promise<ContractorDBUs
         naicsCodes: briefingProfile.naics_codes,
         targetAgencies: briefingProfile.agencies || [],
         watchedCompanies: briefingProfile.watched_companies || [],
-        certifications: briefingProfile.keywords || [],
+        certifications: briefingProfile.certifications || briefingProfile.keywords || [],
         hasDBAccess,
       };
     }
@@ -220,22 +237,25 @@ async function getContractorDBUserProfile(email: string): Promise<ContractorDBUs
     }
 
     // Return default profile if user has DB access but no profile
-    if (hasDBAccess) {
-      return {
-        email,
-        naicsCodes: ['541511', '541512', '541519'],
-        targetAgencies: ['DHS', 'DOD', 'VA', 'GSA', 'HHS'],
-        watchedCompanies: ['Lockheed Martin', 'Boeing', 'Northrop Grumman', 'Raytheon', 'General Dynamics'],
-        certifications: [],
-        hasDBAccess,
-      };
-    }
-
-    return null;
+    return hasDBAccess ? getDefaultProfile(email, hasDBAccess) : null;
   } catch (error) {
     console.error('[ContractorDBBriefingGen] Error getting profile:', error);
     return null;
   }
+}
+
+/**
+ * Get default profile for users with access but no profile
+ */
+function getDefaultProfile(email: string, hasDBAccess: boolean): ContractorDBUserProfile {
+  return {
+    email,
+    naicsCodes: ['541511', '541512', '541519'],
+    targetAgencies: ['DHS', 'DOD', 'VA', 'GSA', 'HHS'],
+    watchedCompanies: ['Lockheed Martin', 'Boeing', 'Northrop Grumman', 'Raytheon', 'General Dynamics'],
+    certifications: [],
+    hasDBAccess,
+  };
 }
 
 /**
