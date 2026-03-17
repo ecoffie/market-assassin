@@ -128,21 +128,10 @@ interface AlertUser {
 }
 
 /**
- * POST /api/cron/daily-alerts
- * Send daily opportunity alerts
- * - Free tier: 5 opps, weekly only (handled by weekly-alerts cron)
- * - Alert Pro ($19/mo): Unlimited opps, daily
+ * Core job logic - extracted so GET and POST can both use it
  */
-export async function POST(request: NextRequest) {
+async function runDailyAlertJob(): Promise<NextResponse> {
   try {
-    // Verify cron secret
-    const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      if (process.env.NODE_ENV === 'production') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-    }
-
     console.log('[Daily Alerts] Starting daily alert job...');
 
     // Load active subscribers cache
@@ -274,11 +263,29 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET endpoint for status/testing
+ * POST /api/cron/daily-alerts
+ * Legacy endpoint - still works for manual triggers with CRON_SECRET
+ */
+export async function POST(request: NextRequest) {
+  // Verify cron secret
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
+  return runDailyAlertJob();
+}
+
+/**
+ * GET endpoint - runs the cron job when called by Vercel cron
+ * Vercel crons use GET requests, so we run the job here
  */
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
 
+  // If checking subscription status for a specific email
   if (email) {
     const isSubscribed = await hasActiveSubscription(email);
     return NextResponse.json({
@@ -289,10 +296,21 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // Check if this is a Vercel cron request
+  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
+  const authHeader = request.headers.get('authorization');
+  const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  // Run the job if triggered by Vercel cron or has CRON_SECRET
+  if (isVercelCron || hasCronSecret) {
+    return runDailyAlertJob();
+  }
+
+  // Otherwise return documentation
   return NextResponse.json({
     message: 'Daily Alerts Cron Job',
-    usage: 'POST to run, or GET ?email=xxx to check subscription status',
-    schedule: 'Every day at 6 AM ET',
+    usage: 'GET ?email=xxx to check subscription status',
+    schedule: 'Every day at 6 AM ET (11:00 UTC)',
     tiers: {
       free: { frequency: 'weekly', limit: 5, price: '$0' },
       alertPro: { frequency: 'daily', limit: 'unlimited', price: '$19/mo' },
