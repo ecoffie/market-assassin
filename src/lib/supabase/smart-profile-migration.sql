@@ -53,7 +53,10 @@ ALTER TABLE user_briefing_profile
   ADD COLUMN IF NOT EXISTS clicked_naics TEXT[] DEFAULT '{}', -- NAICS they've clicked on
   ADD COLUMN IF NOT EXISTS clicked_agencies TEXT[] DEFAULT '{}', -- Agencies they've clicked on
   ADD COLUMN IF NOT EXISTS clicked_contractors TEXT[] DEFAULT '{}', -- Contractors they've clicked on
-  ADD COLUMN IF NOT EXISTS clicked_opportunities TEXT[] DEFAULT '{}'; -- Opportunity IDs they've clicked
+  ADD COLUMN IF NOT EXISTS clicked_opportunities TEXT[] DEFAULT '{}', -- Opportunity IDs they've clicked
+  ADD COLUMN IF NOT EXISTS naics_weights JSONB DEFAULT '{}', -- Click counts per NAICS
+  ADD COLUMN IF NOT EXISTS agency_weights JSONB DEFAULT '{}', -- Click counts per agency
+  ADD COLUMN IF NOT EXISTS company_weights JSONB DEFAULT '{}'; -- Click counts per company
 
 -- Content preferences (learned or explicit)
 ALTER TABLE user_briefing_profile
