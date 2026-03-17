@@ -163,10 +163,10 @@ async function getMAUserProfile(email: string): Promise<MAUserProfile | null> {
       .eq('user_email', email)
       .single();
 
-    if (briefingProfile?.naics_codes?.length > 0) {
+    if (briefingProfile && briefingProfile.naics_codes && briefingProfile.naics_codes.length > 0) {
       return {
         email,
-        naicsCodes: briefingProfile.naics_codes || [],
+        naicsCodes: briefingProfile.naics_codes,
         targetAgencies: briefingProfile.agencies || [],
         watchedCompetitors: briefingProfile.watched_companies || [],
         capabilities: briefingProfile.keywords || [],
@@ -183,10 +183,10 @@ async function getMAUserProfile(email: string): Promise<MAUserProfile | null> {
       .eq('user_email', email)
       .single();
 
-    if (alertSettings?.naics_codes?.length > 0) {
+    if (alertSettings && alertSettings.naics_codes && alertSettings.naics_codes.length > 0) {
       return {
         email,
-        naicsCodes: alertSettings.naics_codes || [],
+        naicsCodes: alertSettings.naics_codes,
         targetAgencies: alertSettings.target_agencies || [],
         watchedCompetitors: ['Leidos', 'CACI', 'Booz Allen', 'Peraton', 'SAIC'], // Default competitors
         capabilities: [],

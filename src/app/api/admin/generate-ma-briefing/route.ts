@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMABriefing } from '@/lib/briefings/market-assassin';
-import { sendEmail } from '@/lib/send-email';
+import nodemailer from 'nodemailer';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -57,7 +57,18 @@ export async function GET(request: NextRequest) {
     // Send email if requested
     if (send) {
       try {
-        await sendEmail({
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || 'smtp.office365.com',
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: false,
+          auth: {
+            user: process.env.SMTP_USER || 'alerts@govcongiants.com',
+            pass: process.env.SMTP_PASSWORD,
+          },
+        });
+
+        await transporter.sendMail({
+          from: `"GovCon Giants AI" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
           to: email,
           subject: emailTemplate.subject,
           html: emailTemplate.htmlBody,
