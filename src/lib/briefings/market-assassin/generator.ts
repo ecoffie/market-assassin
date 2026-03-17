@@ -88,10 +88,10 @@ export async function generateMABriefing(
         briefingDate: new Date().toISOString().split('T')[0],
         timezone: 'ET',
         topBudgetShift: rawData.budgetShifts[0]
-          ? { agency: rawData.budgetShifts[0].agencyAcronym, summary: rawData.budgetShifts[0].amount }
+          ? { agency: rawData.budgetShifts[0].agency, summary: rawData.budgetShifts[0].amount }
           : null,
         topPainPoint: rawData.painPointUpdates[0]
-          ? { agency: rawData.painPointUpdates[0].agencyAcronym, summary: rawData.painPointUpdates[0].painPoint.substring(0, 80) }
+          ? { agency: rawData.painPointUpdates[0].agency, summary: rawData.painPointUpdates[0].painPoint.substring(0, 80) }
           : null,
         topCompetitorMove: rawData.competitorActivity[0]
           ? { company: rawData.competitorActivity[0].companyName, summary: rawData.competitorActivity[0].description.substring(0, 80) }
