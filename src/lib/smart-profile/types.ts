@@ -91,6 +91,7 @@ export interface BriefingUserProfile {
   targetAgencies: string[];
   watchedCompanies: string[];
   keywords: string[];
+  capabilityKeywords: string[];
 
   // Location
   state: string | null;

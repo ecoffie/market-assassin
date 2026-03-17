@@ -226,6 +226,7 @@ export async function getBriefingProfile(email: string): Promise<BriefingUserPro
     targetAgencies: profile.targetAgencies,
     watchedCompanies: profile.watchedCompanies,
     keywords: profile.keywords,
+    capabilityKeywords: profile.capabilityKeywords,
     state: profile.state,
     zipCode: profile.zipCode,
     geographicPreference: profile.geographicPreference,
