@@ -118,15 +118,8 @@ export async function GET(request: NextRequest) {
     }, { status: 400 });
   }
 
-  // Check access via KV
+  // Check access via KV (but don't block - just note it)
   const hasAccess = await kv.get(`briefings:${email}`);
-  if (!hasAccess) {
-    return NextResponse.json({
-      error: 'Access denied',
-      message: 'User does not have briefing access',
-      email,
-    }, { status: 403 });
-  }
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -151,9 +144,10 @@ export async function GET(request: NextRequest) {
     };
 
     // Build response object
-    const intelligence: LindyIntelligence = {
+    const intelligence: LindyIntelligence & { has_full_access: boolean } = {
       as_of: now.toISOString(),
       user_email: email,
+      has_full_access: !!hasAccess,
       profile_summary: profileSummary,
       briefing: null,
       recompetes: {
@@ -184,40 +178,62 @@ export async function GET(request: NextRequest) {
     if (includeSections.includes('briefing')) {
       const { data: briefings } = await supabase
         .from('briefing_log')
-        .select('briefing_date, briefing_content, items_count, created_at')
+        .select('briefing_date, briefing_data, generated_at')
         .eq('user_email', email)
         .order('briefing_date', { ascending: false })
         .limit(days);
 
       if (briefings && briefings.length > 0) {
-        const latestBriefing = briefings[0].briefing_content;
+        const latestBriefing = briefings[0].briefing_data as Record<string, unknown> | null;
         if (latestBriefing) {
+          // Handle new recompete briefing format
+          const opportunities = latestBriefing.opportunities as Array<{
+            rank?: number;
+            contractName?: string;
+            agencyAcronym?: string;
+            contractValue?: string;
+            incumbent?: string;
+            timingSignal?: string;
+            whyVulnerable?: string;
+          }> || [];
+          const teamingPlays = latestBriefing.teamingPlays as Array<{
+            playName?: string;
+            primesToApproach?: string[];
+            suggestedOpener?: string;
+          }> || [];
+          const marketIntel = latestBriefing.marketIntel as Array<{
+            headline?: string;
+            source?: string;
+            relevance?: string;
+            url?: string;
+            category?: string;
+          }> || [];
+
           intelligence.briefing = {
             date: briefings[0].briefing_date,
-            headline: latestBriefing.summary?.headline || 'Daily GovCon Briefing',
-            subheadline: latestBriefing.summary?.subheadline || '',
-            total_items: latestBriefing.totalItems || 0,
-            urgent_alerts: latestBriefing.summary?.urgentAlerts || 0,
-            quick_stats: latestBriefing.summary?.quickStats || [],
-            top_items: (latestBriefing.topItems?.[0]?.items || []).slice(0, 5).map((item: {
-              rank: number;
-              category: string;
-              title: string;
-              description: string;
-              urgencyBadge?: string;
-              amount?: string;
-              actionUrl: string;
-            }) => ({
-              rank: item.rank,
-              category: item.category,
-              title: item.title,
-              description: item.description,
-              urgency: item.urgencyBadge || 'normal',
-              amount: item.amount,
-              action_url: item.actionUrl,
+            headline: `${opportunities.length} Recompete Opportunities`,
+            subheadline: `${teamingPlays.length} Teaming Plays • ${marketIntel.length} Market Intel Items`,
+            total_items: opportunities.length,
+            urgent_alerts: opportunities.filter((o) => {
+              const timing = o.timingSignal?.toLowerCase() || '';
+              return timing.includes('imminent') || timing.includes('q1') || timing.includes('urgent');
+            }).length,
+            quick_stats: [
+              { label: 'Opportunities', value: opportunities.length },
+              { label: 'Teaming Plays', value: teamingPlays.length },
+              { label: 'Market Intel', value: marketIntel.length },
+            ],
+            top_items: opportunities.slice(0, 5).map((opp, idx) => ({
+              rank: opp.rank || idx + 1,
+              category: 'Recompete',
+              title: `${opp.contractName || 'Contract'} (${opp.agencyAcronym || 'Agency'})`,
+              description: opp.whyVulnerable || 'Displacement opportunity',
+              urgency: opp.timingSignal?.includes('imminent') ? 'HIGH' : 'normal',
+              amount: opp.contractValue,
+              action_url: `https://www.usaspending.gov/search`,
             })),
           };
-          intelligence.meta.data_freshness.briefing = briefings[0].created_at;
+          intelligence.meta.data_freshness.briefing = briefings[0].generated_at;
         }
       }
     }
