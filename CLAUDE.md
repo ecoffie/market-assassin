@@ -447,6 +447,25 @@ All admin endpoints follow this pattern:
   - `/api/admin/user-audit` — check duplicates, bundle mismatches, fix access flags
   - `/api/admin/fpds-health` — FPDS API health monitoring
 
+### Session 27 (Mar 16, 2026) - Smart Profile System
+- **Smart User Profiles** — personalized briefing system that learns from user behavior
+  - 40+ profile fields: location, business, certifications, capabilities, engagement
+  - Engagement scoring (0-100): +2/open, +5/click, -2/day inactivity after 7 days
+  - Learned preferences: clicked_naics[], clicked_agencies[], clicked_companies[]
+  - Weighted preference calculation: topNaics, topAgencies, topCompanies
+- **Profile Service** (`src/lib/smart-profile/`):
+  - `types.ts` — SmartUserProfile, BriefingUserProfile, ProfileUpdatePayload
+  - `service.ts` — getSmartProfile, updateProfile, getBriefingProfile, recordInteraction
+  - `index.ts` — exports
+- **API Endpoints**:
+  - `GET/POST /api/profile` — profile CRUD with completeness breakdown
+  - `GET/POST /api/profile/track` — interaction tracking + email open pixel
+- **Briefing Generator Integration**:
+  - Contractor DB, Market Assassin, Recompete generators now use smart profiles
+  - Fall back to explicit preferences if no click history
+- **SQL Migration** (`src/lib/supabase/smart-profile-migration.sql`) — NOT YET RUN
+- **Commits:** `d170aec`, `c396fca`
+
 ### Session 18 (Feb 21, 2026)
 - Fixed all 8 free download pages — `checkoutUrl` pointing to actual resource files
 - Added email gate to `ProductPageAppSumo` for free resources (captures leads to Supabase)
@@ -460,4 +479,4 @@ All admin endpoints follow this pattern:
 - Opportunity Hunter: blurred SAT teaser with Market Assassin upgrade CTA
 - FY2026 budget data expanded: 23 → 47 toptier agencies, 175-entry sub-agency parent map
 
-*Last Updated: March 17, 2026*
+*Last Updated: March 16, 2026*
