@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upsert alert settings
+    // Upsert alert settings (note: source is used for access check only, not stored)
     const { data, error } = await getSupabase()
       .from('user_alert_settings')
       .upsert({
@@ -108,7 +108,6 @@ export async function POST(request: NextRequest) {
         location_zip: locationZip || null,
         is_active: true,
         alert_frequency: 'weekly',
-        source: source || null,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_email',
