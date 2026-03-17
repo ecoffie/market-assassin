@@ -233,11 +233,11 @@ const tests = [
     },
   },
 
-  // Lead Capture
+  // Lead Capture (third-party Beehiiv dependency - non-critical)
   {
     name: 'Lead Capture API',
     category: 'Lead Capture',
-    critical: true,
+    critical: false,
     fn: async () => {
       const res = await fetch(`${BASE_URL}/api/capture-lead`, {
         method: 'POST',
