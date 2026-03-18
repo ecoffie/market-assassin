@@ -198,64 +198,69 @@ export async function fetchSamOpportunities(
     baseParams.set('ptype', noticeTypes.join(','));
   }
 
-  console.log(`[SAM.gov] Fetching opportunities for ${naicsCodes.length} NAICS codes: ${naicsCodes.join(', ')}`);
+  console.log(`[SAM.gov] Fetching opportunities for ${naicsCodes.length} NAICS codes: ${naicsCodes.slice(0, 10).join(', ')}${naicsCodes.length > 10 ? '...' : ''}`);
 
-  // If no NAICS codes, make a single request
-  if (naicsCodes.length === 0) {
-    try {
-      const queryParams = new URLSearchParams(baseParams);
-      queryParams.set('api_key', apiKey);
-      const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
+  // Build the query with all NAICS codes (comma-separated)
+  // SAM.gov API supports multiple NAICS codes in single request
+  const queryParams = new URLSearchParams(baseParams);
+  queryParams.set('api_key', apiKey);
 
-      const response = await fetch(url, {
-        headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(30000),
-      });
-
-      if (!response.ok) {
-        throw new Error(`SAM.gov API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const opportunities = (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
-
-      return {
-        opportunities,
-        totalRecords: data.totalRecords || opportunities.length,
-        fetchedAt: new Date().toISOString(),
-      };
-    } catch (error) {
-      console.error('[SAM.gov] Error fetching opportunities:', error);
-      throw error;
-    }
+  // If we have NAICS codes, join them all with commas for single request
+  // SAM.gov handles comma-separated NAICS codes natively
+  if (naicsCodes.length > 0) {
+    queryParams.set('ncode', naicsCodes.join(','));
   }
 
-  // Make parallel requests for each NAICS code (max 5 concurrent)
-  const naicsToFetch = naicsCodes.slice(0, 5); // Limit to 5 NAICS codes
-  const results = await Promise.all(
-    naicsToFetch.map(naics => fetchSingleNaicsOpportunities(naics, baseParams, apiKey))
-  );
+  const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
 
-  // Merge and deduplicate by noticeId
-  const seenIds = new Set<string>();
-  const allOpportunities: SAMOpportunity[] = [];
+  try {
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(45000), // Longer timeout for multi-NAICS queries
+    });
 
-  for (const opps of results) {
-    for (const opp of opps) {
-      if (!seenIds.has(opp.noticeId)) {
-        seenIds.add(opp.noticeId);
-        allOpportunities.push(opp);
+    if (!response.ok) {
+      console.error(`[SAM.gov] API error: ${response.status} ${response.statusText}`);
+      // Try fallback with fewer NAICS codes if we hit a limit
+      if (naicsCodes.length > 10 && (response.status === 400 || response.status === 413)) {
+        console.log('[SAM.gov] Falling back to first 10 NAICS codes');
+        const fallbackParams = new URLSearchParams(baseParams);
+        fallbackParams.set('api_key', apiKey);
+        fallbackParams.set('ncode', naicsCodes.slice(0, 10).join(','));
+
+        const fallbackResponse = await fetch(`${SAM_API_BASE}/search?${fallbackParams.toString()}`, {
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(30000),
+        });
+
+        if (fallbackResponse.ok) {
+          const data = await fallbackResponse.json();
+          const opportunities = (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
+          console.log(`[SAM.gov] Fallback retrieved ${opportunities.length} opportunities`);
+          return {
+            opportunities: opportunities.slice(0, limit),
+            totalRecords: data.totalRecords || opportunities.length,
+            fetchedAt: new Date().toISOString(),
+          };
+        }
       }
+      throw new Error(`SAM.gov API error: ${response.status} ${response.statusText}`);
     }
+
+    const data = await response.json();
+    const opportunities = (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
+
+    console.log(`[SAM.gov] Retrieved ${opportunities.length} opportunities (total: ${data.totalRecords}) for ${naicsCodes.length} NAICS codes`);
+
+    return {
+      opportunities: opportunities.slice(0, limit),
+      totalRecords: data.totalRecords || opportunities.length,
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('[SAM.gov] Error fetching opportunities:', error);
+    throw error;
   }
-
-  console.log(`[SAM.gov] Retrieved ${allOpportunities.length} unique opportunities across ${naicsToFetch.length} NAICS codes`);
-
-  return {
-    opportunities: allOpportunities.slice(0, limit),
-    totalRecords: allOpportunities.length,
-    fetchedAt: new Date().toISOString(),
-  };
 }
 
 /**
