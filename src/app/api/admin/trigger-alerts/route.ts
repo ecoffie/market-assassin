@@ -10,7 +10,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity } from '@/lib/briefings/pipelines/sam-gov';
-import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import nodemailer from 'nodemailer';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
@@ -205,20 +204,20 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // EXPAND NAICS codes to include related codes (e.g., 541 → all 541xxx)
-      // This gives users broader matches while keeping their core industry focus
-      const expandedNaics = expandNAICSCodes(userNaics);
-      console.log(`[Alerts] ${user.user_email}: Original ${userNaics.length} codes → Expanded ${expandedNaics.length} codes`);
+      // Get 3-digit NAICS prefixes for SAM.gov query (API works better with prefixes than 75+ full codes)
+      // Example: ["541330", "236220", "541511", "238160"] → ["541", "236", "238"]
+      const naicsPrefixes = [...new Set(userNaics.map(code => code.slice(0, 3)))];
+      console.log(`[Alerts] ${user.user_email}: Using ${naicsPrefixes.length} NAICS prefixes: ${naicsPrefixes.join(', ')}`);
 
-      // Fetch opportunities from SAM.gov with EXPANDED NAICS
+      // Fetch opportunities from SAM.gov with 3-digit prefixes (broader search)
       // Note: Don't filter by state or set-aside - too restrictive, reduces matches significantly
       // Users can still see their location and set-aside matches will score higher
       const searchResult = await fetchSamOpportunities({
-        naicsCodes: expandedNaics,
+        naicsCodes: naicsPrefixes,
         // setAsides: [], // REMOVED - filtering kills results
         // state: user.location_state || undefined, // Disabled - too restrictive
-        noticeTypes: ['p', 'r', 'k', 'o'],
-        postedFrom: getDateDaysAgo(30), // Extended to 30 days for better coverage
+        noticeTypes: ['o', 'k'], // Solicitations + Combined Synopsis (same as live-opportunities)
+        postedFrom: getDateDaysAgo(90), // Extended to 90 days for better coverage
         limit: 100, // Increased limit before scoring/filtering
       }, samApiKey);
 
