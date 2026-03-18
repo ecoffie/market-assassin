@@ -54,9 +54,9 @@ fi
 # Test HC-03: Pass rate calculated
 echo -n "HC-03 Pass rate calculated... "
 RESULT=$(curl -s "$BASE_URL/api/cron/health-check?password=$PASSWORD" 2>/dev/null)
-PASS_RATE=$(echo "$RESULT" | jq -r '.summary.passRate // 0')
+PASS_RATE=$(echo "$RESULT" | jq -r '.passRate // "0"')
 if [ "$PASS_RATE" != "0" ] && [ "$PASS_RATE" != "null" ]; then
-  echo -e "${GREEN}PASS${NC} ($PASS_RATE%)"
+  echo -e "${GREEN}PASS${NC} ($PASS_RATE)"
   ((PASS++))
 else
   echo -e "${RED}FAIL${NC}"
@@ -129,9 +129,9 @@ else
   ((FAIL++))
 fi
 
-# Test IND-02: Store page loads
+# Test IND-02: Store page loads (follows redirects)
 echo -n "IND-02 Store page loads... "
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/store" 2>/dev/null)
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$BASE_URL/store" 2>/dev/null)
 if [ "$STATUS" == "200" ]; then
   echo -e "${GREEN}PASS${NC}"
   ((PASS++))

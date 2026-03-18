@@ -48,9 +48,10 @@ while IFS= read -r script; do
   OUTPUT=$(bash "$script" 2>&1)
   EXIT_CODE=$?
 
-  # Parse results from output (macOS compatible)
-  PASS_COUNT=$(echo "$OUTPUT" | grep "Passed:" | tail -1 | sed 's/.*Passed:[^0-9]*\([0-9]*\).*/\1/')
-  FAIL_COUNT=$(echo "$OUTPUT" | grep "Failed:" | tail -1 | sed 's/.*Failed:[^0-9]*\([0-9]*\).*/\1/')
+  # Parse results from output (macOS compatible - strip ANSI codes first)
+  CLEAN_OUTPUT=$(echo "$OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')
+  PASS_COUNT=$(echo "$CLEAN_OUTPUT" | grep "^Passed:" | tail -1 | sed 's/[^0-9]*//g')
+  FAIL_COUNT=$(echo "$CLEAN_OUTPUT" | grep "^Failed:" | tail -1 | sed 's/[^0-9]*//g')
 
   # Default to 0 if not found
   PASS_COUNT=${PASS_COUNT:-0}

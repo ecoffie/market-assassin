@@ -30,7 +30,7 @@ echo ""
 # Test CG-01: Templates endpoint
 echo -n "CG-01 Templates list... "
 RESULT=$(curl -s "$BASE_URL/api/templates" 2>/dev/null)
-COUNT=$(echo "$RESULT" | jq -r '. | length' 2>/dev/null)
+COUNT=$(echo "$RESULT" | jq -r '.templates | length' 2>/dev/null)
 if [ -n "$COUNT" ] && [ "$COUNT" -gt 0 ]; then
   echo -e "${GREEN}PASS${NC} ($COUNT templates)"
   ((PASS++))
@@ -39,11 +39,15 @@ else
   ((FAIL++))
 fi
 
-# Test CG-02: Agency lookup by NAICS
+# Test CG-02: Agency lookup by NAICS (USASpending API)
 echo -n "CG-02 Agency lookup... "
-RESULT=$(curl -s "$BASE_URL/api/agencies/lookup?naics=541511" 2>/dev/null)
+# Agency lookup uses the find-agencies endpoint
+RESULT=$(curl -s -X POST "$BASE_URL/api/usaspending/find-agencies" \
+  -H "Content-Type: application/json" \
+  -d '{"naics":"541511","limit":5}' 2>/dev/null)
+SUCCESS=$(echo "$RESULT" | jq -r '.success // false' 2>/dev/null)
 COUNT=$(echo "$RESULT" | jq -r '.agencies | length' 2>/dev/null)
-if [ -n "$COUNT" ] && [ "$COUNT" -gt 0 ]; then
+if [ "$SUCCESS" == "true" ] && [ -n "$COUNT" ] && [ "$COUNT" -gt 0 ]; then
   echo -e "${GREEN}PASS${NC} ($COUNT agencies)"
   ((PASS++))
 else
@@ -125,7 +129,7 @@ echo ""
 # Test DQ-01: Templates have required fields
 echo -n "DQ-01 Template structure... "
 RESULT=$(curl -s "$BASE_URL/api/templates" 2>/dev/null)
-HAS_FIELDS=$(echo "$RESULT" | jq -r '.[0] | has("id") and has("name")' 2>/dev/null)
+HAS_FIELDS=$(echo "$RESULT" | jq -r '.templates[0] | has("id") and has("name")' 2>/dev/null)
 if [ "$HAS_FIELDS" == "true" ]; then
   echo -e "${GREEN}PASS${NC}"
   ((PASS++))
