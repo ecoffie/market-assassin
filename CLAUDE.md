@@ -8,6 +8,7 @@
 4. **Content Reaper `API_BASE` must be `''`** (empty string) in all `public/content-generator/*.html` files. Never set to an external URL — `govcon-content-generator.vercel.app` is dead.
 5. **Different Supabase databases.** market-assassin and govcon-shop have SEPARATE Supabase instances. They do NOT share tables.
 6. **KV store connected to BOTH projects** via Vercel Storage integration. KV backfills can run from either project.
+7. **SAM.gov API does NOT support comma-separated NAICS codes.** It returns 0 results. Must make parallel requests for each NAICS code and merge results. See `src/lib/briefings/pipelines/sam-gov.ts`.
 
 ---
 
@@ -323,6 +324,18 @@ All admin endpoints follow this pattern:
 
 > Full session history (Sessions 1-18) is in MEMORY.md.
 
+### Session 29 (Mar 18, 2026)
+- **SAM.gov Alerts Fix** — fixed "No opportunities found" error in weekly/daily alerts
+  - **Root cause**: SAM.gov API does NOT support comma-separated NAICS codes (returns 0 results)
+  - **Fix**: Refactored `sam-gov.ts` to make parallel requests for each NAICS code using `Promise.all`
+  - Results merged and deduplicated by `noticeId`
+  - Limited to 5 NAICS codes per query to avoid rate limits
+  - Also improved NAICS fallback logic: uses whichever source (user_alert_settings vs smart_user_profiles) has MORE codes
+  - Changed from expanded 6-digit NAICS to 3-digit prefixes for broader matching
+  - **Key files**: `src/lib/briefings/pipelines/sam-gov.ts`, `src/app/api/admin/trigger-alerts/route.ts`
+  - **Commits**: `18f2718`, `9ab859d`, `0d8425d`
+  - **Test result**: eric@govcongiants.com now receives 4 opportunities (was 0)
+
 ### Session 28 (Mar 17, 2026)
 - **Alerts Signup Bug Fix** — fixed "Failed to save alert profile" error
   - Added `'free-signup'` to `isFreeSource` check in `save-profile/route.ts`
@@ -516,4 +529,4 @@ All admin endpoints follow this pattern:
 - Opportunity Hunter: blurred SAT teaser with Market Assassin upgrade CTA
 - FY2026 budget data expanded: 23 → 47 toptier agencies, 175-entry sub-agency parent map
 
-*Last Updated: March 17, 2026*
+*Last Updated: March 18, 2026*
