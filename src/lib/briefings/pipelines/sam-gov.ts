@@ -200,67 +200,41 @@ export async function fetchSamOpportunities(
 
   console.log(`[SAM.gov] Fetching opportunities for ${naicsCodes.length} NAICS codes: ${naicsCodes.slice(0, 10).join(', ')}${naicsCodes.length > 10 ? '...' : ''}`);
 
-  // Build the query with all NAICS codes (comma-separated)
-  // SAM.gov API supports multiple NAICS codes in single request
-  const queryParams = new URLSearchParams(baseParams);
-  queryParams.set('api_key', apiKey);
-
-  // If we have NAICS codes, join them all with commas for single request
-  // SAM.gov handles comma-separated NAICS codes natively
-  if (naicsCodes.length > 0) {
-    queryParams.set('ncode', naicsCodes.join(','));
+  // SAM.gov API does NOT support comma-separated NAICS codes (returns 0 results)
+  // We must make PARALLEL requests for each NAICS code and merge results
+  if (naicsCodes.length === 0) {
+    console.log('[SAM.gov] No NAICS codes provided');
+    return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
   }
 
-  const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
+  // Make parallel requests for each NAICS code (limit to first 5 to avoid rate limits)
+  const codesToFetch = naicsCodes.slice(0, 5);
+  console.log(`[SAM.gov] Making ${codesToFetch.length} parallel requests for: ${codesToFetch.join(', ')}`);
 
-  try {
-    const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(45000), // Longer timeout for multi-NAICS queries
-    });
+  const results = await Promise.all(
+    codesToFetch.map(code => fetchSingleNaicsOpportunities(code, baseParams, apiKey))
+  );
 
-    if (!response.ok) {
-      console.error(`[SAM.gov] API error: ${response.status} ${response.statusText}`);
-      // Try fallback with fewer NAICS codes if we hit a limit
-      if (naicsCodes.length > 10 && (response.status === 400 || response.status === 413)) {
-        console.log('[SAM.gov] Falling back to first 10 NAICS codes');
-        const fallbackParams = new URLSearchParams(baseParams);
-        fallbackParams.set('api_key', apiKey);
-        fallbackParams.set('ncode', naicsCodes.slice(0, 10).join(','));
+  // Merge and deduplicate by noticeId
+  const seenIds = new Set<string>();
+  const allOpportunities: SAMOpportunity[] = [];
 
-        const fallbackResponse = await fetch(`${SAM_API_BASE}/search?${fallbackParams.toString()}`, {
-          headers: { 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(30000),
-        });
-
-        if (fallbackResponse.ok) {
-          const data = await fallbackResponse.json();
-          const opportunities = (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
-          console.log(`[SAM.gov] Fallback retrieved ${opportunities.length} opportunities`);
-          return {
-            opportunities: opportunities.slice(0, limit),
-            totalRecords: data.totalRecords || opportunities.length,
-            fetchedAt: new Date().toISOString(),
-          };
-        }
+  for (const opportunities of results) {
+    for (const opp of opportunities) {
+      if (!seenIds.has(opp.noticeId)) {
+        seenIds.add(opp.noticeId);
+        allOpportunities.push(opp);
       }
-      throw new Error(`SAM.gov API error: ${response.status} ${response.statusText}`);
     }
-
-    const data = await response.json();
-    const opportunities = (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
-
-    console.log(`[SAM.gov] Retrieved ${opportunities.length} opportunities (total: ${data.totalRecords}) for ${naicsCodes.length} NAICS codes`);
-
-    return {
-      opportunities: opportunities.slice(0, limit),
-      totalRecords: data.totalRecords || opportunities.length,
-      fetchedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error('[SAM.gov] Error fetching opportunities:', error);
-    throw error;
   }
+
+  console.log(`[SAM.gov] Retrieved ${allOpportunities.length} unique opportunities from ${codesToFetch.length} NAICS codes`);
+
+  return {
+    opportunities: allOpportunities.slice(0, limit),
+    totalRecords: allOpportunities.length,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 /**
