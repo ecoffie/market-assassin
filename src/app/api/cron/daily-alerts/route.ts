@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
+import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import nodemailer from 'nodemailer';
 import Stripe from 'stripe';
 import { kv } from '@vercel/kv';
@@ -211,14 +212,42 @@ async function runDailyAlertJob(): Promise<NextResponse> {
           continue;
         }
 
+        // Get NAICS codes - try user_alert_settings first, then fall back to smart_user_profiles
+        let userNaics = user.naics_codes || [];
+
+        if (userNaics.length === 0) {
+          // Fall back to smart_user_profiles
+          const { data: smartProfile } = await getSupabase()
+            .from('smart_user_profiles')
+            .select('naics_codes')
+            .eq('email', user.user_email.toLowerCase())
+            .single();
+
+          if (smartProfile?.naics_codes && smartProfile.naics_codes.length > 0) {
+            userNaics = smartProfile.naics_codes;
+            console.log(`[Daily Alerts] Using smart profile NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
+          }
+        }
+
+        // Skip if still no NAICS codes
+        if (userNaics.length === 0) {
+          console.log(`[Daily Alerts] ${user.user_email} has no NAICS codes, skipping`);
+          results.skipped++;
+          continue;
+        }
+
+        // EXPAND NAICS codes to include related codes (e.g., 541 → all 541xxx)
+        const expandedNaics = expandNAICSCodes(userNaics);
+        console.log(`[Daily Alerts] ${user.user_email}: Original ${userNaics.length} codes → Expanded ${expandedNaics.length} codes`);
+
         // Build search params
         const setAsides = user.business_type
           ? [businessTypeToSetAside[user.business_type] || user.business_type]
           : [];
 
-        // Fetch opportunities from last 24 hours
+        // Fetch opportunities from last 24 hours with EXPANDED NAICS
         const searchResult = await fetchSamOpportunities({
-          naicsCodes: user.naics_codes || [],
+          naicsCodes: expandedNaics,
           setAsides,
           noticeTypes: ['p', 'r', 'k', 'o'],
           postedFrom: getDateDaysAgo(1), // Last 24 hours
@@ -227,11 +256,11 @@ async function runDailyAlertJob(): Promise<NextResponse> {
 
         const opportunities = searchResult.opportunities;
 
-        // Score and rank - no limit for Pro subscribers
+        // Score and rank - use ORIGINAL codes for scoring (exact matches rank higher)
         const scoredOpps = opportunities.map(opp => ({
           ...opp,
           score: scoreOpportunity(opp, {
-            naics_codes: user.naics_codes || [],
+            naics_codes: userNaics, // Original codes, not expanded
             agencies: user.target_agencies || [],
             keywords: [],
           }),
