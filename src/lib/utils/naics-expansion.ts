@@ -166,15 +166,26 @@ export function parseNAICSInput(input: string): string[] {
  * Expand a NAICS code/prefix to all matching 6-digit codes
  *
  * Examples:
- * - "541511" → ["541511"] (already specific)
+ * - "541511" → all 541xxx codes (expand to parent subsector for more matches)
  * - "541" → ["541110", "541120", ..., "541990"] (all 541xxx codes)
  * - "23" → all construction codes (236xxx, 237xxx, 238xxx)
+ *
+ * @param code - NAICS code (2-6 digits)
+ * @param expandFullCodes - If true, 6-digit codes expand to their 3-digit subsector (default: true)
  */
-export function expandNAICSCode(code: string): string[] {
+export function expandNAICSCode(code: string, expandFullCodes = true): string[] {
   const trimmed = code.trim();
 
-  // If already 6 digits, return as-is
+  // If already 6 digits, expand to parent subsector for broader matching
+  // This ensures users with specific codes like "541511" also see related opportunities
   if (trimmed.length === 6) {
+    if (expandFullCodes) {
+      const prefix = trimmed.slice(0, 3);
+      const subsectorCodes = NAICS_DATABASE[prefix];
+      if (subsectorCodes && subsectorCodes.length > 0) {
+        return subsectorCodes;
+      }
+    }
     return [trimmed];
   }
 
