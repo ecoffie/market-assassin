@@ -207,20 +207,16 @@ export async function GET(request: NextRequest) {
       const expandedNaics = expandNAICSCodes(userNaics);
       console.log(`[Alerts] ${user.user_email}: Original ${userNaics.length} codes → Expanded ${expandedNaics.length} codes`);
 
-      const setAsides = user.business_type
-        ? [businessTypeToSetAside[user.business_type] || user.business_type]
-        : [];
-
       // Fetch opportunities from SAM.gov with EXPANDED NAICS
-      // Note: Don't filter by state - too restrictive, reduces matches significantly
-      // Users can still see their location but we search nationwide for their NAICS
+      // Note: Don't filter by state or set-aside - too restrictive, reduces matches significantly
+      // Users can still see their location and set-aside matches will score higher
       const searchResult = await fetchSamOpportunities({
         naicsCodes: expandedNaics,
-        setAsides,
+        // setAsides: [], // REMOVED - filtering kills results
         // state: user.location_state || undefined, // Disabled - too restrictive
         noticeTypes: ['p', 'r', 'k', 'o'],
-        postedFrom: getDateDaysAgo(7),
-        limit: 50,
+        postedFrom: getDateDaysAgo(30), // Extended to 30 days for better coverage
+        limit: 100, // Increased limit before scoring/filtering
       }, samApiKey);
 
       const opportunities = searchResult.opportunities;
