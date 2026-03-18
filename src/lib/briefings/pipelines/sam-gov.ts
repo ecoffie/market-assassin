@@ -280,8 +280,8 @@ export async function fetchOpportunitiesForUser(
     naicsCodes: userProfile.naics_codes?.slice(0, 10) || [], // Limit to top 10
     keywords: userProfile.keywords?.slice(0, 5) || [],
     zipCodes: userProfile.zip_codes?.slice(0, 3) || [],
-    // Posted in last 7 days
-    postedFrom: getDateDaysAgo(7),
+    // Posted in last 30 days for better coverage
+    postedFrom: getDateDaysAgo(30),
     limit: 200,
   };
 
