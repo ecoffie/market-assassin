@@ -179,21 +179,24 @@ export async function GET(request: NextRequest) {
       const alertLimit = isPro ? ALERT_LIMITS.pro : ALERT_LIMITS.free;
       const tier = isPro ? 'pro' : 'free';
 
-      // Get NAICS codes - try user_alert_settings first, then fall back to smart_user_profiles
+      // Get NAICS codes - use whichever source has MORE codes (broader coverage)
       let userNaics = user.naics_codes || [];
 
-      if (userNaics.length === 0) {
-        // Fall back to smart_user_profiles
-        const { data: smartProfile } = await supabase
-          .from('smart_user_profiles')
-          .select('naics_codes')
-          .eq('email', user.user_email.toLowerCase())
-          .single();
+      // Always check smart_user_profiles for potentially better NAICS data
+      const { data: smartProfile } = await supabase
+        .from('smart_user_profiles')
+        .select('naics_codes')
+        .eq('email', user.user_email.toLowerCase())
+        .single();
 
-        if (smartProfile?.naics_codes && smartProfile.naics_codes.length > 0) {
-          userNaics = smartProfile.naics_codes;
-          console.log(`[Alerts] Using smart profile NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
-        }
+      const smartNaics = smartProfile?.naics_codes || [];
+
+      // Use whichever has MORE NAICS codes for broader opportunity matching
+      if (smartNaics.length > userNaics.length) {
+        console.log(`[Alerts] Using smart profile NAICS for ${user.user_email} (${smartNaics.length} > ${userNaics.length}): ${smartNaics.join(', ')}`);
+        userNaics = smartNaics;
+      } else if (userNaics.length > 0) {
+        console.log(`[Alerts] Using alert settings NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
       }
 
       // Skip if still no NAICS codes
