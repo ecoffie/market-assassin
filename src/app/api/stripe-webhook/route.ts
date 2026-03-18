@@ -181,16 +181,33 @@ export async function POST(request: NextRequest) {
       // Send welcome email
       await sendAlertProWelcomeEmail({ to: email, customerName });
     } else if (isFHCMembership) {
-      // Grant MA Standard + Briefings for FHC members
+      // Grant MA Standard + Alert Pro for FHC members ($99/mo includes Alert Pro as a benefit)
       await updateAccessFlags(email, 'assassin_standard');
+      await updateAccessFlags(email, 'hunter_pro'); // Alert Pro includes OH Pro
 
-      // Set KV access for MA
+      // Set KV access for MA + Alert Pro (FHC members get daily alerts as a premium benefit)
       try {
         await kv.set(`ma:${email.toLowerCase()}`, 'true');
-        await kv.set(`briefings:${email.toLowerCase()}`, 'true');
-        console.log(`✅ KV access set for FHC member: ${email}`);
+        await kv.set(`alertpro:${email.toLowerCase()}`, 'true');
+        await kv.set(`ospro:${email.toLowerCase()}`, 'true'); // Alert Pro includes OH Pro
+        console.log(`✅ KV access set for FHC member (MA + Alert Pro): ${email}`);
       } catch (kvError) {
         console.error('KV error (non-fatal):', kvError);
+      }
+
+      // Set alert frequency to daily for FHC members
+      if (supabase) {
+        await supabase
+          .from('user_alert_settings')
+          .upsert({
+            user_email: email.toLowerCase(),
+            alert_frequency: 'daily',
+            subscription_status: 'active',
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'user_email',
+          });
       }
 
       // Send FHC welcome email
@@ -355,13 +372,13 @@ export async function POST(request: NextRequest) {
     const email = customer.email.toLowerCase();
     console.log(`🚫 FHC subscription canceled for: ${email}`);
 
-    // Revoke MA Standard + Briefings access
+    // Revoke MA Standard + Alert Pro access (FHC members get Alert Pro, not briefings)
     if (supabase) {
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({
           access_assassin_standard: false,
-          access_briefings: false,
+          access_hunter_pro: false,
           updated_at: new Date().toISOString(),
         })
         .eq('email', email);
@@ -371,13 +388,24 @@ export async function POST(request: NextRequest) {
       } else {
         console.log(`✅ Revoked Supabase access for: ${email}`);
       }
+
+      // Revert alert frequency to weekly
+      await supabase
+        .from('user_alert_settings')
+        .update({
+          alert_frequency: 'weekly',
+          subscription_status: 'canceled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_email', email);
     }
 
-    // Remove KV access
+    // Remove KV access (MA + Alert Pro + OH Pro)
     try {
       await kv.del(`ma:${email}`);
-      await kv.del(`briefings:${email}`);
-      console.log(`✅ Revoked KV access for: ${email}`);
+      await kv.del(`alertpro:${email}`);
+      await kv.del(`ospro:${email}`);
+      console.log(`✅ Revoked KV access for FHC member: ${email}`);
     } catch (kvError) {
       console.error('KV error revoking access:', kvError);
     }

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import nodemailer from 'nodemailer';
 import Stripe from 'stripe';
+import { kv } from '@vercel/kv';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -44,26 +45,45 @@ const businessTypeToSetAside: Record<string, string> = {
 // Alert Pro subscription product ID
 const ALERT_PRO_PRODUCT_ID = 'prod_U9rOClXY6MFcRu';
 
+// FHC membership product IDs (FHC members get Alert Pro as a premium benefit)
+const FHC_PRODUCT_IDS = ['prod_TaiXlKb350EIQs', 'prod_TMUmxKTtooTx6C'];
+
 // Cache for active subscriptions
 let activeSubscriptionsCache: Set<string> | null = null;
 
 /**
- * Check if user has active Alert Pro subscription
+ * Check if user has daily alert access via:
+ * 1. KV store alertpro:{email} key (fastest check)
+ * 2. Active Alert Pro subscription
+ * 3. Active FHC membership (includes Alert Pro as benefit)
  */
 async function hasActiveSubscription(email: string): Promise<boolean> {
+  const lowerEmail = email.toLowerCase();
+
   // Check cache first
-  if (activeSubscriptionsCache?.has(email.toLowerCase())) {
+  if (activeSubscriptionsCache?.has(lowerEmail)) {
     return true;
+  }
+
+  // Check KV store first (fastest, and authoritative for FHC members)
+  try {
+    const kvAccess = await kv.get(`alertpro:${lowerEmail}`);
+    if (kvAccess === 'true') {
+      console.log(`[Daily Alerts] ${email} has KV alertpro access`);
+      return true;
+    }
+  } catch (kvErr) {
+    console.error('[Daily Alerts] KV check error (non-fatal):', kvErr);
   }
 
   try {
     // Search for customer by email
-    const customers = await getStripe().customers.list({ email: email.toLowerCase(), limit: 1 });
+    const customers = await getStripe().customers.list({ email: lowerEmail, limit: 1 });
     if (customers.data.length === 0) return false;
 
     const customer = customers.data[0];
 
-    // Check for active subscription to Alert Pro
+    // Check for active subscription to Alert Pro OR FHC
     const subscriptions = await getStripe().subscriptions.list({
       customer: customer.id,
       status: 'active',
@@ -72,7 +92,14 @@ async function hasActiveSubscription(email: string): Promise<boolean> {
 
     for (const sub of subscriptions.data) {
       for (const item of sub.items.data) {
-        if (item.price.product === ALERT_PRO_PRODUCT_ID) {
+        const productId = item.price.product as string;
+        // Check Alert Pro product
+        if (productId === ALERT_PRO_PRODUCT_ID) {
+          return true;
+        }
+        // Check FHC membership (FHC includes Alert Pro as benefit)
+        if (FHC_PRODUCT_IDS.includes(productId)) {
+          console.log(`[Daily Alerts] ${email} has FHC membership, granting daily alerts`);
           return true;
         }
       }
@@ -86,13 +113,13 @@ async function hasActiveSubscription(email: string): Promise<boolean> {
 }
 
 /**
- * Load all active Alert Pro subscribers (for caching)
+ * Load all active Alert Pro + FHC subscribers (for caching)
  */
 async function loadActiveSubscribers(): Promise<Set<string>> {
   const subscribers = new Set<string>();
 
   try {
-    // Get all active subscriptions for Alert Pro product
+    // Get all active subscriptions (will check for Alert Pro and FHC products)
     const subscriptions = await getStripe().subscriptions.list({
       status: 'active',
       limit: 100,
@@ -100,16 +127,20 @@ async function loadActiveSubscribers(): Promise<Set<string>> {
     });
 
     for (const sub of subscriptions.data) {
-      const hasAlertPro = sub.items.data.some(
-        item => item.price.product === ALERT_PRO_PRODUCT_ID
+      // Check if subscription includes Alert Pro OR FHC membership
+      const hasAlertAccess = sub.items.data.some(
+        item => {
+          const productId = item.price.product as string;
+          return productId === ALERT_PRO_PRODUCT_ID || FHC_PRODUCT_IDS.includes(productId);
+        }
       );
-      if (hasAlertPro && sub.customer && typeof sub.customer !== 'string' && !('deleted' in sub.customer)) {
+      if (hasAlertAccess && sub.customer && typeof sub.customer !== 'string' && !('deleted' in sub.customer)) {
         const email = (sub.customer as Stripe.Customer).email?.toLowerCase();
         if (email) subscribers.add(email);
       }
     }
 
-    console.log(`[Daily Alerts] Loaded ${subscribers.size} active Alert Pro subscribers`);
+    console.log(`[Daily Alerts] Loaded ${subscribers.size} active Alert Pro + FHC subscribers`);
     return subscribers;
   } catch (err) {
     console.error('[Daily Alerts] Error loading subscribers:', err);
