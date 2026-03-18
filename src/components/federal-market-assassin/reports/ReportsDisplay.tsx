@@ -42,10 +42,14 @@ import {
 } from '../charts';
 import {
   fetchLiveOpportunities,
+  fetchHistoricalContext,
   LiveOpportunity,
   LiveOpportunitiesStats,
+  HistoricalContext,
+  HistoricalContextResponse,
   getUrgencyBadge as getLiveUrgencyBadge,
   formatDeadline,
+  formatCurrency as formatHistoricalCurrency,
 } from '@/lib/utils/live-opportunities';
 
 import { MarketAssassinTier, MARKET_ASSASSIN_TIER_FEATURES } from '@/lib/access-codes';
@@ -3365,6 +3369,11 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
   const [liveError, setLiveError] = useState<string | null>(null);
   const livePagination = usePagination(liveOpps, 10);
 
+  // State for Historical Context Modal
+  const [selectedOpp, setSelectedOpp] = useState<LiveOpportunity | null>(null);
+  const [historicalData, setHistoricalData] = useState<HistoricalContextResponse | null>(null);
+  const [loadingHistorical, setLoadingHistorical] = useState(false);
+
   // Dynamic month/quarter labels
   const now = new Date();
   const currentMonth = now.toLocaleString('default', { month: 'long' });
@@ -3388,6 +3397,23 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
     }
     loadLiveOpportunities();
   }, [inputs]);
+
+  // Handler to open historical context modal
+  const handleViewHistory = async (opp: LiveOpportunity) => {
+    setSelectedOpp(opp);
+    setLoadingHistorical(true);
+    setHistoricalData(null);
+
+    const result = await fetchHistoricalContext(opp);
+    setHistoricalData(result);
+    setLoadingHistorical(false);
+  };
+
+  // Close modal
+  const closeHistoricalModal = () => {
+    setSelectedOpp(null);
+    setHistoricalData(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -3512,7 +3538,7 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
                         <strong>Description:</strong> {opp.description.slice(0, 200)}{opp.description.length > 200 ? '...' : ''}
                       </p>
                     )}
-                    <div className="flex items-center gap-3 pt-2">
+                    <div className="flex items-center gap-3 pt-2 flex-wrap">
                       <a
                         href={opp.uiLink}
                         target="_blank"
@@ -3521,6 +3547,12 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
                       >
                         📄 View on SAM.gov →
                       </a>
+                      <button
+                        onClick={() => handleViewHistory(opp)}
+                        className="inline-flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 font-semibold bg-purple-500/10 px-2 py-1 rounded border border-purple-500/30 hover:bg-purple-500/20 transition-colors"
+                      >
+                        📊 View History & Incumbents
+                      </button>
                       {opp.daysUntilDeadline !== null && opp.daysUntilDeadline <= 7 && (
                         <span className="text-xs text-red-400 font-semibold animate-pulse">
                           ⚠️ Respond soon!
@@ -3643,6 +3675,194 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
           ))}
         </ul>
       </div>
+
+      {/* Historical Context Modal */}
+      {selectedOpp && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={closeHistoricalModal}>
+          <div
+            className="bg-slate-900 border border-purple-500/50 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-700 p-4 flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-1 bg-purple-600 text-white text-xs font-bold rounded">
+                    HISTORICAL INTEL
+                  </span>
+                  <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded">
+                    NAICS {selectedOpp.naics}
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white">{selectedOpp.title}</h3>
+                <p className="text-sm text-slate-400">{selectedOpp.agency}</p>
+              </div>
+              <button
+                onClick={closeHistoricalModal}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {loadingHistorical ? (
+                <div className="flex items-center justify-center py-12">
+                  <svg className="animate-spin h-8 w-8 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="ml-3 text-purple-400 font-semibold">Analyzing historical contract data...</span>
+                </div>
+              ) : historicalData?.success ? (
+                <>
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-slate-800 rounded-lg p-4 border border-purple-500/30">
+                      <p className="text-sm text-purple-400">Past Awards</p>
+                      <p className="text-2xl font-bold text-white">{historicalData.historicalContext.totalPastAwards}</p>
+                    </div>
+                    <div className="bg-slate-800 rounded-lg p-4 border border-emerald-500/30">
+                      <p className="text-sm text-emerald-400">Total Value</p>
+                      <p className="text-2xl font-bold text-emerald-300">{formatHistoricalCurrency(historicalData.historicalContext.totalHistoricalValue)}</p>
+                    </div>
+                    <div className="bg-slate-800 rounded-lg p-4 border border-amber-500/30">
+                      <p className="text-sm text-amber-400">Avg. Contract</p>
+                      <p className="text-2xl font-bold text-amber-300">{formatHistoricalCurrency(historicalData.historicalContext.priceRange.average)}</p>
+                    </div>
+                    <div className="bg-slate-800 rounded-lg p-4 border border-blue-500/30">
+                      <p className="text-sm text-blue-400">Price Range</p>
+                      <p className="text-lg font-bold text-blue-300">
+                        {formatHistoricalCurrency(historicalData.historicalContext.priceRange.min)} - {formatHistoricalCurrency(historicalData.historicalContext.priceRange.max)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Incumbents Section */}
+                  {historicalData.historicalContext.incumbents.length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-bold text-purple-300 mb-3 flex items-center gap-2">
+                        <span>🏆</span> Top Incumbents
+                      </h4>
+                      <div className="space-y-2">
+                        {historicalData.historicalContext.incumbents.slice(0, 5).map((inc, idx) => (
+                          <div key={idx} className="bg-slate-800 rounded-lg p-3 flex justify-between items-center border border-slate-700">
+                            <div className="flex items-center gap-3">
+                              <span className="text-slate-500 font-mono">#{idx + 1}</span>
+                              <div>
+                                <p className="font-semibold text-white">{inc.name}</p>
+                                <p className="text-xs text-slate-400">
+                                  {inc.totalAwards} awards | Last: {new Date(inc.lastAwardDate).toLocaleDateString()}
+                                </p>
+                              </div>
+                              {inc.isCurrentIncumbent && (
+                                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded border border-emerald-500/30">
+                                  CURRENT
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-emerald-400">{formatHistoricalCurrency(inc.totalValue)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent Awards */}
+                  {historicalData.historicalContext.recentAwards.length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-bold text-blue-300 mb-3 flex items-center gap-2">
+                        <span>📋</span> Recent Similar Awards
+                      </h4>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {historicalData.historicalContext.recentAwards.slice(0, 5).map((award, idx) => (
+                          <div key={idx} className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex-1 pr-4">
+                                <p className="font-semibold text-white text-sm line-clamp-1">
+                                  {award.description || `Contract ${award.piid || award.awardId}`}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  {award.awardingAgency} | {new Date(award.awardDate).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <p className="font-bold text-emerald-400 whitespace-nowrap">{formatHistoricalCurrency(award.obligatedAmount)}</p>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-slate-300">
+                                <strong>Winner:</strong> {award.recipient}
+                              </span>
+                              {award.setAside && (
+                                <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">
+                                  {award.setAside}
+                                </span>
+                              )}
+                              {award.contractLink && (
+                                <a
+                                  href={award.contractLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-400 hover:text-blue-300"
+                                >
+                                  View →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Strategic Insights */}
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                    <h4 className="text-lg font-bold text-purple-300 mb-2">💡 Strategic Insights</h4>
+                    <ul className="space-y-2 text-sm text-slate-300">
+                      {historicalData.historicalContext.incumbents.length > 0 && historicalData.historicalContext.incumbents[0].isCurrentIncumbent && (
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-400">⚠️</span>
+                          <span>
+                            <strong className="text-red-400">Incumbent Alert:</strong> {historicalData.historicalContext.incumbents[0].name} holds the current contract with {formatHistoricalCurrency(historicalData.historicalContext.incumbents[0].totalValue)} in awards. Consider teaming or differentiation strategy.
+                          </span>
+                        </li>
+                      )}
+                      <li className="flex items-start gap-2">
+                        <span className="text-emerald-400">💰</span>
+                        <span>
+                          <strong className="text-emerald-400">Pricing Intel:</strong> Historical awards range from {formatHistoricalCurrency(historicalData.historicalContext.priceRange.min)} to {formatHistoricalCurrency(historicalData.historicalContext.priceRange.max)}. Price your bid competitively within this range.
+                        </span>
+                      </li>
+                      {historicalData.historicalContext.totalPastAwards > 5 && (
+                        <li className="flex items-start gap-2">
+                          <span className="text-blue-400">📈</span>
+                          <span>
+                            <strong className="text-blue-400">Market Activity:</strong> This NAICS has {historicalData.historicalContext.totalPastAwards} historical awards, indicating active procurement.
+                          </span>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+
+                  {/* Source Footer */}
+                  <p className="text-xs text-slate-500 text-center">
+                    Data from USASpending.gov | Fetched {new Date(historicalData.metadata.fetchedAt).toLocaleString()}
+                  </p>
+                </>
+              ) : (
+                <div className="text-center py-8 text-slate-400">
+                  <p className="font-semibold text-red-400">Unable to load historical data</p>
+                  <p className="text-sm mt-2">{historicalData?.error || 'Unknown error'}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

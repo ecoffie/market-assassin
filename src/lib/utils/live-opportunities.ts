@@ -159,3 +159,162 @@ export function formatDeadline(deadline: string | null, daysUntil: number | null
     return deadline;
   }
 }
+
+// ============================================
+// Historical Context Types and Functions
+// ============================================
+
+export interface HistoricalAward {
+  awardId: string;
+  piid: string;
+  contractNumber: string;
+  recipient: string;
+  recipientUei: string;
+  awardDate: string;
+  obligatedAmount: number;
+  baseAndExercisedOptionsValue: number;
+  description: string;
+  naicsCode: string;
+  pscCode: string;
+  awardType: string;
+  awardingAgency: string;
+  awardingOffice: string;
+  periodOfPerformanceStart: string;
+  periodOfPerformanceEnd: string;
+  placeOfPerformance: string;
+  setAside: string | null;
+  contractLink: string;
+}
+
+export interface Incumbent {
+  name: string;
+  totalAwards: number;
+  totalValue: number;
+  lastAwardDate: string;
+  isCurrentIncumbent: boolean;
+}
+
+export interface HistoricalContext {
+  totalPastAwards: number;
+  totalHistoricalValue: number;
+  incumbents: Incumbent[];
+  priceRange: {
+    min: number;
+    max: number;
+    average: number;
+  };
+  recentAwards: HistoricalAward[];
+  contractHistory: Array<{
+    year: number;
+    awardCount: number;
+    totalValue: number;
+  }>;
+}
+
+export interface HistoricalContextResponse {
+  success: boolean;
+  opportunity: {
+    title: string;
+    agency: string;
+    naics: string;
+  };
+  historicalContext: HistoricalContext;
+  metadata: {
+    searchCriteria: {
+      agency: string;
+      naics: string;
+      keywords: string[];
+    };
+    fetchedAt: string;
+    source: string;
+  };
+  error?: string;
+}
+
+/**
+ * Fetch historical context for an opportunity
+ */
+export async function fetchHistoricalContext(
+  opportunity: LiveOpportunity
+): Promise<HistoricalContextResponse> {
+  try {
+    const response = await fetch('/api/sam/historical-context', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: opportunity.title,
+        agency: opportunity.agency,
+        naics: opportunity.naics,
+        office: opportunity.office,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('[Historical] API error:', response.status);
+      return {
+        success: false,
+        opportunity: {
+          title: opportunity.title,
+          agency: opportunity.agency,
+          naics: opportunity.naics,
+        },
+        historicalContext: {
+          totalPastAwards: 0,
+          totalHistoricalValue: 0,
+          incumbents: [],
+          priceRange: { min: 0, max: 0, average: 0 },
+          recentAwards: [],
+          contractHistory: [],
+        },
+        metadata: {
+          searchCriteria: { agency: '', naics: '', keywords: [] },
+          fetchedAt: new Date().toISOString(),
+          source: 'USASpending.gov',
+        },
+        error: `API error: ${response.status}`,
+      };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('[Historical] Fetch error:', error);
+    return {
+      success: false,
+      opportunity: {
+        title: opportunity.title,
+        agency: opportunity.agency,
+        naics: opportunity.naics,
+      },
+      historicalContext: {
+        totalPastAwards: 0,
+        totalHistoricalValue: 0,
+        incumbents: [],
+        priceRange: { min: 0, max: 0, average: 0 },
+        recentAwards: [],
+        contractHistory: [],
+      },
+      metadata: {
+        searchCriteria: { agency: '', naics: '', keywords: [] },
+        fetchedAt: new Date().toISOString(),
+        source: 'USASpending.gov',
+      },
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Format currency for display
+ */
+export function formatCurrency(amount: number): string {
+  if (amount >= 1000000000) {
+    return `$${(amount / 1000000000).toFixed(1)}B`;
+  }
+  if (amount >= 1000000) {
+    return `$${(amount / 1000000).toFixed(1)}M`;
+  }
+  if (amount >= 1000) {
+    return `$${(amount / 1000).toFixed(0)}K`;
+  }
+  return `$${amount.toFixed(0)}`;
+}
