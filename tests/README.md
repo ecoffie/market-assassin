@@ -9,15 +9,15 @@ Each new build/feature requires:
 2. **Automated Test Script** (`tests/test-{feature-name}.sh`)
 3. **All tests passing** before merge to main
 
-## Current Test Protocols
+## Current Test Suites
 
-| Feature | Protocol | Script | Status | Last Run |
-|---------|----------|--------|--------|----------|
-| Live Opportunities + Historical | [live-opportunities-test-protocol.md](./live-opportunities-test-protocol.md) | [test-live-opps.sh](./test-live-opps.sh) | ✅ 16/16 | Mar 18, 2026 |
-| Daily Health Check | [health-check-test-protocol.md](./health-check-test-protocol.md) | [test-health-check.sh](./test-health-check.sh) | ✅ 12/12 | Mar 18, 2026 |
-| Content Reaper | [content-reaper-test-protocol.md](./content-reaper-test-protocol.md) | [test-content-reaper.sh](./test-content-reaper.sh) | ✅ 10/10 | Mar 18, 2026 |
-| Smart Profiles | [smart-profiles-test-protocol.md](./smart-profiles-test-protocol.md) | [test-smart-profiles.sh](./test-smart-profiles.sh) | ✅ 8/8 | Mar 18, 2026 |
-| Briefings System | [briefings-test-protocol.md](./briefings-test-protocol.md) | [test-briefings.sh](./test-briefings.sh) | ✅ 14/14 | Mar 18, 2026 |
+| Feature | Protocol | Script | Tests | Status |
+|---------|----------|--------|-------|--------|
+| Live Opportunities + Historical | [live-opportunities-test-protocol.md](./live-opportunities-test-protocol.md) | [test-live-opps.sh](./test-live-opps.sh) | 16 | ✅ Passing |
+| Daily Health Check | — | [test-health-check.sh](./test-health-check.sh) | 11 | ✅ Passing |
+| Content Reaper | — | [test-content-reaper.sh](./test-content-reaper.sh) | 9 | ✅ Passing |
+
+**Total: 36 tests across 3 suites**
 
 ## Run All Tests
 
@@ -25,9 +25,10 @@ Each new build/feature requires:
 # Run all test suites
 bash tests/run-all-tests.sh
 
-# Run specific test
+# Run individual suites
 bash tests/test-live-opps.sh
 bash tests/test-health-check.sh
+bash tests/test-content-reaper.sh
 ```
 
 ## Creating a New Test Protocol
@@ -38,30 +39,57 @@ Use the template generator:
 bash tests/create-test-protocol.sh "Feature Name" "feature-name"
 ```
 
+This creates:
+- `tests/{feature-name}-test-protocol.md` — Detailed test documentation
+- `tests/test-{feature-name}.sh` — Automated test script
+
 Or manually create using the template at `tests/TEMPLATE-test-protocol.md`
 
 ## Test Categories
 
 Each protocol should cover:
 
-1. **API Tests** - Endpoint functionality, error handling
-2. **Data Quality Tests** - Validation, business logic
-3. **UI/UX Tests** - Manual checklist for visual verification
-4. **Performance Tests** - Response times, concurrent requests
-5. **Edge Cases** - Error states, empty data, timeouts
-6. **Integration Tests** - End-to-end user flows
-7. **Regression Checklist** - Post-deploy verification
+1. **API Tests** — Endpoint functionality, error handling
+2. **Data Quality Tests** — Validation, business logic
+3. **UI/UX Tests** — Manual checklist for visual verification
+4. **Performance Tests** — Response times, concurrent requests
+5. **Edge Cases** — Error states, empty data, timeouts
+6. **Security Tests** — Auth, rate limiting, input sanitization
+7. **Integration Tests** — End-to-end user flows
+8. **Regression Checklist** — Post-deploy verification
 
-## CI/CD Integration
+## Test Output Format
 
-Test scripts return exit codes:
+Each test script outputs:
+```
+=========================================
+TEST RESULTS
+=========================================
+Passed:  X
+Failed:  Y
+Skipped: Z
+=========================================
+```
+
+Exit codes:
 - `0` = All tests passed
 - `N` = N tests failed
+
+## CI/CD Integration
 
 Add to your deploy workflow:
 ```bash
 bash tests/run-all-tests.sh || exit 1
 ```
+
+## Automated Test Coverage
+
+| Category | Live Opps | Health Check | Content Reaper |
+|----------|-----------|--------------|----------------|
+| API Tests | 10 | 7 | 4 |
+| Data Quality | 4 | — | 2 |
+| Performance | 2 | — | 1 |
+| Page Health | — | 4 | 2 |
 
 ---
 
