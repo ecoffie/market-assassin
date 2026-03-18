@@ -41,14 +41,12 @@ import {
   BudgetComparisonChart,
 } from '../charts';
 import {
-  getHitListByCoreInputs,
-  getCombinedHitList,
-  getDaysUntilDeadline,
-  getUrgencyBadge,
-  getHitListActionStrategy,
-  getHitListStats,
-  HitListOpportunity,
-} from '@/lib/utils/december-hit-list';
+  fetchLiveOpportunities,
+  LiveOpportunity,
+  LiveOpportunitiesStats,
+  getUrgencyBadge as getLiveUrgencyBadge,
+  formatDeadline,
+} from '@/lib/utils/live-opportunities';
 
 import { MarketAssassinTier, MARKET_ASSASSIN_TIER_FEATURES } from '@/lib/access-codes';
 import PricingIntelTab from './PricingIntelTab';
@@ -3360,11 +3358,12 @@ function OSBPContactsReport({ data }: { data: any }) {
 }
 
 function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }) {
-  // State for combined hit list (curated + dynamic from USAspending)
-  const [hitListOpps, setHitListOpps] = useState<HitListOpportunity[]>([]);
-  const [loadingHitList, setLoadingHitList] = useState(true);
-  const hitListStats = getHitListStats();
-  const hitListPagination = usePagination(hitListOpps, 10);
+  // State for LIVE SAM.gov opportunities
+  const [liveOpps, setLiveOpps] = useState<LiveOpportunity[]>([]);
+  const [liveStats, setLiveStats] = useState<LiveOpportunitiesStats>({ total: 0, urgent: 0, dueThisWeek: 0, setAsides: 0 });
+  const [loadingLive, setLoadingLive] = useState(true);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const livePagination = usePagination(liveOpps, 10);
 
   // Dynamic month/quarter labels
   const now = new Date();
@@ -3372,15 +3371,22 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
   const fiscalQuarter = now.getMonth() >= 9 ? 'Q1' : now.getMonth() >= 6 ? 'Q4' : now.getMonth() >= 3 ? 'Q3' : 'Q2';
   const spendLabel = `${fiscalQuarter} Spend`;
 
-  // Fetch combined hit list on mount
+  // Fetch LIVE opportunities from SAM.gov on mount
   useEffect(() => {
-    async function loadHitList() {
-      setLoadingHitList(true);
-      const combined = await getCombinedHitList(inputs);
-      setHitListOpps(combined);
-      setLoadingHitList(false);
+    async function loadLiveOpportunities() {
+      setLoadingLive(true);
+      setLiveError(null);
+      const result = await fetchLiveOpportunities(inputs);
+      if (result.success) {
+        setLiveOpps(result.opportunities);
+        setLiveStats(result.stats);
+      } else {
+        setLiveError(result.error || 'Failed to load opportunities');
+        setLiveOpps([]);
+      }
+      setLoadingLive(false);
     }
-    loadHitList();
+    loadLiveOpportunities();
   }, [inputs]);
 
   return (
@@ -3396,170 +3402,148 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
         <h3 className="text-xl font-bold text-amber-300 mb-4 flex items-center gap-2">
           <span>📊</span> Executive Summary
         </h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="bg-slate-800/50 rounded-lg p-3">
-            <p className="text-sm text-amber-400">Total {spendLabel}</p>
-            <p className="text-2xl font-bold text-amber-300">
-              {formatCurrency(data.summary.totalQ4Spend)}
-            </p>
+            <p className="text-sm text-amber-400">Active Opportunities</p>
+            <p className="text-2xl font-bold text-amber-300">{liveStats.total}</p>
           </div>
           <div className="bg-slate-800/50 rounded-lg p-3">
-            <p className="text-sm text-amber-400">Urgent Opportunities</p>
-            <p className="text-2xl font-bold text-amber-300">{data.summary.urgentOpportunities}</p>
+            <p className="text-sm text-red-400">Urgent (3 days)</p>
+            <p className="text-2xl font-bold text-red-400">{liveStats.urgent}</p>
           </div>
           <div className="bg-slate-800/50 rounded-lg p-3">
-            <p className="text-sm text-amber-400">Low Competition Contracts</p>
-            <p className="text-2xl font-bold text-amber-300">{hitListOpps.length}</p>
+            <p className="text-sm text-amber-400">Due This Week</p>
+            <p className="text-2xl font-bold text-amber-300">{liveStats.dueThisWeek}</p>
+          </div>
+          <div className="bg-slate-800/50 rounded-lg p-3">
+            <p className="text-sm text-emerald-400">Set-Asides</p>
+            <p className="text-2xl font-bold text-emerald-300">{liveStats.setAsides}</p>
           </div>
         </div>
       </div>
 
-      {/* Monthly Hit List - Low Competition Contracts */}
+      {/* Live Opportunities from SAM.gov */}
       <div className="bg-emerald-500/10 border-2 border-emerald-500/50 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-emerald-300">🎯 {currentMonth} Hit List - Low Competition Contracts</h3>
-          <span className="px-3 py-1 bg-emerald-500 text-white text-sm font-bold rounded-full">
-            {hitListOpps.length} TOTAL
-          </span>
+          <h3 className="text-xl font-bold text-emerald-300">🎯 {currentMonth} Active Opportunities</h3>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded">
+              LIVE FROM SAM.GOV
+            </span>
+            <span className="px-3 py-1 bg-emerald-500 text-white text-sm font-bold rounded-full">
+              {liveOpps.length} ACTIVE
+            </span>
+          </div>
         </div>
         <p className="text-sm text-emerald-400 mb-4">
-          Curated + dynamic opportunities from your {inputs.naicsCode ? `NAICS code (${inputs.naicsCode})` : inputs.pscCode ? `PSC code (${inputs.pscCode})` : 'search criteria'} with higher win probability
+          Live solicitations matching your {inputs.naicsCode ? `NAICS code (${inputs.naicsCode})` : inputs.pscCode ? `PSC code (${inputs.pscCode})` : 'search criteria'}{inputs.businessType ? ` with ${inputs.businessType} set-asides` : ''}
         </p>
 
-        {loadingHitList ? (
+        {loadingLive ? (
           <div className="flex items-center justify-center py-8">
             <svg className="animate-spin h-8 w-8 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span className="ml-3 text-emerald-400 font-semibold">Finding more opportunities from USAspending.gov...</span>
+            <span className="ml-3 text-emerald-400 font-semibold">Fetching live opportunities from SAM.gov...</span>
           </div>
-        ) : hitListOpps.length > 0 ? (
+        ) : liveError ? (
+          <div className="text-center py-8 text-red-400">
+            <p className="font-semibold">Failed to load opportunities</p>
+            <p className="text-sm mt-2 text-slate-400">{liveError}</p>
+          </div>
+        ) : liveOpps.length > 0 ? (
           <div className="space-y-3">
-            {hitListPagination.currentItems.map((opp: HitListOpportunity, idx: number) => {
-              const daysUntil = getDaysUntilDeadline(opp.deadline);
-              const urgencyBadge = getUrgencyBadge(opp);
-              const actionStrategy = getHitListActionStrategy(opp, inputs);
-
-              const isCurated = opp.source === 'curated';
-              const isDynamic = opp.source === 'usaspending';
+            {livePagination.currentItems.map((opp: LiveOpportunity, idx: number) => {
+              const urgencyBadge = getLiveUrgencyBadge(opp);
+              const deadlineText = formatDeadline(opp.responseDeadline, opp.daysUntilDeadline);
 
               return (
                 <div
-                  key={opp.id}
+                  key={opp.id || idx}
                   className="bg-slate-800 border border-emerald-500/30 rounded-lg p-4 hover:border-emerald-500/50 transition-all card-hover"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        {isCurated && (
-                          <span className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded">
-                            CURATED
-                          </span>
-                        )}
-                        {isDynamic && (
-                          <span className="px-2 py-1 bg-purple-600 text-white text-xs font-bold rounded">
-                            SIMILAR AWARD
-                          </span>
-                        )}
-                        <span className={`px-3 py-1 text-xs font-bold rounded ${
-                          urgencyBadge.color === 'red'
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            : urgencyBadge.color === 'orange'
-                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                            : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        }`}>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`px-3 py-1 text-xs font-bold rounded ${urgencyBadge.bgClass} ${urgencyBadge.textClass}`}>
                           {urgencyBadge.text}
                         </span>
-                        {daysUntil !== null && daysUntil > 0 && (
-                          <span className="text-xs text-slate-400">
-                            {daysUntil} days left
+                        {opp.daysUntilDeadline !== null && opp.daysUntilDeadline >= 0 && (
+                          <span className={`text-xs ${opp.daysUntilDeadline <= 3 ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
+                            {opp.daysUntilDeadline === 0 ? 'Due today!' : opp.daysUntilDeadline === 1 ? 'Due tomorrow!' : `${opp.daysUntilDeadline} days left`}
                           </span>
                         )}
-                        {opp.winProbability && (
-                          <span className={`px-2 py-1 text-xs font-bold rounded ${
-                            opp.winProbability === 'high'
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : opp.winProbability === 'medium'
-                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                              : 'bg-slate-700 text-slate-400 border border-slate-600'
-                          }`}>
-                            {opp.winProbability.toUpperCase()} WIN PROB
+                        {opp.setAside && (
+                          <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs font-bold rounded border border-purple-500/30">
+                            {opp.setAside}
                           </span>
                         )}
+                        <span className="px-2 py-1 bg-slate-700 text-slate-300 text-xs rounded">
+                          {opp.noticeType || 'Solicitation'}
+                        </span>
                       </div>
                       <h4 className="font-bold text-slate-100 text-base mb-1">{opp.title}</h4>
                       <p className="text-sm text-slate-400 mb-2">
-                        {opp.agency && <><strong className="text-slate-300">Agency:</strong> {opp.agency} | </>}
-                        <strong className="text-slate-300">NAICS:</strong> {opp.naics}
-                        {opp.amount && <> | <strong className="text-slate-300">Value:</strong> ${(opp.amount / 1000).toFixed(0)}K</>}
+                        <strong className="text-slate-300">Agency:</strong> {opp.agency}
+                        {opp.office && <> | <strong className="text-slate-300">Office:</strong> {opp.office}</>}
+                        {opp.naics && <> | <strong className="text-slate-300">NAICS:</strong> {opp.naics}</>}
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    {isCurated && opp.deadline && (
-                      <p className="text-sm text-slate-300">
-                        <strong>Deadline:</strong> {opp.deadline}
+                    <p className="text-sm text-slate-300">
+                      <strong className={opp.daysUntilDeadline !== null && opp.daysUntilDeadline <= 7 ? 'text-red-400' : 'text-amber-400'}>Response Deadline:</strong>{' '}
+                      <span className={opp.daysUntilDeadline !== null && opp.daysUntilDeadline <= 3 ? 'text-red-400 font-bold' : ''}>{deadlineText}</span>
+                    </p>
+                    {opp.postedDate && (
+                      <p className="text-sm text-slate-400">
+                        <strong>Posted:</strong> {new Date(opp.postedDate).toLocaleDateString()}
                       </p>
                     )}
-                    {isDynamic && opp.awardDate && (
-                      <p className="text-sm text-slate-300">
-                        <strong>Award Date:</strong> {new Date(opp.awardDate).toLocaleDateString()}
-                      </p>
-                    )}
-                    {opp.setAside && opp.setAside !== 'Unrestricted' && (
+                    {opp.setAsideDescription && (
                       <p className="text-sm text-emerald-400">
-                        <strong>Set-Aside:</strong> {opp.setAside}
+                        <strong>Set-Aside:</strong> {opp.setAsideDescription}
                       </p>
                     )}
                     {opp.description && (
-                      <p className="text-sm text-slate-300">
-                        <strong>Description:</strong> {opp.description}
+                      <p className="text-sm text-slate-300 line-clamp-2">
+                        <strong>Description:</strong> {opp.description.slice(0, 200)}{opp.description.length > 200 ? '...' : ''}
                       </p>
                     )}
-                    {opp.poc && (
-                      <p className="text-sm text-blue-400">
-                        <strong>POC:</strong> {opp.poc}
-                      </p>
-                    )}
-                    {isCurated && (
-                      <p className="text-sm text-emerald-300 bg-emerald-500/10 p-2 rounded border border-emerald-500/30">
-                        <strong>Action Strategy:</strong> {actionStrategy}
-                      </p>
-                    )}
-                    {isDynamic && (
-                      <p className="text-sm text-purple-300 bg-purple-500/10 p-2 rounded border border-purple-500/30">
-                        <strong>Why This Matters:</strong> Similar contract was awarded in your NAICS - contact this office to present capabilities for upcoming opportunities
-                      </p>
-                    )}
-                    <a
-                      href={isCurated
-                        ? `https://sam.gov/search/?index=opp&page=1&sort=-modifiedDate&sfm%5Bstatus%5D%5Bis_active%5D=true&keywords=${encodeURIComponent(opp.noticeId || opp.title)}`
-                        : opp.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block text-sm text-blue-400 hover:text-blue-300 font-semibold"
-                    >
-                      📄 {isCurated ? `Search SAM.gov for ${opp.noticeId || 'this opportunity'}` : 'View Award Details on USAspending.gov'} →
-                    </a>
+                    <div className="flex items-center gap-3 pt-2">
+                      <a
+                        href={opp.uiLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 font-semibold"
+                      >
+                        📄 View on SAM.gov →
+                      </a>
+                      {opp.daysUntilDeadline !== null && opp.daysUntilDeadline <= 7 && (
+                        <span className="text-xs text-red-400 font-semibold animate-pulse">
+                          ⚠️ Respond soon!
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
             })}
             <LoadMoreButton
-              showingCount={hitListPagination.showingCount}
-              totalItems={hitListPagination.totalItems}
-              hasMore={hitListPagination.hasMore}
-              onLoadMore={hitListPagination.showMore}
-              onShowAll={hitListPagination.showAll}
+              showingCount={livePagination.showingCount}
+              totalItems={livePagination.totalItems}
+              hasMore={livePagination.hasMore}
+              onLoadMore={livePagination.showMore}
+              onShowAll={livePagination.showAll}
               label="opportunities"
             />
           </div>
         ) : (
           <div className="text-center py-8 text-slate-400">
-            <p>No hit list opportunities found for your criteria.</p>
-            <p className="text-sm mt-2">Try adjusting your NAICS code or business type.</p>
+            <p>No active opportunities found for your criteria.</p>
+            <p className="text-sm mt-2">Try a broader NAICS code or remove set-aside filters.</p>
           </div>
         )}
       </div>
@@ -3619,21 +3603,37 @@ function DecemberSpendReport({ data, inputs }: { data: any; inputs: CoreInputs }
       <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-6">
         <h3 className="text-lg font-bold text-slate-100 mb-3">Recommendations</h3>
         <ul className="space-y-2">
-          {hitListOpps.length > 0 && (
-            <>
-              <li className="flex items-start">
-                <span className="text-emerald-400 mr-2">✓</span>
-                <span className="text-slate-300">
-                  <strong className="text-emerald-400">PRIORITY:</strong> Focus on {hitListOpps.filter((o: HitListOpportunity) => o.isUrgent).length} urgent hit list opportunities with imminent deadlines
-                </span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-emerald-400 mr-2">✓</span>
-                <span className="text-slate-300">
-                  Hit list contracts have lower competition - prioritize these for higher win probability
-                </span>
-              </li>
-            </>
+          {liveStats.urgent > 0 && (
+            <li className="flex items-start">
+              <span className="text-red-400 mr-2">⚠️</span>
+              <span className="text-slate-300">
+                <strong className="text-red-400">URGENT:</strong> {liveStats.urgent} opportunities closing within 3 days - respond immediately!
+              </span>
+            </li>
+          )}
+          {liveStats.dueThisWeek > 0 && (
+            <li className="flex items-start">
+              <span className="text-amber-400 mr-2">⏰</span>
+              <span className="text-slate-300">
+                <strong className="text-amber-400">THIS WEEK:</strong> {liveStats.dueThisWeek} opportunities due within 7 days - prioritize capability statements
+              </span>
+            </li>
+          )}
+          {liveStats.setAsides > 0 && (
+            <li className="flex items-start">
+              <span className="text-emerald-400 mr-2">✓</span>
+              <span className="text-slate-300">
+                <strong className="text-emerald-400">SET-ASIDES:</strong> {liveStats.setAsides} opportunities match your business type - higher win probability
+              </span>
+            </li>
+          )}
+          {liveOpps.length > 0 && (
+            <li className="flex items-start">
+              <span className="text-blue-400 mr-2">📋</span>
+              <span className="text-slate-300">
+                Review each opportunity on SAM.gov for complete solicitation documents and requirements
+              </span>
+            </li>
           )}
           {data.recommendations.map((rec: string, idx: number) => (
             <li key={idx} className="flex items-start">
