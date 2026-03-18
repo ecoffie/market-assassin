@@ -91,7 +91,7 @@ async function searchHistoricalAwards(
         },
       ],
       award_type_codes: ['A', 'B', 'C', 'D'], // Contracts only
-      ...(naics && { naics_codes: [{ code: naics, require_exact_match: true }] }),
+      ...(naics && { naics_codes: { require: [naics] } }),
     },
     fields: [
       'Award ID',
