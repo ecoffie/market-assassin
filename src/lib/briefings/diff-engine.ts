@@ -40,6 +40,11 @@ interface BriefingItem {
   actionabilityScore: number;
   overallScore: number;
 
+  // Win Probability (0-100%)
+  winProbability?: number;
+  winTier?: 'excellent' | 'good' | 'moderate' | 'low' | 'poor';
+  winSummary?: string;
+
   // Metadata
   agency: string;
   naicsCode: string;
@@ -47,6 +52,7 @@ interface BriefingItem {
   deadline: string | null;
   changeType: string | null;
   signals: string[];
+  setAside?: string;
 
   // Action
   actionUrl: string;
@@ -112,6 +118,7 @@ export function processOpportunityDiffs(
       deadline: opp.responseDeadline,
       changeType: 'new',
       signals: ['new_posting'],
+      setAside: opp.setAside || undefined,
 
       actionUrl: opp.uiLink,
       actionLabel: 'View on SAM.gov',
@@ -150,6 +157,7 @@ export function processOpportunityDiffs(
       deadline: opp.responseDeadline,
       changeType: 'deadline',
       signals: [`${daysLeft}_days_remaining`],
+      setAside: opp.setAside || undefined,
 
       actionUrl: opp.uiLink,
       actionLabel: 'Submit Response',
@@ -184,6 +192,7 @@ export function processOpportunityDiffs(
       deadline: opp.responseDeadline,
       changeType: 'amendment',
       signals: changes,
+      setAside: opp.setAside || undefined,
 
       actionUrl: opp.uiLink,
       actionLabel: 'Review Amendment',

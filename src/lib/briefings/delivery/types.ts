@@ -63,6 +63,10 @@ export interface BriefingItemFormatted {
   actionUrl: string;
   actionLabel: string;
   signals: string[];
+  // Win probability scoring
+  winProbability?: number; // 0-100
+  winTier?: 'excellent' | 'good' | 'moderate' | 'low' | 'poor';
+  winSummary?: string;
 }
 
 export interface EmailTemplate {

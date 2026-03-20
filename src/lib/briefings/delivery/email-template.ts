@@ -14,6 +14,10 @@ const BRAND_COLOR = '#1a365d'; // Navy blue
 const ACCENT_COLOR = '#3182ce'; // Blue
 const URGENT_COLOR = '#e53e3e'; // Red
 const SUCCESS_COLOR = '#38a169'; // Green
+const EXCELLENT_COLOR = '#22c55e'; // Green for excellent fit
+const GOOD_COLOR = '#84cc16'; // Lime for good fit
+const MODERATE_COLOR = '#eab308'; // Yellow for moderate fit
+const LOW_COLOR = '#f97316'; // Orange for low fit
 
 /**
  * Generate email template from briefing
@@ -92,6 +96,12 @@ function generateHtmlBody(briefing: GeneratedBriefing): string {
     .item-icon { font-size: 20px; margin-right: 8px; }
     .item-rank { background: ${ACCENT_COLOR}; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; margin-right: 8px; }
     .item-badge { background: ${URGENT_COLOR}; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; margin-left: 8px; }
+    .win-badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 600; margin-left: 8px; }
+    .win-excellent { background: ${EXCELLENT_COLOR}; color: white; }
+    .win-good { background: ${GOOD_COLOR}; color: white; }
+    .win-moderate { background: ${MODERATE_COLOR}; color: #1a1a1a; }
+    .win-low { background: ${LOW_COLOR}; color: white; }
+    .win-summary { font-size: 12px; color: #4a5568; font-style: italic; margin-top: 4px; }
     .item-title { font-size: 15px; font-weight: 600; color: #1a202c; margin: 0; }
     .item-subtitle { font-size: 13px; color: #718096; margin: 4px 0 0; }
     .item-description { font-size: 14px; color: #4a5568; margin: 8px 0; line-height: 1.5; }
@@ -170,6 +180,20 @@ function generateHtmlBody(briefing: GeneratedBriefing): string {
 function renderItem(item: BriefingItemFormatted): string {
   const isUrgent = item.urgencyBadge === 'URGENT' || item.urgencyBadge === 'HIGH';
 
+  // Win probability badge
+  let winBadgeHtml = '';
+  if (item.winProbability !== undefined && item.winTier) {
+    const winClass = `win-${item.winTier}`;
+    const winEmoji = getWinEmoji(item.winTier);
+    winBadgeHtml = `<span class="win-badge ${winClass}">${winEmoji} ${item.winProbability}% FIT</span>`;
+  }
+
+  // Win summary line
+  let winSummaryHtml = '';
+  if (item.winSummary && item.winProbability && item.winProbability >= 45) {
+    winSummaryHtml = `<p class="win-summary">${escapeHtml(item.winSummary)}</p>`;
+  }
+
   return `
     <div class="item${isUrgent ? ' urgent' : ''}">
       <div class="item-header">
@@ -177,8 +201,10 @@ function renderItem(item: BriefingItemFormatted): string {
         <span class="item-rank">${item.rank}</span>
         <h4 class="item-title">${escapeHtml(item.title)}</h4>
         ${item.urgencyBadge ? `<span class="item-badge">${item.urgencyBadge}</span>` : ''}
+        ${winBadgeHtml}
       </div>
       <p class="item-subtitle">${escapeHtml(item.subtitle)}</p>
+      ${winSummaryHtml}
       <p class="item-description">${escapeHtml(item.description)}</p>
       <div class="item-meta">
         ${item.amount ? `<span class="item-amount">${item.amount}</span>` : '<span></span>'}
@@ -186,6 +212,19 @@ function renderItem(item: BriefingItemFormatted): string {
       </div>
     </div>
   `;
+}
+
+/**
+ * Get emoji for win tier
+ */
+function getWinEmoji(tier: string): string {
+  switch (tier) {
+    case 'excellent': return '🎯';
+    case 'good': return '✅';
+    case 'moderate': return '⚡';
+    case 'low': return '⚠️';
+    default: return '';
+  }
 }
 
 /**
@@ -212,10 +251,13 @@ TODAY'S TOP INTELLIGENCE
 `;
 
   for (const item of topItems) {
+    const winLine = item.winProbability !== undefined && item.winProbability >= 45
+      ? `   WIN FIT: ${item.winProbability}% - ${item.winSummary || ''}\n`
+      : '';
     text += `
 ${item.rank}. ${item.categoryIcon} ${item.title}
    ${item.subtitle}
-   ${item.description}
+${winLine}   ${item.description}
    ${item.amount ? `Amount: ${item.amount}` : ''}
    → ${item.actionLabel}: ${item.actionUrl}
 `;

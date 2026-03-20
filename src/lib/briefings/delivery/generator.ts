@@ -22,6 +22,8 @@ import { SAMOpportunity } from '../pipelines/sam-gov';
 import { RecompeteContract } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
+import { calculateWinProbability, WinProbabilityResult } from '../win-probability';
+import { getBriefingProfile, BriefingUserProfile } from '../../smart-profile';
 
 const MAX_TOP_ITEMS = 5;
 const MAX_PER_CATEGORY = 3;
@@ -183,16 +185,44 @@ export async function generateBriefing(
     const maxItems = options.maxItems || 15;
     const items = filteredItems.slice(0, maxItems);
 
+    // Get smart profile for win probability scoring
+    const smartProfile = await getBriefingProfile(userEmail);
+
+    // Calculate win probability for each item
+    const itemsWithWinProb = items.map(item => {
+      // Only calculate for opportunities and recompetes
+      if (['new_opportunity', 'deadline_alert', 'amendment', 'recompete_alert', 'timeline_change'].includes(item.category)) {
+        const winResult = calculateWinProbability(
+          {
+            naicsCode: item.naicsCode,
+            setAside: item.setAside,
+            agency: item.agency,
+            amount: item.amount || undefined,
+            description: item.description,
+            title: item.title,
+          },
+          smartProfile
+        );
+        return {
+          ...item,
+          winProbability: winResult.score,
+          winTier: winResult.tier,
+          winSummary: winResult.summary,
+        };
+      }
+      return item;
+    });
+
     const briefing = formatBriefing(
       userEmail,
       briefingDate,
-      items,
+      itemsWithWinProb,
       diffResult.summary,
       Date.now() - startTime
     );
 
     console.log(
-      `[BriefingGen] Generated briefing for ${userEmail}: ${items.length} items in ${Date.now() - startTime}ms`
+      `[BriefingGen] Generated briefing for ${userEmail}: ${itemsWithWinProb.length} items in ${Date.now() - startTime}ms`
     );
 
     return briefing;
@@ -285,6 +315,10 @@ function formatItem(item: BriefingItem, rank: number): BriefingItemFormatted {
     actionUrl: item.actionUrl,
     actionLabel: item.actionLabel,
     signals: item.signals,
+    // Win probability
+    winProbability: item.winProbability,
+    winTier: item.winTier,
+    winSummary: item.winSummary,
   };
 }
 
