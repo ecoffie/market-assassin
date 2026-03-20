@@ -9,10 +9,10 @@ import { getEnhancedAgencyInfo, isDoDAgency } from '@/lib/utils/command-info';
 import { ComprehensiveReport, CoreInputs, Agency, SimplifiedAcquisitionReport, SimplifiedAcquisitionAgency } from '@/types/federal-market-assassin';
 import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget-authority';
 import { fetchPricingIntel } from '@/lib/utils/calc-rates';
-import { checkReportRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
+import { checkReportRateLimit, checkUnauthenticatedIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { getEmailFromRequest, verifyMAAccess } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
-import { trackGeneration } from '@/lib/abuse-detection';
+import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
 import { getMarketAssassinTier } from '@/lib/access-codes';
 
 export async function POST(request: NextRequest) {
@@ -29,14 +29,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limiting: email-based if available, IP-based fallback
+    // Rate limiting: email-based if available, stricter IP-based for unauthenticated
     const email = getEmailFromRequest(request, body);
     if (email) {
       const rl = await checkReportRateLimit(email);
       if (!rl.allowed) return rateLimitResponse(rl);
     } else {
+      // Stricter limit for unauthenticated: 5/hour vs 30/hour for authenticated fallback
       const ip = getClientIP(request);
-      const rl = await checkIPRateLimit(ip);
+      const rl = await checkUnauthenticatedIPRateLimit(ip);
       if (!rl.allowed) return rateLimitResponse(rl);
     }
 
@@ -45,6 +46,14 @@ export async function POST(request: NextRequest) {
     if (!auth.authenticated) {
       return NextResponse.json(
         { success: false, error: auth.error },
+        { status: 403 }
+      );
+    }
+
+    // Check if user is blocked for abuse
+    if (email && await isUserBlocked(email)) {
+      return NextResponse.json(
+        { success: false, error: 'Account suspended due to unusual activity. Contact support at service@govcongiants.com' },
         { status: 403 }
       );
     }

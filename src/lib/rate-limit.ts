@@ -46,9 +46,53 @@ export function checkContentRateLimit(email: string): Promise<RateLimitResult> {
   return checkRateLimit(`content:${email.toLowerCase()}`, 10, 86400);
 }
 
-/** 30 requests per hour per IP (unauthenticated fallback) */
+/** 30 requests per hour per IP (authenticated fallback) */
 export function checkIPRateLimit(ip: string): Promise<RateLimitResult> {
   return checkRateLimit(`ip:${ip}`, 30, 3600);
+}
+
+/** 5 requests per hour per IP (unauthenticated users - stricter) */
+export function checkUnauthenticatedIPRateLimit(ip: string): Promise<RateLimitResult> {
+  return checkRateLimit(`ip:unauth:${ip}`, 5, 3600);
+}
+
+/** Get current usage count without incrementing (for usage endpoint) */
+export async function getUsageCount(key: string): Promise<number> {
+  const kvKey = `rl:${key}`;
+  const count = await kv.get<number>(kvKey);
+  return count ?? 0;
+}
+
+/** Get report usage for a user */
+export async function getReportUsage(email: string): Promise<{ used: number; limit: number; remaining: number; resetAt: number }> {
+  const key = `rl:report:${email.toLowerCase()}`;
+  const count = await kv.get<number>(key) ?? 0;
+  const ttl = await kv.ttl(key);
+  const limit = 50;
+  const resetAt = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : Math.floor(Date.now() / 1000) + 86400;
+
+  return {
+    used: count,
+    limit,
+    remaining: Math.max(0, limit - count),
+    resetAt,
+  };
+}
+
+/** Get content generation usage for a user */
+export async function getContentUsage(email: string): Promise<{ used: number; limit: number; remaining: number; resetAt: number }> {
+  const key = `rl:content:${email.toLowerCase()}`;
+  const count = await kv.get<number>(key) ?? 0;
+  const ttl = await kv.ttl(key);
+  const limit = 10;
+  const resetAt = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : Math.floor(Date.now() / 1000) + 86400;
+
+  return {
+    used: count,
+    limit,
+    remaining: Math.max(0, limit - count),
+    resetAt,
+  };
 }
 
 /** 30 requests per minute per IP (admin endpoints are password-protected) */
