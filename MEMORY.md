@@ -4,7 +4,71 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
-## Session 28 (Mar 17, 2026)
+## Session 30 (Mar 20, 2026)
+
+### Win Probability Scoring for Daily Briefings
+- Added intelligent fit scoring to opportunity alerts (0-100%)
+- New file: `src/lib/briefings/win-probability.ts`
+- **6 scoring factors:**
+  - NAICS Match (0-25 pts) — exact, prefix, or related
+  - Set-Aside Eligibility (0-25 pts) — matches user certifications
+  - Agency Experience (0-15 pts) — has past performance with agency
+  - Contract Size Fit (0-15 pts) — within user's typical range
+  - Capability Match (0-10 pts) — keywords match profile
+  - Contract Vehicle (0-10 pts) — user holds required vehicle
+- **Tiers:** excellent (75%+), good (60-74%), moderate (45-59%), low (30-44%), poor (<30%)
+- Color-coded badges in email: green, lime, yellow, orange
+- Shows fit summary for opportunities ≥45%
+- Updated types in `src/lib/briefings/delivery/types.ts`
+
+### Rate Limiting & Abuse Detection (Complete)
+- **Report generation:** 50/day per user (email-based via KV)
+- **Unauthenticated IPs:** 5/hour (stricter than 30/hour for authenticated)
+- **Abuse thresholds:**
+  - Warning: 100 generations (console log)
+  - Flag: 250 generations (stored in `abuse:flag:{email}`)
+  - Block: 500+ generations (blocks API access)
+- **Admin endpoint:** `/api/admin/abuse-report`
+  - `GET ?password=XXX` — view all flagged users
+  - `GET ?password=XXX&email=X` — check specific user
+  - `POST { action: "clear", email: "X" }` — clear flag after review
+- **Auto-block:** `isUserBlocked(email)` check in `generate-all/route.ts`
+- Updated `src/lib/rate-limit.ts` with `checkUnauthenticatedIPRateLimit()` and usage getters
+- Updated `src/lib/abuse-detection.ts` with full flagging system
+
+### Usage API Fix
+- Replaced stub endpoints that returned hardcoded `limit: 999`
+- Now returns real KV-based usage data
+- Files fixed:
+  - `/api/usage/route.ts`
+  - `/api/usage/check/route.ts`
+  - `/api/usage/increment/route.ts`
+
+### Recompete Tracker Verification
+- Confirmed all requested features already implemented:
+  - Pagination (25/50/100/All selector)
+  - CSV export with user email watermark
+  - Excel export via SheetJS
+  - PDF export with GovCon Giants branding
+  - Location filtering (regions + state checkboxes + "Near Me")
+  - Mobile responsive (3 breakpoints: 1024px, 768px, 400px)
+
+### Action Planner Status Review
+- Mostly complete, needs YouTube video IDs from Eric
+- Weekly digest cron not yet configured in vercel.json
+- Password reset email path incomplete
+
+### LinkedIn Lead Magnet Status
+- Separate project at `/Users/ericcoffie/Linkedin App`
+- MVP complete (Profile Optimizer phase)
+- Not part of Market Assassin codebase
+
+### Commits
+- `c7a3f9b` — Rate limiting, abuse detection, usage API fix
+
+---
+
+## Session 29 (Mar 18, 2026)
 
 ### Alerts Signup Bug Fix
 - User reported "Failed to save alert profile" error from `/alerts/signup`
@@ -364,4 +428,4 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 
 ---
 
-*Last Updated: March 17, 2026*
+*Last Updated: March 20, 2026*
