@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Federal Market Assassin | GovCon Giants",
-  description: "The Ultimate Government Contracting Intelligence System - Powered by GovCon Giants",
+  title: "Free Federal Contracting Tools | GovCon Giants",
+  description: "Free government contracting tools: opportunity search, contractor database, recompete tracker, market intelligence. Find and win federal contracts.",
 };
 
 export default function RootLayout({
