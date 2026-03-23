@@ -350,6 +350,12 @@ function AlertPreferencesContent() {
                     </div>
                   </label>
                 </div>
+
+                <div className="mt-3 px-3 py-2 bg-red-500/5 rounded-lg border border-red-500/10">
+                  <p className="text-red-300 text-xs">
+                    🎁 <strong>FREE PREVIEW</strong> — Alerts are free during beta. Premium features coming soon.
+                  </p>
+                </div>
               </div>
 
               {/* Section: Daily Briefings */}
