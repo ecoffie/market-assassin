@@ -336,7 +336,8 @@ export async function GET(request: NextRequest) {
 /**
  * Retry failed briefings from previous days
  */
-async function retryFailedBriefings(supabase: ReturnType<typeof createClient>): Promise<{ retried: number; succeeded: number }> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function retryFailedBriefings(supabase: any): Promise<{ retried: number; succeeded: number }> {
   const results = { retried: 0, succeeded: 0 };
 
   const threeDaysAgo = new Date();
