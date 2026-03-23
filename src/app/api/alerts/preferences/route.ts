@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       data: {
         email: data.user_email,
         naicsCodes: data.naics_codes,
+        keywords: data.keywords || [],
         businessType: data.business_type,
         targetAgencies: data.target_agencies,
         locationState: data.location_state,
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
       timezone,
       isActive,
       naicsCodes,
+      keywords,
       businessType,
       targetAgencies,
       locationState,
@@ -149,7 +151,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (naicsCodes !== undefined) {
-      updates.naics_codes = Array.isArray(naicsCodes) ? naicsCodes : [];
+      // Only save numeric codes
+      const cleanCodes = Array.isArray(naicsCodes)
+        ? naicsCodes.filter((c: string) => /^\d+$/.test(c))
+        : [];
+      updates.naics_codes = cleanCodes;
+    }
+
+    if (keywords !== undefined) {
+      updates.keywords = Array.isArray(keywords) ? keywords : [];
     }
 
     if (businessType !== undefined) {

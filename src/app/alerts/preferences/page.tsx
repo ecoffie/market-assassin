@@ -48,6 +48,7 @@ const US_STATES = [
 interface AlertSettings {
   email: string;
   naicsCodes: string[] | null;
+  keywords: string[] | null;
   businessType: string | null;
   targetAgencies: string[];
   locationState: string | null;
@@ -72,10 +73,16 @@ function AlertPreferencesContent() {
 
   // Form state
   const [naicsInput, setNaicsInput] = useState('');
+  const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [locationState, setLocationState] = useState('');
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'paused'>('daily');
   const [briefingsEnabled, setBriefingsEnabled] = useState(true);
+
+  // Helper to filter NAICS codes (only numeric values)
+  const cleanNaicsCodes = (codes: string[]): string[] => {
+    return codes.filter(c => /^\d+$/.test(c.trim()));
+  };
 
   useEffect(() => {
     if (emailParam) {
@@ -94,7 +101,10 @@ function AlertPreferencesContent() {
 
       if (data.success && data.data) {
         setSettings(data.data);
-        setNaicsInput(data.data.naicsCodes?.join(', ') || '');
+        // Clean NAICS codes - filter out non-numeric values
+        const cleanedNaics = cleanNaicsCodes(data.data.naicsCodes || []);
+        setNaicsInput(cleanedNaics.join(', '));
+        setKeywordsInput(data.data.keywords?.join(', ') || '');
         setBusinessType(data.data.businessType || '');
         setLocationState(data.data.locationState || '');
         // Map isActive + frequency to our new frequency state
@@ -129,10 +139,17 @@ function AlertPreferencesContent() {
     setSuccess('');
 
     try {
+      // Parse and clean NAICS codes (only numeric)
       const naicsCodes = naicsInput
         .split(/[,\s]+/)
         .map(c => c.trim())
-        .filter(c => c.length > 0);
+        .filter(c => /^\d+$/.test(c));
+
+      // Parse keywords
+      const keywords = keywordsInput
+        .split(/[,]+/)
+        .map(k => k.trim())
+        .filter(k => k.length > 0);
 
       const res = await fetch('/api/alerts/preferences', {
         method: 'POST',
@@ -140,6 +157,7 @@ function AlertPreferencesContent() {
         body: JSON.stringify({
           email: settings?.email || email,
           naicsCodes,
+          keywords,
           businessType: businessType || null,
           locationState: locationState || null,
           frequency: frequency,
@@ -416,6 +434,24 @@ function AlertPreferencesContent() {
                     rows={2}
                     placeholder="541511, 541512, 236220"
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono text-sm"
+                  />
+                </div>
+
+                {/* Keywords */}
+                <div className="mb-5">
+                  <label htmlFor="keywords" className="block text-sm font-medium text-slate-300 mb-1">
+                    Keywords <span className="text-slate-500 font-normal">(optional)</span>
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Catch mislabeled opportunities. We&apos;ll search titles and descriptions for these terms.
+                  </p>
+                  <textarea
+                    id="keywords"
+                    value={keywordsInput}
+                    onChange={(e) => setKeywordsInput(e.target.value)}
+                    rows={2}
+                    placeholder="construction, remediation, IT services, software development"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
                   />
                 </div>
 

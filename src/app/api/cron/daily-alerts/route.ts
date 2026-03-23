@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
+import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import nodemailer from 'nodemailer';
 
 // Lazy initialization to avoid build-time errors
@@ -51,6 +52,7 @@ const TIMEZONE_OFFSETS: Record<string, number> = {
 interface AlertUser {
   user_email: string;
   naics_codes: string[];
+  keywords: string[] | null;
   business_type: string | null;
   target_agencies: string[];
   location_state: string | null;
@@ -316,7 +318,19 @@ async function runDailyAlertJob(options?: {
 
         // EXPAND NAICS codes to include related codes (e.g., 541 → all 541xxx)
         const expandedNaics = expandNAICSCodes(userNaics);
-        console.log(`[Daily Alerts] ${user.user_email}: Original ${userNaics.length} codes → Expanded ${expandedNaics.length} codes`);
+
+        // Get related PSC codes for broader search
+        const relatedPSCs: string[] = [];
+        for (const naics of userNaics.slice(0, 3)) { // Top 3 NAICS
+          const pscMatches = getPSCsForNAICS(naics, 3); // Top 3 PSCs per NAICS
+          relatedPSCs.push(...pscMatches.map(p => p.pscCode));
+        }
+        const uniquePSCs = [...new Set(relatedPSCs)];
+
+        // Get user keywords
+        const userKeywords = user.keywords || [];
+
+        console.log(`[Daily Alerts] ${user.user_email}: ${userNaics.length} NAICS → ${expandedNaics.length} expanded, ${uniquePSCs.length} PSCs, ${userKeywords.length} keywords`);
 
         // Get recently sent opportunity IDs for deduplication
         const recentlySentIds = await getRecentlySentOpportunityIds(user.user_email);
@@ -326,9 +340,10 @@ async function runDailyAlertJob(options?: {
           ? [businessTypeToSetAside[user.business_type] || user.business_type]
           : [];
 
-        // Fetch opportunities from last 24 hours with EXPANDED NAICS
+        // Fetch opportunities using NAICS + keywords (primary search)
         const searchResult = await fetchSamOpportunities({
           naicsCodes: expandedNaics,
+          keywords: userKeywords.length > 0 ? userKeywords : undefined,
           setAsides,
           noticeTypes: ['p', 'r', 'k', 'o'],
           postedFrom: getDateDaysAgo(1), // Last 24 hours
@@ -352,7 +367,7 @@ async function runDailyAlertJob(options?: {
           score: scoreOpportunity(opp, {
             naics_codes: userNaics, // Original codes, not expanded
             agencies: user.target_agencies || [],
-            keywords: [],
+            keywords: userKeywords,
           }),
         })).sort((a, b) => b.score - a.score);
 
