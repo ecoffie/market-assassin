@@ -4,6 +4,57 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 31 (Mar 23, 2026)
+
+### JTED Conference Presentation - Final Polish
+
+Built and polished "State of the Union for Small Business" presentation for JTED Conference & MacDill AFB Industry Day (April 1, 2026).
+
+**Presentation File:** `presentations/JTED-2026-Slides.html` (53 slides)
+
+#### Screenshot Integration (Full-Size Hero Treatment)
+User feedback: "the images should be the size of the slide not the afterthought"
+
+Fixed all screenshot slides to use full-width centered images:
+- Slide 31: SAM.gov pie chart (showing SAM is just one slice of opportunities)
+- Slide 32: USASpending agency spend analysis dashboard
+- Slide 33: OpenClaw Discord daily briefing screenshot
+- Slide 35: LinkedIn analytics (110K impressions in 7 days)
+
+**Image styling:**
+```html
+<div style="display: flex; justify-content: center; align-items: center; flex: 1;">
+  <img src="images/X.png" style="max-width: 90%; max-height: 65vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
+</div>
+```
+
+#### A/E/C IDIQ Restructure
+Replaced generic IDIQ content with Southern US / A/E/C-focused opportunities using Recompete Tracker data:
+- **Slide 27 - Construction IDIQs:** NAVFAC Southeast $1.01B (expiring Sep 2026)
+- **Slide 28 - Engineering IDIQs:** DOE $55B ceiling, NAVFAC A/E vehicles
+- **Slide 29 - Heavy/Civil IDIQs:** USACE Jacksonville, Galveston, Huntsville
+- **Slide 30 - SAT Opportunities:** $350K threshold, 5-10 day decisions
+
+#### New Slides Added
+- Slide 3: "What You'll Walk Away With" (takeaways upfront)
+- Slide 33: CPARS & Past Performance with GSA graphic
+
+#### Images Created (`presentations/images/`)
+| File | Source | Purpose |
+|------|--------|---------|
+| `sam-gov-search.png` | Encore Funding `myth-samgov.png` | SAM is just one slice |
+| `usaspending-dashboard.png` | market-assassin `agency spend analysis.png` | Agency dashboard |
+| `openclaw-discord.png` | presentations `discord.png` | Daily briefing |
+| `linkedin-analytics.png` | presentations `linkedin.png` | 110K impressions |
+| `cpars-past-performance.png` | Encore Funding `myth-experience.png` | GSA PP requirements |
+
+### Key Takeaways
+- A/E/C contractors want specific, actionable intel (contract numbers, values, dates)
+- Screenshots should be hero elements, not sidebar afterthoughts
+- Real Recompete Tracker data adds credibility vs generic talking points
+
+---
+
 ## Session 30 (Mar 20, 2026)
 
 ### Win Probability Scoring for Daily Briefings
@@ -428,4 +479,4 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 
 ---
 
-*Last Updated: March 20, 2026*
+*Last Updated: March 23, 2026*

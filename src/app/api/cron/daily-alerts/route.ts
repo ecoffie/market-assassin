@@ -3,8 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import nodemailer from 'nodemailer';
-import Stripe from 'stripe';
-import { kv } from '@vercel/kv';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -12,10 +10,6 @@ function getSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
-}
-
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY!);
 }
 
 function getTransporter() {
@@ -43,111 +37,16 @@ const businessTypeToSetAside: Record<string, string> = {
   'Small Business': 'SBP',
 };
 
-// Alert Pro subscription product ID
-const ALERT_PRO_PRODUCT_ID = 'prod_U9rOClXY6MFcRu';
-
-// FHC membership product IDs (FHC members get Alert Pro as a premium benefit)
-const FHC_PRODUCT_IDS = ['prod_TaiXlKb350EIQs', 'prod_TMUmxKTtooTx6C'];
-
-// Cache for active subscriptions
-let activeSubscriptionsCache: Set<string> | null = null;
-
-/**
- * Check if user has daily alert access via:
- * 1. KV store alertpro:{email} key (fastest check)
- * 2. Active Alert Pro subscription
- * 3. Active FHC membership (includes Alert Pro as benefit)
- */
-async function hasActiveSubscription(email: string): Promise<boolean> {
-  const lowerEmail = email.toLowerCase();
-
-  // Check cache first
-  if (activeSubscriptionsCache?.has(lowerEmail)) {
-    return true;
-  }
-
-  // Check KV store first (fastest, and authoritative for FHC members)
-  try {
-    const kvAccess = await kv.get(`alertpro:${lowerEmail}`);
-    if (kvAccess === 'true') {
-      console.log(`[Daily Alerts] ${email} has KV alertpro access`);
-      return true;
-    }
-  } catch (kvErr) {
-    console.error('[Daily Alerts] KV check error (non-fatal):', kvErr);
-  }
-
-  try {
-    // Search for customer by email
-    const customers = await getStripe().customers.list({ email: lowerEmail, limit: 1 });
-    if (customers.data.length === 0) return false;
-
-    const customer = customers.data[0];
-
-    // Check for active subscription to Alert Pro OR FHC
-    const subscriptions = await getStripe().subscriptions.list({
-      customer: customer.id,
-      status: 'active',
-      limit: 10,
-    });
-
-    for (const sub of subscriptions.data) {
-      for (const item of sub.items.data) {
-        const productId = item.price.product as string;
-        // Check Alert Pro product
-        if (productId === ALERT_PRO_PRODUCT_ID) {
-          return true;
-        }
-        // Check FHC membership (FHC includes Alert Pro as benefit)
-        if (FHC_PRODUCT_IDS.includes(productId)) {
-          console.log(`[Daily Alerts] ${email} has FHC membership, granting daily alerts`);
-          return true;
-        }
-      }
-    }
-
-    return false;
-  } catch (err) {
-    console.error('[Daily Alerts] Error checking subscription:', err);
-    return false;
-  }
-}
-
-/**
- * Load all active Alert Pro + FHC subscribers (for caching)
- */
-async function loadActiveSubscribers(): Promise<Set<string>> {
-  const subscribers = new Set<string>();
-
-  try {
-    // Get all active subscriptions (will check for Alert Pro and FHC products)
-    const subscriptions = await getStripe().subscriptions.list({
-      status: 'active',
-      limit: 100,
-      expand: ['data.customer'],
-    });
-
-    for (const sub of subscriptions.data) {
-      // Check if subscription includes Alert Pro OR FHC membership
-      const hasAlertAccess = sub.items.data.some(
-        item => {
-          const productId = item.price.product as string;
-          return productId === ALERT_PRO_PRODUCT_ID || FHC_PRODUCT_IDS.includes(productId);
-        }
-      );
-      if (hasAlertAccess && sub.customer && typeof sub.customer !== 'string' && !('deleted' in sub.customer)) {
-        const email = (sub.customer as Stripe.Customer).email?.toLowerCase();
-        if (email) subscribers.add(email);
-      }
-    }
-
-    console.log(`[Daily Alerts] Loaded ${subscribers.size} active Alert Pro + FHC subscribers`);
-    return subscribers;
-  } catch (err) {
-    console.error('[Daily Alerts] Error loading subscribers:', err);
-    return subscribers;
-  }
-}
+// Timezone hour offsets (UTC offset for delivery at ~6 AM local)
+const TIMEZONE_OFFSETS: Record<string, number> = {
+  'America/New_York': -5,      // 11 UTC = 6 AM ET
+  'America/Chicago': -6,       // 12 UTC = 6 AM CT
+  'America/Denver': -7,        // 13 UTC = 6 AM MT
+  'America/Los_Angeles': -8,   // 14 UTC = 6 AM PT
+  'America/Phoenix': -7,       // No DST
+  'Pacific/Honolulu': -10,     // 16 UTC = 6 AM HT
+  'America/Anchorage': -9,     // 15 UTC = 6 AM AK
+};
 
 interface AlertUser {
   user_email: string;
@@ -157,24 +56,197 @@ interface AlertUser {
   location_state: string | null;
   alert_frequency: string;
   is_active: boolean;
+  timezone?: string;
+  last_alert_sent?: string;
+}
+
+interface SentOpportunity {
+  noticeId: string;
+  title: string;
 }
 
 /**
- * Core job logic - extracted so GET and POST can both use it
+ * Get opportunities already sent to user in the last 7 days (for deduplication)
  */
-async function runDailyAlertJob(): Promise<NextResponse> {
+async function getRecentlySentOpportunityIds(email: string): Promise<Set<string>> {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const { data } = await getSupabase()
+    .from('alert_log')
+    .select('opportunities_data')
+    .eq('user_email', email)
+    .gte('alert_date', sevenDaysAgo.toISOString().split('T')[0]);
+
+  const sentIds = new Set<string>();
+  if (data) {
+    for (const log of data) {
+      if (log.opportunities_data && Array.isArray(log.opportunities_data)) {
+        for (const opp of log.opportunities_data) {
+          if (opp.noticeId) sentIds.add(opp.noticeId);
+        }
+      }
+    }
+  }
+
+  return sentIds;
+}
+
+/**
+ * Check if it's the right time to send to this user based on their timezone
+ * We want to deliver around 6 AM local time
+ */
+function isDeliveryTimeForTimezone(timezone: string | undefined): boolean {
+  const currentHourUTC = new Date().getUTCHours();
+
+  // Default to Eastern Time
+  const tz = timezone || 'America/New_York';
+  const offset = TIMEZONE_OFFSETS[tz] || -5;
+
+  // We run at 11 UTC. Calculate what hour that is in user's timezone
+  // For ET (offset -5): 11 + (-5) = 6 AM ✓
+  // For PT (offset -8): 11 + (-8) = 3 AM (too early, skip)
+  // For CT (offset -6): 11 + (-6) = 5 AM (close enough)
+
+  const localHour = (currentHourUTC + offset + 24) % 24;
+
+  // Allow delivery if local time is between 5 AM and 8 AM
+  return localHour >= 5 && localHour <= 8;
+}
+
+/**
+ * Save failed email for retry
+ */
+async function saveFailedAlert(
+  email: string,
+  opportunities: (SAMOpportunity & { score: number })[],
+  error: string
+) {
+  await getSupabase()
+    .from('alert_log')
+    .upsert({
+      user_email: email,
+      alert_date: new Date().toISOString().split('T')[0],
+      opportunities_count: opportunities.length,
+      opportunities_data: opportunities.slice(0, 20).map(o => ({
+        noticeId: o.noticeId,
+        title: o.title,
+        agency: o.department,
+        naics: o.naicsCode,
+        deadline: o.responseDeadline,
+      })),
+      delivery_status: 'failed',
+      error_message: error,
+      retry_count: 0,
+    }, {
+      onConflict: 'user_email,alert_date',
+    });
+}
+
+/**
+ * Retry failed alerts from previous runs
+ */
+async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number }> {
+  const results = { retried: 0, succeeded: 0 };
+
+  // Get failed alerts from last 3 days with retry_count < 3
+  const threeDaysAgo = new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+  const { data: failedAlerts } = await getSupabase()
+    .from('alert_log')
+    .select('*')
+    .eq('delivery_status', 'failed')
+    .lt('retry_count', 3)
+    .gte('alert_date', threeDaysAgo.toISOString().split('T')[0]);
+
+  if (!failedAlerts || failedAlerts.length === 0) return results;
+
+  console.log(`[Daily Alerts] Retrying ${failedAlerts.length} failed alerts...`);
+
+  for (const alert of failedAlerts) {
+    results.retried++;
+
+    try {
+      // Get user settings
+      const { data: user } = await getSupabase()
+        .from('user_alert_settings')
+        .select('*')
+        .eq('user_email', alert.user_email)
+        .single();
+
+      if (!user || !alert.opportunities_data) continue;
+
+      // Resend email
+      await sendDailyAlertEmail(
+        alert.user_email,
+        alert.opportunities_data.map((o: any) => ({
+          ...o,
+          score: 50, // Default score for retry
+          uiLink: `https://sam.gov/opp/${o.noticeId}/view`,
+        })),
+        user as AlertUser
+      );
+
+      // Mark as sent
+      await getSupabase()
+        .from('alert_log')
+        .update({
+          delivery_status: 'sent',
+          sent_at: new Date().toISOString(),
+          error_message: null,
+        })
+        .eq('id', alert.id);
+
+      results.succeeded++;
+      console.log(`[Daily Alerts] Retry succeeded for ${alert.user_email}`);
+
+    } catch (err: any) {
+      // Increment retry count
+      await getSupabase()
+        .from('alert_log')
+        .update({
+          retry_count: (alert.retry_count || 0) + 1,
+          error_message: err.message,
+        })
+        .eq('id', alert.id);
+
+      console.error(`[Daily Alerts] Retry failed for ${alert.user_email}:`, err.message);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Core job logic - FREE FOR EVERYONE (no subscription check)
+ */
+async function runDailyAlertJob(options?: {
+  skipTimezoneCheck?: boolean;
+  testEmail?: string;
+}): Promise<NextResponse> {
   try {
-    console.log('[Daily Alerts] Starting daily alert job...');
+    console.log('[Daily Alerts] Starting daily alert job (FREE FOR ALL)...');
 
-    // Load active subscribers cache
-    activeSubscriptionsCache = await loadActiveSubscribers();
+    // First, retry any failed alerts from previous runs
+    const retryResults = await retryFailedAlerts();
+    if (retryResults.retried > 0) {
+      console.log(`[Daily Alerts] Retried ${retryResults.retried} failed alerts, ${retryResults.succeeded} succeeded`);
+    }
 
-    // Get all active daily alert users
-    const { data: users, error: usersError } = await getSupabase()
+    // Build query for daily alert users
+    let query = getSupabase()
       .from('user_alert_settings')
       .select('*')
       .eq('is_active', true)
       .eq('alert_frequency', 'daily');
+
+    // If test email specified, only process that user
+    if (options?.testEmail) {
+      query = query.eq('user_email', options.testEmail);
+    }
+
+    const { data: users, error: usersError } = await query;
 
     if (usersError) {
       console.error('[Daily Alerts] Error fetching users:', usersError);
@@ -183,7 +255,12 @@ async function runDailyAlertJob(): Promise<NextResponse> {
 
     if (!users || users.length === 0) {
       console.log('[Daily Alerts] No daily alert users found');
-      return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
+      return NextResponse.json({
+        success: true,
+        message: 'No users to process',
+        sent: 0,
+        retryResults
+      });
     }
 
     console.log(`[Daily Alerts] Processing ${users.length} daily users...`);
@@ -197,18 +274,19 @@ async function runDailyAlertJob(): Promise<NextResponse> {
       sent: 0,
       skipped: 0,
       failed: 0,
-      notSubscribed: 0,
+      noNaics: 0,
+      noOpps: 0,
+      wrongTimezone: 0,
+      deduplicated: 0,
       errors: [] as string[],
     };
 
     for (const user of users as AlertUser[]) {
       try {
-        // Check if user has active Alert Pro subscription
-        const isSubscribed = await hasActiveSubscription(user.user_email);
-
-        if (!isSubscribed) {
-          console.log(`[Daily Alerts] ${user.user_email} not subscribed, skipping`);
-          results.notSubscribed++;
+        // Check timezone (skip if not delivery time for this user)
+        if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
+          console.log(`[Daily Alerts] ${user.user_email} timezone ${user.timezone || 'ET'} - not delivery time, skipping`);
+          results.wrongTimezone++;
           continue;
         }
 
@@ -232,13 +310,16 @@ async function runDailyAlertJob(): Promise<NextResponse> {
         // Skip if still no NAICS codes
         if (userNaics.length === 0) {
           console.log(`[Daily Alerts] ${user.user_email} has no NAICS codes, skipping`);
-          results.skipped++;
+          results.noNaics++;
           continue;
         }
 
         // EXPAND NAICS codes to include related codes (e.g., 541 → all 541xxx)
         const expandedNaics = expandNAICSCodes(userNaics);
         console.log(`[Daily Alerts] ${user.user_email}: Original ${userNaics.length} codes → Expanded ${expandedNaics.length} codes`);
+
+        // Get recently sent opportunity IDs for deduplication
+        const recentlySentIds = await getRecentlySentOpportunityIds(user.user_email);
 
         // Build search params
         const setAsides = user.business_type
@@ -251,10 +332,19 @@ async function runDailyAlertJob(): Promise<NextResponse> {
           setAsides,
           noticeTypes: ['p', 'r', 'k', 'o'],
           postedFrom: getDateDaysAgo(1), // Last 24 hours
-          limit: 100, // Unlimited for Pro
+          limit: 100,
         }, samApiKey);
 
-        const opportunities = searchResult.opportunities;
+        let opportunities = searchResult.opportunities;
+
+        // DEDUPLICATE: Filter out opportunities already sent in last 7 days
+        const beforeDedup = opportunities.length;
+        opportunities = opportunities.filter(opp => !recentlySentIds.has(opp.noticeId));
+        const dedupCount = beforeDedup - opportunities.length;
+        if (dedupCount > 0) {
+          console.log(`[Daily Alerts] ${user.user_email}: Deduplicated ${dedupCount} already-sent opportunities`);
+          results.deduplicated += dedupCount;
+        }
 
         // Score and rank - use ORIGINAL codes for scoring (exact matches rank higher)
         const scoredOpps = opportunities.map(opp => ({
@@ -268,43 +358,57 @@ async function runDailyAlertJob(): Promise<NextResponse> {
 
         if (scoredOpps.length === 0) {
           console.log(`[Daily Alerts] No new opportunities for ${user.user_email}`);
-          results.skipped++;
+          results.noOpps++;
           continue;
         }
 
-        // Send email (unlimited for Pro)
-        await sendDailyAlertEmail(user.user_email, scoredOpps, user);
+        // Send email
+        try {
+          await sendDailyAlertEmail(user.user_email, scoredOpps, user);
 
-        // Log the alert
-        await getSupabase().from('alert_log').upsert({
-          user_email: user.user_email,
-          alert_date: new Date().toISOString().split('T')[0],
-          opportunities_count: scoredOpps.length,
-          opportunities_data: scoredOpps.slice(0, 10).map(o => ({
-            title: o.title,
-            agency: o.department,
-            naics: o.naicsCode,
-            deadline: o.responseDeadline,
-          })),
-          sent_at: new Date().toISOString(),
-          delivery_status: 'sent',
-          alert_type: 'daily',
-        }, {
-          onConflict: 'user_email,alert_date',
-        });
+          // Log the alert with opportunity IDs for deduplication
+          await getSupabase().from('alert_log').upsert({
+            user_email: user.user_email,
+            alert_date: new Date().toISOString().split('T')[0],
+            opportunities_count: scoredOpps.length,
+            opportunities_data: scoredOpps.slice(0, 20).map(o => ({
+              noticeId: o.noticeId,
+              title: o.title,
+              agency: o.department,
+              naics: o.naicsCode,
+              deadline: o.responseDeadline,
+              score: o.score,
+            })),
+            sent_at: new Date().toISOString(),
+            delivery_status: 'sent',
+            alert_type: 'daily',
+            retry_count: 0,
+          }, {
+            onConflict: 'user_email,alert_date',
+          });
 
-        // Update user stats
-        await getSupabase()
-          .from('user_alert_settings')
-          .update({
-            last_alert_sent: new Date().toISOString(),
-            last_alert_count: scoredOpps.length,
-            total_alerts_sent: (user as any).total_alerts_sent + 1 || 1,
-          })
-          .eq('user_email', user.user_email);
+          // Update user stats
+          await getSupabase()
+            .from('user_alert_settings')
+            .update({
+              last_alert_sent: new Date().toISOString(),
+              last_alert_count: scoredOpps.length,
+              total_alerts_sent: (user as any).total_alerts_sent + 1 || 1,
+            })
+            .eq('user_email', user.user_email);
 
-        console.log(`[Daily Alerts] Sent ${scoredOpps.length} opps to ${user.user_email}`);
-        results.sent++;
+          console.log(`[Daily Alerts] ✅ Sent ${scoredOpps.length} opps to ${user.user_email}`);
+          results.sent++;
+
+        } catch (emailError: any) {
+          console.error(`[Daily Alerts] Email send failed for ${user.user_email}:`, emailError.message);
+
+          // Save for retry
+          await saveFailedAlert(user.user_email, scoredOpps, emailError.message);
+
+          results.failed++;
+          results.errors.push(`${user.user_email}: ${emailError.message}`);
+        }
 
       } catch (userError: any) {
         console.error(`[Daily Alerts] Error processing ${user.user_email}:`, userError);
@@ -313,9 +417,9 @@ async function runDailyAlertJob(): Promise<NextResponse> {
       }
     }
 
-    console.log(`[Daily Alerts] Complete. Sent: ${results.sent}, Skipped: ${results.skipped}, Not Subscribed: ${results.notSubscribed}, Failed: ${results.failed}`);
+    console.log(`[Daily Alerts] Complete. Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Wrong TZ: ${results.wrongTimezone}, Failed: ${results.failed}, Deduplicated: ${results.deduplicated}`);
 
-    return NextResponse.json({ success: true, results });
+    return NextResponse.json({ success: true, results, retryResults });
   } catch (error: any) {
     console.error('[Daily Alerts] Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -324,7 +428,7 @@ async function runDailyAlertJob(): Promise<NextResponse> {
 
 /**
  * POST /api/cron/daily-alerts
- * Legacy endpoint - still works for manual triggers with CRON_SECRET
+ * Manual trigger with CRON_SECRET
  */
 export async function POST(request: NextRequest) {
   // Verify cron secret
@@ -335,25 +439,23 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return runDailyAlertJob();
+  const body = await request.json().catch(() => ({}));
+  return runDailyAlertJob({
+    skipTimezoneCheck: body.skipTimezoneCheck,
+    testEmail: body.testEmail,
+  });
 }
 
 /**
  * GET endpoint - runs the cron job when called by Vercel cron
- * Vercel crons use GET requests, so we run the job here
  */
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
+  const test = request.nextUrl.searchParams.get('test') === 'true';
 
-  // If checking subscription status for a specific email
-  if (email) {
-    const isSubscribed = await hasActiveSubscription(email);
-    return NextResponse.json({
-      email,
-      hasAlertProSubscription: isSubscribed,
-      frequency: isSubscribed ? 'daily' : 'weekly',
-      limit: isSubscribed ? 'unlimited' : 5,
-    });
+  // If checking/testing for a specific email
+  if (email && test) {
+    return runDailyAlertJob({ testEmail: email, skipTimezoneCheck: true });
   }
 
   // Check if this is a Vercel cron request
@@ -368,13 +470,19 @@ export async function GET(request: NextRequest) {
 
   // Otherwise return documentation
   return NextResponse.json({
-    message: 'Daily Alerts Cron Job',
-    usage: 'GET ?email=xxx to check subscription status',
-    schedule: 'Every day at 6 AM ET (11:00 UTC)',
-    tiers: {
-      free: { frequency: 'weekly', limit: 5, price: '$0' },
-      alertPro: { frequency: 'daily', limit: 'unlimited', price: '$19/mo' },
+    message: 'Daily Alerts Cron Job (FREE FOR EVERYONE)',
+    usage: {
+      test: 'GET ?email=xxx&test=true to send test alert',
+      manual: 'POST with Authorization: Bearer {CRON_SECRET}',
     },
+    schedule: 'Every day at 6 AM local time (based on user timezone)',
+    features: [
+      'FREE for all users (no paywall)',
+      'Respects alert_frequency column (daily users only)',
+      'Deduplication (won\'t send same opp twice in 7 days)',
+      'Retry failed emails (up to 3 attempts)',
+      'Timezone-aware delivery (~6 AM local)',
+    ],
   });
 }
 
@@ -405,13 +513,13 @@ function getDaysUntil(dateString: string): number {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-// Send daily alert email with MA upsell
+// Send daily alert email
 async function sendDailyAlertEmail(
   email: string,
   opportunities: (SAMOpportunity & { score: number })[],
   user: AlertUser
 ) {
-  const unsubscribeUrl = `https://tools.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = `https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
   const maUrl = 'https://tools.govcongiants.org/market-assassin';
 
@@ -419,6 +527,10 @@ async function sendDailyAlertEmail(
     const daysUntil = getDaysUntil(opp.responseDeadline);
     const urgencyColor = daysUntil <= 7 ? '#dc2626' : daysUntil <= 14 ? '#d97706' : '#16a34a';
     const urgencyText = daysUntil <= 7 ? '⚡ Due Soon' : daysUntil <= 14 ? '📅 2 weeks' : '';
+
+    // Score badge
+    const scoreColor = opp.score >= 75 ? '#16a34a' : opp.score >= 50 ? '#84cc16' : opp.score >= 30 ? '#eab308' : '#f97316';
+    const scoreBadge = `<span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${opp.score}%</span>`;
 
     return `
       <tr>
@@ -429,6 +541,7 @@ async function sendDailyAlertEmail(
             </span>
             ${opp.setAside ? `<span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${opp.setAside}</span>` : ''}
             ${urgencyText ? `<span style="background: ${urgencyColor}15; color: ${urgencyColor}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${urgencyText}</span>` : ''}
+            ${scoreBadge}
           </div>
           <a href="${opp.uiLink}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
             ${i + 1}. ${opp.title.slice(0, 90)}${opp.title.length > 90 ? '...' : ''}
@@ -480,7 +593,7 @@ async function sendDailyAlertEmail(
     </table>
     ${moreCount > 0 ? `
     <div style="padding: 14px 16px; background: #f8fafc; text-align: center; border-top: 1px solid #e5e7eb;">
-      <span style="color: #64748b; font-size: 13px;">+ ${moreCount} more opportunities in your dashboard</span>
+      <span style="color: #64748b; font-size: 13px;">+ ${moreCount} more opportunities matching your profile</span>
     </div>
     ` : ''}
   </div>
@@ -491,7 +604,7 @@ async function sendDailyAlertEmail(
       🎯 Ready to Win These Contracts?
     </h3>
     <p style="color: #fecaca; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
-      Finding opportunities is just step one. <strong>Market Assassin</strong> shows you agency pain points, competitor intel, and exactly how to position your proposal.
+      Finding opportunities is step one. <strong>Market Assassin</strong> shows you agency pain points, competitor intel, and exactly how to position your proposal.
     </p>
     <a href="${maUrl}" style="background: white; color: #991b1b; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
       Get Market Assassin →

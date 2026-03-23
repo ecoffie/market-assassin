@@ -6,6 +6,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Valid timezones for delivery
+const VALID_TIMEZONES = [
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Phoenix',
+  'Pacific/Honolulu',
+  'America/Anchorage',
+];
+
 /**
  * GET /api/alerts/preferences?email=xxx
  * Get alert preferences for a user
@@ -44,10 +55,20 @@ export async function GET(request: NextRequest) {
         targetAgencies: data.target_agencies,
         locationState: data.location_state,
         frequency: data.alert_frequency,
+        timezone: data.timezone || 'America/New_York',
         isActive: data.is_active,
         lastAlertSent: data.last_alert_sent,
         totalAlertsSent: data.total_alerts_sent,
       },
+      availableTimezones: [
+        { value: 'America/New_York', label: 'Eastern Time (ET)' },
+        { value: 'America/Chicago', label: 'Central Time (CT)' },
+        { value: 'America/Denver', label: 'Mountain Time (MT)' },
+        { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+        { value: 'America/Phoenix', label: 'Arizona (no DST)' },
+        { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
+        { value: 'America/Anchorage', label: 'Alaska Time (AK)' },
+      ],
     });
   } catch (error) {
     console.error('[Alert Preferences] Error:', error);
@@ -65,7 +86,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, frequency, isActive, naicsCodes, businessType, targetAgencies, locationState } = body;
+    const {
+      email,
+      frequency,
+      timezone,
+      isActive,
+      naicsCodes,
+      businessType,
+      targetAgencies,
+      locationState,
+    } = body;
 
     if (!email) {
       return NextResponse.json(
@@ -94,13 +124,24 @@ export async function POST(request: NextRequest) {
     };
 
     if (frequency !== undefined) {
-      if (!['weekly', 'paused'].includes(frequency)) {
+      // Now accepts 'daily', 'weekly', or 'paused'
+      if (!['daily', 'weekly', 'paused'].includes(frequency)) {
         return NextResponse.json(
-          { success: false, error: 'Invalid frequency. Use "weekly" or "paused"' },
+          { success: false, error: 'Invalid frequency. Use "daily", "weekly", or "paused"' },
           { status: 400 }
         );
       }
       updates.alert_frequency = frequency;
+    }
+
+    if (timezone !== undefined) {
+      if (!VALID_TIMEZONES.includes(timezone)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid timezone. Valid options: ${VALID_TIMEZONES.join(', ')}` },
+          { status: 400 }
+        );
+      }
+      updates.timezone = timezone;
     }
 
     if (isActive !== undefined) {
@@ -144,6 +185,7 @@ export async function POST(request: NextRequest) {
       data: {
         email: data.user_email,
         frequency: data.alert_frequency,
+        timezone: data.timezone,
         isActive: data.is_active,
       },
     });

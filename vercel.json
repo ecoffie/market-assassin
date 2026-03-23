@@ -42,8 +42,20 @@
       "schedule": "0 11 * * *"
     },
     {
-      "path": "/api/cron/health-check?email=true",
+      "path": "/api/cron/daily-alerts",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron/health-check?email=true",
+      "schedule": "0 13 * * *"
     }
   ]
 }
