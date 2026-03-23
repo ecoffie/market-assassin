@@ -15,35 +15,6 @@ const BUSINESS_TYPES = [
   { value: 'HUBZone', label: 'HUBZone' },
 ];
 
-const US_STATES = [
-  { value: '', label: 'Nationwide (All States)' },
-  { value: 'AL', label: 'Alabama' }, { value: 'AK', label: 'Alaska' },
-  { value: 'AZ', label: 'Arizona' }, { value: 'AR', label: 'Arkansas' },
-  { value: 'CA', label: 'California' }, { value: 'CO', label: 'Colorado' },
-  { value: 'CT', label: 'Connecticut' }, { value: 'DE', label: 'Delaware' },
-  { value: 'DC', label: 'District of Columbia' }, { value: 'FL', label: 'Florida' },
-  { value: 'GA', label: 'Georgia' }, { value: 'HI', label: 'Hawaii' },
-  { value: 'ID', label: 'Idaho' }, { value: 'IL', label: 'Illinois' },
-  { value: 'IN', label: 'Indiana' }, { value: 'IA', label: 'Iowa' },
-  { value: 'KS', label: 'Kansas' }, { value: 'KY', label: 'Kentucky' },
-  { value: 'LA', label: 'Louisiana' }, { value: 'ME', label: 'Maine' },
-  { value: 'MD', label: 'Maryland' }, { value: 'MA', label: 'Massachusetts' },
-  { value: 'MI', label: 'Michigan' }, { value: 'MN', label: 'Minnesota' },
-  { value: 'MS', label: 'Mississippi' }, { value: 'MO', label: 'Missouri' },
-  { value: 'MT', label: 'Montana' }, { value: 'NE', label: 'Nebraska' },
-  { value: 'NV', label: 'Nevada' }, { value: 'NH', label: 'New Hampshire' },
-  { value: 'NJ', label: 'New Jersey' }, { value: 'NM', label: 'New Mexico' },
-  { value: 'NY', label: 'New York' }, { value: 'NC', label: 'North Carolina' },
-  { value: 'ND', label: 'North Dakota' }, { value: 'OH', label: 'Ohio' },
-  { value: 'OK', label: 'Oklahoma' }, { value: 'OR', label: 'Oregon' },
-  { value: 'PA', label: 'Pennsylvania' }, { value: 'RI', label: 'Rhode Island' },
-  { value: 'SC', label: 'South Carolina' }, { value: 'SD', label: 'South Dakota' },
-  { value: 'TN', label: 'Tennessee' }, { value: 'TX', label: 'Texas' },
-  { value: 'UT', label: 'Utah' }, { value: 'VT', label: 'Vermont' },
-  { value: 'VA', label: 'Virginia' }, { value: 'WA', label: 'Washington' },
-  { value: 'WV', label: 'West Virginia' }, { value: 'WI', label: 'Wisconsin' },
-  { value: 'WY', label: 'Wyoming' },
-];
 
 interface AlertSettings {
   email: string;
@@ -75,7 +46,6 @@ function AlertPreferencesContent() {
   const [naicsInput, setNaicsInput] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
-  const [locationState, setLocationState] = useState('');
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'paused'>('daily');
   const [briefingsEnabled, setBriefingsEnabled] = useState(true);
 
@@ -106,7 +76,6 @@ function AlertPreferencesContent() {
         setNaicsInput(cleanedNaics.join(', '));
         setKeywordsInput(data.data.keywords?.join(', ') || '');
         setBusinessType(data.data.businessType || '');
-        setLocationState(data.data.locationState || '');
         // Map isActive + frequency to our new frequency state
         if (!data.data.isActive) {
           setFrequency('paused');
@@ -159,7 +128,6 @@ function AlertPreferencesContent() {
           naicsCodes,
           keywords,
           businessType: businessType || null,
-          locationState: locationState || null,
           frequency: frequency,
           isActive: frequency !== 'paused',
         }),
@@ -474,24 +442,6 @@ function AlertPreferencesContent() {
                   </select>
                 </div>
 
-                {/* Location */}
-                <div>
-                  <label htmlFor="state" className="block text-sm font-medium text-slate-300 mb-1">
-                    Location
-                  </label>
-                  <select
-                    id="state"
-                    value={locationState}
-                    onChange={(e) => setLocationState(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                  >
-                    {US_STATES.map((state) => (
-                      <option key={state.value} value={state.value}>
-                        {state.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
               {/* Save button */}
