@@ -120,6 +120,13 @@ function generateHtmlBody(briefing: GeneratedBriefing): string {
 </head>
 <body>
   <div class="container">
+    <!-- FREE PREVIEW Banner -->
+    <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center;">
+      <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
+        🎁 FREE PREVIEW • You're testing our daily briefings — no charge during beta!
+      </p>
+    </div>
+
     <!-- Header -->
     <div class="header">
       <h1>🎯 Daily GovCon Briefing</h1>
@@ -234,6 +241,9 @@ function generateTextBody(briefing: GeneratedBriefing): string {
   const topItems = briefing.topItems[0]?.items || [];
 
   let text = `
+🎁 FREE PREVIEW - You're testing our daily briefings — no charge during beta!
+========================================
+
 DAILY GOVCON BRIEFING
 ${formatDate(briefing.briefingDate)}
 ========================================

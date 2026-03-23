@@ -567,8 +567,15 @@ async function sendDailyAlertEmail(
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 620px; margin: 0 auto; padding: 20px; background: #f8fafc;">
 
+  <!-- FREE PREVIEW Banner -->
+  <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+    <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
+      🎁 FREE PREVIEW • You're testing our daily alerts — no charge during beta!
+    </p>
+  </div>
+
   <!-- Header -->
-  <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center; border-radius: 12px 12px 0 0;">
+  <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center;">
     <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">
       🎯 Your Daily Opportunities
     </h1>
