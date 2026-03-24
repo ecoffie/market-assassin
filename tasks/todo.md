@@ -2,34 +2,48 @@
 
 ## Session State (March 23, 2026)
 
-### Just Completed - JTED Conference Presentation ✅
+### Just Completed - Alerts & Briefings System Overhaul
 
-**Presentation:** State of the Union for Small Business
-**Event:** JTED Conference & MacDill AFB Industry Day
-**Date:** April 1, 2026 | Centro Asturiano de Tampa
-**File:** `presentations/JTED-2026-Slides.html` (53 slides)
+Made daily alerts and briefings FREE FOR EVERYONE during beta. Complete system improvements:
 
-#### Completed This Session:
-- [x] Added full-size screenshots (hero treatment, not afterthoughts)
-  - Slide 31: SAM.gov pie chart (SAM is just one slice)
-  - Slide 32: USASpending agency dashboard
-  - Slide 33: OpenClaw Discord daily briefing
-  - Slide 35: LinkedIn analytics (110K impressions)
-- [x] Created A/E/C-specific IDIQ slides using Recompete Tracker data
-  - Slide 27: Construction IDIQs (NAVFAC Southeast $1.01B, expiring Sep 2026)
-  - Slide 28: Engineering IDIQs (DOE $55B ceiling, NAVFAC A/E)
-  - Slide 29: Heavy/Civil IDIQs (USACE Jacksonville, Galveston, Huntsville)
-- [x] Added SAT Opportunities slide (Slide 30)
-- [x] Added CPARS & Past Performance slide (Slide 33) with GSA graphic
-- [x] Added "What You'll Walk Away With" slide (Slide 3) near beginning
-- [x] Restructured slides for Southern US / A/E/C focus
+#### Alerts System
+- [x] Removed paywall - all users get daily alerts free
+- [x] Added deduplication (won't resend same opp in 7 days)
+- [x] Added retry logic (3 attempts for failed emails)
+- [x] Added timezone-aware delivery (~6 AM local time)
+- [x] Added keywords search (catch mislabeled opportunities)
+- [x] Added PSC crosswalk (auto-generate related PSC codes from NAICS)
+- [x] Cleaned NAICS display (filter out non-numeric values)
+- [x] Removed state filter (always search nationwide)
+- [x] Added FREE PREVIEW banners to emails
 
-#### Screenshot Images (in `presentations/images/`):
-- `sam-gov-search.png` - Pie chart showing SAM is small slice
-- `usaspending-dashboard.png` - Agency spend analysis
-- `openclaw-discord.png` - Daily displacement intel
-- `linkedin-analytics.png` - 110K impressions dashboard
-- `cpars-past-performance.png` - GSA Past Performance Requirements
+#### Briefings System
+- [x] Made free for everyone (pulls from both user_briefing_profile AND user_alert_settings)
+- [x] Added deduplication (check briefing_log before sending)
+- [x] Added retry logic (3 attempts within 3 days)
+- [x] Added timezone-aware delivery (6-10 AM local time)
+- [x] Added FREE PREVIEW banner to emails
+
+#### Preferences Page Redesign
+- [x] New frequency radio buttons: Daily / Weekly / Paused
+- [x] New briefings section with opt-in checkbox
+- [x] New keywords field for catching mislabeled opps
+- [x] Clean NAICS codes (numeric only)
+- [x] Removed state filter (nationwide by default)
+- [x] FREE PREVIEW banners on both sections
+- [x] Clear unsubscribe option
+
+#### SQL Migrations Run
+- `alerts-schema-update.sql` - timezone, retry_count, alert_type columns
+- `briefings-schema-update.sql` - retry_count column
+- `keywords-schema-update.sql` - keywords column
+
+#### Cron Schedule (vercel.json)
+| Job | Schedule (UTC) | Description |
+|-----|----------------|-------------|
+| send-briefings | 9 AM | Daily briefings |
+| daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | Timezone coverage |
+| weekly-alerts | 11 PM Sunday | Weekly digest |
 
 ### Pending
 - [ ] Create JTED landing page with downloadable handout (`/jted`)
@@ -39,6 +53,12 @@
 ---
 
 ## Previous Session Work
+
+### Session 31 - Earlier (Mar 23, 2026)
+- JTED Conference Presentation - Final Polish
+- Full-size screenshots (hero treatment)
+- A/E/C IDIQ restructure with Recompete Tracker data
+- "What You'll Walk Away With" slide added
 
 ### Session 30 (Mar 20, 2026)
 - Win Probability Scoring for Daily Briefings (0-100%)
@@ -50,17 +70,19 @@
 - Daily Health Check System (12 tests, 100% pass rate)
 - Content Reaper Length Optimization
 
-### Session 28 (Mar 17, 2026)
-- Smart User Profile System (40+ fields)
-- Profile onboarding UI (`/profile/setup`)
-- Evaluation criteria documentation
-
 ---
 
 ## Health Check Access
 ```
 HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html
 JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
+```
+
+## Test URLs
+```
+Daily Alerts: https://tools.govcongiants.org/api/cron/daily-alerts?email=eric@govcongiants.com&test=true
+Briefings: https://tools.govcongiants.org/api/cron/send-briefings?email=eric@govcongiants.com&test=true
+Preferences: https://tools.govcongiants.org/alerts/preferences?email=eric@govcongiants.com
 ```
 
 ---

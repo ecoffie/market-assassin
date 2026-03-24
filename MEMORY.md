@@ -6,7 +6,62 @@ This file contains detailed session history for the Market Assassin project. For
 
 ## Session 31 (Mar 23, 2026)
 
-### JTED Conference Presentation - Final Polish
+### Alerts & Briefings System Overhaul (Later)
+
+Made daily alerts and briefings **FREE FOR EVERYONE** during beta. Complete system improvements:
+
+#### Daily Alerts (`/api/cron/daily-alerts`)
+- **Removed paywall** — All users get daily alerts free (removed Stripe/KV subscription checks)
+- **Deduplication** — Won't resend same opportunity within 7 days (tracks `noticeId` in `alert_log.opportunities_data`)
+- **Retry logic** — 3 attempts for failed emails with `retry_count` column
+- **Timezone-aware delivery** — ~6 AM local time using UTC offset calculation
+- **Keywords search** — Catch mislabeled opportunities by searching title/description
+- **PSC crosswalk** — Auto-generates related PSC codes from NAICS using existing `getPSCsForNAICS()` function
+- **Clean NAICS display** — Filters out non-numeric values (e.g., "236210, Industrial, Building" → "236210")
+- **Removed state filter** — Always searches nationwide
+- **FREE PREVIEW banners** — Added to emails so users know it's beta/test mode
+
+#### Daily Briefings (`/api/cron/send-briefings`)
+- **Made free for everyone** — Pulls from BOTH `user_briefing_profile` AND `user_alert_settings` tables
+- **Deduplication** — Checks `briefing_log` before sending
+- **Retry logic** — 3 attempts within 3 days
+- **Timezone-aware delivery** — 6-10 AM local time
+- **FREE PREVIEW banner** — Added to email template
+
+#### Preferences Page Redesign (`/alerts/preferences`)
+- **New frequency radio buttons:** Daily / Weekly / Paused
+- **New briefings section** with opt-in checkbox
+- **New keywords field** for catching mislabeled opportunities
+- **Clean NAICS codes** — Numeric only on load/save
+- **Removed state filter** — Nationwide by default
+- **FREE PREVIEW banners** — On both alerts and briefings sections
+- **Clear unsubscribe option**
+
+#### SQL Migrations Created
+| File | Changes |
+|------|---------|
+| `alerts-schema-update.sql` | timezone, retry_count, alert_type columns |
+| `briefings-schema-update.sql` | retry_count column |
+| `keywords-schema-update.sql` | keywords TEXT[] column |
+
+#### Cron Schedule (vercel.json)
+| Job | Schedule (UTC) | Description |
+|-----|----------------|-------------|
+| send-briefings | 9 AM | Daily briefings |
+| daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | Timezone coverage (4 runs) |
+| weekly-alerts | 11 PM Sunday | Weekly digest |
+
+#### Key Files Modified
+- `src/app/api/cron/daily-alerts/route.ts` — Complete rewrite (639+ lines)
+- `src/app/api/cron/send-briefings/route.ts` — Complete rewrite (394 lines)
+- `src/app/alerts/preferences/page.tsx` — Complete redesign
+- `src/app/api/alerts/preferences/route.ts` — Added keywords support
+- `src/lib/briefings/delivery/email-template.ts` — FREE PREVIEW banner
+- `vercel.json` — Added 3 more daily-alerts cron runs
+
+---
+
+### JTED Conference Presentation - Final Polish (Earlier)
 
 Built and polished "State of the Union for Small Business" presentation for JTED Conference & MacDill AFB Industry Day (April 1, 2026).
 

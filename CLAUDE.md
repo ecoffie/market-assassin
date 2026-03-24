@@ -71,6 +71,31 @@
 **Purpose:** Personalized daily GovCon intel emails with win probability scoring
 **Features:** Smart profiles, engagement tracking, Lindy AI integration
 
+### 8. Daily Alerts System
+**Location:** `/src/app/api/cron/daily-alerts/`, `/src/app/alerts/`
+**Purpose:** Automated opportunity alert emails based on user NAICS/keywords
+**Status:** FREE FOR EVERYONE during beta (paywall removed Mar 23, 2026)
+**Features:**
+- Deduplication (won't resend same opp in 7 days)
+- Retry logic (3 attempts for failed emails)
+- Timezone-aware delivery (~6 AM local time)
+- Keywords search (catch mislabeled opportunities)
+- PSC crosswalk (auto-generate related PSC codes from NAICS)
+- FREE PREVIEW banners on emails
+
+**Key Files:**
+- `api/cron/daily-alerts/route.ts` — Main cron handler
+- `api/cron/send-briefings/route.ts` — Briefings cron handler
+- `alerts/preferences/page.tsx` — User preferences UI
+- `api/alerts/preferences/route.ts` — Preferences API
+
+**Cron Schedule (UTC):**
+| Job | Times | Purpose |
+|-----|-------|---------|
+| daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | Timezone coverage |
+| send-briefings | 9 AM | Daily briefings |
+| weekly-alerts | 11 PM Sunday | Weekly digest |
+
 ---
 
 ## Products & Pricing
@@ -175,6 +200,10 @@
 | `src/lib/send-email.ts` | All email templates |
 | `src/lib/briefings/` | Daily briefing system |
 | `src/lib/smart-profile/` | User profile learning system |
+| `src/app/api/cron/daily-alerts/route.ts` | Daily alerts cron (FREE during beta) |
+| `src/app/api/cron/send-briefings/route.ts` | Daily briefings cron (FREE during beta) |
+| `src/app/alerts/preferences/page.tsx` | Alert/briefing preferences UI |
+| `src/lib/utils/psc-crosswalk.ts` | PSC-NAICS crosswalk for broader search |
 
 ---
 

@@ -39,7 +39,7 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 | Teaming Recommendation Engine | HIGH | Pending | Suggest 3-5 primes per report based on subcontracting needs. Include draft outreach email. |
 | Location Optimization | MEDIUM | Pending | "Near Me" filter (user ZIP) + Proximity Score. Haversine formula for distance. |
 | Agency Gap Analysis | MEDIUM | Pending | Show agencies with unmet small biz goals (e.g., "DoD under 3% SDVOSB spend"). |
-| Custom Alerts | MEDIUM | Pending | User sets NAICS/agency watchlists. Weekly email with new data + scores. Supabase Edge Function + cron. |
+| Custom Alerts | MEDIUM | **DONE** | Daily/weekly alerts FREE during beta (Mar 23, 2026). NAICS, keywords, PSC crosswalk. Timezone-aware delivery. Deduplication. Retry logic. |
 | Proposal Prep Starter | LOW | Pending | One-click "Start Proposal" button. Export key data + AI outline prompt. Integrate with AI Proposal Toolkit. |
 | **Simplified Acquisition Entry Points** | HIGH | **DONE** | SAT (≤$250K) and micro (≤$10K) metrics computed during existing award aggregation — zero extra API calls. Premium "Entry Points" tab with ranked agencies, satFriendlinessScore (0-100), accessibility levels (high/moderate/low), strategic recommendations. "Easy Entry" badge on AgencySelectionTable. Blurred teaser in Opportunity Hunter drives MA upgrades. |
 
@@ -91,7 +91,7 @@ Tracking all instances of hardcoded/simulated data that should be replaced with 
 |---------|----------|--------|-------|
 | AI Win Probability Score | HIGH | Pending | Score each recompete 1-100% based on NAICS, certs, location, incumbent weakness. |
 | Teaming Suggestions | HIGH | Pending | 3-5 primes per recompete. Include draft outreach email. |
-| Custom Alerts | MEDIUM | Pending | NAICS/agency watchlists. Daily/weekly email with new recompetes. |
+| Custom Alerts | MEDIUM | **DONE** | Daily alerts system integrated with recompetes. FREE during beta. |
 | Historical Trends Dashboard | MEDIUM | Pending | Past winners, average value, win rates. Agency overview tab with spend graphs. |
 | Location Optimization | MEDIUM | Pending | "Near Me" filter + Proximity Score. Haversine formula. |
 | Proposal Prep Starter | LOW | Pending | One-click "Start Proposal" per recompete. Export key data + AI outline. |
@@ -233,10 +233,10 @@ A new certification program mapping to real BD job requirements ($80K-$150K+ rol
 4. Finish LinkedIn Lead Magnet
 
 ### Short-Term (2-4 Weeks)
-1. PSC-NAICS Crosswalk Integration (cross-tool)
-2. AI Win Probability Score (both tools)
+1. ~~PSC-NAICS Crosswalk Integration (cross-tool)~~ **DONE** (Mar 23, 2026)
+2. AI Win Probability Score (both tools) — **DONE** for Briefings (Mar 20, 2026)
 3. Teaming Suggestions (both tools)
-4. Custom Alerts system
+4. ~~Custom Alerts system~~ **DONE** — Daily alerts FREE for everyone during beta (Mar 23, 2026)
 5. Mobile responsiveness fixes
 
 ### Medium-Term (1-3 Months)
@@ -262,4 +262,4 @@ A new certification program mapping to real BD job requirements ($80K-$150K+ rol
 
 ---
 
-*Last Updated: February 18, 2026*
+*Last Updated: March 23, 2026*
