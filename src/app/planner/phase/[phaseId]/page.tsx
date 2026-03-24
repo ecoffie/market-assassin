@@ -34,6 +34,14 @@ const phaseDataMap: Record<string, { id: number; name: string; icon: string }> =
 
 type FilterType = 'all' | 'pending' | 'completed' | 'overdue' | 'high';
 
+// Video lesson interface
+interface VideoLesson {
+  id: string;
+  title: string;
+  duration: string;
+  vimeoId?: string;
+}
+
 // Task interface for display
 interface Task {
   id: string;
@@ -45,6 +53,7 @@ interface Task {
   priority: 'high' | 'medium' | 'low';
   isCustom: boolean;
   link: string;
+  videoLessons?: VideoLesson[];
 }
 
 // Priority Badge Component
@@ -313,6 +322,54 @@ function AccordionItem({
             <div>
               <p className="text-gray-700 text-sm leading-relaxed">{localTask.description}</p>
             </div>
+
+            {/* Video Lessons Section */}
+            {localTask.videoLessons && localTask.videoLessons.length > 0 && (
+              <div className="bg-gradient-to-r from-[#1e40af]/5 to-purple-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-[#1e40af] mb-3 flex items-center gap-2">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Training Videos ({localTask.videoLessons.length} {localTask.videoLessons.length === 1 ? 'lesson' : 'lessons'})
+                </h4>
+                <div className="space-y-2">
+                  {localTask.videoLessons.map((video, idx) => (
+                    <div
+                      key={video.id}
+                      className="flex items-center justify-between bg-white rounded-lg p-3 shadow-sm border border-gray-100 hover:border-[#1e40af]/30 transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[#1e40af]/10 flex items-center justify-center text-[#1e40af] font-semibold text-sm">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">{video.title}</p>
+                          <p className="text-xs text-gray-500">{video.duration}</p>
+                        </div>
+                      </div>
+                      {video.vimeoId && video.vimeoId !== 'PLACEHOLDER' ? (
+                        <a
+                          href={`https://vimeo.com/${video.vimeoId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-[#1e40af] text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
+                        >
+                          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                          Watch
+                        </a>
+                      ) : (
+                        <span className="px-3 py-1.5 bg-gray-100 text-gray-500 text-xs font-medium rounded-md">
+                          Coming Soon
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Priority Selector */}
             <div>
@@ -627,6 +684,7 @@ export default function PhaseDetailPage() {
           priority: ((t.userTask as any)?.priority || t.priority || 'medium') as 'high' | 'medium' | 'low',
           isCustom: t.isCustom || false,
           link: ((t.userTask as any)?.link || t.link || '') as string,
+          videoLessons: (t as any).videoLessons || undefined,
         }));
 
         setTasks(displayTasks);
@@ -645,6 +703,7 @@ export default function PhaseDetailPage() {
           priority: 'medium' as const,
           isCustom: false,
           link: '',
+          videoLessons: (t as any).videoLessons || undefined,
         })));
       } finally {
         setIsLoading(false);

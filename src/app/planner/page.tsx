@@ -299,8 +299,27 @@ function Sidebar({ isOpen, onClose, phases }: { isOpen: boolean; onClose: () => 
               </Link>
             ))}
 
-            {/* Resources Link */}
+            {/* Training Videos Link */}
             <div className="pt-4 mt-4 border-t border-gray-200">
+              <Link
+                href="/planner/lessons"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors group"
+                onClick={onClose}
+              >
+                <span className="text-2xl">🎬</span>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 group-hover:text-[#1e40af] transition-colors">
+                    Training Videos
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Micro-lessons library
+                  </div>
+                </div>
+                <svg className="h-4 w-4 text-gray-400 group-hover:text-[#1e40af] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+
               <Link
                 href="/planner/resources"
                 className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors group"
@@ -312,7 +331,7 @@ function Sidebar({ isOpen, onClose, phases }: { isOpen: boolean; onClose: () => 
                     Resources
                   </div>
                   <div className="text-xs text-gray-500">
-                    Videos, templates & tips
+                    Templates & tips
                   </div>
                 </div>
                 <svg className="h-4 w-4 text-gray-400 group-hover:text-[#1e40af] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
