@@ -77,9 +77,9 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
     description: 'Determine your business structure: Supplier v Service Provider v Consultant. This decision affects how you will be classified and what opportunities you can pursue.',
     order: 1,
     videoLessons: [
-      { id: '1-01a', title: 'Why Structure Matters', duration: '1:15', vimeoId: 'PLACEHOLDER' },
-      { id: '1-01b', title: 'Three Business Models', duration: '2:17', vimeoId: 'PLACEHOLDER' },
-      { id: '1-01c', title: 'Making Your Choice', duration: '1:28', vimeoId: 'PLACEHOLDER' },
+      { id: '1-01a', title: 'Why Structure Matters', duration: '1:15', vimeoId: '1176467880' },
+      { id: '1-01b', title: 'Three Business Models', duration: '2:17', vimeoId: '1176467952' },
+      { id: '1-01c', title: 'Making Your Choice', duration: '1:28', vimeoId: '1176467997' },
     ]
   },
   {
@@ -88,8 +88,8 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
     description: 'Obtain your DUNS number (if needed) and Unique Entity Identifier (UEI). The UEI is automatically assigned when you register in SAM.gov and replaces the DUNS number for federal contracts.',
     order: 2,
     videoLessons: [
-      { id: '1-02a', title: 'What is a UEI?', duration: '1:10', vimeoId: 'PLACEHOLDER' },
-      { id: '1-02b', title: 'How to Get Your UEI', duration: '1:25', vimeoId: 'PLACEHOLDER' },
+      { id: '1-02a', title: 'What is a UEI?', duration: '1:10', vimeoId: '1176468032' },
+      { id: '1-02b', title: 'How to Get Your UEI', duration: '1:25', vimeoId: '1176468041' },
     ]
   },
   {
@@ -98,9 +98,9 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
     description: 'Set up a professional email domain (e.g., yourname@yourcompany.com) rather than using free email services. This enhances credibility and professionalism when communicating with government agencies and prime contractors.',
     order: 3,
     videoLessons: [
-      { id: '1-03a', title: 'Why Professional Email Matters', duration: '1:05', vimeoId: 'PLACEHOLDER' },
-      { id: '1-03b', title: 'Setting Up Your Domain', duration: '1:20', vimeoId: 'PLACEHOLDER' },
-      { id: '1-03c', title: 'Email Best Practices', duration: '1:08', vimeoId: 'PLACEHOLDER' },
+      { id: '1-03a', title: 'Why Professional Email Matters', duration: '1:05', vimeoId: '1176468060' },
+      { id: '1-03b', title: 'Setting Up Your Domain', duration: '1:20', vimeoId: '1176468066' },
+      { id: '1-03c', title: 'Email Best Practices', duration: '1:08', vimeoId: '1176468083' },
     ]
   },
   {
@@ -109,9 +109,9 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
     description: 'Identify the North American Industry Classification System (NAICS) codes that best represent your business capabilities. These codes determine which contracts you can pursue.',
     order: 4,
     videoLessons: [
-      { id: '1-04a', title: 'What Are NAICS Codes?', duration: '1:18', vimeoId: 'PLACEHOLDER' },
-      { id: '1-04b', title: 'Finding Your Codes', duration: '1:12', vimeoId: 'PLACEHOLDER' },
-      { id: '1-04c', title: 'Strategic Code Selection', duration: '1:05', vimeoId: 'PLACEHOLDER' },
+      { id: '1-04a', title: 'What Are NAICS Codes?', duration: '1:18', vimeoId: '1176468098' },
+      { id: '1-04b', title: 'Finding Your Codes', duration: '1:12', vimeoId: '1176468107' },
+      { id: '1-04c', title: 'Strategic Code Selection', duration: '1:05', vimeoId: '1176468116' },
     ]
   },
   { phaseId: 1, title: 'How to Identify NAICS', description: 'Learn how to properly identify and select NAICS codes. Research which codes align with your services/products and which agencies use those codes most frequently.', order: 5 },
@@ -121,10 +121,10 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
     description: 'Complete your System for Award Management (SAM.gov) registration. This is the primary database for federal contractors and is required for all government contracting opportunities.',
     order: 6,
     videoLessons: [
-      { id: '1-05a', title: 'SAM.gov Overview', duration: '0:55', vimeoId: 'PLACEHOLDER' },
-      { id: '1-05b', title: 'Registration Requirements', duration: '0:58', vimeoId: 'PLACEHOLDER' },
-      { id: '1-05c', title: 'Step-by-Step Registration', duration: '1:10', vimeoId: 'PLACEHOLDER' },
-      { id: '1-05d', title: 'Maintaining Your Profile', duration: '0:55', vimeoId: 'PLACEHOLDER' },
+      { id: '1-05a', title: 'SAM.gov Overview', duration: '0:55', vimeoId: '1176468133' },
+      { id: '1-05b', title: 'Registration Requirements', duration: '0:58', vimeoId: '1176468145' },
+      { id: '1-05c', title: 'Step-by-Step Registration', duration: '1:10', vimeoId: '1176468159' },
+      { id: '1-05d', title: 'Maintaining Your Profile', duration: '0:55', vimeoId: '1176468169' },
     ]
   },
   { phaseId: 1, title: 'How to Create a SAM.gov Profile', description: 'Follow step-by-step instructions to create your SAM.gov profile with accurate business information, NAICS codes, and banking details.', order: 7 },
@@ -134,8 +134,8 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
     description: 'Complete your Dynamic Small Business Search (DSBS) profile. This is the public-facing database that agencies use to find small businesses.',
     order: 8,
     videoLessons: [
-      { id: '1-06a', title: 'What is DSBS?', duration: '1:00', vimeoId: 'PLACEHOLDER' },
-      { id: '1-06b', title: 'Optimizing Your Profile', duration: '1:08', vimeoId: 'PLACEHOLDER' },
+      { id: '1-06a', title: 'What is DSBS?', duration: '1:00', vimeoId: '1176468183' },
+      { id: '1-06b', title: 'Optimizing Your Profile', duration: '1:08', vimeoId: '1176468203' },
     ]
   },
   {
@@ -144,8 +144,8 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
     description: 'Contact your local APEX Accelerator (formerly PTAC) for free counseling and assistance with government contracting. They can help with registrations, certifications, and finding opportunities.',
     order: 9,
     videoLessons: [
-      { id: '1-07a', title: 'Apex Accelerator Benefits', duration: '1:15', vimeoId: 'PLACEHOLDER' },
-      { id: '1-07b', title: 'How to Connect', duration: '1:07', vimeoId: 'PLACEHOLDER' },
+      { id: '1-07a', title: 'Apex Accelerator Benefits', duration: '1:15', vimeoId: '1176468215' },
+      { id: '1-07b', title: 'How to Connect', duration: '1:07', vimeoId: '1176468225' },
     ]
   },
   { phaseId: 1, title: 'Benefits / What to say to Apex Accelerator', description: 'Prepare for your APEX Accelerator meeting. Know what services they offer, what questions to ask, and how to make the most of their free resources and counseling.', order: 10 },
@@ -155,10 +155,10 @@ const SEED_TASKS: Omit<Task, 'id'>[] = [
     description: 'Create or update your Capability Statement. This one-page document highlights your company\'s core competencies, past performance, differentiators, and key personnel. Include what makes you unique based on bootcamp guidance.',
     order: 11,
     videoLessons: [
-      { id: '1-08a', title: 'What is a Capability Statement?', duration: '0:55', vimeoId: 'PLACEHOLDER' },
-      { id: '1-08b', title: 'The Core Sections', duration: '1:17', vimeoId: 'PLACEHOLDER' },
-      { id: '1-08c', title: 'Your Differentiators', duration: '1:19', vimeoId: 'PLACEHOLDER' },
-      { id: '1-08d', title: 'Design & Distribution', duration: '1:18', vimeoId: 'PLACEHOLDER' },
+      { id: '1-08a', title: 'What is a Capability Statement?', duration: '0:55', vimeoId: '1176468233' },
+      { id: '1-08b', title: 'The Core Sections', duration: '1:17', vimeoId: '1176468248' },
+      { id: '1-08c', title: 'Your Differentiators', duration: '1:19', vimeoId: '1176468259' },
+      { id: '1-08d', title: 'Design & Distribution', duration: '1:18', vimeoId: '1176468275' },
     ]
   },
   { phaseId: 1, title: 'What to put on Capability Statement / Clip from Bootcamp - differentiators', description: 'Learn what to include on your Capability Statement: core competencies, past performance examples, key personnel, certifications, and most importantly - your differentiators that set you apart from competitors.', order: 12 },
