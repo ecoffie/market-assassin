@@ -302,10 +302,12 @@ export async function GET(request: NextRequest) {
     ];
 
     // Insert mock snapshots
+    // NOTE: SAM.gov opportunities excluded - those go to Daily Alerts
+    // Briefings focus on: recompetes, awards, contractor intel, web signals
     const snapshots = [
-      { tool: 'opportunity_hunter', data: { items: mockOpportunities, totalRecords: 3, fetchedAt: new Date().toISOString() } },
-      { tool: 'recompete', data: { items: mockRecompetes, totalRecords: 2, fetchedAt: new Date().toISOString() } },
-      { tool: 'usaspending', data: { items: mockAwards, totalRecords: 2, fetchedAt: new Date().toISOString() } },
+      // NO opportunity_hunter - SAM.gov opps handled by Daily Alerts
+      { tool: 'recompete', data: { contracts: mockRecompetes, totalCount: mockRecompetes.length, fetchedAt: new Date().toISOString() } },
+      { tool: 'market_assassin', data: { awards: mockAwards, totalCount: mockAwards.length, totalSpending: mockAwards.reduce((sum, a) => sum + a.awardAmount, 0), fetchedAt: new Date().toISOString() } },
       { tool: 'web_intelligence', data: { signals: mockWebSignals, fetchedAt: new Date().toISOString() } },
     ];
 

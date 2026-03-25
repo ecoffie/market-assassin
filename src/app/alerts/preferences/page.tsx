@@ -15,6 +15,50 @@ const BUSINESS_TYPES = [
   { value: 'HUBZone', label: 'HUBZone' },
 ];
 
+// Popular industry categories with their NAICS codes
+const INDUSTRY_PRESETS = [
+  {
+    label: '🏗️ Construction',
+    codes: ['236', '237', '238'],
+    description: 'Building, heavy civil, specialty trades'
+  },
+  {
+    label: '💻 IT Services',
+    codes: ['541511', '541512', '541513', '541519'],
+    description: 'Software, systems design, data processing'
+  },
+  {
+    label: '🛡️ Cybersecurity',
+    codes: ['541512', '541519', '518210'],
+    description: 'Security systems, data protection'
+  },
+  {
+    label: '📊 Professional Services',
+    codes: ['541'],
+    description: 'Consulting, engineering, R&D'
+  },
+  {
+    label: '🏥 Healthcare',
+    codes: ['621', '622', '623'],
+    description: 'Medical, hospitals, nursing care'
+  },
+  {
+    label: '📦 Logistics & Supply',
+    codes: ['493', '484', '488'],
+    description: 'Warehousing, trucking, transportation'
+  },
+  {
+    label: '🔧 Facilities & Maintenance',
+    codes: ['561210', '561720', '561730'],
+    description: 'Janitorial, landscaping, building services'
+  },
+  {
+    label: '🎓 Training & Education',
+    codes: ['611430', '611420', '611710'],
+    description: 'Professional training, educational services'
+  },
+];
+
 
 interface AlertSettings {
   email: string;
@@ -393,22 +437,89 @@ function AlertPreferencesContent() {
                   🎯 What Opportunities?
                 </h2>
 
+                {/* Quick Industry Select */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-slate-300 mb-3">
+                    Quick Select by Industry
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {INDUSTRY_PRESETS.map((preset) => {
+                      // Check if any of the preset codes are already in the input
+                      const currentCodes = naicsInput.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
+                      const hasPreset = preset.codes.some(code => currentCodes.includes(code));
+
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            // Add the preset codes to existing codes (avoid duplicates)
+                            const existingCodes = naicsInput.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
+                            const newCodes = [...new Set([...existingCodes, ...preset.codes])];
+                            setNaicsInput(newCodes.join(', '));
+                          }}
+                          className={`text-left p-3 rounded-lg border transition-all ${
+                            hasPreset
+                              ? 'bg-red-500/20 border-red-500/40 text-white'
+                              : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="font-medium text-sm">{preset.label}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{preset.description}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* NAICS Codes */}
                 <div className="mb-5">
                   <label htmlFor="naics" className="block text-sm font-medium text-slate-300 mb-1">
                     NAICS Codes
                   </label>
-                  <p className="text-xs text-slate-500 mb-2">
-                    Separate with commas. Use prefixes like &quot;541&quot; to match all codes starting with 541.
-                  </p>
+                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 mb-3">
+                    <p className="text-sm text-slate-300 mb-2">
+                      💡 <strong>Pro tip:</strong> Use short codes to match entire industries:
+                    </p>
+                    <ul className="text-xs text-slate-400 space-y-1 ml-4">
+                      <li><code className="bg-slate-700 px-1.5 py-0.5 rounded text-emerald-400">236</code> → matches <strong>ALL</strong> building construction (236110, 236115, 236220, etc.)</li>
+                      <li><code className="bg-slate-700 px-1.5 py-0.5 rounded text-emerald-400">238</code> → matches <strong>ALL</strong> specialty trades (electrical, plumbing, HVAC, etc.)</li>
+                      <li><code className="bg-slate-700 px-1.5 py-0.5 rounded text-emerald-400">541</code> → matches <strong>ALL</strong> professional services</li>
+                    </ul>
+                  </div>
                   <textarea
                     id="naics"
                     value={naicsInput}
                     onChange={(e) => setNaicsInput(e.target.value)}
                     rows={2}
-                    placeholder="541511, 541512, 236220"
+                    placeholder="236, 238, 541512"
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono text-sm"
                   />
+                  {naicsInput && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {naicsInput.split(/[,\s]+/).filter(c => /^\d+$/.test(c.trim())).map((code, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 bg-slate-800 border border-slate-600 rounded-full px-2.5 py-1 text-xs"
+                        >
+                          <span className="text-white font-mono">{code.trim()}</span>
+                          {code.trim().length <= 3 && (
+                            <span className="text-emerald-400">✓ prefix</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const codes = naicsInput.split(/[,\s]+/).filter(c => c.trim() !== code.trim());
+                              setNaicsInput(codes.join(', '));
+                            }}
+                            className="text-slate-500 hover:text-red-400 ml-1"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Keywords */}

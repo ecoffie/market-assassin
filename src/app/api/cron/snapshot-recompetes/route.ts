@@ -14,9 +14,12 @@ import { fetchRecompetesForUser } from '@/lib/briefings/pipelines/fpds-recompete
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret
+  // Verify cron authorization (Vercel cron header OR Bearer token)
+  const isVercelCron = request.headers.get('x-vercel-cron') === '1';
   const authHeader = request.headers.get('authorization');
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  const hasCronSecret = authHeader === `Bearer ${CRON_SECRET}`;
+
+  if (!isVercelCron && !hasCronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -75,11 +78,12 @@ export async function GET(request: NextRequest) {
             user_email: user.user_email,
             snapshot_date: today,
             tool: 'recompete',
-            snapshot_data: {
+            raw_data: {
               contracts: result.contracts,
               totalCount: result.totalCount,
               fetchedAt: result.fetchedAt,
             },
+            item_count: result.contracts.length,
           }, {
             onConflict: 'user_email,snapshot_date,tool',
           });

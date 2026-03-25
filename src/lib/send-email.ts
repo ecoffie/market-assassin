@@ -10,6 +10,43 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+/**
+ * Generic email sending function
+ */
+interface SendEmailParams {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  from?: string;
+}
+
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+  from,
+}: SendEmailParams): Promise<boolean> {
+  try {
+    const fromAddress = from || `"GovCon Giants AI" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`;
+
+    await transporter.sendMail({
+      from: fromAddress,
+      to,
+      subject,
+      html,
+      text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML if no text provided
+    });
+
+    console.log(`[SendEmail] Sent to ${to}: ${subject}`);
+    return true;
+  } catch (error) {
+    console.error(`[SendEmail] Failed to send to ${to}:`, error);
+    throw error;
+  }
+}
+
 interface SendAccessCodeEmailParams {
   to: string;
   companyName?: string;

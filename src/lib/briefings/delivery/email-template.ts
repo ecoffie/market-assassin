@@ -46,11 +46,29 @@ function generateSubject(briefing: GeneratedBriefing): string {
     day: 'numeric',
   });
 
-  if (briefing.summary.urgentAlerts > 0) {
-    return `🚨 ${briefing.summary.urgentAlerts} Urgent Alert${briefing.summary.urgentAlerts > 1 ? 's' : ''} - GovCon Briefing ${date}`;
+  // Prioritize recompetes in subject (exclusive intel)
+  const recompeteCount = briefing.categorizedItems?.recompete_alert?.items?.length || 0;
+  if (recompeteCount > 0) {
+    return `🔄 ${recompeteCount} Recompete${recompeteCount > 1 ? 's' : ''} Found - Market Intel ${date}`;
   }
 
-  return `📊 Your Daily GovCon Briefing - ${date}`;
+  // Teaming opportunities
+  const teamingCount = (briefing.categorizedItems?.teaming_signal?.items?.length || 0);
+  if (teamingCount > 0) {
+    return `🤝 ${teamingCount} Teaming Lead${teamingCount > 1 ? 's' : ''} - Market Intel ${date}`;
+  }
+
+  // Competitor wins
+  const competitorCount = briefing.categorizedItems?.competitor_win?.items?.length || 0;
+  if (competitorCount > 0) {
+    return `⚔️ ${competitorCount} Competitor Win${competitorCount > 1 ? 's' : ''} - Market Intel ${date}`;
+  }
+
+  if (briefing.summary.urgentAlerts > 0) {
+    return `🚨 ${briefing.summary.urgentAlerts} Urgent Intel - Market Brief ${date}`;
+  }
+
+  return `📊 Your Daily Market Intel - ${date}`;
 }
 
 /**
@@ -65,7 +83,7 @@ function generateHtmlBody(briefing: GeneratedBriefing): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Daily GovCon Briefing</title>
+  <title>Your Daily Market Intel</title>
   <!--[if mso]>
   <noscript>
     <xml>
@@ -123,13 +141,13 @@ function generateHtmlBody(briefing: GeneratedBriefing): string {
     <!-- FREE PREVIEW Banner -->
     <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center;">
       <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
-        🎁 FREE PREVIEW • You're testing our daily briefings — no charge during beta!
+        🎁 FREE PREVIEW • Exclusive market intel — recompetes, teaming leads, competitor wins!
       </p>
     </div>
 
     <!-- Header -->
     <div class="header">
-      <h1>🎯 Daily GovCon Briefing</h1>
+      <h1>📊 Daily Market Intel</h1>
       <p>${formatDate(briefing.briefingDate)}</p>
     </div>
 
@@ -149,7 +167,7 @@ function generateHtmlBody(briefing: GeneratedBriefing): string {
 
     <!-- Top Intelligence -->
     <div class="section">
-      <h3>🔥 Today's Top Intelligence</h3>
+      <h3>🔥 Top Market Intel</h3>
       ${topItems.map(item => renderItem(item)).join('')}
     </div>
 
@@ -241,10 +259,10 @@ function generateTextBody(briefing: GeneratedBriefing): string {
   const topItems = briefing.topItems[0]?.items || [];
 
   let text = `
-🎁 FREE PREVIEW - You're testing our daily briefings — no charge during beta!
+🎁 FREE PREVIEW - You're testing our daily market intel — no charge during beta!
 ========================================
 
-DAILY GOVCON BRIEFING
+DAILY MARKET INTEL
 ${formatDate(briefing.briefingDate)}
 ========================================
 
@@ -255,7 +273,7 @@ QUICK STATS:
 ${briefing.summary.quickStats.map(stat => `• ${stat.label}: ${stat.value}`).join('\n')}
 
 ========================================
-TODAY'S TOP INTELLIGENCE
+TOP MARKET INTEL
 ========================================
 
 `;

@@ -18,6 +18,61 @@ import { useAuth } from '@/lib/supabase/AuthContext';
 import { updateStreak, checkAndAwardBadges } from '@/lib/supabase/gamification';
 import ConfettiCelebration from '@/components/planner/ConfettiCelebration';
 
+// Video Modal Component
+function VideoModal({
+  isOpen,
+  onClose,
+  vimeoId,
+  title,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  vimeoId: string;
+  title: string;
+}) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+      <div className="relative w-full max-w-4xl">
+        <button
+          onClick={onClose}
+          className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors flex items-center gap-2"
+        >
+          <span className="text-sm">Close</span>
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <div className="bg-black rounded-lg overflow-hidden shadow-2xl">
+          <div className="p-3 bg-gray-900 border-b border-gray-700">
+            <h3 className="text-white font-medium text-sm">{title}</h3>
+          </div>
+          <div className="relative" style={{ paddingTop: '56.25%' }}>
+            <iframe
+              src={`https://player.vimeo.com/video/${vimeoId}?autoplay=1&title=0&byline=0&portrait=0`}
+              className="absolute inset-0 w-full h-full"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Phase data mapping
 const phaseDataMap: Record<string, { id: number; name: string; icon: string }> = {
   '1': { id: 1, name: 'Setup', icon: '🏗️' },
@@ -130,6 +185,7 @@ function AccordionItem({
   const [localTask, setLocalTask] = useState(task);
   const [isSaving, setIsSaving] = useState(false);
   const notesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [activeVideo, setActiveVideo] = useState<{ vimeoId: string; title: string } | null>(null);
 
   // Update local task when prop changes
   useEffect(() => {
@@ -349,17 +405,18 @@ function AccordionItem({
                         </div>
                       </div>
                       {video.vimeoId && video.vimeoId !== 'PLACEHOLDER' ? (
-                        <a
-                          href={`https://vimeo.com/${video.vimeoId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveVideo({ vimeoId: video.vimeoId!, title: video.title });
+                          }}
                           className="px-3 py-1.5 bg-[#1e40af] text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
                         >
                           <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z" />
                           </svg>
                           Watch
-                        </a>
+                        </button>
                       ) : (
                         <span className="px-3 py-1.5 bg-gray-100 text-gray-500 text-xs font-medium rounded-md">
                           Coming Soon
@@ -435,6 +492,16 @@ function AccordionItem({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Video Modal */}
+      {activeVideo && (
+        <VideoModal
+          isOpen={true}
+          onClose={() => setActiveVideo(null)}
+          vimeoId={activeVideo.vimeoId}
+          title={activeVideo.title}
+        />
       )}
     </div>
   );

@@ -84,11 +84,12 @@ export async function GET(request: NextRequest) {
             user_email: user.user_email,
             snapshot_date: today,
             tool: 'opportunity_hunter',
-            snapshot_data: {
+            raw_data: {
               opportunities: result.opportunities,
               totalRecords: result.totalRecords,
               fetchedAt: result.fetchedAt,
             },
+            item_count: result.opportunities.length,
             // diff_data will be computed when generating briefings
           }, {
             onConflict: 'user_email,snapshot_date,tool',

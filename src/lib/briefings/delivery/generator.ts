@@ -29,33 +29,43 @@ const MAX_TOP_ITEMS = 5;
 const MAX_PER_CATEGORY = 3;
 
 const CATEGORY_ICONS: Record<string, string> = {
-  new_opportunity: '🎯',
-  deadline_alert: '⏰',
-  amendment: '📝',
-  new_award: '🏆',
-  competitor_win: '⚔️',
+  // Recompete Intel
   recompete_alert: '🔄',
   timeline_change: '📅',
+  // Award Intel
+  new_award: '🏆',
+  competitor_win: '⚔️',
+  spending_shift: '💰',
+  // Contractor/Teaming Intel
   teaming_signal: '🤝',
   sblo_update: '📋',
   certification_change: '📜',
-  spending_shift: '💰',
+  // Web Intelligence
   web_signal: '🌐',
+  // Legacy (kept for compatibility but not actively used)
+  new_opportunity: '🎯',
+  deadline_alert: '⏰',
+  amendment: '📝',
 };
 
 const CATEGORY_TITLES: Record<string, string> = {
+  // Recompete Intel
+  recompete_alert: 'Recompete Opportunities',
+  timeline_change: 'Contract Timeline Changes',
+  // Award Intel
+  new_award: 'Recent Contract Awards',
+  competitor_win: 'Competitor Wins',
+  spending_shift: 'Agency Spending Shifts',
+  // Contractor/Teaming Intel
+  teaming_signal: 'Teaming Opportunities',
+  sblo_update: 'SBLO Contact Updates',
+  certification_change: 'Certification Changes',
+  // Web Intelligence
+  web_signal: 'Market Intelligence',
+  // Legacy
   new_opportunity: 'New Opportunities',
   deadline_alert: 'Deadline Alerts',
   amendment: 'Amendments',
-  new_award: 'Contract Awards',
-  competitor_win: 'Competitor Activity',
-  recompete_alert: 'Recompete Opportunities',
-  timeline_change: 'Timeline Changes',
-  teaming_signal: 'Teaming Signals',
-  sblo_update: 'SBLO Updates',
-  certification_change: 'Certification Changes',
-  spending_shift: 'Spending Shifts',
-  web_signal: 'Web Intelligence',
 };
 
 /**
@@ -134,10 +144,12 @@ export async function generateBriefing(
     const snapshotsByTool = organizeSnapshots(snapshots || []);
 
     // Step 3: Run diff engine
+    // NOTE: SAM.gov opportunities excluded - those go to Daily Alerts
+    // Briefings focus on: recompetes, awards, contractor intel, web signals
     const diffResult = generateBriefingDiff(
       {
-        today: (snapshotsByTool.opportunities?.today || []) as SAMOpportunity[],
-        yesterday: (snapshotsByTool.opportunities?.yesterday || []) as SAMOpportunity[],
+        today: [], // SAM.gov opps excluded - handled by Daily Alerts
+        yesterday: [],
       },
       {
         today: (snapshotsByTool.recompetes?.today || []) as RecompeteContract[],
@@ -334,19 +346,33 @@ function generateHeadline(
 ): string {
   const urgentCount = items.filter((i) => i.urgencyScore >= 80).length;
 
-  if (urgentCount > 0) {
-    return `${urgentCount} urgent alert${urgentCount > 1 ? 's' : ''} requiring attention`;
-  }
-
-  if (summary.byCategory.new_opportunity > 0) {
-    return `${summary.byCategory.new_opportunity} new opportunities match your profile`;
-  }
-
+  // Prioritize recompetes (exclusive intel)
   if (summary.byCategory.recompete_alert > 0) {
-    return `${summary.byCategory.recompete_alert} recompete opportunities identified`;
+    const recompeteCount = summary.byCategory.recompete_alert;
+    return `${recompeteCount} recompete ${recompeteCount > 1 ? 'opportunities' : 'opportunity'} in your market`;
   }
 
-  return `${summary.totalItems} intelligence items for today`;
+  // Teaming signals are high-value
+  if (summary.byCategory.teaming_signal > 0) {
+    return `${summary.byCategory.teaming_signal} new teaming ${summary.byCategory.teaming_signal > 1 ? 'opportunities' : 'opportunity'} identified`;
+  }
+
+  // Competitor wins need attention
+  if (summary.byCategory.competitor_win > 0) {
+    return `${summary.byCategory.competitor_win} competitor win${summary.byCategory.competitor_win > 1 ? 's' : ''} to analyze`;
+  }
+
+  // Award intel
+  if (summary.byCategory.new_award > 0) {
+    return `${summary.byCategory.new_award} new contract awards in your NAICS`;
+  }
+
+  // Urgent items
+  if (urgentCount > 0) {
+    return `${urgentCount} urgent intel item${urgentCount > 1 ? 's' : ''} requiring attention`;
+  }
+
+  return `${summary.totalItems} market intelligence items for today`;
 }
 
 /**
@@ -375,31 +401,40 @@ function generateQuickStats(
 ): QuickStat[] {
   const stats: QuickStat[] = [];
 
-  // Total items
+  // Recompetes (high-value exclusive intel)
+  if (summary.byCategory.recompete_alert) {
+    stats.push({
+      label: 'Recompetes',
+      value: summary.byCategory.recompete_alert,
+    });
+  }
+
+  // Teaming opportunities
+  const teamingCount = (summary.byCategory.teaming_signal || 0) + (summary.byCategory.sblo_update || 0);
+  if (teamingCount > 0) {
+    stats.push({
+      label: 'Teaming Leads',
+      value: teamingCount,
+    });
+  }
+
+  // Awards
+  const awardCount = (summary.byCategory.new_award || 0) + (summary.byCategory.competitor_win || 0);
+  if (awardCount > 0) {
+    stats.push({
+      label: 'Awards',
+      value: awardCount,
+    });
+  }
+
+  // Total intel items
   stats.push({
-    label: 'Total Items',
+    label: 'Intel Items',
     value: summary.totalItems,
   });
 
-  // Opportunities
-  if (summary.byCategory.new_opportunity) {
-    stats.push({
-      label: 'New Opps',
-      value: summary.byCategory.new_opportunity,
-    });
-  }
-
-  // Deadline alerts
-  if (summary.byCategory.deadline_alert) {
-    stats.push({
-      label: 'Deadlines',
-      value: summary.byCategory.deadline_alert,
-      trend: 'down', // Deadlines decreasing = good
-    });
-  }
-
-  // Top agency
-  if (summary.topAgencies.length > 0) {
+  // Top agency if we have room
+  if (stats.length < 4 && summary.topAgencies.length > 0) {
     stats.push({
       label: 'Top Agency',
       value: truncate(summary.topAgencies[0].agency, 20),
@@ -488,27 +523,40 @@ function organizeSnapshots(
     const isToday = snap.snapshot_date === today;
     const bucket = isToday ? 'today' : 'yesterday';
 
-    const data = snap.raw_data as { items?: unknown[]; signals?: unknown[] } | null;
+    const data = snap.raw_data as Record<string, unknown> | null;
     if (!data) continue;
 
     switch (snap.tool) {
       case 'opportunity_hunter':
-        if (Array.isArray(data.items)) {
+        // Cron stores as { opportunities: [...] }
+        if (Array.isArray(data.opportunities)) {
+          organized.opportunities[bucket].push(...data.opportunities);
+        } else if (Array.isArray(data.items)) {
           organized.opportunities[bucket].push(...data.items);
         }
         break;
       case 'recompete':
-        if (Array.isArray(data.items)) {
+        // Cron stores as { contracts: [...] }
+        if (Array.isArray(data.contracts)) {
+          organized.recompetes[bucket].push(...data.contracts);
+        } else if (Array.isArray(data.items)) {
           organized.recompetes[bucket].push(...data.items);
         }
         break;
+      case 'market_assassin':
       case 'usaspending':
-        if (Array.isArray(data.items)) {
+        // Cron stores as { awards: [...] }
+        if (Array.isArray(data.awards)) {
+          organized.awards[bucket].push(...data.awards);
+        } else if (Array.isArray(data.items)) {
           organized.awards[bucket].push(...data.items);
         }
         break;
       case 'contractor_db':
-        if (Array.isArray(data.items)) {
+        // Cron stores as { contractors: [...] }
+        if (Array.isArray(data.contractors)) {
+          organized.contractors[bucket].push(...data.contractors);
+        } else if (Array.isArray(data.items)) {
           organized.contractors[bucket].push(...data.items);
         }
         break;
