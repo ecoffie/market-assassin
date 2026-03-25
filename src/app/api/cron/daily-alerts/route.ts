@@ -54,9 +54,10 @@ interface AlertUser {
   naics_codes: string[];
   keywords: string[] | null;
   business_type: string | null;
-  target_agencies: string[];
+  agencies: string[];  // renamed from target_agencies
   location_state: string | null;
   alert_frequency: string;
+  alerts_enabled: boolean;
   is_active: boolean;
   timezone?: string;
   last_alert_sent?: string;
@@ -236,11 +237,12 @@ async function runDailyAlertJob(options?: {
       console.log(`[Daily Alerts] Retried ${retryResults.retried} failed alerts, ${retryResults.succeeded} succeeded`);
     }
 
-    // Build query for daily alert users
+    // Build query for daily alert users (unified table)
     let query = getSupabase()
-      .from('user_alert_settings')
+      .from('user_notification_settings')
       .select('*')
       .eq('is_active', true)
+      .eq('alerts_enabled', true)
       .eq('alert_frequency', 'daily');
 
     // If test email specified, only process that user
@@ -366,7 +368,7 @@ async function runDailyAlertJob(options?: {
           ...opp,
           score: scoreOpportunity(opp, {
             naics_codes: userNaics, // Original codes, not expanded
-            agencies: user.target_agencies || [],
+            agencies: user.agencies || [],
             keywords: userKeywords,
           }),
         })).sort((a, b) => b.score - a.score);

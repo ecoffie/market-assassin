@@ -104,9 +104,10 @@ interface AlertUser {
   user_email: string;
   naics_codes: string[];
   business_type: string | null;
-  target_agencies: string[];
+  agencies: string[];
   location_state: string | null;
   alert_frequency: string;
+  alerts_enabled: boolean;
   is_active: boolean;
 }
 
@@ -119,7 +120,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
 
     // Get all active alert users
     const { data: users, error: usersError } = await supabase
-      .from('user_alert_settings')
+      .from('user_notification_settings')
       .select('*')
       .eq('is_active', true)
       .eq('alert_frequency', 'weekly');
@@ -181,7 +182,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
           ...opp,
           score: scoreOpportunity(opp, {
             naics_codes: user.naics_codes || [],
-            agencies: user.target_agencies || [],
+            agencies: user.agencies || [],
             keywords: [],
           }),
         })).sort((a, b) => b.score - a.score);
@@ -218,7 +219,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
 
         // Update user's alert stats
         await supabase
-          .from('user_alert_settings')
+          .from('user_notification_settings')
           .update({
             last_alert_sent: new Date().toISOString(),
             last_alert_count: topOpps.length,
@@ -295,7 +296,7 @@ export async function GET(request: NextRequest) {
 
   // Test mode for specific user
   const { data: user } = await supabase
-    .from('user_alert_settings')
+    .from('user_notification_settings')
     .select('*')
     .eq('user_email', email.toLowerCase())
     .single();
@@ -309,7 +310,7 @@ export async function GET(request: NextRequest) {
       email: user.user_email,
       naicsCodes: user.naics_codes,
       businessType: user.business_type,
-      agencies: user.target_agencies,
+      agencies: user.agencies,
       isActive: user.is_active,
       lastAlertSent: user.last_alert_sent,
     },

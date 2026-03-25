@@ -3,7 +3,7 @@
  *
  * Runs nightly to aggregate user search history into briefing profiles.
  * Takes the most frequently searched NAICS codes, agencies, etc.
- * and updates user_briefing_profile with their watchlist.
+ * and updates user_notification_settings with their watchlist.
  *
  * Schedule: 1 AM ET daily (before snapshot jobs)
  */
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
 
         // Check if profile exists
         const { data: existing } = await supabase
-          .from('user_briefing_profile')
+          .from('user_notification_settings')
           .select('id')
           .eq('user_email', email)
           .single();
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         if (existing) {
           // Update existing profile — write BOTH individual columns AND aggregated_profile JSONB
           const { error: updateError } = await supabase
-            .from('user_briefing_profile')
+            .from('user_notification_settings')
             .update({
               naics_codes: aggregated.naics_codes,
               agencies: aggregated.agencies,
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
         } else {
           // Create new profile — write BOTH individual columns AND aggregated_profile JSONB
           const { error: insertError } = await supabase
-            .from('user_briefing_profile')
+            .from('user_notification_settings')
             .insert({
               user_email: email,
               naics_codes: aggregated.naics_codes,

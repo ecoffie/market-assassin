@@ -2,14 +2,13 @@
  * Send Briefings Cron Job
  *
  * Generates and sends daily briefings to ALL users (FREE FOR EVERYONE).
- * Pulls from both user_briefing_profile AND user_alert_settings tables.
+ * Pulls from unified user_notification_settings table.
  * Schedule: 9 AM UTC daily (after all data gathering completes)
  *
  * Process:
- * 1. Get all users from both tables
- * 2. Deduplicate by email
- * 3. For each user: generate briefing → send email
- * 4. Track delivery status with retry support
+ * 1. Get all users with briefings_enabled=true
+ * 2. For each user: generate briefing → send email
+ * 3. Track delivery status with retry support
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -101,20 +100,20 @@ export async function GET(request: NextRequest) {
       console.log(`[SendBriefings] Retried ${retryResults.retried} failed briefings, ${retryResults.succeeded} succeeded`);
     }
 
-    // Step 1: Get users from BOTH tables
+    // Step 1: Get users from unified notification settings table
     const allUsers: BriefingUser[] = [];
-    const seenEmails = new Set<string>();
 
-    // Get from user_briefing_profile (original source)
-    const { data: briefingProfiles } = await supabase
-      .from('user_briefing_profile')
-      .select('user_email, aggregated_profile, naics_codes, agencies, preferences, sms_enabled, phone_number, timezone')
+    const { data: notificationSettings } = await supabase
+      .from('user_notification_settings')
+      .select('user_email, naics_codes, agencies, timezone, sms_enabled, phone_number, briefings_enabled, is_active, aggregated_profile')
+      .eq('is_active', true)
+      .eq('briefings_enabled', true)
       .limit(MAX_USERS_PER_RUN);
 
-    if (briefingProfiles) {
-      for (const p of briefingProfiles) {
+    if (notificationSettings) {
+      for (const p of notificationSettings) {
         const email = p.user_email?.toLowerCase();
-        if (!email || seenEmails.has(email)) continue;
+        if (!email) continue;
 
         // Extract NAICS from either JSONB or columns
         const jsonb = p.aggregated_profile as Record<string, unknown> | null;
@@ -136,7 +135,6 @@ export async function GET(request: NextRequest) {
 
         if (naics.length === 0 && agencies.length === 0) continue;
 
-        seenEmails.add(email);
         allUsers.push({
           email,
           naics_codes: naics,
@@ -145,34 +143,6 @@ export async function GET(request: NextRequest) {
           sms_enabled: p.sms_enabled,
           phone_number: p.phone_number,
           source: 'briefing_profile',
-        });
-      }
-    }
-
-    // Get from user_alert_settings (daily alerts users)
-    const { data: alertSettings } = await supabase
-      .from('user_alert_settings')
-      .select('user_email, naics_codes, target_agencies, timezone, alert_frequency, is_active')
-      .eq('is_active', true)
-      .limit(MAX_USERS_PER_RUN);
-
-    if (alertSettings) {
-      for (const a of alertSettings) {
-        const email = a.user_email?.toLowerCase();
-        if (!email || seenEmails.has(email)) continue;
-
-        const naics = a.naics_codes || [];
-        const agencies = a.target_agencies || [];
-
-        if (naics.length === 0) continue;
-
-        seenEmails.add(email);
-        allUsers.push({
-          email,
-          naics_codes: naics,
-          agencies,
-          timezone: a.timezone,
-          source: 'alert_settings',
         });
       }
     }

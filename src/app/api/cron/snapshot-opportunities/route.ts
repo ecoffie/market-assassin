@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get all users with briefing access and a profile
     const { data: users, error: usersError } = await supabase
-      .from('user_briefing_profile')
+      .from('user_notification_settings')
       .select('user_email, naics_codes, agencies, keywords, zip_codes')
       .not('naics_codes', 'eq', '{}'); // Only users with watchlist data
 

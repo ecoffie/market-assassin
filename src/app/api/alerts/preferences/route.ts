@@ -19,7 +19,7 @@ const VALID_TIMEZONES = [
 
 /**
  * GET /api/alerts/preferences?email=xxx
- * Get alert preferences for a user
+ * Get notification preferences for a user (alerts + briefings)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('user_alert_settings')
+      .from('user_notification_settings')
       .select('*')
       .eq('user_email', email.toLowerCase())
       .single();
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: null,
-        message: 'No alert settings found',
+        message: 'No notification settings found',
       });
     }
 
@@ -50,16 +50,28 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         email: data.user_email,
-        naicsCodes: data.naics_codes,
+        // Search criteria
+        naicsCodes: data.naics_codes || [],
         keywords: data.keywords || [],
         businessType: data.business_type,
-        targetAgencies: data.target_agencies,
+        targetAgencies: data.agencies || [],
         locationState: data.location_state,
+        // Alerts
+        alertsEnabled: data.alerts_enabled,
         frequency: data.alert_frequency,
+        // Briefings
+        briefingsEnabled: data.briefings_enabled,
+        briefingFrequency: data.briefing_frequency,
+        // Delivery
         timezone: data.timezone || 'America/New_York',
+        smsEnabled: data.sms_enabled,
+        phoneNumber: data.phone_number,
+        // Status
         isActive: data.is_active,
         lastAlertSent: data.last_alert_sent,
+        lastBriefingSent: data.last_briefing_sent,
         totalAlertsSent: data.total_alerts_sent,
+        totalBriefingsSent: data.total_briefings_sent,
       },
       availableTimezones: [
         { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -72,7 +84,7 @@ export async function GET(request: NextRequest) {
       ],
     });
   } catch (error) {
-    console.error('[Alert Preferences] Error:', error);
+    console.error('[Notification Preferences] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -82,21 +94,31 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/alerts/preferences
- * Update alert preferences
+ * Create or update notification preferences (alerts + briefings)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
       email,
+      // Alerts
       frequency,
+      alertsEnabled,
+      // Briefings
+      briefingsEnabled,
+      briefingFrequency,
+      // Delivery
       timezone,
-      isActive,
+      smsEnabled,
+      phoneNumber,
+      // Search criteria
       naicsCodes,
       keywords,
       businessType,
       targetAgencies,
       locationState,
+      // Master switch
+      isActive,
     } = body;
 
     if (!email) {
@@ -106,36 +128,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedEmail = email.toLowerCase();
+
     // Check if user exists
     const { data: existing } = await supabase
-      .from('user_alert_settings')
+      .from('user_notification_settings')
       .select('user_email')
-      .eq('user_email', email.toLowerCase())
+      .eq('user_email', normalizedEmail)
       .single();
 
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'No alert profile found for this email' },
-        { status: 404 }
-      );
-    }
-
-    // Build update object with only provided fields
-    const updates: Record<string, any> = {
+    // Build upsert object
+    const record: Record<string, unknown> = {
+      user_email: normalizedEmail,
       updated_at: new Date().toISOString(),
     };
 
+    // Alert frequency
     if (frequency !== undefined) {
-      // Now accepts 'daily', 'weekly', or 'paused'
       if (!['daily', 'weekly', 'paused'].includes(frequency)) {
         return NextResponse.json(
           { success: false, error: 'Invalid frequency. Use "daily", "weekly", or "paused"' },
           { status: 400 }
         );
       }
-      updates.alert_frequency = frequency;
+      record.alert_frequency = frequency;
+      // Also set alerts_enabled based on frequency
+      record.alerts_enabled = frequency !== 'paused';
     }
 
+    if (alertsEnabled !== undefined) {
+      record.alerts_enabled = Boolean(alertsEnabled);
+    }
+
+    // Briefings
+    if (briefingsEnabled !== undefined) {
+      record.briefings_enabled = Boolean(briefingsEnabled);
+    }
+
+    if (briefingFrequency !== undefined) {
+      if (!['daily', 'weekly', 'paused'].includes(briefingFrequency)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid briefing frequency' },
+          { status: 400 }
+        );
+      }
+      record.briefing_frequency = briefingFrequency;
+    }
+
+    // Timezone
     if (timezone !== undefined) {
       if (!VALID_TIMEZONES.includes(timezone)) {
         return NextResponse.json(
@@ -143,64 +183,103 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      updates.timezone = timezone;
+      record.timezone = timezone;
     }
 
+    // SMS
+    if (smsEnabled !== undefined) {
+      record.sms_enabled = Boolean(smsEnabled);
+    }
+
+    if (phoneNumber !== undefined) {
+      record.phone_number = phoneNumber || null;
+    }
+
+    // Master switch
     if (isActive !== undefined) {
-      updates.is_active = Boolean(isActive);
+      record.is_active = Boolean(isActive);
     }
 
+    // Search criteria
     if (naicsCodes !== undefined) {
-      // Only save numeric codes
+      // Only save numeric codes (allow prefixes like '236')
       const cleanCodes = Array.isArray(naicsCodes)
         ? naicsCodes.filter((c: string) => /^\d+$/.test(c))
         : [];
-      updates.naics_codes = cleanCodes;
+      record.naics_codes = cleanCodes;
     }
 
     if (keywords !== undefined) {
-      updates.keywords = Array.isArray(keywords) ? keywords : [];
+      record.keywords = Array.isArray(keywords) ? keywords : [];
     }
 
     if (businessType !== undefined) {
-      updates.business_type = businessType || null;
+      record.business_type = businessType || null;
     }
 
     if (targetAgencies !== undefined) {
-      updates.target_agencies = Array.isArray(targetAgencies) ? targetAgencies : [];
+      record.agencies = Array.isArray(targetAgencies) ? targetAgencies : [];
     }
 
     if (locationState !== undefined) {
-      updates.location_state = locationState || null;
+      record.location_state = locationState || null;
     }
 
-    const { data, error } = await supabase
-      .from('user_alert_settings')
-      .update(updates)
-      .eq('user_email', email.toLowerCase())
-      .select()
-      .single();
+    let data;
+    let error;
+
+    if (existing) {
+      // Update existing record
+      const result = await supabase
+        .from('user_notification_settings')
+        .update(record)
+        .eq('user_email', normalizedEmail)
+        .select()
+        .single();
+      data = result.data;
+      error = result.error;
+    } else {
+      // Insert new record with defaults
+      record.created_at = new Date().toISOString();
+      record.alerts_enabled = record.alerts_enabled ?? true;
+      record.briefings_enabled = record.briefings_enabled ?? true;
+      record.alert_frequency = record.alert_frequency ?? 'daily';
+      record.briefing_frequency = record.briefing_frequency ?? 'daily';
+      record.timezone = record.timezone ?? 'America/New_York';
+      record.is_active = record.is_active ?? true;
+
+      const result = await supabase
+        .from('user_notification_settings')
+        .insert(record)
+        .select()
+        .single();
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
-      console.error('[Alert Preferences] Update error:', error);
+      console.error('[Notification Preferences] Upsert error:', error);
       return NextResponse.json(
-        { success: false, error: 'Failed to update preferences' },
+        { success: false, error: 'Failed to save preferences' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Preferences updated',
+      message: existing ? 'Preferences updated' : 'Preferences created',
       data: {
         email: data.user_email,
-        frequency: data.alert_frequency,
+        alertsEnabled: data.alerts_enabled,
+        alertFrequency: data.alert_frequency,
+        briefingsEnabled: data.briefings_enabled,
+        briefingFrequency: data.briefing_frequency,
         timezone: data.timezone,
         isActive: data.is_active,
       },
     });
   } catch (error) {
-    console.error('[Alert Preferences] Error:', error);
+    console.error('[Notification Preferences] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

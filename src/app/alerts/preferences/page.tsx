@@ -126,8 +126,8 @@ function AlertPreferencesContent() {
         } else {
           setFrequency(data.data.frequency === 'weekly' ? 'weekly' : 'daily');
         }
-        // For now, briefings is always enabled (no DB field yet)
-        setBriefingsEnabled(true);
+        // Load briefings enabled from API
+        setBriefingsEnabled(data.data.briefingsEnabled ?? true);
       } else {
         setNotFound(true);
       }
@@ -174,6 +174,7 @@ function AlertPreferencesContent() {
           businessType: businessType || null,
           frequency: frequency,
           isActive: frequency !== 'paused',
+          briefingsEnabled: briefingsEnabled,
         }),
       });
 
