@@ -444,27 +444,37 @@ function AlertPreferencesContent() {
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {INDUSTRY_PRESETS.map((preset) => {
-                      // Check if any of the preset codes are already in the input
+                      // Check if ALL of the preset codes are in the input (fully selected)
                       const currentCodes = naicsInput.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
-                      const hasPreset = preset.codes.some(code => currentCodes.includes(code));
+                      const hasAllPresetCodes = preset.codes.every(code => currentCodes.includes(code));
 
                       return (
                         <button
                           key={preset.label}
                           type="button"
                           onClick={() => {
-                            // Add the preset codes to existing codes (avoid duplicates)
                             const existingCodes = naicsInput.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
-                            const newCodes = [...new Set([...existingCodes, ...preset.codes])];
-                            setNaicsInput(newCodes.join(', '));
+
+                            if (hasAllPresetCodes) {
+                              // Remove all codes from this preset
+                              const newCodes = existingCodes.filter(code => !preset.codes.includes(code));
+                              setNaicsInput(newCodes.join(', '));
+                            } else {
+                              // Add the preset codes (avoid duplicates)
+                              const newCodes = [...new Set([...existingCodes, ...preset.codes])];
+                              setNaicsInput(newCodes.join(', '));
+                            }
                           }}
                           className={`text-left p-3 rounded-lg border transition-all ${
-                            hasPreset
+                            hasAllPresetCodes
                               ? 'bg-red-500/20 border-red-500/40 text-white'
                               : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600'
                           }`}
                         >
-                          <div className="font-medium text-sm">{preset.label}</div>
+                          <div className="font-medium text-sm flex items-center gap-2">
+                            {preset.label}
+                            {hasAllPresetCodes && <span className="text-xs text-red-400">✓</span>}
+                          </div>
                           <div className="text-xs text-slate-500 mt-0.5">{preset.description}</div>
                         </button>
                       );
