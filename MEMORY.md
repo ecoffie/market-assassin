@@ -22,7 +22,7 @@ Made daily alerts and briefings **FREE FOR EVERYONE** during beta. Complete syst
 - **FREE PREVIEW banners** — Added to emails so users know it's beta/test mode
 
 #### Daily Briefings (`/api/cron/send-briefings`)
-- **Made free for everyone** — Pulls from BOTH `user_briefing_profile` AND `user_alert_settings` tables
+- **Made free for everyone** — Pulls from BOTH `user_notification_settings` AND `user_notification_settings` tables
 - **Deduplication** — Checks `briefing_log` before sending
 - **Retry logic** — 3 attempts within 3 days
 - **Timezone-aware delivery** — 6-10 AM local time
@@ -180,7 +180,7 @@ Replaced generic IDIQ content with Southern US / A/E/C-focused opportunities usi
 - User reported "Failed to save alert profile" error from `/alerts/signup`
 - **Root causes identified:**
   1. `source: 'free-signup'` wasn't recognized as free tier (only `'opportunity-hunter-free'` was)
-  2. Upsert attempted to insert `source` column which doesn't exist in `user_alert_settings` table
+  2. Upsert attempted to insert `source` column which doesn't exist in `user_notification_settings` table
 - **Fixes applied to `src/app/api/alerts/save-profile/route.ts`:**
   - Added `|| source === 'free-signup'` to `isFreeSource` check
   - Removed `source` field from database upsert
@@ -362,7 +362,7 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
   - `naicsCodes[]` — direct array
   - `naicsInput` — comma-separated string
   - `pscCode` — expands via PSC→NAICS crosswalk
-- All inputs merged and expanded before saving to `user_alert_settings`
+- All inputs merged and expanded before saving to `user_notification_settings`
 
 ### TypeScript Fix
 - Fixed `auth.tier` error in `generate-all/route.ts`

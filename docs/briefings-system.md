@@ -80,7 +80,7 @@ src/lib/briefings/
 
 ### Core Tables
 
-#### `user_briefing_profile`
+#### `user_notification_settings`
 User watchlist and delivery preferences.
 
 | Column | Type | Description |
@@ -140,7 +140,7 @@ Main briefing delivery job. Runs at 9 AM UTC daily.
 **Flow:**
 1. Verify Vercel cron header or CRON_SECRET
 2. Retry failed briefings from previous 3 days (max 3 retries)
-3. Fetch users from `user_briefing_profile` AND `user_alert_settings`
+3. Fetch users from `user_notification_settings` AND `user_notification_settings`
 4. Deduplicate by email address
 5. Filter by timezone (6-10 AM local time)
 6. Check `briefing_log` to prevent duplicate sends
@@ -381,7 +381,7 @@ Briefings deliver between 6-10 AM local time:
    ```
 
 2. **Verify user profile exists:**
-   - Check `user_briefing_profile` table has naics_codes populated
+   - Check `user_notification_settings` table has naics_codes populated
 
 3. **Test specific user:**
    ```bash

@@ -18,7 +18,7 @@ This is NOT a generic chatbot. It is a **personalized briefing assistant** that:
 ### Context: Existing System
 We already have a Daily Briefings system that:
 1. **Captures user searches** across tools → stored in `user_search_history` (tool, search_type, search_value, metadata)
-2. **Aggregates into a watchlist** → `user_briefing_profile` with: naics_codes, agencies, zip_codes, keywords, watched_companies, watched_contracts (with frequency weights)
+2. **Aggregates into a watchlist** → `user_notification_settings` with: naics_codes, agencies, zip_codes, keywords, watched_companies, watched_contracts (with frequency weights)
 3. **Generates personalized briefings** daily → opportunities, recompetes, contract awards, contractor changes, web intelligence — all filtered by their profile
 4. **Delivers via email** (and optionally SMS) — cron at 9 AM UTC
 5. **Logs each briefing** → `briefing_log` stores `briefing_content` (JSONB), `briefing_html`, `briefing_sms` — designed for chatbot context
@@ -45,7 +45,7 @@ The PRD should cover:
 
 3. **Data & Context Architecture**
    - Primary context: `briefing_log.briefing_content` for the user's most recent briefings (last 7–14 days)
-   - Secondary: `user_briefing_profile` (watchlist, preferences)
+   - Secondary: `user_notification_settings` (watchlist, preferences)
    - Tertiary: `user_search_history` for "what have I been researching?"
    - Access control: User must be identified (email) and have `access_briefing_chat` or equivalent
    - Data freshness: Briefing content is daily; chatbot should know "as of [date]"
@@ -67,7 +67,7 @@ The PRD should cover:
 6. **Identity & Linking**
    - User links phone/WhatsApp/Telegram/Discord to their GovCon account (email)
    - Verification flow (e.g., code sent to email or channel)
-   - Schema: `user_briefing_profile.preferences` or new `user_chat_channels` table
+   - Schema: `user_notification_settings.preferences` or new `user_chat_channels` table
 
 7. **Phased Rollout**
    - Phase 1: Single channel (e.g., WhatsApp or Telegram), email-linked users only
@@ -81,7 +81,7 @@ The PRD should cover:
    - Real-time data (briefing is daily; chat reflects last briefing)
 
 9. **Dependencies**
-   - Existing: `user_briefing_profile`, `briefing_log`, `user_search_history`, briefing generator
+   - Existing: `user_notification_settings`, `briefing_log`, `user_search_history`, briefing generator
    - New: Channel adapters (WhatsApp Business API, Telegram Bot API, etc.), chat API route, LLM integration (Groq/OpenAI)
 
 10. **Open Questions for PRD**
@@ -96,11 +96,11 @@ The PRD should cover:
 
 | Data Source | Location | Purpose |
 |-------------|----------|---------|
-| User watchlist | `user_briefing_profile` | NAICS, agencies, companies, keywords, zip codes |
+| User watchlist | `user_notification_settings` | NAICS, agencies, companies, keywords, zip codes |
 | Briefing content | `briefing_log.briefing_content` | Full structured briefing per user per date |
 | Search history | `user_search_history` | What user has searched (tool, type, value) |
 | Access flag | `user_profiles.access_briefing_chat` | Schema already has this column |
-| Delivery prefs | `user_briefing_profile.preferences` | Can extend for channel (WhatsApp, etc.) |
+| Delivery prefs | `user_notification_settings.preferences` | Can extend for channel (WhatsApp, etc.) |
 
 ---
 

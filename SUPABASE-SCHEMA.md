@@ -89,7 +89,7 @@ Captures all user searches across tools for auto-building watchlists.
 
 ---
 
-### `user_briefing_profile`
+### `user_notification_settings`
 
 Aggregated watchlist from search history + user preferences.
 
@@ -219,7 +219,7 @@ Shared cache for web search results (expires after 24 hours).
 
 ## Alerts Tables
 
-### `user_alert_settings`
+### `user_notification_settings`
 
 Alert preferences for MA Premium users.
 
@@ -356,7 +356,7 @@ Located in `src/lib/supabase/`:
 | `user-profiles-schema.sql` | `user_profiles` |
 | `purchases-schema-v2.sql` | `purchases` |
 | `briefings-schema.sql` | All briefing tables + functions |
-| `alerts-schema.sql` | `user_alert_settings`, `alert_log` |
+| `alerts-schema.sql` | `user_notification_settings`, `alert_log` |
 | `planner-schema.sql` | `user_plans`, `planner_gamification` |
 
 ---
