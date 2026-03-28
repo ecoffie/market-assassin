@@ -1,13 +1,21 @@
 /**
  * Recompete Data Aggregator
  *
- * Pulls data from USASpending, RSS feeds, and web search to build
- * the raw data needed for recompete briefings.
+ * Pulls data from SAM.gov Contract Awards API (primary), USASpending (fallback),
+ * RSS feeds, and web search to build the raw data needed for recompete briefings.
+ *
+ * UPDATED March 2026: Integrated SAM.gov Contract Awards API for bid counts,
+ * competition data, and incumbent tracking (FPDS replacement).
  */
 
 import { RawRecompeteData, RecompeteUserProfile } from './types';
 import { fetchAllRSSFeeds, filterRSSByKeywords, filterRecentRSS, rssToSearchResults } from '../web-intel/rss';
 import { searchGovConNews, isSerperConfigured } from '../web-intel/serper';
+import {
+  getExpiringContracts as getSAMExpiringContracts,
+  aggregateContractIntelligence,
+  ContractAward
+} from '@/lib/sam';
 
 const USASPENDING_API = 'https://api.usaspending.gov/api/v2';
 
@@ -62,9 +70,79 @@ const RECOMPETE_KEYWORDS = [
 ];
 
 /**
- * Fetch expiring contracts from USASpending
+ * Convert SAM.gov ContractAward to our RawRecompeteData format
+ */
+function samAwardToRecompeteContract(award: ContractAward): RawRecompeteData['expiringContracts'][0] {
+  return {
+    piid: award.piid,
+    agency: award.awardingAgencyName,
+    agencyCode: '',
+    vendorName: award.recipientName,
+    vendorUei: award.recipientUei,
+    obligatedAmount: award.currentTotalValueOfAward,
+    currentEndDate: award.periodOfPerformanceCurrentEndDate,
+    naicsCode: award.naicsCode,
+    naicsDescription: award.naicsDescription,
+    setAsideType: undefined, // Map from extentCompeted if needed
+    placeOfPerformanceState: award.placeOfPerformanceState,
+    // NEW: Competition intelligence from SAM.gov
+    numberOfBids: award.numberOfOffersReceived,
+    competitionLevel: award.competitionLevel,
+    competitionType: award.extentCompetedDescription,
+    daysUntilExpiration: award.daysUntilExpiration,
+  };
+}
+
+/**
+ * Fetch expiring contracts - tries SAM.gov Contract Awards API first,
+ * falls back to USASpending if SAM.gov fails.
  */
 async function fetchExpiringContracts(
+  profile: RecompeteUserProfile,
+  options: { monthsAhead?: number; limit?: number } = {}
+): Promise<RawRecompeteData['expiringContracts']> {
+  const { monthsAhead = 18, limit = 100 } = options;
+  const naicsCodes = profile.naicsCodes.length > 0 ? profile.naicsCodes.slice(0, 5) : ['541511', '541512', '541519'];
+
+  // Try SAM.gov Contract Awards API first (has bid counts!)
+  try {
+    console.log('[DataAggregator] Fetching from SAM.gov Contract Awards API...');
+    const allContracts: RawRecompeteData['expiringContracts'] = [];
+
+    for (const naics of naicsCodes) {
+      const samContracts = await getSAMExpiringContracts(naics, monthsAhead);
+
+      for (const award of samContracts) {
+        // Only include contracts with $1M+ value
+        if (award.currentTotalValueOfAward >= 1000000) {
+          allContracts.push(samAwardToRecompeteContract(award));
+        }
+      }
+
+      console.log(`[DataAggregator] SAM.gov NAICS ${naics}: ${samContracts.length} contracts`);
+    }
+
+    if (allContracts.length > 0) {
+      console.log(`[DataAggregator] SAM.gov: ${allContracts.length} total expiring contracts`);
+      // Sort by value descending
+      allContracts.sort((a, b) => b.obligatedAmount - a.obligatedAmount);
+      return allContracts.slice(0, limit);
+    }
+
+    console.log('[DataAggregator] SAM.gov returned no results, falling back to USASpending');
+  } catch (error) {
+    console.error('[DataAggregator] SAM.gov API error, falling back to USASpending:', error);
+  }
+
+  // Fallback to USASpending
+  return fetchExpiringContractsFromUSASpending(profile, options);
+}
+
+/**
+ * Fallback: Fetch expiring contracts from USASpending
+ * (Used when SAM.gov is rate limited or unavailable)
+ */
+async function fetchExpiringContractsFromUSASpending(
   profile: RecompeteUserProfile,
   options: { monthsAhead?: number; limit?: number } = {}
 ): Promise<RawRecompeteData['expiringContracts']> {
@@ -151,10 +229,15 @@ async function fetchExpiringContracts(
           naicsDescription: award['naics_description'] || award['Description'] || '',
           setAsideType: undefined, // Not available in this endpoint
           placeOfPerformanceState: award['pop_state_code'] || undefined,
+          // USASpending doesn't have bid counts - mark as unknown
+          numberOfBids: undefined,
+          competitionLevel: undefined,
+          competitionType: undefined,
+          daysUntilExpiration: daysUntilEnd,
         });
       }
 
-      console.log(`[DataAggregator] NAICS ${naics}: ${contracts.length} expiring contracts found`);
+      console.log(`[DataAggregator] USASpending NAICS ${naics}: ${contracts.length} expiring contracts`);
     }
 
     // Sort by value descending

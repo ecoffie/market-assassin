@@ -1,74 +1,158 @@
 # GovCon Giants - Current Tasks
 
-## Session State (March 23, 2026)
+## Session State (March 28, 2026)
 
-### Just Completed - Alerts & Briefings System Overhaul
+### Just Completed - Market Intelligence Pipeline Fix
 
-Made daily alerts and briefings FREE FOR EVERYONE during beta. Complete system improvements:
+**MAJOR FIX:** Daily Alerts and Daily Briefs now reach ALL 394+ users
 
-#### Alerts System
-- [x] Removed paywall - all users get daily alerts free
-- [x] Added deduplication (won't resend same opp in 7 days)
-- [x] Added retry logic (3 attempts for failed emails)
-- [x] Added timezone-aware delivery (~6 AM local time)
-- [x] Added keywords search (catch mislabeled opportunities)
-- [x] Added PSC crosswalk (auto-generate related PSC codes from NAICS)
-- [x] Cleaned NAICS display (filter out non-numeric values)
-- [x] Removed state filter (always search nationwide)
-- [x] Added FREE PREVIEW banners to emails
+#### What Was Wrong
+- Daily Alerts queried `user_alert_settings` (394 users) ✅
+- Daily Briefs/Snapshots ONLY queried `user_notification_settings` (32 users) ❌
+- 362 users (94%) were missing Daily Briefs entirely
 
-#### Briefings System
-- [x] Made free for everyone (pulls from both user_briefing_profile AND user_alert_settings)
-- [x] Added deduplication (check briefing_log before sending)
-- [x] Added retry logic (3 attempts within 3 days)
-- [x] Added timezone-aware delivery (6-10 AM local time)
-- [x] Added FREE PREVIEW banner to emails
+#### What We Fixed
+- [x] `send-briefings/route.ts` - Now queries BOTH tables, deduplicates by email
+- [x] `snapshot-recompetes/route.ts` - Now queries BOTH tables + fallback NAICS
+- [x] `snapshot-awards/route.ts` - Now queries BOTH tables + fallback NAICS
+- [x] Added fallback NAICS codes: `541512, 541611, 541330, 236220, 238210`
+- [x] Added construction NAICS (236, 238) to coverage
+- [x] Auto-enroll ALL purchasers in alert_settings via Stripe webhook
+- [x] Added "BONUS: Free Daily Alerts" section to all purchase emails
 
-#### Preferences Page Redesign
-- [x] New frequency radio buttons: Daily / Weekly / Paused
-- [x] New briefings section with opt-in checkbox
-- [x] New keywords field for catching mislabeled opps
-- [x] Clean NAICS codes (numeric only)
-- [x] Removed state filter (nationwide by default)
-- [x] FREE PREVIEW banners on both sections
-- [x] Clear unsubscribe option
+#### New Admin Endpoints
+- `/api/admin/test-market-intel-pipeline` - Full pipeline status/testing
+- `/api/admin/sync-alert-to-notification` - Sync users between tables
+- `/api/admin/send-naics-reminder` - Send NAICS setup reminder emails
 
-#### SQL Migrations Run
-- `alerts-schema-update.sql` - timezone, retry_count, alert_type columns
-- `briefings-schema-update.sql` - retry_count column
-- `keywords-schema-update.sql` - keywords column
+#### Documentation Updated
+- [x] `tasks/lessons.md` - 5 new lessons (two-table problem, fallback NAICS, etc.)
+- [x] `docs/ecosystem.md` - Market Intel pipeline diagram
+- [x] `CLAUDE.md` - New endpoints + bug prevention rules
 
-#### Cron Schedule (vercel.json)
-| Job | Schedule (UTC) | Description |
-|-----|----------------|-------------|
-| send-briefings | 9 AM | Daily briefings |
-| daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | Timezone coverage |
-| weekly-alerts | 11 PM Sunday | Weekly digest |
+#### Market Intelligence - Now FREE for Beta
+- **Daily Alerts** (4x/day) - SAM.gov opportunities matching user NAICS
+- **Daily Briefs** (9 AM UTC) - Recompete intel, awards, teaming leads
+- **Weekly Pursuit Brief** (Monday 10 AM UTC) - Auto-selects TOP opportunity
+- **Weekly Deep Dive** (Sunday 10 AM UTC) - Comprehensive market analysis
+
+#### Test Endpoints
+```bash
+# Test full pipeline
+curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026"
+
+# Test specific user
+curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026&email=user@example.com"
+
+# Send test component
+curl -X POST "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026&email=user@example.com&component=briefs"
+```
+
+### Previously Completed - SAM.gov API Integration (Phase 1-4)
+
+Full SAM.gov API integration to replace retired FPDS.gov. Implemented 4 APIs with USASpending fallback.
+
+#### Phase 1: Contract Awards API
+- [x] Created `src/lib/sam/contract-awards.ts` - Core wrapper
+- [x] Created `src/lib/sam/usaspending-fallback.ts` - Fallback for bid counts
+- [x] USASpending as primary source (no System Account needed)
+- [x] Bid count data working (numberOfOffersReceived)
+- [x] Competition level classification (sole_source, low, medium, high)
+- [x] Admin test endpoint: `/api/admin/test-sam-awards`
+- [x] USASpending test endpoint: `/api/admin/test-usaspending`
+
+#### Phase 2: Entity Management API
+- [x] Created `src/lib/sam/entity-api.ts`
+- [x] Search entities by name, UEI, CAGE, NAICS
+- [x] SAM status verification
+- [x] Certification lookups (8a, SDVOSB, WOSB, HUBZone)
+- [x] Admin test endpoint: `/api/admin/test-sam-entity`
+
+#### Phase 3: Federal Hierarchy API
+- [x] Created `src/lib/sam/federal-hierarchy.ts`
+- [x] Agency structure lookups
+- [x] Office search by NAICS
+- [x] Buying offices summary
+- [x] Admin test endpoint: `/api/admin/test-sam-hierarchy`
+- [x] Public endpoint: `/api/agency-hierarchy`
+
+#### Phase 4: Subaward API
+- [x] Created `src/lib/sam/subaward-api.ts`
+- [x] Prime→Sub relationship mapping
+- [x] Teaming network builder
+- [x] Admin test endpoint: `/api/admin/test-sam-subaward`
+- [ ] **BLOCKED:** Requires SAM.gov System Account (requested, waiting 1-4 weeks)
+
+#### Shared Infrastructure
+- [x] Created `src/lib/sam/utils.ts` - Rate limiting, caching, error handling
+- [x] Created `src/lib/sam/index.ts` - Unified exports
+- [x] Supabase cache table: `sam_api_cache`
+- [x] Rate limit: 1,000 requests/day with in-memory tracking
+- [x] Cache TTL: 24h for awards/entity, 1h for opportunities
+
+### Waiting On
+- [ ] SAM.gov System Account approval (1-4 weeks)
+  - Entity reactivated ✅
+  - Request submitted ✅
+  - Once approved: Contract Awards + Subaward APIs will use SAM.gov directly
 
 ### Pending
+- [ ] Teaming network visualization (blocked on Subaward API access)
+- [ ] Enrich Recompete Tracker static data with bid counts
 - [ ] Create JTED landing page with downloadable handout (`/jted`)
-- [ ] Record demo video for /opp page
-- [ ] Test profile tracking with real click interactions
+
+---
+
+## API Status
+
+| API | Status | Source | Requires System Account |
+|-----|--------|--------|------------------------|
+| Opportunities | ✅ Working | SAM.gov | No |
+| Entity Management | ✅ Working | SAM.gov | No |
+| Federal Hierarchy | ✅ Working | SAM.gov | No |
+| Contract Awards | ✅ Working | **USASpending** | Yes (using fallback) |
+| Subaward | ⏳ Waiting | SAM.gov | Yes |
+
+## Test Endpoints
+
+```bash
+# Contract Awards (uses USASpending)
+curl "https://tools.govcongiants.org/api/admin/test-sam-awards?password=galata-assassin-2026&naics=541512"
+
+# USASpending direct
+curl "https://tools.govcongiants.org/api/admin/test-usaspending?password=galata-assassin-2026&naics=541512"
+
+# Entity lookup
+curl "https://tools.govcongiants.org/api/admin/test-sam-entity?password=galata-assassin-2026&name=Booz"
+
+# Federal Hierarchy
+curl "https://tools.govcongiants.org/api/admin/test-sam-hierarchy?password=galata-assassin-2026&agency=VA"
+
+# Subaward (blocked until System Account)
+curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata-assassin-2026&prime_uei=XXX"
+```
 
 ---
 
 ## Previous Session Work
 
-### Session 31 - Earlier (Mar 23, 2026)
-- JTED Conference Presentation - Final Polish
-- Full-size screenshots (hero treatment)
-- A/E/C IDIQ restructure with Recompete Tracker data
-- "What You'll Walk Away With" slide added
+### Session 34 (Mar 28, 2026)
+- Fixed Market Intelligence pipeline (two-table problem)
+- All 394+ users now receive Daily Alerts AND Daily Briefs
+- Added construction NAICS (236, 238) to coverage
+- Auto-enroll all purchasers in alerts
+- Added bonus section to purchase emails
+- Created 3 new admin endpoints for pipeline testing
 
-### Session 30 (Mar 20, 2026)
-- Win Probability Scoring for Daily Briefings (0-100%)
-- Rate Limiting & Abuse Detection (complete)
-- Usage API Fix (real KV data)
+### Session 33 (Mar 26, 2026)
+- Daily Alerts vs Market Intelligence clarification
+- SAM.gov API integration (Phase 1-4)
 
-### Session 29 (Mar 18, 2026)
-- Alerts Signup Bug Fix
-- Daily Health Check System (12 tests, 100% pass rate)
-- Content Reaper Length Optimization
+### Session 31 (Mar 23, 2026)
+- Alerts & Briefings System Overhaul
+- Made daily alerts FREE FOR EVERYONE during beta
+- Added deduplication, retry logic, timezone-aware delivery
+- Added PSC crosswalk for broader search
 
 ---
 
@@ -76,13 +160,6 @@ Made daily alerts and briefings FREE FOR EVERYONE during beta. Complete system i
 ```
 HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html
 JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
-```
-
-## Test URLs
-```
-Daily Alerts: https://tools.govcongiants.org/api/cron/daily-alerts?email=eric@govcongiants.com&test=true
-Briefings: https://tools.govcongiants.org/api/cron/send-briefings?email=eric@govcongiants.com&test=true
-Preferences: https://tools.govcongiants.org/alerts/preferences?email=eric@govcongiants.com
 ```
 
 ---
@@ -96,4 +173,4 @@ Preferences: https://tools.govcongiants.org/alerts/preferences?email=eric@govcon
 
 **Resume command:** `/continue`
 
-**Last updated:** March 23, 2026 (Session 31)
+**Last updated:** March 28, 2026 (Session 34)

@@ -153,19 +153,25 @@ export interface CondensedBriefing {
  * Raw data from various sources before AI enhancement
  */
 export interface RawRecompeteData {
-  // From USASpending/FPDS
+  // From SAM.gov Contract Awards API (primary) or USASpending (fallback)
   expiringContracts: Array<{
     piid: string;
     contractNumber?: string;
     agency: string;
     agencyCode: string;
     vendorName: string;
+    vendorUei?: string; // UEI for competitor tracking
     obligatedAmount: number;
     currentEndDate: string;
     naicsCode: string;
     naicsDescription: string;
     setAsideType?: string;
     placeOfPerformanceState?: string;
+    // NEW: Competition intelligence from SAM.gov Contract Awards API
+    numberOfBids?: number;  // How many bidders on original award
+    competitionLevel?: 'sole_source' | 'low' | 'medium' | 'high';
+    competitionType?: string; // "Full and Open", "Sole Source", etc.
+    daysUntilExpiration?: number;
   }>;
 
   // From RSS/Web scraping

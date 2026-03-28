@@ -100,9 +100,11 @@ export async function GET(request: NextRequest) {
       console.log(`[SendBriefings] Retried ${retryResults.retried} failed briefings, ${retryResults.succeeded} succeeded`);
     }
 
-    // Step 1: Get users from unified notification settings table
+    // Step 1: Get users from BOTH tables (user_notification_settings AND user_alert_settings)
     const allUsers: BriefingUser[] = [];
+    const seenEmails = new Set<string>();
 
+    // Source 1: user_notification_settings (original source)
     const { data: notificationSettings } = await supabase
       .from('user_notification_settings')
       .select('user_email, naics_codes, agencies, timezone, sms_enabled, phone_number, briefings_enabled, is_active, aggregated_profile')
@@ -113,7 +115,8 @@ export async function GET(request: NextRequest) {
     if (notificationSettings) {
       for (const p of notificationSettings) {
         const email = p.user_email?.toLowerCase();
-        if (!email) continue;
+        if (!email || seenEmails.has(email)) continue;
+        seenEmails.add(email);
 
         // Extract NAICS from either JSONB or columns
         const jsonb = p.aggregated_profile as Record<string, unknown> | null;
@@ -133,7 +136,17 @@ export async function GET(request: NextRequest) {
           agencies = [...new Set([...agencies, ...p.agencies])];
         }
 
-        if (naics.length === 0 && agencies.length === 0) continue;
+        // FALLBACK: If user has no NAICS and no agencies, use popular default NAICS codes
+        if (naics.length === 0 && agencies.length === 0) {
+          naics = [
+            '541512', // Computer Systems Design
+            '541611', // Management Consulting
+            '541330', // Engineering Services
+            '541990', // Other Professional Services
+            '561210', // Facilities Support Services
+          ];
+          console.log(`[SendBriefings] Using fallback NAICS for ${email} (from notification_settings)`);
+        }
 
         allUsers.push({
           email,
@@ -146,6 +159,50 @@ export async function GET(request: NextRequest) {
         });
       }
     }
+
+    // Source 2: user_alert_settings (users enrolled via Stripe webhook or alert signup)
+    // This catches users who haven't been synced to notification_settings yet
+    const { data: alertSettings } = await supabase
+      .from('user_alert_settings')
+      .select('user_email, naics_codes, keywords, target_agencies, timezone, briefings_enabled, is_active')
+      .eq('is_active', true)
+      .eq('briefings_enabled', true)
+      .limit(MAX_USERS_PER_RUN);
+
+    if (alertSettings) {
+      for (const p of alertSettings) {
+        const email = p.user_email?.toLowerCase();
+        if (!email || seenEmails.has(email)) continue; // Skip if already added from notification_settings
+        seenEmails.add(email);
+
+        let naics: string[] = Array.isArray(p.naics_codes) ? p.naics_codes : [];
+        const agencies: string[] = Array.isArray(p.target_agencies) ? p.target_agencies : [];
+
+        // FALLBACK: If user has no NAICS and no agencies, use popular default NAICS codes
+        if (naics.length === 0 && agencies.length === 0) {
+          naics = [
+            '541512', // Computer Systems Design
+            '541611', // Management Consulting
+            '541330', // Engineering Services
+            '541990', // Other Professional Services
+            '561210', // Facilities Support Services
+          ];
+          console.log(`[SendBriefings] Using fallback NAICS for ${email} (from alert_settings)`);
+        }
+
+        allUsers.push({
+          email,
+          naics_codes: naics,
+          agencies,
+          timezone: p.timezone || 'America/New_York',
+          sms_enabled: false,
+          phone_number: undefined,
+          source: 'alert_settings' as const,
+        });
+      }
+    }
+
+    console.log(`[SendBriefings] Found ${allUsers.length} total users (${notificationSettings?.length || 0} from notification_settings, ${alertSettings?.length || 0} from alert_settings, ${seenEmails.size - allUsers.length} duplicates removed)`);
 
     // Filter to test email if specified
     let usersToProcess = allUsers;

@@ -108,4 +108,346 @@ const text = `Hashtags: ${post.hashtags.join(' ')}`;
 
 ---
 
-*Last Updated: March 17, 2026*
+## SAM.gov API Authentication
+
+**Lesson (Mar 25, 2026):** SAM.gov Contract Awards and Subaward APIs require **System Account**, not just public API key.
+
+**What works with public API key:**
+- Opportunities API ✅
+- Entity Management API ✅
+- Federal Hierarchy API ✅
+
+**What requires System Account:**
+- Contract Awards API ❌
+- Subaward Reporting API ❌
+
+**How to get System Account:**
+1. Entity must be **Active** in SAM.gov (renew if expired)
+2. Go to Workspace → System Accounts
+3. Request System Account access
+4. Wait 1-4 weeks for approval
+5. Add new API key to environment
+
+**Workaround:** USASpending.gov API provides similar contract data including bid counts (`number_of_offers_received`) without authentication. Use as fallback or primary source.
+
+---
+
+## USASpending API Field Mapping
+
+**Lesson (Mar 25, 2026):** USASpending search endpoint returns `generated_internal_id`, not `generated_unique_award_id`.
+
+**Pattern:**
+```typescript
+// Search endpoint returns generated_internal_id
+const awardId = result.generated_internal_id || result.generated_unique_award_id;
+
+// Use that ID for detail lookup
+const details = await fetch(`/api/v2/awards/${awardId}/`);
+```
+
+**Key field locations in award detail response:**
+```typescript
+// Competition data is nested
+const bidCount = details.latest_transaction_contract_data.number_of_offers_received;
+const competition = details.latest_transaction_contract_data.extent_competed;
+
+// Recipient is nested
+const recipientName = details.recipient.recipient_name;
+
+// Dates are nested
+const endDate = details.period_of_performance.end_date;
+
+// NAICS is nested
+const naicsCode = details.naics_hierarchy.base_code.code;
+```
+
+---
+
+## Daily Briefings Pipeline Migration
+
+**Lesson (Mar 26, 2026):** When replacing a data source (FPDS → USASpending), update ALL consumers, not just the wrapper.
+
+**Files that import from `fpds-recompete.ts`:**
+- `snapshot-recompetes/route.ts` - cron job
+- `diff-engine.ts` - snapshot comparison
+- `ai-briefing-generator.ts` - AI prompt generation
+- `generator.ts` - email generation
+- `pursuit-brief-generator.ts` - pursuit briefs
+- `weekly-briefing-generator.ts` - weekly digests
+- `perplexity-enrichment.ts` - web enrichment
+- `pipelines/index.ts` - unified exports
+
+**Pattern:**
+```typescript
+// OLD - imported from retired FPDS
+import { fetchFPDSByNaics, FPDSAward } from '@/lib/utils/fpds-api';
+
+// NEW - use SAM/USASpending wrapper
+import {
+  getExpiringContracts,
+  type ContractAward
+} from '@/lib/sam';
+```
+
+**Key changes to RecompeteContract interface:**
+```typescript
+// NEW fields added
+incumbentUei: string | null;      // DUNS deprecated
+numberOfBids?: number;            // From USASpending
+competitionLevel?: 'sole_source' | 'low' | 'medium' | 'high';
+competitionType?: string;         // e.g., "Full and Open Competition"
+```
+
+---
+
+## Market Intelligence System (3 Report Types)
+
+**Lesson (Mar 26, 2026):** The system is called "Market Intelligence" with 3 distinct report types.
+
+**The 3 Report Types:**
+1. **Daily Brief** - Daily Market Intel with Top 10 + 3 Ghosting/Teaming Plays
+2. **Weekly Deep Dive** - Full analysis of 10 Opportunities with competitive landscape, calendar
+3. **Pursuit Brief** - Single opportunity deep dive with score (68/100 CONDITIONAL)
+
+**Key Files:**
+- `/api/admin/send-all-briefings/route.ts` - Sends all 3 types
+- Uses `user_notification_settings` table for NAICS codes
+- Fetches real data from USASpending API
+
+**Pattern:**
+```typescript
+// Always pull NAICS from user's saved profile
+const { data: userSettings } = await supabase
+  .from('user_notification_settings')
+  .select('naics_codes, agencies, keywords')
+  .eq('user_email', email)
+  .single();
+
+const userNaics = userSettings?.naics_codes || [];
+```
+
+---
+
+## Daily Alerts vs Market Intelligence
+
+**Lesson (Mar 26, 2026):** These are TWO SEPARATE systems - do NOT conflate them.
+
+| System | Access | KV Key | Access Flag |
+|--------|--------|--------|-------------|
+| **Daily Alerts** | FREE for everyone (beta) | `alertpro:{email}` for Pro tier | N/A (free) |
+| **Market Intelligence** | Pro/Ultimate bundles only | `briefings:{email}` | `access_briefings` |
+
+**Daily Alerts:**
+- Simple SAM.gov opportunity notifications
+- User sets NAICS codes at `/alerts/preferences`
+- Cron: `/api/cron/daily-alerts`
+- FREE during beta - no access check
+
+**Market Intelligence:**
+- Premium system with 3 report types
+- Deep analysis, bid counts, win probability
+- Only granted via Pro Bundle ($997) or Ultimate Bundle ($1,497)
+- Individual tool purchases do NOT include Market Intelligence
+
+**Why separate?**
+- Daily Alerts = demo/trial hook to show value
+- Market Intelligence = premium upsell for serious contractors
+
+---
+
+## Pre-Deploy QA Testing
+
+**Lesson (Mar 27, 2026):** Always run QA tests before deployment. The SAM.gov date format bug (YYYY-MM-DD vs MM/dd/yyyy) would have been caught.
+
+**Commands:**
+```bash
+# Run pre-deploy tests (required before deploy)
+npm run test:pre-deploy
+
+# Safe deploy (runs tests first, blocks if failures)
+npm run deploy
+
+# Run all test suites
+npm test
+```
+
+**What pre-deploy tests check:**
+1. TypeScript compilation (no type errors)
+2. SAM.gov date format validation
+3. Critical API endpoint health
+4. Daily alerts pipeline
+5. Market Intelligence pipeline
+6. Access control rules (Starter bundle exclusion)
+7. Environment variable references
+
+**Rule:** Never deploy without running `npm run test:pre-deploy` first.
+
+**Files:**
+- `tests/test-pre-deploy.sh` - Main QA script
+- `tests/run-all-tests.sh` - Full test suite runner
+
+---
+
+## Market Intelligence - Two Table Problem
+
+**Lesson (Mar 27, 2026):** Daily Alerts and Daily Briefings use DIFFERENT user tables. Must query BOTH.
+
+**Tables:**
+| Table | Purpose | Primary Users |
+|-------|---------|---------------|
+| `user_alert_settings` | Alert preferences, Stripe webhook enrollments | 394 users |
+| `user_notification_settings` | Briefing preferences, smart profiles | 32 users |
+
+**What went wrong:**
+- Daily Alerts cron queried `user_alert_settings` → 394 users got alerts
+- Daily Briefings cron queried ONLY `user_notification_settings` → Only 32 users got briefs
+- 362 users (94%) missed briefings because they weren't synced
+
+**Fix (send-briefings/route.ts):**
+```typescript
+// Source 1: user_notification_settings (original source)
+const { data: notificationSettings } = await supabase
+  .from('user_notification_settings')
+  .select('user_email, naics_codes, ...')
+  .eq('is_active', true)
+  .eq('briefings_enabled', true);
+
+// Source 2: user_alert_settings (Stripe webhook enrollments)
+const { data: alertSettings } = await supabase
+  .from('user_alert_settings')
+  .select('user_email, naics_codes, ...')
+  .eq('is_active', true)
+  .eq('briefings_enabled', true);
+
+// Dedupe by email (use Set to track seen emails)
+const seenEmails = new Set<string>();
+for (const p of notificationSettings) { ... }
+for (const p of alertSettings) {
+  if (seenEmails.has(email)) continue; // Skip duplicates
+  ...
+}
+```
+
+**Admin endpoints created:**
+- `/api/admin/sync-alert-to-notification` - Sync users between tables
+- `/api/admin/test-market-intel-pipeline` - Pipeline status/testing
+
+---
+
+## Fallback NAICS Codes
+
+**Lesson (Mar 27, 2026):** Users without NAICS codes should still receive alerts/briefs using popular defaults.
+
+**Problem:** 362/394 users had no NAICS codes set. They received nothing.
+
+**Solution:** If user has no NAICS AND no agencies, use fallback codes:
+```typescript
+if (naics.length === 0 && agencies.length === 0) {
+  naics = [
+    '541512', // Computer Systems Design
+    '541611', // Management Consulting
+    '541330', // Engineering Services
+    '541990', // Other Professional Services
+    '561210', // Facilities Support Services
+  ];
+}
+```
+
+**Why these codes:** Highest volume of federal opportunities, covers most small businesses.
+
+**Companion action:** Send NAICS reminder email to encourage personalization.
+- Endpoint: `/api/admin/send-naics-reminder?password=xxx&mode=execute`
+
+---
+
+## Auto-Enrollment for Purchasers
+
+**Lesson (Mar 27, 2026):** All purchasers should be auto-enrolled in free alerts during beta.
+
+**What changed (Stripe webhook):**
+```typescript
+// AUTO-ENROLL ALL PURCHASERS in alert settings
+if (supabase) {
+  const { data: existingSettings } = await supabase
+    .from('user_alert_settings')
+    .select('user_email')
+    .eq('user_email', email.toLowerCase())
+    .limit(1);
+
+  if (!existingSettings || existingSettings.length === 0) {
+    await supabase.from('user_alert_settings').insert({
+      user_email: email.toLowerCase(),
+      alerts_enabled: true,
+      briefings_enabled: true,
+      subscription_status: 'beta',
+      // ... other defaults
+    });
+  }
+}
+```
+
+**Added to purchase emails:**
+```html
+<div style="background: #f0fdf4; border: 2px solid #22c55e;">
+  🎁 BONUS: Free Daily Opportunity Alerts
+  As a GovCon Giants customer, you're automatically enrolled!
+  <a href="https://tools.govcongiants.org/alerts/preferences?email=...">
+    Set Up Your Daily Alerts
+  </a>
+</div>
+```
+
+---
+
+## Briefing Snapshot Pipeline
+
+**Lesson (Mar 27, 2026):** Daily Briefings require populated snapshot tables. No snapshots = 0 briefing items.
+
+**Data flow:**
+```
+Crons (7 AM UTC)          →    briefing_snapshots table    →    generateBriefing()
+snapshot-opportunities    →    tool: opportunity_hunter    →    items for user
+snapshot-recompetes      →    tool: recompete             →    items for user
+snapshot-awards          →    tool: market_assassin       →    items for user
+snapshot-contractors     →    tool: contractor_db         →    items for user
+```
+
+**If briefing returns 0 items, check:**
+1. Are snapshots being created? Query `briefing_snapshots` for today
+2. Does user's NAICS match any snapshot data?
+3. Is the NAICS code included in snapshot crons?
+
+**Construction NAICS (236, 238) coverage:**
+- May have lower volume in snapshot data
+- Consider expanding snapshot cron queries to include construction codes
+
+---
+
+## Pipeline Testing Checklist
+
+**Lesson (Mar 27, 2026):** Always test the full Market Intelligence pipeline before declaring victory.
+
+**Pipeline Test Endpoint:**
+```bash
+curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026"
+```
+
+**What it checks:**
+- Daily Alerts: Users eligible, users with NAICS, recent deliveries
+- Daily Briefs: Both tables, recent deliveries
+- Pursuit Brief: Eligibility
+- Weekly Deep Dive: Eligibility
+
+**Test specific user:**
+```bash
+curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026&email=user@example.com"
+```
+
+**Send test component:**
+```bash
+curl -X POST "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026&email=user@example.com&component=briefs"
+```
+
+---
+
+*Last Updated: March 28, 2026*

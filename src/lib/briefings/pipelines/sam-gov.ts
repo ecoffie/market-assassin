@@ -169,8 +169,9 @@ export async function fetchSamOpportunities(
   // Build base query parameters (without NAICS - we'll add per-request)
   const baseParams = new URLSearchParams();
   baseParams.set('limit', String(Math.min(limit, 50))); // Cap per-request to 50
-  baseParams.set('postedFrom', postedFrom || getDefaultPostedFrom());
-  baseParams.set('postedTo', postedTo || getTodayDate());
+  // SAM.gov requires MM/dd/yyyy format - convert if passed in ISO format (YYYY-MM-DD)
+  baseParams.set('postedFrom', postedFrom ? convertToSAMDateFormat(postedFrom) : getDefaultPostedFrom());
+  baseParams.set('postedTo', postedTo ? convertToSAMDateFormat(postedTo) : getTodayDate());
 
   // Add keywords
   if (keywords.length > 0) {
@@ -386,6 +387,21 @@ function formatDateForSAM(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   const year = date.getFullYear();
   return `${month}/${day}/${year}`;
+}
+
+// Convert any date format to SAM.gov MM/dd/yyyy format
+function convertToSAMDateFormat(dateString: string): string {
+  // If already in MM/dd/yyyy format, return as-is
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+    return dateString;
+  }
+  // Convert from ISO format (YYYY-MM-DD) or any parseable format
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    // Invalid date, return default (30 days ago)
+    return getDefaultPostedFrom();
+  }
+  return formatDateForSAM(date);
 }
 
 function getTodayDate(): string {

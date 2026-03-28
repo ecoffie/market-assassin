@@ -3,7 +3,8 @@
  *
  * GET /api/admin/send-all-briefings?password=...&email=eric@govcongiants.com
  *
- * Generates and sends using REAL data and Claude AI:
+ * Fetches REAL contract data from USASpending based on user's NAICS codes,
+ * then generates and sends using Claude AI:
  * 1. Daily Brief (Top 10 + 3 Ghosting Plays)
  * 2. Weekly Deep Dive (Full analysis + competitive landscape)
  * 3. Pursuit Brief (Single opportunity deep dive)
@@ -11,133 +12,56 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
-// Sample real contract data for demo purposes
-const SAMPLE_CONTRACTS = [
-  {
-    contractNumber: 'HC1028-22-D-0001',
-    contractName: 'DISA Enterprise IT Support Services',
-    agency: 'DoD/Defense Information Systems Agency',
-    incumbent: 'Leidos',
-    value: 450000000,
-    naicsCode: '541512',
-    expirationDate: '2026-09-30',
-    daysUntilExpiration: 188,
-    setAside: 'Full & Open',
-    description: 'Enterprise IT support including network operations, cybersecurity monitoring, help desk. On 3rd bridge extension.',
-  },
-  {
-    contractNumber: 'HHSN316201500001W',
-    contractName: 'CDC Data Analytics & Visualization Platform',
-    agency: 'HHS/Centers for Disease Control',
-    incumbent: 'Booz Allen Hamilton',
-    value: 180000000,
-    naicsCode: '541511',
-    expirationDate: '2026-06-30',
-    daysUntilExpiration: 97,
-    setAside: 'Full & Open',
-    description: 'Public health data analytics, dashboards, ML/AI capabilities. Post-pandemic scope expansion.',
-  },
-  {
-    contractNumber: '36C10B20D0003',
-    contractName: 'VA Claims Processing Support Services',
-    agency: 'VA/Veterans Benefits Administration',
-    incumbent: 'Maximus',
-    value: 320000000,
-    naicsCode: '541611',
-    expirationDate: '2026-05-15',
-    daysUntilExpiration: 51,
-    setAside: 'Full & Open (was 8a)',
-    description: 'Claims adjudication support, call center operations. Transitioning from 8(a) to full & open.',
-  },
-  {
-    contractNumber: 'HSHQDC-17-C-00037',
-    contractName: 'DHS Cybersecurity Operations Center',
-    agency: 'DHS/CISA',
-    incumbent: 'SAIC',
-    value: 275000000,
-    naicsCode: '541519',
-    expirationDate: '2026-07-31',
-    daysUntilExpiration: 128,
-    setAside: 'Full & Open',
-    description: '24/7 SOC operations, incident response, threat intel. SAIC absorbed Halfaker - integration in progress.',
-  },
-  {
-    contractNumber: 'W911QX-21-D-0002',
-    contractName: 'Army INSCOM Intelligence Support',
-    agency: 'Army/INSCOM',
-    incumbent: 'CACI',
-    value: 520000000,
-    naicsCode: '541990',
-    expirationDate: '2026-08-30',
-    daysUntilExpiration: 158,
-    setAside: 'Full & Open',
-    description: 'Intelligence analysis, SIGINT support, counterintelligence. Consolidation vehicle merging 3 contracts.',
-  },
-  {
-    contractNumber: 'TIRNO-19-Z-00001',
-    contractName: 'IRS Enterprise Modernization Services',
-    agency: 'Treasury/Internal Revenue Service',
-    incumbent: 'Accenture Federal',
-    value: 890000000,
-    naicsCode: '541513',
-    expirationDate: '2027-03-31',
-    daysUntilExpiration: 371,
-    setAside: 'Full & Open',
-    description: 'Tax system modernization, legacy migration. Congressional scrutiny on IRS IT spend.',
-  },
-  {
-    contractNumber: 'NA14NES4320003',
-    contractName: 'NOAA Weather Systems Maintenance',
-    agency: 'Commerce/NOAA',
-    incumbent: 'L3Harris',
-    value: 145000000,
-    naicsCode: '334511',
-    expirationDate: '2026-07-15',
-    daysUntilExpiration: 112,
-    setAside: 'Small Business',
-    description: 'Weather satellite ground systems maintenance. L3Harris divesting services division.',
-  },
-  {
-    contractNumber: 'EP-D-22-043',
-    contractName: 'EPA Environmental Monitoring Network',
-    agency: 'EPA',
-    incumbent: 'Battelle',
-    value: 95000000,
-    naicsCode: '541620',
-    expirationDate: '2026-09-15',
-    daysUntilExpiration: 174,
-    setAside: 'Small Business Set-Aside',
-    description: 'Air and water quality monitoring, lab analysis. Administration pushing for diverse suppliers.',
-  },
-  {
-    contractNumber: '75FCMC22D0029',
-    contractName: 'SSA Customer Service Centers',
-    agency: 'SSA',
-    incumbent: 'General Dynamics IT',
-    value: 210000000,
-    naicsCode: '561422',
-    expirationDate: '2026-09-30',
-    daysUntilExpiration: 188,
-    setAside: 'Full & Open',
-    description: 'Contact center operations, case processing. GDIT lost Navy BPO recently - hungry for wins.',
-  },
-  {
-    contractNumber: 'DJ-134-16-C-4000',
-    contractName: 'DOJ Litigation Support Services',
-    agency: 'DOJ/Civil Division',
-    incumbent: 'Deloitte',
-    value: 165000000,
-    naicsCode: '541199',
-    expirationDate: '2027-01-31',
-    daysUntilExpiration: 312,
-    setAside: 'Full & Open',
-    description: 'E-discovery, document review, legal analytics. DOJ historically rotates after 2 terms.',
-  },
-];
+// NAICS prefix expansion for 3-digit codes
+const NAICS_EXPANSION: Record<string, string[]> = {
+  '236': ['236220', '236210', '236115', '236116', '236117', '236118'], // Construction of Buildings
+  '237': ['237110', '237120', '237130', '237210', '237310', '237990'], // Heavy & Civil Engineering
+  '238': ['238110', '238120', '238130', '238140', '238150', '238160', '238170', '238190', '238210', '238220', '238290', '238310', '238320', '238330', '238340', '238350', '238390', '238910', '238990'], // Specialty Trade Contractors
+  '541': ['541511', '541512', '541513', '541519', '541611', '541612', '541613', '541614', '541618', '541620', '541690', '541710', '541720', '541810', '541820', '541830', '541840', '541850', '541860', '541870', '541890', '541910', '541921', '541922', '541930', '541940', '541990'], // Professional Services
+  '518': ['518210'], // Data Processing, Hosting
+  '519': ['519130', '519190'], // Other Information Services
+  '561': ['561110', '561210', '561311', '561312', '561320', '561330', '561410', '561421', '561422', '561431', '561439', '561440', '561450', '561491', '561492', '561499', '561510', '561520', '561591', '561599', '561611', '561612', '561613', '561621', '561622', '561710', '561720', '561730', '561740', '561790', '561910', '561920', '561990'], // Administrative and Support Services
+};
+
+function expandNaicsCodes(codes: string[]): string[] {
+  const expanded: string[] = [];
+  for (const code of codes) {
+    if (code.length === 3 && NAICS_EXPANSION[code]) {
+      expanded.push(...NAICS_EXPANSION[code]);
+    } else if (code.length === 6) {
+      expanded.push(code);
+    } else {
+      // Try to match as prefix
+      for (const [prefix, fullCodes] of Object.entries(NAICS_EXPANSION)) {
+        if (code.startsWith(prefix)) {
+          expanded.push(...fullCodes);
+          break;
+        }
+      }
+    }
+  }
+  return [...new Set(expanded)].slice(0, 10); // Dedupe and limit to 10
+}
+
+interface ContractForBriefing {
+  contractNumber: string;
+  contractName: string;
+  agency: string;
+  incumbent: string;
+  value: number;
+  naicsCode: string;
+  expirationDate: string;
+  daysUntilExpiration: number;
+  setAside: string;
+  description: string;
+  numberOfBids?: number;
+  competitionLevel?: string;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -154,6 +78,130 @@ export async function GET(request: NextRequest) {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+  // Get user's NAICS codes from settings
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: userSettings } = await supabase
+    .from('user_notification_settings')
+    .select('naics_codes, agencies, keywords')
+    .eq('user_email', toEmail)
+    .single();
+
+  const userNaics = userSettings?.naics_codes || ['541512', '541611'];
+  const userAgencies = userSettings?.agencies || [];
+  const userKeywords = userSettings?.keywords || [];
+
+  console.log(`[SendAllBriefings] User NAICS codes: ${userNaics.join(', ')}`);
+
+  // Expand NAICS codes (3-digit → 6-digit)
+  const expandedNaics = expandNaicsCodes(userNaics);
+  console.log(`[SendAllBriefings] Expanded NAICS: ${expandedNaics.join(', ')}`);
+
+  // Fetch REAL contract data from USASpending
+  // Use the searchContractAwards function directly to get high-value contracts
+  const allContracts: ContractForBriefing[] = [];
+  for (const naics of expandedNaics.slice(0, 5)) { // Limit to 5 NAICS codes for speed
+    try {
+      console.log(`[SendAllBriefings] Fetching contracts for NAICS ${naics}...`);
+      // Fetch ALL contracts for market intel (not just expiring ones)
+      const response = await fetch(`https://api.usaspending.gov/api/v2/search/spending_by_award/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filters: {
+            time_period: [{ start_date: '2022-01-01', end_date: '2027-12-31' }],
+            award_type_codes: ['A', 'B', 'C', 'D'], // Contracts only
+            naics_codes: { require: [naics] },
+          },
+          fields: [
+            'Award ID', 'Recipient Name', 'Start Date', 'End Date',
+            'Award Amount', 'Awarding Agency', 'Awarding Sub Agency',
+            'generated_internal_id'
+          ],
+          page: 1,
+          limit: 25,
+          sort: 'Award Amount',
+          order: 'desc',
+        }),
+      });
+
+      if (!response.ok) {
+        console.error(`[SendAllBriefings] USASpending error for ${naics}: ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const awards = data.results || [];
+
+      // Fetch detail for top contracts to get bid counts
+      for (const award of awards.slice(0, 5)) {
+        const awardId = award.generated_internal_id || award['Award ID'];
+        try {
+          const detailRes = await fetch(`https://api.usaspending.gov/api/v2/awards/${awardId}/`);
+          if (detailRes.ok) {
+            const detail = await detailRes.json();
+            const contractData = detail.latest_transaction_contract_data || {};
+            const periodPerf = detail.period_of_performance || {};
+            const endDate = periodPerf.end_date || award['End Date'] || '';
+            const daysUntil = endDate ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 180;
+
+            const numberOfBids = parseInt(contractData.number_of_offers_received || '0', 10) || 0;
+            const extentCompeted = contractData.extent_competed || '';
+            let competitionLevel: 'sole_source' | 'low' | 'medium' | 'high' = 'medium';
+            if (extentCompeted === 'C' || extentCompeted === 'B' || numberOfBids === 0) {
+              competitionLevel = 'sole_source';
+            } else if (numberOfBids <= 2) {
+              competitionLevel = 'low';
+            } else if (numberOfBids <= 5) {
+              competitionLevel = 'medium';
+            } else {
+              competitionLevel = 'high';
+            }
+
+            allContracts.push({
+              contractNumber: detail.piid || award['Award ID'],
+              contractName: detail.description || `${naics} Contract - ${detail.awarding_agency?.toptier_agency?.name || award['Awarding Agency'] || 'Federal'}`,
+              agency: detail.awarding_agency?.toptier_agency?.name || award['Awarding Agency'] || '',
+              incumbent: detail.recipient?.recipient_name || award['Recipient Name'] || '',
+              value: detail.total_obligation || Number(award['Award Amount']) || 0,
+              naicsCode: naics,
+              expirationDate: endDate,
+              daysUntilExpiration: daysUntil,
+              setAside: contractData.extent_competed_description || 'Full & Open',
+              description: detail.description || `Federal contract in NAICS ${naics}`,
+              numberOfBids,
+              competitionLevel,
+            });
+          }
+        } catch (detailErr) {
+          console.error(`[SendAllBriefings] Error fetching award detail ${awardId}:`, detailErr);
+        }
+      }
+
+      console.log(`[SendAllBriefings] NAICS ${naics}: ${awards.length} awards found, ${allContracts.length} total`);
+    } catch (err) {
+      console.error(`[SendAllBriefings] Error fetching NAICS ${naics}:`, err);
+    }
+  }
+
+  // Sort by value (highest first) and take top 15
+  allContracts.sort((a, b) => b.value - a.value);
+  const topContracts = allContracts.slice(0, 15);
+
+  console.log(`[SendAllBriefings] Total contracts fetched: ${allContracts.length}, using top ${topContracts.length}`);
+
+  if (topContracts.length === 0) {
+    return NextResponse.json({
+      success: false,
+      error: 'No contracts found for user NAICS codes',
+      naicsCodes: userNaics,
+      expandedNaics,
+    }, { status: 400 });
+  }
+
   const results = {
     daily: { success: false, error: '' },
     weekly: { success: false, error: '' },
@@ -162,8 +210,8 @@ export async function GET(request: NextRequest) {
 
   // 1. Generate and send Daily Brief
   try {
-    console.log(`[SendAllBriefings] Generating Daily Brief...`);
-    const dailyBriefing = await generateDailyBrief(anthropic);
+    console.log(`[SendAllBriefings] Generating Daily Brief with ${topContracts.length} contracts...`);
+    const dailyBriefing = await generateDailyBrief(anthropic, topContracts);
     const dailyHtml = generateDailyEmailHtml(dailyBriefing);
     const dailyText = generateDailyEmailText(dailyBriefing);
 
@@ -184,7 +232,7 @@ export async function GET(request: NextRequest) {
   // 2. Generate and send Weekly Deep Dive
   try {
     console.log(`[SendAllBriefings] Generating Weekly Deep Dive...`);
-    const weeklyBriefing = await generateWeeklyDeepDive(anthropic);
+    const weeklyBriefing = await generateWeeklyDeepDive(anthropic, topContracts);
     const weeklyHtml = generateWeeklyEmailHtml(weeklyBriefing);
     const weeklyText = generateWeeklyEmailText(weeklyBriefing);
 
@@ -202,10 +250,10 @@ export async function GET(request: NextRequest) {
     results.weekly = { success: false, error: String(err) };
   }
 
-  // 3. Generate and send Pursuit Brief
+  // 3. Generate and send Pursuit Brief (for the top opportunity)
   try {
-    console.log(`[SendAllBriefings] Generating Pursuit Brief...`);
-    const pursuitBrief = await generatePursuitBrief(anthropic, SAMPLE_CONTRACTS[0]);
+    console.log(`[SendAllBriefings] Generating Pursuit Brief for top opportunity...`);
+    const pursuitBrief = await generatePursuitBrief(anthropic, topContracts[0]);
     const pursuitHtml = generatePursuitEmailHtml(pursuitBrief);
     const pursuitText = generatePursuitEmailText(pursuitBrief);
 
@@ -228,6 +276,10 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: allSuccess,
     toEmail,
+    naicsUsed: userNaics,
+    expandedNaics,
+    contractsFetched: allContracts.length,
+    contractsUsed: topContracts.length,
     results,
     message: allSuccess ? `All 3 briefings sent to ${toEmail}` : 'Some briefings failed - check results',
   });
@@ -260,11 +312,11 @@ interface DailyBriefing {
   mustWatch: string[];
 }
 
-async function generateDailyBrief(anthropic: Anthropic): Promise<DailyBriefing> {
+async function generateDailyBrief(anthropic: Anthropic, contracts: ContractForBriefing[]): Promise<DailyBriefing> {
   const prompt = `You are a senior GovCon capture strategist. Analyze these federal contracts and generate a Daily Market Intel Briefing.
 
-CONTRACT DATA:
-${JSON.stringify(SAMPLE_CONTRACTS, null, 2)}
+CONTRACT DATA (REAL DATA FROM USASPENDING):
+${JSON.stringify(contracts, null, 2)}
 
 Generate JSON with:
 1. "opportunities" - Rank top 10 by actionability (not just value). Each needs: rank, contractName, agency, incumbent, value (number), window (timeline string), displacementAngle (strategic insight - WHY winnable NOW)
@@ -276,8 +328,9 @@ DISPLACEMENT ANGLES TO IDENTIFY:
 - Multiple extensions (procurement fatigue)
 - 8(a) → unrestricted transitions
 - M&A integration friction
-- Performance issues
+- Performance issues (look at numberOfBids - low bids = vulnerable)
 - New technology requirements
+- Contracts with competitionLevel "sole_source" or "low" are high priority
 
 Return ONLY valid JSON.`;
 
@@ -332,20 +385,25 @@ interface WeeklyBriefing {
   calendar: { date: string; event: string; type: string; priority: string }[];
 }
 
-async function generateWeeklyDeepDive(anthropic: Anthropic): Promise<WeeklyBriefing> {
+async function generateWeeklyDeepDive(anthropic: Anthropic, contracts: ContractForBriefing[]): Promise<WeeklyBriefing> {
   const monday = new Date();
   monday.setDate(monday.getDate() - monday.getDay() + 1);
 
   const prompt = `You are a senior GovCon capture strategist. Generate a Weekly Deep Dive briefing with full analysis.
 
-CONTRACT DATA:
-${JSON.stringify(SAMPLE_CONTRACTS, null, 2)}
+CONTRACT DATA (REAL DATA FROM USASPENDING):
+${JSON.stringify(contracts, null, 2)}
 
 Generate JSON with:
 1. "opportunities" - Top 10 with FULL analysis. Each needs: rank, contractName, agency, incumbent, value (number), window, displacementAngle, keyDates (array of {label, date}), competitiveLandscape (array of 3-4 insights about competition), recommendedApproach (string)
 2. "teamingPlays" - 3 DETAILED plays. Each: playNumber, strategyName, targetCompany, whyTarget (array of reasons), whoToContact (array of roles/titles), suggestedOpener, followUpMessage
-3. "marketSignals" - 4 news items. Each: headline, source, implication, actionRequired (boolean)
-4. "calendar" - 6 key dates. Each: date, event, type (deadline/industry_day/rfi_due/award_expected), priority (high/medium/low)
+3. "marketSignals" - 4 news items based on the contract data. Each: headline, source, implication, actionRequired (boolean)
+4. "calendar" - 6 key dates based on expiration dates. Each: date, event, type (deadline/industry_day/rfi_due/award_expected), priority (high/medium/low)
+
+Focus on contracts with:
+- Low numberOfBids (1-2 bids = vulnerable incumbent)
+- competitionLevel "sole_source" or "low"
+- Near-term expiration (daysUntilExpiration < 180)
 
 Be specific with dates, names, dollar amounts. This is for strategic planning.
 
@@ -386,14 +444,19 @@ interface PursuitBrief {
   immediateNextMove: { action: string; owner: string; deadline: string };
 }
 
-async function generatePursuitBrief(anthropic: Anthropic, contract: typeof SAMPLE_CONTRACTS[0]): Promise<PursuitBrief> {
+async function generatePursuitBrief(anthropic: Anthropic, contract: ContractForBriefing): Promise<PursuitBrief> {
   const prompt = `You are a senior GovCon capture manager. Generate a 1-page Pursuit Brief for this opportunity.
 
-OPPORTUNITY:
+OPPORTUNITY (REAL DATA FROM USASPENDING):
 ${JSON.stringify(contract, null, 2)}
 
+Key factors:
+- numberOfBids: ${contract.numberOfBids || 'Unknown'} (1-2 bids = high displacement potential)
+- competitionLevel: ${contract.competitionLevel || 'Unknown'}
+- daysUntilExpiration: ${contract.daysUntilExpiration} days
+
 Generate JSON with:
-1. "opportunityScore" - 0-100 based on winability (75+ = strong pursuit, 60-74 = conditional, <60 = evaluate)
+1. "opportunityScore" - 0-100 based on winability (75+ = strong pursuit, 60-74 = conditional, <60 = evaluate). Factor in low bid count = higher score.
 2. "whyWorthPursuing" - 2-3 sentence strategic rationale
 3. "workingHypothesis" - Theory of the case for winning
 4. "priorityIntel" - 5 must-answer questions before bid/no-bid

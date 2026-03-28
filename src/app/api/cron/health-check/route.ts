@@ -254,6 +254,80 @@ const tests = [
       };
     },
   },
+
+  // SAM.gov API Health Checks
+  {
+    name: 'SAM Contract Awards API',
+    category: 'SAM.gov APIs',
+    critical: false,
+    fn: async () => {
+      const res = await fetch(
+        `${BASE_URL}/api/admin/test-sam-awards?password=${ADMIN_PASSWORD}&naics=541512`
+      );
+      const data = await res.json();
+      return {
+        passed: data.success === true,
+        message: data.success
+          ? `Awards API OK (${data.elapsedMs}ms)`
+          : data.error || 'Failed',
+        details: data.rateLimits ? `Rate limit: ${JSON.stringify(data.rateLimits)}` : undefined,
+      };
+    },
+  },
+  {
+    name: 'SAM Entity API',
+    category: 'SAM.gov APIs',
+    critical: false,
+    fn: async () => {
+      const res = await fetch(
+        `${BASE_URL}/api/admin/test-sam-entity?password=${ADMIN_PASSWORD}&name=Booz`
+      );
+      const data = await res.json();
+      return {
+        passed: data.success === true,
+        message: data.success
+          ? `Entity API OK (${data.elapsedMs}ms)`
+          : data.error || 'Failed',
+        details: data.rateLimits ? `Rate limit: ${JSON.stringify(data.rateLimits)}` : undefined,
+      };
+    },
+  },
+  {
+    name: 'SAM Subaward API',
+    category: 'SAM.gov APIs',
+    critical: false,
+    fn: async () => {
+      const res = await fetch(
+        `${BASE_URL}/api/admin/test-sam-subaward?password=${ADMIN_PASSWORD}&naics=541512`
+      );
+      const data = await res.json();
+      return {
+        passed: data.success === true,
+        message: data.success
+          ? `Subaward API OK (${data.elapsedMs}ms)`
+          : data.error || 'Failed',
+        details: data.rateLimits ? `Rate limit: ${JSON.stringify(data.rateLimits)}` : undefined,
+      };
+    },
+  },
+  {
+    name: 'SAM Federal Hierarchy API',
+    category: 'SAM.gov APIs',
+    critical: false,
+    fn: async () => {
+      const res = await fetch(
+        `${BASE_URL}/api/admin/test-sam-hierarchy?password=${ADMIN_PASSWORD}&mode=departments`
+      );
+      const data = await res.json();
+      return {
+        passed: data.success === true,
+        message: data.success
+          ? `Hierarchy API OK (${data.elapsedMs}ms)`
+          : data.error || 'Failed',
+        details: data.rateLimits ? `Rate limit: ${JSON.stringify(data.rateLimits)}` : undefined,
+      };
+    },
+  },
 ];
 
 // ============================================================

@@ -1,11 +1,17 @@
 /**
- * FPDS Recompete Pipeline
+ * Recompete Pipeline
  *
- * Fetches expiring contracts from FPDS for recompete tracking.
- * Returns contract end dates, incumbents, values, and NAICS.
+ * Fetches expiring contracts for recompete tracking.
+ * UPDATED March 2026: Now uses USASpending API (FPDS retired Feb 24, 2026)
+ *
+ * Returns contract end dates, incumbents, values, NAICS, and competition data.
  */
 
-import { fetchFPDSByNaics, FPDSAward } from '@/lib/utils/fpds-api';
+import {
+  getExpiringContracts as getSAMExpiringContracts,
+  searchContractAwards,
+  type ContractAward
+} from '@/lib/sam';
 
 interface RecompeteContract {
   contractNumber: string;
@@ -16,6 +22,7 @@ interface RecompeteContract {
   incumbentName: string;
   incumbentDuns: string | null;
   incumbentCage: string | null;
+  incumbentUei: string | null; // NEW: UEI (DUNS replacement)
 
   // Contract details
   obligatedAmount: number;
@@ -51,6 +58,11 @@ interface RecompeteContract {
   // Calculated fields
   daysUntilExpiration: number;
   expirationRisk: 'low' | 'medium' | 'high' | 'critical';
+
+  // NEW: Competition intelligence from USASpending
+  numberOfBids?: number;
+  competitionLevel?: 'sole_source' | 'low' | 'medium' | 'high';
+  competitionType?: string; // e.g., "Full and Open Competition"
 }
 
 interface RecompeteSearchParams {
@@ -89,94 +101,99 @@ function getExpirationRisk(daysUntil: number): 'low' | 'medium' | 'high' | 'crit
 }
 
 /**
- * Convert FPDS award to RecompeteContract
+ * Convert SAM/USASpending ContractAward to RecompeteContract
  */
-function fpdsAwardToRecompete(award: FPDSAward): RecompeteContract {
-  const daysUntilExpiration = calculateDaysUntilExpiration(award.signedDate);
-  // Note: FPDS doesn't directly expose end date in all cases
-  // We'll use signedDate + estimated duration when available
+function samAwardToRecompete(award: ContractAward): RecompeteContract {
+  const daysUntilExpiration = award.daysUntilExpiration ?? calculateDaysUntilExpiration(award.periodOfPerformanceCurrentEndDate);
 
   return {
-    contractNumber: '', // Will be populated from full FPDS data
+    contractNumber: award.piid,
     orderNumber: null,
-    piid: '',
+    piid: award.piid,
 
-    incumbentName: award.vendorName,
-    incumbentDuns: null,
+    incumbentName: award.recipientName,
+    incumbentDuns: null, // DUNS deprecated
     incumbentCage: null,
+    incumbentUei: award.recipientUei || null,
 
-    obligatedAmount: award.obligatedAmount,
-    baseAndAllOptionsValue: award.obligatedAmount, // Approximate
+    obligatedAmount: award.totalObligation,
+    baseAndAllOptionsValue: award.currentTotalValueOfAward,
     naicsCode: award.naicsCode,
     naicsDescription: award.naicsDescription,
-    psc: '',
+    psc: award.pscCode || '',
 
-    contractingOffice: award.contractingOffice.officeId,
-    contractingOfficeName: award.contractingOffice.officeName,
-    agency: award.contractingOffice.agencyName,
-    department: award.contractingOffice.departmentName,
+    contractingOffice: award.awardingSubAgencyName || '',
+    contractingOfficeName: award.awardingSubAgencyName || '',
+    agency: award.awardingAgencyName,
+    department: award.awardingAgencyName,
 
-    signedDate: award.signedDate,
-    effectiveDate: award.signedDate,
-    currentCompletionDate: '', // Need full FPDS query
-    ultimateCompletionDate: '',
+    signedDate: award.actionDate || award.periodOfPerformanceStartDate,
+    effectiveDate: award.periodOfPerformanceStartDate,
+    currentCompletionDate: award.periodOfPerformanceCurrentEndDate,
+    ultimateCompletionDate: award.periodOfPerformancePotentialEndDate || award.periodOfPerformanceCurrentEndDate,
 
-    setAsideType: award.setAsideType || null,
-    isSmallBusiness: award.isSmallBusiness,
-    isWomenOwned: award.isWomenOwned,
-    isVeteranOwned: award.isVeteranOwned,
-    isServiceDisabledVeteranOwned: award.isServiceDisabledVeteranOwned,
-    is8aProgram: award.is8aProgram,
-    isHubZone: award.isHubZone,
+    setAsideType: null, // Would need to map from extentCompeted
+    isSmallBusiness: false, // Not available in USASpending response
+    isWomenOwned: false,
+    isVeteranOwned: false,
+    isServiceDisabledVeteranOwned: false,
+    is8aProgram: false,
+    isHubZone: false,
 
-    placeOfPerformanceState: award.placeOfPerformanceState,
+    placeOfPerformanceState: award.placeOfPerformanceState || '',
 
     daysUntilExpiration,
     expirationRisk: getExpirationRisk(daysUntilExpiration),
+
+    // NEW: Competition intelligence
+    numberOfBids: award.numberOfOffersReceived,
+    competitionLevel: award.competitionLevel,
+    competitionType: award.extentCompetedDescription,
   };
 }
 
 /**
- * Fetch expiring contracts from FPDS
+ * Fetch expiring contracts from USASpending (FPDS retired Feb 2026)
  */
 export async function fetchExpiringContracts(
   params: RecompeteSearchParams
 ): Promise<RecompeteSearchResult> {
   const {
     naicsCodes = [],
-    agencies = [],
     monthsToExpiration = 12,
     limit = 200,
   } = params;
 
-  console.log(`[FPDS Recompete] Fetching expiring contracts for NAICS: ${naicsCodes.join(', ') || 'all'}`);
+  console.log(`[Recompete] Fetching expiring contracts for NAICS: ${naicsCodes.join(', ') || 'all'}`);
 
   const allContracts: RecompeteContract[] = [];
 
-  // Fetch from FPDS for each NAICS code
+  // Fetch from USASpending via our SAM wrapper for each NAICS code
   for (const naicsCode of naicsCodes.slice(0, 5)) { // Limit to 5 NAICS codes
     try {
-      const fpdsResult = await fetchFPDSByNaics(naicsCode, { maxRecords: limit });
+      const samContracts = await getSAMExpiringContracts(naicsCode, monthsToExpiration);
 
-      for (const award of fpdsResult.awards) {
-        const contract = fpdsAwardToRecompete(award);
+      for (const award of samContracts) {
+        const contract = samAwardToRecompete(award);
 
-        // Filter by expiration window
-        if (contract.daysUntilExpiration <= monthsToExpiration * 30) {
+        // Filter by expiration window and minimum value ($100k+)
+        if (contract.daysUntilExpiration > 0 &&
+          contract.daysUntilExpiration <= monthsToExpiration * 30 &&
+          contract.obligatedAmount >= 100000) {
           allContracts.push(contract);
         }
       }
 
-      console.log(`[FPDS Recompete] NAICS ${naicsCode}: ${fpdsResult.awards.length} awards`);
+      console.log(`[Recompete] NAICS ${naicsCode}: ${samContracts.length} awards`);
     } catch (error) {
-      console.error(`[FPDS Recompete] Error fetching NAICS ${naicsCode}:`, error);
+      console.error(`[Recompete] Error fetching NAICS ${naicsCode}:`, error);
     }
   }
 
   // Sort by days until expiration (soonest first)
   allContracts.sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration);
 
-  console.log(`[FPDS Recompete] Total expiring contracts: ${allContracts.length}`);
+  console.log(`[Recompete] Total expiring contracts: ${allContracts.length}`);
 
   return {
     contracts: allContracts.slice(0, limit),
@@ -341,6 +358,18 @@ export function scoreRecompete(
   } else if (contract.obligatedAmount >= 1000000) {
     score += 10;
     factors.push('million_dollar_contract');
+  }
+
+  // NEW: Low competition = higher displacement potential
+  if (contract.competitionLevel === 'sole_source') {
+    score += 20;
+    factors.push('sole_source_contract');
+  } else if (contract.competitionLevel === 'low') {
+    score += 15;
+    factors.push('low_competition_2_or_fewer_bids');
+  } else if (contract.numberOfBids !== undefined && contract.numberOfBids <= 3) {
+    score += 10;
+    factors.push('moderate_competition_3_bids');
   }
 
   return {

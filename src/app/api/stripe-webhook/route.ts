@@ -143,6 +143,43 @@ export async function POST(request: NextRequest) {
     const customerName = session.customer_details?.name || undefined;
     const productName = lineItems.data[0]?.description || 'GovCon Product';
 
+    // AUTO-ENROLL ALL PURCHASERS in alert settings (free daily alerts during beta)
+    // This ensures every paying customer gets daily opportunity alerts
+    if (supabase) {
+      const { data: existingSettings } = await supabase
+        .from('user_alert_settings')
+        .select('user_email')
+        .eq('user_email', email.toLowerCase())
+        .limit(1);
+
+      if (!existingSettings || existingSettings.length === 0) {
+        // Create new alert settings for this purchaser
+        await supabase.from('user_alert_settings').insert({
+          user_email: email.toLowerCase(),
+          alerts_enabled: true,
+          briefings_enabled: true,
+          alert_frequency: 'daily',
+          is_active: true,
+          subscription_status: 'beta', // Beta access for purchasers
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        console.log(`✅ Auto-enrolled purchaser in alerts: ${email}`);
+      } else {
+        // Ensure existing users have alerts enabled
+        await supabase
+          .from('user_alert_settings')
+          .update({
+            alerts_enabled: true,
+            briefings_enabled: true,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_email', email.toLowerCase());
+        console.log(`✅ Enabled alerts for existing user: ${email}`);
+      }
+    }
+
     // Check if this is an Alert Pro subscription
     const isAlertPro = tier === 'alert_pro' ||
       productName?.toLowerCase().includes('alert pro') ||

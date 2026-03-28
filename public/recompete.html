@@ -476,6 +476,43 @@
             font-weight: 600;
         }
 
+        /* Bids/Competition badges */
+        .bids-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: help;
+            min-width: 32px;
+            text-align: center;
+        }
+
+        .bids-badge.sole-source {
+            background: #10b981;
+            color: white;
+        }
+
+        .bids-badge.low {
+            background: #22c55e;
+            color: white;
+        }
+
+        .bids-badge.medium {
+            background: #fbbf24;
+            color: #1e293b;
+        }
+
+        .bids-badge.high {
+            background: #ef4444;
+            color: white;
+        }
+
+        .bids-badge.unknown {
+            background: #e2e8f0;
+            color: #94a3b8;
+        }
+
         .award-id {
             font-family: 'Courier New', monospace;
             font-size: 12px;
@@ -1192,6 +1229,7 @@
                             <th data-sort="Recipient">Prime Contractor</th>
                             <th data-sort="Agency">Agency</th>
                             <th data-sort="value">Value</th>
+                            <th data-sort="bids">Bids</th>
                             <th data-sort="NAICS">NAICS</th>
                             <th data-sort="Expiration">Expires</th>
                             <th data-sort="Award ID">Award ID</th>
@@ -1199,7 +1237,7 @@
                     </thead>
                     <tbody id="resultsBody">
                         <tr>
-                            <td colspan="6">
+                            <td colspan="7">
                                 <div class="loading">
                                     <div class="loading-spinner"></div>
                                     <p>Loading contracts...</p>
@@ -1217,7 +1255,7 @@
     <!-- Source Attribution -->
     <div style="margin: 16px auto; max-width: 1200px; padding: 12px 16px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; border-top: 1px solid #334155;">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span>Source: <a href="https://www.fpds.gov" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">FPDS.gov</a> &amp; <a href="https://www.usaspending.gov" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">USASpending.gov</a> &mdash; Expiring contract data updated monthly. Budget trends from OMB FY2026 Request.</span>
+        <span>Source: <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">SAM.gov</a> &amp; <a href="https://www.usaspending.gov" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">USASpending.gov</a> &mdash; Competition data from SAM.gov Contract Awards API. Budget trends from OMB FY2026 Request.</span>
     </div>
 
     <div class="footer">
@@ -1381,6 +1419,36 @@
             return '$' + value.toLocaleString();
         }
 
+        // Get bid count badge with color coding
+        // Green = low competition (good opportunity), Red = high competition
+        function getBidsBadge(numBids, competitionLevel) {
+            if (numBids === undefined && !competitionLevel) {
+                return '<span class="bids-badge unknown" title="Competition data not available">—</span>';
+            }
+
+            // Determine color based on competition level or bid count
+            let colorClass = 'medium';
+            let tooltip = '';
+
+            if (competitionLevel === 'sole_source') {
+                colorClass = 'sole-source';
+                tooltip = 'Sole Source - No competition!';
+            } else if (competitionLevel === 'low' || numBids <= 2) {
+                colorClass = 'low';
+                tooltip = 'Low competition - Prime target';
+            } else if (competitionLevel === 'medium' || numBids <= 5) {
+                colorClass = 'medium';
+                tooltip = 'Medium competition';
+            } else {
+                colorClass = 'high';
+                tooltip = 'High competition';
+            }
+
+            const displayText = numBids !== undefined ? numBids : (competitionLevel === 'sole_source' ? 'SS' : '?');
+
+            return `<span class="bids-badge ${colorClass}" title="${tooltip}">${displayText}</span>`;
+        }
+
         function handleSort(field) {
             if (currentSort.field === field) {
                 currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
@@ -1412,6 +1480,10 @@
                 if (field === 'value') {
                     aVal = parseValue(a['Total Value']);
                     bVal = parseValue(b['Total Value']);
+                } else if (field === 'bids') {
+                    // Sort by number of bids - put unknown at end
+                    aVal = a.numberOfBids !== undefined ? a.numberOfBids : 999;
+                    bVal = b.numberOfBids !== undefined ? b.numberOfBids : 999;
                 } else {
                     aVal = (a[field] || '').toLowerCase();
                     bVal = (b[field] || '').toLowerCase();
@@ -1768,12 +1840,14 @@
                 const valueClass = value >= 100000000 ? 'high' : '';
                 const naicsCode = contract.NAICS?.split(' ')[0] || '';
                 const globalIdx = (currentPage - 1) * effectivePerPage + idx;
+                const bidsBadge = getBidsBadge(contract.numberOfBids, contract.competitionLevel);
 
                 return `
                     <tr onclick="showContractDetails(${globalIdx})">
                         <td class="prime-name">${contract.Recipient || 'Unknown'}</td>
                         <td class="agency-name">${contract.Agency || 'N/A'}${getBudgetBadge(contract.Agency)}${contract.State ? `<span class="state-badge">${contract.State}</span>` : ''}<br><small style="color:#94a3b8">${contract.Office || ''}</small></td>
                         <td class="contract-value ${valueClass}">${formatValueDisplay(contract['Total Value'])}</td>
+                        <td>${bidsBadge}</td>
                         <td><span class="naics-badge">${naicsCode}</span></td>
                         <td><span class="date-badge">${contract.Expiration || 'N/A'}</span></td>
                         <td class="award-id">${contract['Award ID'] || 'N/A'}</td>

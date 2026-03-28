@@ -8,6 +8,104 @@
 4. **Different Supabase databases.** market-assassin and govcon-shop have SEPARATE Supabase instances. They do NOT share tables.
 5. **KV store connected to BOTH projects** via Vercel Storage integration. KV backfills can run from either project.
 6. **SAM.gov API does NOT support comma-separated NAICS codes.** Must make parallel requests for each NAICS code and merge results. See `src/lib/briefings/pipelines/sam-gov.ts`.
+7. **FPDS.gov retired Feb 24, 2026.** All federal contract data now flows through SAM.gov APIs. See `docs/sam-apis.md` for full reference.
+8. **Always run QA tests before deploying.** Use `npm run deploy` (runs tests first) or `npm run test:pre-deploy`.
+
+---
+
+## Pre-Deploy QA
+
+**ALWAYS run before deployment:**
+
+```bash
+# Safe deploy (runs tests first, blocks on failure)
+npm run deploy
+
+# Or run tests manually
+npm run test:pre-deploy
+```
+
+**What it checks:**
+- TypeScript compilation
+- SAM.gov date format (MM/dd/yyyy not YYYY-MM-DD)
+- Critical API endpoints
+- Daily Alerts pipeline
+- Market Intelligence pipeline
+- Access control rules
+- Environment variables
+
+**Test files:** `tests/test-pre-deploy.sh`, `tests/run-all-tests.sh`
+
+---
+
+## SAM.gov API Integration
+
+**Reference:** [`docs/sam-apis.md`](./docs/sam-apis.md)
+
+### API Status (March 25, 2026)
+
+| API | Status | Source | System Account Required |
+|-----|--------|--------|------------------------|
+| Opportunities | ✅ Working | SAM.gov | No |
+| Entity Management | ✅ Working | SAM.gov | No |
+| Federal Hierarchy | ✅ Working | SAM.gov | No |
+| Contract Awards | ✅ Working | **USASpending** | Yes (using fallback) |
+| Subaward | ⏳ Waiting | SAM.gov | Yes |
+
+**Note:** Contract Awards and Subaward APIs require SAM.gov System Account. Entity reactivated, request submitted, waiting 1-4 weeks for approval.
+
+### Rate Limits & Caching
+
+- **Standard tier:** 1,000 requests/day, 10/min
+- **Cache TTL:** 24h for awards/entity, 1h for opportunities
+- **Cache table:** `sam_api_cache` in Supabase
+- **Fallback:** USASpending API (primary for Contract Awards)
+
+### Key Rules
+
+1. **No comma-separated NAICS** — make parallel requests
+2. **Always cache responses** — 24h TTL minimum
+3. **USASpending is primary for Contract Awards** — has bid count data
+4. **Use MCP tools when available** — `mcp__samgov__*` for opportunities
+
+### Env Variables
+
+```env
+SAM_API_KEY=xxx                    # Opportunities (existing)
+SAM_CONTRACT_AWARDS_API_KEY=xxx    # Needs System Account
+SAM_ENTITY_API_KEY=xxx             # Same as SAM_API_KEY
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/sam/utils.ts` | Shared rate limit, cache, error handling |
+| `src/lib/sam/contract-awards.ts` | Contract Awards wrapper (uses USASpending) |
+| `src/lib/sam/usaspending-fallback.ts` | USASpending API for bid counts |
+| `src/lib/sam/entity-api.ts` | Entity Management API wrapper |
+| `src/lib/sam/subaward-api.ts` | Subaward Reporting API wrapper |
+| `src/lib/sam/federal-hierarchy.ts` | Federal Hierarchy API wrapper |
+| `src/lib/sam/index.ts` | Unified exports |
+
+### Test Endpoints
+
+```bash
+# Test Contract Awards (uses USASpending)
+curl "https://tools.govcongiants.org/api/admin/test-sam-awards?password=galata-assassin-2026&naics=541512"
+
+# Test USASpending directly
+curl "https://tools.govcongiants.org/api/admin/test-usaspending?password=galata-assassin-2026&naics=541512"
+
+# Test Entity Lookup
+curl "https://tools.govcongiants.org/api/admin/test-sam-entity?password=galata-assassin-2026&name=Booz"
+
+# Test Hierarchy
+curl "https://tools.govcongiants.org/api/admin/test-sam-hierarchy?password=galata-assassin-2026&agency=VA"
+
+# Test Subaward (blocked until System Account)
+curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata-assassin-2026&prime_uei=XXX"
+```
 
 ---
 
@@ -225,6 +323,13 @@
 | `/api/admin/trigger-alerts` | Manually trigger alert emails |
 | `/api/admin/send-test-briefing` | Generate and send test briefing |
 | `/api/admin/grant-briefings` | Batch grant briefings access |
+| `/api/admin/test-sam-awards` | Test SAM Contract Awards API |
+| `/api/admin/test-sam-entity` | Test SAM Entity Management API |
+| `/api/admin/test-sam-subaward` | Test SAM Subaward API |
+| `/api/admin/test-sam-hierarchy` | Test SAM Hierarchy API |
+| `/api/admin/test-market-intel-pipeline` | **Full Market Intel pipeline testing** |
+| `/api/admin/sync-alert-to-notification` | Sync users between alert/notif tables |
+| `/api/admin/send-naics-reminder` | Send NAICS setup reminder emails |
 | `/api/cron/health-check` | Automated API health tests |
 
 ---
@@ -237,6 +342,8 @@
 4. **Always persist state after generation** — upsert to database immediately.
 5. **Arrays must be `.join(' ')` not interpolated** — avoid `${array}` producing comma-joined.
 6. **Never `.slice()` user data silently** — make caps explicit or configurable.
+7. **Query BOTH user tables for Market Intel** — `user_alert_settings` AND `user_notification_settings`, dedupe by email.
+8. **Always add fallback NAICS** — If user has no NAICS, use defaults: `541512, 541611, 541330, 541990, 561210`.
 
 ---
 
@@ -266,4 +373,4 @@ GROQ_API_KEY=gsk_...
 
 ---
 
-*Last Updated: March 23, 2026*
+*Last Updated: March 25, 2026*

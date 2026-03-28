@@ -89,12 +89,39 @@ export async function generateBriefing(
   const briefingDate = new Date().toISOString().split('T')[0];
 
   try {
-    // Step 1: Get user profile (check JSONB first, fallback to individual columns)
-    const { data: profileData } = await supabase
+    // Step 1: Get user profile (check user_briefing_profile first, fallback to user_notification_settings)
+    let profileData = null;
+
+    // Try user_briefing_profile first
+    const { data: briefingProfile } = await supabase
       .from('user_briefing_profile')
       .select('aggregated_profile, naics_codes, agencies, keywords, zip_codes, watched_companies, watched_contracts')
       .eq('user_email', userEmail)
       .single();
+
+    if (briefingProfile) {
+      profileData = briefingProfile;
+    } else {
+      // Fallback to user_notification_settings (where alert preferences are stored)
+      const { data: notificationSettings } = await supabase
+        .from('user_notification_settings')
+        .select('naics_codes, agencies, keywords')
+        .eq('user_email', userEmail)
+        .single();
+
+      if (notificationSettings) {
+        console.log(`[BriefingGen] Using notification settings for ${userEmail}`);
+        profileData = {
+          naics_codes: notificationSettings.naics_codes || [],
+          agencies: notificationSettings.agencies || [],
+          keywords: notificationSettings.keywords || [],
+          zip_codes: [],
+          watched_companies: [],
+          watched_contracts: [],
+          aggregated_profile: null,
+        };
+      }
+    }
 
     if (!profileData) {
       console.log(`[BriefingGen] No profile for ${userEmail}`);

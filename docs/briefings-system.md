@@ -1,14 +1,60 @@
-# Daily Briefings System Documentation
+# Market Intelligence System
 
-Complete reference for the GovCon Giants Daily Intelligence Briefings system.
+Complete reference for the GovCon Giants Market Intelligence system.
 
 ---
 
 ## Overview
 
-The Daily Briefings system delivers personalized government contracting intelligence to users via email and SMS. It aggregates data from multiple sources, applies relevance scoring, and generates formatted briefings tailored to each user's business profile.
+The Market Intelligence system delivers personalized government contracting intelligence to users via email. It aggregates data from multiple sources (USASpending, SAM.gov), applies relevance scoring, and generates formatted reports tailored to each user's NAICS codes and target agencies.
 
-**Status:** FREE FOR EVERYONE during beta (paywall removed Mar 23, 2026)
+**Status:** DEMO/TRIAL during 3/28 bootcamp
+
+---
+
+## Daily Alerts vs Market Intelligence
+
+**IMPORTANT:** These are TWO SEPARATE systems:
+
+| System | Description | Access |
+|--------|-------------|--------|
+| **Daily Alerts** | Simple opportunity notifications based on NAICS/keywords | FREE for everyone (beta) |
+| **Market Intelligence** | Premium 3-report system with deep analysis, scoring, pursuit briefs | Pro Bundle ($997) and Ultimate Bundle ($1,497) only |
+
+### Daily Alerts (FREE)
+- Basic SAM.gov opportunity alerts
+- User configures NAICS codes at `/alerts/preferences`
+- Cron: `/api/cron/daily-alerts`
+- Simple email with matching opportunities
+
+### Market Intelligence (Premium)
+- 3 Report Types: Daily Brief, Weekly Deep Dive, Pursuit Brief
+- USASpending contract data with bid counts
+- Win probability scoring
+- Competitive landscape analysis
+- Only in Pro/Ultimate bundles or explicit briefings purchases
+
+---
+
+## The 3 Report Types
+
+| Report | Description | Frequency |
+|--------|-------------|-----------|
+| **Daily Brief** | Daily Market Intel with Top 10 Recompete Opportunities + 3 Ghosting/Teaming Plays + Must Watch signals | Daily |
+| **Weekly Deep Dive** | Full analysis of 10 Opportunities with competitive landscape, key dates, teaming plays, market signals, calendar | Weekly |
+| **Pursuit Brief** | Single opportunity deep dive with score (e.g., 68/100 CONDITIONAL), working hypothesis, priority intel, outreach targets, 5-day action plan, risk assessment | On-demand |
+
+### Test Endpoint
+```bash
+# Send all 3 report types to a user
+curl "https://tools.govcongiants.org/api/admin/send-all-briefings?password=galata-assassin-2026&email=user@example.com"
+```
+
+### Slash Command
+```
+/test-briefings                      # Send to eric@govcongiants.com
+/test-briefings user@example.com     # Send to specific email
+```
 
 ---
 

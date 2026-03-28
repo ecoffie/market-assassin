@@ -4,6 +4,72 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 34 (Mar 28, 2026)
+
+### Market Intelligence Pipeline Fix - Two Table Problem
+
+**MAJOR FIX:** Daily Briefings were only reaching 32/394 users (8%) because snapshot crons and send-briefings only queried `user_notification_settings`, missing the 394 users in `user_alert_settings`.
+
+#### The Problem
+| Table | Users | What queried it |
+|-------|-------|-----------------|
+| `user_alert_settings` | 394 | Daily Alerts cron ✅ |
+| `user_notification_settings` | 32 | Snapshot crons, Send Briefings ❌ |
+
+#### The Fix
+- **`send-briefings/route.ts`** — Now queries BOTH tables, deduplicates by email
+- **`snapshot-recompetes/route.ts`** — Now queries BOTH tables + fallback NAICS
+- **`snapshot-awards/route.ts`** — Now queries BOTH tables + fallback NAICS
+- **Stripe webhook** — Auto-enrolls ALL purchasers in `user_alert_settings`
+- **Purchase emails** — Added "BONUS: Free Daily Alerts" section to all confirmation emails
+
+#### Fallback NAICS Codes
+For users without NAICS codes set:
+```typescript
+['541512', '541611', '541330', '236220', '238210']
+```
+- Includes construction (236, 238) per Eric's request
+- Ensures ALL users get relevant intel even without personalization
+
+#### New Admin Endpoints
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/admin/test-market-intel-pipeline` | Full pipeline status + per-user testing |
+| `/api/admin/sync-alert-to-notification` | Sync users between tables |
+| `/api/admin/send-naics-reminder` | Send NAICS setup reminder emails |
+
+#### Documentation Updated
+- `tasks/lessons.md` — 5 new lessons (two-table problem, fallback NAICS, auto-enrollment, snapshot pipeline, testing checklist)
+- `docs/ecosystem.md` — Market Intel pipeline diagram, cron schedule
+- `CLAUDE.md` — New endpoints, bug prevention rules
+
+#### Key Takeaways
+1. Always query BOTH user tables for Market Intel
+2. Always provide fallback NAICS for users without codes
+3. Test full pipeline with `/api/admin/test-market-intel-pipeline`
+4. Construction NAICS (236, 238) now included in coverage
+
+---
+
+## Session 33 (Mar 26, 2026)
+
+### Daily Alerts vs Market Intelligence Clarification
+
+**IMPORTANT DISTINCTION established:**
+- **Daily Alerts** = FREE for everyone (beta) - simple SAM.gov opportunity notifications
+- **Market Intelligence** = Premium (Pro/Ultimate bundles only) - 3 report types with deep analysis
+
+### SAM.gov API Integration (Phase 1-4)
+
+Full SAM.gov API integration to replace retired FPDS.gov. Implemented 4 APIs with USASpending fallback.
+
+- **Phase 1:** Contract Awards API (USASpending fallback)
+- **Phase 2:** Entity Management API
+- **Phase 3:** Federal Hierarchy API
+- **Phase 4:** Subaward API (blocked on System Account)
+
+---
+
 ## Session 31 (Mar 23, 2026)
 
 ### Alerts & Briefings System Overhaul (Later)

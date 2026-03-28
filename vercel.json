@@ -6,6 +6,10 @@
       "schedule": "0 14 * * 1"
     },
     {
+      "path": "/api/cron/weekly-deep-dive",
+      "schedule": "0 10 * * 0"
+    },
+    {
       "path": "/api/cron/aggregate-profiles",
       "schedule": "0 6 * * *"
     },
@@ -32,6 +36,10 @@
     {
       "path": "/api/cron/send-briefings",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/pursuit-brief",
+      "schedule": "0 10 * * 1"
     },
     {
       "path": "/api/cron/weekly-alerts",

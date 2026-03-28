@@ -118,6 +118,15 @@ export async function sendDatabaseAccessEmail({
       </ul>
     </div>
 
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 12px; padding: 25px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0; text-align: center;">🎁 BONUS: Free Daily Opportunity Alerts</h3>
+      <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
+      <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
+      <div style="text-align: center;">
+        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+      </div>
+    </div>
+
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
     <p style="color: #6b7280; font-size: 12px; text-align: center;">
@@ -244,6 +253,15 @@ export async function sendAccessCodeEmail({
       <a href="https://vimeo.com/1150857756?fl=tl&fe=ec" style="display: inline-block; background: #1e40af; color: white !important; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-weight: 600;">Watch Now</a>
     </div>
 
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 12px; padding: 25px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0; text-align: center;">🎁 BONUS: Free Daily Opportunity Alerts</h3>
+      <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
+      <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
+      <div style="text-align: center;">
+        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+      </div>
+    </div>
+
     <p style="text-align: center; color: #64748b;">
       Questions? Reply to this email or contact us at hello@govconedu.com
     </p>
@@ -330,6 +348,15 @@ export async function sendOpportunityHunterProEmail({
       <strong>Your registered email:</strong> ${to}<br>
       <span style="font-size: 14px;">Use this email to verify your Pro access anytime.</span>
     </p>
+
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 12px; padding: 25px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0; text-align: center;">🎁 BONUS: Free Daily Opportunity Alerts</h3>
+      <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
+      <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
+      <div style="text-align: center;">
+        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+      </div>
+    </div>
 
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
@@ -696,6 +723,15 @@ export async function sendContentReaperEmail({
       <span style="font-size: 14px;">Use this email to verify your access anytime.</span>
     </p>
 
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 12px; padding: 25px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0; text-align: center;">🎁 BONUS: Free Daily Opportunity Alerts</h3>
+      <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
+      <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
+      <div style="text-align: center;">
+        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+      </div>
+    </div>
+
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
     <p style="color: #6b7280; font-size: 12px; text-align: center;">
@@ -814,6 +850,15 @@ export async function sendRecompeteEmail({
       <strong>Your registered email:</strong> ${to}<br>
       <span style="font-size: 14px;">Use this email to verify your access anytime.</span>
     </p>
+
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 12px; padding: 25px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0; text-align: center;">🎁 BONUS: Free Daily Opportunity Alerts</h3>
+      <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
+      <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
+      <div style="text-align: center;">
+        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+      </div>
+    </div>
 
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
@@ -1004,6 +1049,15 @@ export async function sendBundleEmail({
       <strong>Your registered email:</strong> ${to}<br>
       <span style="font-size: 14px;">Use this email to access all your tools.</span>
     </p>
+
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 12px; padding: 25px; margin: 25px 0;">
+      <h3 style="color: #166534; margin: 0 0 10px 0; text-align: center;">🎁 BONUS: Free Daily Opportunity Alerts</h3>
+      <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
+      <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
+      <div style="text-align: center;">
+        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+      </div>
+    </div>
 
     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 

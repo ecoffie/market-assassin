@@ -292,11 +292,12 @@ export async function updateAccessFlags(
 
   // Bundle access grants (supports both short names and full product IDs)
   if (bundle) {
-    // GovCon Starter Bundle ($697): Hunter Pro + Recompete + Contractor DB
+    // GovCon Starter Bundle ($697): Hunter Pro + Recompete + Contractor DB (NO Market Intelligence)
     if (bundle === 'starter' || bundle === 'govcon-starter-bundle') {
       updates.access_hunter_pro = true;
       updates.access_recompete = true;
       updates.access_contractor_db = true;
+      // No access_briefings - Starter bundle doesn't include Market Intelligence
     }
     // Pro Giant Bundle ($997): Contractor DB + Recompete + MA Standard + Content Reaper + 1 Year Briefings
     else if (bundle === 'pro' || bundle === 'pro-giant-bundle') {
@@ -347,6 +348,10 @@ export async function updateAccessFlags(
       updates.access_content_full_fix = true;
       updates.access_content_standard = true; // Ensure standard is also set
     }
+
+    // NOTE: Market Intelligence (access_briefings) is NOT auto-granted to tool purchasers.
+    // It's only included in Pro/Ultimate bundles and explicit briefings purchases.
+    // Daily Alerts (free during beta) are separate from Market Intelligence.
   }
 
   if (Object.keys(updates).length === 0) return {};
@@ -390,17 +395,21 @@ export async function grantBundleAccess(
   if (!profile) return null;
 
   // Define what each bundle includes
+  // NOTE: Market Intelligence (access_briefings) only in Pro ($997) and Ultimate ($1497) bundles
+  // Daily Alerts are FREE for everyone during beta - separate from Market Intelligence
   const bundleProducts: Record<string, Record<string, unknown>> = {
-    // GovCon Starter Bundle ($697) - No briefings
+    // GovCon Starter Bundle ($697) - NO Market Intelligence
     'starter': {
       access_hunter_pro: true,
       access_recompete: true,
       access_contractor_db: true,
+      // No access_briefings
     },
     'govcon-starter-bundle': {
       access_hunter_pro: true,
       access_recompete: true,
       access_contractor_db: true,
+      // No access_briefings
     },
     // Pro Giant Bundle ($997) - 1 Year Briefings
     'pro': {

@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "bash tests/run-all-tests.sh",
+    "test:pre-deploy": "bash tests/test-pre-deploy.sh",
+    "test:local": "bash tests/test-pre-deploy.sh --local",
+    "predeploy": "npm run test:pre-deploy",
+    "deploy": "npm run predeploy && vercel --prod"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
