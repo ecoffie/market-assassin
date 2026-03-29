@@ -160,23 +160,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Source 2: user_alert_settings (users enrolled via Stripe webhook or alert signup)
-    // This catches users who haven't been synced to notification_settings yet
-    const { data: alertSettings } = await supabase
-      .from('user_alert_settings')
-      .select('user_email, naics_codes, keywords, target_agencies, timezone, briefings_enabled, is_active')
-      .eq('is_active', true)
-      .eq('briefings_enabled', true)
+    // Source 2: smart_user_profiles (users from search history aggregation)
+    // This catches users who have used tools but not explicitly set preferences
+    const { data: smartProfiles } = await supabase
+      .from('smart_user_profiles')
+      .select('email, naics_codes, keywords, agencies, timezone')
       .limit(MAX_USERS_PER_RUN);
 
-    if (alertSettings) {
-      for (const p of alertSettings) {
-        const email = p.user_email?.toLowerCase();
+    if (smartProfiles) {
+      for (const p of smartProfiles) {
+        const email = p.email?.toLowerCase();
         if (!email || seenEmails.has(email)) continue; // Skip if already added from notification_settings
         seenEmails.add(email);
 
         let naics: string[] = Array.isArray(p.naics_codes) ? p.naics_codes : [];
-        const agencies: string[] = Array.isArray(p.target_agencies) ? p.target_agencies : [];
+        const agencies: string[] = Array.isArray(p.agencies) ? p.agencies : [];
 
         // FALLBACK: If user has no NAICS and no agencies, use popular default NAICS codes
         if (naics.length === 0 && agencies.length === 0) {
@@ -187,7 +185,7 @@ export async function GET(request: NextRequest) {
             '541990', // Other Professional Services
             '561210', // Facilities Support Services
           ];
-          console.log(`[SendBriefings] Using fallback NAICS for ${email} (from alert_settings)`);
+          console.log(`[SendBriefings] Using fallback NAICS for ${email} (from smart_profiles)`);
         }
 
         allUsers.push({
@@ -197,12 +195,12 @@ export async function GET(request: NextRequest) {
           timezone: p.timezone || 'America/New_York',
           sms_enabled: false,
           phone_number: undefined,
-          source: 'alert_settings' as const,
+          source: 'alert_settings' as const, // Keep for type compat
         });
       }
     }
 
-    console.log(`[SendBriefings] Found ${allUsers.length} total users (${notificationSettings?.length || 0} from notification_settings, ${alertSettings?.length || 0} from alert_settings, ${seenEmails.size - allUsers.length} duplicates removed)`);
+    console.log(`[SendBriefings] Found ${allUsers.length} total users (${notificationSettings?.length || 0} from notification_settings, ${smartProfiles?.length || 0} from smart_profiles, ${seenEmails.size - allUsers.length} duplicates removed)`);
 
     // Filter to test email if specified
     let usersToProcess = allUsers;

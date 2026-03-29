@@ -50,7 +50,7 @@ interface AlertUser {
   user_email: string;
   naics_codes: string[] | null;
   business_type: string | null;
-  target_agencies: string[];
+  agencies: string[];  // unified table uses 'agencies' not 'target_agencies'
   location_state: string | null;
   is_active: boolean;
 }
@@ -114,8 +114,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Get all active alert users
-  let query = supabase.from('user_alert_settings').select('*').eq('is_active', true);
+  // Get all active alert users (unified table)
+  let query = supabase.from('user_notification_settings').select('*').eq('is_active', true).eq('alerts_enabled', true);
 
   if (singleEmail) {
     query = query.eq('user_email', singleEmail.toLowerCase());
@@ -233,7 +233,7 @@ export async function GET(request: NextRequest) {
         ...opp,
         score: scoreOpportunity(opp, {
           naics_codes: userNaics, // Original codes, not expanded - so exact matches score higher
-          agencies: user.target_agencies || [],
+          agencies: user.agencies || [],
           keywords: [],
         }),
       })).sort((a, b) => b.score - a.score);
@@ -253,10 +253,9 @@ export async function GET(request: NextRequest) {
         delivery_status: 'sent',
       }, { onConflict: 'user_email,alert_date' });
 
-      // Update user stats
-      await supabase.from('user_alert_settings').update({
+      // Update user stats (unified table)
+      await supabase.from('user_notification_settings').update({
         last_alert_sent: new Date().toISOString(),
-        last_alert_count: topOpps.length,
         total_alerts_sent: (user as any).total_alerts_sent + 1 || 1,
       }).eq('user_email', user.user_email);
 

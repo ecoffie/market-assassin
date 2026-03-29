@@ -33,8 +33,8 @@ export async function GET(request: Request) {
   );
 
   const { data, error } = await supabase
-    .from('user_briefing_profile')
-    .select('timezone, email_frequency, preferred_delivery_hour, sms_enabled, phone_number')
+    .from('user_notification_settings')
+    .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number')
     .eq('user_email', email)
     .single();
 
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   // Return defaults if no profile exists
   const preferences: BriefingPreferences = {
     timezone: data?.timezone || 'America/New_York',
-    email_frequency: data?.email_frequency || 'daily',
+    email_frequency: (data?.briefing_frequency as 'daily' | 'weekly') || 'daily',
     preferred_delivery_hour: data?.preferred_delivery_hour || 7,
     sms_enabled: data?.sms_enabled || false,
     phone_number: data?.phone_number || null,
@@ -90,18 +90,26 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Upsert user briefing profile
+  // Map email_frequency to briefing_frequency for unified table
+  const mappedUpdates = { ...updates };
+  if ('email_frequency' in mappedUpdates) {
+    mappedUpdates.briefing_frequency = mappedUpdates.email_frequency;
+    delete mappedUpdates.email_frequency;
+  }
+
+  // Upsert user notification settings (unified table)
   const { data, error } = await supabase
-    .from('user_briefing_profile')
+    .from('user_notification_settings')
     .upsert(
       {
         user_email: email,
-        ...updates,
+        briefings_enabled: true,
+        ...mappedUpdates,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_email' }
     )
-    .select('timezone, email_frequency, preferred_delivery_hour, sms_enabled, phone_number')
+    .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number')
     .single();
 
   if (error) {
@@ -115,7 +123,7 @@ export async function POST(request: Request) {
     success: true,
     preferences: {
       timezone: data.timezone,
-      email_frequency: data.email_frequency,
+      email_frequency: data.briefing_frequency,
       preferred_delivery_hour: data.preferred_delivery_hour,
       sms_enabled: data.sms_enabled,
       phone_number: data.phone_number,

@@ -96,18 +96,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upsert alert settings (note: source is used for access check only, not stored)
+    // Upsert notification settings (unified table)
     const { data, error } = await getSupabase()
-      .from('user_alert_settings')
+      .from('user_notification_settings')
       .upsert({
         user_email: email.toLowerCase(),
-        naics_codes: expandedNaics.length > 0 ? expandedNaics : null,
+        naics_codes: expandedNaics.length > 0 ? expandedNaics : [],
         business_type: businessType || null,
-        target_agencies: targetAgencies || [],
+        agencies: targetAgencies || [],
         location_state: locationState || null,
         location_zip: locationZip || null,
         is_active: true,
-        alert_frequency: 'weekly',
+        alerts_enabled: true,
+        alert_frequency: 'daily',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_email',
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
         inputCodes: allNaicsCodes.length,
         expandedCodes: expandedNaics.length,
         businessType: data.business_type,
-        targetAgencies: data.target_agencies,
+        targetAgencies: data.agencies,
         frequency: data.alert_frequency,
       },
     });
@@ -164,7 +165,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error } = await getSupabase()
-      .from('user_alert_settings')
+      .from('user_notification_settings')
       .select('*')
       .eq('user_email', email.toLowerCase())
       .single();
@@ -183,7 +184,7 @@ export async function GET(request: NextRequest) {
         email: data.user_email,
         naicsCodes: data.naics_codes,
         businessType: data.business_type,
-        targetAgencies: data.target_agencies,
+        targetAgencies: data.agencies,
         locationState: data.location_state,
         locationZip: data.location_zip,
         frequency: data.alert_frequency,

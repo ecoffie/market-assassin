@@ -20,11 +20,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Deactivate alerts for this user
+    // Deactivate alerts for this user (unified table)
     const { error } = await supabase
-      .from('user_alert_settings')
+      .from('user_notification_settings')
       .update({
-        is_active: false,
+        alerts_enabled: false,
         alert_frequency: 'paused',
         updated_at: new Date().toISOString(),
       })
@@ -67,9 +67,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { error } = await supabase
-      .from('user_alert_settings')
+      .from('user_notification_settings')
       .update({
-        is_active: false,
+        alerts_enabled: false,
         alert_frequency: 'paused',
         updated_at: new Date().toISOString(),
       })

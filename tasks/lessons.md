@@ -288,48 +288,20 @@ npm test
 
 ---
 
-## Market Intelligence - Two Table Problem
+## Market Intelligence - Two Table Problem (RESOLVED)
 
-**Lesson (Mar 27, 2026):** Daily Alerts and Daily Briefings use DIFFERENT user tables. Must query BOTH.
+**Lesson (Mar 27, 2026):** ~~Daily Alerts and Daily Briefings use DIFFERENT user tables. Must query BOTH.~~
 
-**Tables:**
-| Table | Purpose | Primary Users |
-|-------|---------|---------------|
-| `user_alert_settings` | Alert preferences, Stripe webhook enrollments | 394 users |
-| `user_notification_settings` | Briefing preferences, smart profiles | 32 users |
+**UPDATE (Mar 29, 2026):** This was resolved by dropping old tables and using UNIFIED `user_notification_settings` table for everything.
 
-**What went wrong:**
-- Daily Alerts cron queried `user_alert_settings` → 394 users got alerts
-- Daily Briefings cron queried ONLY `user_notification_settings` → Only 32 users got briefs
-- 362 users (94%) missed briefings because they weren't synced
+**Old approach (don't use):**
+- Query `user_alert_settings` AND `user_notification_settings`, dedupe by email
 
-**Fix (send-briefings/route.ts):**
-```typescript
-// Source 1: user_notification_settings (original source)
-const { data: notificationSettings } = await supabase
-  .from('user_notification_settings')
-  .select('user_email, naics_codes, ...')
-  .eq('is_active', true)
-  .eq('briefings_enabled', true);
+**New approach:**
+- Single source of truth: `user_notification_settings`
+- Fallback for NAICS: `smart_user_profiles` (search history aggregation)
 
-// Source 2: user_alert_settings (Stripe webhook enrollments)
-const { data: alertSettings } = await supabase
-  .from('user_alert_settings')
-  .select('user_email, naics_codes, ...')
-  .eq('is_active', true)
-  .eq('briefings_enabled', true);
-
-// Dedupe by email (use Set to track seen emails)
-const seenEmails = new Set<string>();
-for (const p of notificationSettings) { ... }
-for (const p of alertSettings) {
-  if (seenEmails.has(email)) continue; // Skip duplicates
-  ...
-}
-```
-
-**Admin endpoints created:**
-- `/api/admin/sync-alert-to-notification` - Sync users between tables
+**Admin endpoints:**
 - `/api/admin/test-market-intel-pipeline` - Pipeline status/testing
 
 ---
@@ -450,4 +422,76 @@ curl -X POST "https://tools.govcongiants.org/api/admin/test-market-intel-pipelin
 
 ---
 
-*Last Updated: March 28, 2026*
+## Unified Notification Table Migration
+
+**Lesson (Mar 29, 2026):** The old `user_alert_settings` and `user_briefing_profile` tables were DROPPED and replaced with `user_notification_settings`.
+
+**What happened:**
+- Supabase schema was migrated to unified `user_notification_settings` table
+- BUT code still referenced old tables (`user_alert_settings`, `user_briefing_profile`)
+- Cron health check showed 15/16 passing (Alerts Signup failing)
+- Root cause: Table didn't exist
+
+**Files that needed updating:**
+| File | Old Table | New Table |
+|------|-----------|-----------|
+| `api/cron/daily-alerts/route.ts` | `user_alert_settings` | `user_notification_settings` |
+| `api/cron/send-briefings/route.ts` | `user_alert_settings` | `smart_user_profiles` (fallback) |
+| `api/admin/trigger-alerts/route.ts` | `user_alert_settings` | `user_notification_settings` |
+| `api/alerts/save-profile/route.ts` | `user_alert_settings` | `user_notification_settings` |
+| `api/alerts/unsubscribe/route.ts` | `user_alert_settings` | `user_notification_settings` |
+| `api/briefings/preferences/route.ts` | `user_briefing_profile` | `user_notification_settings` |
+
+**Column mapping:**
+| Old Column | New Column |
+|------------|------------|
+| `target_agencies` | `agencies` |
+| `email_frequency` | `briefing_frequency` |
+| `is_active` (for alerts) | `alerts_enabled` |
+| `is_active` (for briefings) | `briefings_enabled` |
+
+**Pattern:** Always check Supabase schema before assuming table names. Use health check endpoint to verify all systems working.
+
+---
+
+## GHL API Pagination
+
+**Lesson (Mar 29, 2026):** GoHighLevel API uses cursor-based pagination, not offset-based.
+
+**Wrong:**
+```bash
+# This fails with "property skip should not exist"
+curl ".../contacts/?skip=100&limit=100"
+```
+
+**Correct:**
+```bash
+# Get first page
+response=$(curl ".../contacts/?limit=100")
+
+# Extract next page URL from response
+next_url=$(echo "$response" | jq -r '.meta.nextPageUrl')
+
+# Use that URL for next page
+curl "$next_url"
+```
+
+**Pattern:** Check `.meta.nextPageUrl` in response for cursor. Total count in `.meta.total`.
+
+---
+
+## Bulk Enrollment Best Practice
+
+**Lesson (Mar 29, 2026):** Test with small sample before bulk operations.
+
+**Pattern:**
+1. Test with 5 users first
+2. Verify they appear in database
+3. Then batch enroll remaining
+4. Save email list to permanent file (not /tmp)
+
+**File saved:** `data/bootcamp-attendees-to-enroll.txt` (8,804 emails)
+
+---
+
+*Last Updated: March 29, 2026*

@@ -1,6 +1,43 @@
 # GovCon Giants - Current Tasks
 
-## Session State (March 28, 2026)
+## Session State (March 29, 2026)
+
+### 🔔 REMINDER: Batch Enroll Bootcamp Attendees (April 12-19, 2026)
+
+**After 2-3 weeks of testing alerts with current 457 users, enroll the remaining bootcamp attendees.**
+
+**Action:** Run this command to enroll 8,804 bootcamp attendees:
+```bash
+cd "/Users/ericcoffie/Market Assasin/market-assassin"
+cat data/bootcamp-attendees-to-enroll.txt | while read email; do
+  curl -s -X POST "https://tools.govcongiants.org/api/alerts/save-profile" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\": \"$email\", \"naicsCodes\": [\"541512\", \"541611\", \"541330\"], \"businessType\": \"\", \"source\": \"free-signup\"}"
+done
+```
+
+**File location:** `data/bootcamp-attendees-to-enroll.txt` (8,804 emails)
+**Source:** GHL contacts with any "bootcamp" tag
+
+---
+
+### Session 35 - Cron Fix & Bootcamp Enrollment (March 29, 2026)
+
+#### Completed
+- [x] Fixed cron health check (16/16 passing, was 15/16)
+- [x] Migrated all code from `user_alert_settings` → `user_notification_settings`
+- [x] Fixed `send-briefings`, `daily-alerts`, `trigger-alerts`, `save-profile`, `unsubscribe`, `briefings/preferences`
+- [x] Enrolled 58 Contract Vehicles Bootcamp attendees (Mar 28)
+- [x] Pulled 8,804 total bootcamp attendees from GHL (all tags containing "bootcamp")
+- [x] Saved to `data/bootcamp-attendees-to-enroll.txt` for future batch enrollment
+
+#### Pending
+- [ ] Verify alerts/briefings working with current 457 users (2-3 weeks)
+- [ ] Batch enroll 8,804 bootcamp attendees after verification
+
+---
+
+## Previous Session State (March 28, 2026)
 
 ### Just Completed - Market Intelligence Pipeline Fix
 
@@ -30,7 +67,21 @@
 - [x] `docs/ecosystem.md` - Market Intel pipeline diagram
 - [x] `CLAUDE.md` - New endpoints + bug prevention rules
 
-#### Market Intelligence - Now FREE for Beta
+#### Market Intelligence Pricing (Finalized)
+
+**Beta Period:** Now through April 27, 2026 (FREE for everyone)
+
+**Post-Beta Pricing:**
+| User Type | Daily Alerts ($19/mo) | Daily Briefings ($49/mo) |
+|-----------|----------------------|--------------------------|
+| OH Free users (no purchase) | ❌ Pay $19/mo | ❌ Pay $49/mo |
+| OH Pro ($19/mo) subscribers | ✅ Included | ❌ Pay $49/mo |
+| Any product buyer (excl OH free) | ✅ Free | ❌ Pay $49/mo |
+| Pro Giant ($997) | ✅ Free | ✅ 1 year free |
+| Ultimate ($1,497) | ✅ Free | ✅ Lifetime free |
+| Beta users (no purchase) | 30 days free → $19/mo | 30 days free → $49/mo |
+
+**Schedule:**
 - **Daily Alerts** (4x/day) - SAM.gov opportunities matching user NAICS
 - **Daily Briefs** (9 AM UTC) - Recompete intel, awards, teaming leads
 - **Weekly Pursuit Brief** (Monday 10 AM UTC) - Auto-selects TOP opportunity

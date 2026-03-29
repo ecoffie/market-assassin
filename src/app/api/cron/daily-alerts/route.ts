@@ -171,9 +171,9 @@ async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number
     results.retried++;
 
     try {
-      // Get user settings
+      // Get user settings (unified table)
       const { data: user } = await getSupabase()
-        .from('user_alert_settings')
+        .from('user_notification_settings')
         .select('*')
         .eq('user_email', alert.user_email)
         .single();
@@ -294,7 +294,7 @@ async function runDailyAlertJob(options?: {
           continue;
         }
 
-        // Get NAICS codes - try user_alert_settings first, then fall back to smart_user_profiles
+        // Get NAICS codes - try user_notification_settings first, then fall back to smart_user_profiles
         let userNaics = user.naics_codes || [];
 
         if (userNaics.length === 0) {
@@ -404,12 +404,11 @@ async function runDailyAlertJob(options?: {
             onConflict: 'user_email,alert_date',
           });
 
-          // Update user stats
+          // Update user stats (unified table)
           await getSupabase()
-            .from('user_alert_settings')
+            .from('user_notification_settings')
             .update({
               last_alert_sent: new Date().toISOString(),
-              last_alert_count: scoredOpps.length,
               total_alerts_sent: (user as any).total_alerts_sent + 1 || 1,
             })
             .eq('user_email', user.user_email);

@@ -10,6 +10,7 @@
 6. **SAM.gov API does NOT support comma-separated NAICS codes.** Must make parallel requests for each NAICS code and merge results. See `src/lib/briefings/pipelines/sam-gov.ts`.
 7. **FPDS.gov retired Feb 24, 2026.** All federal contract data now flows through SAM.gov APIs. See `docs/sam-apis.md` for full reference.
 8. **Always run QA tests before deploying.** Use `npm run deploy` (runs tests first) or `npm run test:pre-deploy`.
+9. **Unified notification table:** All alert/briefing code uses `user_notification_settings` (not the old `user_alert_settings` or `user_briefing_profile` tables which were dropped).
 
 ---
 
@@ -158,7 +159,7 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 ### 5. Opportunity Hunter
 **Location:** `/src/app/opportunity-hunter/`
 **Purpose:** Find government buyers — agency spending analysis, NAICS targeting
-**Price:** Free + Pro ($49) + Alert Pro ($19/mo)
+**Price:** Free + Pro ($19/mo)
 
 ### 6. Action Planner
 **Location:** `/src/app/planner/`
@@ -172,7 +173,8 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 ### 8. Daily Alerts System
 **Location:** `/src/app/api/cron/daily-alerts/`, `/src/app/alerts/`
 **Purpose:** Automated opportunity alert emails based on user NAICS/keywords
-**Status:** FREE FOR EVERYONE during beta (paywall removed Mar 23, 2026)
+**Price:** $19/mo (FREE during beta through April 27, 2026)
+**Free for:** Any product purchaser (except OH free tier)
 **Features:**
 - Deduplication (won't resend same opp in 7 days)
 - Retry logic (3 attempts for failed emails)
@@ -200,15 +202,28 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 
 | Product | Price | KV Key | Stripe Metadata |
 |---------|-------|--------|-----------------|
-| Opportunity Hunter Pro | $49 | `ospro:{email}` | `tier: hunter_pro` |
-| Alert Pro (subscription) | $19/mo | `alertpro:{email}` | `tier: alert_pro` |
+| Opportunity Hunter Pro | $19/mo | `ospro:{email}` | `tier: hunter_pro` |
+| Daily Alerts | $19/mo | `alertpro:{email}` | `tier: alert_pro` |
+| Daily Briefings | $49/mo | `briefings:{email}` | `tier: briefings` |
 | Content Reaper | $197 | `contentgen:{email}` | `tier: content_standard` |
 | Market Assassin Standard | $297 | `ma:{email}` | `tier: assassin_standard` |
 | Content Reaper Full Fix | $397 | `contentgen:{email}` | `tier: content_full_fix` |
 | Recompete Tracker | $397 | `recompete:{email}` | `tier: recompete` |
 | Federal Contractor Database | $497 | `dbaccess:{email}` | `tier: contractor_db` |
 | Market Assassin Premium | $497 | `ma:{email}` | `tier: assassin_premium` |
-| Daily Briefings | included in bundles | `briefings:{email}` | `tier: briefings` |
+
+### Market Intelligence Pricing (Post-Beta: April 27, 2026)
+
+| User Type | Daily Alerts ($19/mo) | Daily Briefings ($49/mo) |
+|-----------|----------------------|--------------------------|
+| OH Free users (no purchase) | ❌ Pay $19/mo | ❌ Pay $49/mo |
+| OH Pro ($19/mo) subscribers | ✅ Included | ❌ Pay $49/mo |
+| Any product buyer (excl OH free) | ✅ Free | ❌ Pay $49/mo |
+| Pro Giant ($997) | ✅ Free | ✅ 1 year free |
+| Ultimate ($1,497) | ✅ Free | ✅ Lifetime free |
+| Beta users (no purchase) | 30 days free → $19/mo | 30 days free → $49/mo |
+
+**Beta End Date:** April 27, 2026
 
 ### Bundles
 | Bundle | Price | Includes |
@@ -342,7 +357,7 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 4. **Always persist state after generation** — upsert to database immediately.
 5. **Arrays must be `.join(' ')` not interpolated** — avoid `${array}` producing comma-joined.
 6. **Never `.slice()` user data silently** — make caps explicit or configurable.
-7. **Query BOTH user tables for Market Intel** — `user_alert_settings` AND `user_notification_settings`, dedupe by email.
+7. **Use unified `user_notification_settings` table** — Old tables (`user_alert_settings`, `user_briefing_profile`) were dropped. All code uses unified table now.
 8. **Always add fallback NAICS** — If user has no NAICS, use defaults: `541512, 541611, 541330, 541990, 561210`.
 
 ---
@@ -373,4 +388,25 @@ GROQ_API_KEY=gsk_...
 
 ---
 
-*Last Updated: March 25, 2026*
+## 🔔 Pending Tasks
+
+### Batch Enroll Bootcamp Attendees (April 12-19, 2026)
+
+**Status:** Waiting 2-3 weeks to verify alerts working with current 457 users
+
+**Action:** Enroll 8,804 bootcamp attendees from `data/bootcamp-attendees-to-enroll.txt`
+
+```bash
+# Run this after verifying alerts are working
+cat data/bootcamp-attendees-to-enroll.txt | while read email; do
+  curl -s -X POST "https://tools.govcongiants.org/api/alerts/save-profile" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\": \"$email\", \"naicsCodes\": [\"541512\", \"541611\", \"541330\"], \"businessType\": \"\", \"source\": \"free-signup\"}"
+done
+```
+
+**Source:** All GHL contacts with any "bootcamp" tag (contract-vehicles-bootcamp, jan31-bootcamp, feb-proposal-bootcamp, etc.)
+
+---
+
+*Last Updated: March 29, 2026*
