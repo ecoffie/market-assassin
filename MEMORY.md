@@ -4,6 +4,55 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 35 (Mar 30, 2026)
+
+### JTED 2026 Package - COMPLETE
+
+**Event:** JTED 2026 AEC Industry Day at MacDill AFB — April 1, 2026
+
+#### Deliverables Created
+| File | Size | Purpose |
+|------|------|---------|
+| `JTED-2026-Revised.html` | - | 98-slide HTML source |
+| `JTED-2026-Compressed.pptx` | 8MB | PowerPoint (JPEG slides) |
+| `JTED-2026-Intel-Pack.pdf` | - | Companion guide |
+| `JTED-2026-Slides.pdf` | - | Slides PDF |
+
+#### Landing Page Deployed
+- **URL:** `govcongiants.org/jted-2026`
+- **Thank You:** `govcongiants.org/jted-2026/thank-you`
+- **GHL Tag:** `jted-2026-landing`
+- **Downloads:** Intel Pack + Slides (email gated)
+
+#### PowerPoint Export Process
+1. Initial attempt: pandoc (failed - only 2 slides, no formatting)
+2. Second attempt: python-pptx text extraction (wrong - small text)
+3. Third attempt: Puppeteer screenshots (failed - scroll position bug)
+4. **Final solution:** Puppeteer with `display:none` isolation + 2x deviceScaleFactor + JPEG compression
+   - Script: `export-slides-compressed.js`
+   - Result: 98 unique slides, 38MB → 8MB (79% smaller)
+
+#### Intel Pack Contents
+1. 10 Expiring A/E/C Contracts ($10B+ combined)
+2. 5 Teaming Plays with word-for-word scripts
+3. SAM.gov Alert Setup (step-by-step)
+4. USASpending Recompete Tracking
+5. Top 5 SAT Agencies for Construction
+6. Sources Sought Response Template
+7. IDIQ/MACC Vehicles Open for Bid
+8. 4 AI Prompts for GovCon
+9. Glossary of A/E/C Terms
+10. Key Resources & Links
+
+#### Key Files
+| File | Purpose |
+|------|---------|
+| `presentations/export-slides-compressed.js` | JPEG export + PPTX creation |
+| `govcon-funnels/src/app/jted-2026/page.tsx` | Landing page |
+| `govcon-funnels/public/downloads/` | PDF files |
+
+---
+
 ## Session 34 (Mar 28, 2026)
 
 ### Market Intelligence Pipeline Fix - Two Table Problem
@@ -600,4 +649,4 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 
 ---
 
-*Last Updated: March 23, 2026*
+*Last Updated: March 30, 2026*

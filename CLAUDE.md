@@ -409,4 +409,30 @@ done
 
 ---
 
-*Last Updated: March 29, 2026*
+## JTED 2026 Presentation & Guide
+
+**Event:** AEC Industry Day at MacDill AFB — April 1, 2026
+
+### Presentation
+- **File:** `presentations/JTED-2026-Revised.html` (98 slides)
+- **PowerPoint:** `presentations/JTED-2026-Compressed.pptx` (8MB, image-based)
+- **Export script:** `node presentations/export-slides-compressed.js`
+- **Status:** Complete with QR code
+
+### Companion Guide (Complete)
+- **Intel Pack PDF:** `presentations/JTED-2026-Intel-Pack.pdf`
+- **Slides PDF:** `presentations/JTED-2026-Slides.pdf`
+- **Landing page:** `govcongiants.org/jted-2026` (deployed)
+- **GHL tag:** `jted-2026-landing`
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `presentations/JTED-2026-Revised.html` | 98-slide HTML source |
+| `presentations/JTED-2026-Compressed.pptx` | PowerPoint (8MB) |
+| `presentations/JTED-2026-Intel-Pack.pdf` | Companion guide |
+| `presentations/export-slides-compressed.js` | JPEG export + PPTX |
+
+---
+
+*Last Updated: March 30, 2026*

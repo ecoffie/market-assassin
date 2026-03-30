@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Start, Grow, Scale Your GovCon Business | JTED 2026</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f172a; color: #fff; }
+    .slide {
+      min-height: 100vh;
+      padding: 60px 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      position: relative;
+      page-break-after: always;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #059669, #10b981, #34d399);
+    }
+    .logo {
+      position: absolute;
+      top: 25px;
+      right: 60px;
+      font-weight: 900;
+      font-size: 16px;
+    }
+    .logo span { color: #10b981; }
+    .event-badge {
+      position: absolute;
+      top: 25px;
+      left: 60px;
+      background: #1e3a8a;
+      color: white;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    h1 {
+      font-size: 58px;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+    h1.medium { font-size: 48px; }
+    h1.small { font-size: 42px; }
+    h1 .highlight { color: #10b981; }
+    h1 .warning { color: #f59e0b; }
+    h1 .alert { color: #ef4444; }
+    h1 .purple { color: #a78bfa; }
+    h2 {
+      font-size: 42px;
+      font-weight: 800;
+      margin-bottom: 25px;
+      color: #10b981;
+    }
+    h2.white { color: white; }
+    h3 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #a78bfa;
+      margin-bottom: 15px;
+    }
+    .subtitle {
+      font-size: 26px;
+      color: #94a3b8;
+    }
+    .center-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    .stat-box {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      border-radius: 16px;
+      padding: 30px;
+      text-align: center;
+    }
+    .stat-box.warning { background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); }
+    .stat-box.alert { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); }
+    .stat-box.purple { background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); }
+    .stat-box.navy { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
+    .stat-box .number {
+      font-size: 64px;
+      font-weight: 900;
+      color: white;
+      line-height: 1;
+    }
+    .stat-box .number.smaller { font-size: 48px; }
+    .stat-box .label {
+      font-size: 18px;
+      color: rgba(255,255,255,0.9);
+      margin-top: 8px;
+    }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; flex: 1; align-items: center; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; flex: 1; }
+    .four-col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+    .five-col { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .icon-box {
+      background: rgba(30, 41, 59, 0.8);
+      border: 2px solid #334155;
+      border-radius: 12px;
+      padding: 20px 15px;
+      text-align: center;
+    }
+    .icon-box.green { border-color: #10b981; }
+    .icon-box.purple { border-color: #a78bfa; }
+    .icon-box.warning { border-color: #f59e0b; }
+    .icon-box.alert { border-color: #ef4444; }
+    .icon-box .icon { font-size: 36px; margin-bottom: 10px; }
+    .icon-box .text { font-size: 16px; color: #e2e8f0; font-weight: 600; }
+    .icon-box .sub { font-size: 13px; color: #94a3b8; margin-top: 6px; }
+    .section-slide {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      text-align: center;
+      justify-content: center;
+      align-items: center;
+    }
+    .section-slide.purple { background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); }
+    .section-slide.navy { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
+    .section-slide::before { background: linear-gradient(90deg, #0f172a, #1e293b, #334155); }
+    .section-slide h1 { font-size: 64px; color: white; }
+    .section-slide .icon { font-size: 60px; margin-bottom: 15px; }
+    .quote-box {
+      background: rgba(30, 41, 59, 0.9);
+      border-left: 5px solid #10b981;
+      padding: 25px 35px;
+      border-radius: 0 12px 12px 0;
+      font-size: 24px;
+      font-style: italic;
+      color: #e2e8f0;
+    }
+    .quote-box.warning { border-left-color: #f59e0b; }
+    .quote-box.purple { border-left-color: #a78bfa; }
+    .quote-box .source {
+      font-size: 16px;
+      color: #10b981;
+      margin-top: 12px;
+      font-style: normal;
+      font-weight: 700;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+    .data-table th {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: white;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 700;
+    }
+    .data-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #334155;
+      color: #e2e8f0;
+    }
+    .data-table tr:hover td { background: rgba(30, 41, 59, 0.5); }
+    .highlight-value { color: #10b981; font-weight: 700; }
+    .warning-value { color: #f59e0b; font-weight: 700; }
+    .purple-value { color: #a78bfa; font-weight: 700; }
+    .vs-container { display: flex; align-items: center; justify-content: center; gap: 25px; }
+    .vs-box { flex: 1; padding: 30px; border-radius: 12px; text-align: center; }
+    .vs-box.bad { background: rgba(239, 68, 68, 0.15); border: 2px solid #ef4444; }
+    .vs-box.good { background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; }
+    .vs-box .icon { font-size: 40px; margin-bottom: 12px; }
+    .vs-box .text { font-size: 20px; font-weight: 700; }
+    .vs-box.bad .text { color: #fca5a5; }
+    .vs-box.good .text { color: #6ee7b7; }
+    .vs-divider { font-size: 32px; font-weight: 900; color: #475569; }
+    .insight-box {
+      background: linear-gradient(135deg, #166534, #10b981);
+      padding: 20px 30px;
+      border-radius: 12px;
+      margin-top: 20px;
+    }
+    .insight-box .label {
+      font-size: 14px;
+      color: rgba(255,255,255,0.8);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .insight-box .text {
+      font-size: 22px;
+      color: white;
+      font-weight: 600;
+    }
+    .big-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+    .big-stat .number {
+      font-size: 140px;
+      font-weight: 900;
+      color: #10b981;
+      line-height: 1;
+    }
+    .big-stat .number.purple { color: #a78bfa; }
+    .big-stat .number.warning { color: #f59e0b; }
+    .big-stat .label {
+      font-size: 28px;
+      color: #94a3b8;
+      margin-top: 15px;
+    }
+    .cta-slide {
+      background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+      text-align: center;
+      justify-content: center;
+      align-items: center;
+    }
+    .cta-slide::before { background: linear-gradient(90deg, #fbbf24, #f59e0b, #d97706); }
+    .cta-slide h1 { color: white; margin-bottom: 20px; }
+    .cta-slide .url {
+      font-size: 32px;
+      font-weight: 900;
+      color: #fef3c7;
+      background: rgba(0,0,0,0.2);
+      padding: 15px 40px;
+      border-radius: 10px;
+      margin-top: 25px;
+    }
+    .slide-number {
+      position: absolute;
+      bottom: 25px;
+      right: 60px;
+      color: #475569;
+      font-size: 14px;
+    }
+    .action-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: rgba(30, 41, 59, 0.8);
+      padding: 15px 25px;
+      border-radius: 10px;
+      border-left: 4px solid #10b981;
+      margin-bottom: 12px;
+    }
+    .action-item .num { font-size: 24px; font-weight: 900; color: #10b981; width: 35px; }
+    .action-item .text { font-size: 20px; color: #e2e8f0; }
+    .timeline {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      position: relative;
+      margin-top: 40px;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      top: 35px;
+      left: 15%;
+      right: 15%;
+      height: 4px;
+      background: linear-gradient(90deg, #10b981, #a78bfa, #f59e0b);
+      border-radius: 2px;
+    }
+    .timeline-step { text-align: center; z-index: 1; }
+    .timeline-step .circle {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 12px;
+    }
+    .timeline-step .label { font-size: 22px; font-weight: 800; }
+    .timeline-step.start .circle { background: linear-gradient(135deg, #059669, #10b981); }
+    .timeline-step.start .label { color: #10b981; }
+    .timeline-step.grow .circle { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+    .timeline-step.grow .label { color: #a78bfa; }
+    .timeline-step.scale .circle { background: linear-gradient(135deg, #d97706, #f59e0b); }
+    .timeline-step.scale .label { color: #f59e0b; }
+    @media print {
+      .slide { page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ================================================ -->
+<!-- SECTION 1: OPENING (Slides 1-12) -->
+<!-- Eric's thought leadership intro -->
+<!-- ================================================ -->
+
+<!-- Slide 1: Title with QR Code -->
+<div class="slide">
+  <div class="event-badge">JTED 2026 • AEC Industry Day</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 60px;">
+    <div style="flex: 1;">
+      <h1><span class="highlight">Start</span>, <span class="purple">Grow</span>, <span class="warning">Scale</span></h1>
+      <p class="subtitle">Your Government Contracting Business</p>
+      <div class="timeline" style="margin-top: 30px;">
+        <div class="timeline-step start">
+          <div class="circle">🚀</div>
+          <div class="label">START</div>
+        </div>
+        <div class="timeline-step grow">
+          <div class="circle">📈</div>
+          <div class="label">GROW</div>
+        </div>
+        <div class="timeline-step scale">
+          <div class="circle">🏆</div>
+          <div class="label">SCALE</div>
+        </div>
+      </div>
+    </div>
+    <div style="text-align: center; margin-left: 40px;">
+      <div style="background: white; padding: 15px; border-radius: 12px; display: inline-block;">
+        <img src="images/jted-qr-code.png" alt="QR Code" style="width: 140px; height: 140px;">
+      </div>
+      <p style="font-size: 14px; margin-top: 10px; color: #64748b;">Scan for free resources</p>
+      <p style="font-size: 12px; color: #94a3b8;">govcongiants.org/jted-2026</p>
+    </div>
+  </div>
+  <div class="slide-number">1 / 98</div>
+</div>
+
+<!-- Slide 2: Who I am -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">I talk to <span class="highlight">hundreds</span> of<br>small businesses every week.</h1>
+    <p class="subtitle" style="margin-top: 25px;">8,000+ bootcamp registrations. 49K+ YouTube subscribers.</p>
+    <p class="subtitle" style="margin-top: 10px;">I see what works. I see what doesn't.</p>
+  </div>
+  <div class="slide-number">2 / 98</div>
+</div>
+
+<!-- Slide 3: Now let's talk market -->
+<div class="slide section-slide">
+  <div class="icon">📈</div>
+  <h1>Now Let's Talk Market</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9;">The State of Federal Contracting in 2026</p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">3 / 98</div>
+</div>
+
+<!-- Slide 10: Market Size -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="big-stat">
+    <div class="number">$834B</div>
+    <div class="label">FY2025 Federal Contract Spending</div>
+  </div>
+  <div class="slide-number">4 / 98</div>
+</div>
+
+<!-- Slide 11: Largest ever -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1><span class="highlight">Largest. Ever.</span></h1>
+  </div>
+  <div class="slide-number">5 / 98</div>
+</div>
+
+<!-- Slide 5: SB Share -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="big-stat">
+    <div class="number purple">28.8%</div>
+    <div class="label">Went to Small Business = $183.5B</div>
+  </div>
+  <div class="slide-number">6 / 98</div>
+</div>
+
+<!-- Slide 6: But headlines say... -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">But the headlines say...</h1>
+  </div>
+  <div class="slide-number">7 / 98</div>
+</div>
+
+<!-- Slide 7: 8(a) headlines -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box" style="border-left-color: #ef4444; max-width: 900px;">
+      "1,100 Firms Suspended from 8(a) Program"<br><br>
+      "SBA Data Call Targets Small Business"<br><br>
+      "8(a) Program Under Investigation"
+    </div>
+  </div>
+  <div class="slide-number">8 / 98</div>
+</div>
+
+<!-- Slide 8: Scary right? -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">Scary, right?</h1>
+  </div>
+  <div class="slide-number">9 / 98</div>
+</div>
+
+<!-- Slide 9: Here's what they're NOT telling you -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">Here's what they're<br><span class="alert">NOT</span> telling you.</h1>
+  </div>
+  <div class="slide-number">10 / 98</div>
+</div>
+
+<!-- Slide 10: 8(a) RECORD -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="big-stat">
+    <div class="number">$26B</div>
+    <div class="label">8(a) Awards in 2025 — ALL-TIME RECORD</div>
+  </div>
+  <div class="slide-number">11 / 98</div>
+</div>
+
+<!-- Slide 11: Sam Lee Quote -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box" style="max-width: 950px;">
+      "1,100 firms suspended? That means LESS competition for compliant businesses. The 8(a) program just hit its highest awards EVER. This is the strongest moment in 8(a) history."
+      <div class="source">— Sam Le, GovCon Intelligence (17 years SBA Policy)</div>
+    </div>
+  </div>
+  <div class="slide-number">12 / 98</div>
+</div>
+
+<!-- Slide 12: The real story -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2 class="white">The Real Story</h2>
+  <div class="three-col">
+    <div class="stat-box">
+      <div class="number smaller">$26B</div>
+      <div class="label">8(a) Record Awards</div>
+    </div>
+    <div class="stat-box alert">
+      <div class="number smaller">1,100</div>
+      <div class="label">Firms Removed</div>
+    </div>
+    <div class="stat-box purple">
+      <div class="number smaller">↓</div>
+      <div class="label">Less Competition</div>
+    </div>
+  </div>
+  <div class="insight-box" style="margin-top: 30px;">
+    <div class="label">Eric's Take</div>
+    <div class="text">Bad actors getting removed = MORE opportunity for compliant small businesses. Stay compliant. Stay ready.</div>
+  </div>
+  <div class="slide-number">13 / 98</div>
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 2: WHAT CHANGED (Slides 13-22) -->
+<!-- Rule changes, thresholds, NDAA -->
+<!-- ================================================ -->
+
+<!-- Slide 13: Section - What Changed -->
+<div class="slide section-slide purple">
+  <div class="icon">⚡</div>
+  <h1>What Changed</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9; font-size: 24px;">Revolutionary FAR Overhaul</p>
+  <p class="subtitle" style="color: white; opacity: 0.7; font-size: 18px; margin-top: 15px;">Executive Order 14275 • April 2025 • First changes effective Feb 1, 2026</p>
+  <p class="subtitle" style="color: white; opacity: 0.6; font-size: 16px; margin-top: 10px;">Biggest rewrite in 40+ years — faster acquisitions, plain language, more competition</p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">14 / 98</div>
+</div>
+
+<!-- Slide 14: Rule of Two -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="stat-box" style="padding: 50px 80px;">
+      <div class="icon" style="font-size: 60px; margin-bottom: 15px;">✓</div>
+      <div class="number smaller">Rule of Two</div>
+      <div class="label" style="font-size: 22px;">is SAFE — FAR (Federal Acquisition Regulation) 19.104-1</div>
+    </div>
+    <p style="margin-top: 30px; font-size: 22px; color: #94a3b8;">COs MUST set aside if 2+ small businesses can compete.</p>
+  </div>
+  <div class="slide-number">15 / 98</div>
+</div>
+
+<!-- Slide 15: Set-aside changes table -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>What Changed for Set-Asides</h2>
+  <table class="data-table" style="font-size: 17px;">
+    <tr>
+      <th>Set-Aside Type</th>
+      <th>Before</th>
+      <th>After</th>
+      <th>Status</th>
+    </tr>
+    <tr>
+      <td>Small Business (Rule of Two)</td>
+      <td>MUST set aside</td>
+      <td>MUST set aside</td>
+      <td><span style="background: #10b981; padding: 4px 10px; border-radius: 4px; font-weight: 700;">SAFE</span></td>
+    </tr>
+    <tr>
+      <td>8(a) Business Development</td>
+      <td>Emphasized</td>
+      <td>"MAY" set aside</td>
+      <td><span style="background: #f59e0b; padding: 4px 10px; border-radius: 4px; font-weight: 700;">CHANGED</span></td>
+    </tr>
+    <tr>
+      <td>HUBZone (Historically Underutilized Business Zone)</td>
+      <td>Emphasized</td>
+      <td>"MAY" set aside</td>
+      <td><span style="background: #f59e0b; padding: 4px 10px; border-radius: 4px; font-weight: 700;">CHANGED</span></td>
+    </tr>
+    <tr>
+      <td>SDVOSB (Service-Disabled Veteran-Owned SB)</td>
+      <td>Emphasized</td>
+      <td>"MAY" set aside</td>
+      <td><span style="background: #f59e0b; padding: 4px 10px; border-radius: 4px; font-weight: 700;">CHANGED</span></td>
+    </tr>
+    <tr>
+      <td>WOSB (Women-Owned Small Business)</td>
+      <td>Emphasized</td>
+      <td>"MAY" set aside</td>
+      <td><span style="background: #f59e0b; padding: 4px 10px; border-radius: 4px; font-weight: 700;">CHANGED</span></td>
+    </tr>
+  </table>
+  <p style="margin-top: 20px; font-size: 18px; color: #94a3b8;">"MAY" = Discretionary. Agencies CAN still use them — but you have to make the case.</p>
+  <div class="slide-number">16 / 98</div>
+</div>
+
+<!-- Slide 16: The game changer rule -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">The Rule That Changed<br><span class="highlight">Everything</span></h1>
+  </div>
+  <div class="slide-number">17 / 98</div>
+</div>
+
+<!-- Slide 17: Old vs New 8(a) -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2 class="white">8(a) Follow-On Rule (FAR 19.108-11)</h2>
+  <div class="vs-container">
+    <div class="vs-box bad">
+      <div class="icon">🔒</div>
+      <div class="text" style="font-size: 24px;">"Once 8(a),<br>Always 8(a)"</div>
+      <p style="margin-top: 15px; color: #94a3b8; font-size: 16px;">Follow-ons locked to 8(a)</p>
+    </div>
+    <div class="vs-divider">→</div>
+    <div class="vs-box good">
+      <div class="icon">🔓</div>
+      <div class="text" style="font-size: 24px;">8(a) follow-ons can move to<br>HUBZone, SDVOSB, WOSB</div>
+      <p style="margin-top: 15px; color: #94a3b8; font-size: 16px;">Doors opened</p>
+    </div>
+  </div>
+  <div class="slide-number">18 / 98</div>
+</div>
+
+<!-- Slide 18: What this means -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box" style="max-width: 900px;">
+      "If you're HUBZone or SDVOSB, doors just opened that were previously locked. Contracts that HAD to go to 8(a) can now come to you."
+    </div>
+  </div>
+  <div class="slide-number">19 / 98</div>
+</div>
+
+<!-- Removed: Flipping Requirements slide - moved to downloadable workbook -->
+
+<!-- Slide 20: Threshold changes -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Thresholds Just Got Better</h2>
+  <p style="color: #64748b; margin-bottom: 20px; font-size: 14px;">FAR Inflation Adjustment (Oct 2025) + NDAA FY2026 (Dec 2025)</p>
+  <div class="three-col">
+    <div class="stat-box">
+      <div class="number smaller">$15K</div>
+      <div class="label">Micro-Purchase</div>
+      <p style="font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 8px;">GPC (Gov't Purchase Card) buys<br>No competition required</p>
+      <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">FAR Case 2024-001 • Up from $10K</p>
+    </div>
+    <div class="stat-box purple">
+      <div class="number smaller">$350K</div>
+      <div class="label">SAT</div>
+      <p style="font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 8px;">Simplified Acquisition Threshold<br>Faster awards, less paperwork</p>
+      <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">FAR Case 2024-001 • Up from $250K</p>
+    </div>
+    <div class="stat-box warning">
+      <div class="number smaller">$35M</div>
+      <div class="label">CAS Exemption</div>
+      <p style="font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 8px;">Cost Accounting Standards<br>No CAS-compliant system needed</p>
+      <p style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">NDAA FY2026 • Up from $2.5M</p>
+    </div>
+  </div>
+  <div class="insight-box">
+    <div class="label">What This Means For You</div>
+    <div class="text">Under $15K = credit card buy. Under $350K = faster process. Under $35M = no expensive accounting systems.</div>
+  </div>
+  <div class="slide-number">20 / 98</div>
+</div>
+
+<!-- Slide 20: CAS Insight -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box" style="max-width: 900px;">
+      "I've talked to contractors who passed on bigger opportunities because they didn't want the CAS headache. That excuse is gone now. The ceiling just got a lot higher."
+    </div>
+  </div>
+  <div class="slide-number">21 / 98</div>
+</div>
+
+<!-- Slide 21: Section - NDAA FY2026 -->
+<div class="slide section-slide navy">
+  <div class="icon">📜</div>
+  <h1>NDAA FY2026</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9; font-size: 24px;">National Defense Authorization Act</p>
+  <p class="subtitle" style="color: white; opacity: 0.7; font-size: 18px; margin-top: 15px;">Signed December 18, 2025 • $895B Defense Budget</p>
+  <p class="subtitle" style="color: white; opacity: 0.6; font-size: 16px; margin-top: 10px;">Most contractor-friendly NDAA in years — higher thresholds, less compliance burden</p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">22 / 98</div>
+</div>
+
+<!-- Slide 22: TINA Threshold - Big for Construction -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>TINA Threshold: $2M → $10M</h2>
+  <p style="color: #64748b; margin-bottom: 25px; font-size: 16px;">Truth in Negotiations Act • Section 1804 • Effective June 30, 2026</p>
+  <div class="two-col">
+    <div>
+      <div class="stat-box purple" style="margin-bottom: 20px;">
+        <div class="number smaller">Before</div>
+        <div class="label" style="font-size: 48px; margin-top: 10px;">$2M</div>
+        <p style="font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 10px;">Certified cost or pricing data required</p>
+      </div>
+      <p style="color: #94a3b8; font-size: 16px;">• Full cost accounting disclosure<br>• Defective pricing liability<br>• DCAA audit risk</p>
+    </div>
+    <div>
+      <div class="stat-box" style="margin-bottom: 20px;">
+        <div class="number smaller">After</div>
+        <div class="label" style="font-size: 48px; margin-top: 10px;">$10M</div>
+        <p style="font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 10px;">Most A/E/C contracts now exempt</p>
+      </div>
+      <p style="color: #94a3b8; font-size: 16px;">• Bid without certified cost data<br>• No defective pricing risk<br>• Lower compliance burden</p>
+    </div>
+  </div>
+  <p style="margin-top: 25px; color: #10b981; font-weight: 700; font-size: 20px; text-align: center;">If you've avoided federal contracts because of cost accounting — this changes everything.</p>
+  <div class="slide-number">23 / 98</div>
+</div>
+
+<!-- Slide 23: Progressive Design-Build -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Progressive Design-Build Now Authorized</h2>
+  <p style="color: #64748b; margin-bottom: 25px; font-size: 16px;">Section 2809 • First-ever congressional approval for MILCON</p>
+  <div class="two-col">
+    <div>
+      <h3 style="color: #ef4444; font-size: 20px; margin-bottom: 15px;">Traditional Design-Build</h3>
+      <div class="icon-box" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); margin-bottom: 10px;">
+        <div class="text" style="font-size: 16px; color: #fca5a5;">❌ Lowest price wins</div>
+      </div>
+      <div class="icon-box" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); margin-bottom: 10px;">
+        <div class="text" style="font-size: 16px; color: #fca5a5;">❌ Lock in price before design</div>
+      </div>
+      <div class="icon-box" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);">
+        <div class="text" style="font-size: 16px; color: #fca5a5;">❌ Change orders = adversarial</div>
+      </div>
+    </div>
+    <div>
+      <h3 style="color: #10b981; font-size: 20px; margin-bottom: 15px;">Progressive Design-Build</h3>
+      <div class="icon-box green" style="margin-bottom: 10px;">
+        <div class="text" style="font-size: 16px;">✓ Selected on QUALIFICATIONS</div>
+      </div>
+      <div class="icon-box green" style="margin-bottom: 10px;">
+        <div class="text" style="font-size: 16px;">✓ Collaborate during design</div>
+      </div>
+      <div class="icon-box green">
+        <div class="text" style="font-size: 16px;">✓ Negotiate price AFTER scope is clear</div>
+      </div>
+    </div>
+  </div>
+  <p style="margin-top: 25px; color: #a78bfa; font-weight: 600; font-size: 18px; text-align: center;">Best for complex projects: shipyards, industrial facilities, overseas bases</p>
+  <div class="slide-number">24 / 98</div>
+</div>
+
+<!-- Slide 24: Multiyear + Shipyard Provisions -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>More NDAA Wins for A/E/C</h2>
+  <div class="two-col" style="margin-top: 30px;">
+    <div>
+      <div class="stat-box navy" style="margin-bottom: 20px;">
+        <div class="label" style="font-size: 16px; margin-bottom: 8px;">Section 2814</div>
+        <div class="number smaller" style="font-size: 28px;">Multiyear Contracting</div>
+        <p style="font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 10px;">Construction contracts can now span multiple fiscal years</p>
+      </div>
+      <p style="color: #94a3b8; font-size: 15px;">• Longer planning horizons<br>• Fewer stop-start procurements<br>• Better workforce continuity</p>
+    </div>
+    <div>
+      <div class="stat-box warning" style="margin-bottom: 20px;">
+        <div class="label" style="font-size: 16px; margin-bottom: 8px;">Section 2816</div>
+        <div class="number smaller" style="font-size: 28px;">Cost-Plus for Shipyards</div>
+        <p style="font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 10px;">CPIF contracts authorized for SIOP projects</p>
+      </div>
+      <p style="color: #94a3b8; font-size: 15px;">• Acknowledges complexity risk<br>• Dry dock modernization<br>• Waterfront recapitalization</p>
+    </div>
+  </div>
+  <div style="margin-top: 25px; background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.3); border-radius: 12px; padding: 15px; text-align: center;">
+    <p style="color: #a78bfa; font-size: 16px; margin: 0;"><strong>Section 2803:</strong> DoD must now publish 20-year infrastructure improvement plans — visibility into the pipeline</p>
+  </div>
+  <div class="slide-number">25 / 98</div>
+</div>
+
+<!-- Slide 25: DoD Infrastructure Pain Points -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>What DoD Is Desperate to Fix</h2>
+  <p style="color: #64748b; margin-bottom: 20px; font-size: 16px;">Where the A/E/C Money Is Going</p>
+  <div class="three-col">
+    <div class="stat-box warning">
+      <div class="number smaller">$33B+</div>
+      <div class="label">Air Force Backlog</div>
+      <p style="font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 8px;">Aging bases need<br>facility recapitalization</p>
+    </div>
+    <div class="stat-box navy">
+      <div class="number smaller">$1.5B</div>
+      <div class="label">NAVFAC Shipyards</div>
+      <p style="font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 8px;">SIOP modernization<br>through FY2027</p>
+    </div>
+    <div class="stat-box purple">
+      <div class="number smaller">$500M+</div>
+      <div class="label">Energy Resilience</div>
+      <p style="font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 8px;">Microgrids, solar, battery<br>storage (ERCIP funding)</p>
+    </div>
+  </div>
+  <div style="margin-top: 30px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+    <div class="icon-box green" style="padding: 12px 20px;">
+      <div class="text" style="font-size: 16px;">✓ Climate resilience projects</div>
+    </div>
+    <div class="icon-box green" style="padding: 12px 20px;">
+      <div class="text" style="font-size: 16px;">✓ PDI Indo-Pacific construction</div>
+    </div>
+    <div class="icon-box green" style="padding: 12px 20px;">
+      <div class="text" style="font-size: 16px;">✓ Base hardening</div>
+    </div>
+  </div>
+  <div class="slide-number">26 / 98</div>
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 3: WHERE THE A/E/C MONEY IS (Slides 23-42) -->
+<!-- The actionable data you loved -->
+<!-- ================================================ -->
+
+<!-- Slide 23: Section - Where the Money Is -->
+<div class="slide section-slide">
+  <div class="icon">💰</div>
+  <h1>Where the A/E/C<br>Money Is</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9; font-size: 28px;">Construction & Engineering Opportunities</p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">27 / 98</div>
+</div>
+
+<!-- Slide 24: Budget Winners & Losers -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>FY2025 → FY2026 Budget Trends</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="color: #10b981;">Winners</h3>
+      <table class="data-table">
+        <tr><td>DoD</td><td>$848B → $962B</td><td class="highlight-value">+$113B</td></tr>
+        <tr><td>DHS</td><td>$65B → $107B</td><td class="highlight-value">+$42B</td></tr>
+        <tr><td>VA</td><td>$160B → $187B</td><td class="highlight-value">+$27B</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3 style="color: #ef4444;">Losers</h3>
+      <table class="data-table">
+        <tr><td>State Dept</td><td>$59B → $10B</td><td style="color: #ef4444; font-weight: 700;">-84%</td></tr>
+        <tr><td>HHS</td><td>$127B → $94B</td><td style="color: #ef4444; font-weight: 700;">-26%</td></tr>
+        <tr><td>NASA</td><td>$25B → $19B</td><td style="color: #ef4444; font-weight: 700;">-24%</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">If you're doing work for State or HHS, it's time to pivot. The money is moving to defense, veterans, and homeland security.</div>
+  </div>
+  <div class="slide-number">28 / 98</div>
+</div>
+
+<!-- Slide 25: USACE Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="big-stat">
+    <div class="number" style="font-size: 120px;">$10.4B</div>
+    <div class="label">U.S. Army Corps of Engineers FY2026</div>
+  </div>
+  <div class="slide-number">29 / 98</div>
+</div>
+
+<!-- Slide 26: USACE Breakdown -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>USACE (Army Corps of Engineers) — Where the Money Is</h2>
+  <table class="data-table">
+    <tr><th>Program</th><th>Budget</th><th>Opportunity</th></tr>
+    <tr><td>Civil Works</td><td class="highlight-value">$7.6B</td><td>Flood control, coastal storm damage</td></tr>
+    <tr><td>Infrastructure (Waterways)</td><td class="highlight-value">$2.5B</td><td>Construction, dredging</td></tr>
+    <tr><td>Harbor Maintenance</td><td class="highlight-value">$1.8B</td><td>Port infrastructure</td></tr>
+    <tr><td>Ecosystem Restoration</td><td>$1.2B</td><td>Environmental engineering</td></tr>
+    <tr><td>Navigation Channels</td><td>$1.1B</td><td>Dredging, marine construction</td></tr>
+    <tr><td>Disaster Recovery</td><td>$900M</td><td>Rapid-response construction</td></tr>
+    <tr><td>Dam Safety</td><td>$800M</td><td>Structural engineering</td></tr>
+  </table>
+  <div class="slide-number">30 / 98</div>
+</div>
+
+<!-- Slide 27: USACE Pain Points -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>USACE Pain Points = Your Opportunity</h2>
+  <div class="four-col">
+    <div class="icon-box green">
+      <div class="icon">🏗️</div>
+      <div class="text">Dam Safety<br>Backlog</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">📊</div>
+      <div class="text">Digital PM<br>BIM/GIS</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">⚙️</div>
+      <div class="text">Design-Build<br>Mandates</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">📋</div>
+      <div class="text">Permitting<br>Bottlenecks</div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">USACE is desperate for contractors who understand digital delivery. Show up with BIM capability and you're ahead of 80%.</div>
+  </div>
+  <div class="slide-number">31 / 98</div>
+</div>
+
+<!-- Slide 28: USACE Priorities - Where the Money Is -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>USACE FY2025-2026 Priorities</h2>
+  <p style="color: #64748b; margin-bottom: 20px; font-size: 15px;">$7.6B Civil Works + $2.5B Bipartisan Infrastructure Law</p>
+  <div class="three-col">
+    <div class="stat-box">
+      <div class="number smaller">$2.5B</div>
+      <div class="label">Inland Waterways</div>
+      <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 6px;">Lock & dam modernization<br>Dredging contracts</p>
+    </div>
+    <div class="stat-box warning">
+      <div class="number smaller">$800M</div>
+      <div class="label">Dam Safety</div>
+      <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 6px;">Structural engineering<br>RFPs in Q3 FY2025</p>
+    </div>
+    <div class="stat-box purple">
+      <div class="number smaller">$1.2B</div>
+      <div class="label">Ecosystem Restoration</div>
+      <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 6px;">Environmental engineering<br>Everglades, Great Lakes</p>
+    </div>
+  </div>
+  <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+    <div class="icon-box green" style="padding: 10px 16px;">
+      <div class="text" style="font-size: 14px;">$600M Levee Upgrades</div>
+    </div>
+    <div class="icon-box green" style="padding: 10px 16px;">
+      <div class="text" style="font-size: 14px;">$500M MILCON Support</div>
+    </div>
+    <div class="icon-box green" style="padding: 10px 16px;">
+      <div class="text" style="font-size: 14px;">$400M Climate Resilience</div>
+    </div>
+  </div>
+  <div class="slide-number">32 / 98</div>
+</div>
+
+<!-- Slide 29: USACE Jacksonville -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>USACE Jacksonville District</h2>
+  <div class="two-col">
+    <div class="stat-box" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="number">$4B+</div>
+      <div class="label">Annual Construction</div>
+    </div>
+    <div>
+      <div class="icon-box green" style="margin-bottom: 15px;">
+        <div class="text">🌴 Everglades Restoration</div>
+      </div>
+      <div class="icon-box green" style="margin-bottom: 15px;">
+        <div class="text">🌀 Hurricane Recovery</div>
+      </div>
+      <div class="icon-box green">
+        <div class="text">🏗️ MILCON (Military Construction)</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">33 / 98</div>
+</div>
+
+<!-- Slide 29: NAVFAC Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="big-stat">
+    <div class="number purple" style="font-size: 120px;">$8.5B+</div>
+    <div class="label">Naval Facilities Engineering Command</div>
+  </div>
+  <div class="slide-number">34 / 98</div>
+</div>
+
+<!-- Slide 30: NAVFAC Breakdown -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>NAVFAC (Naval Facilities Engineering) — Where the Money Is</h2>
+  <table class="data-table">
+    <tr><th>Program</th><th>Budget</th><th>What's Hot</th></tr>
+    <tr><td>MILCON (Military Construction) Indo-Pacific</td><td class="purple-value">$2.3B</td><td>Design-build at Pacific bases</td></tr>
+    <tr><td>Shipyard Modernization (SIOP)</td><td class="purple-value">$1.5B</td><td>Dry dock, facility upgrades</td></tr>
+    <tr><td>Infrastructure Resilience</td><td>$1.1B</td><td>Climate adaptation, coastal</td></tr>
+    <tr><td>MACCs (Multiple Award Construction Contracts)</td><td class="highlight-value">$950M</td><td>Facility sustainment, repair</td></tr>
+    <tr><td>BRAC (Base Realignment & Closure) Cleanup</td><td>$800M</td><td>Environmental remediation</td></tr>
+    <tr><td>FSC (Facility Support Contract) Recompetes</td><td>$600M</td><td>Base operations, maintenance</td></tr>
+    <tr><td>ESPC (Energy Savings Performance Contracts)</td><td>$500M</td><td>Solar, microgrids</td></tr>
+  </table>
+  <div class="slide-number">35 / 98</div>
+</div>
+
+<!-- Slide 31: NAVFAC Insight -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box purple" style="max-width: 900px;">
+      "NAVFAC is one of the most small-business-friendly commands in DoD. Their MACC program is designed for you."
+    </div>
+    <div class="stat-box purple" style="margin-top: 30px; padding: 25px 50px;">
+      <div class="number smaller">$950M</div>
+      <div class="label">in MACC Task Orders Open for Bidding</div>
+    </div>
+    <p style="margin-top: 20px; font-size: 22px; color: #a78bfa;">If you're not on a MACC, you're missing out.</p>
+  </div>
+  <div class="slide-number">36 / 98</div>
+</div>
+
+<!-- Slide 32: VA Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>VA Construction</h1>
+    <p class="subtitle">PACT Act Surge</p>
+  </div>
+  <div class="slide-number">37 / 98</div>
+</div>
+
+<!-- Slide 33: VA PACT Act -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>VA — PACT Act Infrastructure</h2>
+  <div class="two-col">
+    <div>
+      <div class="stat-box purple" style="margin-bottom: 15px;">
+        <div class="number smaller">$2.7B</div>
+        <div class="label">PACT Act Infrastructure</div>
+      </div>
+      <div class="stat-box warning">
+        <div class="number smaller">$50B+</div>
+        <div class="label">Deferred Maintenance Backlog</div>
+      </div>
+    </div>
+    <div>
+      <div class="icon-box green" style="margin-bottom: 12px;">
+        <div class="text">🏥 Toxic Exposure Clinics</div>
+      </div>
+      <div class="icon-box green" style="margin-bottom: 12px;">
+        <div class="text">📋 PM & Oversight Needed</div>
+      </div>
+      <div class="icon-box green">
+        <div class="text">⏰ 1,300+ Healthcare Sites</div>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">VA construction has been a mess. They're actively looking for contractors who can help them fix their project management.</div>
+  </div>
+  <div class="slide-number">38 / 98</div>
+</div>
+
+<!-- Slide 34: Other A/E/C -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Other A/E/C Opportunities</h2>
+  <div class="three-col">
+    <div class="stat-box navy">
+      <div class="number smaller">$33B+</div>
+      <div class="label">Air Force Infrastructure Backlog</div>
+      <p style="font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 8px;">$800M at Tinker, Hill, Robins</p>
+    </div>
+    <div class="stat-box">
+      <div class="number smaller">$7B</div>
+      <div class="label">Coast Guard Shore</div>
+      <p style="font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 8px;">$650M annual upgrades</p>
+    </div>
+    <div class="stat-box warning">
+      <div class="number smaller">$20B+</div>
+      <div class="label">FEMA Disaster Relief</div>
+      <p style="font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 8px;">Climate construction surge</p>
+    </div>
+  </div>
+  <div class="slide-number">39 / 98</div>
+</div>
+
+<!-- Slide 35: Task Orders Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">The real game is</h1>
+    <h1><span class="warning">Task Orders</span></h1>
+  </div>
+  <div class="slide-number">40 / 98</div>
+</div>
+
+<!-- Slide 36: 80% stat -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="big-stat">
+    <div class="number warning">55%</div>
+    <div class="label">of federal dollars flow through vehicles — NOT the open market</div>
+  </div>
+  <div class="slide-number">41 / 98</div>
+</div>
+
+<!-- Slide 37: If you're only on SAM.gov -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box warning" style="max-width: 900px;">
+      "If you're only searching SAM.gov for 'open' solicitations, you're missing 55% of the opportunity."
+    </div>
+  </div>
+  <div class="slide-number">42 / 98</div>
+</div>
+
+<!-- Slide 38: AEC Vehicle Numbers -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>A/E/C Vehicle Numbers <span style="color: #10b981;">(NAICS 236220)</span></h2>
+  <div class="three-col">
+    <div class="stat-box">
+      <div class="number smaller">$400M</div>
+      <div class="label">USACE Savannah<br>SB Design-Build MATOC</div>
+    </div>
+    <div class="stat-box purple">
+      <div class="number smaller">$249M</div>
+      <div class="label">NAVFAC Washington<br>8(a) MACC</div>
+    </div>
+    <div class="stat-box warning">
+      <div class="number smaller">$700M+</div>
+      <div class="label">NAVFAC Active<br>Small Business MACCs</div>
+    </div>
+  </div>
+  <div class="slide-number">43 / 98</div>
+</div>
+
+<!-- Slide 39: Small Business Construction MATOCs -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Small Business MATOCs (Multiple Award Task Order Contracts) <span style="color: #10b981;">(NAICS 236220)</span></h2>
+  <table class="data-table" style="font-size: 14px;">
+    <tr>
+      <th>Vehicle</th>
+      <th>Agency</th>
+      <th>Set-Aside</th>
+      <th>Ceiling</th>
+      <th>Task Order Size</th>
+    </tr>
+    <tr>
+      <td><strong>Savannah DB MATOC</strong></td>
+      <td>USACE Savannah</td>
+      <td class="highlight-value">100% SB</td>
+      <td>$400M</td>
+      <td>$5M - $25M</td>
+    </tr>
+    <tr>
+      <td><strong>Sacramento MATOC</strong></td>
+      <td>USACE Sacramento</td>
+      <td class="highlight-value">100% SB</td>
+      <td>$99M</td>
+      <td>$500K - $10M</td>
+    </tr>
+    <tr>
+      <td><strong>Omaha SDVOSB MATOC</strong></td>
+      <td>USACE Omaha</td>
+      <td class="highlight-value">SDVOSB</td>
+      <td>$99M</td>
+      <td>$1M - $15M</td>
+    </tr>
+    <tr>
+      <td><strong>New England SB MATOC</strong></td>
+      <td>USACE New England</td>
+      <td class="highlight-value">100% SB</td>
+      <td>$90M</td>
+      <td>$500K - $8M</td>
+    </tr>
+    <tr>
+      <td><strong>NAVFAC SE 8(a) MACC</strong></td>
+      <td>NAVFAC Southeast</td>
+      <td class="highlight-value">8(a)</td>
+      <td>$107M</td>
+      <td>$1M - $20M</td>
+    </tr>
+    <tr>
+      <td><strong>NAVFAC Marianas 8(a)</strong></td>
+      <td>NAVFAC Marianas</td>
+      <td class="highlight-value">8(a)</td>
+      <td>$75M</td>
+      <td>$500K - $10M</td>
+    </tr>
+  </table>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">These are $1M-$30M company targets. Stop chasing $1B IDIQs — get on these vehicles and build past performance.</div>
+  </div>
+  <div class="slide-number">44 / 98</div>
+</div>
+
+<!-- Slide 40: Engineering IDIQs Table -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Engineering IDIQs Expiring 2026 <span style="color: #a78bfa;">(NAICS 541330)</span></h2>
+  <table class="data-table" style="font-size: 14px;">
+    <tr>
+      <th>Contract #</th>
+      <th>Agency</th>
+      <th>Incumbent</th>
+      <th>Value</th>
+      <th>Expires</th>
+    </tr>
+    <tr>
+      <td><strong>DEEE0008029</strong></td>
+      <td>DOE Golden Field</td>
+      <td>CEG Solutions</td>
+      <td class="purple-value">$55B</td>
+      <td class="warning-value">Apr 2026</td>
+    </tr>
+    <tr>
+      <td><strong>DEEE0008034</strong></td>
+      <td>DOE Golden Field</td>
+      <td>Energy Systems Group</td>
+      <td class="purple-value">$55B</td>
+      <td class="warning-value">Apr 2026</td>
+    </tr>
+    <tr>
+      <td><strong>HQ072716D0001</strong></td>
+      <td>Defense Microelectronics</td>
+      <td>Lockheed Martin</td>
+      <td class="purple-value">$17.5B</td>
+      <td class="warning-value">Mar 2026</td>
+    </tr>
+    <tr>
+      <td><strong>70B04C19D00000046</strong></td>
+      <td>DHS IT Contracting</td>
+      <td>CACI Federal</td>
+      <td class="purple-value">$3B</td>
+      <td class="warning-value">May 2026</td>
+    </tr>
+  </table>
+  <div class="insight-box" style="background: linear-gradient(135deg, #5b21b6, #7c3aed);">
+    <div class="label">New Vehicle Coming</div>
+    <div class="text">Air Force RAES — $3.4B A/E MATOC. 5 small business slots. Awards Aug 2026.</div>
+  </div>
+  <div class="slide-number">45 / 98</div>
+</div>
+
+<!-- Slide 41: Heavy/Civil IDIQs -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Heavy/Civil Construction Expiring 2026 <span style="color: #f59e0b;">(NAICS 237xxx)</span></h2>
+  <table class="data-table" style="font-size: 14px;">
+    <tr>
+      <th>Contract #</th>
+      <th>Agency</th>
+      <th>Incumbent</th>
+      <th>Value</th>
+      <th>Expires</th>
+    </tr>
+    <tr>
+      <td><strong>N6247325D5203</strong></td>
+      <td>NAVFAC Southwest</td>
+      <td>A&R Pacific-Garney JV</td>
+      <td class="warning-value">$249M</td>
+      <td style="color: #ef4444; font-weight: 700;">Dec 2026</td>
+    </tr>
+    <tr>
+      <td><strong>W912DQ21D1001</strong></td>
+      <td>USACE Kansas City</td>
+      <td>Dubuque Barge & Fleet</td>
+      <td class="warning-value">$99.5M</td>
+      <td style="color: #ef4444; font-weight: 700;">Sep 2026</td>
+    </tr>
+    <tr>
+      <td><strong>W912HY24D0003</strong></td>
+      <td>USACE Galveston</td>
+      <td>Great Lakes Dredge</td>
+      <td class="warning-value">$98M</td>
+      <td style="color: #ef4444; font-weight: 700;">Dec 2026</td>
+    </tr>
+    <tr>
+      <td><strong>W912EP21A0008</strong></td>
+      <td>USACE Jacksonville</td>
+      <td>Gale Construction</td>
+      <td class="warning-value">$25M</td>
+      <td style="color: #ef4444; font-weight: 700;">Jun 2026</td>
+    </tr>
+  </table>
+  <div class="insight-box" style="background: linear-gradient(135deg, #b45309, #d97706);">
+    <div class="label">USACE Galveston $7B MATOC</div>
+    <div class="text">Forgen-Ahtna JV won small business slot. Horizontal construction, dredging, flood control.</div>
+  </div>
+  <div class="slide-number">46 / 98</div>
+</div>
+
+<!-- Slide 42: Partner NOW -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>Partner with primes</h1>
+    <h1><span class="warning">NOW</span></h1>
+    <p class="subtitle" style="margin-top: 25px;">They're building teams for these recompetes TODAY.</p>
+  </div>
+  <div class="slide-number">47 / 98</div>
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 4: HOW TO WIN (Slides 43-60) -->
+<!-- SAT, Flipping, AI, LinkedIn, Upskilling -->
+<!-- ================================================ -->
+
+<!-- Slide 43: Section - How to Win -->
+<div class="slide section-slide navy">
+  <div class="icon">🏆</div>
+  <h1>How to Win</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9; font-size: 28px;">What I see working every single day</p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">48 / 98</div>
+</div>
+
+<!-- Slide 44: SAT Strategy Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>Don't Sleep on</h1>
+    <h1><span class="highlight">SAT Opportunities</span></h1>
+  </div>
+  <div class="slide-number">49 / 98</div>
+</div>
+
+<!-- Slide 45: SAT Numbers -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Why SAT (Simplified Acquisition Threshold) Wins</h2>
+  <p style="color: #64748b; margin-bottom: 25px;">Contracts under $350K use streamlined procedures — faster awards, less paperwork, fewer competitors</p>
+  <div class="three-col">
+    <div class="stat-box">
+      <div class="number smaller">$350K</div>
+      <div class="label">Max Value</div>
+      <p style="font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 8px;">As of Oct 2025</p>
+    </div>
+    <div class="stat-box purple">
+      <div class="number smaller">3+</div>
+      <div class="label">Vendors Solicited</div>
+      <p style="font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 8px;">vs full & open RFP</p>
+    </div>
+    <div class="stat-box warning">
+      <div class="number smaller">21-45</div>
+      <div class="label">Days to Award</div>
+      <p style="font-size: 14px; color: rgba(255,255,255,0.7); margin-top: 8px;">vs 90-180 for large contracts</p>
+    </div>
+  </div>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">Win 10 SAT contracts and you have the past performance to compete for the big ones.</div>
+  </div>
+  <div class="slide-number">50 / 98</div>
+</div>
+
+<!-- Slide 46: Top 5 SAT Agencies for Construction -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Top SAT Agencies <span style="color: #10b981;">(NAICS 236220)</span></h2>
+  <p style="color: #64748b; margin-bottom: 20px; font-size: 14px;">USASpending data: Construction contracts $10K-$350K (2024-2025)</p>
+  <table class="data-table" style="font-size: 15px;">
+    <tr>
+      <th>#</th>
+      <th>Agency</th>
+      <th>Why They Matter</th>
+      <th>SAT Volume</th>
+    </tr>
+    <tr>
+      <td style="color: #10b981; font-weight: 900; font-size: 20px;">1</td>
+      <td><strong>GSA (General Services Administration)</strong></td>
+      <td>Federal building repairs, tenant improvements</td>
+      <td class="highlight-value">$142M</td>
+    </tr>
+    <tr>
+      <td style="color: #10b981; font-weight: 900; font-size: 20px;">2</td>
+      <td><strong>VA (Veterans Affairs)</strong></td>
+      <td>Hospital renovations, clinic buildouts</td>
+      <td class="highlight-value">$103M</td>
+    </tr>
+    <tr>
+      <td style="color: #10b981; font-weight: 900; font-size: 20px;">3</td>
+      <td><strong>DOI (Dept of Interior)</strong></td>
+      <td>National parks, BLM facilities, tribal projects</td>
+      <td class="highlight-value">$57M</td>
+    </tr>
+    <tr>
+      <td style="color: #10b981; font-weight: 900; font-size: 20px;">4</td>
+      <td><strong>HHS (Health & Human Services)</strong></td>
+      <td>CDC, NIH, IHS facility maintenance</td>
+      <td class="highlight-value">$53M</td>
+    </tr>
+    <tr>
+      <td style="color: #10b981; font-weight: 900; font-size: 20px;">5</td>
+      <td><strong>USDA (Agriculture)</strong></td>
+      <td>Forest Service, rural development projects</td>
+      <td class="highlight-value">$36M</td>
+    </tr>
+  </table>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">Civilian agencies award MORE SAT construction than DoD sub-agencies. Don't sleep on GSA, VA, and Interior.</div>
+  </div>
+  <div class="slide-number">51 / 98</div>
+</div>
+
+<!-- Slide 47: Shape the requirement -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box" style="max-width: 950px;">
+      "The contractor who shapes the requirement wins the contract. Don't be passive — go in EARLY. By the time the RFP drops, you should already know what's in it."
+    </div>
+  </div>
+  <div class="slide-number">52 / 98</div>
+</div>
+
+<!-- Slide 48: Teaming header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>The Teaming</h1>
+    <h1><span class="purple">Imperative</span></h1>
+  </div>
+  <div class="slide-number">53 / 98</div>
+</div>
+
+<!-- Slide 49: MACC/MATOC Teaming -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="two-col">
+    <div class="stat-box purple" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="number">70%</div>
+      <div class="label">MACC Task Orders Use Subs</div>
+      <p style="font-size: 16px; color: rgba(255,255,255,0.7); margin-top: 10px;">Primes need YOUR specialty</p>
+    </div>
+    <div>
+      <h3 style="color: #10b981;">How to Approach Construction Primes</h3>
+      <div class="icon-box green" style="margin-bottom: 10px; text-align: left; padding: 15px 20px;">
+        <div class="text">Know their MACC/MATOC vehicles</div>
+      </div>
+      <div class="icon-box green" style="margin-bottom: 10px; text-align: left; padding: 15px 20px;">
+        <div class="text">1-page capability brief (bonding, certs)</div>
+      </div>
+      <div class="icon-box green" style="margin-bottom: 10px; text-align: left; padding: 15px 20px;">
+        <div class="text">Offer a specialty they don't have</div>
+      </div>
+      <div class="icon-box green" style="text-align: left; padding: 15px 20px;">
+        <div class="text">FOLLOW UP after task order drops</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">54 / 98</div>
+</div>
+
+<!-- Slide 50: The $50K Story Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="small">Two Companies.</h1>
+    <h1 class="small">Same Contract.</h1>
+    <h1 class="small"><span class="highlight">Different Outcome.</span></h1>
+  </div>
+  <div class="slide-number">55 / 98</div>
+</div>
+
+<!-- Slide 52: Company A vs B -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="vs-container">
+    <div class="vs-box bad" style="padding: 25px;">
+      <h3 style="color: #fca5a5; margin-bottom: 15px;">Company A</h3>
+      <p style="color: #94a3b8; font-size: 16px; margin-bottom: 15px;">Won small testing IDIQ. ~$50K.</p>
+      <div style="text-align: left; font-size: 15px; color: #94a3b8;">
+        ✗ PM saw it as small job<br>
+        ✗ Sent tech to check boxes<br>
+        ✗ Zero relationships built<br>
+        ✗ No intel fed to BD
+      </div>
+      <div style="margin-top: 20px; padding: 15px; background: rgba(239,68,68,0.3); border-radius: 8px;">
+        <p style="font-size: 28px; font-weight: 900; color: white;">$50K</p>
+        <p style="font-size: 14px; color: #fca5a5;">Contract ended. No follow-on.</p>
+      </div>
+    </div>
+    <div class="vs-divider">VS</div>
+    <div class="vs-box good" style="padding: 25px;">
+      <h3 style="color: #6ee7b7; margin-bottom: 15px;">Company B</h3>
+      <p style="color: #94a3b8; font-size: 16px; margin-bottom: 15px;">Same type of contract.</p>
+      <div style="text-align: left; font-size: 15px; color: #94a3b8;">
+        ✓ Saw it as a door<br>
+        ✓ Trained field person on BD<br>
+        ✓ Built COR relationships<br>
+        ✓ Fed intel back real-time
+      </div>
+      <div style="margin-top: 20px; padding: 15px; background: rgba(16,185,129,0.3); border-radius: 8px;">
+        <p style="font-size: 28px; font-weight: 900; color: white;">$4M+ over 4 years</p>
+        <p style="font-size: 14px; color: #6ee7b7;">Sole-source follow-ons.</p>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">56 / 98</div>
+</div>
+
+<!-- Slide 53: Train your ops people -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box" style="max-width: 900px;">
+      "Most small businesses keep BD separate from operations. That's a mistake. Your best lead generators are the people doing the work."
+    </div>
+  </div>
+  <div class="slide-number">57 / 98</div>
+</div>
+
+<!-- Slide 54: Upskilling -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>The Business Case for BD Training</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="color: #a78bfa;">Roles You Could Build</h3>
+      <table class="data-table">
+        <tr><td>BD Manager</td><td class="highlight-value">$85K–$130K</td></tr>
+        <tr><td>Capture Manager</td><td class="highlight-value">$95K–$145K</td></tr>
+        <tr><td>Market Research Analyst</td><td class="highlight-value">$80K–$135K</td></tr>
+      </table>
+      <p style="margin-top: 15px; font-size: 16px; color: #94a3b8;">These are skills you can develop in your existing team.</p>
+    </div>
+    <div>
+      <h3 style="color: #10b981;">Why Upskill vs Hire?</h3>
+      <div class="icon-box green" style="margin-bottom: 10px; text-align: left; padding: 12px 18px;">
+        <div class="text" style="font-size: 15px;">✓ Your ops people know the customer</div>
+      </div>
+      <div class="icon-box green" style="margin-bottom: 10px; text-align: left; padding: 12px 18px;">
+        <div class="text" style="font-size: 15px;">✓ They understand your delivery</div>
+      </div>
+      <div class="icon-box green" style="margin-bottom: 10px; text-align: left; padding: 12px 18px;">
+        <div class="text" style="font-size: 15px;">✓ Retention beats recruitment</div>
+      </div>
+      <div class="icon-box green" style="text-align: left; padding: 12px 18px;">
+        <div class="text" style="font-size: 15px;">✓ Cross-functional teams win more</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">58 / 98</div>
+</div>
+
+<!-- Removed: AI section moved to end of presentation -->
+
+<!-- ================================================ -->
+<!-- SECTION 5: VISIBILITY (Slides 55-63) -->
+<!-- LinkedIn, Social Media, Being Visible -->
+<!-- ================================================ -->
+
+<!-- Slide 55: Section - Visibility -->
+<div class="slide section-slide purple">
+  <div class="icon">👁️</div>
+  <h1>Visibility</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9; font-size: 24px;">If They Can't Find You, They Can't Buy From You</p>
+  <p class="subtitle" style="color: white; opacity: 0.6; font-size: 16px; margin-top: 15px;">LinkedIn • Website • Being Where Primes Are Looking</p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">59 / 98</div>
+</div>
+
+<!-- Slide 56: What Agencies Are Saying -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>What Agencies Are Saying</h2>
+  <p style="color: #64748b; margin-bottom: 25px; font-size: 16px;">Real quotes from contracting officers and SBLOs</p>
+  <div class="quote-box warning" style="max-width: 900px; margin-bottom: 20px;">
+    "Our biggest problem isn't finding contracts. It's finding qualified small businesses who can actually do the work."
+  </div>
+  <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-top: 25px;">
+    <div class="icon-box" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); padding: 12px 18px;">
+      <div class="text" style="font-size: 14px; color: #fca5a5;">"We struggle to locate qualified small businesses"</div>
+    </div>
+    <div class="icon-box" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); padding: 12px 18px;">
+      <div class="text" style="font-size: 14px; color: #fca5a5;">"Small businesses aren't where we can find them"</div>
+    </div>
+    <div class="icon-box" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); padding: 12px 18px;">
+      <div class="text" style="font-size: 14px; color: #fca5a5;">"We don't know where to look"</div>
+    </div>
+  </div>
+  <div class="insight-box" style="margin-top: 30px;">
+    <div class="label">The Truth</div>
+    <div class="text">You don't have a qualification problem. You have a visibility problem. And that's fixable.</div>
+  </div>
+  <div class="slide-number">60 / 98</div>
+</div>
+
+<!-- Slide 57: LinkedIn Section -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>LinkedIn vs SEO</h1>
+    <h1><span class="highlight">Speed Wins</span></h1>
+  </div>
+  <div class="slide-number">61 / 98</div>
+</div>
+
+<!-- Slide 62: SEO vs LinkedIn -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="vs-container">
+    <div class="vs-box bad" style="padding: 25px;">
+      <h3 style="color: #fca5a5; margin-bottom: 15px;">SEO (12-Month Grind)</h3>
+      <div style="text-align: left; font-size: 15px; color: #94a3b8;">
+        ✗ 100+ published content pieces<br>
+        ✗ 30+ top-3 Google rankings<br>
+        ✗ Pray algorithm doesn't change
+      </div>
+      <div style="margin-top: 20px; padding: 15px; background: rgba(239,68,68,0.3); border-radius: 8px;">
+        <p style="font-size: 14px; color: #fca5a5;">12-Month Goal</p>
+        <p style="font-size: 28px; font-weight: 900; color: white;">75K visitors</p>
+        <p style="font-size: 12px; color: #fca5a5;">(if everything works)</p>
+      </div>
+    </div>
+    <div class="vs-divider">VS</div>
+    <div class="vs-box good" style="padding: 25px;">
+      <h3 style="color: #6ee7b7; margin-bottom: 15px;">LinkedIn (Fast Lane)</h3>
+      <div style="text-align: left; font-size: 15px; color: #94a3b8;">
+        ✓ Results start with first post<br>
+        ✓ Algorithm favors consistency<br>
+        ✓ COs and primes scrolling
+      </div>
+      <div style="margin-top: 20px; padding: 15px; background: rgba(16,185,129,0.3); border-radius: 8px;">
+        <p style="font-size: 14px; color: #6ee7b7;">My LinkedIn Last Week</p>
+        <p style="font-size: 28px; font-weight: 900; color: white;">110K impressions</p>
+        <p style="font-size: 12px; color: #6ee7b7;">in 7 days</p>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">62 / 98</div>
+</div>
+
+<!-- Slide 63: 110K stat -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="big-stat">
+    <div class="number">110K</div>
+    <div class="label">LinkedIn impressions in 7 days</div>
+  </div>
+  <div class="slide-number">63 / 98</div>
+</div>
+
+<!-- Slide 64: LinkedIn Analytics Screenshot -->
+<div class="slide" style="padding: 40px 60px;">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2 style="margin-bottom: 12px;">This Is What Consistency Looks Like</h2>
+  <p style="color: #94a3b8; margin-bottom: 16px; text-align: center;">My LinkedIn analytics — last 7 days</p>
+  <div style="display: flex; justify-content: center; align-items: center; flex: 1;">
+    <img src="images/linkedin-analytics.png" alt="LinkedIn Analytics Dashboard" style="max-width: 90%; max-height: 55vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
+  </div>
+  <p style="color: #10b981; text-align: center; margin-top: 16px; font-size: 22px; font-weight: 600;">110K impressions in 7 days. LinkedIn rewards consistency — not history.</p>
+  <div class="slide-number">64 / 98</div>
+</div>
+
+<!-- Slide: LinkedIn Strategy -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>LinkedIn Strategy That Works</h2>
+  <div class="four-col">
+    <div class="icon-box green">
+      <div class="icon">🏆</div>
+      <div class="text">Share Your Wins</div>
+      <div class="sub">Every award, every milestone</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">💬</div>
+      <div class="text">Comment on Agency Posts</div>
+      <div class="sub">COs are watching</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">📢</div>
+      <div class="text">Publish Thought Leadership</div>
+      <div class="sub">Pain points you solve</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">🤝</div>
+      <div class="text">Engage with Primes</div>
+      <div class="sub">They're looking for subs</div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">I've seen small businesses get on Sources Sought lists because a CO saw their LinkedIn post. Being invisible and hoping contracts find you doesn't work — COs Google you before they call.</div>
+  </div>
+  <div class="slide-number">65 / 98</div>
+</div>
+
+<!-- Slide 67: Be visible -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="quote-box" style="max-width: 900px;">
+      "The contractors winning right now are visible. They're not hiding behind their capability statements."
+    </div>
+  </div>
+  <div class="slide-number">66 / 98</div>
+</div>
+
+<!-- ================================================ -->
+<!-- SECTION 6: CLOSING -->
+<!-- The opportunity, action items, CTA -->
+<!-- ================================================ -->
+
+<!-- Slide: The Facts -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>The Facts</h2>
+  <div class="four-col">
+    <div class="stat-box">
+      <div class="number smaller">+$113B</div>
+      <div class="label">DoD Budget Growth</div>
+    </div>
+    <div class="stat-box purple">
+      <div class="number smaller">$35M</div>
+      <div class="label">CAS Threshold</div>
+    </div>
+    <div class="stat-box warning">
+      <div class="number smaller">$26B</div>
+      <div class="label">8(a) Record</div>
+    </div>
+    <div class="stat-box navy">
+      <div class="number smaller">✓</div>
+      <div class="label">Rule of Two Safe</div>
+    </div>
+  </div>
+  <div class="slide-number">67 / 98</div>
+</div>
+
+<!-- Slide 72: Early Engagement -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Early Engagement is Everything</h2>
+  <div class="four-col">
+    <div class="icon-box green">
+      <div class="icon">📅</div>
+      <div class="text">Monitor Forecasts</div>
+      <div class="sub">SAM, GovWin, agencies</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">📞</div>
+      <div class="text">Request 1-on-1s</div>
+      <div class="sub">Before RFP drops</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">📝</div>
+      <div class="text">Respond to Sources Sought</div>
+      <div class="sub">Even if you won't bid</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">🤝</div>
+      <div class="text">Build SBLO Relationships</div>
+      <div class="sub">They're your advocates</div>
+    </div>
+  </div>
+  <div class="slide-number">68 / 98</div>
+</div>
+
+<!-- Slide 73: Set Up SAM Alerts -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Set Up SAM.gov Alerts <span style="color: #10b981;">(Free)</span></h2>
+  <div class="four-col">
+    <div class="icon-box green">
+      <div class="icon">🔔</div>
+      <div class="text">Your NAICS Codes</div>
+      <div class="sub">Get notified on new opps</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">📍</div>
+      <div class="text">Your State/Region</div>
+      <div class="sub">Local opportunities first</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">🏢</div>
+      <div class="text">Target Agencies</div>
+      <div class="sub">USACE, NAVFAC, VA</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">📝</div>
+      <div class="text">Sources Sought</div>
+      <div class="sub">Shape requirements early</div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">90% of small businesses don't have SAM alerts set up. That's free intel delivered to your inbox every day.</div>
+  </div>
+  <div class="slide-number">69 / 98</div>
+</div>
+
+<!-- Slide 74: Track Recompetes -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2>Track Recompetes <span style="color: #f59e0b;">(12-18 Months Out)</span></h2>
+  <div class="three-col">
+    <div class="icon-box purple">
+      <div class="icon">📊</div>
+      <div class="text">USASpending.gov</div>
+      <div class="sub">See contract end dates</div>
+    </div>
+    <div class="icon-box purple">
+      <div class="icon">🎯</div>
+      <div class="text">Identify Incumbents</div>
+      <div class="sub">Research their performance</div>
+    </div>
+    <div class="icon-box purple">
+      <div class="icon">🤝</div>
+      <div class="text">Build Relationships</div>
+      <div class="sub">Before the RFP drops</div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <div class="label">Eric's Take</div>
+    <div class="text">The best contracts are won 12-18 months before the solicitation. If you're waiting for SAM.gov, you're already late.</div>
+  </div>
+  <div class="slide-number">70 / 98</div>
+</div>
+
+<!-- Slide 75: The question -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">The question isn't whether<br>the opportunity exists.</h1>
+    <p style="font-size: 36px; margin-top: 30px;">It's whether you're going to<br><span style="color: #10b981; font-weight: 900;">go get it.</span></p>
+  </div>
+  <div class="slide-number">71 / 98</div>
+</div>
+
+<!-- ================================================ -->
+<!-- AI & MARKET INTELLIGENCE SECTION -->
+<!-- How I use AI to stay ahead -->
+<!-- ================================================ -->
+
+<!-- Slide: AI Section Header -->
+<div class="slide section-slide">
+  <div class="icon">🤖</div>
+  <h1>AI</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9; font-size: 28px;">Artificial Intelligence for Market Intelligence</p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">72 / 98</div>
+</div>
+
+<!-- Slide: Data Center Explosion - AI driving construction demand -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">AI Is Driving <span class="warning">Construction Demand</span></h1>
+    <p class="subtitle" style="margin-top: 20px; margin-bottom: 40px;">Data centers need builders — federal agencies are paying attention</p>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; max-width: 950px;">
+      <div class="stat-box navy">
+        <div class="number smaller">$88B</div>
+        <div class="label">in data center projects<br>starting in next 6 months</div>
+      </div>
+      <div class="stat-box warning">
+        <div class="number smaller">190%</div>
+        <div class="label">year-over-year increase<br>in construction spending</div>
+      </div>
+      <div class="stat-box purple">
+        <div class="number smaller">76</div>
+        <div class="label">major projects<br>breaking ground in 2026</div>
+      </div>
+    </div>
+    <div class="insight-box" style="margin-top: 35px; max-width: 750px;">
+      <div class="label">WHERE THE MONEY IS GOING</div>
+      <div class="text">Virginia $15B • Louisiana $15B • Mississippi $14B • Texas $13B</div>
+    </div>
+  </div>
+  <div class="slide-number">73 / 98</div>
+</div>
+
+<!-- Slide: How I Stay Ahead -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>How do I stay ahead of<br><span class="highlight">thousands</span> of opportunities?</h1>
+  </div>
+  <div class="slide-number">74 / 98</div>
+</div>
+
+<!-- Slide: 85+ Websites -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="stat-box alert" style="padding: 50px 80px; margin-bottom: 30px;">
+      <div class="number">85+</div>
+      <div class="label" style="font-size: 24px;">Federal Procurement Portals</div>
+    </div>
+    <h1 class="medium" style="margin-top: 20px;"><span class="warning">Beyond</span> SAM.gov</h1>
+    <p class="subtitle" style="margin-top: 20px;">eBuy • DIBBS • SeaPort • FedConnect • PIEE • Agency Sites...</p>
+    <p class="subtitle" style="margin-top: 10px; color: #ef4444;">Are you checking them all?</p>
+  </div>
+  <div class="slide-number">75 / 98</div>
+</div>
+
+<!-- Slide: The Problem -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">How Do You Track <span class="highlight">250 Agencies</span><br>and <span class="purple">Thousands</span> of Opportunities?</h1>
+    <p class="subtitle" style="margin-top: 30px;">The data is scattered. Priorities shift. Budgets move.</p>
+    <p class="subtitle" style="margin-top: 15px; color: #f59e0b;">You can't manually keep up.</p>
+  </div>
+  <div class="slide-number">76 / 98</div>
+</div>
+
+<!-- Slide: I Built a Database -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2 style="margin-bottom: 15px; text-align: center;">So I Built a <span class="highlight">Federal Intelligence Database</span></h2>
+  <p style="color: #64748b; text-align: center; margin-bottom: 40px;">Aggregating data from 10+ federal sources, updated continuously</p>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; max-width: 1100px; margin: 0 auto;">
+    <div class="stat-box">
+      <div class="number smaller">250</div>
+      <div class="label">Federal Agencies<br>& Sub-Agencies</div>
+    </div>
+    <div class="stat-box purple">
+      <div class="number smaller">2,765</div>
+      <div class="label">Agency Pain Points<br>Documented</div>
+    </div>
+    <div class="stat-box warning">
+      <div class="number smaller">2,500</div>
+      <div class="label">Strategic Priorities<br>with Budget Data</div>
+    </div>
+    <div class="stat-box navy">
+      <div class="number smaller">2,768</div>
+      <div class="label">Prime Contractors<br>Mapped</div>
+    </div>
+  </div>
+  <div class="insight-box" style="margin-top: 35px; max-width: 800px; margin-left: auto; margin-right: auto;">
+    <div class="label">TOTAL INTELLIGENCE</div>
+    <div class="text">5,265+ actionable insights with fiscal year budgets (FY2024-2027)</div>
+  </div>
+  <div class="slide-number">77 / 98</div>
+</div>
+
+<!-- Slide: Data Sources -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2 style="margin-bottom: 30px; text-align: center;">Where Does This Data Come From?</h2>
+  <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; max-width: 1100px; margin: 0 auto;">
+    <div class="icon-box green">
+      <div class="icon">📜</div>
+      <div class="text">NDAA</div>
+      <div class="sub">National Defense Authorization Act</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">🔍</div>
+      <div class="text">GAO</div>
+      <div class="sub">Gov't Accountability Office</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">📋</div>
+      <div class="text">OMB</div>
+      <div class="sub">Office of Mgmt & Budget</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">🛡️</div>
+      <div class="text">Executive Orders</div>
+      <div class="sub">102 Active Orders</div>
+    </div>
+    <div class="icon-box green">
+      <div class="icon">🔐</div>
+      <div class="text">NIST/CISA</div>
+      <div class="sub">Cybersecurity Standards</div>
+    </div>
+    <div class="icon-box purple">
+      <div class="icon">💰</div>
+      <div class="text">USASpending</div>
+      <div class="sub">Contract Awards</div>
+    </div>
+    <div class="icon-box purple">
+      <div class="icon">📢</div>
+      <div class="text">SAM.gov</div>
+      <div class="sub">Live Opportunities</div>
+    </div>
+    <div class="icon-box purple">
+      <div class="icon">📊</div>
+      <div class="text">Agency OIGs</div>
+      <div class="sub">55 Inspector Reports</div>
+    </div>
+    <div class="icon-box purple">
+      <div class="icon">💵</div>
+      <div class="text">CBO</div>
+      <div class="sub">Budget Forecasts</div>
+    </div>
+    <div class="icon-box purple">
+      <div class="icon">📰</div>
+      <div class="text">Federal Register</div>
+      <div class="sub">Regulatory Changes</div>
+    </div>
+  </div>
+  <div class="insight-box" style="margin-top: 35px; max-width: 700px; margin-left: auto; margin-right: auto;">
+    <div class="label">CONTINUOUS UPDATES</div>
+    <div class="text">AI scans these sources daily and updates agency intelligence automatically</div>
+  </div>
+  <div class="slide-number">78 / 98</div>
+</div>
+
+<!-- Slide: What AI Delivers - Transition -->
+<div class="slide section-slide navy">
+  <div class="icon">📬</div>
+  <h1>What This Delivers To Me</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9;">Every Day. Automatically.</p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">79 / 98</div>
+</div>
+
+<!-- Slide: What I Get - Overview -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <h2 style="margin-bottom: 40px;">What AI Delivers <span class="highlight">Every Week</span></h2>
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; max-width: 1000px;">
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 16px; padding: 30px;">
+      <div style="font-size: 36px; margin-bottom: 15px;">📬</div>
+      <h3 style="font-size: 20px; margin-bottom: 10px;">Daily Opportunity Alerts</h3>
+      <p style="color: #94a3b8; font-size: 14px; margin-bottom: 12px;">SAM.gov opportunities matching MY NAICS codes, delivered before competitors see them.</p>
+      <span style="background: #1e3a8a; padding: 6px 14px; border-radius: 6px; font-size: 12px;">4x daily</span>
+    </div>
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 16px; padding: 30px;">
+      <div style="font-size: 36px; margin-bottom: 15px;">📊</div>
+      <h3 style="font-size: 20px; margin-bottom: 10px;">Daily Briefings</h3>
+      <p style="color: #94a3b8; font-size: 14px; margin-bottom: 12px;">Curated intel with win probability scores, agency insights, and teaming opportunities.</p>
+      <span style="background: #1e3a8a; padding: 6px 14px; border-radius: 6px; font-size: 12px;">Every morning 6 AM</span>
+    </div>
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 16px; padding: 30px;">
+      <div style="font-size: 36px; margin-bottom: 15px;">🔍</div>
+      <h3 style="font-size: 20px; margin-bottom: 10px;">Weekly Deep Dive</h3>
+      <p style="color: #94a3b8; font-size: 14px; margin-bottom: 12px;">Full competitive analysis of 10 opportunities including bid history and win strategies.</p>
+      <span style="background: #1e3a8a; padding: 6px 14px; border-radius: 6px; font-size: 12px;">Every Sunday</span>
+    </div>
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 16px; padding: 30px;">
+      <div style="font-size: 36px; margin-bottom: 15px;">🎯</div>
+      <h3 style="font-size: 20px; margin-bottom: 10px;">Weekly Pursuit Brief</h3>
+      <p style="color: #94a3b8; font-size: 14px; margin-bottom: 12px;">AI picks MY best opportunity and gives me a detailed pursuit plan with win probability.</p>
+      <span style="background: #1e3a8a; padding: 6px 14px; border-radius: 6px; font-size: 12px;">Every Monday</span>
+    </div>
+  </div>
+  <div class="slide-number">80 / 98</div>
+</div>
+
+<!-- Slide 85: Key Takeaways Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>Key Takeaways</h1>
+  </div>
+  <div class="slide-number">81 / 98</div>
+</div>
+
+<!-- Slide 77: START Takeaway -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="two-col">
+    <div class="stat-box" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="icon" style="font-size: 60px; margin-bottom: 15px;">🚀</div>
+      <div class="number smaller">START</div>
+    </div>
+    <div>
+      <div class="icon-box green" style="margin-bottom: 12px; text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Get visible (SAM.gov, LinkedIn)</div>
+      </div>
+      <div class="icon-box green" style="margin-bottom: 12px; text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Get certified (8(a), SDVOSB, HUBZone)</div>
+      </div>
+      <div class="icon-box green" style="text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Fix your capability statement</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">82 / 98</div>
+</div>
+
+<!-- Slide 78: GROW Takeaway -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="two-col">
+    <div class="stat-box purple" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="icon" style="font-size: 60px; margin-bottom: 15px;">📈</div>
+      <div class="number smaller">GROW</div>
+    </div>
+    <div>
+      <div class="icon-box purple" style="margin-bottom: 12px; text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Win SAT contracts ($350K)</div>
+      </div>
+      <div class="icon-box purple" style="margin-bottom: 12px; text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Sub to primes (build past perf)</div>
+      </div>
+      <div class="icon-box purple" style="text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Use AI to free up time</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">83 / 98</div>
+</div>
+
+<!-- Slide 79: SCALE Takeaway -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="two-col">
+    <div class="stat-box warning" style="display: flex; flex-direction: column; justify-content: center;">
+      <div class="icon" style="font-size: 60px; margin-bottom: 15px;">🏆</div>
+      <div class="number smaller">SCALE</div>
+    </div>
+    <div>
+      <div class="icon-box warning" style="margin-bottom: 12px; text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Get on contract vehicles</div>
+      </div>
+      <div class="icon-box warning" style="margin-bottom: 12px; text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Chase task orders (55% of spend)</div>
+      </div>
+      <div class="icon-box warning" style="text-align: left; padding: 18px 22px;">
+        <div class="text">✓ Team strategically for recompetes</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">84 / 98</div>
+</div>
+
+<!-- Slide 80: Action Items Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>Your Action Items</h1>
+    <p class="subtitle">This Week</p>
+  </div>
+  <div class="slide-number">85 / 98</div>
+</div>
+
+<!-- Slide 81: Action Items 1-3 -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="action-item">
+    <div class="num">1</div>
+    <div class="text">Review your certifications — 8(a) to HUBZone flexibility is real</div>
+  </div>
+  <div class="action-item">
+    <div class="num">2</div>
+    <div class="text">Start CMMC assessment — Don't wait for the RFP</div>
+  </div>
+  <div class="action-item">
+    <div class="num">3</div>
+    <div class="text">Get on contract vehicles — MACCs, SeaPort, MATOC</div>
+  </div>
+  <div class="slide-number">86 / 98</div>
+</div>
+
+<!-- Slide 82: Action Items 4-6 -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="action-item">
+    <div class="num">4</div>
+    <div class="text">Engage early — Tomorrow's win starts with today's relationship</div>
+  </div>
+  <div class="action-item">
+    <div class="num">5</div>
+    <div class="text">Use AI — Free up time for business development</div>
+  </div>
+  <div class="action-item">
+    <div class="num">6</div>
+    <div class="text">Be visible — LinkedIn, industry events, agency outreach</div>
+  </div>
+  <div class="slide-number">87 / 98</div>
+</div>
+
+<!-- ================================================ -->
+<!-- NEW SECTION: LOW HANGING FRUIT -->
+<!-- The Bar Has Never Been So Low -->
+<!-- ================================================ -->
+
+<!-- Slide 83: Low Hanging Fruit Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>Low Hanging Fruit</h1>
+    <h1 class="medium" style="color: #f59e0b;">What Most People Miss</h1>
+  </div>
+  <div class="slide-number">88 / 98</div>
+</div>
+
+<!-- Slide 84: The Bar Has Never Been Lower -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1>The bar has never been</h1>
+    <h1><span class="highlight">so low.</span></h1>
+  </div>
+  <div class="slide-number">89 / 98</div>
+</div>
+
+<!-- Slide 85: 5 Things Header -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1><span class="highlight">5 Things</span></h1>
+    <h1 class="medium">That Set You Apart</h1>
+  </div>
+  <div class="slide-number">90 / 98</div>
+</div>
+
+<!-- Slide 86: Thing 1 -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="big-stat">
+      <div class="number" style="font-size: 150px; color: #10b981;">1</div>
+    </div>
+    <h1>Do what you say<br>you're going to do.</h1>
+  </div>
+  <div class="slide-number">91 / 98</div>
+</div>
+
+<!-- Slide 87: Thing 2 -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="big-stat">
+      <div class="number" style="font-size: 150px; color: #10b981;">2</div>
+    </div>
+    <h1>Show up on time.</h1>
+  </div>
+  <div class="slide-number">92 / 98</div>
+</div>
+
+<!-- Slide 88: Thing 3 -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="big-stat">
+      <div class="number" style="font-size: 150px; color: #10b981;">3</div>
+    </div>
+    <h1>Deliver excellence.</h1>
+  </div>
+  <div class="slide-number">93 / 98</div>
+</div>
+
+<!-- Slide 89: Thing 4 -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="big-stat">
+      <div class="number" style="font-size: 150px; color: #10b981;">4</div>
+    </div>
+    <h1>Communicate often<br>and thoroughly.</h1>
+    <p class="subtitle" style="margin-top: 20px;">In person. In writing.</p>
+  </div>
+  <div class="slide-number">94 / 98</div>
+</div>
+
+<!-- Slide 90: Thing 5 -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <div class="big-stat">
+      <div class="number" style="font-size: 150px; color: #10b981;">5</div>
+    </div>
+    <h1>Be known as a person<br>who gets things done.</h1>
+  </div>
+  <div class="slide-number">95 / 98</div>
+</div>
+
+<!-- ================================================ -->
+<!-- CLOSING SLIDES -->
+<!-- ================================================ -->
+
+<!-- Slide: Meet 3 primes -->
+<div class="slide">
+  <div class="event-badge">JTED 2026</div>
+  <div class="logo">GovCon <span>Giants</span></div>
+  <div class="center-content">
+    <h1 class="medium">Before you leave today:</h1>
+    <h1>Meet <span class="highlight">3 Primes</span></h1>
+    <p class="subtitle" style="margin-top: 25px;">for teaming opportunities.</p>
+  </div>
+  <div class="slide-number">96 / 98</div>
+</div>
+
+<!-- Slide 92: QR Code Download -->
+<div class="slide cta-slide">
+  <h1>Download the Guide</h1>
+  <p style="font-size: 22px; color: white; opacity: 0.9; margin-bottom: 25px;">All the data from today's presentation</p>
+  <div style="background: white; padding: 20px; border-radius: 16px; display: inline-block;">
+    <img src="images/jted-qr-code.png" alt="QR Code" style="display: block; width: 220px; height: 220px;">
+  </div>
+  <div class="url" style="margin-top: 20px;">govcongiants.org/jted-2026</div>
+  <div style="margin-top: 30px; display: flex; justify-content: center; gap: 40px;">
+    <div style="text-align: center;">
+      <div style="font-size: 28px; margin-bottom: 5px;">📊</div>
+      <div style="font-size: 14px; color: rgba(255,255,255,0.8);">10 Expiring<br>Contracts</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 28px; margin-bottom: 5px;">🤝</div>
+      <div style="font-size: 14px; color: rgba(255,255,255,0.8);">Teaming<br>Plays</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 28px; margin-bottom: 5px;">📝</div>
+      <div style="font-size: 14px; color: rgba(255,255,255,0.8);">Templates<br>& Prompts</div>
+    </div>
+  </div>
+  <p style="margin-top: 25px; font-size: 18px; color: white; opacity: 0.7;">
+    Eric Coffie | GovCon Giants | @govconeric
+  </p>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">97 / 98</div>
+</div>
+
+<!-- Slide 94: Thank You -->
+<div class="slide section-slide">
+  <div class="icon">🙏</div>
+  <h1>Thank You</h1>
+  <p class="subtitle" style="color: white; opacity: 0.9; font-size: 24px; margin-top: 20px;">Now go meet 3 primes before you leave.</p>
+  <div style="margin-top: 40px; display: flex; justify-content: center; gap: 30px;">
+    <div style="text-align: center;">
+      <div style="font-size: 16px; color: rgba(255,255,255,0.7);">YouTube</div>
+      <div style="font-size: 18px; font-weight: 700;">@govcongiants</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 16px; color: rgba(255,255,255,0.7);">LinkedIn</div>
+      <div style="font-size: 18px; font-weight: 700;">Eric Coffie</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 16px; color: rgba(255,255,255,0.7);">Website</div>
+      <div style="font-size: 18px; font-weight: 700;">govcongiants.org</div>
+    </div>
+  </div>
+  <div class="slide-number" style="color: rgba(255,255,255,0.6);">98 / 98</div>
+</div>
+
+</body>
+</html>
