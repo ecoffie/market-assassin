@@ -9,11 +9,12 @@
 
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
-import { RecompeteContract } from '../pipelines/fpds-recompete';
+import { RecompeteContract, fetchExpiringContracts } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
 import { WebSignal } from '../web-intel/types';
 import { enrichContractsWithIntel, ContractIntelligence } from '../enrichment';
+import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 
 // Types for AI-generated briefings
 export interface AIBriefingOpportunity {
@@ -146,7 +147,7 @@ export async function generateAIBriefing(
     // Step 1: Get user profile from unified table
     const { data: profileData } = await supabase
       .from('user_notification_settings')
-      .select('aggregated_profile, naics_codes, agencies, keywords')
+      .select('aggregated_profile, naics_codes, agencies, keywords, primary_industry')
       .eq('user_email', userEmail)
       .single();
 
@@ -156,9 +157,15 @@ export async function generateAIBriefing(
       agencies: [],
       keywords: [],
       aggregated_profile: null,
+      primary_industry: null,
     };
 
     const profile = buildProfile(effectiveProfile);
+    const primaryIndustry = (profileData?.primary_industry as string) || null;
+
+    // Prioritize NAICS codes by primary industry
+    const prioritizedNaics = prioritizeNaicsByIndustry(profile.naics_codes, primaryIndustry);
+    console.log(`[AIBriefingGen] Primary industry: ${primaryIndustry || 'none'}, prioritized NAICS: ${prioritizedNaics.slice(0, 5).join(', ')}...`);
 
     // Step 2: Get today's snapshots
     const today = new Date().toISOString().split('T')[0];
@@ -172,35 +179,28 @@ export async function generateAIBriefing(
 
     console.log(`[AIBriefingGen] Snapshots: ${snapshots?.length || 0}, Recompetes: ${organizedData.recompetes.length}, Awards: ${organizedData.awards.length}`);
 
-    // FALLBACK: If no snapshots, fetch live data from SAM.gov
+    // FALLBACK: If no snapshots, fetch live recompete data from USASpending
     if (organizedData.recompetes.length === 0 && organizedData.awards.length === 0) {
-      console.log(`[AIBriefingGen] No snapshots found, fetching live data from SAM.gov...`);
+      console.log(`[AIBriefingGen] No snapshots found, fetching live recompete data from USASpending...`);
       try {
-        const liveData = await fetchLiveOpportunityData(profile.naics_codes);
-        if (liveData.opportunities.length > 0) {
-          // Convert SAM opportunities to recompete-like format for AI processing
+        // Use prioritized NAICS codes (primary industry first)
+        const naicsToUse = prioritizedNaics.length > 0 ? prioritizedNaics : ['541512', '541611', '541330'];
+        const recompeteResult = await fetchExpiringContracts({
+          naicsCodes: naicsToUse,
+          monthsToExpiration: 12,
+          limit: 50,
+        });
+        if (recompeteResult.contracts.length > 0) {
           organizedData = {
-            recompetes: liveData.opportunities.map((opp: SAMOpportunity) => ({
-              piid: opp.noticeId || '',
-              incumbentName: opp.organizationName || 'Unknown',
-              contractingAgency: opp.department || opp.subtierAgency || 'Federal Agency',
-              currentValue: opp.estimatedValue || 0,
-              naicsCode: opp.naicsCode || '',
-              expirationDate: opp.responseDeadLine || '',
-              title: opp.title || '',
-              description: opp.description?.slice(0, 500) || '',
-              placeOfPerformance: opp.poState || '',
-              setAside: opp.setAside || '',
-              type: opp.type || 'presolicitation',
-            })) as unknown as RecompeteContract[],
+            recompetes: recompeteResult.contracts,
             awards: [],
             contractors: [],
             webSignals: [],
           };
-          console.log(`[AIBriefingGen] Found ${liveData.opportunities.length} live opportunities`);
+          console.log(`[AIBriefingGen] Found ${recompeteResult.contracts.length} live recompete opportunities`);
         }
       } catch (err) {
-        console.warn(`[AIBriefingGen] Live data fetch failed:`, err);
+        console.warn(`[AIBriefingGen] Live recompete data fetch failed:`, err);
       }
     }
 
@@ -454,85 +454,4 @@ function getAnthropicClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
   return new Anthropic({ apiKey });
-}
-
-/**
- * SAM.gov Opportunity type for live data fetch
- */
-interface SAMOpportunity {
-  noticeId: string;
-  title: string;
-  description?: string;
-  department?: string;
-  subtierAgency?: string;
-  organizationName?: string;
-  naicsCode?: string;
-  setAside?: string;
-  type?: string;
-  poState?: string;
-  responseDeadLine?: string;
-  estimatedValue?: number;
-}
-
-/**
- * Fetch live opportunity data from SAM.gov API
- */
-async function fetchLiveOpportunityData(naicsCodes: string[]): Promise<{ opportunities: SAMOpportunity[] }> {
-  const apiKey = process.env.SAM_API_KEY;
-  if (!apiKey) {
-    console.warn('[AIBriefingGen] No SAM_API_KEY configured');
-    return { opportunities: [] };
-  }
-
-  const allOpportunities: SAMOpportunity[] = [];
-  const effectiveNaics = naicsCodes.length > 0 ? naicsCodes.slice(0, 3) : ['541512', '541611'];
-
-  // Get date 30 days ago in MM/dd/yyyy format
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const postedFrom = `${String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0')}/${String(thirtyDaysAgo.getDate()).padStart(2, '0')}/${thirtyDaysAgo.getFullYear()}`;
-
-  for (const naics of effectiveNaics) {
-    try {
-      const url = new URL('https://api.sam.gov/opportunities/v2/search');
-      url.searchParams.set('api_key', apiKey);
-      url.searchParams.set('naicsCode', naics);
-      url.searchParams.set('postedFrom', postedFrom);
-      url.searchParams.set('limit', '25');
-
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        console.warn(`[AIBriefingGen] SAM.gov API error for ${naics}: ${response.status}`);
-        continue;
-      }
-
-      const data = await response.json();
-      const opportunities = (data.opportunitiesData || []).map((opp: Record<string, unknown>) => {
-        const placeOfPerformance = opp.placeOfPerformance as Record<string, unknown> | undefined;
-        const state = placeOfPerformance?.state as Record<string, unknown> | undefined;
-        const award = opp.award as Record<string, unknown> | undefined;
-        return {
-          noticeId: opp.noticeId as string,
-          title: opp.title as string,
-          description: opp.description as string | undefined,
-          department: opp.fullParentPathName as string | undefined,
-          subtierAgency: opp.office as string | undefined,
-          organizationName: opp.organizationType as string | undefined,
-          naicsCode: naics,
-          setAside: opp.typeOfSetAsideDescription as string | undefined,
-          type: opp.type as string | undefined,
-          poState: state?.code as string | undefined,
-          responseDeadLine: opp.responseDeadLine as string | undefined,
-          estimatedValue: award?.amount as number | undefined,
-        };
-      });
-
-      allOpportunities.push(...opportunities);
-      console.log(`[AIBriefingGen] Fetched ${opportunities.length} opportunities for NAICS ${naics}`);
-    } catch (err) {
-      console.warn(`[AIBriefingGen] Failed to fetch NAICS ${naics}:`, err);
-    }
-  }
-
-  return { opportunities: allOpportunities };
 }

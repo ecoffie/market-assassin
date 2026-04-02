@@ -62,6 +62,7 @@ const INDUSTRY_PRESETS = [
 
 interface AlertSettings {
   email: string;
+  primaryIndustry: string | null;
   naicsCodes: string[] | null;
   keywords: string[] | null;
   businessType: string | null;
@@ -91,6 +92,7 @@ function AlertPreferencesContent() {
   const [notFound, setNotFound] = useState(false);
 
   // Form state
+  const [primaryIndustry, setPrimaryIndustry] = useState('');
   const [naicsInput, setNaicsInput] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
@@ -144,6 +146,8 @@ function AlertPreferencesContent() {
 
       if (data.success && data.data) {
         setSettings(data.data);
+        // Load primary industry
+        setPrimaryIndustry(data.data.primaryIndustry || '');
         // Clean NAICS codes - filter out non-numeric values
         const cleanedNaics = cleanNaicsCodes(data.data.naicsCodes || []);
         setNaicsInput(cleanedNaics.join(', '));
@@ -205,6 +209,7 @@ function AlertPreferencesContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: settings?.email || email,
+          primaryIndustry: primaryIndustry || null,
           naicsCodes,
           keywords,
           businessType: businessType || null,
@@ -477,10 +482,54 @@ function AlertPreferencesContent() {
                   🎯 What Opportunities?
                 </h2>
 
+                {/* Primary Industry Selector */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Primary Industry <span className="text-red-400">*</span>
+                  </label>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Select your main business type. Briefings will prioritize opportunities in this industry.
+                  </p>
+                  <select
+                    value={primaryIndustry}
+                    onChange={(e) => {
+                      const newPrimary = e.target.value;
+                      setPrimaryIndustry(newPrimary);
+                      // Also add the primary industry's NAICS codes if not already present
+                      if (newPrimary) {
+                        const preset = INDUSTRY_PRESETS.find(p => p.label.includes(newPrimary));
+                        if (preset) {
+                          const existingCodes = naicsInput.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
+                          const newCodes = [...new Set([...preset.codes, ...existingCodes])];
+                          setNaicsInput(newCodes.join(', '));
+                        }
+                      }
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  >
+                    <option value="">-- Select Primary Industry --</option>
+                    {INDUSTRY_PRESETS.map((preset) => {
+                      const cleanLabel = preset.label.replace(/^[^\w]+\s*/, ''); // Remove emoji prefix
+                      return (
+                        <option key={preset.label} value={cleanLabel}>
+                          {preset.label} — {preset.description}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {primaryIndustry && (
+                    <div className="mt-2 px-3 py-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                      <p className="text-emerald-400 text-xs">
+                        Your briefings will prioritize {primaryIndustry} opportunities first.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Quick Industry Select */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-300 mb-3">
-                    Quick Select by Industry
+                    Additional Industries (Optional)
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {INDUSTRY_PRESETS.map((preset) => {

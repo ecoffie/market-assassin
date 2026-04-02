@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       data: {
         email: data.user_email,
         // Search criteria
+        primaryIndustry: data.primary_industry || null,
         naicsCodes: data.naics_codes || [],
         keywords: data.keywords || [],
         businessType: data.business_type,
@@ -119,6 +120,8 @@ export async function POST(request: NextRequest) {
       targetAgencies,
       locationState,
       locationStates, // Multi-state support
+      // Primary industry
+      primaryIndustry,
       // Master switch
       isActive,
     } = body;
@@ -230,6 +233,11 @@ export async function POST(request: NextRequest) {
     if (locationStates !== undefined) {
       // Store as JSON array of state codes
       record.location_states = Array.isArray(locationStates) ? locationStates : [];
+    }
+
+    // Primary industry
+    if (primaryIndustry !== undefined) {
+      record.primary_industry = primaryIndustry || null;
     }
 
     let data;

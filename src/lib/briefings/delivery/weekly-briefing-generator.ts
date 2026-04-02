@@ -9,10 +9,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
-import { RecompeteContract } from '../pipelines/fpds-recompete';
+import { RecompeteContract, fetchExpiringContracts } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
 import { WebSignal } from '../web-intel/types';
+import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 
 export interface WeeklyOpportunityAnalysis {
   rank: number;
@@ -172,14 +173,12 @@ export async function generateWeeklyBriefing(
   const supabase = getSupabaseClient();
 
   if (!supabase) {
-    console.error('[WeeklyBriefing] Supabase not configured');
-    return null;
+    throw new Error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
   const anthropic = getAnthropicClient();
   if (!anthropic) {
-    console.error('[WeeklyBriefing] Anthropic not configured');
-    return null;
+    throw new Error('Anthropic not configured - missing ANTHROPIC_API_KEY');
   }
 
   // Get Monday of current week
@@ -195,7 +194,7 @@ export async function generateWeeklyBriefing(
     // Get user profile from unified table
     const { data: profileData } = await supabase
       .from('user_notification_settings')
-      .select('aggregated_profile, naics_codes, agencies, keywords')
+      .select('aggregated_profile, naics_codes, agencies, keywords, primary_industry')
       .eq('user_email', userEmail)
       .single();
 
@@ -205,9 +204,15 @@ export async function generateWeeklyBriefing(
       agencies: [],
       keywords: [],
       aggregated_profile: null,
+      primary_industry: null,
     };
 
     const profile = buildProfile(effectiveProfile);
+    const primaryIndustry = (profileData?.primary_industry as string) || null;
+
+    // Prioritize NAICS codes by primary industry
+    const prioritizedNaics = prioritizeNaicsByIndustry(profile.naics_codes, primaryIndustry);
+    console.log(`[WeeklyBriefing] Primary industry: ${primaryIndustry || 'none'}, prioritized NAICS: ${prioritizedNaics.slice(0, 5).join(', ')}...`);
 
     // Get last 7 days of snapshots
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
@@ -217,7 +222,34 @@ export async function generateWeeklyBriefing(
       .eq('user_email', userEmail)
       .gte('snapshot_date', weekAgo);
 
-    const organizedData = organizeSnapshots(snapshots || []);
+    let organizedData = organizeSnapshots(snapshots || []);
+
+    console.log(`[WeeklyBriefing] Snapshots: ${snapshots?.length || 0}, Recompetes: ${organizedData.recompetes.length}`);
+
+    // FALLBACK: If no snapshots, fetch live recompete data from USASpending
+    if (organizedData.recompetes.length === 0 && organizedData.awards.length === 0) {
+      console.log(`[WeeklyBriefing] No snapshots found, fetching live recompete data from USASpending...`);
+      try {
+        // Use prioritized NAICS codes (primary industry first)
+        const naicsToUse = prioritizedNaics.length > 0 ? prioritizedNaics : ['541512', '541611', '541330'];
+        const recompeteResult = await fetchExpiringContracts({
+          naicsCodes: naicsToUse,
+          monthsToExpiration: 12,
+          limit: 50,
+        });
+        if (recompeteResult.contracts.length > 0) {
+          organizedData = {
+            recompetes: recompeteResult.contracts,
+            awards: [],
+            contractors: [],
+            webSignals: [],
+          };
+          console.log(`[WeeklyBriefing] Found ${recompeteResult.contracts.length} live recompete opportunities`);
+        }
+      } catch (err) {
+        console.warn(`[WeeklyBriefing] Live recompete data fetch failed:`, err);
+      }
+    }
 
     // Build user prompt
     const userPrompt = buildUserPrompt(profile, organizedData);
@@ -237,11 +269,23 @@ export async function generateWeeklyBriefing(
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : null;
     if (!responseText) {
-      console.error('[WeeklyBriefing] Empty response from OpenAI');
+      console.error('[WeeklyBriefing] Empty response from Claude');
       return null;
     }
 
-    const aiResponse = JSON.parse(responseText);
+    // Strip markdown code fences if present
+    let jsonText = responseText.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    const aiResponse = JSON.parse(jsonText);
 
     const maxOpps = options.maxOpportunities || 10;
     const maxPlays = options.maxTeamingPlays || 3;
@@ -256,10 +300,10 @@ export async function generateWeeklyBriefing(
       marketSignals: aiResponse.marketSignals || [],
       calendar: aiResponse.calendar || [],
       rawDataSummary: {
-        recompetesAnalyzed: organizedData.recompetes.length,
-        awardsAnalyzed: organizedData.awards.length,
-        contractorsAnalyzed: organizedData.contractors.length,
-        webSignalsAnalyzed: organizedData.webSignals.length,
+        recompetesAnalyzed: organizedData.recompetes?.length || 0,
+        awardsAnalyzed: organizedData.awards?.length || 0,
+        contractorsAnalyzed: organizedData.contractors?.length || 0,
+        webSignalsAnalyzed: organizedData.webSignals?.length || 0,
       },
       processingTimeMs: Date.now() - startTime,
     };
@@ -271,7 +315,7 @@ export async function generateWeeklyBriefing(
     return briefing;
   } catch (error) {
     console.error('[WeeklyBriefing] Error:', error);
-    return null;
+    throw error;
   }
 }
 

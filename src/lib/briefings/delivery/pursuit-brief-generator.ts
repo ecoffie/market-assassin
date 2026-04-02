@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
 import { RecompeteContract } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
+import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 
 export interface PursuitOutreachTarget {
   priority: number;
@@ -155,14 +156,12 @@ export async function generatePursuitBrief(
   const supabase = getSupabaseClient();
 
   if (!supabase) {
-    console.error('[PursuitBrief] Supabase not configured');
-    return null;
+    throw new Error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
   const anthropic = getAnthropicClient();
   if (!anthropic) {
-    console.error('[PursuitBrief] Anthropic not configured');
-    return null;
+    throw new Error('Anthropic not configured - missing ANTHROPIC_API_KEY');
   }
 
   // Fallback NAICS codes
@@ -172,7 +171,7 @@ export async function generatePursuitBrief(
     // Get user profile from unified table
     const { data: profileData } = await supabase
       .from('user_notification_settings')
-      .select('aggregated_profile, naics_codes, agencies, keywords')
+      .select('aggregated_profile, naics_codes, agencies, keywords, primary_industry')
       .eq('user_email', userEmail)
       .single();
 
@@ -183,6 +182,15 @@ export async function generatePursuitBrief(
       watched_companies: [],
     };
 
+    const primaryIndustry = (profileData?.primary_industry as string) || null;
+
+    // Prioritize NAICS codes by primary industry
+    const prioritizedNaics = prioritizeNaicsByIndustry(profile.naics_codes, primaryIndustry);
+    console.log(`[PursuitBrief] Primary industry: ${primaryIndustry || 'none'}, prioritized NAICS: ${prioritizedNaics.slice(0, 5).join(', ')}...`);
+
+    // Update profile with prioritized codes for the AI prompt
+    profile.naics_codes = prioritizedNaics;
+
     // Build user prompt with opportunity details
     const userPrompt = buildUserPrompt(profile, opportunity);
 
@@ -190,7 +198,7 @@ export async function generatePursuitBrief(
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 3000,
+      max_tokens: 4000,
       messages: [
         {
           role: 'user',
@@ -201,11 +209,23 @@ export async function generatePursuitBrief(
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : null;
     if (!responseText) {
-      console.error('[PursuitBrief] Empty response from OpenAI');
+      console.error('[PursuitBrief] Empty response from Claude');
       return null;
     }
 
-    const aiResponse = JSON.parse(responseText);
+    // Strip markdown code fences if present
+    let jsonText = responseText.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    const aiResponse = JSON.parse(jsonText);
 
     const brief: PursuitBrief = {
       id: `pursuit-${userEmail}-${Date.now()}`,
@@ -240,7 +260,7 @@ export async function generatePursuitBrief(
     return brief;
   } catch (error) {
     console.error('[PursuitBrief] Error:', error);
-    return null;
+    throw error;
   }
 }
 
