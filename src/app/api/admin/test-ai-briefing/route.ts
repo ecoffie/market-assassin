@@ -44,15 +44,22 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const briefing = await generateAIBriefing(email, {
-      maxOpportunities: 10,
-      maxTeamingPlays: 3,
-    });
+    let briefing;
+    let generationError: string | null = null;
+    try {
+      briefing = await generateAIBriefing(email, {
+        maxOpportunities: 10,
+        maxTeamingPlays: 3,
+      });
+    } catch (genErr) {
+      generationError = genErr instanceof Error ? genErr.message : String(genErr);
+      console.error('[TestAIBriefing] Generation error:', genErr);
+    }
 
     if (!briefing) {
       return NextResponse.json({
         success: false,
-        error: 'Failed to generate briefing - check logs for details',
+        error: generationError || 'Briefing returned null - check profile or Anthropic config',
         envCheck: { hasAnthropicKey, hasSamKey, hasSupabase },
       });
     }
