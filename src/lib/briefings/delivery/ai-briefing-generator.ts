@@ -170,7 +170,39 @@ export async function generateAIBriefing(
       .eq('user_email', userEmail)
       .eq('snapshot_date', today);
 
-    const organizedData = organizeSnapshots(snapshots || []);
+    let organizedData = organizeSnapshots(snapshots || []);
+
+    // FALLBACK: If no snapshots, fetch live data from SAM.gov
+    if (organizedData.recompetes.length === 0 && organizedData.awards.length === 0) {
+      console.log(`[AIBriefingGen] No snapshots found, fetching live data...`);
+      try {
+        const liveData = await fetchLiveOpportunityData(profile.naics_codes);
+        if (liveData.opportunities.length > 0) {
+          // Convert SAM opportunities to recompete-like format for AI processing
+          organizedData = {
+            recompetes: liveData.opportunities.map((opp: SAMOpportunity) => ({
+              piid: opp.noticeId || '',
+              incumbentName: opp.organizationName || 'Unknown',
+              contractingAgency: opp.department || opp.subtierAgency || 'Federal Agency',
+              currentValue: opp.estimatedValue || 0,
+              naicsCode: opp.naicsCode || '',
+              expirationDate: opp.responseDeadLine || '',
+              title: opp.title || '',
+              description: opp.description?.slice(0, 500) || '',
+              placeOfPerformance: opp.poState || '',
+              setAside: opp.setAside || '',
+              type: opp.type || 'presolicitation',
+            })) as unknown as RecompeteContract[],
+            awards: [],
+            contractors: [],
+            webSignals: [],
+          };
+          console.log(`[AIBriefingGen] Found ${liveData.opportunities.length} live opportunities`);
+        }
+      } catch (err) {
+        console.warn(`[AIBriefingGen] Live data fetch failed:`, err);
+      }
+    }
 
     // Step 3: Enrich top recompetes with Perplexity (real-time web intel)
     let enrichedIntel: Map<string, ContractIntelligence> = new Map();
@@ -421,4 +453,85 @@ function getAnthropicClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
   return new Anthropic({ apiKey });
+}
+
+/**
+ * SAM.gov Opportunity type for live data fetch
+ */
+interface SAMOpportunity {
+  noticeId: string;
+  title: string;
+  description?: string;
+  department?: string;
+  subtierAgency?: string;
+  organizationName?: string;
+  naicsCode?: string;
+  setAside?: string;
+  type?: string;
+  poState?: string;
+  responseDeadLine?: string;
+  estimatedValue?: number;
+}
+
+/**
+ * Fetch live opportunity data from SAM.gov API
+ */
+async function fetchLiveOpportunityData(naicsCodes: string[]): Promise<{ opportunities: SAMOpportunity[] }> {
+  const apiKey = process.env.SAM_API_KEY;
+  if (!apiKey) {
+    console.warn('[AIBriefingGen] No SAM_API_KEY configured');
+    return { opportunities: [] };
+  }
+
+  const allOpportunities: SAMOpportunity[] = [];
+  const effectiveNaics = naicsCodes.length > 0 ? naicsCodes.slice(0, 3) : ['541512', '541611'];
+
+  // Get date 30 days ago in MM/dd/yyyy format
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const postedFrom = `${String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0')}/${String(thirtyDaysAgo.getDate()).padStart(2, '0')}/${thirtyDaysAgo.getFullYear()}`;
+
+  for (const naics of effectiveNaics) {
+    try {
+      const url = new URL('https://api.sam.gov/opportunities/v2/search');
+      url.searchParams.set('api_key', apiKey);
+      url.searchParams.set('naicsCode', naics);
+      url.searchParams.set('postedFrom', postedFrom);
+      url.searchParams.set('limit', '25');
+
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        console.warn(`[AIBriefingGen] SAM.gov API error for ${naics}: ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const opportunities = (data.opportunitiesData || []).map((opp: Record<string, unknown>) => {
+        const placeOfPerformance = opp.placeOfPerformance as Record<string, unknown> | undefined;
+        const state = placeOfPerformance?.state as Record<string, unknown> | undefined;
+        const award = opp.award as Record<string, unknown> | undefined;
+        return {
+          noticeId: opp.noticeId as string,
+          title: opp.title as string,
+          description: opp.description as string | undefined,
+          department: opp.fullParentPathName as string | undefined,
+          subtierAgency: opp.office as string | undefined,
+          organizationName: opp.organizationType as string | undefined,
+          naicsCode: naics,
+          setAside: opp.typeOfSetAsideDescription as string | undefined,
+          type: opp.type as string | undefined,
+          poState: state?.code as string | undefined,
+          responseDeadLine: opp.responseDeadLine as string | undefined,
+          estimatedValue: award?.amount as number | undefined,
+        };
+      });
+
+      allOpportunities.push(...opportunities);
+      console.log(`[AIBriefingGen] Fetched ${opportunities.length} opportunities for NAICS ${naics}`);
+    } catch (err) {
+      console.warn(`[AIBriefingGen] Failed to fetch NAICS ${naics}:`, err);
+    }
+  }
+
+  return { opportunities: allOpportunities };
 }
