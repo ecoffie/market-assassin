@@ -165,16 +165,19 @@ export async function generatePursuitBrief(
     return null;
   }
 
+  // Fallback NAICS codes
+  const FALLBACK_NAICS = ['541512', '541611', '541330', '541990', '561210'];
+
   try {
-    // Get user profile for context
+    // Get user profile from unified table
     const { data: profileData } = await supabase
-      .from('user_briefing_profile')
-      .select('aggregated_profile, naics_codes, agencies, keywords, watched_companies')
+      .from('user_notification_settings')
+      .select('aggregated_profile, naics_codes, agencies, keywords')
       .eq('user_email', userEmail)
       .single();
 
     const profile = profileData ? buildProfile(profileData) : {
-      naics_codes: [],
+      naics_codes: FALLBACK_NAICS,
       agencies: [],
       keywords: [],
       watched_companies: [],

@@ -113,29 +113,56 @@ interface AlertUser {
 
 /**
  * Core job logic - extracted so GET and POST can both use it
+ *
+ * Processes TWO groups of users:
+ * 1. Users with alert_frequency='weekly' (explicitly chose weekly)
+ * 2. Free tier users with alert_frequency='daily' (skipped by daily-alerts cron)
  */
 async function runWeeklyAlertJob(): Promise<NextResponse> {
   try {
     console.log('[Weekly Alerts] Starting weekly alert job...');
 
-    // Get all active alert users
-    const { data: users, error: usersError } = await supabase
+    // Get all active alert users who want alerts (weekly OR daily)
+    // Daily-alerts cron skips free tier users, so we include them here
+    const { data: allUsers, error: usersError } = await supabase
       .from('user_notification_settings')
       .select('*')
       .eq('is_active', true)
-      .eq('alert_frequency', 'weekly');
+      .eq('alerts_enabled', true);
 
     if (usersError) {
       console.error('[Weekly Alerts] Error fetching users:', usersError);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
-    if (!users || users.length === 0) {
+    if (!allUsers || allUsers.length === 0) {
       console.log('[Weekly Alerts] No active alert users found');
       return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
     }
 
-    console.log(`[Weekly Alerts] Processing ${users.length} users...`);
+    // Refresh buyer cache first
+    buyerEmailsCache = null;
+    await fetchBuyerEmails();
+
+    // Filter to:
+    // 1. Users who chose weekly
+    // 2. Free tier users (no product purchase) regardless of preference
+    const users: AlertUser[] = [];
+    for (const user of allUsers) {
+      const { tier } = await getAlertLimit(user.user_email);
+
+      // Include if explicitly weekly OR free tier
+      if (user.alert_frequency === 'weekly' || tier === 'free') {
+        users.push(user as AlertUser);
+      }
+    }
+
+    if (users.length === 0) {
+      console.log('[Weekly Alerts] No users to process after tier filtering');
+      return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
+    }
+
+    console.log(`[Weekly Alerts] Processing ${users.length} users (includes free tier daily users)...`);
 
     const samApiKey = process.env.SAM_API_KEY;
     if (!samApiKey) {
@@ -445,6 +472,21 @@ async function sendAlertEmail(
       <a href="${briefingsUpgradeUrl}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
         Upgrade to Daily Briefings - $19/mo
       </a>
+    </div>
+
+    <!-- Feedback Section -->
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 16px 20px; margin-top: 25px; text-align: center;">
+      <p style="color: #166534; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
+        Was this weekly digest helpful?
+      </p>
+      <div>
+        <a href="https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=weekly_digest" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+          👍 Yes
+        </a>
+        <a href="https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=weekly_digest" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+          👎 No
+        </a>
+      </div>
     </div>
   </div>
 

@@ -56,3 +56,15 @@ export type {
   ContractorSearchParams,
   ContractorSearchResult,
 } from './contractor-db';
+
+// Grants.gov Pipeline
+export {
+  searchGrants,
+  searchGrantsByNAICS,
+  scoreGrant,
+} from './grants-gov';
+export type {
+  GrantOpportunity,
+  GrantSearchParams,
+  GrantSearchResult,
+} from './grants-gov';

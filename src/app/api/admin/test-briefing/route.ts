@@ -32,36 +32,32 @@ export async function GET(request: NextRequest) {
   );
 
   try {
-    // Ensure user has a briefing profile (auto-create default if missing)
+    // Ensure user has a notification settings profile (auto-create default if missing)
     const { data: existingProfile } = await supabase
-      .from('user_briefing_profile')
+      .from('user_notification_settings')
       .select('user_email')
       .eq('user_email', email)
       .single();
 
     if (!existingProfile) {
-      console.log(`[TestBriefing] Creating default briefing profile for ${email}`);
-      const defaultProfile = {
-        naics_codes: ['541512', '541511', '541519', '541513', '541330'],
-        agencies: [
-          'Department of Defense',
-          'Department of Homeland Security',
-          'Department of Veterans Affairs',
-          'General Services Administration',
-          'Department of Health and Human Services',
-        ],
-        keywords: ['cybersecurity', 'IT modernization', 'cloud', 'data analytics', 'small business'],
-        zip_codes: [],
-        watched_companies: [],
-        watched_contracts: [],
-      };
+      console.log(`[TestBriefing] Creating default notification profile for ${email}`);
+      const defaultNaics = ['541512', '541511', '541519', '541513', '541330'];
+      const defaultAgencies = [
+        'Department of Defense',
+        'Department of Homeland Security',
+        'Department of Veterans Affairs',
+        'General Services Administration',
+        'Department of Health and Human Services',
+      ];
 
-      await supabase.from('user_briefing_profile').upsert({
+      await supabase.from('user_notification_settings').upsert({
         user_email: email,
-        aggregated_profile: defaultProfile,
-        naics_codes: defaultProfile.naics_codes,
-        agencies: defaultProfile.agencies,
-        keywords: defaultProfile.keywords,
+        naics_codes: defaultNaics,
+        agencies: defaultAgencies,
+        keywords: ['cybersecurity', 'IT modernization', 'cloud', 'data analytics'],
+        alerts_enabled: true,
+        briefings_enabled: true,
+        is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_email' });

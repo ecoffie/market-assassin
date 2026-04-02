@@ -1,6 +1,56 @@
 # GovCon Giants - Current Tasks
 
-## Session State (March 29, 2026)
+## Session State (March 30, 2026)
+
+### 🎯 PRIORITY: JTED 2026 Companion Guide & Landing Page
+
+**Event:** JTED 2026 AEC Industry Day at MacDill AFB — April 1, 2026
+
+**Full plan saved at:** `presentations/JTED-2026-PLAN.md`
+
+#### Completed Tasks (Session 36 - March 30, 2026)
+- [x] Pulled real expiring contract data from USASpending for 10 A/E/C contracts ($10B+ combined)
+- [x] Created JTED Intel Pack HTML guide (`presentations/JTED-2026-Intel-Pack.html`)
+- [x] Exported Intel Pack to PDF (`JTED-2026-Intel-Pack.pdf`)
+- [x] Exported presentation slides to PDF (`JTED-2026-Slides.pdf`)
+- [x] Created landing page at `/jted-2026` on govcon-funnels
+- [x] Created thank-you page with download links at `/jted-2026/thank-you`
+- [x] QR code slide already in presentation (slide 97) pointing to govcongiants.org/jted-2026
+
+#### Pending: Deploy
+- [ ] Deploy govcon-funnels to make /jted-2026 live
+
+#### Guide Sections (Actionable Intel - NOT a copy of slides)
+1. **10 Expiring A/E/C Contracts** — Daily briefing format with incumbent, value, why vulnerable
+2. **5 Teaming Plays** — Specific primes to approach with suggested openers
+3. **How to Set Up SAM.gov Alerts** — Step-by-step with screenshots
+4. **How to Track Recompetes** — USASpending.gov walkthrough
+5. **Top 5 SAT Agencies for Construction** — With search prefixes
+6. **Sources Sought Response Template** — Copy-paste template
+7. **IDIQ/MACC Vehicles Open for Bid** — Air Force RAES, NAVFAC MACC II, etc.
+8. **AI Prompts for GovCon** — 4 copy-paste prompts
+9. **Glossary & Resources**
+
+#### Downloads (Landing Page)
+1. A/E/C Federal Intel Pack (actionable guide)
+2. Presentation Slides PDF (separate file)
+
+#### Presentation Status
+- **File:** `presentations/JTED-2026-Revised.html` (98 slides)
+- **PDF:** `presentations/JTED-2026-Slides.pdf` (also in govcon-funnels/public/downloads/)
+- **Completed:** Full content, QR code slide, SAM alerts, recompete tracking, all sections
+
+#### Intel Pack Status
+- **HTML:** `presentations/JTED-2026-Intel-Pack.html` (10 sections of actionable intel)
+- **PDF:** `presentations/JTED-2026-Intel-Pack.pdf` (also in govcon-funnels/public/downloads/)
+- **Contents:** 10 expiring contracts, 5 teaming plays, SAM alerts guide, Sources Sought template, AI prompts, glossary
+
+#### Landing Page Status
+- **URL:** govcongiants.org/jted-2026
+- **Thank You:** govcongiants.org/jted-2026/thank-you (with download links)
+- **Source tag:** `jted-2026-landing`
+
+---
 
 ### 🔔 REMINDER: Batch Enroll Bootcamp Attendees (April 12-19, 2026)
 

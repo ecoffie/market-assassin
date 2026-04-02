@@ -32,9 +32,9 @@ export async function GET(request: NextRequest) {
   const today = new Date().toISOString().split('T')[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
-  // 1. Get user profile
+  // 1. Get user profile from unified table
   const { data: profile, error: profileError } = await supabase
-    .from('user_briefing_profile')
+    .from('user_notification_settings')
     .select('*')
     .eq('user_email', email)
     .single();

@@ -228,16 +228,9 @@ export async function searchUSASpendingAwards(
     }];
   }
 
-  // Expiration filter - contracts ending within N days
-  if (params.expiresWithinDays) {
-    const today = new Date();
-    const future = new Date(today.getTime() + params.expiresWithinDays * 24 * 60 * 60 * 1000);
-    filters.time_period = [{
-      date_type: 'date_signed', // USASpending doesn't have direct end_date filter in search
-      start_date: today.toISOString().split('T')[0],
-      end_date: future.toISOString().split('T')[0]
-    }];
-  }
+  // NOTE: USASpending search API doesn't support filtering by end_date directly
+  // We'll fetch recent contracts and filter client-side by daysUntilExpiration
+  // The expiresWithinDays param is handled in the transform step below
 
   // Competition filter
   if (params.extentCompeted) {
@@ -331,8 +324,18 @@ export async function searchUSASpendingAwards(
       })
     );
 
+    // Apply client-side expiration filter if requested
+    let filteredContracts = contractsWithDetails;
+    if (params.expiresWithinDays) {
+      filteredContracts = contractsWithDetails.filter(c => {
+        const days = c.daysUntilExpiration || 999;
+        return days > 0 && days <= params.expiresWithinDays!;
+      });
+      console.log(`[USASpending] Filtered to ${filteredContracts.length} contracts expiring within ${params.expiresWithinDays} days`);
+    }
+
     return {
-      contracts: contractsWithDetails,
+      contracts: filteredContracts,
       totalCount: data.page_metadata?.total || results.length,
       page,
       pageSize: size,

@@ -91,20 +91,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Source 2: user_alert_settings
-    const { data: alertSettings, error: alertError } = await supabase
-      .from('user_alert_settings')
-      .select('user_email, naics_codes, target_agencies')
-      .eq('is_active', true)
-      .eq('briefings_enabled', true);
+    // Source 2: smart_user_profiles (users from search history aggregation)
+    const { data: smartProfiles, error: smartError } = await supabase
+      .from('smart_user_profiles')
+      .select('email, naics_codes, agencies')
+      .limit(200);
 
-    if (alertError) {
-      console.error('[Cron] Error fetching alert_settings:', alertError);
+    if (smartError) {
+      console.error('[Cron] Error fetching smart_user_profiles:', smartError);
     }
 
-    if (alertSettings) {
-      for (const u of alertSettings) {
-        const email = u.user_email?.toLowerCase();
+    if (smartProfiles) {
+      for (const u of smartProfiles) {
+        const email = u.email?.toLowerCase();
         if (!email || seenEmails.has(email)) continue;
         seenEmails.add(email);
 
@@ -116,9 +115,9 @@ export async function GET(request: NextRequest) {
         allUsers.push({
           user_email: email,
           naics_codes: naics,
-          agencies: Array.isArray(u.target_agencies) ? u.target_agencies : [],
+          agencies: Array.isArray(u.agencies) ? u.agencies : [],
           watched_companies: [],
-          source: 'alert_settings',
+          source: 'alert_settings' as const,
         });
       }
     }

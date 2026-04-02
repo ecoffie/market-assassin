@@ -67,7 +67,11 @@ interface AlertSettings {
   businessType: string | null;
   targetAgencies: string[];
   locationState: string | null;
+  locationStates: string[] | null; // Multi-state support
+  alertsEnabled: boolean;
   frequency: string;
+  briefingsEnabled: boolean;
+  briefingFrequency: string;
   timezone: string;
   isActive: boolean;
   lastAlertSent: string | null;
@@ -90,8 +94,33 @@ function AlertPreferencesContent() {
   const [naicsInput, setNaicsInput] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
+  const [locationState, setLocationState] = useState('');
+  const [locationStates, setLocationStates] = useState<string[]>([]); // Multi-state support
+  const [showStateSelector, setShowStateSelector] = useState(false);
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'paused'>('daily');
   const [briefingsEnabled, setBriefingsEnabled] = useState(true);
+
+  // US States for location filter
+  const US_STATES = [
+    { value: '', label: 'All States (Nationwide)' },
+    { value: 'AL', label: 'Alabama' }, { value: 'AK', label: 'Alaska' }, { value: 'AZ', label: 'Arizona' },
+    { value: 'AR', label: 'Arkansas' }, { value: 'CA', label: 'California' }, { value: 'CO', label: 'Colorado' },
+    { value: 'CT', label: 'Connecticut' }, { value: 'DE', label: 'Delaware' }, { value: 'DC', label: 'Washington DC' },
+    { value: 'FL', label: 'Florida' }, { value: 'GA', label: 'Georgia' }, { value: 'HI', label: 'Hawaii' },
+    { value: 'ID', label: 'Idaho' }, { value: 'IL', label: 'Illinois' }, { value: 'IN', label: 'Indiana' },
+    { value: 'IA', label: 'Iowa' }, { value: 'KS', label: 'Kansas' }, { value: 'KY', label: 'Kentucky' },
+    { value: 'LA', label: 'Louisiana' }, { value: 'ME', label: 'Maine' }, { value: 'MD', label: 'Maryland' },
+    { value: 'MA', label: 'Massachusetts' }, { value: 'MI', label: 'Michigan' }, { value: 'MN', label: 'Minnesota' },
+    { value: 'MS', label: 'Mississippi' }, { value: 'MO', label: 'Missouri' }, { value: 'MT', label: 'Montana' },
+    { value: 'NE', label: 'Nebraska' }, { value: 'NV', label: 'Nevada' }, { value: 'NH', label: 'New Hampshire' },
+    { value: 'NJ', label: 'New Jersey' }, { value: 'NM', label: 'New Mexico' }, { value: 'NY', label: 'New York' },
+    { value: 'NC', label: 'North Carolina' }, { value: 'ND', label: 'North Dakota' }, { value: 'OH', label: 'Ohio' },
+    { value: 'OK', label: 'Oklahoma' }, { value: 'OR', label: 'Oregon' }, { value: 'PA', label: 'Pennsylvania' },
+    { value: 'RI', label: 'Rhode Island' }, { value: 'SC', label: 'South Carolina' }, { value: 'SD', label: 'South Dakota' },
+    { value: 'TN', label: 'Tennessee' }, { value: 'TX', label: 'Texas' }, { value: 'UT', label: 'Utah' },
+    { value: 'VT', label: 'Vermont' }, { value: 'VA', label: 'Virginia' }, { value: 'WA', label: 'Washington' },
+    { value: 'WV', label: 'West Virginia' }, { value: 'WI', label: 'Wisconsin' }, { value: 'WY', label: 'Wyoming' },
+  ];
 
   // Helper to filter NAICS codes (only numeric values)
   const cleanNaicsCodes = (codes: string[]): string[] => {
@@ -120,12 +149,19 @@ function AlertPreferencesContent() {
         setNaicsInput(cleanedNaics.join(', '));
         setKeywordsInput(data.data.keywords?.join(', ') || '');
         setBusinessType(data.data.businessType || '');
-        // Map isActive + frequency to our new frequency state
-        if (!data.data.isActive) {
+        setLocationState(data.data.locationState || '');
+        // Load multi-state selection (new feature)
+        const savedStates = data.data.locationStates || (data.data.locationState ? [data.data.locationState] : []);
+        setLocationStates(savedStates);
+
+        // Map isActive + alertsEnabled to our frequency state
+        // Priority: isActive=false means paused, then check alertsEnabled and frequency
+        if (!data.data.isActive || !data.data.alertsEnabled) {
           setFrequency('paused');
         } else {
           setFrequency(data.data.frequency === 'weekly' ? 'weekly' : 'daily');
         }
+
         // Load briefings enabled from API
         setBriefingsEnabled(data.data.briefingsEnabled ?? true);
       } else {
@@ -172,7 +208,10 @@ function AlertPreferencesContent() {
           naicsCodes,
           keywords,
           businessType: businessType || null,
+          locationState: locationStates[0] || locationState || null, // Primary state for legacy
+          locationStates: locationStates.length > 0 ? locationStates : (locationState ? [locationState] : []),
           frequency: frequency,
+          alertsEnabled: frequency !== 'paused',
           isActive: frequency !== 'paused',
           briefingsEnabled: briefingsEnabled,
         }),
@@ -568,6 +607,174 @@ function AlertPreferencesContent() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Location States - Multi-Select with Smart Expansion */}
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    📍 Place of Performance
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Select multiple states. We auto-expand to include bordering states + DC.
+                  </p>
+
+                  {/* Selected states chips */}
+                  {locationStates.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {locationStates.map((state) => {
+                        const stateLabel = US_STATES.find(s => s.value === state)?.label || state;
+                        return (
+                          <span
+                            key={state}
+                            className="inline-flex items-center gap-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full px-2.5 py-1 text-xs"
+                          >
+                            <span className="text-white font-medium">{stateLabel}</span>
+                            <button
+                              type="button"
+                              onClick={() => setLocationStates(locationStates.filter(s => s !== state))}
+                              className="text-emerald-400 hover:text-red-400 ml-1"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+                      {locationStates.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setLocationStates([])}
+                          className="text-xs text-slate-500 hover:text-red-400 px-2"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add state dropdown */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowStateSelector(!showStateSelector)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-left text-white focus:outline-none focus:ring-2 focus:ring-red-500 flex items-center justify-between"
+                    >
+                      <span className={locationStates.length === 0 ? 'text-slate-500' : 'text-white'}>
+                        {locationStates.length === 0 ? 'All States (Nationwide)' : `${locationStates.length} state${locationStates.length > 1 ? 's' : ''} selected`}
+                      </span>
+                      <span className="text-slate-400">{showStateSelector ? '▲' : '▼'}</span>
+                    </button>
+
+                    {showStateSelector && (
+                      <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                        {/* Nationwide option */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLocationStates([]);
+                            setShowStateSelector(false);
+                          }}
+                          className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 ${
+                            locationStates.length === 0 ? 'bg-red-500/20 text-red-400' : 'text-slate-300'
+                          }`}
+                        >
+                          ✓ All States (Nationwide)
+                        </button>
+                        <div className="border-t border-slate-700" />
+                        {/* State list */}
+                        {US_STATES.filter(s => s.value !== '').map((state) => (
+                          <button
+                            key={state.value}
+                            type="button"
+                            onClick={() => {
+                              if (locationStates.includes(state.value)) {
+                                setLocationStates(locationStates.filter(s => s !== state.value));
+                              } else {
+                                setLocationStates([...locationStates, state.value]);
+                              }
+                            }}
+                            className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-700 flex items-center justify-between ${
+                              locationStates.includes(state.value) ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300'
+                            }`}
+                          >
+                            <span>{state.label}</span>
+                            {locationStates.includes(state.value) && <span>✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick region buttons */}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLocationStates(['FL', 'GA', 'AL', 'SC', 'NC', 'TN'])}
+                      className="text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600"
+                    >
+                      Southeast
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocationStates(['VA', 'MD', 'DC', 'WV', 'DE', 'PA', 'NJ'])}
+                      className="text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600"
+                    >
+                      Mid-Atlantic
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocationStates(['TX', 'OK', 'AR', 'LA', 'NM'])}
+                      className="text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600"
+                    >
+                      Southwest
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocationStates(['CA', 'OR', 'WA', 'NV', 'AZ'])}
+                      className="text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600"
+                    >
+                      West Coast
+                    </button>
+                  </div>
+
+                  {/* Smart expansion preview */}
+                  {locationStates.length > 0 && (
+                    <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                      <p className="text-xs text-emerald-400 font-medium mb-1">
+                        🎯 Smart Expansion Active
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {(() => {
+                          const borders: Record<string, string[]> = {
+                            FL: ['AL', 'GA'], GA: ['AL', 'FL', 'NC', 'SC', 'TN'], TX: ['AR', 'LA', 'NM', 'OK'],
+                            CA: ['AZ', 'NV', 'OR'], NY: ['CT', 'MA', 'NJ', 'PA', 'VT'], VA: ['DC', 'KY', 'MD', 'NC', 'TN', 'WV'],
+                            NC: ['GA', 'SC', 'TN', 'VA'], PA: ['DE', 'MD', 'NJ', 'NY', 'OH', 'WV'], OH: ['IN', 'KY', 'MI', 'PA', 'WV'],
+                            IL: ['IA', 'IN', 'KY', 'MO', 'WI'], MI: ['IN', 'OH', 'WI'], NJ: ['DE', 'NY', 'PA'],
+                            MD: ['DC', 'DE', 'PA', 'VA', 'WV'], AZ: ['CA', 'CO', 'NM', 'NV', 'UT'], CO: ['AZ', 'KS', 'NE', 'NM', 'OK', 'UT', 'WY'],
+                            AL: ['FL', 'GA', 'MS', 'TN'], SC: ['GA', 'NC'], TN: ['AL', 'AR', 'GA', 'KY', 'MO', 'MS', 'NC', 'VA'],
+                            AR: ['LA', 'MO', 'MS', 'OK', 'TN', 'TX'], LA: ['AR', 'MS', 'TX'], NM: ['AZ', 'CO', 'OK', 'TX', 'UT'],
+                            OK: ['AR', 'CO', 'KS', 'MO', 'NM', 'TX'], NV: ['AZ', 'CA', 'ID', 'OR', 'UT'], OR: ['CA', 'ID', 'NV', 'WA'],
+                            WA: ['ID', 'OR'], DC: ['MD', 'VA'], WV: ['KY', 'MD', 'OH', 'PA', 'VA'], DE: ['MD', 'NJ', 'PA'],
+                          };
+                          const stateNames: Record<string, string> = {
+                            FL: 'FL', GA: 'GA', TX: 'TX', CA: 'CA', NY: 'NY', VA: 'VA', NC: 'NC', PA: 'PA', OH: 'OH', IL: 'IL',
+                            MI: 'MI', NJ: 'NJ', MD: 'MD', AZ: 'AZ', CO: 'CO', AL: 'AL', SC: 'SC', TN: 'TN', AR: 'AR', LA: 'LA',
+                            NM: 'NM', OK: 'OK', NV: 'NV', OR: 'OR', CT: 'CT', MA: 'MA', VT: 'VT', DC: 'DC', KY: 'KY', WV: 'WV',
+                            IN: 'IN', WI: 'WI', MO: 'MO', IA: 'IA', DE: 'DE', KS: 'KS', NE: 'NE', UT: 'UT', WY: 'WY', WA: 'WA',
+                            ID: 'ID', MS: 'MS',
+                          };
+                          // Collect all border states for selected states
+                          const allBorders = new Set<string>();
+                          locationStates.forEach(state => {
+                            (borders[state] || []).forEach(b => allBorders.add(b));
+                          });
+                          allBorders.add('DC'); // Always include DC
+                          // Combine selected + borders
+                          const allStates = [...new Set([...locationStates, ...allBorders])].sort();
+                          return `Searching ${allStates.length} states: ${allStates.slice(0, 10).map(s => stateNames[s] || s).join(', ')}${allStates.length > 10 ? '...' : ''}`;
+                        })()}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
               </div>

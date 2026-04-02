@@ -13,10 +13,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { generateAIBriefing, AIGeneratedBriefing } from '@/lib/briefings/delivery/ai-briefing-generator';
+import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-template';
+import { sendEmail } from '@/lib/send-email';
 import {
-  generateBriefing,
-  deliverBriefing,
-} from '@/lib/briefings/delivery';
+  IntelligenceMetrics,
+  logIntelligenceDelivery,
+  GuardrailMonitor,
+  CircuitBreaker,
+  postSendValidation,
+} from '@/lib/intelligence';
 
 const BATCH_SIZE = 10;
 const MAX_USERS_PER_RUN = 200;
@@ -90,6 +96,24 @@ export async function GET(request: NextRequest) {
   let briefingsFailed = 0;
   let briefingsSkipped = 0;
   const errors: string[] = [];
+
+  // Initialize metrics and guardrails
+  const metrics = new IntelligenceMetrics('briefings');
+  const guardrail = new GuardrailMonitor('send-briefings');
+  const circuitBreaker = new CircuitBreaker('send-briefings');
+
+  // Check circuit breaker (skip for test mode)
+  if (!testEmail) {
+    const isOpen = await circuitBreaker.isOpen();
+    if (isOpen) {
+      console.log('[SendBriefings] Circuit breaker OPEN - skipping this run');
+      return NextResponse.json({
+        success: false,
+        error: 'Circuit breaker open - too many recent failures',
+        message: 'System paused due to high failure rate. Will auto-reset in 30 minutes.',
+      }, { status: 503 });
+    }
+  }
 
   console.log('[SendBriefings] Starting daily briefing delivery (FREE FOR ALL)...');
 
@@ -233,6 +257,14 @@ export async function GET(request: NextRequest) {
 
       const batchPromises = batch.map(async (user) => {
         try {
+          // Check guardrails before processing each user
+          const guardrailCheck = guardrail.check();
+          if (!guardrailCheck.continue) {
+            console.log(`[SendBriefings] Guardrail blocked: ${guardrailCheck.reason}`);
+            briefingsSkipped++;
+            return;
+          }
+
           // Check timezone (skip if not delivery time, unless test mode)
           if (!testEmail && !isDeliveryTimeForTimezone(user.timezone)) {
             console.log(`[SendBriefings] ${user.email} timezone ${user.timezone || 'ET'} - not delivery time, skipping`);
@@ -255,26 +287,29 @@ export async function GET(request: NextRequest) {
             return;
           }
 
-          // Generate briefing
-          const briefing = await generateBriefing(user.email, {
-            includeWebIntel: true,
-            maxItems: 15,
+          // Generate AI-powered briefing (Top 10 + 3 Teaming Plays)
+          const briefing = await generateAIBriefing(user.email, {
+            maxOpportunities: 10,
+            maxTeamingPlays: 3,
           });
 
-          if (!briefing || briefing.totalItems === 0) {
-            console.log(`[SendBriefings] No items for ${user.email}`);
+          if (!briefing || briefing.opportunities.length === 0) {
+            console.log(`[SendBriefings] No opportunities for ${user.email}`);
             briefingsSkipped++;
             return;
           }
+
+          const briefingDate = new Date().toISOString().split('T')[0];
+          const totalItems = briefing.opportunities.length + briefing.teamingPlays.length;
 
           // Persist briefing to briefing_log
           try {
             await supabase.from('briefing_log').upsert({
               user_email: user.email,
-              briefing_date: briefing.briefingDate,
+              briefing_date: briefingDate,
               briefing_content: briefing,
-              items_count: briefing.totalItems,
-              tools_included: briefing.sourcesIncluded,
+              items_count: totalItems,
+              tools_included: ['ai_briefing', 'recompetes', 'teaming_plays'],
               delivery_status: 'pending',
               retry_count: 0,
               created_at: new Date().toISOString(),
@@ -283,42 +318,68 @@ export async function GET(request: NextRequest) {
             console.error(`[SendBriefings] Failed to log briefing for ${user.email}:`, logErr);
           }
 
-          // Determine delivery method
-          let deliveryMethod: 'email' | 'sms' | 'both' = 'email';
-          if (user.sms_enabled && user.phone_number) {
-            deliveryMethod = 'both';
-          }
+          // Generate AI email template
+          const emailTemplate = generateAIEmailTemplate(briefing);
 
-          // Deliver briefing
-          const results = await deliverBriefing(briefing, {
-            email: user.email,
-            phone: user.phone_number,
-            method: deliveryMethod,
-          });
+          // Send email (sendEmail returns boolean or throws on error)
+          try {
+            await sendEmail({
+              to: user.email,
+              subject: emailTemplate.subject,
+              html: emailTemplate.htmlBody,
+              text: emailTemplate.textBody,
+            });
 
-          const anySuccess = results.some((r) => r.success);
-          if (anySuccess) {
+            // Email sent successfully
             briefingsSent++;
-            console.log(`[SendBriefings] ✅ Sent to ${user.email}`);
+            metrics.recordEmailSent();
+            metrics.recordOpportunityMatched(totalItems);
+            guardrail.recordSuccess();
+            circuitBreaker.record(true);
+            console.log(`[SendBriefings] ✅ AI Briefing sent to ${user.email} (${briefing.opportunities.length} opps, ${briefing.teamingPlays.length} plays)`);
 
             await supabase.from('briefing_log').update({
               delivery_status: 'sent',
               email_sent_at: new Date().toISOString(),
             }).eq('user_email', user.email)
-              .eq('briefing_date', briefing.briefingDate);
-          } else {
+              .eq('briefing_date', briefingDate);
+
+            // Log to intelligence_log for tracking
+            await logIntelligenceDelivery({
+              userEmail: user.email,
+              intelligenceType: 'briefing',
+              itemsCount: totalItems,
+              itemIds: ['ai_briefing', 'recompetes', 'teaming_plays'],
+              deliveryStatus: 'sent',
+            });
+          } catch (emailErr) {
             briefingsFailed++;
-            const errorMsg = results.map(r => r.error).filter(Boolean).join(', ');
+            metrics.recordEmailFailed();
+            guardrail.recordFailure('email_send_failed');
+            circuitBreaker.record(false);
+            const errorMsg = emailErr instanceof Error ? emailErr.message : 'Unknown email error';
             errors.push(`${user.email}: ${errorMsg}`);
 
             await supabase.from('briefing_log').update({
               delivery_status: 'failed',
               error_message: errorMsg,
             }).eq('user_email', user.email)
-              .eq('briefing_date', briefing.briefingDate);
+              .eq('briefing_date', briefingDate);
+
+            // Log failed delivery
+            await logIntelligenceDelivery({
+              userEmail: user.email,
+              intelligenceType: 'briefing',
+              itemsCount: 0,
+              deliveryStatus: 'failed',
+              errorMessage: errorMsg,
+            });
           }
         } catch (err) {
           briefingsFailed++;
+          metrics.recordEmailFailed();
+          guardrail.recordFailure('processing_error');
+          circuitBreaker.record(false);
           const errorMsg = `Error processing ${user.email}: ${err}`;
           console.error(`[SendBriefings] ${errorMsg}`);
           errors.push(errorMsg);
@@ -333,6 +394,23 @@ export async function GET(request: NextRequest) {
       `[SendBriefings] Complete: ${briefingsSent} sent, ${briefingsSkipped} skipped, ${briefingsFailed} failed, ${elapsed}ms`
     );
 
+    // Save metrics to database
+    try {
+      await metrics.save();
+      console.log('[SendBriefings] Metrics saved');
+    } catch (metricsErr) {
+      console.error('[SendBriefings] Failed to save metrics:', metricsErr);
+    }
+
+    // Post-send validation (checks failure rates, may trip circuit breaker)
+    await postSendValidation('send-briefings', {
+      attempted: briefingsSent + briefingsFailed,
+      sent: briefingsSent,
+      failed: briefingsFailed,
+      failedRecipients: errors.slice(0, 10).map(e => e.split(':')[0]),
+      duration: elapsed,
+    });
+
     return NextResponse.json({
       success: true,
       briefingsSent,
@@ -342,9 +420,19 @@ export async function GET(request: NextRequest) {
       retryResults,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       elapsed,
+      guardrailStatus: guardrail.check(),
     });
   } catch (error) {
     console.error('[SendBriefings] Fatal error:', error);
+
+    // Record fatal error in metrics
+    metrics.recordEmailFailed();
+    try {
+      await metrics.save();
+    } catch {
+      // Ignore metrics save failure on fatal error
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -385,33 +473,34 @@ async function retryFailedBriefings(supabase: any): Promise<{ retried: number; s
     try {
       if (!briefing.briefing_content) continue;
 
-      // Re-deliver
-      const deliveryResults = await deliverBriefing(briefing.briefing_content, {
-        email: briefing.user_email,
-        method: 'email',
+      // Re-generate email template from stored briefing content
+      const emailTemplate = generateAIEmailTemplate(briefing.briefing_content as AIGeneratedBriefing);
+
+      // Re-send email (sendEmail returns boolean or throws)
+      await sendEmail({
+        to: briefing.user_email,
+        subject: emailTemplate.subject,
+        html: emailTemplate.htmlBody,
+        text: emailTemplate.textBody,
       });
 
-      if (deliveryResults.some(r => r.success)) {
-        await supabase.from('briefing_log').update({
-          delivery_status: 'sent',
-          email_sent_at: new Date().toISOString(),
-          error_message: null,
-        }).eq('id', briefing.id);
-
-        results.succeeded++;
-        console.log(`[SendBriefings] Retry succeeded for ${briefing.user_email}`);
-      } else {
-        await supabase.from('briefing_log').update({
-          retry_count: (briefing.retry_count || 0) + 1,
-        }).eq('id', briefing.id);
-      }
-    } catch (err: any) {
+      // Email sent successfully
       await supabase.from('briefing_log').update({
-        retry_count: (briefing.retry_count || 0) + 1,
-        error_message: err.message,
+        delivery_status: 'sent',
+        email_sent_at: new Date().toISOString(),
+        error_message: null,
       }).eq('id', briefing.id);
 
-      console.error(`[SendBriefings] Retry failed for ${briefing.user_email}:`, err.message);
+      results.succeeded++;
+      console.log(`[SendBriefings] Retry succeeded for ${briefing.user_email}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      await supabase.from('briefing_log').update({
+        retry_count: (briefing.retry_count || 0) + 1,
+        error_message: errorMessage,
+      }).eq('id', briefing.id);
+
+      console.error(`[SendBriefings] Retry failed for ${briefing.user_email}:`, errorMessage);
     }
   }
 

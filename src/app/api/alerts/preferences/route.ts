@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
         businessType: data.business_type,
         targetAgencies: data.agencies || [],
         locationState: data.location_state,
+        locationStates: data.location_states || (data.location_state ? [data.location_state] : []),
         // Alerts
         alertsEnabled: data.alerts_enabled,
         frequency: data.alert_frequency,
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
       businessType,
       targetAgencies,
       locationState,
+      locationStates, // Multi-state support
       // Master switch
       isActive,
     } = body;
@@ -223,6 +225,11 @@ export async function POST(request: NextRequest) {
 
     if (locationState !== undefined) {
       record.location_state = locationState || null;
+    }
+
+    if (locationStates !== undefined) {
+      // Store as JSON array of state codes
+      record.location_states = Array.isArray(locationStates) ? locationStates : [];
     }
 
     let data;

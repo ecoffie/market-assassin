@@ -188,20 +188,26 @@ export async function generateWeeklyBriefing(
   monday.setDate(today.getDate() - today.getDay() + 1);
   const weekOf = monday.toISOString().split('T')[0];
 
+  // Fallback NAICS codes for users without profile data
+  const FALLBACK_NAICS = ['541512', '541611', '541330', '541990', '561210'];
+
   try {
-    // Get user profile
+    // Get user profile from unified table
     const { data: profileData } = await supabase
-      .from('user_briefing_profile')
-      .select('aggregated_profile, naics_codes, agencies, keywords, watched_companies')
+      .from('user_notification_settings')
+      .select('aggregated_profile, naics_codes, agencies, keywords')
       .eq('user_email', userEmail)
       .single();
 
-    if (!profileData) {
-      console.log(`[WeeklyBriefing] No profile for ${userEmail}`);
-      return null;
-    }
+    // Use fallback if no profile
+    const effectiveProfile = profileData || {
+      naics_codes: FALLBACK_NAICS,
+      agencies: [],
+      keywords: [],
+      aggregated_profile: null,
+    };
 
-    const profile = buildProfile(profileData);
+    const profile = buildProfile(effectiveProfile);
 
     // Get last 7 days of snapshots
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];

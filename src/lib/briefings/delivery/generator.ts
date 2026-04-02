@@ -88,44 +88,48 @@ export async function generateBriefing(
 
   const briefingDate = new Date().toISOString().split('T')[0];
 
-  try {
-    // Step 1: Get user profile (check user_briefing_profile first, fallback to user_notification_settings)
-    let profileData = null;
+  // Fallback NAICS codes for users without profile data
+  const FALLBACK_NAICS = [
+    '541512', // Computer Systems Design
+    '541611', // Management Consulting
+    '541330', // Engineering Services
+    '541990', // Other Professional Services
+    '561210', // Facilities Support Services
+  ];
 
-    // Try user_briefing_profile first
-    const { data: briefingProfile } = await supabase
-      .from('user_briefing_profile')
-      .select('aggregated_profile, naics_codes, agencies, keywords, zip_codes, watched_companies, watched_contracts')
+  try {
+    // Step 1: Get user profile from unified user_notification_settings table
+    const { data: notificationSettings } = await supabase
+      .from('user_notification_settings')
+      .select('naics_codes, agencies, keywords, aggregated_profile')
       .eq('user_email', userEmail)
       .single();
 
-    if (briefingProfile) {
-      profileData = briefingProfile;
+    let profileData;
+
+    if (notificationSettings) {
+      console.log(`[BriefingGen] Found profile for ${userEmail}`);
+      profileData = {
+        naics_codes: notificationSettings.naics_codes || [],
+        agencies: notificationSettings.agencies || [],
+        keywords: notificationSettings.keywords || [],
+        zip_codes: [],
+        watched_companies: [],
+        watched_contracts: [],
+        aggregated_profile: notificationSettings.aggregated_profile,
+      };
     } else {
-      // Fallback to user_notification_settings (where alert preferences are stored)
-      const { data: notificationSettings } = await supabase
-        .from('user_notification_settings')
-        .select('naics_codes, agencies, keywords')
-        .eq('user_email', userEmail)
-        .single();
-
-      if (notificationSettings) {
-        console.log(`[BriefingGen] Using notification settings for ${userEmail}`);
-        profileData = {
-          naics_codes: notificationSettings.naics_codes || [],
-          agencies: notificationSettings.agencies || [],
-          keywords: notificationSettings.keywords || [],
-          zip_codes: [],
-          watched_companies: [],
-          watched_contracts: [],
-          aggregated_profile: null,
-        };
-      }
-    }
-
-    if (!profileData) {
-      console.log(`[BriefingGen] No profile for ${userEmail}`);
-      return null;
+      // No profile - use fallback NAICS
+      console.log(`[BriefingGen] No profile for ${userEmail}, using fallback NAICS`);
+      profileData = {
+        naics_codes: FALLBACK_NAICS,
+        agencies: [],
+        keywords: [],
+        zip_codes: [],
+        watched_companies: [],
+        watched_contracts: [],
+        aggregated_profile: null,
+      };
     }
 
     // Use aggregated_profile JSONB if populated, otherwise build from individual columns
@@ -147,10 +151,10 @@ export async function generateBriefing(
 
     const userProfile = buildUserProfile(profileSource as Record<string, unknown>);
 
-    // Check if profile has any meaningful data
+    // Check if profile has any meaningful data - use fallback if empty
     if (userProfile.naics_codes.length === 0 && userProfile.agencies.length === 0 && userProfile.keywords.length === 0) {
-      console.log(`[BriefingGen] Empty profile for ${userEmail} — no NAICS, agencies, or keywords`);
-      return null;
+      console.log(`[BriefingGen] Empty profile for ${userEmail}, using fallback NAICS`);
+      userProfile.naics_codes = FALLBACK_NAICS;
     }
 
     // Step 2: Get today's and yesterday's snapshots
@@ -170,6 +174,25 @@ export async function generateBriefing(
     // Organize snapshots by tool and date
     const snapshotsByTool = organizeSnapshots(snapshots || []);
 
+    // Step 2.5: Fetch LIVE recompete data if snapshots are empty (fallback)
+    let recompetesToday = (snapshotsByTool.recompetes?.today || []) as RecompeteContract[];
+    if (recompetesToday.length === 0 && userProfile.naics_codes.length > 0) {
+      console.log(`[BriefingGen] No recompete snapshots, fetching live data for ${userEmail}`);
+      try {
+        const { fetchRecompetesForUser } = await import('../pipelines/fpds-recompete');
+        const liveResult = await fetchRecompetesForUser({
+          naics_codes: userProfile.naics_codes.slice(0, 5), // Limit to 5 NAICS for speed
+          agencies: userProfile.agencies,
+          watched_companies: [],
+          watched_contracts: [],
+        });
+        recompetesToday = liveResult.contracts;
+        console.log(`[BriefingGen] Fetched ${recompetesToday.length} live recompetes`);
+      } catch (err) {
+        console.error(`[BriefingGen] Live recompete fetch failed:`, err);
+      }
+    }
+
     // Step 3: Run diff engine
     // NOTE: SAM.gov opportunities excluded - those go to Daily Alerts
     // Briefings focus on: recompetes, awards, contractor intel, web signals
@@ -179,7 +202,7 @@ export async function generateBriefing(
         yesterday: [],
       },
       {
-        today: (snapshotsByTool.recompetes?.today || []) as RecompeteContract[],
+        today: recompetesToday,
         yesterday: (snapshotsByTool.recompetes?.yesterday || []) as RecompeteContract[],
       },
       {

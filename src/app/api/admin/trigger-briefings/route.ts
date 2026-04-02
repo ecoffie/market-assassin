@@ -27,21 +27,20 @@ export async function GET(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Get users with briefing profiles
+  // Get users with briefing profiles from unified table
   const { data: profiles, error } = await supabase
-    .from('user_briefing_profile')
-    .select('user_email, naics_codes, agencies')
-    .not('naics_codes', 'eq', '{}')
+    .from('user_notification_settings')
+    .select('user_email, naics_codes, agencies, briefings_enabled, is_active')
+    .eq('is_active', true)
+    .eq('briefings_enabled', true)
     .limit(limit);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const validProfiles = profiles?.filter(p =>
-    p.user_email &&
-    p.naics_codes?.length > 0
-  ) || [];
+  // Allow users even without NAICS (will use fallback defaults)
+  const validProfiles = profiles?.filter(p => p.user_email) || [];
 
   if (mode === 'preview') {
     return NextResponse.json({

@@ -141,20 +141,26 @@ export async function generateAIBriefing(
 
   const briefingDate = new Date().toISOString().split('T')[0];
 
+  // Fallback NAICS codes for users without profile data
+  const FALLBACK_NAICS = ['541512', '541611', '541330', '541990', '561210'];
+
   try {
-    // Step 1: Get user profile
+    // Step 1: Get user profile from unified table
     const { data: profileData } = await supabase
-      .from('user_briefing_profile')
-      .select('aggregated_profile, naics_codes, agencies, keywords, watched_companies')
+      .from('user_notification_settings')
+      .select('aggregated_profile, naics_codes, agencies, keywords')
       .eq('user_email', userEmail)
       .single();
 
-    if (!profileData) {
-      console.log(`[AIBriefingGen] No profile for ${userEmail}`);
-      return null;
-    }
+    // Use fallback if no profile
+    const effectiveProfile = profileData || {
+      naics_codes: FALLBACK_NAICS,
+      agencies: [],
+      keywords: [],
+      aggregated_profile: null,
+    };
 
-    const profile = buildProfile(profileData);
+    const profile = buildProfile(effectiveProfile);
 
     // Step 2: Get today's snapshots
     const today = new Date().toISOString().split('T')[0];

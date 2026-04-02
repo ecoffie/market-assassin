@@ -57,7 +57,8 @@ interface SAMSearchParams {
   limit?: number;
   // Opportunity types: p=presolicitation, r=sources sought, k=combined, o=solicitation
   noticeTypes?: string[];
-  state?: string; // State code for location filtering
+  state?: string; // Single state code (legacy)
+  states?: string[]; // Multiple state codes for expanded search
 }
 
 interface SAMSearchResult {
@@ -164,6 +165,7 @@ export async function fetchSamOpportunities(
     limit = 100,
     noticeTypes = [],
     state,
+    states,
   } = params;
 
   // Build base query parameters (without NAICS - we'll add per-request)
@@ -189,9 +191,12 @@ export async function fetchSamOpportunities(
     baseParams.set('poplace', zipCodes.join(','));
   }
 
-  // Add state filter
-  if (state) {
-    baseParams.set('state', state);
+  // State filter - support multiple states for expanded coverage
+  // SAM.gov API supports comma-separated state codes
+  const stateList = states || (state ? [state] : []);
+  if (stateList.length > 0) {
+    baseParams.set('state', stateList.join(','));
+    console.log(`[SAM.gov] State filter: ${stateList.join(', ')}`);
   }
 
   // Add notice types
@@ -208,8 +213,9 @@ export async function fetchSamOpportunities(
     return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
   }
 
-  // Make parallel requests for each NAICS code (limit to first 5 to avoid rate limits)
-  const codesToFetch = naicsCodes.slice(0, 5);
+  // Make parallel requests for each NAICS code (limit to 10 to balance coverage vs rate limits)
+  // Rate limit: 10 requests/minute, 1000/day - fetching 10 codes is safe
+  const codesToFetch = naicsCodes.slice(0, 10);
   console.log(`[SAM.gov] Making ${codesToFetch.length} parallel requests for: ${codesToFetch.join(', ')}`);
 
   const results = await Promise.all(
@@ -251,13 +257,14 @@ export async function fetchOpportunitiesForUser(
   apiKey: string
 ): Promise<SAMSearchResult> {
   // Build search params from user profile
+  // Expanded limits for better opportunity coverage
   const params: SAMSearchParams = {
-    naicsCodes: userProfile.naics_codes?.slice(0, 10) || [], // Limit to top 10
-    keywords: userProfile.keywords?.slice(0, 5) || [],
-    zipCodes: userProfile.zip_codes?.slice(0, 3) || [],
+    naicsCodes: userProfile.naics_codes?.slice(0, 15) || [], // Expanded from 10 to 15
+    keywords: userProfile.keywords?.slice(0, 10) || [], // Expanded from 5 to 10
+    zipCodes: userProfile.zip_codes?.slice(0, 5) || [], // Expanded from 3 to 5
     // Posted in last 30 days for better coverage
     postedFrom: getDateDaysAgo(30),
-    limit: 200,
+    limit: 300, // Increased from 200
   };
 
   return fetchSamOpportunities(params, apiKey);

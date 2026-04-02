@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
+import { searchGrantsByNAICS, scoreGrant, GrantOpportunity } from '@/lib/briefings/pipelines/grants-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import nodemailer from 'nodemailer';
+import {
+  IntelligenceMetrics,
+  logIntelligenceDelivery,
+  GuardrailMonitor,
+  CircuitBreaker,
+  postSendValidation,
+} from '@/lib/intelligence';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -56,11 +64,58 @@ interface AlertUser {
   business_type: string | null;
   agencies: string[];  // renamed from target_agencies
   location_state: string | null;
+  location_states: string[] | null; // Multi-state support
   alert_frequency: string;
   alerts_enabled: boolean;
   is_active: boolean;
   timezone?: string;
   last_alert_sent?: string;
+}
+
+// Alert tier types
+type AlertTier = 'free' | 'paid';
+
+// Products that grant paid tier (daily alerts)
+const PAID_TIER_ACCESS_FLAGS = [
+  'access_hunter_pro',       // Alert Pro subscription
+  'access_assassin_standard',
+  'access_assassin_premium',
+  'access_recompete',
+  'access_contractor_db',
+  'access_content_standard',
+  'access_content_full_fix',
+  'access_briefings',
+];
+
+/**
+ * Check if user has paid tier access (any product purchase)
+ * Free tier users should use weekly-alerts cron instead
+ */
+async function getUserAlertTier(email: string): Promise<AlertTier> {
+  try {
+    // Check user_profiles for any access flag
+    const { data: profile } = await getSupabase()
+      .from('user_profiles')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (!profile) {
+      return 'free';
+    }
+
+    // Check if user has ANY paid access flag
+    for (const flag of PAID_TIER_ACCESS_FLAGS) {
+      if ((profile as any)[flag] === true) {
+        return 'paid';
+      }
+    }
+
+    return 'free';
+  } catch (error) {
+    console.error(`[Daily Alerts] Error checking tier for ${email}:`, error);
+    return 'free'; // Default to free on error
+  }
 }
 
 interface SentOpportunity {
@@ -222,14 +277,31 @@ async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number
 }
 
 /**
- * Core job logic - FREE FOR EVERYONE (no subscription check)
+ * Core job logic - PAID TIER ONLY
+ * Free tier users are skipped (they get weekly alerts via weekly-alerts cron)
+ * Paid tier = any product purchase (MA, Recompete, Content, Database, etc.)
  */
 async function runDailyAlertJob(options?: {
   skipTimezoneCheck?: boolean;
   testEmail?: string;
 }): Promise<NextResponse> {
+  // Initialize metrics and guardrails
+  const metrics = new IntelligenceMetrics('daily_alerts');
+  const guardrails = new GuardrailMonitor('daily-alerts');
+  const circuitBreaker = new CircuitBreaker('daily-alerts');
+
+  // Check if circuit breaker is open (too many recent failures)
+  if (await circuitBreaker.isOpen()) {
+    console.error('[Daily Alerts] Circuit breaker is OPEN - skipping this run');
+    return NextResponse.json({
+      success: false,
+      error: 'Circuit breaker is open due to recent failures. Will retry in 30 minutes.',
+      circuitBreakerOpen: true,
+    }, { status: 503 });
+  }
+
   try {
-    console.log('[Daily Alerts] Starting daily alert job (FREE FOR ALL)...');
+    console.log('[Daily Alerts] Starting daily alert job (PAID TIER ONLY)...');
 
     // First, retry any failed alerts from previous runs
     const retryResults = await retryFailedAlerts();
@@ -268,6 +340,7 @@ async function runDailyAlertJob(options?: {
     }
 
     console.log(`[Daily Alerts] Processing ${users.length} daily users...`);
+    metrics.recordUserEligible(); // Track total eligible before filtering
 
     const samApiKey = process.env.SAM_API_KEY;
     if (!samApiKey) {
@@ -282,15 +355,37 @@ async function runDailyAlertJob(options?: {
       noOpps: 0,
       wrongTimezone: 0,
       deduplicated: 0,
+      freeTierSkipped: 0, // Free tier users (they get weekly alerts instead)
       errors: [] as string[],
     };
 
     for (const user of users as AlertUser[]) {
+      // Check guardrails before processing each user
+      const guardrailCheck = guardrails.check();
+      if (!guardrailCheck.continue) {
+        console.error(`[Daily Alerts] Guardrail triggered: ${guardrailCheck.reason}`);
+        await guardrails.logEvent('trip', guardrailCheck.reason!);
+        metrics.recordCircuitBreakerTripped();
+        break; // Stop processing more users
+      }
+
       try {
         // Check timezone (skip if not delivery time for this user)
         if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
           console.log(`[Daily Alerts] ${user.user_email} timezone ${user.timezone || 'ET'} - not delivery time, skipping`);
           results.wrongTimezone++;
+          metrics.recordUserSkipped();
+          continue;
+        }
+
+        // Check tier - free tier users should get weekly alerts, not daily
+        const tier = await getUserAlertTier(user.user_email);
+        if (tier === 'free') {
+          // Free tier users get weekly alerts (handled by weekly-alerts cron)
+          // Skip them in daily alerts to save them for the weekly digest
+          console.log(`[Daily Alerts] ${user.user_email} is free tier - will receive weekly alerts instead`);
+          results.freeTierSkipped++;
+          metrics.recordUserSkipped();
           continue;
         }
 
@@ -315,6 +410,7 @@ async function runDailyAlertJob(options?: {
         if (userNaics.length === 0) {
           console.log(`[Daily Alerts] ${user.user_email} has no NAICS codes, skipping`);
           results.noNaics++;
+          metrics.recordUserSkipped();
           continue;
         }
 
@@ -342,17 +438,34 @@ async function runDailyAlertJob(options?: {
           ? [businessTypeToSetAside[user.business_type] || user.business_type]
           : [];
 
+        // Get states to search (multi-state or single state with expansion)
+        const userStates = user.location_states?.length
+          ? user.location_states
+          : user.location_state
+            ? [user.location_state]
+            : undefined;
+
         // Fetch opportunities using NAICS + keywords (primary search)
-        const searchResult = await fetchSamOpportunities({
-          naicsCodes: expandedNaics,
-          keywords: userKeywords.length > 0 ? userKeywords : undefined,
-          setAsides,
-          noticeTypes: ['p', 'r', 'k', 'o'],
-          postedFrom: getDateDaysAgo(1), // Last 24 hours
-          limit: 100,
-        }, samApiKey);
+        metrics.recordApiCall();
+        let searchResult;
+        try {
+          searchResult = await fetchSamOpportunities({
+            naicsCodes: expandedNaics,
+            keywords: userKeywords.length > 0 ? userKeywords : undefined,
+            setAsides,
+            states: userStates, // Multi-state support
+            noticeTypes: ['p', 'r', 'k', 'o'],
+            postedFrom: getDateDaysAgo(1), // Last 24 hours
+            limit: 100,
+          }, samApiKey);
+        } catch (apiError: any) {
+          metrics.recordApiError();
+          guardrails.recordApiError('SAM.gov');
+          throw apiError;
+        }
 
         let opportunities = searchResult.opportunities;
+        metrics.recordOpportunitiesTotal(opportunities.length);
 
         // DEDUPLICATE: Filter out opportunities already sent in last 7 days
         const beforeDedup = opportunities.length;
@@ -373,15 +486,65 @@ async function runDailyAlertJob(options?: {
           }),
         })).sort((a, b) => b.score - a.score);
 
-        if (scoredOpps.length === 0) {
+        // Fetch Grants.gov opportunities (parallel to contracts)
+        let scoredGrants: (GrantOpportunity & { score: number })[] = [];
+        try {
+          const grantsResult = await searchGrantsByNAICS(userNaics, {
+            limit: 15,
+            postedFrom: getDateDaysAgo(7), // Last 7 days for grants (less frequent posting)
+          });
+
+          // Score and filter grants
+          scoredGrants = grantsResult.grants
+            .filter(g => !recentlySentIds.has(g.oppNumber)) // Dedupe
+            .map(g => ({
+              ...g,
+              score: scoreGrant(g, {
+                naics_codes: userNaics,
+                keywords: userKeywords,
+                agencies: user.agencies || [],
+              }),
+            }))
+            .filter(g => g.score >= 20) // Only include relevant grants
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5); // Top 5 grants
+
+          if (scoredGrants.length > 0) {
+            console.log(`[Daily Alerts] ${user.user_email}: Found ${scoredGrants.length} matching grants`);
+          }
+        } catch (grantsError) {
+          console.error(`[Daily Alerts] Grants.gov error for ${user.user_email}:`, grantsError);
+          // Continue without grants - don't fail the whole alert
+        }
+
+        if (scoredOpps.length === 0 && scoredGrants.length === 0) {
           console.log(`[Daily Alerts] No new opportunities for ${user.user_email}`);
           results.noOpps++;
+          metrics.recordUserSkipped();
           continue;
         }
 
+        // Track matched opportunities
+        metrics.recordOpportunityMatched(scoredOpps.length + scoredGrants.length, scoredOpps[0]?.score);
+
         // Send email
         try {
-          await sendDailyAlertEmail(user.user_email, scoredOpps, user);
+          metrics.recordEmailAttempted();
+          await sendDailyAlertEmail(user.user_email, scoredOpps, user, scoredGrants);
+
+          // Track successful send
+          metrics.recordEmailSent();
+          guardrails.recordSuccess();
+          circuitBreaker.record(true);
+
+          // Log to intelligence_log for tracking
+          await logIntelligenceDelivery({
+            userEmail: user.user_email,
+            intelligenceType: 'daily_alert',
+            deliveryStatus: 'sent',
+            itemsCount: scoredOpps.length + scoredGrants.length,
+            itemIds: scoredOpps.slice(0, 20).map(o => o.noticeId),
+          });
 
           // Log the alert with opportunity IDs for deduplication
           await getSupabase().from('alert_log').upsert({
@@ -419,6 +582,20 @@ async function runDailyAlertJob(options?: {
         } catch (emailError: any) {
           console.error(`[Daily Alerts] Email send failed for ${user.user_email}:`, emailError.message);
 
+          // Track failure
+          metrics.recordEmailFailed();
+          guardrails.recordFailure(emailError.message);
+          circuitBreaker.record(false);
+
+          // Log to intelligence_log
+          await logIntelligenceDelivery({
+            userEmail: user.user_email,
+            intelligenceType: 'daily_alert',
+            deliveryStatus: 'failed',
+            itemsCount: scoredOpps.length,
+            errorMessage: emailError.message,
+          });
+
           // Save for retry
           await saveFailedAlert(user.user_email, scoredOpps, emailError.message);
 
@@ -428,16 +605,42 @@ async function runDailyAlertJob(options?: {
 
       } catch (userError: any) {
         console.error(`[Daily Alerts] Error processing ${user.user_email}:`, userError);
+        metrics.recordEmailFailed();
+        guardrails.recordFailure(userError.message);
+        circuitBreaker.record(false);
         results.failed++;
         results.errors.push(`${user.user_email}: ${userError.message}`);
       }
     }
 
-    console.log(`[Daily Alerts] Complete. Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Wrong TZ: ${results.wrongTimezone}, Failed: ${results.failed}, Deduplicated: ${results.deduplicated}`);
+    console.log(`[Daily Alerts] Complete. Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Wrong TZ: ${results.wrongTimezone}, Free Tier: ${results.freeTierSkipped}, Failed: ${results.failed}, Deduplicated: ${results.deduplicated}`);
 
-    return NextResponse.json({ success: true, results, retryResults });
+    // Save metrics to database
+    await metrics.save();
+
+    // Run post-send validation
+    await postSendValidation('daily-alerts', {
+      attempted: results.sent + results.failed,
+      sent: results.sent,
+      failed: results.failed,
+      failedRecipients: results.errors.map(e => e.split(':')[0]),
+      duration: metrics.getSnapshot().duration_ms,
+    });
+
+    return NextResponse.json({
+      success: true,
+      results,
+      retryResults,
+      metrics: metrics.getSnapshot(),
+      guardrailStats: guardrails.getStats(),
+    });
   } catch (error: any) {
     console.error('[Daily Alerts] Error:', error);
+
+    // Still try to save metrics on error
+    metrics.recordGuardrailWarning();
+    await metrics.save();
+
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -486,18 +689,23 @@ export async function GET(request: NextRequest) {
 
   // Otherwise return documentation
   return NextResponse.json({
-    message: 'Daily Alerts Cron Job (FREE FOR EVERYONE)',
+    message: 'Daily Alerts Cron Job (PAID TIER ONLY)',
     usage: {
       test: 'GET ?email=xxx&test=true to send test alert',
       manual: 'POST with Authorization: Bearer {CRON_SECRET}',
     },
     schedule: 'Every day at 6 AM local time (based on user timezone)',
+    tiers: {
+      free: 'Free tier users get WEEKLY alerts (5 opps max via weekly-alerts cron)',
+      paid: 'Paid tier users get DAILY alerts (unlimited opps via this cron)',
+    },
     features: [
-      'FREE for all users (no paywall)',
-      'Respects alert_frequency column (daily users only)',
+      'Paid tier users only (any product purchase)',
+      'Free tier users redirected to weekly-alerts cron',
       'Deduplication (won\'t send same opp twice in 7 days)',
       'Retry failed emails (up to 3 attempts)',
       'Timezone-aware delivery (~6 AM local)',
+      'Includes grants from Grants.gov',
     ],
   });
 }
@@ -533,11 +741,13 @@ function getDaysUntil(dateString: string): number {
 async function sendDailyAlertEmail(
   email: string,
   opportunities: (SAMOpportunity & { score: number })[],
-  user: AlertUser
+  user: AlertUser,
+  grants: (GrantOpportunity & { score: number })[] = []
 ) {
   const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = `https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
   const maUrl = 'https://tools.govcongiants.org/market-assassin';
+  const totalCount = opportunities.length + grants.length;
 
   const opportunitiesHtml = opportunities.slice(0, 20).map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
@@ -596,7 +806,7 @@ async function sendDailyAlertEmail(
       🎯 Your Daily Opportunities
     </h1>
     <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 14px;">
-      ${formatDate(new Date().toISOString())} • ${opportunities.length} matches found
+      ${formatDate(new Date().toISOString())} • ${totalCount} matches found
     </p>
   </div>
 
@@ -621,7 +831,67 @@ async function sendDailyAlertEmail(
     ` : ''}
   </div>
 
+  ${grants.length > 0 ? `
+  <!-- Grants Section -->
+  <div style="margin-top: 24px;">
+    <div style="background: linear-gradient(135deg, #065f46 0%, #059669 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
+      <h2 style="color: white; margin: 0; font-size: 18px; font-weight: 700;">
+        🎓 Grant Opportunities
+      </h2>
+      <p style="color: #a7f3d0; margin: 4px 0 0 0; font-size: 13px;">
+        ${grants.length} federal grants matching your profile
+      </p>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #d1fae5; border-top: none; border-radius: 0 0 12px 12px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        ${grants.map((grant, i) => {
+          const daysUntil = getDaysUntil(grant.closeDate);
+          const urgencyColor = daysUntil <= 14 ? '#dc2626' : daysUntil <= 30 ? '#d97706' : '#16a34a';
+          const scoreColor = grant.score >= 60 ? '#16a34a' : grant.score >= 40 ? '#84cc16' : '#eab308';
+          const fundingText = grant.awardCeiling ? `Up to $${(grant.awardCeiling / 1000).toFixed(0)}K` : '';
+
+          return `
+            <tr>
+              <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+                <div style="margin-bottom: 6px;">
+                  <span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                    GRANT
+                  </span>
+                  ${fundingText ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${fundingText}</span>` : ''}
+                  <span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${grant.score}%</span>
+                </div>
+                <a href="${grant.link}" style="color: #065f46; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+                  ${i + 1}. ${grant.title.slice(0, 90)}${grant.title.length > 90 ? '...' : ''}
+                </a>
+                <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
+                  ${grant.agency} &nbsp;•&nbsp;
+                  <span style="color: ${urgencyColor};">Closes ${formatDate(grant.closeDate)}</span>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </table>
+    </div>
+  </div>
+  ` : ''}
+
   <!-- Market Assassin Upsell -->
+  <!-- Feedback Section -->
+  <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 16px 20px; margin-top: 20px; text-align: center;">
+    <p style="color: #166534; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
+      Was this alert helpful?
+    </p>
+    <div style="display: inline-block;">
+      <a href="https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+        👍 Yes
+      </a>
+      <a href="https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+        👎 No
+      </a>
+    </div>
+  </div>
+
   <div style="background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
     <h3 style="color: white; margin: 0 0 8px 0; font-size: 17px; font-weight: 700;">
       🎯 Ready to Win These Contracts?
@@ -655,7 +925,7 @@ async function sendDailyAlertEmail(
   await getTransporter().sendMail({
     from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
-    subject: `🎯 ${opportunities.length} New Opportunities - ${formatDate(new Date().toISOString())}`,
+    subject: `🎯 ${totalCount} New Opportunities${grants.length > 0 ? ' + Grants' : ''} - ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
   });
 }

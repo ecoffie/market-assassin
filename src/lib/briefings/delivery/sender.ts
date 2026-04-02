@@ -67,7 +67,7 @@ export async function sendBriefingEmail(
   }
 
   const transporter = getTransporter();
-  const template = generateEmailTemplate(briefing);
+  const template = generateEmailTemplate(briefing, toEmail);
 
   try {
     const info = await transporter.sendMail({
