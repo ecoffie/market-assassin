@@ -172,9 +172,11 @@ export async function generateAIBriefing(
 
     let organizedData = organizeSnapshots(snapshots || []);
 
+    console.log(`[AIBriefingGen] Snapshots: ${snapshots?.length || 0}, Recompetes: ${organizedData.recompetes.length}, Awards: ${organizedData.awards.length}`);
+
     // FALLBACK: If no snapshots, fetch live data from SAM.gov
     if (organizedData.recompetes.length === 0 && organizedData.awards.length === 0) {
-      console.log(`[AIBriefingGen] No snapshots found, fetching live data...`);
+      console.log(`[AIBriefingGen] No snapshots found, fetching live data from SAM.gov...`);
       try {
         const liveData = await fetchLiveOpportunityData(profile.naics_codes);
         if (liveData.opportunities.length > 0) {
@@ -274,6 +276,7 @@ export async function generateAIBriefing(
     return briefing;
   } catch (error) {
     console.error('[AIBriefingGen] Error:', error);
+    console.error('[AIBriefingGen] Error stack:', error instanceof Error ? error.stack : 'no stack');
     return null;
   }
 }
