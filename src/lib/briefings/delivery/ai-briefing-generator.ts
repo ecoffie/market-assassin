@@ -129,14 +129,12 @@ export async function generateAIBriefing(
   const supabase = getSupabaseClient();
 
   if (!supabase) {
-    console.error('[AIBriefingGen] Supabase not configured');
-    return null;
+    throw new Error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
   const anthropic = getAnthropicClient();
   if (!anthropic) {
-    console.error('[AIBriefingGen] Anthropic not configured');
-    return null;
+    throw new Error('Anthropic not configured - missing ANTHROPIC_API_KEY');
   }
 
   const briefingDate = new Date().toISOString().split('T')[0];
@@ -240,8 +238,7 @@ export async function generateAIBriefing(
 
     const responseText = message.content[0].type === 'text' ? message.content[0].text : null;
     if (!responseText) {
-      console.error('[AIBriefingGen] Empty response from OpenAI');
-      return null;
+      throw new Error('Empty response from Claude API - no text content returned');
     }
 
     // Step 5: Parse and validate response
@@ -277,7 +274,8 @@ export async function generateAIBriefing(
   } catch (error) {
     console.error('[AIBriefingGen] Error:', error);
     console.error('[AIBriefingGen] Error stack:', error instanceof Error ? error.stack : 'no stack');
-    return null;
+    // Re-throw with a more descriptive message
+    throw new Error(`AI Briefing generation failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
