@@ -494,4 +494,41 @@ curl "$next_url"
 
 ---
 
-*Last Updated: March 29, 2026*
+## Vercel.json Changes Must Be Committed
+
+**Lesson (Apr 2, 2026):** Vercel cron changes made to `vercel.json` must be **committed to git** to persist.
+
+**What happened:**
+1. Briefing crons were added in commit `b940a72`
+2. During a different commit (`332674a`), some crons were accidentally removed
+3. Each time we manually fixed `vercel.json` and deployed, it worked *once*
+4. But the next deploy from git reverted back to the committed (broken) version
+5. Result: Briefings sent once then stopped; Daily Alerts kept working (they were committed)
+
+**Why this happens:**
+- Vercel deploys from git HEAD
+- Local changes to `vercel.json` deploy when you run `vercel --prod`
+- But if you don't commit, next team deploy or CI deploy uses git version
+
+**Prevention:**
+```bash
+# After changing vercel.json, ALWAYS commit
+git add vercel.json
+git commit -m "fix: Update cron schedules"
+
+# Verify crons are in git
+git show HEAD:vercel.json | grep "your-cron-path"
+```
+
+**Checklist for cron changes:**
+1. [ ] Edit vercel.json locally
+2. [ ] Deploy and test: `vercel --prod`
+3. [ ] **COMMIT THE CHANGE**: `git add vercel.json && git commit -m "..."`
+4. [ ] Verify: `git show HEAD:vercel.json | grep cron`
+5. [ ] Push to remote if using CI
+
+**Rule:** "If it's not committed, it didn't happen."
+
+---
+
+*Last Updated: April 2, 2026*
