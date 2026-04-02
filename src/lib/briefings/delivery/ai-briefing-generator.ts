@@ -226,7 +226,7 @@ export async function generateAIBriefing(
     console.log(`[AIBriefingGen] Generating AI briefing for ${userEmail}...`);
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-haiku-20240307',
       max_tokens: 4000,
       messages: [
         {
