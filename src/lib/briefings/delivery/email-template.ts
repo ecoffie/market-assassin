@@ -22,11 +22,11 @@ const LOW_COLOR = '#f97316'; // Orange for low fit
 /**
  * Generate email template from briefing
  */
-export function generateEmailTemplate(briefing: GeneratedBriefing): EmailTemplate {
+export function generateEmailTemplate(briefing: GeneratedBriefing, userEmail?: string): EmailTemplate {
   const subject = generateSubject(briefing);
   const preheader = briefing.summary.headline;
-  const htmlBody = generateHtmlBody(briefing);
-  const textBody = generateTextBody(briefing);
+  const htmlBody = generateHtmlBody(briefing, userEmail);
+  const textBody = generateTextBody(briefing, userEmail);
 
   return {
     subject,
@@ -74,8 +74,9 @@ function generateSubject(briefing: GeneratedBriefing): string {
 /**
  * Generate HTML email body
  */
-function generateHtmlBody(briefing: GeneratedBriefing): string {
+function generateHtmlBody(briefing: GeneratedBriefing, userEmail?: string): string {
   const topItems = briefing.topItems[0]?.items || [];
+  const encodedEmail = userEmail ? encodeURIComponent(userEmail) : '';
 
   return `
 <!DOCTYPE html>
@@ -171,16 +172,41 @@ function generateHtmlBody(briefing: GeneratedBriefing): string {
       ${topItems.map(item => renderItem(item)).join('')}
     </div>
 
-    <!-- Categories -->
-    ${Object.entries(briefing.categorizedItems)
-      .filter(([_, section]) => section.items.length > 0)
-      .slice(0, 3) // Max 3 categories in email
-      .map(([category, section]) => `
-        <div class="section">
-          <h3>${section.title}</h3>
-          ${section.items.slice(0, 2).map(item => renderItem(item)).join('')}
-        </div>
-      `).join('')}
+    <!-- Categories (excluding items already shown in Top Intel) -->
+    ${(() => {
+      const topItemIds = new Set(topItems.map(item => item.id));
+      return Object.entries(briefing.categorizedItems)
+        .filter(([_, section]) => section.items.length > 0)
+        .slice(0, 3) // Max 3 categories in email
+        .map(([category, section]) => {
+          // Filter out items already shown in Top Intel
+          const uniqueItems = section.items.filter(item => !topItemIds.has(item.id));
+          if (uniqueItems.length === 0) return '';
+          return `
+            <div class="section">
+              <h3>${section.title}</h3>
+              ${uniqueItems.slice(0, 2).map(item => renderItem(item)).join('')}
+            </div>
+          `;
+        }).join('');
+    })()}
+
+    <!-- Feedback Section -->
+    ${encodedEmail ? `
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 16px 20px; margin: 20px 24px; text-align: center;">
+      <p style="color: #166534; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
+        Was this briefing helpful?
+      </p>
+      <div style="display: inline-block;">
+        <a href="https://tools.govcongiants.org/api/feedback?email=${encodedEmail}&type=helpful&source=briefing" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+          👍 Yes
+        </a>
+        <a href="https://tools.govcongiants.org/api/feedback?email=${encodedEmail}&type=not_helpful&source=briefing" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+          👎 No
+        </a>
+      </div>
+    </div>
+    ` : ''}
 
     <!-- Footer -->
     <div class="footer">
@@ -255,8 +281,9 @@ function getWinEmoji(tier: string): string {
 /**
  * Generate plain text email body
  */
-function generateTextBody(briefing: GeneratedBriefing): string {
+function generateTextBody(briefing: GeneratedBriefing, userEmail?: string): string {
   const topItems = briefing.topItems[0]?.items || [];
+  const encodedEmail = userEmail ? encodeURIComponent(userEmail) : '';
 
   let text = `
 🎁 FREE PREVIEW - You're testing our daily market intel — no charge during beta!
@@ -288,6 +315,18 @@ ${item.rank}. ${item.categoryIcon} ${item.title}
 ${winLine}   ${item.description}
    ${item.amount ? `Amount: ${item.amount}` : ''}
    → ${item.actionLabel}: ${item.actionUrl}
+`;
+  }
+
+  // Add feedback section if email is provided
+  if (encodedEmail) {
+    text += `
+========================================
+WAS THIS BRIEFING HELPFUL?
+========================================
+
+👍 YES: https://tools.govcongiants.org/api/feedback?email=${encodedEmail}&type=helpful&source=briefing
+👎 NO: https://tools.govcongiants.org/api/feedback?email=${encodedEmail}&type=not_helpful&source=briefing
 `;
   }
 

@@ -206,6 +206,7 @@ export function processOpportunityDiffs(
 
 /**
  * Process recompete diffs into briefing items
+ * Deduplicates by incumbent name to avoid showing same contractor multiple times
  */
 export function processRecompeteDiffs(
   today: RecompeteContract[],
@@ -215,8 +216,16 @@ export function processRecompeteDiffs(
   const diff = diffRecompetes(today, yesterday);
   const items: BriefingItem[] = [];
 
+  // Track incumbents we've already added to avoid duplicates
+  const seenIncumbents = new Set<string>();
+
   // ENTERED 90-DAY WINDOW
   for (const contract of diff.enteredWindow) {
+    // Skip if we've already seen this incumbent
+    const incumbentKey = contract.incumbentName?.toLowerCase().trim();
+    if (incumbentKey && seenIncumbents.has(incumbentKey)) continue;
+    if (incumbentKey) seenIncumbents.add(incumbentKey);
+
     const { displacementScore, factors } = scoreRecompete(contract, userProfile);
 
     items.push({
@@ -226,7 +235,7 @@ export function processRecompeteDiffs(
 
       title: `90-Day Alert: ${contract.incumbentName}`,
       subtitle: `${contract.agency} • Expires in ${contract.daysUntilExpiration} days`,
-      description: `$${(contract.obligatedAmount / 1000000).toFixed(1)}M contract entering recompete window`,
+      description: `Contract entering recompete window - position for capture now`,
 
       relevanceScore: displacementScore,
       urgencyScore: 85,
@@ -249,6 +258,11 @@ export function processRecompeteDiffs(
 
   // TIMELINE CHANGES
   for (const { contract, changes } of diff.timelineChanges) {
+    // Skip if we've already seen this incumbent
+    const incumbentKey = contract.incumbentName?.toLowerCase().trim();
+    if (incumbentKey && seenIncumbents.has(incumbentKey)) continue;
+    if (incumbentKey) seenIncumbents.add(incumbentKey);
+
     const { displacementScore, factors } = scoreRecompete(contract, userProfile);
 
     items.push({
@@ -258,7 +272,7 @@ export function processRecompeteDiffs(
 
       title: `Timeline Change: ${contract.incumbentName}`,
       subtitle: changes.join(', '),
-      description: `Contract timeline has been modified`,
+      description: `Contract timeline modified - review updated dates`,
 
       relevanceScore: displacementScore,
       urgencyScore: 60,
@@ -281,6 +295,11 @@ export function processRecompeteDiffs(
 
   // NEW RECOMPETES
   for (const contract of diff.newRecompetes) {
+    // Skip if we've already seen this incumbent
+    const incumbentKey = contract.incumbentName?.toLowerCase().trim();
+    if (incumbentKey && seenIncumbents.has(incumbentKey)) continue;
+    if (incumbentKey) seenIncumbents.add(incumbentKey);
+
     const { displacementScore, factors } = scoreRecompete(contract, userProfile);
 
     items.push({
@@ -290,7 +309,7 @@ export function processRecompeteDiffs(
 
       title: `New Recompete: ${contract.incumbentName}`,
       subtitle: `${contract.agency} • ${contract.daysUntilExpiration} days`,
-      description: `$${(contract.obligatedAmount / 1000000).toFixed(1)}M contract now in tracking window`,
+      description: `Contract now in tracking window - start capture activities`,
 
       relevanceScore: displacementScore,
       urgencyScore: 50,
