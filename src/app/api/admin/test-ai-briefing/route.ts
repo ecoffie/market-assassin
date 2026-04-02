@@ -31,6 +31,19 @@ export async function GET(request: NextRequest) {
   try {
     console.log(`[TestAIBriefing] Generating AI briefing for ${email}...`);
 
+    // Check environment variables
+    const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+    const hasSamKey = !!process.env.SAM_API_KEY;
+    const hasSupabase = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!hasAnthropicKey) {
+      return NextResponse.json({
+        success: false,
+        error: 'ANTHROPIC_API_KEY not configured',
+        envCheck: { hasAnthropicKey, hasSamKey, hasSupabase },
+      });
+    }
+
     const briefing = await generateAIBriefing(email, {
       maxOpportunities: 10,
       maxTeamingPlays: 3,
@@ -39,7 +52,8 @@ export async function GET(request: NextRequest) {
     if (!briefing) {
       return NextResponse.json({
         success: false,
-        error: 'Failed to generate briefing - check profile or OpenAI config',
+        error: 'Failed to generate briefing - check logs for details',
+        envCheck: { hasAnthropicKey, hasSamKey, hasSupabase },
       });
     }
 
