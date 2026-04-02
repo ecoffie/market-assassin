@@ -14,28 +14,20 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/snapshot-opportunities",
-      "schedule": "0 7 * * *"
+      "path": "/api/cron/send-notifications",
+      "schedule": "0 13 * * *"
     },
     {
-      "path": "/api/cron/snapshot-recompetes",
-      "schedule": "15 7 * * *"
+      "path": "/api/cron/send-notifications",
+      "schedule": "0 15 * * *"
     },
     {
-      "path": "/api/cron/snapshot-awards",
-      "schedule": "30 7 * * *"
+      "path": "/api/cron/send-notifications",
+      "schedule": "0 17 * * *"
     },
     {
-      "path": "/api/cron/snapshot-contractors",
-      "schedule": "45 7 * * *"
-    },
-    {
-      "path": "/api/cron/web-intelligence",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/send-briefings",
-      "schedule": "0 9 * * *"
+      "path": "/api/cron/send-notifications",
+      "schedule": "0 19 * * *"
     },
     {
       "path": "/api/cron/pursuit-brief",
@@ -44,6 +36,10 @@
     {
       "path": "/api/cron/weekly-alerts",
       "schedule": "0 23 * * 0"
+    },
+    {
+      "path": "/api/cron/send-briefings",
+      "schedule": "0 10 * * *"
     },
     {
       "path": "/api/cron/daily-alerts",
