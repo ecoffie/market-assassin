@@ -269,10 +269,10 @@ export async function GET(request: NextRequest) {
     results.daily = { success: false, error: String(err) };
   }
 
-  // 2. Generate and send Weekly Deep Dive
+  // 2. Generate and send Weekly Deep Dive (with SAM.gov status enrichment)
   try {
-    console.log(`[SendAllBriefings] Generating Weekly Deep Dive...`);
-    const weeklyBriefing = await generateWeeklyDeepDive(anthropic, topContracts);
+    console.log(`[SendAllBriefings] Generating Weekly Deep Dive with SAM.gov status...`);
+    const weeklyBriefing = await generateWeeklyDeepDive(anthropic, topContracts, samOpportunities);
     const weeklyHtml = generateWeeklyEmailHtml(weeklyBriefing);
     const weeklyText = generateWeeklyEmailText(weeklyBriefing);
 
@@ -687,6 +687,96 @@ Return ONLY valid JSON with exactly 5 opportunities, 2 teaming plays, and 3 must
   };
 }
 
+// ============ SAM.gov STATUS CHECKER FOR RECOMPETES ============
+
+interface SamStatusResult {
+  status: 'no_activity' | 'sources_sought' | 'presolicitation' | 'active_rfp';
+  message: string;
+  noticeId?: string;
+  deadline?: string;
+  samLink?: string;
+}
+
+async function checkSamStatusForContract(
+  contract: ContractForBriefing,
+  samOpportunities: SAMOpportunity[]
+): Promise<SamStatusResult> {
+  // Search through already-fetched SAM.gov opportunities for matches
+  // Match by: agency name similarity, NAICS code, or keywords from contract description
+
+  const agencyLower = contract.agency.toLowerCase();
+  const descWords = contract.contractName.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+
+  // Find matches in SAM.gov opportunities
+  const matches = samOpportunities.filter(opp => {
+    const oppAgencyLower = (opp.department || '').toLowerCase();
+    const oppTitleLower = (opp.title || '').toLowerCase();
+    const oppDescLower = (opp.description || '').toLowerCase();
+
+    // Agency match
+    const agencyMatch = oppAgencyLower.includes(agencyLower.split(' ')[0]) ||
+                       agencyLower.includes(oppAgencyLower.split(' ')[0]);
+
+    // NAICS match
+    const naicsMatch = opp.naicsCode === contract.naicsCode;
+
+    // Keyword match (at least 2 significant words)
+    const keywordMatches = descWords.filter(word =>
+      oppTitleLower.includes(word) || oppDescLower.includes(word)
+    ).length;
+    const keywordMatch = keywordMatches >= 2;
+
+    return naicsMatch && (agencyMatch || keywordMatch);
+  });
+
+  if (matches.length === 0) {
+    return {
+      status: 'no_activity',
+      message: 'No solicitation posted yet - early positioning opportunity'
+    };
+  }
+
+  // Analyze the best match
+  const bestMatch = matches[0];
+  const noticeTypeLower = (bestMatch.noticeType || '').toLowerCase();
+
+  if (noticeTypeLower.includes('solicit') || noticeTypeLower.includes('rfp') || noticeTypeLower.includes('rfq')) {
+    return {
+      status: 'active_rfp',
+      message: `Active solicitation found - Response due ${bestMatch.responseDeadline || 'TBD'}`,
+      noticeId: bestMatch.noticeId,
+      deadline: bestMatch.responseDeadline,
+      samLink: bestMatch.uiLink || `https://sam.gov/opp/${bestMatch.noticeId}/view`
+    };
+  }
+
+  if (noticeTypeLower.includes('source') || noticeTypeLower.includes('rfi') || noticeTypeLower.includes('market research')) {
+    return {
+      status: 'sources_sought',
+      message: 'Sources Sought/RFI posted - Respond to get on radar',
+      noticeId: bestMatch.noticeId,
+      samLink: bestMatch.uiLink || `https://sam.gov/opp/${bestMatch.noticeId}/view`
+    };
+  }
+
+  if (noticeTypeLower.includes('presolic') || noticeTypeLower.includes('intent')) {
+    return {
+      status: 'presolicitation',
+      message: 'Pre-solicitation notice posted - RFP coming soon',
+      noticeId: bestMatch.noticeId,
+      samLink: bestMatch.uiLink || `https://sam.gov/opp/${bestMatch.noticeId}/view`
+    };
+  }
+
+  // Default for any other match
+  return {
+    status: 'sources_sought',
+    message: `Related notice found: ${bestMatch.noticeType || 'Notice'}`,
+    noticeId: bestMatch.noticeId,
+    samLink: bestMatch.uiLink || `https://sam.gov/opp/${bestMatch.noticeId}/view`
+  };
+}
+
 // ============ WEEKLY DEEP DIVE GENERATOR ============
 
 interface WeeklyOpportunity {
@@ -700,6 +790,13 @@ interface WeeklyOpportunity {
   keyDates: { label: string; date: string }[];
   competitiveLandscape: string[];
   recommendedApproach: string;
+  samStatus?: {
+    status: 'no_activity' | 'sources_sought' | 'presolicitation' | 'active_rfp';
+    message: string;
+    noticeId?: string;
+    deadline?: string;
+    samLink?: string;
+  };
 }
 
 interface WeeklyTeamingPlay {
@@ -720,7 +817,7 @@ interface WeeklyBriefing {
   calendar: { date: string; event: string; type: string; priority: string }[];
 }
 
-async function generateWeeklyDeepDive(anthropic: Anthropic, contracts: ContractForBriefing[]): Promise<WeeklyBriefing> {
+async function generateWeeklyDeepDive(anthropic: Anthropic, contracts: ContractForBriefing[], samOpportunities: SAMOpportunity[] = []): Promise<WeeklyBriefing> {
   const monday = new Date();
   monday.setDate(monday.getDate() - monday.getDay() + 1);
 
@@ -803,9 +900,26 @@ Return ONLY valid JSON with ALL required fields populated.`;
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   const data = JSON.parse(jsonMatch?.[0] || '{}');
 
+  // Enrich opportunities with SAM.gov status
+  const enrichedOpportunities: WeeklyOpportunity[] = [];
+  const aiOpportunities = data.opportunities || [];
+
+  for (let i = 0; i < Math.min(aiOpportunities.length, contracts.length); i++) {
+    const aiOpp = aiOpportunities[i];
+    const contract = contracts[i];
+
+    // Check SAM.gov status for this contract
+    const samStatus = await checkSamStatusForContract(contract, samOpportunities);
+
+    enrichedOpportunities.push({
+      ...aiOpp,
+      samStatus,
+    });
+  }
+
   return {
     weekOf: monday.toISOString().split('T')[0],
-    opportunities: data.opportunities || [],
+    opportunities: enrichedOpportunities,
     teamingPlays: data.teamingPlays || [],
     marketSignals: data.marketSignals || [],
     calendar: data.calendar || [],
@@ -1089,6 +1203,15 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
     .priority-high { background: #fee2e2; color: #991b1b; }
     .priority-medium { background: #fef3c7; color: #92400e; }
     .priority-low { background: #dbeafe; color: #1e40af; }
+    .sam-status-box { background: #f0fdf4; border-radius: 6px; padding: 12px; margin: 12px 0; border-left: 4px solid #10b981; }
+    .sam-status-label { font-size: 11px; color: #047857; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
+    .sam-status-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+    .sam-status-no_activity { background: #f3f4f6; color: #4b5563; }
+    .sam-status-sources_sought { background: #fef3c7; color: #92400e; }
+    .sam-status-presolicitation { background: #dbeafe; color: #1e40af; }
+    .sam-status-active_rfp { background: #dcfce7; color: #166534; }
+    .sam-status-message { font-size: 13px; color: #065f46; margin: 0 0 8px; }
+    .sam-link-btn { display: inline-block; background: #10b981; color: white; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; text-decoration: none; }
     .footer { background: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb; }
     .footer p { margin: 0 0 8px; font-size: 12px; color: #6b7280; }
     .footer a { color: ${ACCENT_COLOR}; text-decoration: none; }
@@ -1134,6 +1257,19 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
             </div>
           ` : ''}
           ${opp.recommendedApproach ? `<div style="font-size: 13px; color: #4b5563; margin-top: 12px;"><strong>Recommended Approach:</strong> ${escapeHtml(opp.recommendedApproach)}</div>` : ''}
+          ${opp.samStatus ? `
+            <div class="sam-status-box">
+              <div class="sam-status-label">📡 SAM.gov Status</div>
+              <span class="sam-status-badge sam-status-${opp.samStatus.status}">${
+                opp.samStatus.status === 'no_activity' ? '⏳ NO ACTIVITY YET' :
+                opp.samStatus.status === 'sources_sought' ? '📋 SOURCES SOUGHT' :
+                opp.samStatus.status === 'presolicitation' ? '📢 PRE-SOLICITATION' :
+                '🎯 ACTIVE RFP'
+              }</span>
+              <p class="sam-status-message">${escapeHtml(opp.samStatus.message)}</p>
+              ${opp.samStatus.samLink ? `<a href="${opp.samStatus.samLink}" class="sam-link-btn" target="_blank">View on SAM.gov →</a>` : ''}
+            </div>
+          ` : ''}
         </div>
       `).join('')}
     </div>
@@ -1226,6 +1362,16 @@ function generateWeeklyEmailText(briefing: WeeklyBriefing): string {
     if (opp.competitiveLandscape?.length > 0) {
       text += `   COMPETITIVE LANDSCAPE:\n`;
       opp.competitiveLandscape.forEach(c => { text += `   • ${c}\n`; });
+    }
+    if (opp.samStatus) {
+      text += `\n   📡 SAM.gov STATUS: ${opp.samStatus.status === 'no_activity' ? 'No activity yet' :
+        opp.samStatus.status === 'sources_sought' ? 'Sources Sought' :
+        opp.samStatus.status === 'presolicitation' ? 'Pre-solicitation' :
+        'Active RFP'}\n`;
+      text += `   ${opp.samStatus.message}\n`;
+      if (opp.samStatus.samLink) {
+        text += `   Link: ${opp.samStatus.samLink}\n`;
+      }
     }
     text += `\n${'─'.repeat(40)}\n\n`;
   }
