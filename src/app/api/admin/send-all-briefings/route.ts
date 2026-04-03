@@ -313,26 +313,27 @@ interface DailyBriefing {
 }
 
 async function generateDailyBrief(anthropic: Anthropic, contracts: ContractForBriefing[]): Promise<DailyBriefing> {
-  const prompt = `You are a senior GovCon capture strategist. Analyze these federal contracts and generate a Daily Market Intel Briefing.
+  const prompt = `You are a senior GovCon capture strategist. Generate a CONCISE Daily Market Intel Briefing - quick to scan, actionable.
 
 CONTRACT DATA (REAL DATA FROM USASPENDING):
 ${JSON.stringify(contracts, null, 2)}
 
 Generate JSON with:
-1. "opportunities" - Rank top 10 by actionability (not just value). Each needs: rank, contractName, agency, incumbent, value (number), window (timeline string), displacementAngle (strategic insight - WHY winnable NOW)
-2. "teamingPlays" - 3 specific teaming plays. Each needs: playNumber, strategyName, targetPrimes (array of company names), rationale, suggestedOpener (copy-paste ready outreach message)
-3. "mustWatch" - 4 key signals/events to monitor this week
+1. "opportunities" - Rank TOP 5 ONLY by actionability (not just value). Each needs: rank, contractName, agency, incumbent, value (number), window (timeline string), displacementAngle (1-2 sentence strategic insight - WHY winnable NOW)
+2. "teamingPlays" - 2 specific teaming plays. Each needs: playNumber, strategyName, targetPrimes (array of company names), rationale, suggestedOpener (copy-paste ready outreach message)
+3. "mustWatch" - 3 key signals/events to monitor this week
+
+KEEP IT CONCISE - this is a 2-minute read. Focus on the BEST opportunities, not all of them.
 
 DISPLACEMENT ANGLES TO IDENTIFY:
 - Bridge contracts (vulnerability)
 - Multiple extensions (procurement fatigue)
 - 8(a) → unrestricted transitions
 - M&A integration friction
-- Performance issues (look at numberOfBids - low bids = vulnerable)
-- New technology requirements
+- Performance issues (low numberOfBids = vulnerable)
 - Contracts with competitionLevel "sole_source" or "low" are high priority
 
-Return ONLY valid JSON.`;
+Return ONLY valid JSON with exactly 5 opportunities, 2 teaming plays, and 3 must-watch items.`;
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -611,7 +612,7 @@ function generateDailyEmailHtml(briefing: DailyBriefing): string {
 
     <div class="section">
       <div class="section-header">
-        <h2>TOP ${briefing.opportunities.length} RECOMPETE OPPORTUNITIES</h2>
+        <h2>🎯 TOP 5 RECOMPETE OPPORTUNITIES</h2>
       </div>
       ${briefing.opportunities.map(opp => `
         <div class="opportunity">
