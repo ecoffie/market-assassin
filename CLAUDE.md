@@ -317,6 +317,8 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 | `src/app/api/cron/send-briefings/route.ts` | Daily briefings cron (FREE during beta) |
 | `src/app/alerts/preferences/page.tsx` | Alert/briefing preferences UI |
 | `src/lib/utils/psc-crosswalk.ts` | PSC-NAICS crosswalk for broader search |
+| `docs/govcon-market-research.md` | GAO market research framework for AI prompts |
+| `docs/PRD-market-research-intelligence.md` | PRD for market research integration |
 
 ---
 

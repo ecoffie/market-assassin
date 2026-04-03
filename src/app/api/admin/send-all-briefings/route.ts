@@ -64,6 +64,31 @@ function getDaysUntil(dateString: string): number {
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+// Helper: Format ISO date to SAM.gov style (Apr 07, 2026 12:00 PM EDT)
+function formatSamDate(isoDateString: string): string {
+  if (!isoDateString) return 'TBD';
+  try {
+    const date = new Date(isoDateString);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    // Determine timezone abbreviation
+    const tzOffset = date.getTimezoneOffset();
+    let tz = 'ET';
+    if (isoDateString.includes('-04:00') || isoDateString.includes('-0400')) tz = 'EDT';
+    else if (isoDateString.includes('-05:00') || isoDateString.includes('-0500')) tz = 'EST';
+    else if (isoDateString.includes('Z')) tz = 'UTC';
+    return `${month} ${day}, ${year} ${hours}:${minutes} ${ampm} ${tz}`;
+  } catch {
+    return isoDateString;
+  }
+}
+
 interface ContractForBriefing {
   contractNumber: string;
   contractName: string;
@@ -122,15 +147,17 @@ export async function GET(request: NextRequest) {
   const SAM_API_KEY = process.env.SAM_API_KEY || '';
   let samOpportunities: SAMOpportunity[] = [];
 
+  console.log(`[SendAllBriefings] SAM_API_KEY present: ${SAM_API_KEY ? 'YES (' + SAM_API_KEY.substring(0, 15) + '...)' : 'NO'}`);
+
   try {
-    console.log(`[SendAllBriefings] Fetching SAM.gov opportunities...`);
+    console.log(`[SendAllBriefings] Fetching SAM.gov opportunities for NAICS: ${expandedNaics.slice(0, 5).join(', ')}...`);
     const samResult = await fetchSamOpportunities({
       naicsCodes: expandedNaics.slice(0, 10),
       postedFrom: getDateDaysAgo(30), // Last 30 days
       limit: 50,
     }, SAM_API_KEY);
     samOpportunities = samResult.opportunities;
-    console.log(`[SendAllBriefings] SAM.gov: ${samOpportunities.length} active opportunities found`);
+    console.log(`[SendAllBriefings] SAM.gov: ${samOpportunities.length} active opportunities found (total: ${samResult.totalRecords})`);
   } catch (err) {
     console.error('[SendAllBriefings] SAM.gov fetch error:', err);
   }
@@ -290,22 +317,28 @@ export async function GET(request: NextRequest) {
     results.weekly = { success: false, error: String(err) };
   }
 
-  // 3. Generate and send Pursuit Brief (for the top opportunity)
+  // 3. Generate and send Pursuit Brief (COMBINED: Top 3 from SAM.gov + USASpending)
   try {
-    console.log(`[SendAllBriefings] Generating Pursuit Brief for top opportunity...`);
-    const pursuitBrief = await generatePursuitBrief(anthropic, topContracts[0]);
-    const pursuitHtml = generatePursuitEmailHtml(pursuitBrief);
-    const pursuitText = generatePursuitEmailText(pursuitBrief);
+    console.log(`[SendAllBriefings] Generating Pursuit Brief - combining SAM.gov + USASpending sources...`);
+
+    // Combine opportunities from both sources for AI to evaluate
+    const combinedOpportunities = buildCombinedPursuitCandidates(samOpportunities, topContracts);
+    console.log(`[SendAllBriefings] Combined ${combinedOpportunities.length} opportunities for pursuit analysis`);
+
+    // Generate comprehensive TOP 3 pursuit brief
+    const pursuitBriefTop3 = await generateCombinedPursuitBrief(anthropic, combinedOpportunities);
+    const pursuitHtml = generateCombinedPursuitEmailHtml(pursuitBriefTop3);
+    const pursuitText = generateCombinedPursuitEmailText(pursuitBriefTop3);
 
     await sendEmail({
       to: toEmail,
-      subject: `[3/3] PURSUIT BRIEF: ${pursuitBrief.contractName} - Score: ${pursuitBrief.opportunityScore}/100`,
+      subject: `[3/3] YOUR TOP 3 PURSUIT TARGETS - Combined SAM.gov + Recompete Intel`,
       html: pursuitHtml,
       text: pursuitText,
     });
 
     results.pursuit = { success: true, error: '' };
-    console.log(`[SendAllBriefings] Pursuit Brief sent`);
+    console.log(`[SendAllBriefings] Pursuit Brief (Top 3) sent`);
   } catch (err) {
     console.error('[SendAllBriefings] Pursuit error:', err);
     results.pursuit = { success: false, error: String(err) };
@@ -416,7 +449,7 @@ Return ONLY valid JSON.`;
     agency: opp.department || opp.subTier || 'Federal',
     naicsCode: opp.naicsCode,
     setAside: opp.setAsideDescription || opp.setAside,
-    responseDeadline: opp.responseDeadline,
+    responseDeadline: formatSamDate(opp.responseDeadline),
     daysRemaining: getDaysUntil(opp.responseDeadline),
     noticeType: opp.noticeType,
     solicitationNumber: opp.solicitationNumber,
@@ -989,6 +1022,177 @@ Return ONLY valid JSON.`;
     actionPlan: data.actionPlan || [],
     risks: data.risks || [],
     immediateNextMove: data.immediateNextMove || { action: 'Review opportunity', owner: 'Capture Lead', deadline: 'Tomorrow' },
+  };
+}
+
+// ============ COMBINED PURSUIT BRIEF (TOP 3 FROM BOTH SOURCES) ============
+
+interface CombinedPursuitCandidate {
+  source: 'SAM.gov' | 'USASpending';
+  title: string;
+  agency: string;
+  value: string;
+  valueNum: number;
+  naicsCode: string;
+  setAside: string;
+  deadline?: string;
+  daysRemaining?: number;
+  incumbent?: string;
+  description: string;
+  samLink?: string;
+  // For USASpending recompetes
+  numberOfBids?: number;
+  competitionLevel?: string;
+  expirationDate?: string;
+}
+
+interface PursuitTarget {
+  rank: number;
+  title: string;
+  agency: string;
+  value: string;
+  source: 'SAM.gov' | 'USASpending';
+  winProbability: number;
+  winProbabilityBreakdown: {
+    naicsMatch: number;
+    setAsideMatch: number;
+    competitionLevel: number;
+    valueRange: number;
+    timelineAlignment: number;
+  };
+  whyWorthPursuing: string;
+  captureStrategy: string;
+  keyContacts: string[];
+  teamingPartners: string[];
+  timeline: { week: number; milestone: string }[];
+  competitiveThreat: string;
+  deadline?: string;
+  samLink?: string;
+}
+
+interface CombinedPursuitBrief {
+  generatedAt: string;
+  targets: PursuitTarget[];
+}
+
+function buildCombinedPursuitCandidates(
+  samOpportunities: SAMOpportunity[],
+  usaSpendingContracts: ContractForBriefing[]
+): CombinedPursuitCandidate[] {
+  const candidates: CombinedPursuitCandidate[] = [];
+
+  // Add top SAM.gov opportunities (active solicitations - bid NOW)
+  for (const opp of samOpportunities.slice(0, 10)) {
+    candidates.push({
+      source: 'SAM.gov',
+      title: opp.title || 'Untitled Opportunity',
+      agency: `${opp.department || 'Unknown'}${opp.subTier ? ` - ${opp.subTier}` : ''}`,
+      value: 'TBD', // SAM opportunities API doesn't include award amount
+      valueNum: 0,
+      naicsCode: opp.naicsCode || 'N/A',
+      setAside: opp.setAsideDescription || 'Full & Open',
+      deadline: opp.responseDeadline,
+      daysRemaining: getDaysUntil(opp.responseDeadline || ''),
+      description: opp.description?.slice(0, 500) || '',
+      samLink: `https://sam.gov/opp/${opp.noticeId}/view`,
+    });
+  }
+
+  // Add top USASpending recompetes (position BEFORE RFP drops)
+  for (const contract of usaSpendingContracts.slice(0, 10)) {
+    candidates.push({
+      source: 'USASpending',
+      title: contract.contractName,
+      agency: contract.agency,
+      value: `$${(contract.value / 1_000_000).toFixed(1)}M`,
+      valueNum: contract.value,
+      naicsCode: contract.naicsCode,
+      setAside: contract.setAside || 'Full & Open',
+      incumbent: contract.incumbent,
+      description: contract.description?.slice(0, 500) || '',
+      numberOfBids: contract.numberOfBids,
+      competitionLevel: contract.competitionLevel,
+      expirationDate: contract.expirationDate,
+      daysRemaining: contract.daysUntilExpiration,
+    });
+  }
+
+  return candidates;
+}
+
+async function generateCombinedPursuitBrief(
+  anthropic: Anthropic,
+  candidates: CombinedPursuitCandidate[]
+): Promise<CombinedPursuitBrief> {
+  const prompt = `You are a senior GovCon capture manager. Analyze these opportunities from TWO SOURCES and select the TOP 3 highest-probability wins.
+
+CANDIDATE OPPORTUNITIES:
+${JSON.stringify(candidates, null, 2)}
+
+SOURCE CONTEXT:
+- SAM.gov = ACTIVE solicitations you can bid on NOW (deadline matters!)
+- USASpending = RECOMPETE intel (incumbent contract expiring, position BEFORE RFP drops)
+
+For each of your TOP 3 selections, provide:
+1. "winProbability" - 0-100 score
+2. "winProbabilityBreakdown" - JSON with these 5 factors (each 0-20 points):
+   - "naicsMatch": How well does NAICS align
+   - "setAsideMatch": Does set-aside match typical small business
+   - "competitionLevel": Lower competition = higher score
+   - "valueRange": Sweet spot $100K-$50M = higher score
+   - "timelineAlignment": Reasonable timeline = higher score
+3. "whyWorthPursuing" - 2-3 sentence strategic rationale
+4. "captureStrategy" - Specific approach to win this
+5. "keyContacts" - 3 specific roles to reach out to (e.g., "Small Business Program Manager", "Agency OSDBU Director", "Program Manager"). NEVER include generic "Contracting Officer" - they don't engage with contractors during market research. Focus on people who can actually help position you.
+6. "teamingPartners" - 2-3 types of partners to approach (e.g., "Cleared IT staffing firm")
+7. "timeline" - 4 milestones: [{ "week": 1, "milestone": "..." }, ...]
+8. "competitiveThreat" - Who else is likely bidding and why
+
+SELECTION CRITERIA (ranked):
+1. Win probability based on factors above
+2. Actionable timeline (deadline within 60 days for SAM.gov, expiring within 18 months for recompete)
+3. Value in sweet spot ($100K - $50M)
+4. Low competition indicators (few bids, incumbent vulnerable)
+
+Return JSON array of exactly 3 targets, ranked 1-3:
+{
+  "targets": [
+    {
+      "rank": 1,
+      "title": "...",
+      "agency": "...",
+      "value": "$XM",
+      "source": "SAM.gov",
+      "winProbability": 85,
+      "winProbabilityBreakdown": { "naicsMatch": 20, "setAsideMatch": 18, "competitionLevel": 17, "valueRange": 15, "timelineAlignment": 15 },
+      "whyWorthPursuing": "...",
+      "captureStrategy": "...",
+      "keyContacts": ["...", "...", "..."],
+      "teamingPartners": ["...", "..."],
+      "timeline": [{ "week": 1, "milestone": "..." }, ...],
+      "competitiveThreat": "...",
+      "deadline": "2026-04-15",
+      "samLink": "https://..."
+    },
+    ...
+  ]
+}
+
+Return ONLY valid JSON.`;
+
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4000,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const text = message.content[0].type === 'text' ? message.content[0].text : '';
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const data = JSON.parse(jsonMatch?.[0] || '{ "targets": [] }');
+
+  return {
+    generatedAt: new Date().toISOString(),
+    targets: data.targets || [],
   };
 }
 
@@ -1586,6 +1790,224 @@ ${brief.immediateNextMove.action}
 Owner: ${brief.immediateNextMove.owner}
 Deadline: ${brief.immediateNextMove.deadline}
 
+Generated by GovCon Giants AI
+`;
+}
+
+// ============ COMBINED PURSUIT BRIEF (TOP 3) EMAIL TEMPLATES ============
+
+function generateCombinedPursuitEmailHtml(brief: CombinedPursuitBrief): string {
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'TBD';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 75) return SUCCESS_COLOR;
+    if (score >= 60) return '#f59e0b';
+    return '#ef4444';
+  };
+
+  const getScoreLabel = (score: number) => {
+    if (score >= 75) return 'EXCELLENT';
+    if (score >= 60) return 'GOOD';
+    return 'EVALUATE';
+  };
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Top 3 Pursuit Targets</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; }
+    .container { max-width: 700px; margin: 0 auto; background: #ffffff; }
+    .header { background: linear-gradient(135deg, ${BRAND_COLOR} 0%, ${ACCENT_COLOR} 100%); color: white; padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
+    .header p { margin: 12px 0 0; font-size: 16px; opacity: 0.9; }
+    .section { padding: 24px; border-bottom: 1px solid #e5e7eb; }
+    .section:last-of-type { border-bottom: none; }
+    .target-card { background: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 20px; border: 1px solid #e5e7eb; }
+    .target-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .target-rank { width: 48px; height: 48px; background: linear-gradient(135deg, ${BRAND_COLOR} 0%, ${ACCENT_COLOR} 100%); color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; }
+    .target-info { flex: 1; min-width: 200px; }
+    .target-title { font-size: 18px; font-weight: 700; color: #111827; margin: 0 0 4px; }
+    .target-meta { font-size: 14px; color: #6b7280; margin: 0; }
+    .source-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; margin-left: 8px; }
+    .source-sam { background: #dbeafe; color: #1e40af; }
+    .source-usa { background: #fef3c7; color: #92400e; }
+    .score-box { text-align: center; background: white; border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .score-number { font-size: 28px; font-weight: 700; }
+    .score-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .score-breakdown { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px dashed #e5e7eb; }
+    .breakdown-item { text-align: center; }
+    .breakdown-score { font-size: 14px; font-weight: 700; color: #374151; }
+    .breakdown-label { font-size: 10px; color: #9ca3af; text-transform: uppercase; }
+    .subsection { margin-top: 16px; padding-top: 16px; border-top: 1px dashed #e5e7eb; }
+    .subsection-title { font-size: 13px; color: ${BRAND_COLOR}; font-weight: 700; text-transform: uppercase; margin: 0 0 8px; letter-spacing: 0.5px; }
+    .subsection-content { font-size: 14px; color: #374151; line-height: 1.6; margin: 0; }
+    .list-inline { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .list-inline li { background: #eff6ff; color: #1e40af; padding: 4px 10px; border-radius: 4px; font-size: 13px; }
+    .timeline { margin: 0; padding: 0; list-style: none; }
+    .timeline-item { display: flex; padding: 6px 0; }
+    .timeline-week { width: 60px; font-weight: 700; color: ${SUCCESS_COLOR}; font-size: 13px; }
+    .timeline-milestone { font-size: 13px; color: #374151; }
+    .view-link { display: inline-block; background: ${BRAND_COLOR}; color: white; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; margin-top: 16px; }
+    .view-link:hover { background: ${ACCENT_COLOR}; }
+    .footer { background: #f9fafb; padding: 24px; text-align: center; }
+    .footer p { margin: 0 0 8px; font-size: 12px; color: #6b7280; }
+    .footer a { color: ${ACCENT_COLOR}; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>YOUR TOP 3 PURSUIT TARGETS</h1>
+      <p>Combined intelligence from SAM.gov + USASpending</p>
+    </div>
+
+    <div class="section">
+      ${brief.targets.map(target => `
+        <div class="target-card">
+          <div class="target-header">
+            <div class="target-rank">#${target.rank}</div>
+            <div class="target-info">
+              <h3 class="target-title">
+                ${escapeHtml(target.title)}
+                <span class="source-badge ${target.source === 'SAM.gov' ? 'source-sam' : 'source-usa'}">${target.source}</span>
+              </h3>
+              <p class="target-meta">${escapeHtml(target.agency)} | ${escapeHtml(target.value)}${target.deadline ? ` | Due: ${formatDate(target.deadline)}` : ''}</p>
+            </div>
+            <div class="score-box">
+              <div class="score-number" style="color: ${getScoreColor(target.winProbability)}">${target.winProbability}%</div>
+              <div class="score-label" style="color: ${getScoreColor(target.winProbability)}">${getScoreLabel(target.winProbability)}</div>
+            </div>
+          </div>
+
+          <div class="score-breakdown">
+            <div class="breakdown-item">
+              <div class="breakdown-score">${target.winProbabilityBreakdown?.naicsMatch || 0}/20</div>
+              <div class="breakdown-label">NAICS</div>
+            </div>
+            <div class="breakdown-item">
+              <div class="breakdown-score">${target.winProbabilityBreakdown?.setAsideMatch || 0}/20</div>
+              <div class="breakdown-label">Set-Aside</div>
+            </div>
+            <div class="breakdown-item">
+              <div class="breakdown-score">${target.winProbabilityBreakdown?.competitionLevel || 0}/20</div>
+              <div class="breakdown-label">Competition</div>
+            </div>
+            <div class="breakdown-item">
+              <div class="breakdown-score">${target.winProbabilityBreakdown?.valueRange || 0}/20</div>
+              <div class="breakdown-label">Value</div>
+            </div>
+            <div class="breakdown-item">
+              <div class="breakdown-score">${target.winProbabilityBreakdown?.timelineAlignment || 0}/20</div>
+              <div class="breakdown-label">Timeline</div>
+            </div>
+          </div>
+
+          <div class="subsection">
+            <h4 class="subsection-title">Why Worth Pursuing</h4>
+            <p class="subsection-content">${escapeHtml(target.whyWorthPursuing)}</p>
+          </div>
+
+          <div class="subsection">
+            <h4 class="subsection-title">Capture Strategy</h4>
+            <p class="subsection-content">${escapeHtml(target.captureStrategy)}</p>
+          </div>
+
+          <div class="subsection">
+            <h4 class="subsection-title">Key Contacts to Engage</h4>
+            <ul class="list-inline">
+              ${(target.keyContacts || []).map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div class="subsection">
+            <h4 class="subsection-title">Teaming Partners to Approach</h4>
+            <ul class="list-inline">
+              ${(target.teamingPartners || []).map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div class="subsection">
+            <h4 class="subsection-title">4-Week Timeline</h4>
+            <ul class="timeline">
+              ${(target.timeline || []).map(t => `
+                <li class="timeline-item">
+                  <span class="timeline-week">Week ${t.week}</span>
+                  <span class="timeline-milestone">${escapeHtml(t.milestone)}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+
+          <div class="subsection">
+            <h4 class="subsection-title">Competitive Threat</h4>
+            <p class="subsection-content">${escapeHtml(target.competitiveThreat)}</p>
+          </div>
+
+          ${target.samLink ? `<a href="${target.samLink}" class="view-link">View on SAM.gov</a>` : ''}
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="footer">
+      <p>Generated by <strong>GovCon Giants AI</strong> on ${new Date(brief.generatedAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+      <p><a href="https://shop.govcongiants.org/briefings">View Full Analysis</a> | <a href="https://shop.govcongiants.org/briefings/settings">Manage Preferences</a></p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+}
+
+function generateCombinedPursuitEmailText(brief: CombinedPursuitBrief): string {
+  return `
+YOUR TOP 3 PURSUIT TARGETS
+${'='.repeat(50)}
+Combined intelligence from SAM.gov + USASpending
+
+${brief.targets.map(target => `
+${'='.repeat(50)}
+#${target.rank} ${target.title}
+${'='.repeat(50)}
+Source: ${target.source}
+Agency: ${target.agency}
+Value: ${target.value}
+${target.deadline ? `Deadline: ${target.deadline}` : ''}
+
+WIN PROBABILITY: ${target.winProbability}%
+  - NAICS Match: ${target.winProbabilityBreakdown?.naicsMatch || 0}/20
+  - Set-Aside Match: ${target.winProbabilityBreakdown?.setAsideMatch || 0}/20
+  - Competition Level: ${target.winProbabilityBreakdown?.competitionLevel || 0}/20
+  - Value Range: ${target.winProbabilityBreakdown?.valueRange || 0}/20
+  - Timeline Alignment: ${target.winProbabilityBreakdown?.timelineAlignment || 0}/20
+
+WHY WORTH PURSUING:
+${target.whyWorthPursuing}
+
+CAPTURE STRATEGY:
+${target.captureStrategy}
+
+KEY CONTACTS:
+${(target.keyContacts || []).map(c => `  - ${c}`).join('\n')}
+
+TEAMING PARTNERS:
+${(target.teamingPartners || []).map(p => `  - ${p}`).join('\n')}
+
+4-WEEK TIMELINE:
+${(target.timeline || []).map(t => `  Week ${t.week}: ${t.milestone}`).join('\n')}
+
+COMPETITIVE THREAT:
+${target.competitiveThreat}
+${target.samLink ? `\nView on SAM.gov: ${target.samLink}` : ''}
+`).join('\n')}
+
+${'='.repeat(50)}
 Generated by GovCon Giants AI
 `;
 }
