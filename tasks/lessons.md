@@ -531,4 +531,35 @@ git show HEAD:vercel.json | grep "your-cron-path"
 
 ---
 
-*Last Updated: April 2, 2026*
+## Check Existing Variable Names Before Writing Data Files
+
+**Lesson (Apr 3, 2026):** Always check what variable name an HTML file expects before writing/modifying data files.
+
+**What happened:**
+- `recompete.html` expected: `var expiringContractsData = [...]`
+- Merge script wrote: `var contractsData = [...]`
+- Result: Stats showed `--` (blank) because JavaScript couldn't find the variable
+
+**Prevention:**
+```bash
+# Before writing a data file, check what the HTML expects
+grep -n "expiringContractsData\|contractsData" public/recompete.html
+
+# Check current variable name in data file
+head -1 public/contracts-data.js
+```
+
+**Pattern for data scripts:**
+```javascript
+// At top of script, document the expected variable name
+const VARIABLE_NAME = 'expiringContractsData'; // MUST match recompete.html
+
+// Use it when writing
+const output = `var ${VARIABLE_NAME} = ${JSON.stringify(data, null, 2)};`;
+```
+
+**Rule:** Read the consumer (HTML) before writing the producer (data file).
+
+---
+
+*Last Updated: April 3, 2026*
