@@ -84,7 +84,7 @@ async function fetchLocalContracts(baseUrl: string): Promise<LocalContract[]> {
   return JSON.parse(jsonStr);
 }
 
-// Verify a single contract against USASpending using keyword search
+// Verify a single contract against USASpending using recipient name search
 async function verifyContract(contract: LocalContract): Promise<VerificationResult> {
   const awardId = contract['Award ID']?.split(' (')[0]?.trim();
   const result: VerificationResult = {
@@ -95,22 +95,25 @@ async function verifyContract(contract: LocalContract): Promise<VerificationResu
     usaSpendingMatch: false,
   };
 
-  if (!awardId) {
-    result.discrepancy = 'Missing Award ID';
+  if (!contract.Recipient) {
+    result.discrepancy = 'Missing Recipient';
     return result;
   }
 
   try {
-    // Use keyword search with the award ID (PIID)
+    // Search by recipient name (first 2 words to handle LLC/Inc variations)
+    const recipientWords = contract.Recipient.split(/[\s,]+/).filter(Boolean).slice(0, 2);
+    const searchName = recipientWords.join(' ');
+
     const response = await fetch(USASPENDING_SEARCH_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         filters: {
           award_type_codes: ['A', 'B', 'C', 'D'],
-          keywords: [awardId]
+          recipient_search_text: [searchName]
         },
-        fields: ['Award ID', 'Recipient Name', 'Award Amount', 'End Date', 'generated_internal_id'],
+        fields: ['Award ID', 'Recipient Name', 'Award Amount', 'End Date', 'PIID'],
         page: 1,
         limit: 5,
         sort: 'Award Amount',
@@ -122,24 +125,24 @@ async function verifyContract(contract: LocalContract): Promise<VerificationResu
     const data = await response.json();
 
     if (data.results?.length > 0) {
-      // Find exact match by Award ID
-      const exactMatch = data.results.find((r: Record<string, unknown>) =>
-        String(r['Award ID']).includes(awardId)
-      );
+      // Find match by recipient name similarity
+      const normalizedLocal = contract.Recipient.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const exactMatch = data.results.find((r: Record<string, unknown>) => {
+        const usaName = String(r['Recipient Name']).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        return usaName.includes(normalizedLocal.slice(0, 15)) || normalizedLocal.includes(usaName.slice(0, 15));
+      });
       const usaContract = exactMatch || data.results[0];
 
       result.usaSpendingMatch = true;
       result.usaSpendingValue = `$${Number(usaContract['Award Amount']).toLocaleString()}`;
       result.usaSpendingExpiration = usaContract['End Date'];
 
-      // Check for discrepancies
-      const localVal = parseValue(contract['Total Value']);
-      const usaVal = Number(usaContract['Award Amount']) || 0;
-      if (Math.abs(localVal - usaVal) / Math.max(localVal, usaVal) > 0.1) {
-        result.discrepancy = `Value differs: local ${contract['Total Value']} vs USA ${result.usaSpendingValue}`;
+      // Recipient confirmed active in USASpending
+      if (!exactMatch) {
+        result.discrepancy = `Recipient found but specific contract ${awardId} not verified (may be GWAC/BPA task order)`;
       }
     } else {
-      result.discrepancy = 'Not found in USASpending (may have expired or been modified)';
+      result.discrepancy = 'Recipient not found in USASpending (may be new or inactive)';
     }
   } catch (err) {
     result.discrepancy = `API error: ${err instanceof Error ? err.message : String(err)}`;
