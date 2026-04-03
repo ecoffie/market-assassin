@@ -9,7 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
-import { RecompeteContract } from '../pipelines/fpds-recompete';
+import { RecompeteContract, fetchExpiringContractsFromLocal } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 

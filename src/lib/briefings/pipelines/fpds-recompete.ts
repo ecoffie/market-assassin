@@ -378,4 +378,160 @@ export function scoreRecompete(
   };
 }
 
+/**
+ * Fetch expiring contracts from local pre-populated data (contracts-data.js)
+ * This uses the same data as the Recompete Tracker - comprehensive FPDS dump
+ */
+export async function fetchExpiringContractsFromLocal(
+  params: RecompeteSearchParams & { baseUrl?: string }
+): Promise<RecompeteSearchResult> {
+  const {
+    naicsCodes = [],
+    monthsToExpiration = 12,
+    limit = 200,
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org',
+  } = params;
+
+  console.log(`[Recompete-Local] Fetching from contracts-data.js for NAICS: ${naicsCodes.join(', ') || 'all'}`);
+
+  try {
+    // Fetch the pre-populated contracts data
+    const dataUrl = `${baseUrl}/contracts-data.js?v=${Date.now()}`;
+    const response = await fetch(dataUrl, { signal: AbortSignal.timeout(15000) });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch contracts-data.js: ${response.status}`);
+    }
+
+    const text = await response.text();
+    // Parse: strip "const expiringContractsData = " prefix and trailing ";"
+    const jsonStr = text.replace(/^[^[]*/, '').replace(/;?\s*$/, '');
+    const allContracts = JSON.parse(jsonStr) as LocalContract[];
+
+    console.log(`[Recompete-Local] Loaded ${allContracts.length} contracts from local data`);
+
+    // Filter by NAICS codes (match prefix)
+    const naicsPrefixes = naicsCodes.map(code => code.slice(0, 3)); // First 3 digits
+    const matchingContracts = allContracts.filter(contract => {
+      if (!contract.NAICS) return false;
+      const contractNaics = contract.NAICS.split(' - ')[0].trim();
+      // Match full code or prefix
+      return naicsCodes.some(code => contractNaics.startsWith(code)) ||
+             naicsPrefixes.some(prefix => contractNaics.startsWith(prefix));
+    });
+
+    console.log(`[Recompete-Local] ${matchingContracts.length} contracts match NAICS filter`);
+
+    // Convert to RecompeteContract format
+    const recompeteContracts: RecompeteContract[] = matchingContracts.map(contract => {
+      const daysUntilExpiration = calculateDaysUntilExpiration(parseLocalDate(contract.Expiration));
+      const naicsParts = (contract.NAICS || '').split(' - ');
+      const naicsCode = naicsParts[0]?.trim() || '';
+      const naicsDescription = naicsParts.slice(1).join(' - ').trim() || '';
+
+      return {
+        contractNumber: contract['Award ID']?.split(' (')[0]?.trim() || '',
+        orderNumber: null,
+        piid: contract['Award ID']?.split(' (')[0]?.trim() || '',
+
+        incumbentName: contract.Recipient || 'Unknown',
+        incumbentDuns: null,
+        incumbentCage: null,
+        incumbentUei: null,
+
+        obligatedAmount: parseValue(contract['Total Value']),
+        baseAndAllOptionsValue: parseValue(contract['Total Value']),
+        naicsCode,
+        naicsDescription,
+        psc: '',
+
+        contractingOffice: contract.Office || '',
+        contractingOfficeName: contract.Office || '',
+        agency: contract.Agency || '',
+        department: contract.Agency || '',
+
+        signedDate: parseLocalDate(contract['Start Date']),
+        effectiveDate: parseLocalDate(contract['Start Date']),
+        currentCompletionDate: parseLocalDate(contract.Expiration),
+        ultimateCompletionDate: parseLocalDate(contract.Expiration),
+
+        setAsideType: null,
+        isSmallBusiness: false,
+        isWomenOwned: false,
+        isVeteranOwned: false,
+        isServiceDisabledVeteranOwned: false,
+        is8aProgram: false,
+        isHubZone: false,
+
+        placeOfPerformanceState: contract.State || '',
+
+        daysUntilExpiration,
+        expirationRisk: getExpirationRisk(daysUntilExpiration),
+
+        numberOfBids: undefined,
+        competitionLevel: undefined,
+        competitionType: undefined,
+      };
+    });
+
+    // Filter by expiration window (future contracts only, within monthsToExpiration)
+    const maxDays = monthsToExpiration * 30;
+    const filtered = recompeteContracts.filter(c =>
+      c.daysUntilExpiration > 0 && c.daysUntilExpiration <= maxDays
+    );
+
+    // Sort by days until expiration (soonest first)
+    filtered.sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration);
+
+    console.log(`[Recompete-Local] Returning ${Math.min(filtered.length, limit)} contracts (${filtered.length} in window)`);
+
+    return {
+      contracts: filtered.slice(0, limit),
+      totalCount: filtered.length,
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error(`[Recompete-Local] Error:`, error);
+    // Fall back to USASpending API
+    console.log(`[Recompete-Local] Falling back to USASpending API...`);
+    return fetchExpiringContracts(params);
+  }
+}
+
+// Local contract format from contracts-data.js
+interface LocalContract {
+  Recipient: string;
+  Agency: string;
+  Office?: string;
+  NAICS: string;
+  State?: string;
+  'Total Value': string;
+  'Contract Count'?: number;
+  Expiration: string;
+  'Award ID': string;
+  'Start Date': string;
+  Contracts?: Array<{
+    'Award ID': string;
+    'Start Date': string;
+    Expiration: string;
+    Value: string;
+  }>;
+}
+
+// Parse "$1,234,567.89 " to number
+function parseValue(valueStr: string | undefined): number {
+  if (!valueStr) return 0;
+  const cleaned = valueStr.replace(/[$,\s]/g, '');
+  return parseFloat(cleaned) || 0;
+}
+
+// Parse "M/D/YYYY" to ISO date string
+function parseLocalDate(dateStr: string | undefined): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return '';
+  const [month, day, year] = parts;
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
 export type { RecompeteContract, RecompeteSearchParams, RecompeteSearchResult };

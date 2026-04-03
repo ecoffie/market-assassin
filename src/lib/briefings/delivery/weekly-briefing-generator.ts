@@ -9,7 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
-import { RecompeteContract, fetchExpiringContracts } from '../pipelines/fpds-recompete';
+import { RecompeteContract, fetchExpiringContractsFromLocal, fetchExpiringContracts } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
 import { WebSignal } from '../web-intel/types';
@@ -226,13 +226,14 @@ export async function generateWeeklyBriefing(
 
     console.log(`[WeeklyBriefing] Snapshots: ${snapshots?.length || 0}, Recompetes: ${organizedData.recompetes.length}`);
 
-    // FALLBACK: If no snapshots, fetch live recompete data from USASpending
+    // FALLBACK: If no snapshots, fetch from LOCAL FPDS data first (then USASpending as backup)
     if (organizedData.recompetes.length === 0 && organizedData.awards.length === 0) {
-      console.log(`[WeeklyBriefing] No snapshots found, fetching live recompete data from USASpending...`);
+      console.log(`[WeeklyBriefing] No snapshots found, fetching from LOCAL contracts-data.js (FPDS dump)...`);
       try {
         // Use prioritized NAICS codes (primary industry first)
         const naicsToUse = prioritizedNaics.length > 0 ? prioritizedNaics : ['541512', '541611', '541330'];
-        const recompeteResult = await fetchExpiringContracts({
+        // PRIMARY: Use local FPDS data dump (contracts-data.js) - comprehensive data including Construction
+        const recompeteResult = await fetchExpiringContractsFromLocal({
           naicsCodes: naicsToUse,
           monthsToExpiration: 12,
           limit: 50,
@@ -244,10 +245,27 @@ export async function generateWeeklyBriefing(
             contractors: [],
             webSignals: [],
           };
-          console.log(`[WeeklyBriefing] Found ${recompeteResult.contracts.length} live recompete opportunities`);
+          console.log(`[WeeklyBriefing] Found ${recompeteResult.contracts.length} recompete opportunities from LOCAL data`);
+        } else {
+          // BACKUP: Try USASpending API if no local matches
+          console.log(`[WeeklyBriefing] No local data matches, trying USASpending API...`);
+          const usaResult = await fetchExpiringContracts({
+            naicsCodes: naicsToUse,
+            monthsToExpiration: 12,
+            limit: 50,
+          });
+          if (usaResult.contracts.length > 0) {
+            organizedData = {
+              recompetes: usaResult.contracts,
+              awards: [],
+              contractors: [],
+              webSignals: [],
+            };
+            console.log(`[WeeklyBriefing] Found ${usaResult.contracts.length} from USASpending API`);
+          }
         }
       } catch (err) {
-        console.warn(`[WeeklyBriefing] Live recompete data fetch failed:`, err);
+        console.warn(`[WeeklyBriefing] Recompete data fetch failed:`, err);
       }
     }
 

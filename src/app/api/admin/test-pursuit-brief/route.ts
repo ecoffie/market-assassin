@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generatePursuitBrief, PursuitBrief } from '@/lib/briefings/delivery/pursuit-brief-generator';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
-import { fetchExpiringContracts } from '@/lib/briefings/pipelines/fpds-recompete';
+import { fetchExpiringContractsFromLocal, fetchExpiringContracts } from '@/lib/briefings/pipelines/fpds-recompete';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
@@ -82,7 +82,8 @@ export async function GET(request: NextRequest) {
       const naicsCodes = prioritizeNaicsByIndustry(rawNaicsCodes, primaryIndustry);
       console.log(`[TestPursuitBrief] Primary industry: ${primaryIndustry || 'none'}, prioritized NAICS: ${naicsCodes.slice(0, 5).join(', ')}...`);
 
-      const recompeteResult = await fetchExpiringContracts({
+      // PRIMARY: Use local FPDS data dump (contracts-data.js)
+      const recompeteResult = await fetchExpiringContractsFromLocal({
         naicsCodes,
         monthsToExpiration: 12,
         limit: 10,
