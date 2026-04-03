@@ -82,13 +82,19 @@ DISPLACEMENT ANGLES TO LOOK FOR:
 - Bridge contracts (vulnerability signal)
 - Multiple extensions (procurement fatigue)
 - 8(a) → unrestricted recompetes (new competition opens)
-- Incumbent terminations or scandals
+- Incumbent terminations or scandals (ONLY if verified with source)
 - M&A integration friction (company absorbed another)
 - New requirements/technology shifts
 - Consolidation vehicles (fresh competition)
-- Protest outcomes (incumbent lost)
+- Protest outcomes (incumbent lost) - ONLY with GAO case numbers
 - Greenfield opportunities (no incumbent)
-- Contract performance issues (from news/signals)
+- Contract performance issues (ONLY from verified news sources)
+
+CRITICAL - DO NOT FABRICATE:
+- DO NOT claim ASBCA cases, OSHA violations, or GAO protests without case numbers
+- DO NOT speculate about incumbent "performance issues" without verified sources
+- If real-time intelligence is empty or shows "no verified signals", use contract-based angles only (timeline, value, set-aside changes)
+- Better to say "Standard recompete opportunity" than to fabricate issues
 
 RANKING CRITERIA (in order):
 1. Active solicitation or RFI (immediate action)
@@ -498,28 +504,46 @@ function extractAndParseJSON<T>(responseText: string): T {
   // Remove control characters except \n, \r, \t (which are valid in JSON strings)
   jsonStr = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
 
-  // Step 4: Fix common JSON issues from AI responses
-  // Replace unescaped newlines inside strings with \n
-  jsonStr = jsonStr.replace(/"([^"]*?)(?<!\\)\n([^"]*?)"/g, (match, p1, p2) => {
-    return `"${p1}\\n${p2}"`;
-  });
+  // Step 4: Replace ALL literal newlines with escaped newlines
+  // This handles the case where Claude outputs actual newlines in JSON strings
+  // First, normalize line endings
+  jsonStr = jsonStr.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // Step 5: Try to parse
+  // Step 5: Replace newlines that appear inside string values with spaces
+  // Use a state machine approach to track whether we're inside a string
+  let result = '';
+  let inString = false;
+  let prevChar = '';
+
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i];
+
+    // Track string boundaries (accounting for escaped quotes)
+    if (char === '"' && prevChar !== '\\') {
+      inString = !inString;
+    }
+
+    // Replace newlines inside strings with spaces
+    if (char === '\n' && inString) {
+      result += ' ';
+    } else {
+      result += char;
+    }
+
+    // Track previous character (handle double backslash)
+    prevChar = (char === '\\' && prevChar === '\\') ? '' : char;
+  }
+
+  jsonStr = result;
+
+  // Step 6: Try to parse
   try {
     return JSON.parse(jsonStr) as T;
   } catch (firstError) {
-    // Step 6: More aggressive sanitization - replace all newlines in strings
-    // This is a fallback for really messy responses
-    const sanitized = jsonStr.replace(
-      /"([^"]*)"/g,
-      (match, content) => {
-        const cleaned = content
-          .replace(/\n/g, '\\n')
-          .replace(/\r/g, '\\r')
-          .replace(/\t/g, '\\t');
-        return `"${cleaned}"`;
-      }
-    );
+    // Step 7: Aggressive fallback - remove all newlines and extra whitespace
+    const sanitized = jsonStr
+      .replace(/\n/g, ' ')
+      .replace(/\s+/g, ' ');
 
     try {
       return JSON.parse(sanitized) as T;

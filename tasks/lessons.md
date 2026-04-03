@@ -651,4 +651,53 @@ Briefings are in inbox when users wake up at 6-7 AM ET.
 
 ---
 
+## AI Hallucination in Briefing Enrichment
+
+**Lesson (Apr 3, 2026):** AI models (Claude, Perplexity) will fabricate legal/regulatory issues when prompted to find "incumbent vulnerabilities."
+
+**What happened:**
+- Perplexity enrichment prompt asked for "Incumbent Issues: Performance problems, protests, negative CPARS, staffing issues?"
+- Prompt said "Always provide a displacementAngle even if speculative"
+- Result: AI fabricated ASBCA cases, OSHA violations, and GAO protests that don't exist
+- Web search verification found NO evidence of these claims
+- Users received briefings with false legal claims about contractors
+
+**Root cause:** The instruction "even if speculative" encouraged the AI to make things up when it couldn't find real data.
+
+**Prevention:**
+```typescript
+// BAD prompt - encourages hallucination
+"Incumbent Issues: Performance problems, protests, negative CPARS, staffing issues?"
+"Always provide a displacementAngle even if speculative"
+
+// GOOD prompt - demands verification
+"Incumbent Issues: ONLY report issues with verifiable sources - protests filed
+with GAO, ASBCA cases with case numbers, news articles with URLs. DO NOT speculate."
+"CRITICAL: If you cannot find a verifiable source (URL, case number), set field to false/null"
+"DO NOT fabricate ASBCA cases, GAO protests, CPARS issues, or OSHA violations"
+```
+
+**Rule:** Never instruct AI to be "speculative" about legal/regulatory issues. Require verifiable sources or return empty.
+
+**Files updated:**
+- `src/lib/briefings/enrichment/perplexity-enrichment.ts` - Removed speculation, added verification requirements
+- `src/lib/briefings/delivery/ai-briefing-generator.ts` - Added DO NOT FABRICATE instructions
+
+**Categories to NEVER hallucinate:**
+- ASBCA (Armed Services Board of Contract Appeals) cases
+- GAO (Government Accountability Office) protests
+- CPARS (Contractor Performance Assessment Reporting System) ratings
+- OSHA violations
+- Legal actions, lawsuits, settlements
+- Contract terminations
+
+**Better displacement angles (no hallucination needed):**
+- Bridge contract status (verifiable via contract data)
+- Multiple extensions (verifiable via contract history)
+- Set-aside changes (8(a) graduation → full competition)
+- M&A activity (publicly announced, news sources required)
+- Contract value and timeline (from contract data)
+
+---
+
 *Last Updated: April 3, 2026*

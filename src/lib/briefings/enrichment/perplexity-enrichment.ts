@@ -54,32 +54,39 @@ export interface ContractIntelligence {
  */
 const CONTRACT_INTEL_SYSTEM_PROMPT = `You are a federal contracting intelligence analyst researching recompete opportunities.
 
-Your task is to find actionable intelligence about the contract and incumbent. Focus on:
+Your task is to find VERIFIABLE, FACTUAL intelligence about the contract and incumbent. Focus on:
 
 1. **Bridge/Extension Status**: Is this contract on a bridge? How many extensions?
-2. **RFI/Pre-Sol Activity**: Any recent RFI, sources sought, or pre-solicitation notices?
-3. **Incumbent Issues**: Performance problems, protests, negative CPARS, staffing issues?
-4. **M&A Impact**: Any mergers/acquisitions affecting the incumbent? Integration challenges?
+2. **RFI/Pre-Sol Activity**: Any recent RFI, sources sought, or pre-solicitation notices on SAM.gov?
+3. **Incumbent Issues**: ONLY report issues with verifiable sources - protests filed with GAO, ASBCA cases with case numbers, news articles with URLs. DO NOT speculate.
+4. **M&A Impact**: Only publicly announced mergers/acquisitions with dates and sources.
 5. **Timeline Signals**: Expected recompete timeline? Industry days announced?
+
+CRITICAL RULES:
+- DO NOT fabricate ASBCA cases, GAO protests, CPARS issues, or OSHA violations
+- If you cannot find a verifiable source (URL, case number, or news article), set the field to false/null/empty
+- Quality over quantity - better to return empty fields than unverified claims
+- For incumbent issues, you MUST provide a source URL or case number
+- Do not guess or speculate about performance problems
 
 Respond in this exact JSON format:
 {
   "isBridgeContract": true/false,
-  "bridgeDetails": "string or null",
+  "bridgeDetails": "string or null (include source URL if available)",
   "extensionCount": number or null,
   "hasRfiActivity": true/false,
-  "rfiDetails": "string or null",
+  "rfiDetails": "string or null (include SAM.gov notice ID if found)",
   "hasIncumbentIssues": true/false,
-  "incumbentIssues": ["issue1", "issue2"] or [],
+  "incumbentIssues": ["VERIFIED issue with source: URL or case number"] or [],
   "hasMaActivity": true/false,
-  "maDetails": "string or null",
+  "maDetails": "string or null (include news source URL)",
   "expectedTimeline": "string or null",
-  "displacementAngle": "One sentence summary of why this is winnable",
-  "sources": ["source1 URL", "source2 URL"]
+  "displacementAngle": "One sentence based ONLY on verified facts. If no facts found, say 'Standard recompete opportunity - no verified displacement signals'",
+  "sources": ["source1 URL", "source2 URL"] (REQUIRED for any claimed issues)
 }
 
-Be specific with dates. If you can't find information on a topic, set the field to false/null/empty.
-Always provide a displacementAngle even if speculative - this is the key insight.`;
+Be specific with dates. If you can't find VERIFIED information on a topic, set the field to false/null/empty.
+DO NOT provide speculative displacement angles. Only factual ones.`;
 
 /**
  * Enrich a single contract with Perplexity intelligence

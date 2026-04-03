@@ -24,8 +24,8 @@ import {
   postSendValidation,
 } from '@/lib/intelligence';
 
-const BATCH_SIZE = 25;
 const MAX_USERS_PER_RUN = 1000;
+const DELAY_BETWEEN_USERS_MS = 3000; // 3 second delay between users to avoid Claude API rate limits (50k tokens/min)
 
 // Timezone offsets for delivery timing
 const TIMEZONE_OFFSETS: Record<string, number> = {
@@ -249,21 +249,26 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    console.log(`[SendBriefings] Processing ${usersToProcess.length} users (${allUsers.length - usersToProcess.length} filtered/deduped)`);
+    console.log(`[SendBriefings] Processing ${usersToProcess.length} users SEQUENTIALLY (${allUsers.length - usersToProcess.length} filtered/deduped)`);
 
-    // Step 2: Process in batches
-    for (let i = 0; i < usersToProcess.length; i += BATCH_SIZE) {
-      const batch = usersToProcess.slice(i, i + BATCH_SIZE);
+    // Step 2: Process users SEQUENTIALLY to avoid Claude API rate limits (50k tokens/min)
+    // With 892 users @ 3s delay = ~45 minutes, fits within Vercel Pro function limits
+    for (let i = 0; i < usersToProcess.length; i++) {
+      const user = usersToProcess[i];
 
-      const batchPromises = batch.map(async (user) => {
-        try {
-          // Check guardrails before processing each user
-          const guardrailCheck = guardrail.check();
-          if (!guardrailCheck.continue) {
-            console.log(`[SendBriefings] Guardrail blocked: ${guardrailCheck.reason}`);
-            briefingsSkipped++;
-            return;
-          }
+      // Log progress every 10 users
+      if (i % 10 === 0) {
+        console.log(`[SendBriefings] Progress: ${i}/${usersToProcess.length} users processed`);
+      }
+
+      try {
+        // Check guardrails before processing each user
+        const guardrailCheck = guardrail.check();
+        if (!guardrailCheck.continue) {
+          console.log(`[SendBriefings] Guardrail blocked: ${guardrailCheck.reason}`);
+          briefingsSkipped++;
+          continue;
+        }
 
           // REMOVED: Timezone filter was blocking most users
           // All briefings now sent at 7 AM UTC (2-3 AM ET) so users see them when they wake up
@@ -277,11 +282,11 @@ export async function GET(request: NextRequest) {
             .eq('briefing_date', today)
             .single();
 
-          if (existingBriefing?.delivery_status === 'sent') {
-            console.log(`[SendBriefings] ${user.email} already received briefing today, skipping`);
-            briefingsSkipped++;
-            return;
-          }
+        if (existingBriefing?.delivery_status === 'sent') {
+          console.log(`[SendBriefings] ${user.email} already received briefing today, skipping`);
+          briefingsSkipped++;
+          continue;
+        }
 
           // Generate AI-powered briefing (Top 10 + 3 Teaming Plays)
           const briefing = await generateAIBriefing(user.email, {
@@ -289,11 +294,11 @@ export async function GET(request: NextRequest) {
             maxTeamingPlays: 3,
           });
 
-          if (!briefing || briefing.opportunities.length === 0) {
-            console.log(`[SendBriefings] No opportunities for ${user.email}`);
-            briefingsSkipped++;
-            return;
-          }
+        if (!briefing || briefing.opportunities.length === 0) {
+          console.log(`[SendBriefings] No opportunities for ${user.email}`);
+          briefingsSkipped++;
+          continue;
+        }
 
           const briefingDate = new Date().toISOString().split('T')[0];
           const totalItems = briefing.opportunities.length + briefing.teamingPlays.length;
@@ -380,9 +385,9 @@ export async function GET(request: NextRequest) {
           console.error(`[SendBriefings] ${errorMsg}`);
           errors.push(errorMsg);
         }
-      });
 
-      await Promise.all(batchPromises);
+        // Add delay between users to avoid Claude API rate limits (50k tokens/min)
+        await new Promise(r => setTimeout(r, DELAY_BETWEEN_USERS_MS));
     }
 
     const elapsed = Date.now() - startTime;
