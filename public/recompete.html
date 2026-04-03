@@ -1324,7 +1324,7 @@
                 return;
             }
 
-            // Show "Data Through" based on most recent expiration date (indicates data freshness)
+            // Show "Data Through" based on latest expiration date in dataset
             try {
                 // Parse M/D/YYYY format dates
                 const parseDate = (str) => {
@@ -1339,9 +1339,8 @@
                     .sort((a, b) => b - a); // Sort descending (latest expiration first)
                 const latestExpiration = dates[0] || null;
                 if (latestExpiration) {
-                    // Show when data was last updated (today's date) and latest expiration
-                    const today = new Date();
-                    const dateStr = today.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    // Show the latest expiration date in the dataset
+                    const dateStr = latestExpiration.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
                     document.getElementById('lastUpdatedDate').innerHTML = dateStr + '<span style="color:#22c55e;font-size:10px;display:block;margin-top:2px">Fresh</span>';
                     document.getElementById('lastUpdatedCard').style.display = '';
                 }
