@@ -155,8 +155,8 @@ async function main() {
 
   console.log(`Total contracts after merge: ${merged.length}`);
 
-  // Write output
-  const output = `var contractsData = ${JSON.stringify(merged, null, 2)};`;
+  // Write output - MUST use expiringContractsData (not contractsData) for recompete.html
+  const output = `var expiringContractsData = ${JSON.stringify(merged, null, 2)};`;
   fs.writeFileSync(CONTRACTS_DATA_PATH, output);
 
   console.log(`\nWritten to: ${CONTRACTS_DATA_PATH}`);

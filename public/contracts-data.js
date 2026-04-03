@@ -1,4 +1,4 @@
-var contractsData = [
+var expiringContractsData = [
   {
     "Award ID": "W9127821D0015",
     "Agency": "Department of Defense",
