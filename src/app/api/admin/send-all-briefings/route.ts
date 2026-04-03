@@ -389,25 +389,74 @@ async function generateWeeklyDeepDive(anthropic: Anthropic, contracts: ContractF
   const monday = new Date();
   monday.setDate(monday.getDate() - monday.getDay() + 1);
 
-  const prompt = `You are a senior GovCon capture strategist. Generate a Weekly Deep Dive briefing with full analysis.
+  const prompt = `You are a senior GovCon capture strategist. Generate a COMPREHENSIVE Weekly Deep Dive briefing. This is MORE DETAILED than the daily brief.
 
 CONTRACT DATA (REAL DATA FROM USASPENDING):
 ${JSON.stringify(contracts, null, 2)}
 
-Generate JSON with:
-1. "opportunities" - Top 10 with FULL analysis. Each needs: rank, contractName, agency, incumbent, value (number), window, displacementAngle, keyDates (array of {label, date}), competitiveLandscape (array of 3-4 insights about competition), recommendedApproach (string)
-2. "teamingPlays" - 3 DETAILED plays. Each: playNumber, strategyName, targetCompany, whyTarget (array of reasons), whoToContact (array of roles/titles), suggestedOpener, followUpMessage
-3. "marketSignals" - 4 news items based on the contract data. Each: headline, source, implication, actionRequired (boolean)
-4. "calendar" - 6 key dates based on expiration dates. Each: date, event, type (deadline/industry_day/rfi_due/award_expected), priority (high/medium/low)
+REQUIRED JSON STRUCTURE - ALL FIELDS ARE MANDATORY:
 
-Focus on contracts with:
-- Low numberOfBids (1-2 bids = vulnerable incumbent)
-- competitionLevel "sole_source" or "low"
-- Near-term expiration (daysUntilExpiration < 180)
+{
+  "opportunities": [
+    {
+      "rank": 1,
+      "contractName": "string",
+      "agency": "string",
+      "incumbent": "string",
+      "value": number,
+      "window": "string (e.g. 'Recompete expected Q2 FY26')",
+      "displacementAngle": "string - WHY this incumbent is vulnerable",
+      "keyDates": [
+        {"label": "Contract End", "date": "2026-06-30"},
+        {"label": "Expected RFP", "date": "2026-03-15"},
+        {"label": "Industry Day (Estimated)", "date": "2026-02-01"}
+      ],
+      "competitiveLandscape": [
+        "Incumbent has held contract for 8 years with minimal competition",
+        "Only 2 bidders on last recompete suggests limited awareness",
+        "Recent M&A activity may create teaming opportunities",
+        "Small business set-aside limits large prime participation"
+      ],
+      "recommendedApproach": "string - specific capture strategy for this opportunity"
+    }
+  ],
+  "teamingPlays": [
+    {
+      "playNumber": 1,
+      "strategyName": "string",
+      "targetCompany": "string - specific company name",
+      "whyTarget": ["reason 1", "reason 2", "reason 3"],
+      "whoToContact": ["VP of BD", "Capture Manager", "Program Manager"],
+      "suggestedOpener": "string - copy-paste outreach message",
+      "followUpMessage": "string - follow-up if no response"
+    }
+  ],
+  "marketSignals": [
+    {
+      "headline": "string - news headline based on contract data",
+      "source": "string - publication name",
+      "implication": "string - what this means for capture",
+      "actionRequired": true/false
+    }
+  ],
+  "calendar": [
+    {
+      "date": "2026-04-15",
+      "event": "string - specific event",
+      "type": "deadline|industry_day|rfi_due|award_expected",
+      "priority": "high|medium|low"
+    }
+  ]
+}
 
-Be specific with dates, names, dollar amounts. This is for strategic planning.
+CRITICAL REQUIREMENTS:
+1. EVERY opportunity MUST have keyDates (at least 2-3 dates), competitiveLandscape (at least 3 items), and recommendedApproach
+2. Generate EXACTLY 4 marketSignals based on the contract data patterns you see
+3. Generate EXACTLY 6 calendar items with specific dates
+4. Be specific with company names, dollar amounts, and dates
+5. This is for strategic planning - be actionable and detailed
 
-Return ONLY valid JSON.`;
+Return ONLY valid JSON with ALL required fields populated.`;
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
