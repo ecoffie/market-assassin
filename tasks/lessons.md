@@ -562,4 +562,93 @@ const output = `var ${VARIABLE_NAME} = ${JSON.stringify(data, null, 2)};`;
 
 ---
 
+## AI Response JSON Parsing Failures
+
+**Lesson (Apr 3, 2026):** Claude/AI responses often contain control characters that break `JSON.parse()`. Always sanitize.
+
+**Error:** `Bad control character in string literal in JSON at position 6422`
+
+**What happened:**
+- AI generates JSON response with newlines or control chars inside string values
+- `JSON.parse(responseText)` fails
+- Briefings logged as "attempted" but never sent
+- No one received briefings for 3 weeks
+
+**Solution:** Always use robust JSON extraction:
+```typescript
+function extractAndParseJSON<T>(responseText: string): T {
+  let jsonStr = responseText.trim();
+
+  // Extract from markdown code blocks
+  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+
+  // Find JSON boundaries
+  const firstBrace = jsonStr.indexOf('{');
+  const lastBrace = jsonStr.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+  }
+
+  // Remove control characters (except \n, \r, \t which are valid)
+  jsonStr = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
+
+  return JSON.parse(jsonStr);
+}
+```
+
+**Rule:** Never use raw `JSON.parse()` on AI responses. Always sanitize first.
+
+---
+
+## Timezone Filters Can Block All Users
+
+**Lesson (Apr 3, 2026):** Timezone-based delivery filters can silently block most users if cron timing is wrong.
+
+**What happened:**
+- Code only sent briefings if user's local time was 6-10 AM
+- Cron ran at 10 AM UTC (5-6 AM ET)
+- Most users outside delivery window = silently skipped
+- 90%+ users never received briefings
+
+**Why it's bad:**
+- No error logged (user just "skipped")
+- Looks like success in monitoring
+- Hard to diagnose
+
+**Fix:** Removed timezone filter. Send to ALL users at fixed UTC time (7 AM UTC = 2-3 AM ET).
+Users wake up to see briefings instead of system trying to "guess" their wake time.
+
+**Pattern:** For non-critical notifications, prefer fixed send times over smart delivery windows.
+Smart windows create silent failure modes.
+
+---
+
+## Cron Schedule Best Practices
+
+**Lesson (Apr 3, 2026):** Briefing/alert crons should run BEFORE users wake up, not during business hours.
+
+**Bad schedule:**
+```json
+{ "path": "/api/cron/send-briefings", "schedule": "0 10 * * *" }  // 10 AM UTC = 5-6 AM ET
+```
+Users might already be awake and checking email before briefings arrive.
+
+**Good schedule:**
+```json
+{ "path": "/api/cron/send-briefings", "schedule": "0 7 * * *" }   // 7 AM UTC = 2-3 AM ET
+```
+Briefings are in inbox when users wake up at 6-7 AM ET.
+
+**Current schedule:**
+| Job | UTC Time | ET Time | Purpose |
+|-----|----------|---------|---------|
+| send-briefings | 7 AM | 2-3 AM | Daily briefings (before wake) |
+| daily-alerts (1) | 11 AM | 6-7 AM | Morning alert (first check) |
+| daily-alerts (2) | 12 PM | 7-8 AM | Morning catch-up |
+| daily-alerts (3) | 2 PM | 9-10 AM | Mid-morning |
+| daily-alerts (4) | 4 PM | 11 AM-12 PM | Lunch catch-up |
+
+---
+
 *Last Updated: April 3, 2026*

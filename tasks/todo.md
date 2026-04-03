@@ -2,6 +2,62 @@
 
 ## Session State (April 3, 2026)
 
+### 🔥 CRITICAL FIX: Daily Briefings Now Working
+
+**Problem:** Briefings were being logged as "sent" in database but no one received them for 3 weeks.
+
+**Root Causes Found & Fixed:**
+
+1. **JSON Parsing Error** - AI responses from Claude contained control characters that broke `JSON.parse()`
+   - **Fix:** Added `extractAndParseJSON()` helper with robust sanitization in `ai-briefing-generator.ts`
+
+2. **Timezone Filter Blocking 90%+ Users** - Only sent if local time 6-10 AM, but cron ran at wrong time
+   - **Fix:** Removed timezone filter entirely - briefings now go to ALL users
+
+3. **Cron Schedule Wrong** - Was running at 10 AM UTC (5-6 AM ET)
+   - **Fix:** Changed to 7 AM UTC (2-3 AM ET) so users see briefings when they wake up
+
+4. **Small Batch Sizes** - Only 10 users/batch, max 200 users/run
+   - **Fix:** Increased to 25/batch, 1000 max users per run
+
+**Files Modified:**
+- `src/lib/briefings/delivery/ai-briefing-generator.ts` - Added JSON sanitization
+- `src/app/api/cron/send-briefings/route.ts` - Removed timezone filter, increased batches
+- `vercel.json` - Changed cron from `0 10 * * *` to `0 7 * * *`
+- `src/app/api/admin/enable-briefings-all/route.ts` - New admin endpoint
+
+**Verification:** 9 briefings sent successfully via trigger-briefings. Check if zach@govcongiants.com received email.
+
+**Current Cron Schedule:**
+| Job | Schedule (UTC) | Local (ET) |
+|-----|----------------|------------|
+| send-briefings | 7 AM | 2-3 AM |
+| daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | 6-7 AM, 7-8 AM, 9-10 AM, 11 AM-12 PM |
+
+---
+
+## 📋 ACTIVE: Intelligence Platform Moat Strategy
+
+**PRD:** `docs/PRD-intelligence-platform.md`
+
+### Priority Order:
+1. **NOW:** Moat 1 & 2 - Validate with 800 users (30 days) ← FIXING BRIEFINGS
+2. **NEXT:** Moat 3 - Proprietary Knowledge Base (RAG)
+3. **THEN:** Moat 4 - GovCon Data API
+4. **LAST:** Part 2 - Lead conversion for 8,000
+
+### Phase 1A: 21-Day Free Trial (PENDING - After briefings confirmed)
+- [ ] Add `trial_start_date`, `trial_end_date` columns
+- [ ] Create trial signup flow
+- [ ] Email sequence (welcome, day 14, day 18, day 21)
+- [ ] Trial expiration cron
+
+### Phase 1B: Weekly Bids Report (PENDING)
+- [ ] New cron `weekly-bids-report` (Monday 6 AM local)
+- [ ] Query SAM.gov for all open opps by user NAICS
+- [ ] Categorize by notice type
+- [ ] Format as digest email
+
 ---
 
 ## 📋 FUTURE TASKS (After Moat Phases)
