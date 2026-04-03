@@ -23,7 +23,8 @@ import { INDUSTRY_PRESETS } from '@/lib/industry-presets';
 
 export const maxDuration = 120; // 2 minutes
 
-const USASPENDING_API = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
+const USASPENDING_SEARCH_API = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
+const USASPENDING_AWARD_API = 'https://api.usaspending.gov/api/v2/awards/';
 
 interface LocalContract {
   Recipient: string;
@@ -83,7 +84,7 @@ async function fetchLocalContracts(baseUrl: string): Promise<LocalContract[]> {
   return JSON.parse(jsonStr);
 }
 
-// Verify a single contract against USASpending
+// Verify a single contract against USASpending using keyword search
 async function verifyContract(contract: LocalContract): Promise<VerificationResult> {
   const awardId = contract['Award ID']?.split(' (')[0]?.trim();
   const result: VerificationResult = {
@@ -100,18 +101,20 @@ async function verifyContract(contract: LocalContract): Promise<VerificationResu
   }
 
   try {
-    // Search USASpending by award ID
-    const response = await fetch(USASPENDING_API, {
+    // Use keyword search with the award ID (PIID)
+    const response = await fetch(USASPENDING_SEARCH_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         filters: {
           award_type_codes: ['A', 'B', 'C', 'D'],
-          award_ids: [awardId]
+          keywords: [awardId]
         },
-        fields: ['Award ID', 'Recipient Name', 'Award Amount', 'End Date'],
+        fields: ['Award ID', 'Recipient Name', 'Award Amount', 'End Date', 'generated_internal_id'],
         page: 1,
-        limit: 1
+        limit: 5,
+        sort: 'Award Amount',
+        order: 'desc'
       }),
       signal: AbortSignal.timeout(10000)
     });
@@ -119,7 +122,12 @@ async function verifyContract(contract: LocalContract): Promise<VerificationResu
     const data = await response.json();
 
     if (data.results?.length > 0) {
-      const usaContract = data.results[0];
+      // Find exact match by Award ID
+      const exactMatch = data.results.find((r: Record<string, unknown>) =>
+        String(r['Award ID']).includes(awardId)
+      );
+      const usaContract = exactMatch || data.results[0];
+
       result.usaSpendingMatch = true;
       result.usaSpendingValue = `$${Number(usaContract['Award Amount']).toLocaleString()}`;
       result.usaSpendingExpiration = usaContract['End Date'];
@@ -217,7 +225,7 @@ function generateExpansionQueries(gaps: NaicsGap[]): string[] {
     const codes = gap.naicsCode.split(', ');
     for (const code of codes) {
       queries.push(`# ${gap.industry} - NAICS ${code}
-curl -X POST "${USASPENDING_API}" \\
+curl -X POST "${USASPENDING_SEARCH_API}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "filters": {
