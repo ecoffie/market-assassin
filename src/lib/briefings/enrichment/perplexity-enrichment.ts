@@ -10,6 +10,7 @@
 
 import { RecompeteContract } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
+import { searchRelatedOpportunities, type RelatedOpportunityResult } from '../pipelines/sam-gov';
 
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
@@ -47,6 +48,24 @@ export interface ContractIntelligence {
 
   sources: string[];
   fetchedAt: string;
+
+  // SAM.gov VERIFIED data (not from Perplexity)
+  samVerified?: {
+    hasRelatedOpportunities: boolean;
+    sourcesSoughtCount: number;
+    presolicitationCount: number;
+    rfiCount: number;
+    relatedOpportunities?: Array<{
+      noticeId: string;
+      title: string;
+      noticeType: string;
+      postedDate: string;
+      responseDeadline?: string;
+      uiLink: string;
+    }>;
+    searchedAt: string;
+    lookbackDays: number;
+  };
 }
 
 /**
@@ -89,17 +108,97 @@ Be specific with dates. If you can't find VERIFIED information on a topic, set t
 DO NOT provide speculative displacement angles. Only factual ones.`;
 
 /**
- * Enrich a single contract with Perplexity intelligence
+ * Enrich a single contract with Perplexity intelligence + SAM.gov verification
+ *
+ * IMPORTANT: SAM.gov data is VERIFIED and should be trusted.
+ * Perplexity data is web-scraped and should be treated with caution.
  */
 export async function enrichContractWithIntel(
   contract: RecompeteContract
 ): Promise<ContractIntelligence | null> {
-  if (!PERPLEXITY_API_KEY) {
-    console.warn('[Perplexity] API key not configured');
-    return null;
+  const SAM_API_KEY = process.env.SAM_API_KEY;
+
+  // Step 1: Search SAM.gov for VERIFIED RFI/Sources Sought activity
+  let samVerified: ContractIntelligence['samVerified'] = undefined;
+
+  if (SAM_API_KEY && contract.naicsCode) {
+    try {
+      console.log(`[Enrichment] Searching SAM.gov for related opps: NAICS ${contract.naicsCode}, Agency: ${contract.agency}`);
+
+      const samResult = await searchRelatedOpportunities({
+        naicsCode: contract.naicsCode,
+        agency: contract.agency || contract.department || '',
+        incumbentName: contract.incumbentName,
+        lookbackDays: 180, // 6 months
+      }, SAM_API_KEY);
+
+      if (samResult.found) {
+        samVerified = {
+          hasRelatedOpportunities: true,
+          sourcesSoughtCount: samResult.summary.sourcesSought,
+          presolicitationCount: samResult.summary.presolicitation,
+          rfiCount: samResult.summary.rfis,
+          relatedOpportunities: samResult.opportunities.slice(0, 5).map(opp => ({
+            noticeId: opp.noticeId,
+            title: opp.title,
+            noticeType: opp.noticeType,
+            postedDate: opp.postedDate,
+            responseDeadline: opp.responseDeadline,
+            uiLink: opp.uiLink,
+          })),
+          searchedAt: samResult.searchedAt,
+          lookbackDays: samResult.lookbackDays,
+        };
+        console.log(`[Enrichment] SAM.gov found ${samResult.summary.totalFound} related opportunities`);
+      } else {
+        samVerified = {
+          hasRelatedOpportunities: false,
+          sourcesSoughtCount: 0,
+          presolicitationCount: 0,
+          rfiCount: 0,
+          searchedAt: samResult.searchedAt,
+          lookbackDays: samResult.lookbackDays,
+        };
+        console.log(`[Enrichment] SAM.gov: No related opportunities found in last 180 days`);
+      }
+    } catch (err) {
+      console.warn(`[Enrichment] SAM.gov search failed:`, err);
+    }
   }
 
-  const query = buildContractQuery(contract);
+  // Step 2: If no Perplexity API key, return just SAM.gov data
+  if (!PERPLEXITY_API_KEY) {
+    console.warn('[Perplexity] API key not configured, returning SAM.gov data only');
+
+    // Build displacement angle from SAM.gov data
+    let displacementAngle = 'Standard recompete opportunity - no verified displacement signals';
+    if (samVerified?.hasRelatedOpportunities) {
+      const parts = [];
+      if (samVerified.sourcesSoughtCount > 0) parts.push(`${samVerified.sourcesSoughtCount} sources sought`);
+      if (samVerified.presolicitationCount > 0) parts.push(`${samVerified.presolicitationCount} presolicitation`);
+      if (samVerified.rfiCount > 0) parts.push(`${samVerified.rfiCount} RFI`);
+      displacementAngle = `Active acquisition signals on SAM.gov: ${parts.join(', ')}`;
+    }
+
+    return {
+      contractId: contract.contractNumber || contract.piid,
+      incumbent: contract.incumbentName,
+      agency: contract.agency,
+      isBridgeContract: false,
+      hasRfiActivity: samVerified?.hasRelatedOpportunities || false,
+      rfiDetails: samVerified?.relatedOpportunities?.[0]?.title || undefined,
+      hasIncumbentIssues: false,
+      incumbentIssues: [],
+      hasMaActivity: false,
+      displacementAngle,
+      sources: samVerified?.relatedOpportunities?.map(o => o.uiLink) || [],
+      samVerified,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  // Step 3: Call Perplexity for additional web intelligence
+  const query = buildContractQuery(contract, samVerified);
 
   try {
     const response = await fetch(PERPLEXITY_API_URL, {
@@ -135,11 +234,23 @@ export async function enrichContractWithIntel(
     // Parse JSON from response
     const intel = parseIntelResponse(content, contract);
 
+    // OVERRIDE Perplexity RFI data with SAM.gov verified data
+    if (samVerified) {
+      intel.hasRfiActivity = samVerified.hasRelatedOpportunities;
+      if (samVerified.hasRelatedOpportunities && samVerified.relatedOpportunities?.length) {
+        intel.rfiDetails = `VERIFIED on SAM.gov: ${samVerified.relatedOpportunities[0].title} (${samVerified.relatedOpportunities[0].noticeType})`;
+        intel.sources = [...(intel.sources || []), ...samVerified.relatedOpportunities.map(o => o.uiLink)];
+      } else {
+        intel.rfiDetails = `SAM.gov searched (${samVerified.lookbackDays} days): No RFI/Sources Sought found`;
+      }
+    }
+
     return {
       contractId: contract.contractNumber || contract.piid,
       incumbent: contract.incumbentName,
       agency: contract.agency,
       ...intel,
+      samVerified,
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {
@@ -191,7 +302,42 @@ export async function enrichContractsWithIntel(
 /**
  * Build the query for a contract
  */
-function buildContractQuery(contract: RecompeteContract): string {
+function buildContractQuery(
+  contract: RecompeteContract,
+  samVerified?: ContractIntelligence['samVerified']
+): string {
+  // Build SAM.gov verified section if available
+  let samSection = '';
+  if (samVerified) {
+    if (samVerified.hasRelatedOpportunities) {
+      samSection = `
+**VERIFIED SAM.gov Activity (DO NOT OVERRIDE - this data is authoritative):**
+- Sources Sought: ${samVerified.sourcesSoughtCount}
+- Presolicitation: ${samVerified.presolicitationCount}
+- RFI Notices: ${samVerified.rfiCount}
+${samVerified.relatedOpportunities?.slice(0, 3).map(o =>
+  `- "${o.title}" (${o.noticeType}, posted ${o.postedDate})`
+).join('\n') || ''}
+
+NOTE: RFI/pre-solicitation data is ALREADY VERIFIED from SAM.gov. Focus your research on:
+- Bridge/extension status
+- Incumbent issues (ONLY with verifiable sources)
+- M&A activity
+- Timeline signals`;
+    } else {
+      samSection = `
+**SAM.gov Search Result (VERIFIED):**
+- No RFI, Sources Sought, or Presolicitation found in last ${samVerified.lookbackDays} days
+- Set hasRfiActivity to FALSE in your response
+
+Focus your research on:
+- Bridge/extension status
+- Incumbent issues (ONLY with verifiable sources)
+- M&A activity
+- Timeline signals`;
+    }
+  }
+
   return `
 Federal contract intelligence request:
 
@@ -202,11 +348,12 @@ Federal contract intelligence request:
 **Expiration:** ${contract.daysUntilExpiration} days (${contract.currentCompletionDate || 'date unknown'})
 ${contract.contractNumber ? `**Contract Number:** ${contract.contractNumber}` : ''}
 ${contract.contractingOfficeName ? `**Contracting Office:** ${contract.contractingOfficeName}` : ''}
+${samSection}
 
 Please research and provide intelligence on:
 1. Is this contract on a bridge or extension?
-2. Any RFI or pre-solicitation activity?
-3. Incumbent performance issues or vulnerabilities?
+2. ${samVerified ? 'SKIP - RFI data already verified above' : 'Any RFI or pre-solicitation activity?'}
+3. Incumbent performance issues or vulnerabilities? (ONLY report with verifiable sources)
 4. M&A activity affecting ${contract.incumbentName}?
 5. Expected recompete timeline?
 

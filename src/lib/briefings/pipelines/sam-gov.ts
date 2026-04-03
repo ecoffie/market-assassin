@@ -433,4 +433,152 @@ function getDaysUntil(dateString: string): number {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * Search SAM.gov for RFI/Sources Sought/Pre-Solicitation related to a contract
+ *
+ * This searches for early-stage acquisition activity that might indicate
+ * a recompete is being planned. We search by:
+ * - NAICS code
+ * - Agency name keywords
+ * - Incumbent company name
+ * - Contract-related keywords
+ *
+ * Notice types: p=presolicitation, r=sources sought, k=combined
+ */
+export interface RelatedOpportunitySearch {
+  naicsCode: string;
+  agency: string;
+  incumbentName?: string;
+  keywords?: string[];
+  lookbackDays?: number; // How far back to search (default 180 days)
+}
+
+export interface RelatedOpportunityResult {
+  found: boolean;
+  opportunities: SAMOpportunity[];
+  summary: {
+    totalFound: number;
+    sourcesSought: number;
+    presolicitation: number;
+    rfis: number;
+    solicitations: number;
+  };
+  searchedAt: string;
+  lookbackDays: number;
+}
+
+/**
+ * Search SAM.gov for RFI/Sources Sought/Pre-Sol activity related to a contract
+ *
+ * This provides VERIFIED data from SAM.gov instead of relying on AI web search.
+ */
+export async function searchRelatedOpportunities(
+  params: RelatedOpportunitySearch,
+  apiKey: string
+): Promise<RelatedOpportunityResult> {
+  const { naicsCode, agency, incumbentName, keywords = [], lookbackDays = 180 } = params;
+
+  const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2';
+
+  // Build search keywords from agency and incumbent
+  const searchTerms: string[] = [];
+
+  // Add agency keywords (extract key words from agency name)
+  const agencyWords = agency.toLowerCase()
+    .replace(/department of|dept of|u\.s\.|us |agency|office|admin|administration/gi, '')
+    .split(/\s+/)
+    .filter(w => w.length > 2);
+  searchTerms.push(...agencyWords.slice(0, 2));
+
+  // Add any custom keywords
+  searchTerms.push(...keywords);
+
+  // Build query string
+  const query = searchTerms.length > 0 ? searchTerms.join(' OR ') : '';
+
+  // Calculate date range
+  const postedFrom = new Date();
+  postedFrom.setDate(postedFrom.getDate() - lookbackDays);
+  const postedFromStr = formatDateForSAM(postedFrom);
+  const postedToStr = formatDateForSAM(new Date());
+
+  // Build URL with notice types for early-stage activity
+  // p = presolicitation, r = sources sought, k = combined, s = special notice
+  const queryParams = new URLSearchParams({
+    api_key: apiKey,
+    ncode: naicsCode,
+    ptype: 'p,r,k,s', // presol, sources sought, combined, special notice
+    postedFrom: postedFromStr,
+    postedTo: postedToStr,
+    limit: '50',
+  });
+
+  if (query) {
+    queryParams.set('q', query);
+  }
+
+  const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
+
+  console.log(`[SAM.gov] Searching related opps for NAICS ${naicsCode}, agency: ${agency}, lookback: ${lookbackDays} days`);
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      console.error(`[SAM.gov] Related search error: ${response.status}`);
+      return {
+        found: false,
+        opportunities: [],
+        summary: { totalFound: 0, sourcesSought: 0, presolicitation: 0, rfis: 0, solicitations: 0 },
+        searchedAt: new Date().toISOString(),
+        lookbackDays,
+      };
+    }
+
+    const data = await response.json();
+    const opportunities = (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
+
+    // Categorize by notice type
+    const summary = {
+      totalFound: opportunities.length,
+      sourcesSought: opportunities.filter((o: SAMOpportunity) =>
+        o.noticeType.toLowerCase().includes('sources sought') || o.noticeType === 'r'
+      ).length,
+      presolicitation: opportunities.filter((o: SAMOpportunity) =>
+        o.noticeType.toLowerCase().includes('presol') || o.noticeType === 'p'
+      ).length,
+      rfis: opportunities.filter((o: SAMOpportunity) =>
+        o.title.toLowerCase().includes('rfi') ||
+        o.description?.toLowerCase().includes('request for information')
+      ).length,
+      solicitations: opportunities.filter((o: SAMOpportunity) =>
+        o.noticeType.toLowerCase().includes('solicitation') &&
+        !o.noticeType.toLowerCase().includes('presol')
+      ).length,
+    };
+
+    console.log(`[SAM.gov] Found ${summary.totalFound} related opps: ${summary.sourcesSought} sources sought, ${summary.presolicitation} presol, ${summary.rfis} RFIs`);
+
+    return {
+      found: opportunities.length > 0,
+      opportunities,
+      summary,
+      searchedAt: new Date().toISOString(),
+      lookbackDays,
+    };
+  } catch (error) {
+    console.error('[SAM.gov] Related search error:', error);
+    return {
+      found: false,
+      opportunities: [],
+      summary: { totalFound: 0, sourcesSought: 0, presolicitation: 0, rfis: 0, solicitations: 0 },
+      searchedAt: new Date().toISOString(),
+      lookbackDays,
+    };
+  }
+}
+
 export type { SAMOpportunity, SAMSearchParams, SAMSearchResult };
