@@ -24,8 +24,8 @@ import {
   postSendValidation,
 } from '@/lib/intelligence';
 
-const BATCH_SIZE = 10;
-const MAX_USERS_PER_RUN = 200;
+const BATCH_SIZE = 25;
+const MAX_USERS_PER_RUN = 1000;
 
 // Timezone offsets for delivery timing
 const TIMEZONE_OFFSETS: Record<string, number> = {
@@ -265,12 +265,8 @@ export async function GET(request: NextRequest) {
             return;
           }
 
-          // Check timezone (skip if not delivery time, unless test mode)
-          if (!testEmail && !isDeliveryTimeForTimezone(user.timezone)) {
-            console.log(`[SendBriefings] ${user.email} timezone ${user.timezone || 'ET'} - not delivery time, skipping`);
-            briefingsSkipped++;
-            return;
-          }
+          // REMOVED: Timezone filter was blocking most users
+          // All briefings now sent at 7 AM UTC (2-3 AM ET) so users see them when they wake up
 
           // Check for recent briefing (deduplication)
           const today = new Date().toISOString().split('T')[0];

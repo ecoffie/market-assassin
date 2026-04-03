@@ -259,11 +259,11 @@ export async function generateAIBriefing(
       throw new Error('Empty response from Claude API - no text content returned');
     }
 
-    // Step 5: Parse and validate response
-    const aiResponse = JSON.parse(responseText) as {
+    // Step 5: Parse and validate response (with robust JSON extraction)
+    const aiResponse = extractAndParseJSON<{
       opportunities: AIBriefingOpportunity[];
       teamingPlays: AIBriefingTeamingPlay[];
-    };
+    }>(responseText);
 
     const maxOpps = options.maxOpportunities || 10;
     const maxPlays = options.maxTeamingPlays || 3;
@@ -472,4 +472,63 @@ function getAnthropicClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
   return new Anthropic({ apiKey });
+}
+
+/**
+ * Robust JSON extraction and parsing from AI response
+ * Handles: markdown code blocks, control characters, truncated responses
+ */
+function extractAndParseJSON<T>(responseText: string): T {
+  let jsonStr = responseText.trim();
+
+  // Step 1: Extract JSON from markdown code blocks if present
+  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    jsonStr = codeBlockMatch[1].trim();
+  }
+
+  // Step 2: Find JSON object boundaries (first { to last })
+  const firstBrace = jsonStr.indexOf('{');
+  const lastBrace = jsonStr.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+  }
+
+  // Step 3: Sanitize control characters that break JSON.parse
+  // Remove control characters except \n, \r, \t (which are valid in JSON strings)
+  jsonStr = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
+
+  // Step 4: Fix common JSON issues from AI responses
+  // Replace unescaped newlines inside strings with \n
+  jsonStr = jsonStr.replace(/"([^"]*?)(?<!\\)\n([^"]*?)"/g, (match, p1, p2) => {
+    return `"${p1}\\n${p2}"`;
+  });
+
+  // Step 5: Try to parse
+  try {
+    return JSON.parse(jsonStr) as T;
+  } catch (firstError) {
+    // Step 6: More aggressive sanitization - replace all newlines in strings
+    // This is a fallback for really messy responses
+    const sanitized = jsonStr.replace(
+      /"([^"]*)"/g,
+      (match, content) => {
+        const cleaned = content
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t');
+        return `"${cleaned}"`;
+      }
+    );
+
+    try {
+      return JSON.parse(sanitized) as T;
+    } catch (secondError) {
+      // Log both errors for debugging
+      console.error('[extractAndParseJSON] First parse attempt failed:', firstError);
+      console.error('[extractAndParseJSON] Second parse attempt failed:', secondError);
+      console.error('[extractAndParseJSON] Original response (first 500 chars):', responseText.slice(0, 500));
+      throw new Error(`Failed to parse AI response as JSON: ${firstError instanceof Error ? firstError.message : String(firstError)}`);
+    }
+  }
 }

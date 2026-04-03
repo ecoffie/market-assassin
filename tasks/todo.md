@@ -1,6 +1,37 @@
 # GovCon Giants - Current Tasks
 
-## Session State (March 30, 2026)
+## Session State (April 3, 2026)
+
+---
+
+## 📋 FUTURE TASKS (After Moat Phases)
+
+### Recompete Tracker: Expand to 2027 Data
+**Priority:** After Moat 1 & 2 validation
+**Current state:** 9,450 contracts, all 2026 expirations
+**Target:** Add contracts expiring through Oct 2027 (18-month window)
+
+**Why:** Recompete tracking should be 12-18 months out for proper positioning
+
+**Script ready:** `scripts/fetch-2027-contracts.js`
+```bash
+# Fetch and preview 2027 data
+node scripts/fetch-2027-contracts.js
+
+# Fetch and merge into contracts-data.js
+node scripts/fetch-2027-contracts.js --merge
+```
+
+**Tasks:**
+- [ ] Run 2027 fetch script
+- [ ] Verify data quality (no duplicates, proper formatting)
+- [ ] Update cron job date range to include 2027
+- [ ] Deploy with expanded dataset
+- [ ] Update "Data Through" display to show Oct 2027
+
+---
+
+## Previous Session State (March 30, 2026)
 
 ### 🎯 PRIORITY: JTED 2026 Companion Guide & Landing Page
 

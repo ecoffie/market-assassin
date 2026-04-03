@@ -39,7 +39,7 @@
     },
     {
       "path": "/api/cron/send-briefings",
-      "schedule": "0 10 * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/daily-alerts",
