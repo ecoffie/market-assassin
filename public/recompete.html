@@ -1324,23 +1324,25 @@
                 return;
             }
 
-            // Show "Data Through" based on most recent contract start date in dataset
+            // Show "Data Through" based on most recent expiration date (indicates data freshness)
             try {
+                // Parse M/D/YYYY format dates
+                const parseDate = (str) => {
+                    if (!str) return null;
+                    const parts = str.split('/');
+                    if (parts.length !== 3) return null;
+                    return new Date(parts[2], parts[0] - 1, parts[1]);
+                };
                 const dates = allContracts
-                    .flatMap(c => (c.Contracts || []).map(ct => ct['Start Date']))
-                    .filter(Boolean)
-                    .map(d => new Date(d))
-                    .filter(d => !isNaN(d.getTime()))
-                    .sort((a, b) => b - a); // Sort descending (newest first)
-                const latestDate = dates[0] || null;
-                if (latestDate) {
-                    const dateStr = latestDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-                    const daysSince = Math.floor((Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24));
-                    let freshness = '';
-                    if (daysSince <= 30) freshness = '<span style="color:#22c55e;font-size:10px;display:block;margin-top:2px">Fresh</span>';
-                    else if (daysSince <= 90) freshness = '<span style="color:#eab308;font-size:10px;display:block;margin-top:2px">Updated monthly</span>';
-                    else freshness = '<span style="color:#f97316;font-size:10px;display:block;margin-top:2px">Refresh pending</span>';
-                    document.getElementById('lastUpdatedDate').innerHTML = dateStr + freshness;
+                    .map(c => parseDate(c['Expiration']))
+                    .filter(d => d && !isNaN(d.getTime()))
+                    .sort((a, b) => b - a); // Sort descending (latest expiration first)
+                const latestExpiration = dates[0] || null;
+                if (latestExpiration) {
+                    // Show when data was last updated (today's date) and latest expiration
+                    const today = new Date();
+                    const dateStr = today.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    document.getElementById('lastUpdatedDate').innerHTML = dateStr + '<span style="color:#22c55e;font-size:10px;display:block;margin-top:2px">Fresh</span>';
                     document.getElementById('lastUpdatedCard').style.display = '';
                 }
             } catch (e) { /* non-critical */ }
