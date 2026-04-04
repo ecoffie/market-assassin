@@ -377,8 +377,9 @@ interface SamDailyOpportunity {
 interface SamDailyBriefing {
   date: string;
   opportunities: SamDailyOpportunity[];
-  deadlinesThisWeek: { title: string; deadline: string; daysRemaining: number; samLink: string }[];
+  deadlinesThisWeek: { title: string; deadline: string; daysRemaining: number; samLink: string; noticeType: string }[];
   actionTips: string[];
+  noticeSummary: { rfp: number; rfq: number; sourcesSought: number; preSol: number; combined: number; other: number };
 }
 
 async function generateDailyBriefFromSam(anthropic: Anthropic, samOpportunities: SAMOpportunity[]): Promise<SamDailyBriefing> {
@@ -466,7 +467,27 @@ Return ONLY valid JSON.`;
       deadline: o.responseDeadline,
       daysRemaining: getDaysUntil(o.responseDeadline),
       samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
+      noticeType: o.noticeType || 'Notice',
     }));
+
+  // Count notice types for summary
+  const noticeSummary = { rfp: 0, rfq: 0, sourcesSought: 0, preSol: 0, combined: 0, other: 0 };
+  for (const opp of sorted) {
+    const type = (opp.noticeType || '').toLowerCase();
+    if (type.includes('solicitation') || type.includes('rfp')) {
+      noticeSummary.rfp++;
+    } else if (type.includes('rfq') || type.includes('quote')) {
+      noticeSummary.rfq++;
+    } else if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
+      noticeSummary.sourcesSought++;
+    } else if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
+      noticeSummary.preSol++;
+    } else if (type.includes('combined')) {
+      noticeSummary.combined++;
+    } else {
+      noticeSummary.other++;
+    }
+  }
 
   return {
     date: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
@@ -477,6 +498,7 @@ Return ONLY valid JSON.`;
       'Identify teaming partners for larger opportunities',
       'Check SAM.gov for amendments and Q&A updates',
     ],
+    noticeSummary,
   };
 }
 
@@ -495,6 +517,22 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
     if (days <= 3) return 'URGENT';
     if (days <= 7) return 'THIS WEEK';
     return `${days} DAYS`;
+  };
+
+  const getNoticeTypeInfo = (noticeType: string): { label: string; cssClass: string } => {
+    const type = (noticeType || '').toLowerCase();
+    if (type.includes('solicitation') || type.includes('rfp')) {
+      return { label: 'RFP', cssClass: 'type-rfp' };
+    } else if (type.includes('rfq') || type.includes('quote')) {
+      return { label: 'RFQ', cssClass: 'type-rfq' };
+    } else if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
+      return { label: 'Sources Sought', cssClass: 'type-sources' };
+    } else if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
+      return { label: 'Pre-Sol', cssClass: 'type-presol' };
+    } else if (type.includes('combined')) {
+      return { label: 'Combined', cssClass: 'type-combined' };
+    }
+    return { label: 'Notice', cssClass: 'type-other' };
   };
 
   return `
@@ -542,6 +580,24 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
     .footer p { margin: 0 0 8px; font-size: 12px; color: #6b7280; }
     .footer a { color: #059669; text-decoration: none; }
     .source-badge { display: inline-block; background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+    .notice-summary { background: #f0f9ff; padding: 16px; margin: 0; border-bottom: 1px solid #bae6fd; }
+    .notice-summary-title { font-size: 12px; font-weight: 700; color: #0369a1; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .notice-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .notice-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 16px; font-size: 12px; font-weight: 600; }
+    .notice-pill-count { margin-right: 4px; }
+    .pill-rfp { background: #dbeafe; color: #1e40af; }
+    .pill-rfq { background: #fef3c7; color: #92400e; }
+    .pill-sources { background: #d1fae5; color: #065f46; }
+    .pill-presol { background: #f3e8ff; color: #6b21a8; }
+    .pill-combined { background: #fce7f3; color: #9d174d; }
+    .pill-other { background: #f3f4f6; color: #374151; }
+    .deadline-type { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
+    .type-rfp { background: #dbeafe; color: #1e40af; }
+    .type-rfq { background: #fef3c7; color: #92400e; }
+    .type-sources { background: #d1fae5; color: #065f46; }
+    .type-presol { background: #f3e8ff; color: #6b21a8; }
+    .type-combined { background: #fce7f3; color: #9d174d; }
+    .type-other { background: #f3f4f6; color: #374151; }
   </style>
 </head>
 <body>
@@ -550,6 +606,18 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
       <h1>📋 Active Solicitations</h1>
       <p>${briefing.date}</p>
       <div class="header-badge">✅ VERIFIED FROM SAM.gov</div>
+    </div>
+
+    <div class="notice-summary">
+      <div class="notice-summary-title">📊 Notice Type Summary</div>
+      <div class="notice-pills">
+        ${briefing.noticeSummary.rfp > 0 ? `<span class="notice-pill pill-rfp"><span class="notice-pill-count">${briefing.noticeSummary.rfp}</span> RFP/Solicitation</span>` : ''}
+        ${briefing.noticeSummary.rfq > 0 ? `<span class="notice-pill pill-rfq"><span class="notice-pill-count">${briefing.noticeSummary.rfq}</span> RFQ</span>` : ''}
+        ${briefing.noticeSummary.sourcesSought > 0 ? `<span class="notice-pill pill-sources"><span class="notice-pill-count">${briefing.noticeSummary.sourcesSought}</span> Sources Sought/RFI</span>` : ''}
+        ${briefing.noticeSummary.preSol > 0 ? `<span class="notice-pill pill-presol"><span class="notice-pill-count">${briefing.noticeSummary.preSol}</span> Pre-Sol</span>` : ''}
+        ${briefing.noticeSummary.combined > 0 ? `<span class="notice-pill pill-combined"><span class="notice-pill-count">${briefing.noticeSummary.combined}</span> Combined</span>` : ''}
+        ${briefing.noticeSummary.other > 0 ? `<span class="notice-pill pill-other"><span class="notice-pill-count">${briefing.noticeSummary.other}</span> Other</span>` : ''}
+      </div>
     </div>
 
     <div class="section">
@@ -596,12 +664,14 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
     <div class="section" style="padding-top: 0;">
       <div class="deadline-section">
         <h3 class="deadline-header">⏰ DEADLINES THIS WEEK</h3>
-        ${briefing.deadlinesThisWeek.map(d => `
+        ${briefing.deadlinesThisWeek.map(d => {
+          const typeInfo = getNoticeTypeInfo(d.noticeType);
+          return `
           <div class="deadline-item">
-            <span class="deadline-title">${escapeHtml(d.title)}</span>
+            <span class="deadline-title">${escapeHtml(d.title)}<span class="deadline-type ${typeInfo.cssClass}">${typeInfo.label}</span></span>
             <span class="deadline-days" style="background: ${getUrgencyColor(d.daysRemaining)};">${d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : d.daysRemaining + ' days'}</span>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     </div>
     ` : ''}
