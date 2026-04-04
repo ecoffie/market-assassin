@@ -752,7 +752,26 @@ async function sendDailyAlertEmail(
   const opportunitiesHtml = opportunities.slice(0, 20).map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
     const urgencyColor = daysUntil <= 7 ? '#dc2626' : daysUntil <= 14 ? '#d97706' : '#16a34a';
-    const urgencyText = daysUntil <= 7 ? '⚡ Due Soon' : daysUntil <= 14 ? '📅 2 weeks' : '';
+
+    // Enhanced urgency badge for closing soon opportunities
+    const urgencyBadge = daysUntil <= 3
+      ? `<span style="background: #dc2626; color: white; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 4px; animation: pulse 1s infinite;">🔥 ${daysUntil} DAYS LEFT</span>`
+      : daysUntil <= 7
+        ? `<span style="background: #f97316; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">⚡ ${daysUntil} days</span>`
+        : daysUntil <= 14
+          ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">📅 2 weeks</span>`
+          : '';
+
+    // Notice type badge with specific colors
+    const noticeTypeColors: Record<string, { bg: string; text: string }> = {
+      'Solicitation': { bg: '#dcfce7', text: '#166534' },
+      'RFP': { bg: '#dcfce7', text: '#166534' },
+      'RFQ': { bg: '#dbeafe', text: '#1e40af' },
+      'Sources Sought': { bg: '#f3e8ff', text: '#7c3aed' },
+      'Presolicitation': { bg: '#ffedd5', text: '#c2410c' },
+      'Combined Synopsis/Solicitation': { bg: '#ccfbf1', text: '#0f766e' },
+    };
+    const noticeColors = noticeTypeColors[opp.noticeType || ''] || { bg: '#f1f5f9', text: '#475569' };
 
     // Score badge
     const scoreColor = opp.score >= 75 ? '#16a34a' : opp.score >= 50 ? '#84cc16' : opp.score >= 30 ? '#eab308' : '#f97316';
@@ -760,13 +779,13 @@ async function sendDailyAlertEmail(
 
     return `
       <tr>
-        <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;${daysUntil <= 3 ? ' background: #fef2f2;' : ''}">
           <div style="margin-bottom: 6px;">
-            <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+            <span style="background: ${noticeColors.bg}; color: ${noticeColors.text}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
               ${opp.noticeType || 'Solicitation'}
             </span>
-            ${opp.setAside ? `<span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${opp.setAside}</span>` : ''}
-            ${urgencyText ? `<span style="background: ${urgencyColor}15; color: ${urgencyColor}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${urgencyText}</span>` : ''}
+            ${opp.setAside ? `<span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${opp.setAside}</span>` : ''}
+            ${urgencyBadge}
             ${scoreBadge}
           </div>
           <a href="${opp.uiLink}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
@@ -774,8 +793,11 @@ async function sendDailyAlertEmail(
           </a>
           <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
             ${opp.department}${opp.subTier ? ` › ${opp.subTier}` : ''} &nbsp;•&nbsp;
-            NAICS ${opp.naicsCode || 'N/A'} &nbsp;•&nbsp;
-            <span style="color: ${urgencyColor};">Due ${formatDate(opp.responseDeadline)}</span>
+            NAICS ${opp.naicsCode || 'N/A'}
+          </div>
+          <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
+            📅 Posted ${formatDate(opp.postedDate)} &nbsp;•&nbsp;
+            <span style="color: ${urgencyColor}; font-weight: 600;">Due ${formatDate(opp.responseDeadline)}</span>
           </div>
         </td>
       </tr>
