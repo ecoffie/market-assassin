@@ -14,25 +14,39 @@ The Market Intelligence system delivers personalized government contracting inte
 
 ## Daily Alerts vs Market Intelligence
 
-**IMPORTANT:** These are TWO SEPARATE systems:
+**IMPORTANT:** These are TWO SEPARATE systems with clear value differentiation:
 
-| System | Description | Access |
-|--------|-------------|--------|
-| **Daily Alerts** | Simple opportunity notifications based on NAICS/keywords | FREE for everyone (beta) |
-| **Market Intelligence** | Premium 3-report system with deep analysis, scoring, pursuit briefs | Pro Bundle ($997) and Ultimate Bundle ($1,497) only |
+| System | Price | Value Prop | Access |
+|--------|-------|------------|--------|
+| **Daily Alerts** | $19/mo | "Don't miss opportunities" - Volume play | Alert Pro subscription |
+| **Market Intelligence** | $49/mo | "Know WHICH opportunities to pursue" - Strategy play | Pro/Ultimate bundles |
 
-### Daily Alerts (FREE)
-- Basic SAM.gov opportunity alerts
-- User configures NAICS codes at `/alerts/preferences`
+### Daily Alerts ($19/mo)
+- SAM.gov + Grants.gov opportunities matching NAICS/keywords
+- **Notice Type Badges:** Color-coded RFP (green), RFQ (blue), Sources Sought (purple), Pre-Sol (orange), Combined (teal)
+- **Posted Date:** Shows when opportunity was released
+- **Urgency Badges:** 🔥 3 DAYS LEFT (red + highlighted row), ⚡ X days (orange), 📅 2 weeks (yellow)
+- Deduplication (won't resend same opp in 7 days)
+- PSC crosswalk for broader matching
+- User configures at `/alerts/preferences`
 - Cron: `/api/cron/daily-alerts`
-- Simple email with matching opportunities
+- **NOT included:** Win Probability, AI analysis, teaming recommendations
 
-### Market Intelligence (Premium)
-- 3 Report Types: Daily Brief, Weekly Deep Dive, Pursuit Brief
+### Market Intelligence ($49/mo)
+- Everything in Daily Alerts PLUS:
+- **Win Probability Scoring** (0-100% fit with breakdown)
+- **AI-Generated Analysis** per opportunity
+- **3 Report Types:** Daily Brief, Weekly Deep Dive, Pursuit Brief
 - USASpending contract data with bid counts
-- Win probability scoring
 - Competitive landscape analysis
-- Only in Pro/Ultimate bundles or explicit briefings purchases
+- Teaming plays and capture strategies
+- Only in Pro ($997) / Ultimate ($1,497) bundles or explicit briefings purchase
+
+### Value Ladder Logic
+```
+Free Opp Hunter → $19 Alerts (volume) → $49 Intelligence (strategy) → $997 Pro Bundle
+```
+Users hit $19 limit when they realize seeing opportunities isn't enough—they need to know which ones to pursue.
 
 ---
 
@@ -473,9 +487,27 @@ At scale (~1000 users):
 
 ## Changelog
 
-### April 4, 2026
+### April 4, 2026 (PM) - Daily Alerts Enhancement
 
-**Daily Brief Enhancements:**
+**Daily Alerts ($19/mo) Enhancements:**
+- Added color-coded Notice Type Badges: RFP (green), RFQ (blue), Sources Sought (purple), Pre-Sol (orange), Combined (teal)
+- Added Posted Date field: `📅 Posted Apr 07, 2026`
+- Enhanced Urgency System:
+  - 🔥 3 DAYS LEFT (red background + highlighted row) for ≤3 days
+  - ⚡ X days (orange badge) for ≤7 days
+  - 📅 2 weeks (yellow badge) for ≤14 days
+- Row highlighting for urgent opportunities
+- Maintains clear value distinction (no Win Probability to preserve $49 tier value)
+
+**Product Differentiation Strategy:**
+- $19/mo = "Don't miss opportunities" (volume play)
+- $49/mo = "Know WHICH opportunities to pursue" (strategy play with Win Probability + AI)
+
+**File:** `src/app/api/cron/daily-alerts/route.ts`
+
+### April 4, 2026 (AM) - Daily Brief Enhancement
+
+**Daily Brief ($49/mo) Enhancements:**
 - Added Notice Type Badge to each opportunity card (RFP/RFQ/Sources Sought/Pre-Sol/Combined/Other)
 - Added Posted Date field showing when opportunity was released
 - Updated Notice Summary label to "Notice Type Summary (Top 10 Active)" for clarity

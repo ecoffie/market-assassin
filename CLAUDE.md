@@ -174,14 +174,19 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 **Location:** `/src/app/api/cron/daily-alerts/`, `/src/app/alerts/`
 **Purpose:** Automated opportunity alert emails based on user NAICS/keywords
 **Price:** $19/mo (FREE during beta through April 27, 2026)
+**Value Prop:** "Don't miss opportunities" (volume play)
 **Free for:** Any product purchaser (except OH free tier)
 **Features:**
+- **Notice Type Badges:** Color-coded RFP (green), RFQ (blue), Sources Sought (purple), Pre-Sol (orange), Combined (teal)
+- **Posted Date:** Shows when opportunity was released
+- **Urgency Badges:** 🔥 3 DAYS LEFT (red + highlighted row), ⚡ X days (orange), 📅 2 weeks (yellow)
 - Deduplication (won't resend same opp in 7 days)
 - Retry logic (3 attempts for failed emails)
 - Timezone-aware delivery (~6 AM local time)
 - Keywords search (catch mislabeled opportunities)
 - PSC crosswalk (auto-generate related PSC codes from NAICS)
 - FREE PREVIEW banners on emails
+- **NOT included:** Win Probability, AI analysis (reserved for $49/mo Market Intelligence)
 
 **Key Files:**
 - `api/cron/daily-alerts/route.ts` — Main cron handler
