@@ -40,7 +40,7 @@ The Market Intelligence system delivers personalized government contracting inte
 
 | Report | Description | Frequency |
 |--------|-------------|-----------|
-| **Daily Brief** | Daily Market Intel with Top 10 Recompete Opportunities + 3 Ghosting/Teaming Plays + Must Watch signals | Daily |
+| **Daily Brief** | Daily Market Intel with Notice Type Summary, Top 5 Active Opportunities (with notice type badges + posted dates) + Teaming Plays + Key Deadlines | Daily |
 | **Weekly Deep Dive** | Full analysis of 10 Opportunities with competitive landscape, key dates, teaming plays, market signals, calendar | Weekly |
 | **Pursuit Brief** | Single opportunity deep dive with score (e.g., 68/100 CONDITIONAL), working hypothesis, priority intel, outreach targets, 5-day action plan, risk assessment | On-demand |
 
@@ -469,4 +469,20 @@ At scale (~1000 users):
 
 ---
 
-*Last Updated: March 25, 2026*
+---
+
+## Changelog
+
+### April 4, 2026
+
+**Daily Brief Enhancements:**
+- Added Notice Type Badge to each opportunity card (RFP/RFQ/Sources Sought/Pre-Sol/Combined/Other)
+- Added Posted Date field showing when opportunity was released
+- Updated Notice Summary label to "Notice Type Summary (Top 10 Active)" for clarity
+- Color-coded badge CSS classes: `.type-rfp`, `.type-rfq`, `.type-sources-sought`, `.type-presol`, `.type-combined`, `.type-other`
+
+**File:** `src/app/api/admin/send-all-briefings/route.ts`
+
+---
+
+*Last Updated: April 4, 2026*

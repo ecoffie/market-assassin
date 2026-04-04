@@ -28,10 +28,16 @@ Currently Daily Brief and Weekly Deep Dive use the same USASpending data with di
 
 ### Content Structure
 ```
+NOTICE TYPE SUMMARY (Top 10 Active)
+- RFP count, RFQ count, Sources Sought count, etc.
+- Quick glance at opportunity types in today's brief
+
 TOP 5 ACTIVE OPPORTUNITIES
 
 For each:
 - Title, Agency, NAICS, Set-Aside
+- Notice Type Badge (RFP/RFQ/Sources Sought/Pre-Sol/Combined/Other)
+- Posted Date (when released)
 - Response Deadline (DAYS REMAINING)
 - Estimated Value
 - Incumbent (if recompete) - from USASpending lookup
@@ -42,7 +48,7 @@ TEAMING PLAYS (2)
 - Based on active opps that need teaming
 
 DEADLINES THIS WEEK
-- Calendar view of response dates
+- Calendar view of response dates with notice type labels
 ```
 
 ### Selection Criteria (Ranked)
@@ -218,4 +224,22 @@ async function checkSamForSolicitation(contract: Contract): Promise<SamStatus> {
 ---
 
 *Created: April 3, 2026*
-*Status: DRAFT - Pending Eric's Review*
+*Updated: April 4, 2026*
+*Status: IMPLEMENTED*
+
+---
+
+## April 4, 2026 Implementation
+
+### Daily Brief Enhancements (Deployed)
+
+1. **Notice Type Badge** - Each opportunity card displays color-coded badge
+   - RFP (green), RFQ (blue), Sources Sought (purple), Pre-Sol (orange), Combined (teal), Other (gray)
+
+2. **Posted Date** - Shows when opportunity was released, not just deadline
+   - Helps users avoid last-minute surprises
+
+3. **Notice Summary Scope** - Label updated to "Notice Type Summary (Top 10 Active)"
+   - Clarifies the summary represents top 10 active opportunities
+
+**File Modified:** `src/app/api/admin/send-all-briefings/route.ts`
