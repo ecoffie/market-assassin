@@ -372,6 +372,7 @@ interface SamDailyOpportunity {
   solicitationNumber: string;
   samLink: string;
   quickWinAssessment: string;
+  postedDate: string;
 }
 
 interface SamDailyBriefing {
@@ -456,6 +457,7 @@ Return ONLY valid JSON.`;
     solicitationNumber: opp.solicitationNumber,
     samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
     quickWinAssessment: assessmentsMap[opp.title] || 'Active opportunity matching your NAICS - review requirements and deadline.',
+    postedDate: formatSamDate(opp.postedDate),
   }));
 
   // Deadlines this week
@@ -556,6 +558,7 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
     .opp-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
     .opp-rank { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #059669; color: white; border-radius: 50%; font-size: 13px; font-weight: 700; flex-shrink: 0; }
     .opp-title { font-size: 15px; font-weight: 700; color: #111827; margin: 0; flex: 1; padding-left: 10px; }
+    .opp-type-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
     .urgency-badge { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; color: white; white-space: nowrap; }
     .opp-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; font-size: 13px; }
     .opp-meta-item { display: flex; flex-direction: column; }
@@ -609,7 +612,7 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
     </div>
 
     <div class="notice-summary">
-      <div class="notice-summary-title">📊 Notice Type Summary</div>
+      <div class="notice-summary-title">📊 Notice Type Summary (Top 10 Active)</div>
       <div class="notice-pills">
         ${briefing.noticeSummary.rfp > 0 ? `<span class="notice-pill pill-rfp"><span class="notice-pill-count">${briefing.noticeSummary.rfp}</span> RFP/Solicitation</span>` : ''}
         ${briefing.noticeSummary.rfq > 0 ? `<span class="notice-pill pill-rfq"><span class="notice-pill-count">${briefing.noticeSummary.rfq}</span> RFQ</span>` : ''}
@@ -624,12 +627,15 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
       <div class="section-header">
         <h2>🎯 TOP ${briefing.opportunities.length} OPPORTUNITIES TO BID</h2>
       </div>
-      ${briefing.opportunities.map(opp => `
+      ${briefing.opportunities.map(opp => {
+        const oppTypeInfo = getNoticeTypeInfo(opp.noticeType);
+        return `
         <div class="opp-card">
           <div class="opp-header">
-            <div style="display: flex; align-items: flex-start;">
+            <div style="display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px;">
               <span class="opp-rank">${opp.rank}</span>
               <h3 class="opp-title">${escapeHtml(opp.title)}</h3>
+              <span class="opp-type-badge ${oppTypeInfo.cssClass}">${oppTypeInfo.label}</span>
             </div>
             <span class="urgency-badge" style="background: ${getUrgencyColor(opp.daysRemaining)};">${getUrgencyLabel(opp.daysRemaining)}</span>
           </div>
@@ -637,6 +643,10 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
             <div class="opp-meta-item">
               <span class="opp-meta-label">Agency</span>
               <span class="opp-meta-value">${escapeHtml(opp.agency)}</span>
+            </div>
+            <div class="opp-meta-item">
+              <span class="opp-meta-label">Posted</span>
+              <span class="opp-meta-value">${escapeHtml(opp.postedDate)}</span>
             </div>
             <div class="opp-meta-item">
               <span class="opp-meta-label">Response Due</span>
@@ -657,7 +667,7 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
           </div>
           <a href="${opp.samLink}" class="sam-link" target="_blank">View on SAM.gov →</a>
         </div>
-      `).join('')}
+      `}).join('')}
     </div>
 
     ${briefing.deadlinesThisWeek.length > 0 ? `
