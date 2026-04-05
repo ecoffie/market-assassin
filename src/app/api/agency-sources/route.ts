@@ -1,21 +1,18 @@
 /**
  * Agency Source Mapping API
  *
- * Returns procurement sources and spending patterns for federal agencies.
- * Helps users understand WHERE to find opportunities beyond SAM.gov.
- *
- * Combines:
- * - Static spending/vehicle data (21 major agencies)
- * - Pain points database (250 agencies)
+ * Returns procurement sources and spending patterns for ALL 250 federal agencies.
+ * Each agency has: spending patterns, vehicles, secondary sources, pain points, priorities.
  *
  * GET /api/agency-sources?agency=DOD
  * GET /api/agency-sources?agencies=DOD,VA,HHS
  * GET /api/agency-sources?all=true
  * GET /api/agency-sources?search=cyber
+ * GET /api/agency-sources?category=defense
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import agencySourcesData from '@/data/agency-procurement-sources.json';
+import spendingData from '@/data/agency-spending-complete.json';
 import painPointsData from '@/data/agency-pain-points.json';
 
 // Type definitions
@@ -32,10 +29,10 @@ interface Vehicle {
   naics: string[];
 }
 
-interface StaticAgencyData {
+interface SpendingAgencyData {
   abbreviation: string;
-  cgac?: string;
-  parent?: string;
+  parent: string | null;
+  category: string;
   primarySources: string[];
   secondarySources: SecondarySource[];
   spendingPatterns: Record<string, number>;
@@ -53,9 +50,9 @@ interface PainPointAgency {
 interface AgencySourceResponse {
   agency: string;
   abbreviation: string;
-  cgac?: string;
+  category: string;
   parent?: string;
-  spendingBreakdown?: {
+  spendingBreakdown: {
     samPosted: number;
     hiddenMarket: number;
     breakdown: Record<string, number>;
@@ -67,10 +64,9 @@ interface AgencySourceResponse {
   tips: string;
   painPoints?: string[];
   priorities?: string[];
-  hasDetailedSpending: boolean;
 }
 
-// Agency aliases for matching
+// Agency aliases for flexible lookup
 const agencyAliases: Record<string, string[]> = {
   'DEPARTMENT OF DEFENSE': ['DOD', 'DEFENSE', 'PENTAGON'],
   'DEPARTMENT OF THE NAVY': ['NAVY', 'USN', 'DON'],
@@ -95,350 +91,161 @@ const agencyAliases: Record<string, string[]> = {
   'DEPARTMENT OF EDUCATION': ['ED', 'EDUCATION'],
   'DEPARTMENT OF HOUSING AND URBAN DEVELOPMENT': ['HUD', 'HOUSING'],
   'DEPARTMENT OF COMMERCE': ['DOC', 'COMMERCE'],
-  'USACE': ['ARMY CORPS', 'CORPS OF ENGINEERS'],
-  'NAVFAC': ['NAVAL FACILITIES'],
-  'NAVSEA': ['NAVAL SEA SYSTEMS'],
-  'NAVAIR': ['NAVAL AIR SYSTEMS'],
-  'NAVWAR': ['NAVAL INFORMATION WARFARE'],
   'CDC': ['CENTERS FOR DISEASE CONTROL'],
   'FDA': ['FOOD AND DRUG'],
   'CMS': ['MEDICARE', 'MEDICAID'],
   'NIH': ['NATIONAL INSTITUTES OF HEALTH'],
   'FEMA': ['EMERGENCY MANAGEMENT'],
   'CBP': ['CUSTOMS AND BORDER'],
-  'ICE': ['IMMIGRATION AND CUSTOMS'],
   'TSA': ['TRANSPORTATION SECURITY'],
-  'USCG': ['COAST GUARD'],
+  'CISA': ['CYBERSECURITY AND INFRASTRUCTURE'],
   'DARPA': ['DEFENSE ADVANCED RESEARCH'],
   'NSF': ['NATIONAL SCIENCE FOUNDATION'],
-  'NIST': ['NATIONAL INSTITUTE OF STANDARDS'],
-  'NOAA': ['OCEANIC AND ATMOSPHERIC'],
-  'USPTO': ['PATENT AND TRADEMARK'],
   'FAA': ['FEDERAL AVIATION'],
-  'FHWA': ['FEDERAL HIGHWAY'],
-  'FRA': ['FEDERAL RAILROAD'],
-  'FTA': ['FEDERAL TRANSIT'],
   'IRS': ['INTERNAL REVENUE'],
   'FBI': ['FEDERAL BUREAU OF INVESTIGATION'],
-  'DEA': ['DRUG ENFORCEMENT'],
-  'ATF': ['ALCOHOL TOBACCO FIREARMS'],
-  'USMS': ['MARSHALS SERVICE'],
-  'BOP': ['BUREAU OF PRISONS'],
-  'NPS': ['NATIONAL PARK SERVICE'],
-  'BLM': ['BUREAU OF LAND MANAGEMENT'],
-  'USFWS': ['FISH AND WILDLIFE'],
-  'BOR': ['BUREAU OF RECLAMATION'],
-  'USGS': ['GEOLOGICAL SURVEY'],
-  'BIA': ['BUREAU OF INDIAN AFFAIRS'],
-  'SSA': ['SOCIAL SECURITY'],
-  'OPM': ['OFFICE OF PERSONNEL MANAGEMENT'],
-  'GSA': ['GENERAL SERVICES ADMINISTRATION'],
-  'CISA': ['CYBERSECURITY AND INFRASTRUCTURE'],
-  'USCIS': ['CITIZENSHIP AND IMMIGRATION'],
 };
 
-// Helper to normalize agency name for lookup
-function normalizeAgencyName(input: string): { staticName: string | null; painPointName: string | null } {
+const spendingAgencies = spendingData.agencies as Record<string, SpendingAgencyData>;
+const painPointAgencies = painPointsData.agencies as Record<string, PainPointAgency>;
+
+// Find agency by name or alias
+function findAgency(input: string): string | null {
   const normalized = input.toUpperCase().trim();
 
-  // Check static agency data first (spending patterns)
-  let staticName: string | null = null;
-  if (agencySourcesData.agencies[normalized as keyof typeof agencySourcesData.agencies]) {
-    staticName = normalized;
-  } else {
-    // Check abbreviations in static data
-    for (const [fullName, data] of Object.entries(agencySourcesData.agencies)) {
-      const agency = data as StaticAgencyData;
-      if (agency.abbreviation.toUpperCase() === normalized) {
-        staticName = fullName;
-        break;
-      }
-    }
+  // Direct match
+  if (spendingAgencies[input]) {
+    return input;
   }
 
-  // Check pain points database
-  let painPointName: string | null = null;
-  const painPointAgencies = painPointsData.agencies as Record<string, PainPointAgency>;
-
-  // Direct match
-  for (const agencyName of Object.keys(painPointAgencies)) {
-    if (agencyName.toUpperCase() === normalized) {
-      painPointName = agencyName;
-      break;
+  // Case-insensitive match
+  for (const name of Object.keys(spendingAgencies)) {
+    if (name.toUpperCase() === normalized) {
+      return name;
     }
   }
 
   // Alias match
-  if (!painPointName) {
-    for (const [fullName, aliases] of Object.entries(agencyAliases)) {
-      if (aliases.includes(normalized) || normalized === fullName) {
-        // Find the pain points entry that matches
-        for (const agencyName of Object.keys(painPointAgencies)) {
-          if (
-            agencyName.toUpperCase().includes(fullName) ||
-            fullName.includes(agencyName.toUpperCase()) ||
-            aliases.some(alias => agencyName.toUpperCase().includes(alias))
-          ) {
-            painPointName = agencyName;
-            break;
-          }
+  for (const [fullName, aliases] of Object.entries(agencyAliases)) {
+    if (aliases.includes(normalized)) {
+      // Find the actual agency name in our data
+      for (const name of Object.keys(spendingAgencies)) {
+        if (name.toUpperCase().includes(fullName) || fullName.includes(name.toUpperCase())) {
+          return name;
         }
-        break;
       }
+    }
+  }
+
+  // Abbreviation match (from agency data)
+  for (const [name, data] of Object.entries(spendingAgencies)) {
+    if (data.abbreviation.toUpperCase() === normalized) {
+      return name;
     }
   }
 
   // Partial match
-  if (!painPointName) {
-    for (const agencyName of Object.keys(painPointAgencies)) {
-      if (
-        agencyName.toUpperCase().includes(normalized) ||
-        normalized.includes(agencyName.toUpperCase().split(' ')[0])
-      ) {
-        painPointName = agencyName;
-        break;
-      }
+  for (const name of Object.keys(spendingAgencies)) {
+    if (name.toUpperCase().includes(normalized) || normalized.includes(name.toUpperCase().split(' ')[0])) {
+      return name;
     }
   }
 
-  return { staticName, painPointName };
+  return null;
 }
 
-// Extract abbreviation from agency name
-function extractAbbreviation(name: string): string {
-  // Check if there's a parenthetical abbreviation
-  const match = name.match(/\(([A-Z]{2,10})\)/);
-  if (match) return match[1];
+// Build response for an agency
+function buildAgencyResponse(agencyName: string): AgencySourceResponse | null {
+  const spendingInfo = spendingAgencies[agencyName];
+  const painPointInfo = painPointAgencies[agencyName];
 
-  // Generate from first letters
-  const words = name.split(' ').filter(w => !['of', 'the', 'and', 'for'].includes(w.toLowerCase()));
-  if (words.length <= 3) {
-    return words.map(w => w[0]?.toUpperCase() || '').join('');
-  }
-  return words.slice(0, 3).map(w => w[0]?.toUpperCase() || '').join('');
-}
+  if (!spendingInfo) return null;
 
-// Determine parent agency
-function determineParent(name: string): string | undefined {
-  const nameLower = name.toLowerCase();
-
-  if (nameLower.includes('navy') || nameLower.includes('naval')) return 'Department of Defense';
-  if (nameLower.includes('army')) return 'Department of Defense';
-  if (nameLower.includes('air force')) return 'Department of Defense';
-  if (nameLower.includes('defense') && !nameLower.includes('department of defense')) return 'Department of Defense';
-
-  if (nameLower.includes('cdc') || nameLower.includes('fda') || nameLower.includes('cms') ||
-      nameLower.includes('nih') || nameLower.includes('health')) return 'Department of Health and Human Services';
-
-  if (nameLower.includes('fema') || nameLower.includes('cbp') || nameLower.includes('ice') ||
-      nameLower.includes('tsa') || nameLower.includes('coast guard') || nameLower.includes('cisa')) {
-    return 'Department of Homeland Security';
-  }
-
-  if (nameLower.includes('fbi') || nameLower.includes('dea') || nameLower.includes('atf') ||
-      nameLower.includes('marshals') || nameLower.includes('prisons')) return 'Department of Justice';
-
-  if (nameLower.includes('faa') || nameLower.includes('fhwa') || nameLower.includes('fra') ||
-      nameLower.includes('fta')) return 'Department of Transportation';
-
-  if (nameLower.includes('irs') || nameLower.includes('mint') || nameLower.includes('fiscal')) {
-    return 'Department of the Treasury';
-  }
-
-  if (nameLower.includes('nps') || nameLower.includes('blm') || nameLower.includes('fish and wildlife') ||
-      nameLower.includes('reclamation') || nameLower.includes('geological') || nameLower.includes('indian affairs')) {
-    return 'Department of the Interior';
-  }
-
-  return undefined;
-}
-
-// Generate default sources based on agency type
-function getDefaultSources(name: string, parent?: string): { primary: string[]; secondary: SecondarySource[] } {
-  const nameLower = name.toLowerCase();
-  const primary = ['sam.gov'];
-  const secondary: SecondarySource[] = [];
-
-  // Defense agencies
-  if (parent === 'Department of Defense' || nameLower.includes('defense')) {
-    primary.push('gsa_schedule', 'idiq_vehicles');
-    secondary.push({
-      name: 'Defense Procurement Portal',
-      url: 'https://www.acq.osd.mil/',
-      type: 'procurement_info',
-      notes: 'DoD acquisition policy and guidance',
-    });
-  }
-
-  // Civilian agencies typically use GSA
-  if (!nameLower.includes('defense') && !nameLower.includes('military')) {
-    primary.push('gsa_schedule');
-  }
-
-  // Research/science agencies
-  if (nameLower.includes('research') || nameLower.includes('science') ||
-      nameLower.includes('laboratory') || nameLower.includes('institute')) {
-    primary.push('grants.gov');
-    secondary.push({
-      name: 'Grants.gov',
-      url: 'https://www.grants.gov/',
-      type: 'grants',
-      notes: 'Research grants and cooperative agreements',
-    });
-  }
-
-  // Health agencies
-  if (nameLower.includes('health') || nameLower.includes('medical') ||
-      nameLower.includes('disease') || nameLower.includes('drug')) {
-    if (!primary.includes('grants.gov')) primary.push('grants.gov');
-    secondary.push({
-      name: 'NIH RePORTER',
-      url: 'https://reporter.nih.gov/',
-      type: 'research',
-      notes: 'NIH-funded research projects',
-    });
-  }
-
-  return { primary, secondary };
-}
-
-// Generate default spending pattern estimate
-function getDefaultSpendingPattern(name: string, parent?: string): Record<string, number> {
-  const nameLower = name.toLowerCase();
-
-  // Defense agencies - high hidden market
-  if (parent === 'Department of Defense' || nameLower.includes('defense')) {
-    return { samPosted: 20, gsaSchedule: 30, idiqVehicles: 40, directAwards: 10 };
-  }
-
-  // Research agencies - grants heavy
-  if (nameLower.includes('research') || nameLower.includes('science') || nameLower.includes('institute')) {
-    return { samPosted: 25, gsaSchedule: 20, grants: 45, directAwards: 10 };
-  }
-
-  // Health agencies
-  if (nameLower.includes('health') || nameLower.includes('medical')) {
-    return { samPosted: 30, gsaSchedule: 25, grants: 35, directAwards: 10 };
-  }
-
-  // Default civilian
-  return { samPosted: 40, gsaSchedule: 35, bpa: 15, directAwards: 10 };
-}
-
-// Build response for a single agency
-function buildAgencyResponse(input: string): AgencySourceResponse | null {
-  const { staticName, painPointName } = normalizeAgencyName(input);
-
-  if (!staticName && !painPointName) {
-    return null;
-  }
-
-  // Get static data if available
-  const staticData = staticName
-    ? (agencySourcesData.agencies[staticName as keyof typeof agencySourcesData.agencies] as StaticAgencyData)
-    : null;
-
-  // Get pain points data if available
-  const painPointAgencies = painPointsData.agencies as Record<string, PainPointAgency>;
-  const painPointData = painPointName ? painPointAgencies[painPointName] : null;
-
-  // Determine agency name (prefer pain points name as it's more complete)
-  const agencyName = painPointName || staticName || input;
-  const parent = staticData?.parent || determineParent(agencyName);
-
-  // Get sources
-  const defaultSources = getDefaultSources(agencyName, parent);
-  const primarySources = staticData?.primarySources || defaultSources.primary;
-  const secondarySources = staticData?.secondarySources || defaultSources.secondary;
-
-  // Get spending patterns
-  const spendingPatterns = staticData?.spendingPatterns || getDefaultSpendingPattern(agencyName, parent);
-  const samPosted = spendingPatterns.samPosted || 30;
+  const samPosted = spendingInfo.spendingPatterns.samPosted || 30;
   const hiddenMarket = 100 - samPosted;
 
   // Build recommendations
   const recommendations: string[] = [];
 
-  if (spendingPatterns.gsaSchedule && spendingPatterns.gsaSchedule > 30) {
-    recommendations.push(`GSA Schedule is critical - ${spendingPatterns.gsaSchedule}% of spending goes through Schedule.`);
+  if (spendingInfo.spendingPatterns.gsaSchedule && spendingInfo.spendingPatterns.gsaSchedule > 30) {
+    recommendations.push(`GSA Schedule is critical - ${spendingInfo.spendingPatterns.gsaSchedule}% of spending goes through Schedule.`);
   }
 
-  if (spendingPatterns.idiqVehicles && spendingPatterns.idiqVehicles > 20) {
-    recommendations.push(`IDIQ vehicles dominate - ${spendingPatterns.idiqVehicles}% goes through pre-competed vehicles.`);
+  if (spendingInfo.spendingPatterns.idiqVehicles && spendingInfo.spendingPatterns.idiqVehicles > 20) {
+    recommendations.push(`IDIQ vehicles dominate - ${spendingInfo.spendingPatterns.idiqVehicles}% goes through pre-competed vehicles.`);
   }
 
-  if (spendingPatterns.grants && spendingPatterns.grants > 10) {
-    recommendations.push(`Significant grants program - ${spendingPatterns.grants}% comes through grants. Check Grants.gov.`);
+  if (spendingInfo.spendingPatterns.seaport && spendingInfo.spendingPatterns.seaport > 20) {
+    recommendations.push(`SeaPort-NxG is essential - ${spendingInfo.spendingPatterns.seaport}% of spending uses this vehicle.`);
+  }
+
+  if (spendingInfo.spendingPatterns.grants && spendingInfo.spendingPatterns.grants > 10) {
+    recommendations.push(`Significant grants program - ${spendingInfo.spendingPatterns.grants}% comes through grants. Check Grants.gov.`);
   }
 
   if (hiddenMarket > 70) {
     recommendations.push(`High hidden market (${hiddenMarket}%) - Focus on vehicles and direct relationships, not just SAM.gov.`);
   }
 
-  if (staticData?.topVehicles && staticData.topVehicles.length > 0) {
-    const vehicleNames = staticData.topVehicles.map(v => v.name).join(', ');
+  if (spendingInfo.topVehicles && spendingInfo.topVehicles.length > 0) {
+    const vehicleNames = spendingInfo.topVehicles.map(v => v.name).join(', ');
     recommendations.push(`Key vehicles to pursue: ${vehicleNames}`);
   }
 
-  // Add pain point-based recommendations
-  if (painPointData?.painPoints && painPointData.painPoints.length > 0) {
-    recommendations.push(`Top agency pain point: ${painPointData.painPoints[0]}`);
-  }
-
-  // Generate tips
-  let tips = staticData?.tips || '';
-  if (!tips && painPointData?.priorities && painPointData.priorities.length > 0) {
-    tips = `Focus on current priorities: ${painPointData.priorities[0].substring(0, 150)}...`;
-  }
-  if (!tips) {
-    tips = `Check SAM.gov for ${agencyName} opportunities. GSA Schedule recommended for faster entry.`;
+  // Add pain point-based recommendation
+  if (painPointInfo?.painPoints && painPointInfo.painPoints.length > 0) {
+    recommendations.push(`Top agency challenge: ${painPointInfo.painPoints[0]}`);
   }
 
   return {
     agency: agencyName,
-    abbreviation: staticData?.abbreviation || extractAbbreviation(agencyName),
-    cgac: staticData?.cgac,
-    parent,
+    abbreviation: spendingInfo.abbreviation,
+    category: spendingInfo.category,
+    parent: spendingInfo.parent || undefined,
     spendingBreakdown: {
       samPosted,
       hiddenMarket,
-      breakdown: spendingPatterns,
+      breakdown: spendingInfo.spendingPatterns,
     },
-    primarySources,
-    secondarySources,
-    topVehicles: staticData?.topVehicles || [],
+    primarySources: spendingInfo.primarySources,
+    secondarySources: spendingInfo.secondarySources,
+    topVehicles: spendingInfo.topVehicles,
     recommendations,
-    tips,
-    painPoints: painPointData?.painPoints?.slice(0, 5),
-    priorities: painPointData?.priorities?.slice(0, 3),
-    hasDetailedSpending: !!staticData,
+    tips: spendingInfo.tips,
+    painPoints: painPointInfo?.painPoints?.slice(0, 5),
+    priorities: painPointInfo?.priorities?.slice(0, 3),
   };
 }
 
-// Get all agencies from pain points database
-function getAllAgencies(): string[] {
-  const painPointAgencies = painPointsData.agencies as Record<string, PainPointAgency>;
-  return Object.keys(painPointAgencies);
-}
-
-// Search agencies by keyword
+// Search agencies
 function searchAgencies(query: string): string[] {
   const queryLower = query.toLowerCase();
-  const painPointAgencies = painPointsData.agencies as Record<string, PainPointAgency>;
 
-  return Object.entries(painPointAgencies)
+  return Object.entries(spendingAgencies)
     .filter(([name, data]) => {
-      // Search in agency name
+      // Search in name
       if (name.toLowerCase().includes(queryLower)) return true;
 
-      // Search in pain points
-      if (data.painPoints?.some(p => p.toLowerCase().includes(queryLower))) return true;
+      // Search in category
+      if (data.category.toLowerCase().includes(queryLower)) return true;
 
-      // Search in priorities
-      if (data.priorities?.some(p => p.toLowerCase().includes(queryLower))) return true;
+      // Search in pain points
+      const painPoint = painPointAgencies[name];
+      if (painPoint?.painPoints?.some(p => p.toLowerCase().includes(queryLower))) return true;
+      if (painPoint?.priorities?.some(p => p.toLowerCase().includes(queryLower))) return true;
+
+      // Search in tips
+      if (data.tips.toLowerCase().includes(queryLower)) return true;
 
       return false;
     })
+    .map(([name]) => name);
+}
+
+// Get agencies by category
+function getAgenciesByCategory(category: string): string[] {
+  return Object.entries(spendingAgencies)
+    .filter(([, data]) => data.category.toLowerCase() === category.toLowerCase())
     .map(([name]) => name);
 }
 
@@ -452,12 +259,14 @@ export async function GET(request: NextRequest) {
   const tipsParam = searchParams.get('tips');
   const searchParam = searchParams.get('search');
   const listParam = searchParams.get('list');
+  const categoryParam = searchParams.get('category');
+  const categoriesParam = searchParams.get('categories');
 
   // Return vehicle types info
   if (vehiclesParam === 'true') {
     return NextResponse.json({
       success: true,
-      vehicleTypes: agencySourcesData.vehicleTypes,
+      vehicleTypes: spendingData.vehicleTypes,
     });
   }
 
@@ -465,27 +274,58 @@ export async function GET(request: NextRequest) {
   if (tipsParam === 'true') {
     return NextResponse.json({
       success: true,
-      recommendations: agencySourcesData.recommendations,
+      recommendations: spendingData.recommendations,
+    });
+  }
+
+  // Return all categories
+  if (categoriesParam === 'true') {
+    const categories: Record<string, number> = {};
+    for (const data of Object.values(spendingAgencies)) {
+      categories[data.category] = (categories[data.category] || 0) + 1;
+    }
+    return NextResponse.json({
+      success: true,
+      categories: Object.entries(categories)
+        .sort((a, b) => b[1] - a[1])
+        .map(([category, count]) => ({ category, count })),
+    });
+  }
+
+  // Return agencies by category
+  if (categoryParam) {
+    const matchingAgencies = getAgenciesByCategory(categoryParam);
+    const results = matchingAgencies.map(name => buildAgencyResponse(name)).filter(Boolean);
+
+    return NextResponse.json({
+      success: true,
+      category: categoryParam,
+      count: results.length,
+      agencies: results,
     });
   }
 
   // Return list of all agencies
   if (listParam === 'true') {
-    const allAgencyNames = getAllAgencies();
+    const agencyList = Object.entries(spendingAgencies).map(([name, data]) => ({
+      name,
+      abbreviation: data.abbreviation,
+      category: data.category,
+      hiddenMarket: 100 - (data.spendingPatterns.samPosted || 30),
+      vehicleCount: data.topVehicles.length,
+    }));
+
     return NextResponse.json({
       success: true,
-      count: allAgencyNames.length,
-      agencies: allAgencyNames.map(name => ({
-        name,
-        abbreviation: extractAbbreviation(name),
-      })),
+      count: agencyList.length,
+      agencies: agencyList.sort((a, b) => b.hiddenMarket - a.hiddenMarket),
     });
   }
 
-  // Search agencies by keyword
+  // Search agencies
   if (searchParam) {
     const matchingAgencies = searchAgencies(searchParam);
-    const results = matchingAgencies.slice(0, 20).map(name => buildAgencyResponse(name)).filter(Boolean);
+    const results = matchingAgencies.slice(0, 25).map(name => buildAgencyResponse(name)).filter(Boolean);
 
     return NextResponse.json({
       success: true,
@@ -496,28 +336,28 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Return all agencies
+  // Return all agencies (full data)
   if (allParam === 'true') {
-    const allAgencyNames = getAllAgencies();
-    const allAgencies = allAgencyNames.map(name => buildAgencyResponse(name)).filter(Boolean);
+    const allAgencies = Object.keys(spendingAgencies)
+      .map(name => buildAgencyResponse(name))
+      .filter(Boolean);
 
     return NextResponse.json({
       success: true,
       count: allAgencies.length,
       agencies: allAgencies,
-      vehicleTypes: agencySourcesData.vehicleTypes,
-      lastUpdated: agencySourcesData.lastUpdated,
+      vehicleTypes: spendingData.vehicleTypes,
+      lastUpdated: spendingData.lastUpdated,
     });
   }
 
   // Single agency lookup
   if (agencyParam) {
-    const response = buildAgencyResponse(agencyParam);
+    const agencyName = findAgency(agencyParam);
 
-    if (!response) {
+    if (!agencyName) {
       // Find similar agencies
-      const allAgencies = getAllAgencies();
-      const suggestions = allAgencies
+      const suggestions = Object.keys(spendingAgencies)
         .filter(name => name.toLowerCase().includes(agencyParam.toLowerCase().substring(0, 3)))
         .slice(0, 5);
 
@@ -529,10 +369,12 @@ export async function GET(request: NextRequest) {
       }, { status: 404 });
     }
 
+    const response = buildAgencyResponse(agencyName);
+
     return NextResponse.json({
       success: true,
       ...response,
-      vehicleTypes: agencySourcesData.vehicleTypes,
+      vehicleTypes: spendingData.vehicleTypes,
     });
   }
 
@@ -543,9 +385,10 @@ export async function GET(request: NextRequest) {
     const notFound: string[] = [];
 
     for (const agency of agencyList) {
-      const response = buildAgencyResponse(agency);
-      if (response) {
-        results.push(response);
+      const agencyName = findAgency(agency);
+      if (agencyName) {
+        const response = buildAgencyResponse(agencyName);
+        if (response) results.push(response);
       } else {
         notFound.push(agency);
       }
@@ -556,42 +399,42 @@ export async function GET(request: NextRequest) {
       count: results.length,
       agencies: results,
       notFound: notFound.length > 0 ? notFound : undefined,
-      vehicleTypes: agencySourcesData.vehicleTypes,
+      vehicleTypes: spendingData.vehicleTypes,
     });
   }
 
   // Default: return summary
-  const painPointAgencies = painPointsData.agencies as Record<string, PainPointAgency>;
-  const staticAgencies = new Set(Object.keys(agencySourcesData.agencies));
+  const categoryCounts: Record<string, number> = {};
+  let totalHiddenMarket = 0;
 
-  const summary = Object.keys(painPointAgencies).map(name => {
-    const hasDetailedData = staticAgencies.has(name.toUpperCase()) ||
-      Array.from(staticAgencies).some(s =>
-        name.toUpperCase().includes(s) || s.includes(name.toUpperCase().split(' ')[0])
-      );
+  for (const data of Object.values(spendingAgencies)) {
+    categoryCounts[data.category] = (categoryCounts[data.category] || 0) + 1;
+    totalHiddenMarket += 100 - (data.spendingPatterns.samPosted || 30);
+  }
 
-    return {
-      name,
-      abbreviation: extractAbbreviation(name),
-      hasDetailedSpending: hasDetailedData,
-      painPointCount: painPointAgencies[name]?.painPoints?.length || 0,
-    };
-  });
+  const avgHiddenMarket = Math.round(totalHiddenMarket / Object.keys(spendingAgencies).length);
 
   return NextResponse.json({
     success: true,
     message: 'Use ?agency=DOD or ?search=cyber for detailed info. Use ?all=true for full data.',
-    totalAgencies: summary.length,
-    agenciesWithDetailedSpending: summary.filter(a => a.hasDetailedSpending).length,
-    summary: summary.slice(0, 25),
+    stats: {
+      totalAgencies: spendingData.totalAgencies,
+      avgHiddenMarket: `${avgHiddenMarket}%`,
+      topCategories: Object.entries(categoryCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([category, count]) => ({ category, count })),
+    },
     endpoints: {
       singleAgency: '/api/agency-sources?agency=DOD',
       multipleAgencies: '/api/agency-sources?agencies=DOD,VA,HHS',
       search: '/api/agency-sources?search=cyber',
+      byCategory: '/api/agency-sources?category=defense',
       listAll: '/api/agency-sources?list=true',
+      allCategories: '/api/agency-sources?categories=true',
       allData: '/api/agency-sources?all=true',
       vehicles: '/api/agency-sources?vehicles=true',
     },
-    lastUpdated: agencySourcesData.lastUpdated,
+    lastUpdated: spendingData.lastUpdated,
   });
 }
