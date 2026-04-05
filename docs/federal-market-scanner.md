@@ -132,11 +132,12 @@ Output:
 
 | Tool | Status | Purpose |
 |------|--------|---------|
-| `samgov-mcp` | Active | Opportunities, entities, forecasts |
-| `grantsgov-mcp` | Active | Grant opportunities |
-| `multisite-mcp` | Active | NIH, aggregated sources |
-| `usaspending-mcp` | **Needs Config** | Spending data, awards |
-| `event-aggregator` | To Build | Federal events |
+| `samgov-mcp` | ✅ Active | Opportunities, entities, forecasts |
+| `grantsgov-mcp` | ✅ Active | Grant opportunities |
+| `multisite-mcp` | ✅ Active | NIH, aggregated sources |
+| `usaspending-mcp` | ✅ Active | Spending data, awards |
+| `/api/agency-sources` | ✅ Active | Agency procurement sources |
+| `/api/federal-events` | ✅ Active | Federal events aggregator |
 | `recompete-tracker` | To Build | Expiration monitoring |
 
 ### Agents (Autonomous Workflows)
@@ -195,7 +196,7 @@ USASpending API
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| Sources integrated | 10+ | 4 (SAM, Grants, NIH, Forecasts) |
+| Sources integrated | 10+ | 7 (SAM, Grants, NIH, Forecasts, USASpending, Agency Sources, Events) |
 | Visibility gap calculation | < 5 sec | TBD |
 | Recompete tracking accuracy | > 95% | TBD |
 | Event coverage | Major agencies | TBD |
@@ -228,15 +229,37 @@ USASpending API
 }
 ```
 
-### Phase 2: Gap Analysis (Partial)
+### Phase 2: Agency Source Mapping ✅ COMPLETE
 - [x] Visibility gap calculation (in market-scan)
-- [ ] Agency source mapping
+- [x] Agency source mapping (`/api/agency-sources`)
 - [ ] Recompete tracker enhancement
 
-### Phase 3: Events & Intelligence
-- [ ] Event aggregator
+**API Endpoint:** `GET /api/agency-sources?agency={abbrev}`
+
+**Features:**
+- 21 federal agencies with procurement patterns
+- Spending breakdown (SAM vs hidden market)
+- Top vehicles (OASIS+, Alliant 3, SeaPort-NxG, etc.)
+- Secondary sources (DLA DIBBS, agency portals)
+- Actionable recommendations
+
+**Example:** `?agency=DOD` returns 85% hidden market, GSA Schedule tips, vehicle list
+
+### Phase 3: Event Aggregator ✅ COMPLETE
+- [x] Event aggregator (`/api/federal-events`)
 - [ ] Competitor profiling
 - [ ] Market Scanner agent
+
+**API Endpoint:** `GET /api/federal-events?naics={code}` or `?agency={abbrev}`
+
+**Features:**
+- 15 event sources (GSA Interact, SBA, PTAC, agency OSDBUs)
+- 7 event categories (industry_day, matchmaking, training, etc.)
+- 5 major annual conferences
+- NAICS-to-agency mapping for relevant events
+- Recommendations by contractor stage
+
+**Example:** `?naics=541512` returns 10 sources for DOD, VA, DHS, NASA
 
 ### Phase 4: Automation
 - [ ] Weekly market scans (scheduled)
