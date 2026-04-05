@@ -129,11 +129,13 @@ export async function GET(request: NextRequest) {
     const seenEmails = new Set<string>();
 
     // Source 1: user_notification_settings (original source)
+    // BETA MODE: Send to ALL active users regardless of briefings_enabled flag
+    // TODO: After April 27, 2026 beta ends, restore .eq('briefings_enabled', true) filter
     const { data: notificationSettings } = await supabase
       .from('user_notification_settings')
       .select('user_email, naics_codes, agencies, timezone, sms_enabled, phone_number, briefings_enabled, is_active, aggregated_profile')
       .eq('is_active', true)
-      .eq('briefings_enabled', true)
+      // .eq('briefings_enabled', true) // BETA: Commented out - all active users get briefings
       .limit(MAX_USERS_PER_RUN);
 
     if (notificationSettings) {

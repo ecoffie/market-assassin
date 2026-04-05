@@ -700,4 +700,76 @@ with GAO, ASBCA cases with case numbers, news articles with URLs. DO NOT specula
 
 ---
 
-*Last Updated: April 3, 2026*
+## USASpending API - Required Fields
+
+**Lesson (April 5, 2026):** USASpending `/search/spending_by_award/` endpoint requires `award_type_codes` in filters.
+
+**What went wrong:** MCP was returning 422 Unprocessable Entity because `award_type_codes` was missing from the request body.
+
+**Error message:** `Missing value: 'filters|award_type_codes' is a required field`
+
+**Fix:**
+```javascript
+const filters = {
+  award_type_codes: ["A", "B", "C", "D"],  // REQUIRED
+  time_period: [...],
+  naics_codes: [...]
+};
+```
+
+**Award Type Codes:**
+- `A` = BPA Call
+- `B` = Purchase Order
+- `C` = Delivery Order
+- `D` = Definitive Contract
+
+**Rule:** Always include `award_type_codes` when calling USASpending spending_by_award endpoint.
+
+**File fixed:** `/Users/ericcoffie/mcp-servers/usaspending-mcp/index.js`
+
+---
+
+## MCP Servers - Always Verify Supabase Project
+
+**Lesson (April 5, 2026):** When creating MCP servers that connect to Supabase, always verify the project URL matches the intended database.
+
+**What happened:**
+- Multisite MCP was configured with `tnfqhnnipljhatmtkdsw.supabase.co`
+- Market Assassin project uses `krpyelfrbicmvsmwovti.supabase.co`
+- Scraper ran successfully but data went to wrong (or no) database
+- `get_source_health` and `get_multisite_stats` returned errors/empty
+
+**Prevention:**
+```bash
+# Before configuring MCP, check the correct Supabase URL
+grep SUPABASE_URL ~/Market\ Assasin/market-assassin/.env.local
+
+# Verify MCP config matches
+cat ~/.mcp.json | jq '.mcpServers.multisite.env'
+```
+
+**Rule:** After editing `~/.mcp.json`, always restart Claude Code for changes to take effect.
+
+---
+
+## PostgreSQL Empty Array Casting
+
+**Lesson (April 5, 2026):** PostgreSQL requires explicit type casting for empty arrays.
+
+**Error:** `cannot determine type of empty array`
+
+**Bad:**
+```sql
+ADD COLUMN excluded_sources TEXT[] DEFAULT ARRAY[];
+```
+
+**Good:**
+```sql
+ADD COLUMN excluded_sources TEXT[] DEFAULT ARRAY[]::TEXT[];
+```
+
+**Rule:** Always cast empty arrays with `::TYPE[]` suffix.
+
+---
+
+*Last Updated: April 5, 2026*

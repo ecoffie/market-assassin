@@ -561,5 +561,43 @@ GET /api/agency-hierarchy?search=FEMA
 
 ---
 
+---
+
+## Implementation Status
+
+| Moat | Feature | Status | Notes |
+|------|---------|--------|-------|
+| 7 | Agency Hierarchy API | ✅ **COMPLETE** | Tango-style with pain points, contractors, spending |
+| 6 | Multi-Site Aggregation | ⏳ In Progress | MCP built with 21 sources, needs data population |
+| - | USASpending MCP | ✅ **FIXED** | 422 error fixed April 5 (added award_type_codes) |
+| 1 | 21-Day Free Trial | ⏸️ After validation | Waiting on 800 users briefing validation |
+| 2 | Weekly Bids Report | ⏸️ After validation | Monday digest |
+| 3 | Recompete Tracking | ⏸️ After trial | Save + monitor contracts |
+| 4 | Contractor Tracking | ⏸️ After trial | Monitor teaming targets |
+| 5 | Agency Segmentation | ⏸️ After trial | Track specific agencies |
+
+### Moat 7 Completion (April 4, 2026)
+
+**Agency Hierarchy API v2** - Unified federal agency intelligence
+
+**Features Built:**
+- Search by name, abbreviation, or topic
+- CGAC code lookup
+- Pain points matching (250 agencies, 2,765 pain points)
+- Contractor/SBLO contacts (2,768 contractors)
+- USASpending integration (spending stats)
+- 450+ agency alias mappings
+
+**Files Created:**
+- `src/lib/agency-hierarchy/` - Core module
+- `src/data/agency-aliases.json` - Alias mappings
+- `docs/agency-hierarchy-api.md` - API documentation
+- `tests/test-agency-hierarchy.sh` - Test script
+
+**API Endpoint:** `/api/agency-hierarchy`
+
+---
+
 *Created: April 3, 2026*
-*Status: Draft - Awaiting Review*
+*Updated: April 5, 2026*
+*Status: Moat 7 Complete, USASpending MCP Fixed, Moat 6 In Progress*

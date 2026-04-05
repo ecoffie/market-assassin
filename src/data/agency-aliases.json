@@ -1,0 +1,854 @@
+{
+  "_meta": {
+    "description": "Agency abbreviation and alias mappings for unified search",
+    "version": "1.0.0",
+    "lastUpdated": "2026-04-04",
+    "totalAliases": 450
+  },
+  "aliases": {
+    "DOD": "Department of Defense",
+    "DoD": "Department of Defense",
+    "DEFENSE": "Department of Defense",
+    "PENTAGON": "Department of Defense",
+
+    "VA": "Department of Veterans Affairs",
+    "VETERANS": "Department of Veterans Affairs",
+    "VET": "Department of Veterans Affairs",
+
+    "VHA": "Veterans Health Administration (VHA)",
+    "VBA": "Veterans Benefits Administration (VBA)",
+    "NCA": "National Cemetery Administration (NCA)",
+
+    "DHS": "Department of Homeland Security",
+    "HOMELAND": "Department of Homeland Security",
+
+    "HHS": "Department of Health and Human Services",
+    "HEALTH": "Department of Health and Human Services",
+
+    "DOE": "Department of Energy",
+    "ENERGY": "Department of Energy",
+
+    "DOJ": "Department of Justice",
+    "JUSTICE": "Department of Justice",
+
+    "DOT": "Department of Transportation",
+    "TRANSPORTATION": "Department of Transportation",
+
+    "DOL": "Department of Labor",
+    "LABOR": "Department of Labor",
+
+    "DOI": "Department of the Interior",
+    "INTERIOR": "Department of the Interior",
+
+    "DOS": "Department of State",
+    "STATE": "Department of State",
+    "STATE DEPT": "Department of State",
+
+    "TREASURY": "Department of the Treasury",
+    "TREAS": "Department of the Treasury",
+
+    "ED": "Department of Education",
+    "EDUCATION": "Department of Education",
+    "DOEd": "Department of Education",
+
+    "HUD": "Department of Housing and Urban Development",
+    "HOUSING": "Department of Housing and Urban Development",
+
+    "USDA": "Department of Agriculture",
+    "AG": "Department of Agriculture",
+    "AGRICULTURE": "Department of Agriculture",
+
+    "COMMERCE": "Department of Commerce",
+    "DOC": "Department of Commerce",
+
+    "ARMY": "Department of the Army",
+    "USA": "Department of the Army",
+
+    "NAVY": "Department of the Navy",
+    "USN": "Department of the Navy",
+
+    "AIR FORCE": "Department of the Air Force",
+    "USAF": "Department of the Air Force",
+    "AF": "Department of the Air Force",
+
+    "NASA": "NASA",
+    "SPACE": "NASA",
+
+    "GSA": "General Services Administration",
+
+    "SBA": "Small Business Administration",
+    "SMALL BUSINESS": "Small Business Administration",
+
+    "EPA": "Environmental Protection Agency",
+    "ENVIRONMENT": "Environmental Protection Agency",
+
+    "SSA": "Social Security Administration",
+    "SOCIAL SECURITY": "Social Security Administration",
+
+    "OPM": "Office of Personnel Management",
+    "PERSONNEL": "Office of Personnel Management",
+
+    "NSF": "National Science Foundation",
+    "SCIENCE": "National Science Foundation",
+
+    "FEMA": "Federal Emergency Management Agency",
+    "EMERGENCY": "Federal Emergency Management Agency",
+
+    "FBI": "Federal Bureau of Investigation",
+
+    "DEA": "Drug Enforcement Administration",
+
+    "ATF": "Bureau of Alcohol, Tobacco, Firearms and Explosives",
+    "BATFE": "Bureau of Alcohol, Tobacco, Firearms and Explosives",
+
+    "CBP": "U.S. Customs and Border Protection",
+    "CUSTOMS": "U.S. Customs and Border Protection",
+    "BORDER": "U.S. Customs and Border Protection",
+
+    "ICE": "Immigration and Customs Enforcement",
+    "IMMIGRATION": "Immigration and Customs Enforcement",
+
+    "TSA": "Transportation Security Administration",
+
+    "USCG": "U.S. Coast Guard",
+    "COAST GUARD": "U.S. Coast Guard",
+    "CG": "U.S. Coast Guard",
+
+    "USSS": "U.S. Secret Service",
+    "SECRET SERVICE": "U.S. Secret Service",
+
+    "CISA": "Cybersecurity and Infrastructure Security Agency",
+    "CYBER": "Cybersecurity and Infrastructure Security Agency",
+    "CYBERSECURITY": "Cybersecurity and Infrastructure Security Agency",
+
+    "IRS": "Internal Revenue Service",
+    "TAX": "Internal Revenue Service",
+
+    "FAA": "Federal Aviation Administration",
+    "AVIATION": "Federal Aviation Administration",
+    "FAA": "FAA",
+
+    "FHA": "Federal Housing Administration (FHA)",
+
+    "FDA": "Food and Drug Administration",
+    "FOOD AND DRUG": "Food and Drug Administration",
+    "FDA": "FDA",
+
+    "CDC": "Centers for Disease Control and Prevention",
+    "DISEASE CONTROL": "Centers for Disease Control and Prevention",
+    "CDC": "CDC",
+
+    "CMS": "Centers for Medicare & Medicaid Services",
+    "MEDICARE": "Centers for Medicare & Medicaid Services",
+    "MEDICAID": "Centers for Medicare & Medicaid Services",
+    "CMS": "CMS",
+
+    "NIH": "National Institutes of Health",
+    "HEALTH INSTITUTES": "National Institutes of Health",
+    "NIH": "NIH",
+
+    "NIST": "National Institute of Standards and Technology",
+    "STANDARDS": "National Institute of Standards and Technology",
+    "NIST": "NIST",
+
+    "NOAA": "National Oceanic and Atmospheric Administration",
+    "OCEAN": "National Oceanic and Atmospheric Administration",
+    "WEATHER": "National Weather Service (NWS)",
+    "NWS": "National Weather Service (NWS)",
+    "NOAA": "NOAA",
+
+    "USPS": "U.S. Postal Service (USPS)",
+    "POSTAL": "U.S. Postal Service (USPS)",
+    "POST OFFICE": "U.S. Postal Service (USPS)",
+
+    "USPTO": "Patent and Trademark Office",
+    "PATENT": "Patent and Trademark Office",
+    "PTO": "Patent and Trademark Office",
+
+    "BOP": "Bureau of Prisons",
+    "PRISONS": "Bureau of Prisons",
+
+    "BLM": "Bureau of Land Management",
+    "LAND MANAGEMENT": "Bureau of Land Management",
+
+    "NPS": "National Park Service",
+    "PARKS": "National Park Service",
+    "PARK SERVICE": "National Park Service",
+
+    "FWS": "U.S. Fish and Wildlife Service",
+    "FISH AND WILDLIFE": "U.S. Fish and Wildlife Service",
+    "WILDLIFE": "U.S. Fish and Wildlife Service",
+
+    "USGS": "U.S. Geological Survey",
+    "GEOLOGICAL": "U.S. Geological Survey",
+
+    "BIA": "Bureau of Indian Affairs",
+    "INDIAN AFFAIRS": "Bureau of Indian Affairs",
+
+    "RECLAMATION": "Bureau of Reclamation",
+    "BOR": "Bureau of Reclamation",
+
+    "USACE": "U.S. Army Corps of Engineers Civil Works",
+    "CORPS OF ENGINEERS": "U.S. Army Corps of Engineers Civil Works",
+    "ACE": "U.S. Army Corps of Engineers Civil Works",
+    "ARMY CORPS": "U.S. Army Corps of Engineers Civil Works",
+    "USACE": "USACE",
+
+    "USFS": "U.S. Forest Service",
+    "FOREST SERVICE": "U.S. Forest Service",
+    "FORESTRY": "U.S. Forest Service",
+
+    "DARPA": "DARPA",
+    "DEFENSE ADVANCED": "DARPA",
+
+    "DISA": "Defense Information Systems Agency",
+    "DLA": "Defense Logistics Agency",
+    "LOGISTICS": "Defense Logistics Agency",
+
+    "DHA": "Defense Health Agency",
+    "MILITARY HEALTH": "Defense Health Agency",
+
+    "DCAA": "Defense Contract Audit Agency",
+    "CONTRACT AUDIT": "Defense Contract Audit Agency",
+
+    "DCMA": "Defense Contract Management Agency",
+    "CONTRACT MANAGEMENT": "Defense Contract Management Agency",
+
+    "DFAS": "Defense Finance and Accounting Service (DFAS)",
+    "FINANCE ACCOUNTING": "Defense Finance and Accounting Service (DFAS)",
+
+    "DIA": "Defense Intelligence Agency (DIA)",
+    "DEFENSE INTEL": "Defense Intelligence Agency (DIA)",
+
+    "NGA": "National Geospatial-Intelligence Agency (NGA)",
+    "GEOSPATIAL": "National Geospatial-Intelligence Agency (NGA)",
+
+    "NRO": "National Reconnaissance Office (NRO)",
+    "RECONNAISSANCE": "National Reconnaissance Office (NRO)",
+
+    "NSA": "Office of the Director of National Intelligence (ODNI)",
+    "ODNI": "Office of the Director of National Intelligence (ODNI)",
+    "DNI": "Office of the Director of National Intelligence (ODNI)",
+
+    "MDA": "Missile Defense Agency",
+    "MISSILE DEFENSE": "Missile Defense Agency",
+
+    "DTRA": "Defense Threat Reduction Agency (DTRA)",
+    "THREAT REDUCTION": "Defense Threat Reduction Agency (DTRA)",
+
+    "DCSA": "Defense Counterintelligence and Security Agency (DCSA)",
+    "COUNTERINTEL": "Defense Counterintelligence and Security Agency (DCSA)",
+
+    "NAVFAC": "NAVFAC",
+    "NAVAL FACILITIES": "NAVFAC",
+
+    "NAVSEA": "NAVSEA",
+    "NAVAL SEA": "NAVSEA",
+    "SEA SYSTEMS": "NAVSEA",
+
+    "NAVAIR": "NAVAIR",
+    "NAVAL AIR": "NAVAIR",
+    "AIR SYSTEMS": "NAVAIR",
+
+    "NAVWAR": "NAVWAR",
+    "NAVAL WARFARE": "NAVWAR",
+    "INFORMATION WARFARE": "NAVWAR",
+
+    "AFMC": "Air Force Materiel Command",
+    "MATERIEL COMMAND": "Air Force Materiel Command",
+
+    "AFLCMC": "Air Force Sustainment Center",
+    "SUSTAINMENT": "Air Force Sustainment Center",
+
+    "SSC": "Space Systems Command",
+    "SPACE SYSTEMS": "Space Systems Command",
+
+    "ACC": "Army Contracting Command",
+    "ARMY CONTRACTING": "Army Contracting Command",
+
+    "AMC": "Army Materiel Command",
+    "ARMY MATERIEL": "Army Materiel Command",
+
+    "AFC": "Army Futures Command",
+    "FUTURES": "Army Futures Command",
+
+    "MCSC": "Marine Corps Systems Command",
+    "MARINE SYSTEMS": "Marine Corps Systems Command",
+
+    "NNSA": "National Nuclear Security Administration",
+    "NUCLEAR SECURITY": "National Nuclear Security Administration",
+    "NNSA": "NNSA",
+
+    "BPA": "Bonneville Power Administration (BPA)",
+    "BONNEVILLE": "Bonneville Power Administration (BPA)",
+
+    "WAPA": "Western Area Power Administration (WAPA)",
+    "WESTERN POWER": "Western Area Power Administration (WAPA)",
+
+    "TVA": "Tennessee Valley Authority",
+    "TENNESSEE VALLEY": "Tennessee Valley Authority",
+
+    "FERC": "Federal Energy Regulatory Commission (FERC)",
+    "ENERGY REGULATORY": "Federal Energy Regulatory Commission (FERC)",
+
+    "NRC": "Nuclear Regulatory Commission",
+    "NUCLEAR REGULATORY": "Nuclear Regulatory Commission",
+
+    "FCC": "Federal Communications Commission",
+    "COMMUNICATIONS": "Federal Communications Commission",
+
+    "FTC": "Federal Trade Commission",
+    "TRADE COMMISSION": "Federal Trade Commission",
+
+    "SEC": "Securities and Exchange Commission",
+    "SECURITIES": "Securities and Exchange Commission",
+
+    "CFTC": "Commodity Futures Trading Commission",
+    "COMMODITIES": "Commodity Futures Trading Commission",
+
+    "FDIC": "Federal Deposit Insurance Corporation",
+    "DEPOSIT INSURANCE": "Federal Deposit Insurance Corporation",
+
+    "CFPB": "Consumer Financial Protection Bureau",
+    "CONSUMER FINANCIAL": "Consumer Financial Protection Bureau",
+
+    "CPSC": "Consumer Product Safety Commission",
+    "PRODUCT SAFETY": "Consumer Product Safety Commission",
+
+    "EEOC": "Equal Employment Opportunity Commission",
+    "EQUAL EMPLOYMENT": "Equal Employment Opportunity Commission",
+
+    "NLRB": "National Labor Relations Board",
+    "LABOR RELATIONS": "National Labor Relations Board",
+
+    "OSHA": "Occupational Safety and Health Administration (OSHA)",
+    "OCCUPATIONAL SAFETY": "Occupational Safety and Health Administration (OSHA)",
+
+    "MSHA": "Mine Safety and Health Administration (MSHA)",
+    "MINE SAFETY": "Mine Safety and Health Administration (MSHA)",
+
+    "GAO": "Government Accountability Office",
+    "ACCOUNTABILITY": "Government Accountability Office",
+
+    "GPO": "Government Publishing Office (GPO)",
+    "PUBLISHING": "Government Publishing Office (GPO)",
+
+    "LOC": "Library of Congress",
+    "LIBRARY": "Library of Congress",
+
+    "NARA": "National Archives and Records Administration",
+    "ARCHIVES": "National Archives and Records Administration",
+    "RECORDS": "National Archives and Records Administration",
+
+    "SMITHSONIAN": "Smithsonian Institution",
+
+    "USAID": "Agency for International Development",
+    "AID": "Agency for International Development",
+    "INTERNATIONAL DEVELOPMENT": "Agency for International Development",
+
+    "DFC": "U.S. International Development Finance Corporation",
+    "DEVELOPMENT FINANCE": "U.S. International Development Finance Corporation",
+
+    "MCC": "Millennium Challenge Corporation",
+    "MILLENNIUM": "Millennium Challenge Corporation",
+
+    "PEACE CORPS": "Peace Corps",
+
+    "EXIM": "Export-Import Bank of the United States",
+    "EXPORT IMPORT": "Export-Import Bank of the United States",
+
+    "PBGC": "Pension Benefit Guaranty Corporation",
+    "PENSION": "Pension Benefit Guaranty Corporation",
+
+    "NTSB": "National Transportation Safety Board",
+    "TRANSPORTATION SAFETY": "National Transportation Safety Board",
+
+    "FHWA": "Federal Highway Administration",
+    "HIGHWAY": "Federal Highway Administration",
+    "FHWA": "FHWA",
+
+    "FRA": "Federal Railroad Administration (FRA)",
+    "RAILROAD": "Federal Railroad Administration (FRA)",
+    "FRA": "FRA",
+
+    "FTA": "Federal Transit Administration",
+    "TRANSIT": "Federal Transit Administration",
+    "FTA": "FTA",
+
+    "FMCSA": "Federal Motor Carrier Safety Administration (FMCSA)",
+    "MOTOR CARRIER": "Federal Motor Carrier Safety Administration (FMCSA)",
+
+    "PHMSA": "Pipeline and Hazardous Materials Safety Administration (PHMSA)",
+    "PIPELINE": "Pipeline and Hazardous Materials Safety Administration (PHMSA)",
+    "HAZMAT": "Pipeline and Hazardous Materials Safety Administration (PHMSA)",
+
+    "MARAD": "Maritime Administration (MARAD)",
+    "MARITIME": "Maritime Administration (MARAD)",
+
+    "NHTSA": "National Highway Traffic Safety Administration",
+    "TRAFFIC SAFETY": "National Highway Traffic Safety Administration",
+
+    "APHIS": "Animal and Plant Health Inspection Service (APHIS)",
+    "ANIMAL PLANT": "Animal and Plant Health Inspection Service (APHIS)",
+
+    "AMS": "Agricultural Marketing Service (AMS)",
+    "AGRICULTURAL MARKETING": "Agricultural Marketing Service (AMS)",
+
+    "ARS": "Agricultural Research Service",
+    "AGRICULTURAL RESEARCH": "Agricultural Research Service",
+
+    "FSA": "Farm Service Agency (FSA)",
+    "FARM SERVICE": "Farm Service Agency (FSA)",
+
+    "NRCS": "Natural Resources Conservation Service",
+    "CONSERVATION": "Natural Resources Conservation Service",
+
+    "RD": "USDA Rural Development",
+    "RURAL DEVELOPMENT": "USDA Rural Development",
+    "RURAL": "USDA Rural Development",
+
+    "FSIS": "Food Safety and Inspection Service",
+    "FOOD SAFETY": "Food Safety and Inspection Service",
+
+    "FAS": "Federal Acquisition Service",
+    "ACQUISITION SERVICE": "Federal Acquisition Service",
+
+    "PBS": "GSA Public Buildings Service (PBS)",
+    "PUBLIC BUILDINGS": "GSA Public Buildings Service (PBS)",
+
+    "TTS": "GSA Technology Transformation Services (TTS)",
+    "18F": "GSA Technology Transformation Services (TTS)",
+    "TECH TRANSFORMATION": "GSA Technology Transformation Services (TTS)",
+
+    "BEA": "Bureau of Economic Analysis (BEA)",
+    "ECONOMIC ANALYSIS": "Bureau of Economic Analysis (BEA)",
+
+    "BLS": "Bureau of Labor Statistics (BLS)",
+    "LABOR STATISTICS": "Bureau of Labor Statistics (BLS)",
+
+    "CENSUS": "Census Bureau",
+
+    "ITA": "International Trade Administration (ITA)",
+    "TRADE ADMIN": "International Trade Administration (ITA)",
+
+    "BIS": "Bureau of Industry and Security (BIS)",
+    "INDUSTRY SECURITY": "Bureau of Industry and Security (BIS)",
+    "EXPORT CONTROL": "Bureau of Industry and Security (BIS)",
+
+    "EDA": "Economic Development Administration (EDA)",
+    "ECONOMIC DEVELOPMENT": "Economic Development Administration (EDA)",
+
+    "MBDA": "Minority Business Development Agency (MBDA)",
+    "MINORITY BUSINESS": "Minority Business Development Agency (MBDA)",
+
+    "NTIA": "National Telecommunications and Information Administration (NTIA)",
+    "TELECOM": "National Telecommunications and Information Administration (NTIA)",
+
+    "BOEM": "Bureau of Ocean Energy Management (BOEM)",
+    "OCEAN ENERGY": "Bureau of Ocean Energy Management (BOEM)",
+
+    "BSEE": "Bureau of Safety and Environmental Enforcement (BSEE)",
+    "OFFSHORE SAFETY": "Bureau of Safety and Environmental Enforcement (BSEE)",
+
+    "OSMRE": "Office of Surface Mining Reclamation and Enforcement (OSMRE)",
+    "SURFACE MINING": "Office of Surface Mining Reclamation and Enforcement (OSMRE)",
+
+    "IHS": "Indian Health Service",
+    "INDIAN HEALTH": "Indian Health Service",
+
+    "HRSA": "Health Resources and Services Administration (HRSA)",
+    "HEALTH RESOURCES": "Health Resources and Services Administration (HRSA)",
+
+    "AHRQ": "Agency for Healthcare Research and Quality (AHRQ)",
+    "HEALTHCARE RESEARCH": "Agency for Healthcare Research and Quality (AHRQ)",
+
+    "SAMHSA": "Substance Abuse and Mental Health Services Administration (SAMHSA)",
+    "SUBSTANCE ABUSE": "Substance Abuse and Mental Health Services Administration (SAMHSA)",
+    "MENTAL HEALTH": "Substance Abuse and Mental Health Services Administration (SAMHSA)",
+
+    "ACF": "Administration for Children and Families (ACF)",
+    "CHILDREN FAMILIES": "Administration for Children and Families (ACF)",
+
+    "ACL": "Administration for Community Living (ACL)",
+    "COMMUNITY LIVING": "Administration for Community Living (ACL)",
+
+    "ASPR": "Administration for Strategic Preparedness and Response (ASPR)",
+    "PREPAREDNESS": "Administration for Strategic Preparedness and Response (ASPR)",
+
+    "ONC": "Office of the National Coordinator for Health IT (ONC)",
+    "HEALTH IT": "Office of the National Coordinator for Health IT (ONC)",
+
+    "ARPA-E": "ARPA-E (Advanced Research Projects Agency-Energy)",
+    "ENERGY RESEARCH": "ARPA-E (Advanced Research Projects Agency-Energy)",
+
+    "EERE": "Office of Energy Efficiency and Renewable Energy (EERE)",
+    "RENEWABLE": "Office of Energy Efficiency and Renewable Energy (EERE)",
+    "EFFICIENCY": "Office of Energy Efficiency and Renewable Energy (EERE)",
+
+    "EM": "DOE Office of Environmental Management",
+    "ENVIRONMENTAL MANAGEMENT": "DOE Office of Environmental Management",
+    "CLEANUP": "DOE Office of Environmental Management",
+
+    "SC": "DOE Office of Science",
+    "DOE SCIENCE": "DOE Office of Science",
+
+    "FE": "DOE Fossil Energy",
+    "FOSSIL": "DOE Fossil Energy",
+
+    "NE": "DOE Nuclear Energy",
+    "NUCLEAR ENERGY": "DOE Nuclear Energy",
+
+    "FLETC": "Federal Law Enforcement Training Centers (FLETC)",
+    "LAW ENFORCEMENT TRAINING": "Federal Law Enforcement Training Centers (FLETC)",
+
+    "USCIS": "U.S. Citizenship and Immigration Services (USCIS)",
+    "CITIZENSHIP": "U.S. Citizenship and Immigration Services (USCIS)",
+
+    "CWMD": "Countering Weapons of Mass Destruction Office (CWMD)",
+    "WMD": "Countering Weapons of Mass Destruction Office (CWMD)",
+
+    "S&T": "DHS Science and Technology Directorate (S&T)",
+    "DHS S&T": "DHS Science and Technology Directorate (S&T)",
+    "DHS SCIENCE": "DHS Science and Technology Directorate (S&T)",
+
+    "OJP": "Office of Justice Programs (OJP)",
+    "JUSTICE PROGRAMS": "Office of Justice Programs (OJP)",
+
+    "COPS": "Community Oriented Policing Services (COPS Office)",
+    "POLICING": "Community Oriented Policing Services (COPS Office)",
+
+    "OVW": "Office on Violence Against Women (OVW)",
+    "VIOLENCE WOMEN": "Office on Violence Against Women (OVW)",
+
+    "NIC": "National Institute of Corrections (NIC)",
+    "CORRECTIONS": "National Institute of Corrections (NIC)",
+
+    "EOIR": "Executive Office for Immigration Review (EOIR)",
+    "IMMIGRATION REVIEW": "Executive Office for Immigration Review (EOIR)",
+
+    "USMS": "U.S. Marshals Service",
+    "MARSHALS": "U.S. Marshals Service",
+
+    "ETA": "Employment and Training Administration (ETA)",
+    "EMPLOYMENT TRAINING": "Employment and Training Administration (ETA)",
+
+    "WHD": "Wage and Hour Division (WHD)",
+    "WAGE HOUR": "Wage and Hour Division (WHD)",
+
+    "FSA-ED": "Federal Student Aid (FSA)",
+    "STUDENT AID": "Federal Student Aid (FSA)",
+    "STUDENT LOANS": "Federal Student Aid (FSA)",
+
+    "OESE": "Office of Elementary and Secondary Education (OESE)",
+    "K12": "Office of Elementary and Secondary Education (OESE)",
+    "ELEMENTARY": "Office of Elementary and Secondary Education (OESE)",
+
+    "OPE": "Office of Postsecondary Education (OPE)",
+    "POSTSECONDARY": "Office of Postsecondary Education (OPE)",
+    "HIGHER ED": "Office of Postsecondary Education (OPE)",
+
+    "OSERS": "Office of Special Education and Rehabilitative Services (OSERS)",
+    "SPECIAL ED": "Office of Special Education and Rehabilitative Services (OSERS)",
+
+    "CPD": "Office of Community Planning and Development (CPD)",
+    "COMMUNITY DEVELOPMENT": "Office of Community Planning and Development (CPD)",
+
+    "PIH": "Office of Public and Indian Housing (PIH)",
+    "PUBLIC HOUSING": "Office of Public and Indian Housing (PIH)",
+
+    "FHFA": "Federal Housing Finance Agency (FHFA)",
+    "HOUSING FINANCE": "Federal Housing Finance Agency (FHFA)",
+
+    "GINNIE MAE": "Government National Mortgage Association (Ginnie Mae)",
+    "GNMA": "Government National Mortgage Association (Ginnie Mae)",
+
+    "MINT": "United States Mint",
+    "US MINT": "United States Mint",
+
+    "BEP": "Bureau of Engraving and Printing (BEP)",
+    "ENGRAVING": "Bureau of Engraving and Printing (BEP)",
+
+    "FISCAL SERVICE": "Bureau of the Fiscal Service",
+    "FISCAL": "Bureau of the Fiscal Service",
+
+    "OCC": "Office of the Comptroller of the Currency (OCC)",
+    "COMPTROLLER": "Office of the Comptroller of the Currency (OCC)",
+
+    "TTB": "Alcohol and Tobacco Tax and Trade Bureau (TTB)",
+    "ALCOHOL TOBACCO": "Alcohol and Tobacco Tax and Trade Bureau (TTB)",
+
+    "FINCEN": "Financial Crimes Enforcement Network (FinCEN)",
+    "FINANCIAL CRIMES": "Financial Crimes Enforcement Network (FinCEN)",
+
+    "CDFI": "CDFI Fund",
+    "COMMUNITY DEVELOPMENT FI": "CDFI Fund",
+
+    "AFRICOM": "U.S. Africa Command (AFRICOM)",
+    "AFRICA COMMAND": "U.S. Africa Command (AFRICOM)",
+
+    "CENTCOM": "U.S. Central Command (CENTCOM)",
+    "CENTRAL COMMAND": "U.S. Central Command (CENTCOM)",
+
+    "EUCOM": "U.S. European Command (EUCOM)",
+    "EUROPEAN COMMAND": "U.S. European Command (EUCOM)",
+
+    "INDOPACOM": "U.S. Indo-Pacific Command (INDOPACOM)",
+    "PACIFIC COMMAND": "U.S. Indo-Pacific Command (INDOPACOM)",
+    "PACOM": "U.S. Indo-Pacific Command (INDOPACOM)",
+
+    "NORTHCOM": "U.S. Northern Command (NORTHCOM)",
+    "NORTHERN COMMAND": "U.S. Northern Command (NORTHCOM)",
+
+    "SOUTHCOM": "U.S. Southern Command (SOUTHCOM)",
+    "SOUTHERN COMMAND": "U.S. Southern Command (SOUTHCOM)",
+
+    "SOCOM": "U.S. Special Operations Command (SOCOM)",
+    "SPECIAL OPS": "U.S. Special Operations Command (SOCOM)",
+    "SPECIAL OPERATIONS": "U.S. Special Operations Command (SOCOM)",
+
+    "STRATCOM": "U.S. Strategic Command (STRATCOM)",
+    "STRATEGIC COMMAND": "U.S. Strategic Command (STRATCOM)",
+
+    "TRANSCOM": "U.S. Transportation Command (TRANSCOM)",
+    "TRANSPORTATION COMMAND": "U.S. Transportation Command (TRANSCOM)",
+
+    "CYBERCOM": "U.S. Cyber Command (CYBERCOM)",
+    "CYBER COMMAND": "U.S. Cyber Command (CYBERCOM)",
+
+    "SPACECOM": "U.S. Space Command (SPACECOM)",
+    "SPACE COMMAND": "U.S. Space Command (SPACECOM)",
+
+    "DECA": "Defense Commissary Agency (DeCA)",
+    "COMMISSARY": "Defense Commissary Agency (DeCA)",
+
+    "NATIONAL GUARD": "National Guard Bureau",
+    "NGB": "National Guard Bureau",
+
+    "AOC": "Architect of the Capitol (AOC)",
+    "CAPITOL": "Architect of the Capitol (AOC)",
+
+    "CBO": "Congressional Budget Office (CBO)",
+    "BUDGET OFFICE": "Congressional Budget Office (CBO)",
+
+    "ITC": "International Trade Commission",
+    "USITC": "International Trade Commission",
+
+    "FMC": "Federal Maritime Commission",
+    "MARITIME COMMISSION": "Federal Maritime Commission",
+
+    "NCUA": "National Credit Union Administration (NCUA)",
+    "CREDIT UNION": "National Credit Union Administration (NCUA)",
+
+    "NEA": "National Endowment for the Arts",
+    "ARTS": "National Endowment for the Arts",
+
+    "NEH": "National Endowment for the Humanities",
+    "HUMANITIES": "National Endowment for the Humanities",
+
+    "IMLS": "Institute of Museum and Library Services",
+    "MUSEUM": "Institute of Museum and Library Services",
+
+    "AMERICORPS": "Corporation for National and Community Service",
+    "CNCS": "Corporation for National and Community Service",
+
+    "USAGM": "U.S. Agency for Global Media",
+    "VOA": "U.S. Agency for Global Media",
+    "VOICE OF AMERICA": "U.S. Agency for Global Media",
+
+    "CSB": "Chemical Safety and Hazard Investigation Board (CSB)",
+    "CHEMICAL SAFETY": "Chemical Safety and Hazard Investigation Board (CSB)",
+
+    "FMCS": "Federal Mediation and Conciliation Service (FMCS)",
+    "MEDIATION": "Federal Mediation and Conciliation Service (FMCS)",
+
+    "MSPB": "Merit Systems Protection Board (MSPB)",
+    "MERIT SYSTEMS": "Merit Systems Protection Board (MSPB)",
+
+    "OGE": "Office of Government Ethics (OGE)",
+    "ETHICS": "Office of Government Ethics (OGE)",
+
+    "OSTP": "Office of Science and Technology Policy (OSTP)",
+    "SCIENCE POLICY": "Office of Science and Technology Policy (OSTP)",
+
+    "PCLOB": "Privacy and Civil Liberties Oversight Board",
+    "PRIVACY": "Privacy and Civil Liberties Oversight Board",
+
+    "SSS": "Selective Service System",
+    "SELECTIVE SERVICE": "Selective Service System",
+
+    "STB": "Surface Transportation Board",
+    "SURFACE TRANSPORTATION": "Surface Transportation Board",
+
+    "UNICOR": "Federal Prison Industries (UNICOR)",
+    "PRISON INDUSTRIES": "Federal Prison Industries (UNICOR)"
+  },
+  "cgacCodes": {
+    "007": "Department of Agriculture",
+    "011": "Department of Commerce",
+    "012": "Department of Defense",
+    "013": "Department of Education",
+    "014": "Department of Energy",
+    "015": "Department of Health and Human Services",
+    "016": "Department of Homeland Security",
+    "017": "Department of Housing and Urban Development",
+    "018": "Department of the Interior",
+    "019": "Department of Justice",
+    "020": "Department of Labor",
+    "021": "Department of State",
+    "024": "Department of Transportation",
+    "025": "Department of the Treasury",
+    "028": "Department of Veterans Affairs",
+    "047": "General Services Administration",
+    "049": "National Science Foundation",
+    "068": "Environmental Protection Agency",
+    "069": "Federal Emergency Management Agency",
+    "072": "Agency for International Development",
+    "080": "NASA",
+    "089": "Small Business Administration",
+    "097": "Nuclear Regulatory Commission",
+    "422": "Office of Personnel Management",
+    "023": "Social Security Administration"
+  },
+  "parentMappings": {
+    "FEMA": "Department of Homeland Security",
+    "CBP": "Department of Homeland Security",
+    "ICE": "Department of Homeland Security",
+    "TSA": "Department of Homeland Security",
+    "USCG": "Department of Homeland Security",
+    "USSS": "Department of Homeland Security",
+    "CISA": "Department of Homeland Security",
+    "FLETC": "Department of Homeland Security",
+    "USCIS": "Department of Homeland Security",
+
+    "VHA": "Department of Veterans Affairs",
+    "VBA": "Department of Veterans Affairs",
+    "NCA": "Department of Veterans Affairs",
+
+    "FDA": "Department of Health and Human Services",
+    "CDC": "Department of Health and Human Services",
+    "CMS": "Department of Health and Human Services",
+    "NIH": "Department of Health and Human Services",
+    "IHS": "Department of Health and Human Services",
+    "HRSA": "Department of Health and Human Services",
+    "AHRQ": "Department of Health and Human Services",
+    "SAMHSA": "Department of Health and Human Services",
+    "ACF": "Department of Health and Human Services",
+    "ACL": "Department of Health and Human Services",
+    "ASPR": "Department of Health and Human Services",
+
+    "FAA": "Department of Transportation",
+    "FHWA": "Department of Transportation",
+    "FRA": "Department of Transportation",
+    "FTA": "Department of Transportation",
+    "FMCSA": "Department of Transportation",
+    "PHMSA": "Department of Transportation",
+    "MARAD": "Department of Transportation",
+    "NHTSA": "Department of Transportation",
+
+    "IRS": "Department of the Treasury",
+    "MINT": "Department of the Treasury",
+    "BEP": "Department of the Treasury",
+    "OCC": "Department of the Treasury",
+    "TTB": "Department of the Treasury",
+    "FINCEN": "Department of the Treasury",
+    "CDFI": "Department of the Treasury",
+    "FISCAL SERVICE": "Department of the Treasury",
+
+    "FBI": "Department of Justice",
+    "DEA": "Department of Justice",
+    "ATF": "Department of Justice",
+    "BOP": "Department of Justice",
+    "USMS": "Department of Justice",
+    "OJP": "Department of Justice",
+    "EOIR": "Department of Justice",
+
+    "DARPA": "Department of Defense",
+    "DISA": "Department of Defense",
+    "DLA": "Department of Defense",
+    "DHA": "Department of Defense",
+    "DCAA": "Department of Defense",
+    "DCMA": "Department of Defense",
+    "DFAS": "Department of Defense",
+    "DIA": "Department of Defense",
+    "NGA": "Department of Defense",
+    "NRO": "Department of Defense",
+    "MDA": "Department of Defense",
+    "DTRA": "Department of Defense",
+    "DCSA": "Department of Defense",
+    "DECA": "Department of Defense",
+
+    "NAVFAC": "Department of the Navy",
+    "NAVSEA": "Department of the Navy",
+    "NAVAIR": "Department of the Navy",
+    "NAVWAR": "Department of the Navy",
+    "MCSC": "Department of the Navy",
+
+    "AFMC": "Department of the Air Force",
+    "SSC": "Department of the Air Force",
+
+    "ACC": "Department of the Army",
+    "AMC": "Department of the Army",
+    "AFC": "Department of the Army",
+    "USACE": "Department of the Army",
+
+    "NNSA": "Department of Energy",
+    "BPA": "Department of Energy",
+    "WAPA": "Department of Energy",
+    "ARPA-E": "Department of Energy",
+    "EERE": "Department of Energy",
+    "EM": "Department of Energy",
+    "SC": "Department of Energy",
+    "FE": "Department of Energy",
+    "NE": "Department of Energy",
+    "FERC": "Department of Energy",
+
+    "NIST": "Department of Commerce",
+    "NOAA": "Department of Commerce",
+    "CENSUS": "Department of Commerce",
+    "BEA": "Department of Commerce",
+    "ITA": "Department of Commerce",
+    "BIS": "Department of Commerce",
+    "EDA": "Department of Commerce",
+    "MBDA": "Department of Commerce",
+    "NTIA": "Department of Commerce",
+    "USPTO": "Department of Commerce",
+
+    "BLM": "Department of the Interior",
+    "NPS": "Department of the Interior",
+    "FWS": "Department of the Interior",
+    "USGS": "Department of the Interior",
+    "BIA": "Department of the Interior",
+    "BOR": "Department of the Interior",
+    "BOEM": "Department of the Interior",
+    "BSEE": "Department of the Interior",
+    "OSMRE": "Department of the Interior",
+
+    "USFS": "Department of Agriculture",
+    "APHIS": "Department of Agriculture",
+    "AMS": "Department of Agriculture",
+    "ARS": "Department of Agriculture",
+    "FSA": "Department of Agriculture",
+    "NRCS": "Department of Agriculture",
+    "RD": "Department of Agriculture",
+    "FSIS": "Department of Agriculture",
+
+    "FAS": "General Services Administration",
+    "PBS": "General Services Administration",
+    "TTS": "General Services Administration",
+
+    "OSHA": "Department of Labor",
+    "MSHA": "Department of Labor",
+    "ETA": "Department of Labor",
+    "WHD": "Department of Labor",
+    "BLS": "Department of Labor",
+
+    "FSA-ED": "Department of Education",
+    "OESE": "Department of Education",
+    "OPE": "Department of Education",
+    "OSERS": "Department of Education",
+
+    "CPD": "Department of Housing and Urban Development",
+    "PIH": "Department of Housing and Urban Development",
+    "FHA": "Department of Housing and Urban Development"
+  }
+}

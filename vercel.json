@@ -64,6 +64,18 @@
     {
       "path": "/api/cron/refresh-contracts",
       "schedule": "0 23 * * 0"
+    },
+    {
+      "path": "/api/cron/snapshot-multisite?source=nih_reporter",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-multisite?source=darpa_baa",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-multisite?source=nsf_sbir",
+      "schedule": "0 6 * * *"
     }
   ]
 }

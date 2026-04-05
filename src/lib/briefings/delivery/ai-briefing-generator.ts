@@ -15,6 +15,7 @@ import { ContractorRecord } from '../pipelines/contractor-db';
 import { WebSignal } from '../web-intel/types';
 import { enrichContractsWithIntel, ContractIntelligence } from '../enrichment';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
+import { fetchMultisiteForUser, MultisiteOpportunity, ScoredMultisiteOpportunity } from '../pipelines/multisite';
 
 // Types for AI-generated briefings
 export interface AIBriefingOpportunity {
@@ -48,6 +49,7 @@ export interface AIGeneratedBriefing {
     awardsAnalyzed: number;
     contractorsAnalyzed: number;
     webSignalsAnalyzed: number;
+    multisiteOppsAnalyzed: number;
   };
   processingTimeMs: number;
 }
@@ -135,7 +137,19 @@ DO NOT:
 - Write fluffy marketing language
 - Omit incumbent names
 - Give vague timelines
-- Miss highlighting open market research windows`;
+- Miss highlighting open market research windows
+
+R&D OPPORTUNITIES (NIH, DARPA, NSF):
+When multisite opportunities are provided, these are HIGH-VALUE R&D opportunities:
+- NIH Grants: Research funding with rolling deadlines, multiple award phases
+- DARPA BAAs: Cutting-edge technology development with rolling submissions
+- NSF SBIR/STTR: Small business research innovation funding
+These opportunities are DIFFERENT from standard federal contracts:
+- Often have rolling deadlines (not fixed close dates)
+- Require white paper/proposal submissions
+- Focus on innovation and research capabilities vs. past performance
+- Can lead to follow-on production contracts
+Include at least 1-2 R&D opportunities in your top 10 if provided.`;
 
 /**
  * Generate AI-powered briefing
@@ -218,6 +232,7 @@ export async function generateAIBriefing(
             awards: [],
             contractors: [],
             webSignals: [],
+            multisiteOpps: organizedData.multisiteOpps,
           };
           console.log(`[AIBriefingGen] Found ${recompeteResult.contracts.length} recompete opportunities from LOCAL data`);
         } else {
@@ -234,12 +249,61 @@ export async function generateAIBriefing(
               awards: [],
               contractors: [],
               webSignals: [],
+              multisiteOpps: organizedData.multisiteOpps,
             };
             console.log(`[AIBriefingGen] Found ${usaResult.contracts.length} from USASpending API`);
           }
         }
       } catch (err) {
         console.warn(`[AIBriefingGen] Recompete data fetch failed:`, err);
+      }
+    }
+
+    // FALLBACK: Always try to fetch multisite opportunities (NIH, DARPA, NSF)
+    if (organizedData.multisiteOpps.length === 0) {
+      console.log(`[AIBriefingGen] Fetching multisite opportunities (NIH, DARPA, NSF)...`);
+      try {
+        // Fetch directly from multisite pipeline without NAICS filtering
+        // R&D opportunities use different NAICS (541714, 541715) than typical contractors
+        const { fetchMultisiteOpportunities } = await import('../pipelines/multisite');
+        const multisiteResult = await fetchMultisiteOpportunities({
+          postedFrom: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          limit: 25,
+          // No NAICS filter - get all R&D opportunities
+        });
+
+        if (multisiteResult.opportunities.length > 0) {
+          // Score them based on keywords if available
+          const scoredOpps = multisiteResult.opportunities.map(opp => {
+            let score = 10; // Base score for R&D opportunities
+            const matchReasons: string[] = ['R&D opportunity'];
+
+            // Check for keyword matches in title
+            const oppTitle = (opp.title || '').toLowerCase();
+            for (const keyword of profile.keywords) {
+              if (oppTitle.includes(keyword.toLowerCase())) {
+                score += 15;
+                matchReasons.push(`Keyword: ${keyword}`);
+              }
+            }
+
+            // Boost DARPA BAAs (high-value innovation)
+            if (opp.source === 'darpa_baa') {
+              score += 15;
+              matchReasons.push('DARPA BAA');
+            }
+
+            return { ...opp, score, matchReasons };
+          });
+
+          organizedData.multisiteOpps = scoredOpps
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 20);
+
+          console.log(`[AIBriefingGen] Found ${organizedData.multisiteOpps.length} multisite opportunities`);
+        }
+      } catch (err) {
+        console.warn(`[AIBriefingGen] Multisite fetch failed:`, err);
       }
     }
 
@@ -301,6 +365,7 @@ export async function generateAIBriefing(
         awardsAnalyzed: organizedData.awards.length,
         contractorsAnalyzed: organizedData.contractors.length,
         webSignalsAnalyzed: organizedData.webSignals.length,
+        multisiteOppsAnalyzed: organizedData.multisiteOpps.length,
       },
       processingTimeMs: Date.now() - startTime,
     };
@@ -333,6 +398,7 @@ function buildUserPrompt(
     awards: ContractAward[];
     contractors: ContractorRecord[];
     webSignals: WebSignal[];
+    multisiteOpps: ScoredMultisiteOpportunity[];
   },
   enrichedIntel?: Map<string, ContractIntelligence>
 ): string {
@@ -383,6 +449,26 @@ ${JSON.stringify(data.contractors.slice(0, 20), null, 2)}
 
 WEB SIGNALS (${data.webSignals.length} news items):
 ${JSON.stringify(data.webSignals.slice(0, 10), null, 2)}
+
+MULTISITE OPPORTUNITIES (${data.multisiteOpps.length} from NIH, DARPA, NSF):
+${data.multisiteOpps.length > 0 ? JSON.stringify(data.multisiteOpps.slice(0, 20).map(o => ({
+  title: o.title,
+  agency: o.agency,
+  subAgency: o.subAgency,
+  source: o.source,
+  type: o.opportunityType,
+  closeDate: o.closeDate,
+  estimatedValue: o.estimatedValue,
+  score: o.score,
+  matchReasons: o.matchReasons,
+  url: o.sourceUrl
+})), null, 2) : 'No multisite opportunities found'}
+
+NOTE: Multisite opportunities include:
+- NIH grants and SBIR/STTR research opportunities
+- DARPA BAAs (Broad Agency Announcements) - cutting-edge R&D
+- NSF SBIR/STTR solicitations
+These are HIGH-VALUE R&D opportunities that often have rolling deadlines and multiple award phases.
 ${enrichedSection}
 Generate:
 1. TOP 10 RECOMPETE OPPORTUNITIES ranked by actionability (not just value)
@@ -435,12 +521,14 @@ function organizeSnapshots(
   awards: ContractAward[];
   contractors: ContractorRecord[];
   webSignals: WebSignal[];
+  multisiteOpps: ScoredMultisiteOpportunity[];
 } {
   const organized = {
     recompetes: [] as RecompeteContract[],
     awards: [] as ContractAward[],
     contractors: [] as ContractorRecord[],
     webSignals: [] as WebSignal[],
+    multisiteOpps: [] as ScoredMultisiteOpportunity[],
   };
 
   for (const snap of snapshots) {
@@ -467,6 +555,11 @@ function organizeSnapshots(
       case 'web_intelligence':
         if (Array.isArray(data.signals)) {
           organized.webSignals.push(...(data.signals as WebSignal[]));
+        }
+        break;
+      case 'multisite':
+        if (Array.isArray(data.opportunities)) {
+          organized.multisiteOpps.push(...(data.opportunities as ScoredMultisiteOpportunity[]));
         }
         break;
     }

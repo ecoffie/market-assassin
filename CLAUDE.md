@@ -43,17 +43,17 @@ npm run test:pre-deploy
 
 **Reference:** [`docs/sam-apis.md`](./docs/sam-apis.md)
 
-### API Status (March 25, 2026)
+### API Status (April 5, 2026)
 
 | API | Status | Source | System Account Required |
 |-----|--------|--------|------------------------|
 | Opportunities | ✅ Working | SAM.gov | No |
 | Entity Management | ✅ Working | SAM.gov | No |
 | Federal Hierarchy | ✅ Working | SAM.gov | No |
-| Contract Awards | ✅ Working | **USASpending** | Yes (using fallback) |
+| Contract Awards | ✅ Working | **USASpending MCP** | No |
 | Subaward | ⏳ Waiting | SAM.gov | Yes |
 
-**Note:** Contract Awards and Subaward APIs require SAM.gov System Account. Entity reactivated, request submitted, waiting 1-4 weeks for approval.
+**Note:** USASpending MCP fixed April 5, 2026 (added required `award_type_codes` filter).
 
 ### Rate Limits & Caching
 
@@ -88,6 +88,62 @@ SAM_ENTITY_API_KEY=xxx             # Same as SAM_API_KEY
 | `src/lib/sam/subaward-api.ts` | Subaward Reporting API wrapper |
 | `src/lib/sam/federal-hierarchy.ts` | Federal Hierarchy API wrapper |
 | `src/lib/sam/index.ts` | Unified exports |
+
+---
+
+## Agency Hierarchy API v2 (Moat 7)
+
+**Reference:** [`docs/agency-hierarchy-api.md`](./docs/agency-hierarchy-api.md)
+
+Unified federal agency intelligence combining SAM.gov, pain points, contractors, and spending data. Inspired by Tango by MakeGov, enhanced with GovCon-specific intel.
+
+### Quick Examples
+
+```bash
+# Search by abbreviation
+curl "https://tools.govcongiants.org/api/agency-hierarchy?search=VA"
+
+# CGAC code lookup
+curl "https://tools.govcongiants.org/api/agency-hierarchy?cgac=069"
+
+# Get spending data
+curl "https://tools.govcongiants.org/api/agency-hierarchy?mode=spending&agency=DOD"
+
+# Find buying offices for NAICS
+curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buying"
+
+# Service stats
+curl "https://tools.govcongiants.org/api/agency-hierarchy?mode=stats"
+```
+
+### Data Sources
+
+| Source | Contents |
+|--------|----------|
+| SAM.gov Federal Hierarchy | Official org structure |
+| Pain Points Database | 250 agencies, 2,765 pain points |
+| Contractor Database | 2,768 contractors with SBLO contacts |
+| Agency Aliases | 450+ abbreviation mappings |
+| USASpending.gov | Spending aggregations |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/agency-hierarchy/index.ts` | Unified exports |
+| `src/lib/agency-hierarchy/unified-search.ts` | Main search service |
+| `src/lib/agency-hierarchy/pain-points-linker.ts` | Pain points matching |
+| `src/lib/agency-hierarchy/spending-stats.ts` | USASpending integration |
+| `src/data/agency-aliases.json` | Abbreviation mappings |
+| `src/data/agency-pain-points.json` | Pain points database |
+| `src/app/api/agency-hierarchy/route.ts` | API endpoint |
+
+### Test Script
+
+```bash
+./tests/test-agency-hierarchy.sh local  # Test local dev
+./tests/test-agency-hierarchy.sh prod   # Test production
+```
 
 ### Test Endpoints
 

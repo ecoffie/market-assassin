@@ -1,0 +1,251 @@
+================================================================================
+SUPABASE MIGRATION SUMMARY - MULTISITE AGGREGATION (Moat 6)
+================================================================================
+
+STATUS: ✅ READY FOR DEPLOYMENT
+Project ID: krpyelfrbicmvsmwovti (Market Assassin)
+Migration File: /Users/ericcoffie/Market Assasin/market-assassin/migrations/multisite-aggregation-tables.sql
+File Size: 14,159 bytes
+Created: April 4, 2026
+
+================================================================================
+WHAT THIS MIGRATION DOES
+================================================================================
+
+Creates database infrastructure for aggregating opportunities from 23+ federal 
+procurement sources (SAM.gov, DLA DIBBS, Navy NECO, NIH Reporter, DARPA, NSF, 
+DOE National Labs, and more).
+
+KEY ACHIEVEMENTS:
+✅ Unified schema for all opportunity sources
+✅ Pre-configured 21 data sources with rate limits & health tracking  
+✅ Full-text search on opportunities
+✅ Audit trail (scrape_log) for all data imports
+✅ Automatic timestamp maintenance via triggers
+✅ Deduplication via unique (source, external_id) constraint
+✅ Performance indexes on all common queries
+✅ Extensions to user_notification_settings for source filtering
+
+TABLES CREATED: 3
+- aggregated_opportunities (central hub for all scraped data)
+- multisite_sources (configuration registry)
+- scrape_log (audit trail)
+
+INDEXES CREATED: 11 (on NAICS, agency, dates, status, source, type, etc.)
+TRIGGERS CREATED: 2 (auto-update timestamps)
+FUNCTIONS CREATED: 1 (timestamp helper)
+ROWS PRE-POPULATED: 21 sources in multisite_sources
+
+================================================================================
+EXECUTION METHOD (RECOMMENDED)
+================================================================================
+
+OPTION B: Manual via Supabase Dashboard (FASTEST)
+
+1. Go to: https://app.supabase.com/
+2. Log in
+3. Select project: krpyelfrbicmvsmwovti
+4. SQL Editor → New Query
+5. Copy entire contents of: /Users/ericcoffie/Market Assasin/market-assassin/migrations/multisite-aggregation-tables.sql
+6. Paste into editor
+7. Click Run
+8. Wait 5-10 seconds for completion
+9. Verify: Should see 21 rows in multisite_sources
+
+TIME: 5-10 minutes
+RISK: LOW (schema-only, uses IF NOT EXISTS, fully idempotent)
+
+================================================================================
+POST-EXECUTION CHECKLIST
+================================================================================
+
+After running the migration:
+
+[ ] 1. Verify in Supabase Dashboard
+    - Go to Tables section
+    - Should see: aggregated_opportunities, multisite_sources, scrape_log
+
+[ ] 2. Check Table Stats
+    - aggregated_opportunities: 0 rows, 31 columns
+    - multisite_sources: 21 rows (pre-populated sources)
+    - scrape_log: 0 rows
+
+[ ] 3. Verify Indexes
+    - Run: SELECT indexname FROM pg_indexes WHERE tablename = 'aggregated_opportunities';
+    - Should see: idx_agg_opps_naics, idx_agg_opps_agency, idx_agg_opps_posted, etc. (11 total)
+
+[ ] 4. Check Triggers
+    - Run: SELECT trigger_name FROM information_schema.triggers WHERE trigger_schema = 'public';
+    - Should see: update_aggregated_opportunities_updated_at, update_multisite_sources_updated_at
+
+[ ] 5. Verify Source Data
+    - Run: SELECT id, name, tier FROM multisite_sources ORDER BY tier, id;
+    - Should list 21 sources across 3 tiers
+
+[ ] 6. Test user_notification_settings columns
+    - Run: SELECT * FROM user_notification_settings LIMIT 1;
+    - Should see: preferred_sources (TEXT[]), excluded_sources (TEXT[])
+
+================================================================================
+WHAT GETS PRE-LOADED (21 SOURCES)
+================================================================================
+
+TIER 1 (High-Volume - 10K+ actions/day):
+  • dla_dibbs - Defense Logistics Agency ($41.8B/yr)
+  • navy_neco - Navy/Marine Corps  
+  • unison - Reverse auctions (formerly FedBid)
+  • acq_gateway - Acquisition Gateway Forecasts
+
+TIER 2 (Research & BAAs):
+  • nih_reporter - NIH funding opportunities
+  • darpa_baa - DARPA Broad Agency Announcements
+  • nsf_sbir - NSF Small Business Innovation Research
+
+TIER 3 (DOE National Labs - 13 labs):
+  • ornl - Oak Ridge National Lab
+  • lanl - Los Alamos National Lab
+  • snl - Sandia National Labs
+  • llnl - Lawrence Livermore National Lab
+  • pnnl - Pacific Northwest National Lab
+  • inl - Idaho National Lab
+  • anl - Argonne National Lab
+  • bnl - Brookhaven National Lab
+  • slac - SLAC National Accelerator Lab
+  • nrel - National Renewable Energy Lab
+  • pppl - Princeton Plasma Physics Lab
+  • srnl - Savannah River National Lab
+  • jlab - Thomas Jefferson National Lab
+  • ames - Ames National Lab
+  • netl - National Energy Technology Lab
+  • fnal - Fermi National Accelerator Lab
+  • lbnl - Lawrence Berkeley National Lab
+
+All sources are pre-configured with:
+  • Rate limits (respecting agency guidelines)
+  • Scraper type (API, browser, RSS, Firecrawl)
+  • Configuration (search URLs, extraction schemas)
+  • Health tracking fields
+
+================================================================================
+DATABASE SCHEMA OVERVIEW
+================================================================================
+
+aggregated_opportunities (31 columns)
+├─ Identification: id, source, external_id, source_url
+├─ Content: title, description
+├─ Classification: agency, sub_agency, naics_code, psc_code, set_aside, opportunity_type
+├─ Timeline: posted_date, close_date, response_date, archive_date
+├─ Financials: estimated_value, award_value
+├─ Location: place_of_performance_state, city, zip, country
+├─ Contact: contact_name, contact_email, contact_phone, contracting_office
+├─ Attachments: document_urls (JSONB)
+├─ Status: status (active/awarded/cancelled/archived)
+├─ Metadata: raw_data (JSONB), content_hash (SHA256)
+└─ Tracking: scraped_at, updated_at, created_at
+
+multisite_sources (14 columns)
+├─ Identity: id, name, base_url
+├─ Config: scraper_type, tier, rate_limits, config, headers
+├─ Status: is_enabled, last_scrape_at, last_scrape_status, last_scrape_count
+├─ Health: consecutive_failures, avg_response_time_ms, total_scrapes
+├─ Errors: last_error, last_error_at
+└─ Metadata: notes, created_at, updated_at
+
+scrape_log (10 columns)
+├─ Tracking: id, source_id, started_at, completed_at, duration_ms
+├─ Results: status, opportunities_found/new/updated/unchanged
+├─ Errors: error_message, error_details (JSONB)
+├─ Context: triggered_by, params (JSONB)
+└─ Timestamp: created_at
+
+user_notification_settings (2 new columns)
+├─ preferred_sources (TEXT[] array) - default: sam_gov, dla_dibbs, navy_neco, grants_gov
+└─ excluded_sources (TEXT[] array) - default: empty
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problem: "relation 'user_notification_settings' does not exist"
+Solution: This table must exist in the database. It should. If missing, migrate 
+that table first or verify you're connected to the right database.
+
+Problem: SQL syntax errors
+Solution: File may have corrupted during copy/paste. Delete all content and 
+re-paste the entire file from the original source.
+
+Problem: "permission denied" when running
+Solution: Verify you're logged in with an admin account. Check that you have 
+access to the krpyelfrbicmvsmwovti project.
+
+Problem: Takes >1 minute to execute
+Solution: Index creation on new tables is normal. Indexes on large datasets 
+can take time. Do NOT cancel. Wait for "Success" status.
+
+Problem: Partial execution (some tables created, some missing)
+Solution: Run the entire script again. Uses IF NOT EXISTS, so re-running is safe.
+
+================================================================================
+NEXT STEPS AFTER MIGRATION
+================================================================================
+
+1. VERIFY (5 minutes)
+   └─ Check all tables exist in Supabase dashboard
+   └─ Run verification queries
+   └─ Confirm 21 sources are populated
+
+2. CODE INTEGRATION (1-2 weeks)
+   └─ Add API routes to query aggregated_opportunities
+   └─ Create scraper runners for each source
+   └─ Add cron jobs for automated scraping
+   └─ Update UI to display aggregated results
+
+3. DATA POPULATION (2-4 weeks)
+   └─ Run scrapers gradually (respecting rate limits)
+   └─ Monitor scrape_log for errors
+   └─ Backfill historical data
+   └─ Validate data quality
+
+4. FEATURE LAUNCH
+   └─ Enable in Opportunity Hunter tool
+   └─ Add to Daily Alerts pipeline
+   └─ Include in Market Intelligence briefings
+   └─ Create "All Sources" search filter
+
+================================================================================
+KEY FILES & REFERENCES
+================================================================================
+
+Migration File:
+  /Users/ericcoffie/Market Assasin/market-assassin/migrations/multisite-aggregation-tables.sql
+
+Project Documentation:
+  /Users/ericcoffie/Market Assasin/market-assassin/TOOL-BUILD.md (Moat 6 section)
+
+Environment Configuration:
+  /Users/ericcoffie/Market Assasin/market-assassin/.env.local
+
+Supabase Project:
+  URL: https://krpyelfrbicmvsmwovti.supabase.co
+  Dashboard: https://app.supabase.com/
+
+Related Code:
+  - src/lib/sam/ (existing SAM.gov integration)
+  - src/lib/agency-hierarchy/ (agency intelligence)
+  - src/app/api/cron/ (scheduled jobs)
+  - src/lib/briefings/ (AI briefings)
+
+================================================================================
+QUESTIONS OR ISSUES?
+================================================================================
+
+File size: 14,159 bytes (safe)
+Contains: 3 CREATE TABLE, 11 CREATE INDEX, 2 CREATE TRIGGER, 1 CREATE FUNCTION,
+          1 INSERT statement, 1 ALTER TABLE, 1 verification query
+Safety: Fully idempotent - can be run multiple times
+Risk level: LOW
+
+For questions about the Moat 6 roadmap, see: TOOL-BUILD.md
+For Supabase docs: https://supabase.com/docs
+
+================================================================================

@@ -1,6 +1,138 @@
 # GovCon Giants - Current Tasks
 
-## Session State (April 3, 2026)
+## Session State (April 5, 2026)
+
+### ✅ COMPLETED: Multisite Aggregation - Phase 1 (Scrapers + Crons)
+
+**Scrapers Built:**
+1. **NIH RePORTER** - Working, 100 opportunities scraped
+2. **DARPA BAA** (via Grants.gov) - Working, 6 BAAs scraped
+3. **NSF SBIR** (via SBIR.gov) - API rate limited (429), will retry automatically
+
+**Cron Jobs Configured (vercel.json):**
+- NIH Reporter: `0 4 * * *` (4 AM UTC daily)
+- DARPA BAA: `0 5 * * *` (5 AM UTC daily)
+- NSF SBIR: `0 6 * * *` (6 AM UTC daily)
+
+**Database State:**
+- `aggregated_opportunities`: **106 rows** (100 NIH + 6 DARPA)
+- `multisite_sources`: 24 sources configured
+- `scrape_log`: Audit trail working
+
+**Files Created:**
+- `src/lib/scrapers/apis/sbir-gov.ts` - SBIR.gov API client
+- `src/lib/scrapers/apis/darpa-baa.ts` - SAM.gov DARPA scraper (not used)
+- `src/lib/scrapers/apis/grantsgov-darpa.ts` - Grants.gov DARPA scraper (active)
+- Updated `src/lib/scrapers/index.ts` - Exports new scrapers
+- Updated `src/app/api/cron/snapshot-multisite/route.ts` - Uses new scrapers
+
+**Deferred (6 months):**
+- Daily Briefings integration - will revisit after multisite scraping stabilizes
+
+**MCP Tools:**
+```bash
+mcp__multisite__search_multisite     # Search all sources
+mcp__multisite__get_multisite_stats  # Stats (106 total opps)
+mcp__multisite__get_source_health    # Source health status
+mcp__multisite__trigger_scrape       # Manual trigger
+```
+
+---
+
+### Previous: Multisite Database Setup
+
+---
+
+### ✅ COMPLETED: USASpending MCP Fix
+
+**Problem:** USASpending MCP was returning 422 Unprocessable Entity errors.
+
+**Root Cause:** The USASpending API requires `award_type_codes` in the filters (mandatory field).
+
+**Fix Applied:**
+- Added `award_type_codes: ["A", "B", "C", "D"]` to filters in `/Users/ericcoffie/mcp-servers/usaspending-mcp/index.js`
+- Updated default fiscal year from 2024 to 2025
+- Award type codes: A=BPA Call, B=Purchase Order, C=Delivery Order, D=Definitive Contract
+
+**Test Command:**
+```bash
+mcp__usaspending__search_contracts with naics="541512" state="FL" limit=5
+```
+
+---
+
+## Previous Session (April 4, 2026)
+
+### ✅ COMPLETED: Moat 7 - Agency Hierarchy API v2
+
+**Built unified federal agency intelligence API** combining:
+- SAM.gov Federal Hierarchy (official org structure)
+- Pain Points Database (250 agencies, 2,765 pain points)
+- Contractor/SBLO contacts (2,768 contractors)
+- Agency aliases (450+ abbreviation mappings)
+- USASpending.gov (spending aggregations)
+
+**Files Created:**
+- `src/lib/agency-hierarchy/` - Core module (index, unified-search, pain-points-linker, spending-stats)
+- `src/data/agency-aliases.json` - 450+ alias mappings (VA→Veterans Affairs, etc.)
+- `docs/agency-hierarchy-api.md` - Full API documentation
+- `tests/test-agency-hierarchy.sh` - 15 automated tests
+
+**API Endpoint:** `/api/agency-hierarchy`
+
+**Example Usage:**
+```bash
+# Search by abbreviation
+curl "https://tools.govcongiants.org/api/agency-hierarchy?search=VA"
+
+# CGAC code lookup
+curl "https://tools.govcongiants.org/api/agency-hierarchy?cgac=069"
+
+# Get spending data
+curl "https://tools.govcongiants.org/api/agency-hierarchy?mode=spending&agency=DOD"
+
+# Find buying offices for NAICS
+curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buying"
+```
+
+**Test:** `./tests/test-agency-hierarchy.sh local` or `./tests/test-agency-hierarchy.sh prod`
+
+---
+
+## 📋 NEXT: Moat 6 - Multi-Site Aggregation
+
+**Goal:** Scrape 85+ agency sites that SAM.gov doesn't capture (DOE Labs, NIH, DARPA, etc.)
+
+**Status:** MCP built, needs data population
+
+**Multisite MCP Ready:**
+- ✅ MCP server at `/Users/ericcoffie/mcp-servers/multisite/`
+- ✅ Configured in `~/.mcp.json`
+- ✅ 21 sources defined (Tier 1-3)
+- ❌ 0 opportunities in database - scrapers need to run
+
+**Sources (21 total):**
+- **Tier 1:** Acquisition Gateway (forecasts)
+- **Tier 2:** NIH RePORTER, DARPA BAAs, NSF SBIR/STTR
+- **Tier 3:** 17 DOE National Labs
+
+**MCP Tools Available:**
+```bash
+mcp__multisite__search_multisite     # Search aggregated opps
+mcp__multisite__get_multisite_stats  # Stats by source
+mcp__multisite__list_sources         # List all 21 sources
+mcp__multisite__trigger_scrape       # Manually trigger scrape
+mcp__multisite__search_nih           # Direct NIH search
+```
+
+**Next Steps:**
+1. Create `aggregated_opportunities` table in Supabase
+2. Run scrapers to populate data
+3. Test search across sources
+
+---
+
+## Previous Session State (April 3, 2026)
 
 ### 🔥 CRITICAL FIX: Daily Briefings Now Working
 

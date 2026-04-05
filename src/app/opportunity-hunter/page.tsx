@@ -70,10 +70,31 @@ interface Agency {
 const FREE_AGENCY_LIMIT = 10;
 const EMAIL_GATE_LIMIT = 3;
 
+// Smart currency formatter - shows B for billions, M for millions
+const formatSpending = (amount: number): string => {
+  if (amount >= 1e9) {
+    return `$${(amount / 1e9).toFixed(2)}B`;
+  }
+  return `$${(amount / 1e6).toFixed(2)}M`;
+};
+
 interface PainPoint {
   point: string;
   source?: string;
   priority?: 'critical' | 'high' | 'medium' | 'low';
+}
+
+interface AgencyHierarchyData {
+  name: string;
+  abbreviation?: string;
+  cgacCode?: string;
+  parent?: string;
+  painPoints?: string[];
+  priorities?: string[];
+  spending?: {
+    fy2025?: number;
+    fy2024?: number;
+  };
 }
 
 
@@ -112,6 +133,8 @@ export default function OpportunityHunterPage() {
   const [modalAgency, setModalAgency] = useState<Agency | null>(null);
   const [painPoints, setPainPoints] = useState<PainPoint[]>([]);
   const [painPointsLoading, setPainPointsLoading] = useState(false);
+  const [agencyHierarchy, setAgencyHierarchy] = useState<AgencyHierarchyData | null>(null);
+  const [hierarchyLoading, setHierarchyLoading] = useState(false);
 
   // Pro access state
   const [isPro, setIsPro] = useState(false);
@@ -293,6 +316,60 @@ export default function OpportunityHunterPage() {
     return 'N/A';
   };
 
+  const loadAgencyHierarchy = useCallback(async (agency: Agency) => {
+    const agencyName = getAgencyName(agency);
+    const parentAgency = agency.parentAgency || '';
+
+    setHierarchyLoading(true);
+    setAgencyHierarchy(null);
+
+    try {
+      // Try searching by agency name first
+      const searchTerms = [
+        agencyName,
+        parentAgency,
+        // Extract abbreviations like NAVFAC, USACE, etc.
+        agencyName.match(/NAVFAC|NAVSEA|NAVWAR|NAVAIR|NAVSUP|USACE|DLA|GSA|NIH|CDC|VA|DOD|HHS|DOE/i)?.[0],
+      ].filter(Boolean);
+
+      for (const term of searchTerms) {
+        if (!term) continue;
+
+        try {
+          const response = await fetch(`/api/agency-hierarchy?search=${encodeURIComponent(term)}`);
+          const data = await response.json();
+
+          if (data.success && data.results && data.results.length > 0) {
+            const result = data.results[0];
+
+            // Only set hierarchy if we have meaningful data (CGAC, abbreviation, or spending)
+            const hasUsefulData = result.cgacCode || result.shortName || result.spending;
+
+            if (hasUsefulData) {
+              setAgencyHierarchy({
+                name: result.name || result.agency_name,
+                abbreviation: result.shortName || result.abbreviation,
+                cgacCode: result.cgacCode || result.cgac_code,
+                parent: result.parent || result.parentPath || result.parent_toptier_agency_name,
+                painPoints: result.painPoints,
+                priorities: result.priorities,
+                spending: result.spending,
+              });
+            }
+            setHierarchyLoading(false);
+            return;
+          }
+        } catch {
+          // Continue to next term
+        }
+      }
+
+      setHierarchyLoading(false);
+    } catch {
+      setHierarchyLoading(false);
+    }
+  }, []);
+
   const loadPainPoints = useCallback(async (agency: Agency) => {
     const officeName = getAgencyName(agency);
     const parentAgency = agency.parentAgency || '';
@@ -364,12 +441,14 @@ export default function OpportunityHunterPage() {
     setModalAgency(agency);
     setModalOpen(true);
     loadPainPoints(agency);
-  }, [loadPainPoints]);
+    loadAgencyHierarchy(agency);
+  }, [loadPainPoints, loadAgencyHierarchy]);
 
   const closeAgencyModal = useCallback(() => {
     setModalOpen(false);
     setModalAgency(null);
     setPainPoints([]);
+    setAgencyHierarchy(null);
   }, []);
 
   // Close modal on escape key
@@ -741,7 +820,7 @@ export default function OpportunityHunterPage() {
               <div className="space-y-2 text-blue-800">
                 <p><strong>Total Contracts Found:</strong> {results.summary.totalAwards.toLocaleString()}</p>
                 <p><strong>Agencies Spending in Your Category:</strong> {results.summary.totalAgencies}</p>
-                <p><strong>Total Contract Value:</strong> ${(results.summary.totalSpending / 1000000).toFixed(2)}M</p>
+                <p><strong>Total Contract Value:</strong> {formatSpending(results.summary.totalSpending)}</p>
                 <p><strong>Search Criteria:</strong> {formatSearchCriteria(results.searchCriteria)}</p>
 
                 {results.locationTier && results.locationTier > 1 && results.searchedState && (
@@ -886,14 +965,14 @@ export default function OpportunityHunterPage() {
                                 </td>
                                 <td className="px-4 py-4">
                                   <span className={`text-sm font-bold ${agency.setAsideSpending > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                                    ${(agency.setAsideSpending / 1000000).toFixed(2)}M
+                                    {formatSpending(agency.setAsideSpending)}
                                   </span>
                                   {agency.setAsideContractCount > 0 && (
                                     <span className="block text-xs text-gray-600">{agency.setAsideContractCount} contracts</span>
                                   )}
                                 </td>
                                 <td className="px-4 py-4 text-sm font-semibold text-gray-600">
-                                  ${(agency.totalSpending / 1000000).toFixed(2)}M
+                                  {formatSpending(agency.totalSpending)}
                                 </td>
                                 <td className="px-4 py-4 text-sm text-gray-900">{agency.contractCount}</td>
                               </tr>
@@ -918,10 +997,10 @@ export default function OpportunityHunterPage() {
                                   <div className="text-sm text-gray-400">████████████████</div>
                                 </td>
                                 <td className="px-4 py-4 text-sm text-gray-400">
-                                  ${(agency.setAsideSpending / 1000000).toFixed(2)}M
+                                  {formatSpending(agency.setAsideSpending)}
                                 </td>
                                 <td className="px-4 py-4 text-sm text-gray-400">
-                                  ${(agency.totalSpending / 1000000).toFixed(2)}M
+                                  {formatSpending(agency.totalSpending)}
                                 </td>
                                 <td className="px-4 py-4 text-sm text-gray-400">{agency.contractCount}</td>
                               </tr>
@@ -1168,14 +1247,14 @@ export default function OpportunityHunterPage() {
                 <div className="bg-blue-50 rounded-lg p-4">
                   <div className="text-sm text-gray-600 mb-1">Set-Aside Spending</div>
                   <div className="text-2xl font-bold text-blue-600">
-                    ${(modalAgency.setAsideSpending / 1000000).toFixed(2)}M
+                    {formatSpending(modalAgency.setAsideSpending)}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">{modalAgency.setAsideContractCount || 0} contracts</div>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="text-sm text-gray-600 mb-1">Total Spending</div>
                   <div className="text-2xl font-bold text-gray-700">
-                    ${(modalAgency.totalSpending / 1000000).toFixed(2)}M
+                    {formatSpending(modalAgency.totalSpending)}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">{modalAgency.contractCount || 0} contracts</div>
                 </div>
@@ -1223,6 +1302,91 @@ export default function OpportunityHunterPage() {
                   )}
                 </div>
               </div>
+
+              {/* Agency Intelligence - From Hierarchy API */}
+              {(hierarchyLoading || agencyHierarchy) && (
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <h3 className="text-lg font-semibold text-indigo-900">Agency Intelligence</h3>
+                    <span className="ml-auto px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-medium rounded">
+                      GovCon Giants Intel
+                    </span>
+                  </div>
+
+                  {hierarchyLoading ? (
+                    <div className="flex items-center gap-2 text-indigo-700">
+                      <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Loading agency intelligence...</span>
+                    </div>
+                  ) : agencyHierarchy && (
+                    <div className="space-y-4">
+                      {/* Key Intel Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {agencyHierarchy.cgacCode && (
+                          <div className="bg-white/70 rounded-lg p-3">
+                            <div className="text-xs text-gray-500 uppercase tracking-wide">CGAC Code</div>
+                            <div className="text-lg font-bold text-indigo-700">{agencyHierarchy.cgacCode}</div>
+                          </div>
+                        )}
+                        {agencyHierarchy.abbreviation && (
+                          <div className="bg-white/70 rounded-lg p-3">
+                            <div className="text-xs text-gray-500 uppercase tracking-wide">Abbreviation</div>
+                            <div className="text-lg font-bold text-indigo-700">{agencyHierarchy.abbreviation}</div>
+                          </div>
+                        )}
+                        {agencyHierarchy.parent && agencyHierarchy.parent !== agencyHierarchy.name && (
+                          <div className="bg-white/70 rounded-lg p-3 col-span-2">
+                            <div className="text-xs text-gray-500 uppercase tracking-wide">Parent Agency</div>
+                            <div className="text-base font-semibold text-gray-900">{agencyHierarchy.parent}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Spending Data */}
+                      {agencyHierarchy.spending && (agencyHierarchy.spending.fy2025 || agencyHierarchy.spending.fy2024) && (
+                        <div className="bg-white/70 rounded-lg p-4">
+                          <div className="text-sm font-medium text-gray-700 mb-2">Total Agency Spending</div>
+                          <div className="flex gap-6">
+                            {agencyHierarchy.spending.fy2025 && (
+                              <div>
+                                <span className="text-2xl font-bold text-green-600">
+                                  ${(agencyHierarchy.spending.fy2025 / 1e9).toFixed(1)}B
+                                </span>
+                                <span className="text-xs text-gray-500 ml-1">FY2025</span>
+                              </div>
+                            )}
+                            {agencyHierarchy.spending.fy2024 && (
+                              <div>
+                                <span className="text-xl font-semibold text-gray-600">
+                                  ${(agencyHierarchy.spending.fy2024 / 1e9).toFixed(1)}B
+                                </span>
+                                <span className="text-xs text-gray-500 ml-1">FY2024</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Top Priorities - Budget Allocations */}
+                      {agencyHierarchy.priorities && agencyHierarchy.priorities.length > 0 && (
+                        <div className="bg-white/70 rounded-lg p-4">
+                          <div className="text-sm font-medium text-gray-700 mb-3">Top Priorities</div>
+                          <div className="space-y-2">
+                            {agencyHierarchy.priorities.slice(0, 4).map((priority, i) => (
+                              <div key={i} className="text-sm text-indigo-800 bg-indigo-50 rounded px-3 py-2">
+                                {priority}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Set-Aside Types */}
               {modalAgency.setAsideTypes && modalAgency.setAsideTypes.length > 0 && (

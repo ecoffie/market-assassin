@@ -68,3 +68,18 @@ export type {
   GrantSearchParams,
   GrantSearchResult,
 } from './grants-gov';
+
+// Multisite Aggregation Pipeline (NIH, DARPA, NSF, DOE Labs)
+export {
+  fetchMultisiteOpportunities,
+  fetchMultisiteForUser,
+  scoreMultisiteOpportunity,
+  getMultisiteStats,
+  getSourceHealth,
+} from './multisite';
+export type {
+  MultisiteOpportunity,
+  ScoredMultisiteOpportunity,
+  MultisiteSearchResult,
+  UserProfile as MultisiteUserProfile,
+} from './multisite';

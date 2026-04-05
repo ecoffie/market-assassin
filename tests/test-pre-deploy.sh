@@ -94,8 +94,8 @@ else
   test_result "SAM date format converter" "fail" "Missing date format functions in sam-gov.ts"
 fi
 
-# Check that all SAM.gov API calls use proper date format
-WRONG_DATE=$(grep -rn "postedFrom.*toISOString\|postedTo.*toISOString" "$PROJECT_DIR/src" 2>/dev/null | grep -v ".next" | wc -l | tr -d ' ')
+# Check that SAM.gov API calls use proper date format (exclude grants-gov which uses ISO)
+WRONG_DATE=$(grep -rn "postedFrom.*toISOString\|postedTo.*toISOString" "$PROJECT_DIR/src" 2>/dev/null | grep -v ".next" | grep -v "grants-gov" | wc -l | tr -d ' ')
 if [ "$WRONG_DATE" == "0" ]; then
   test_result "No ISO dates passed to SAM.gov" "pass"
 else

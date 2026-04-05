@@ -1,0 +1,214 @@
+================================================================================
+SUPABASE MIGRATION EXECUTION GUIDE
+Moat 6: Multi-Site Aggregation Tables
+================================================================================
+
+PROJECT: Market Assassin
+URL: https://app.supabase.com/
+PROJECT ID: krpyelfrbicmvsmwovti
+FILE: /Users/ericcoffie/Market Assasin/market-assassin/migrations/multisite-aggregation-tables.sql
+
+RECOMMENDED METHOD: Manual Execution via Web Dashboard
+⏱ Time Required: 5-10 minutes
+⚠️ Risk Level: LOW (schema-only, idempotent)
+
+================================================================================
+STEP-BY-STEP INSTRUCTIONS
+================================================================================
+
+1. Open Supabase Dashboard
+   → Go to: https://app.supabase.com/
+   → Log in with your GovCon Giants account
+
+2. Select Project
+   → Look for: "krpyelfrbicmvsmwovti" (Market Assassin)
+   → Click to open
+
+3. Navigate to SQL Editor
+   → Left sidebar → Click "SQL Editor"
+   → (Or look for the "Editor" section)
+
+4. Create New Query
+   → Top right → Click "+ New Query" or "New SQL Query"
+
+5. Open Migration File
+   → On your machine: /Users/ericcoffie/Market Assasin/market-assassin/migrations/multisite-aggregation-tables.sql
+   → Open in text editor (VS Code, etc.)
+   → Select all (Cmd+A)
+   → Copy (Cmd+C)
+
+6. Paste SQL into Editor
+   → Back in Supabase SQL Editor
+   → Click in the text area
+   → Paste (Cmd+V)
+   → You should see SQL starting with "-- Moat 6: Multi-Site Aggregation Tables"
+
+7. Run Migration
+   → Click the blue "Run" button (or press Cmd+Enter)
+   → Status will show: "Loading..." → "Success"
+   → Wait 5-10 seconds for completion
+
+8. Verify Success
+   → In the editor, scroll to the bottom
+   → You'll see a "Verification Query" section already at the end of the SQL
+   → Results should show:
+     ┌─────────────────────┬──────────┐
+     │ table_name          │ row_count│
+     ├─────────────────────┼──────────┤
+     │ aggregated_opps     │ 0        │
+     │ multisite_sources   │ 21       │
+     │ scrape_log          │ 0        │
+     └─────────────────────┴──────────┘
+
+================================================================================
+WHAT GETS CREATED
+================================================================================
+
+3 MAIN TABLES:
+
+1. aggregated_opportunities (0 rows initially)
+   └─ 31 columns: source, external_id, title, description, agency, NAICS, dates, values, location, contacts
+   └─ 9 indexes for fast searches
+   └─ Full-text search on title + description
+   └─ Unique constraint: (source, external_id)
+
+2. multisite_sources (21 rows pre-populated)
+   ├─ Tier 1 (High-volume): DLA DIBBS, Navy NECO, Unison, Acquisition Gateway
+   ├─ Tier 2 (Research): NIH Reporter, DARPA, NSF SBIR
+   └─ Tier 3 (DOE Labs): Oak Ridge, Los Alamos, Sandia, Lawrence Livermore, Pacific Northwest, Idaho, Argonne, Brookhaven, SLAC, NREL, Princeton Plasma, Savannah River, Jefferson Lab, Ames, NETL, Fermi, Berkeley
+
+3. scrape_log (0 rows initially)
+   └─ Audit trail: source, status, opportunities found/new/updated, timestamps, error tracking
+
+PLUS:
+- 2 auto-update triggers for "updated_at" columns
+- 1 helper function for timestamp maintenance
+- 2 new columns on user_notification_settings table
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+ERROR: "relation 'user_notification_settings' does not exist"
+→ Solution: This table must exist first. It should already exist in your database.
+→ If missing, create it first or contact support.
+
+ERROR: "syntax error at or near..."
+→ Solution: SQL is partially copied or corrupted.
+→ Delete everything and re-paste the entire file.
+
+ERROR: "permission denied"
+→ Solution: Check that you're logged in with an account that has admin access.
+→ Verify you're in the correct Supabase organization/project.
+
+SLOW EXECUTION (takes >30 seconds)
+→ This is normal. Indexes take time to build on first run.
+→ Do NOT cancel/refresh while running.
+→ Wait until you see "Success" message.
+
+================================================================================
+VERIFICATION QUERIES (Optional - Run These After Migration)
+================================================================================
+
+Check all three tables exist:
+SELECT COUNT(*) FROM aggregated_opportunities;
+SELECT COUNT(*) FROM multisite_sources;
+SELECT COUNT(*) FROM scrape_log;
+
+Check indexes:
+SELECT indexname FROM pg_indexes 
+WHERE tablename = 'aggregated_opportunities';
+
+Check triggers:
+SELECT trigger_name FROM information_schema.triggers 
+WHERE trigger_schema = 'public';
+
+List all sources:
+SELECT id, name, tier FROM multisite_sources ORDER BY tier, id;
+
+================================================================================
+QUICK REFERENCE: TABLE SCHEMAS
+================================================================================
+
+aggregated_opportunities
+├─ id (UUID, primary key)
+├─ source (VARCHAR(50)) - 'sam_gov', 'dla_dibbs', etc.
+├─ external_id (VARCHAR(255)) - ID from source system
+├─ title (TEXT)
+├─ description (TEXT)
+├─ agency, sub_agency
+├─ naics_code, psc_code, set_aside, opportunity_type
+├─ posted_date, close_date, response_date, archive_date
+├─ estimated_value, award_value
+├─ place_of_performance_state, city, zip, country
+├─ contact_name, contact_email, contact_phone
+├─ contracting_office
+├─ document_urls (JSONB array)
+├─ status ('active', 'awarded', 'cancelled', 'archived')
+├─ raw_data (JSONB)
+├─ content_hash (SHA256)
+├─ scraped_at, updated_at, created_at
+└─ UNIQUE(source, external_id)
+
+multisite_sources
+├─ id (VARCHAR(50), primary key) - 'dla_dibbs', 'navy_neco', etc.
+├─ name (VARCHAR(255))
+├─ base_url (TEXT)
+├─ scraper_type ('api', 'browser', 'rss', 'firecrawl')
+├─ tier (1=high-volume, 2=research, 3=labs)
+├─ rate_limit_per_minute, rate_limit_per_day
+├─ config, headers (JSONB)
+├─ is_enabled (BOOLEAN)
+├─ last_scrape_at, last_scrape_status
+├─ last_scrape_count, last_scrape_duration_ms
+├─ consecutive_failures, avg_response_time_ms
+├─ total_scrapes, total_opportunities_found
+├─ last_error, last_error_at
+├─ notes
+├─ created_at, updated_at
+└─ ON CONFLICT: updates if source already exists
+
+scrape_log
+├─ id (UUID, primary key)
+├─ source_id (VARCHAR(50), FK → multisite_sources.id)
+├─ started_at (TIMESTAMP)
+├─ completed_at (TIMESTAMP)
+├─ duration_ms (INTEGER)
+├─ status ('running', 'success', 'partial', 'failed')
+├─ opportunities_found, opportunities_new, opportunities_updated
+├─ opportunities_unchanged
+├─ error_message, error_details (JSONB)
+├─ triggered_by ('cron', 'manual', 'slash_command', 'mcp')
+├─ params (JSONB)
+└─ created_at
+
+================================================================================
+AFTER MIGRATION: NEXT STEPS
+================================================================================
+
+1. Verify in Supabase:
+   → Check Tables section in dashboard
+   → Should see 3 new tables
+
+2. Update Code:
+   → Add API routes to query aggregated_opportunities
+   → Add cron jobs to populate via scrapers
+   → Update UI to display results
+
+3. Populate Data:
+   → Run scraper for each source (gradually, respecting rate limits)
+   → Fill aggregated_opportunities table
+   → Monitor scrape_log for health
+
+4. Monitor:
+   → Check Health Dashboard
+   → Verify cron jobs are executing
+   → Monitor storage growth
+
+================================================================================
+QUESTIONS?
+================================================================================
+
+Migration File: /Users/ericcoffie/Market Assasin/market-assassin/migrations/multisite-aggregation-tables.sql
+Documentation: Check TOOL-BUILD.md for Moat 6 roadmap details
+

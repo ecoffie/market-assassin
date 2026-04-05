@@ -16,8 +16,8 @@ import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-templ
 import { sendEmail } from '@/lib/send-email';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
-const DEFAULT_LIMIT = 5; // Process 5 users at a time (sequential, not parallel)
-const DELAY_BETWEEN_USERS_MS = 5000; // 5 second delay between users to avoid rate limits
+const DEFAULT_LIMIT = 10; // Process 10 users at a time (sequential, not parallel)
+const DELAY_BETWEEN_USERS_MS = 2000; // 2 second delay between users to avoid rate limits
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -39,11 +39,13 @@ export async function GET(request: NextRequest) {
   const today = new Date().toISOString().split('T')[0];
 
   // Get total counts
+  // BETA MODE: Send to ALL active users regardless of briefings_enabled flag
+  // TODO: After April 27, 2026 beta ends, restore .eq('briefings_enabled', true) filter
   const { count: totalUsers } = await supabase
     .from('user_notification_settings')
     .select('*', { count: 'exact', head: true })
-    .eq('is_active', true)
-    .eq('briefings_enabled', true);
+    .eq('is_active', true);
+    // .eq('briefings_enabled', true) // BETA: Commented out
 
   const { count: alreadySent } = await supabase
     .from('briefing_log')
@@ -86,11 +88,12 @@ export async function GET(request: NextRequest) {
   }
 
   // Get users to process (skip those already sent today)
+  // BETA MODE: Send to ALL active users regardless of briefings_enabled flag
   const { data: users, error } = await supabase
     .from('user_notification_settings')
     .select('user_email, naics_codes, agencies')
     .eq('is_active', true)
-    .eq('briefings_enabled', true)
+    // .eq('briefings_enabled', true) // BETA: Commented out
     .order('user_email')
     .range(offset, offset + limit - 1);
 
