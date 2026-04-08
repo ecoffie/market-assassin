@@ -37,27 +37,28 @@ Scanner Approach:
 
 ### Tier 1: Spending Intelligence (Primary)
 
-| Source | Type | Coverage | Update | MCP Tool |
-|--------|------|----------|--------|----------|
-| USASpending | Awards | $7.5T historical | Daily | `usaspending-mcp` |
-| SAM.gov | Opportunities | Active solicitations | Real-time | `samgov-mcp` |
-| Acquisition Gateway | Forecasts | Planned procurements | Weekly | `samgov-mcp` |
+| Source | Type | Coverage | Update | Status |
+|--------|------|----------|--------|--------|
+| USASpending | Awards | $7.5T historical | Daily | ✅ `usaspending-mcp` |
+| SAM.gov | Opportunities | Active solicitations | Real-time | ✅ `samgov-mcp` |
+| Agency Sources | Spending patterns | 250 agencies | Static | ✅ `/api/agency-sources` |
 
 ### Tier 2: Expanded Opportunities
 
-| Source | Type | Coverage | Update | MCP Tool |
-|--------|------|----------|--------|----------|
-| Grants.gov | Grants | $700B/year | Daily | `grantsgov-mcp` |
-| NIH RePORTER | SBIR/STTR | $45B research | Daily | `multisite-mcp` |
-| SBIR.gov | Small Business R&D | Cross-agency | Weekly | Future |
+| Source | Type | Coverage | Update | Status |
+|--------|------|----------|--------|--------|
+| Grants.gov | Grants | $700B/year | Daily | ✅ `grantsgov-mcp` |
+| NIH RePORTER | SBIR/STTR | $45B research | Daily | ✅ `multisite-mcp` |
+| Agency Forecasts | Planned buys | Per-agency | Weekly | 📋 Phase 4 |
 
 ### Tier 3: Events & Intelligence
 
-| Source | Type | Coverage | Update | Tool |
-|--------|------|----------|--------|------|
-| Agency Calendars | Industry Days | All agencies | Weekly | Event Aggregator |
-| GSA Events | Conferences | GSA-hosted | Monthly | Event Aggregator |
-| SBA Events | Small Business | Regional | Weekly | Event Aggregator |
+| Source | Type | Coverage | Update | Status |
+|--------|------|----------|--------|--------|
+| APEX Accelerators | Training | Nationwide | Weekly | ✅ Event Aggregator |
+| AFCEA/NDIA/SAME | Conferences | Defense/IT/A&E | Monthly | ✅ Event Aggregator |
+| Carahsoft/ACT-IAC | Tech events | IT/Cyber | Monthly | ✅ Event Aggregator |
+| Agency OSDBUs | Industry Days | All agencies | Varies | ✅ Event Aggregator |
 
 ### Explicitly Excluded
 
@@ -232,39 +233,73 @@ USASpending API
 ### Phase 2: Agency Source Mapping ✅ COMPLETE
 - [x] Visibility gap calculation (in market-scan)
 - [x] Agency source mapping (`/api/agency-sources`)
-- [ ] Recompete tracker enhancement
+- [x] Full 250 agency coverage with spending patterns
 
 **API Endpoint:** `GET /api/agency-sources?agency={abbrev}`
 
 **Features:**
-- 21 federal agencies with procurement patterns
-- Spending breakdown (SAM vs hidden market)
-- Top vehicles (OASIS+, Alliant 3, SeaPort-NxG, etc.)
-- Secondary sources (DLA DIBBS, agency portals)
+- 250 federal agencies with procurement patterns
+- Spending breakdown (SAM vs hidden market %)
+- Top vehicles by category (OASIS+, Alliant 3, SeaPort-NxG, CIO-SP4, etc.)
+- Secondary sources and agency portals
+- Pain points and priorities per agency
 - Actionable recommendations
 
-**Example:** `?agency=DOD` returns 85% hidden market, GSA Schedule tips, vehicle list
+**Endpoints:**
+- `?agency=DOD` - Single agency lookup
+- `?search=cyber` - Search agencies
+- `?category=defense` - Filter by category
+- `?list=true` - List all 250 agencies
+- `?all=true` - Full data dump
 
 ### Phase 3: Event Aggregator ✅ COMPLETE
 - [x] Event aggregator (`/api/federal-events`)
-- [ ] Competitor profiling
-- [ ] Market Scanner agent
+- [x] APEX Accelerators (formerly PTAC)
+- [x] AFCEA, NDIA, SAME integration
+- [x] Carahsoft, ACT-IAC, industry events
 
 **API Endpoint:** `GET /api/federal-events?naics={code}` or `?agency={abbrev}`
 
 **Features:**
-- 15 event sources (GSA Interact, SBA, PTAC, agency OSDBUs)
+- 30 event sources (APEX, GSA Interact, SBA, AFCEA, NDIA, SAME, Carahsoft, etc.)
 - 7 event categories (industry_day, matchmaking, training, etc.)
-- 5 major annual conferences
+- 12 major annual conferences with URLs
 - NAICS-to-agency mapping for relevant events
-- Recommendations by contractor stage
+- Recommendations by contractor type (IT, construction, defense, small biz)
 
-**Example:** `?naics=541512` returns 10 sources for DOD, VA, DHS, NASA
+**Endpoints:**
+- `?naics=541512` - Events for agencies buying this NAICS
+- `?agency=DOD` - Defense-related events
+- `?sources=true` - All 30 event sources
+- `?conferences=true` - 12 major annual conferences
 
-### Phase 4: Automation
+### Phase 4: Forecast Aggregator 📋 PLANNED
+- [ ] Agency forecast scraping (each agency publishes separately)
+- [ ] Unified forecast database
+- [ ] NAICS-based forecast matching
+- [ ] Forecast alert system
+
+**Challenge:** No centralized API. Each agency publishes forecasts on their own sites:
+
+| Agency | Forecast Location |
+|--------|-------------------|
+| GSA | acquisitiongateway.gov/forecast |
+| DHS | apfs-cloud.dhs.gov |
+| VA | va.gov/osdbu/forecast |
+| DOD Components | Each service branch has own |
+| HHS | hhs.gov/grants/forecast |
+
+**Approach:**
+1. Scrape top 20 agency forecast pages weekly
+2. Normalize into `agency_forecasts` table
+3. Match to user NAICS profiles
+4. Generate forecast alerts
+
+### Phase 5: Automation
 - [ ] Weekly market scans (scheduled)
 - [ ] Recompete alerts
-- [ ] Event notifications
+- [ ] Forecast notifications
+- [ ] Event calendar sync
 
 ---
 

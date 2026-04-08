@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createSecureAccessUrl } from '@/lib/access-links';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     const email = request.nextUrl.searchParams.get('email');
 
     if (!email) {
-      return new NextResponse(getUnsubscribePage('error', 'No email provided'), {
+      return new NextResponse(await getUnsubscribePage('error', 'No email provided'), {
         headers: { 'Content-Type': 'text/html' },
       });
     }
@@ -32,19 +33,19 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('[Unsubscribe] Error:', error);
-      return new NextResponse(getUnsubscribePage('error', 'Failed to unsubscribe'), {
+      return new NextResponse(await getUnsubscribePage('error', 'Failed to unsubscribe'), {
         headers: { 'Content-Type': 'text/html' },
       });
     }
 
     console.log(`[Unsubscribe] Unsubscribed ${email} from alerts`);
 
-    return new NextResponse(getUnsubscribePage('success', email), {
+    return new NextResponse(await getUnsubscribePage('success', email), {
       headers: { 'Content-Type': 'text/html' },
     });
   } catch (error) {
     console.error('[Unsubscribe] Error:', error);
-    return new NextResponse(getUnsubscribePage('error', 'Something went wrong'), {
+    return new NextResponse(await getUnsubscribePage('error', 'Something went wrong'), {
       headers: { 'Content-Type': 'text/html' },
     });
   }
@@ -97,8 +98,9 @@ export async function POST(request: NextRequest) {
 }
 
 // Generate HTML page for unsubscribe confirmation
-function getUnsubscribePage(status: 'success' | 'error', message: string): string {
+async function getUnsubscribePage(status: 'success' | 'error', message: string): Promise<string> {
   const isSuccess = status === 'success';
+  const resubscribeUrl = isSuccess ? await createSecureAccessUrl(message, 'preferences') : '/alerts/preferences';
 
   return `
 <!DOCTYPE html>
@@ -178,7 +180,7 @@ function getUnsubscribePage(status: 'success' | 'error', message: string): strin
       <p>You've been unsubscribed from weekly opportunity alerts.</p>
       <p class="email">${message}</p>
       <p style="margin-top: 24px; font-size: 14px;">
-        Changed your mind? <a href="/alerts/preferences?email=${encodeURIComponent(message)}">Resubscribe</a>
+        Changed your mind? <a href="${resubscribeUrl}">Resubscribe</a>
       </p>
     ` : `
       <p>${message}</p>

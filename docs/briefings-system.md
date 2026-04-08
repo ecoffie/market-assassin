@@ -84,7 +84,7 @@ curl "https://tools.govcongiants.org/api/admin/send-all-briefings?password=galat
 │  7:30 AM  │ snapshot-awards       │ Fetch recent contract awards   │
 │  7:45 AM  │ snapshot-contractors  │ Fetch contractor DB updates    │
 │  8:00 AM  │ web-intelligence      │ Gather web signals via Serper  │
-│  9:00 AM  │ send-briefings        │ Generate & deliver briefings   │
+│  7:00 AM  │ send-briefings        │ Generate & deliver briefings   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -195,19 +195,48 @@ Delivery tracking and content storage.
 
 ### `/api/cron/send-briefings`
 
-Main briefing delivery job. Runs at 9 AM UTC daily.
+Main briefing delivery job. Runs at 7 AM UTC daily.
 
 **Flow:**
 1. Verify Vercel cron header or CRON_SECRET
 2. Retry failed briefings from previous 3 days (max 3 retries)
-3. Fetch users from `user_notification_settings` AND `user_notification_settings`
-4. Deduplicate by email address
-5. Filter by timezone (6-10 AM local time)
-6. Check `briefing_log` to prevent duplicate sends
-7. Generate briefing with up to 15 items
-8. Persist to `briefing_log`
-9. Send via email/SMS
-10. Log delivery status
+3. Resolve the audience from `user_notification_settings` plus `smart_user_profiles`
+4. Apply rollout mode:
+   - `beta_all` sends to the full eligible audience
+   - `rollout` sends to a sticky program cohort with cooldown and fallback caps
+   - rollout cohorts are intended to receive all 3 brief types before rotating
+5. Deduplicate by email address
+6. Check `briefing_log` to prevent duplicate sends for the same user/day
+7. Generate an AI briefing for each selected user
+8. Skip users with no opportunities
+9. Persist the generated briefing to `briefing_log`
+10. Send the email and update delivery status
+11. Save daily metrics and run post-send validation
+
+**Current audience behavior:**
+- During broad beta, the system can run in `beta_all`
+- For conversion testing, switch to `rollout`
+- Rollout mode prioritizes program-ready users with NAICS data and limits fallback users when possible
+- Rotation is guarded by cohort progress, not just a simple timer
+
+**Rollout control endpoint:**
+```bash
+# Preview current rollout state
+curl "https://tools.govcongiants.org/api/admin/briefing-rollout?password=YOUR_PASSWORD"
+
+# Enable controlled rollout
+curl -X POST "https://tools.govcongiants.org/api/admin/briefing-rollout?password=YOUR_PASSWORD&mode=rollout&cohortSize=250&stickyDays=14&cooldownDays=21&maxFallbackPercent=15&requiredDailyBriefs=2&requiredWeeklyDeepDives=2&requiredPursuitBriefs=2&includeSmartProfiles=true"
+
+# Rotate to a fresh cohort
+curl -X POST "https://tools.govcongiants.org/api/admin/briefing-rollout?password=YOUR_PASSWORD&rotate=true"
+```
+
+**Program cohort completion rules:**
+- keep the cohort active for at least 14 days
+- require at least 2 successful `daily brief` sends per member
+- require at least 2 successful `weekly deep dive` sends per member
+- require at least 2 successful `pursuit brief` sends per member
+- manual rotation is blocked until the cohort is complete unless `force=true` is used
 
 **Test manually:**
 ```bash

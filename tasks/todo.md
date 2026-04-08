@@ -1,8 +1,48 @@
 # GovCon Giants - Current Tasks
 
-## Session State (April 5, 2026)
+## Session State (April 6, 2026)
 
-### ✅ COMPLETED: Multisite Aggregation - Phase 1 (Scrapers + Crons)
+### ✅ COMPLETED: Forecast Intelligence System - Phase 1-2
+
+**Status:** 7,764 forecasts from 13 agencies (April 6, 2026)
+
+**Data Sources:**
+| Agency | Source | Records |
+|--------|--------|---------|
+| DOJ | justice.gov Excel | 3,140 |
+| DOI | GSA Acquisition Gateway CSV | 2,039 |
+| DOE | energy.gov Excel | 833 |
+| DHS | Puppeteer scraper | 683 |
+| NASA | nasa.gov Excel | 294 |
+| VA | GSA Acquisition Gateway CSV | 268 |
+| GSA | GSA Acquisition Gateway CSV | 164 |
+| NRC | GSA Acquisition Gateway CSV | 79 |
+| DOT | GSA Acquisition Gateway CSV | 68 |
+| SSA | Excel (SBF Report) | 60 |
+| NSF | PDF (Acquisition Forecast) | 56 |
+| DOL | GSA Acquisition Gateway CSV | 47 |
+| **Total** | | **7,764** |
+
+**Key Achievement:** Discovered GSA Acquisition Gateway CSV export (acquisitiongateway.gov/forecast) - single source for 7 agencies with 2,698 records.
+
+**Import Scripts:**
+- `scripts/import-forecasts.js` - Excel import (DOE, NASA, DOJ)
+- `scripts/import-gsa-forecasts.js` - GSA Acquisition Gateway CSV import
+- `scripts/import-nsf-forecasts.js` - NSF PDF data import (hardcoded from PDF)
+- `scripts/import-ssa-forecasts.js` - SSA Excel (.xlsm) import
+
+**Files Created/Modified:**
+- `scripts/import-gsa-forecasts.js` - NEW: Parses CSV with value ranges, set-asides, dates
+- `src/lib/forecasts/scrapers/` - Puppeteer scrapers (DHS working, others return 0)
+- Updated `CLAUDE.md` with Forecast Intelligence section
+
+**Phase 3-4 Pending (Puppeteer scrapers):**
+- HHS, Treasury, EPA, USDA, DOD - require SPA login or different approach
+- Alternative: Re-download GSA Acquisition Gateway CSV periodically
+
+---
+
+### Previous: Multisite Aggregation - Phase 1 (Scrapers + Crons)
 
 **Scrapers Built:**
 1. **NIH RePORTER** - Working, 100 opportunities scraped
@@ -99,8 +139,28 @@ curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buyi
 
 ---
 
-## 📋 NEXT: Moat 6 - Multi-Site Aggregation
+## 📋 NEXT PRIORITY: Ship Daily Briefings
 
+**Goal:** Get Daily Briefings working reliably for current users before expanding
+
+**Current Status:**
+- ✅ Briefings code working
+- ✅ 457 users enrolled
+- ⏳ Monitoring delivery for 2-3 weeks
+
+**After Briefings Ship:**
+1. Batch enroll 8,804 bootcamp attendees
+2. Recompete Tracker: Add 2027 data
+3. 21-Day Free Trial system
+4. Restore and finish DSBS Profile Scorer after Federal Market Scanner is complete
+
+---
+
+## 🔮 DEFERRED: Market Intelligence Expansion
+
+**Pushed to future date - after briefings ship successfully**
+
+### Moat 6 - Multi-Site Aggregation
 **Goal:** Scrape 85+ agency sites that SAM.gov doesn't capture (DOE Labs, NIH, DARPA, etc.)
 
 **Status:** MCP built, needs data population
@@ -111,24 +171,19 @@ curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buyi
 - ✅ 21 sources defined (Tier 1-3)
 - ❌ 0 opportunities in database - scrapers need to run
 
-**Sources (21 total):**
-- **Tier 1:** Acquisition Gateway (forecasts)
-- **Tier 2:** NIH RePORTER, DARPA BAAs, NSF SBIR/STTR
-- **Tier 3:** 17 DOE National Labs
+### Phase 3-4 Forecast Scrapers (Puppeteer)
+| Agency | Source | Est. Coverage |
+|--------|--------|---------------|
+| HHS | procurementforecast.hhs.gov | $12B |
+| Treasury | osdbu.forecast.treasury.gov | $2B |
+| EPA | ordspub.epa.gov | $1.5B |
+| USDA | forecast.edc.usda.gov | $4B |
+| DOD | Multi-source | $40B |
 
-**MCP Tools Available:**
-```bash
-mcp__multisite__search_multisite     # Search aggregated opps
-mcp__multisite__get_multisite_stats  # Stats by source
-mcp__multisite__list_sources         # List all 21 sources
-mcp__multisite__trigger_scrape       # Manually trigger scrape
-mcp__multisite__search_nih           # Direct NIH search
-```
-
-**Next Steps:**
-1. Create `aggregated_opportunities` table in Supabase
-2. Run scrapers to populate data
-3. Test search across sources
+### Post-FMS Follow-Up
+- DSBS Profile Scorer
+  - keep off the tools/store page until Federal Market Scanner is shipped
+  - revisit positioning, UX, and scoring logic after FMS launch
 
 ---
 
@@ -352,7 +407,7 @@ done
 
 **Schedule:**
 - **Daily Alerts** (4x/day) - SAM.gov opportunities matching user NAICS
-- **Daily Briefs** (9 AM UTC) - Recompete intel, awards, teaming leads
+- **Daily Briefs** (7 AM UTC) - Recompete intel, awards, teaming leads
 - **Weekly Pursuit Brief** (Monday 10 AM UTC) - Auto-selects TOP opportunity
 - **Weekly Deep Dive** (Sunday 10 AM UTC) - Comprehensive market analysis
 

@@ -14,6 +14,7 @@ import {
   sendAlertProWelcomeEmail,
 } from '@/lib/send-email';
 import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
+import { grantBriefingsAccess } from '@/lib/briefings/access';
 
 // Webhook secrets
 const liveWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -88,9 +89,8 @@ export async function POST(request: NextRequest) {
   // Handle checkout.session.completed
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    const tier = session.metadata?.tier;
+    let tier = session.metadata?.tier;
     const bundle = session.metadata?.bundle;
-    const userId = session.metadata?.user_id;
     const email = session.customer_details?.email || session.customer_email;
 
     if (!email) {
@@ -102,6 +102,16 @@ export async function POST(request: NextRequest) {
     // Get line items for product_id
     const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
     const productId = lineItems.data[0]?.price?.id || 'unknown';
+    const lineItemDescription = lineItems.data[0]?.description || '';
+    const normalizedDescription = lineItemDescription.toLowerCase();
+
+    // Payment links for standalone Market Intelligence may not inject session metadata.
+    // Fall back to the product description so the purchase still grants briefings access.
+    if (!tier && !bundle) {
+      if (normalizedDescription.includes('market intelligence') || normalizedDescription.includes('daily briefings')) {
+        tier = 'briefings';
+      }
+    }
 
     // Check if already processed
     if (supabase) {
@@ -122,7 +132,7 @@ export async function POST(request: NextRequest) {
         stripe_session_id: session.id,
         stripe_customer_id: typeof session.customer === 'string' ? session.customer : session.customer?.id,
         product_id: productId,
-        product_name: lineItems.data[0]?.description,
+        product_name: lineItemDescription,
         tier: tier || 'unknown',
         bundle: bundle || null,
         amount_paid: session.amount_total ? session.amount_total / 100 : null,
@@ -136,7 +146,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Auto-update access flags (always update, user_id is optional)
-    await updateAccessFlags(email, tier, bundle);
+    const accessUpdates = await updateAccessFlags(email, tier, bundle);
+
+    // Keep KV in sync with paid briefings entitlement so /briefings access works immediately.
+    if (accessUpdates.access_briefings) {
+      await grantBriefingsAccess(email);
+    }
 
     // Get/create profile
     const profile = await getOrCreateProfile(email);

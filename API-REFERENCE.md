@@ -50,6 +50,7 @@ All admin endpoints require `?password=galata-assassin-2026`
 | `/api/admin/send-test-briefing` | POST | Generate and send test briefing |
 | `/api/admin/seed-test-briefing` | GET | Seed test briefing data |
 | `/api/admin/debug-snapshots` | GET | Debug briefing snapshots |
+| `/api/admin/briefing-rollout` | GET/POST | Preview and control briefing program cohorts |
 
 ---
 
@@ -138,6 +139,28 @@ All admin endpoints require `?password=galata-assassin-2026`
 | `/api/alerts/preferences` | GET/POST | Get/update alert preferences |
 | `/api/alerts/unsubscribe` | GET | Unsubscribe from alerts |
 | `/api/planner/weekly-digest` | GET | Send weekly planner digest |
+
+### Briefing Rollout Notes
+
+`/api/admin/briefing-rollout` controls the full briefing program rollout, not just the daily brief.
+
+Current recommended production settings:
+
+```text
+mode=rollout
+cohortSize=250
+stickyDays=14
+cooldownDays=21
+maxFallbackPercent=15
+requiredDailyBriefs=2
+requiredWeeklyDeepDives=2
+requiredPursuitBriefs=2
+```
+
+Behavior:
+- `beta_all` sends to the whole eligible audience
+- `rollout` sends to a sticky cohort
+- rotation is blocked until the cohort has received all 3 brief types at least twice, unless `force=true` is used
 
 ---
 

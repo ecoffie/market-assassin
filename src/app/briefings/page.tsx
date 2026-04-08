@@ -53,14 +53,117 @@ interface BriefingEntry {
   content: GeneratedBriefing;
 }
 
+interface LegacyAIBriefing {
+  id?: string;
+  generatedAt?: string;
+  briefingDate?: string;
+  opportunities?: Array<{
+    rank?: number;
+    agency?: string;
+    contractName?: string;
+    incumbent?: string;
+    displacementAngle?: string;
+    value?: string;
+    window?: string;
+  }>;
+  teamingPlays?: Array<{
+    playNumber?: number;
+    strategyName?: string;
+    rationale?: string;
+    targetPrimes?: string[];
+    suggestedOpener?: string;
+  }>;
+}
+
+function isGeneratedBriefing(value: unknown): value is GeneratedBriefing {
+  if (!value || typeof value !== 'object') return false;
+  return 'summary' in value && 'topItems' in value;
+}
+
+function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGeneratedAt: string): GeneratedBriefing {
+  if (isGeneratedBriefing(raw)) {
+    return raw;
+  }
+
+  const legacy = (raw || {}) as LegacyAIBriefing;
+  const opportunities = legacy.opportunities || [];
+  const teamingPlays = legacy.teamingPlays || [];
+
+  const topOpportunityItems: BriefingItemFormatted[] = opportunities.map((opp, index) => ({
+    id: `opportunity-${index + 1}`,
+    rank: opp.rank || index + 1,
+    category: 'Opportunity',
+    categoryIcon: '📄',
+    title: opp.contractName || `Opportunity ${index + 1}`,
+    subtitle: `${opp.agency || 'Federal agency'}${opp.incumbent ? ` • Incumbent: ${opp.incumbent}` : ''}`,
+    description: opp.displacementAngle || 'Opportunity identified from your briefing pipeline.',
+    urgencyBadge: index < 3 ? 'HIGH' : undefined,
+    amount: opp.value,
+    deadline: opp.window,
+    actionUrl: '/briefings',
+    actionLabel: 'View briefing workspace',
+    signals: [opp.agency, opp.incumbent].filter(Boolean) as string[],
+  }));
+
+  const teamingItems: BriefingItemFormatted[] = teamingPlays.map((play, index) => ({
+    id: `teaming-${index + 1}`,
+    rank: play.playNumber || index + 1,
+    category: 'Teaming Play',
+    categoryIcon: '🤝',
+    title: play.strategyName || `Teaming Play ${index + 1}`,
+    subtitle: play.targetPrimes?.length ? `Targets: ${play.targetPrimes.join(', ')}` : 'Suggested teaming move',
+    description: play.rationale || play.suggestedOpener || 'Recommended teaming move from your briefing.',
+    actionUrl: '/briefings',
+    actionLabel: 'Open briefing workspace',
+    signals: play.targetPrimes || [],
+  }));
+
+  return {
+    id: legacy.id || `legacy-${fallbackDate}`,
+    generatedAt: legacy.generatedAt || fallbackGeneratedAt,
+    briefingDate: legacy.briefingDate || fallbackDate,
+    summary: {
+      headline: opportunities.length > 0 ? `${opportunities.length} opportunities identified` : 'Market intelligence briefing',
+      subheadline: teamingPlays.length > 0
+        ? `${teamingPlays.length} teaming plays surfaced from your latest briefing`
+        : 'Your latest market intelligence briefing is ready.',
+      quickStats: [
+        { label: 'Opportunities', value: opportunities.length },
+        { label: 'Teaming Plays', value: teamingPlays.length },
+      ],
+      urgentAlerts: Math.min(3, opportunities.length),
+    },
+    topItems: [
+      {
+        title: 'Top Opportunities',
+        items: topOpportunityItems.slice(0, 5),
+      },
+    ],
+    categorizedItems: {
+      opportunities: {
+        title: 'All Opportunities',
+        items: topOpportunityItems,
+      },
+      teaming: {
+        title: 'Teaming Plays',
+        items: teamingItems,
+      },
+    },
+    totalItems: topOpportunityItems.length + teamingItems.length,
+    sourcesIncluded: ['Briefing Log'],
+  };
+}
+
 export default function BriefingsDashboard() {
   const [email, setEmail] = useState('');
   const [inputEmail, setInputEmail] = useState('');
-  const [status, setStatus] = useState<'loading' | 'gate' | 'verifying' | 'denied' | 'ready'>('loading');
+  const [status, setStatus] = useState<'loading' | 'gate' | 'verifying' | 'denied' | 'ready'>('gate');
   const [briefings, setBriefings] = useState<BriefingEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
+  const [linkSending, setLinkSending] = useState(false);
+  const [linkMessage, setLinkMessage] = useState('');
 
   const selectedBriefing = briefings.find(b => b.briefing_date === selectedDate)?.content ?? null;
 
@@ -77,14 +180,22 @@ export default function BriefingsDashboard() {
       return;
     }
 
-    const entries: BriefingEntry[] = data.briefings || [];
+    const entries: BriefingEntry[] = (data.briefings || []).map((entry: {
+      briefing_date: string;
+      generated_at: string;
+      items_count: number;
+      content: unknown;
+    }) => ({
+      ...entry,
+      content: normalizeBriefing(entry.content, entry.briefing_date, entry.generated_at),
+    }));
     // Single briefing response (days=1 fallback)
     if (data.briefing && !data.briefings) {
       entries.push({
         briefing_date: data.briefing_date,
         generated_at: data.generated_at,
         items_count: data.briefing?.totalItems || 0,
-        content: data.briefing,
+        content: normalizeBriefing(data.briefing, data.briefing_date, data.generated_at),
       });
     }
 
@@ -100,29 +211,34 @@ export default function BriefingsDashboard() {
   // On mount, check localStorage
   useEffect(() => {
     const saved = localStorage.getItem('briefings_access_email');
-    if (saved) {
-      setEmail(saved);
-      setStatus('verifying');
-      fetch('/api/briefings/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: saved }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.hasAccess) {
-            fetchBriefings(saved);
-          } else {
-            localStorage.removeItem('briefings_access_email');
-            setStatus('gate');
-          }
-        })
-        .catch(() => {
-          setStatus('gate');
-        });
-    } else {
-      setStatus('gate');
+    if (!saved) {
+      return;
     }
+
+    const verifySavedAccess = async () => {
+      setStatus('verifying');
+
+      try {
+        const response = await fetch('/api/briefings/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: saved }),
+        });
+        const data = await response.json();
+
+        if (data.hasAccess) {
+          await fetchBriefings(saved);
+          return;
+        }
+
+        localStorage.removeItem('briefings_access_email');
+        setStatus('gate');
+      } catch {
+        setStatus('gate');
+      }
+    };
+
+    void verifySavedAccess();
   }, [fetchBriefings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,6 +252,38 @@ export default function BriefingsDashboard() {
     } catch {
       setError('Something went wrong. Please try again.');
       setStatus('gate');
+    }
+  };
+
+  const handleSendSecureLink = async () => {
+    const trimmed = inputEmail.toLowerCase().trim();
+    if (!trimmed) {
+      setError('Enter your email first so we can send the secure link.');
+      return;
+    }
+
+    setLinkSending(true);
+    setLinkMessage('');
+    setError('');
+
+    try {
+      const response = await fetch('/api/access-links/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmed, destination: 'briefings' }),
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        setError(data.error || 'Could not send secure link.');
+        return;
+      }
+
+      setLinkMessage('Secure link sent. Check your email to open your briefings.');
+    } catch {
+      setError('Could not send secure link. Please try again.');
+    } finally {
+      setLinkSending(false);
     }
   };
 
@@ -190,9 +338,20 @@ export default function BriefingsDashboard() {
               View My Briefings
             </button>
           </form>
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={handleSendSecureLink}
+              disabled={linkSending}
+              className="text-sm text-amber-400 hover:text-amber-300 disabled:opacity-50"
+            >
+              {linkSending ? 'Sending secure link...' : 'Email me a secure access link'}
+            </button>
+          </div>
+          {linkMessage ? <p className="text-green-400 text-sm mt-3 text-center">{linkMessage}</p> : null}
           <p className="text-gray-500 text-sm mt-4 text-center">
             Don&apos;t have access?{' '}
-            <Link href="/store" className="text-amber-400 hover:underline">Get Daily Briefings</Link>
+            <Link href="/market-intelligence" className="text-amber-400 hover:underline">View access and pricing</Link>
           </p>
         </div>
       </div>
@@ -205,14 +364,14 @@ export default function BriefingsDashboard() {
         <div className="max-w-md w-full p-8 bg-gray-900 border border-gray-800 rounded-2xl text-center">
           <h1 className="text-2xl font-bold text-white mb-2">No Briefing Access</h1>
           <p className="text-gray-400 mb-6">
-            Daily briefings are included with Pro Giant ($997) and Ultimate ($1,497) bundles,
-            or the Federal Help Center membership ($99/mo).
+            Market Intelligence includes daily briefs, weekly deep dives, and pursuit briefs.
+            If you need to purchase or upgrade, use the access page below and then come back here to read your briefings.
           </p>
           <Link
-            href="/store"
+            href="/market-intelligence"
             className="inline-block py-3 px-6 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl transition-colors"
           >
-            View Plans
+            View Access Options
           </Link>
           <button
             onClick={() => { setStatus('gate'); setError(''); }}
@@ -259,7 +418,7 @@ export default function BriefingsDashboard() {
             <p className="text-5xl mb-4">&#128236;</p>
             <h2 className="text-xl font-semibold mb-2">No Briefings Yet</h2>
             <p className="text-gray-400 max-w-md">
-              Your first briefing will appear here after the next daily delivery (9 AM UTC).
+              Your first briefing will appear here after the next daily delivery (7 AM UTC).
               Check your email — it may already be in your inbox.
             </p>
           </div>

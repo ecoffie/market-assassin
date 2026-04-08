@@ -67,6 +67,38 @@ interface SAMSearchResult {
   fetchedAt: string;
 }
 
+interface SAMRawOpportunity {
+  noticeId?: string;
+  title?: string;
+  solicitationNumber?: string;
+  naicsCode?: string;
+  classificationCode?: string;
+  description?: string;
+  department?: { name?: string };
+  fullParentPathName?: string;
+  subtierAgency?: { name?: string };
+  office?: { name?: string };
+  officeAddress?: { city?: string; state?: string; zip?: string; country?: string };
+  postedDate?: string;
+  responseDeadLine?: string;
+  responseDeadline?: string;
+  archiveDate?: string;
+  typeOfSetAside?: string | null;
+  typeOfSetAsideDescription?: string | null;
+  type?: string;
+  noticeType?: string;
+  active?: boolean | string;
+  placeOfPerformance?: {
+    city?: { name?: string };
+    state?: { code?: string };
+    zip?: string;
+    country?: { code?: string };
+  } | null;
+  uiLink?: string;
+  lastModifiedDate?: string;
+  [key: string]: unknown;
+}
+
 // SAM.gov API base URL
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2';
 
@@ -107,8 +139,8 @@ async function fetchSingleNaicsOpportunities(
       return [];
     }
 
-    const data = await response.json();
-    return (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
+    const data = await response.json() as { opportunitiesData?: SAMRawOpportunity[] };
+    return (data.opportunitiesData || []).map((opp) => parseOpportunity(opp));
   } catch (error) {
     console.error(`[SAM.gov] Error fetching NAICS ${naicsCode}:`, error);
     return [];
@@ -118,7 +150,7 @@ async function fetchSingleNaicsOpportunities(
 /**
  * Parse raw SAM.gov opportunity into our interface
  */
-function parseOpportunity(opp: any): SAMOpportunity {
+function parseOpportunity(opp: SAMRawOpportunity): SAMOpportunity {
   return {
     noticeId: opp.noticeId || '',
     title: opp.title || '',
@@ -253,6 +285,8 @@ export async function fetchOpportunitiesForUser(
     agencies: string[];
     keywords: string[];
     zip_codes: string[];
+    location_state?: string | null;
+    location_states?: string[] | null;
   },
   apiKey: string
 ): Promise<SAMSearchResult> {
@@ -262,6 +296,8 @@ export async function fetchOpportunitiesForUser(
     naicsCodes: userProfile.naics_codes?.slice(0, 15) || [], // Expanded from 10 to 15
     keywords: userProfile.keywords?.slice(0, 10) || [], // Expanded from 5 to 10
     zipCodes: userProfile.zip_codes?.slice(0, 5) || [], // Expanded from 3 to 5
+    state: userProfile.location_state || undefined,
+    states: userProfile.location_states?.slice(0, 10) || undefined,
     // Posted in last 30 days for better coverage
     postedFrom: getDateDaysAgo(30),
     limit: 300, // Increased from 200
@@ -538,8 +574,8 @@ export async function searchRelatedOpportunities(
       };
     }
 
-    const data = await response.json();
-    const opportunities = (data.opportunitiesData || []).map((opp: any) => parseOpportunity(opp));
+    const data = await response.json() as { opportunitiesData?: SAMRawOpportunity[] };
+    const opportunities = (data.opportunitiesData || []).map((opp) => parseOpportunity(opp));
 
     // Categorize by notice type
     const summary = {

@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchOpportunitiesForUser, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
+import { fetchOpportunitiesForUser } from '@/lib/briefings/pipelines/sam-gov';
 
 // Vercel cron jobs send a secret to verify the request
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Get all users with briefing access and a profile
     const { data: users, error: usersError } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies, keywords, zip_codes')
+      .select('user_email, naics_codes, agencies, keywords, zip_codes, location_state, location_states')
       .not('naics_codes', 'eq', '{}'); // Only users with watchlist data
 
     if (usersError) {
@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
             agencies: user.agencies || [],
             keywords: user.keywords || [],
             zip_codes: user.zip_codes || [],
+            location_state: user.location_state || null,
+            location_states: user.location_states || [],
           },
           samApiKey
         );

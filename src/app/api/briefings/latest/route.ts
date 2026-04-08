@@ -2,15 +2,15 @@
  * Public Briefing API
  *
  * Returns a user's latest briefing(s) as JSON.
- * Auth: email + KV access check (briefings:{email}).
+ * Auth: email + briefings entitlement check (KV and/or user_profiles).
  *
  * GET /api/briefings/latest?email=user@example.com         → latest briefing
  * GET /api/briefings/latest?email=user@example.com&days=7  → last 7 days (max 30)
  */
 
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
 import { createClient } from '@supabase/supabase-js';
+import { hasBriefingsAccess } from '@/lib/briefings/access';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -22,8 +22,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 });
   }
 
-  // Check briefing access via KV
-  const hasAccess = await kv.get(`briefings:${email}`);
+  // Check briefing access via KV and paid entitlement fallback
+  const hasAccess = await hasBriefingsAccess(email);
   if (!hasAccess) {
     return NextResponse.json({ error: 'No briefing access' }, { status: 403 });
   }
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       briefing: null,
-      message: 'No briefings found. Briefings are generated daily at 9 AM UTC.',
+      message: 'No briefings found. Briefings are generated daily at 7 AM UTC.',
     });
   }
 

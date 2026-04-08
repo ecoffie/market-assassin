@@ -85,11 +85,49 @@ Configured in `vercel.json`:
 | `/api/cron/snapshot-awards` | 7:30 AM daily | Snapshot award data |
 | `/api/cron/snapshot-contractors` | 7:45 AM daily | Snapshot contractor data |
 | `/api/cron/web-intelligence` | 8:00 AM daily | Gather web intelligence |
-| `/api/cron/send-briefings` | 9:00 AM daily | Send daily briefings |
+| `/api/cron/send-briefings` | 7:00 AM daily | Send daily briefings |
 | `/api/cron/daily-alerts` | 11:00 AM daily | Send Alert Pro daily alerts |
 | `/api/cron/health-check` | 12:00 PM daily | System health check + email |
 | `/api/cron/weekly-alerts` | 11:00 PM Sunday | Send weekly opportunity alerts |
 | `/api/planner/weekly-digest` | 2:00 PM Monday | Send planner weekly digest |
+
+### Briefing Rollout Config
+
+The briefing program can run in two audience modes:
+
+- `beta_all`: all eligible briefing users
+- `rollout`: a controlled program cohort
+
+Recommended production rollout settings:
+
+```text
+mode=rollout
+cohortSize=250
+stickyDays=14
+cooldownDays=21
+maxFallbackPercent=15
+requiredDailyBriefs=2
+requiredWeeklyDeepDives=2
+requiredPursuitBriefs=2
+includeSmartProfiles=true
+```
+
+Operational note:
+- rotation is now guarded by cohort completion, not just a timer
+- a cohort must receive the full 3-brief experience twice before normal rotation
+
+Useful commands:
+
+```bash
+# Preview rollout state
+curl "https://tools.govcongiants.org/api/admin/briefing-rollout?password=${ADMIN_PASSWORD}"
+
+# Persist recommended rollout settings
+curl -X POST "https://tools.govcongiants.org/api/admin/briefing-rollout?password=${ADMIN_PASSWORD}&mode=rollout&cohortSize=250&stickyDays=14&cooldownDays=21&maxFallbackPercent=15&requiredDailyBriefs=2&requiredWeeklyDeepDives=2&requiredPursuitBriefs=2&includeSmartProfiles=true"
+
+# Rotate only when the cohort is complete
+curl -X POST "https://tools.govcongiants.org/api/admin/briefing-rollout?password=${ADMIN_PASSWORD}&rotate=true"
+```
 
 ### Manual Cron Trigger
 

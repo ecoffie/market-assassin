@@ -12,6 +12,7 @@ import {
   searchContractAwards,
   type ContractAward
 } from '@/lib/sam';
+import { expandNaicsPrefixes, hasNaicsPrefixes } from '@/lib/industry-presets';
 
 interface RecompeteContract {
   contractNumber: string;
@@ -166,10 +167,20 @@ export async function fetchExpiringContracts(
 
   console.log(`[Recompete] Fetching expiring contracts for NAICS: ${naicsCodes.join(', ') || 'all'}`);
 
+  // IMPORTANT: USASpending API requires full 6-digit NAICS codes
+  // Expand any 3-4 digit prefixes (e.g., "236" -> ["236115", "236116", ...])
+  let codesToUse = naicsCodes;
+  if (hasNaicsPrefixes(naicsCodes)) {
+    const expanded = expandNaicsPrefixes(naicsCodes);
+    console.log(`[Recompete] Expanded ${naicsCodes.length} NAICS prefixes to ${expanded.length} full codes`);
+    codesToUse = expanded;
+  }
+
   const allContracts: RecompeteContract[] = [];
 
   // Fetch from USASpending via our SAM wrapper for each NAICS code
-  for (const naicsCode of naicsCodes.slice(0, 5)) { // Limit to 5 NAICS codes
+  // Limit to avoid rate limiting - expanded lists can be long
+  for (const naicsCode of codesToUse.slice(0, 10)) {
     try {
       const samContracts = await getSAMExpiringContracts(naicsCode, monthsToExpiration);
 

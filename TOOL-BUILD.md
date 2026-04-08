@@ -13,7 +13,8 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 - [Action Planner Dashboard](#6-action-planner-dashboard)
 - [LinkedIn Lead Magnet](#7-linkedin-lead-magnet)
 - [30-Day Certification Program](#8-30-day-certification-program)
-- [General Platform Tasks](#9-general-platform-tasks)
+- [Forecast Intelligence](#9-forecast-intelligence)
+- [General Platform Tasks](#10-general-platform-tasks)
 
 ---
 
@@ -209,7 +210,73 @@ A new certification program mapping to real BD job requirements ($80K-$150K+ rol
 
 ---
 
-## 9. General Platform Tasks
+## 9. Forecast Intelligence
+
+**Current:** Free tool | **Live URL:** https://tools.govcongiants.org/forecasts
+**Status:** Phase 1 complete (April 5, 2026)
+
+Early-warning intel on upcoming procurement opportunities 6-18 months before solicitation. Aggregates forecasts from 11 federal agencies covering $94.5B in estimated federal spend.
+
+### Completed (Phase 1)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Database Schema | **DONE** | 3 tables: `agency_forecasts`, `forecast_sync_runs`, `forecast_sources` |
+| Phase 1 Sources (DOE, NASA, DOJ) | **DONE** | Excel-based import, 4,267 records |
+| Search UI | **DONE** | Filters: Agency, NAICS, Set-Aside, FY, State, Keywords |
+| API Endpoint | **DONE** | `/api/forecasts` with pagination, CSV export |
+| Import Script | **DONE** | `scripts/import-forecasts.js` with dry-run mode, deduplication |
+
+**Current Record Counts (April 6, 2026):**
+| Agency | Records | Notes |
+|--------|---------|-------|
+| DOE | 833 | energy.gov Excel (header row 17) |
+| NASA | 294 | nasa.gov Excel |
+| DOJ | 3,140 | justice.gov Excel (245 dupes removed) |
+| DHS | 683 | API interception scraper (WORKING) |
+| **Total** | **4,950** | |
+
+### Phase 2 (GSA Acquisition Gateway)
+
+| Feature | Priority | Status | Notes |
+|---------|----------|--------|-------|
+| GSA Puppeteer Scraper | HIGH | **Needs Update** | acquisitiongateway.gov page structure changed, scraper returns 0 records |
+| API Fallback | MEDIUM | Pending | Test API endpoints before browser scraping |
+
+### Phase 3 (Major Agencies)
+
+| Agency | Est. Coverage | Status | Notes |
+|--------|---------------|--------|-------|
+| DHS | $8B | **DONE** | apfs-cloud.dhs.gov - API interception works (683 records) |
+| VA | $10B | **Needs Update** | vendorportal.ecms.va.gov - page structure changed |
+| HHS | $12B | **Needs Update** | procurementforecast.hhs.gov - timeout/structure change |
+| Treasury | $2B | **Needs Update** | osdbu.forecast.treasury.gov - returns 0 records |
+| EPA | $1.5B | **Needs Update** | ofmpub.epa.gov - returns 0 records |
+| USDA | $4B | **Needs Update** | forecast.edc.usda.gov - page structure changed |
+
+### Phase 4 (DOD Multi-Source)
+
+| Component | Est. Coverage | Status | Notes |
+|-----------|---------------|--------|-------|
+| Army | $15B | **Needs Update** | Returns 0 records - page changed |
+| Navy | $10B | **Needs Update** | Returns 0 records - page changed |
+| Air Force | $8B | **Needs Update** | Returns 0 records - page changed |
+| DLA | $4B | **Needs Update** | Returns 0 records - page changed |
+| DISA | $2B | **Needs Update** | Returns 0 records - page changed |
+| MDA | $1B | **Needs Update** | Returns 0 records - page changed |
+
+### Future Enhancements
+
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| Alert Integration | HIGH | Notify users of new forecasts matching their NAICS |
+| Win Probability | MEDIUM | Score forecasts based on user profile |
+| Automated Cron Sync | MEDIUM | Weekly sync via Vercel cron |
+| Teaming Suggestions | LOW | Match forecasts to potential prime partners |
+
+---
+
+## 10. General Platform Tasks
 
 | Task | Priority | Status | Notes |
 |------|----------|--------|-------|

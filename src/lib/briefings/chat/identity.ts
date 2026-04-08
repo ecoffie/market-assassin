@@ -9,6 +9,7 @@
 import { kv } from '@vercel/kv';
 import nodemailer from 'nodemailer';
 import type { PhoneLinkRecord } from './types';
+import { hasBriefingsAccess } from '@/lib/briefings/access';
 
 /**
  * Resolve a phone number to a user email
@@ -42,7 +43,7 @@ export async function linkPhoneToEmail(
   const normalizedEmail = email.toLowerCase().trim();
 
   // Check if this email has briefing access
-  const briefingAccess = await kv.get(`briefings:${normalizedEmail}`);
+  const briefingAccess = await hasBriefingsAccess(normalizedEmail);
   if (!briefingAccess) {
     return {
       success: false,

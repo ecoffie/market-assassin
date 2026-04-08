@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import nodemailer from 'nodemailer';
+import { createSecureAccessUrl } from '@/lib/access-links';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 const SHOP_ADMIN_PASSWORD = 'admin123';
@@ -286,7 +287,7 @@ async function sendAlertEmail(
   totalAvailable: number
 ) {
   const unsubscribeUrl = `https://tools.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
-  const preferencesUrl = `https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
+  const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const ohProUpgradeUrl = 'https://buy.stripe.com/7sIaGqevYeIcdri147';
 
   const showUpgrade = tier === 'free' && totalAvailable > 5;

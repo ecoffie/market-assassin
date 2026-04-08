@@ -13,10 +13,56 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { kv } from '@vercel/kv';
 import nodemailer from 'nodemailer';
+import { createSecureAccessUrl } from '@/lib/access-links';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
-const BATCH_SIZE = 10;
+const SEND_DELAY_MS = 750;
+const CONCURRENCY_RETRY_DELAY_MS = 5000;
+const MAX_SEND_ATTEMPTS = 2;
+const LAST_RUN_KEY = 'admin:naics-reminder:last-run';
+const DEFAULT_BATCH_LIMIT = 100;
+const MAX_BATCH_LIMIT = 349;
+const REMINDER_COOLDOWN_DAYS = 14;
+
+interface ReminderRunRecord {
+  runAt: string;
+  mode: 'execute' | 'retry-failed' | 'single';
+  totalAudience: number;
+  usersWithProfileData: number;
+  usersWithFallback: number;
+  totalTargeted: number;
+  sent: number;
+  failed: number;
+  failedEmails: string[];
+  sampleErrors: string[];
+  skippedRecentlyReminded?: number;
+  batchLimit?: number;
+}
+
+interface FallbackAudienceUser {
+  email: string;
+  source: 'notification_settings' | 'smart_profiles';
+  hasNaics: boolean;
+  hasAgencies: boolean;
+}
+
+function isIgnorableMissingTableError(message: string): boolean {
+  return message.includes('Could not find the table') || message.includes('schema cache');
+}
+
+function isConcurrencyLimitError(message: string): boolean {
+  return message.includes('432 4.3.2') || message.toLowerCase().includes('concurrent connections limit exceeded');
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getReminderSentKey(email: string): string {
+  return `admin:naics-reminder:last-sent:${email.toLowerCase()}`;
+}
 
 function getSupabase() {
   return createClient(
@@ -37,8 +83,8 @@ function getTransporter() {
   });
 }
 
-function generateReminderEmail(email: string): { subject: string; html: string; text: string } {
-  const preferencesUrl = `https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
+async function generateReminderEmail(email: string): Promise<{ subject: string; html: string; text: string }> {
+  const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
 
   const subject = "🎯 Unlock Personalized GovCon Intel - Set Your NAICS Codes (30 seconds)";
 
@@ -99,7 +145,7 @@ function generateReminderEmail(email: string): { subject: string; html: string; 
       <p style="margin: 0 0 5px 0;"><span style="font-weight: 700; color: #1d4ed8;">GovCon</span><span style="font-weight: 700; color: #f59e0b;">Giants</span> - Your AI-Powered GovCon Intel</p>
       <p style="margin: 0;">Questions? Reply to this email or contact service@govcongiants.com</p>
       <p style="margin: 10px 0 0 0;">
-        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}&action=unsubscribe" style="color: #94a3b8;">Unsubscribe</a>
+        <a href="https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}" style="color: #94a3b8;">Unsubscribe</a>
       </p>
     </div>
   </div>
@@ -140,6 +186,94 @@ Questions? Reply to this email or contact service@govcongiants.com
   return { subject, html, text };
 }
 
+async function getBriefingFallbackAudience() {
+  const supabase = getSupabase();
+
+  const { data: notificationSettings, error: notificationError } = await supabase
+    .from('user_notification_settings')
+    .select('user_email, naics_codes, agencies, aggregated_profile')
+    .eq('is_active', true);
+
+  if (notificationError) {
+    throw new Error(notificationError.message);
+  }
+
+  const { data: smartProfiles, error: smartProfilesError } = await supabase
+    .from('smart_user_profiles')
+    .select('email, naics_codes, agencies');
+
+  if (smartProfilesError && !isIgnorableMissingTableError(smartProfilesError.message)) {
+    throw new Error(smartProfilesError.message);
+  }
+
+  const seenEmails = new Set<string>();
+  const fallbackUsers: FallbackAudienceUser[] = [];
+  let totalAudience = 0;
+  let usersWithProfileData = 0;
+
+  for (const profile of notificationSettings || []) {
+    const email = profile.user_email?.toLowerCase();
+    if (!email || seenEmails.has(email)) continue;
+    seenEmails.add(email);
+    totalAudience++;
+
+    const aggregated = profile.aggregated_profile as Record<string, unknown> | null;
+    const aggregatedNaics = aggregated && Array.isArray(aggregated.naics_codes)
+      ? aggregated.naics_codes
+      : [];
+    const aggregatedAgencies = aggregated && Array.isArray(aggregated.agencies)
+      ? aggregated.agencies
+      : [];
+    const naics = Array.isArray(profile.naics_codes) ? profile.naics_codes : [];
+    const agencies = Array.isArray(profile.agencies) ? profile.agencies : [];
+    const hasNaics = aggregatedNaics.length > 0 || naics.length > 0;
+    const hasAgencies = aggregatedAgencies.length > 0 || agencies.length > 0;
+
+    if (hasNaics || hasAgencies) {
+      usersWithProfileData++;
+      continue;
+    }
+
+    fallbackUsers.push({
+      email,
+      source: 'notification_settings',
+      hasNaics,
+      hasAgencies,
+    });
+  }
+
+  for (const profile of smartProfiles || []) {
+    const email = profile.email?.toLowerCase();
+    if (!email || seenEmails.has(email)) continue;
+    seenEmails.add(email);
+    totalAudience++;
+
+    const naics = Array.isArray(profile.naics_codes) ? profile.naics_codes : [];
+    const agencies = Array.isArray(profile.agencies) ? profile.agencies : [];
+    const hasNaics = naics.length > 0;
+    const hasAgencies = agencies.length > 0;
+
+    if (hasNaics || hasAgencies) {
+      usersWithProfileData++;
+      continue;
+    }
+
+    fallbackUsers.push({
+      email,
+      source: 'smart_profiles',
+      hasNaics,
+      hasAgencies,
+    });
+  }
+
+  return {
+    totalAudience,
+    usersWithProfileData,
+    usersWithFallback: fallbackUsers.length,
+    fallbackUsers,
+  };
+}
+
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
 
@@ -150,91 +284,86 @@ export async function GET(request: NextRequest) {
     }, { status: 401 });
   }
 
-  const supabase = getSupabase();
+  try {
+    const audience = await getBriefingFallbackAudience();
+    const lastRun = await kv.get<ReminderRunRecord>(LAST_RUN_KEY);
+    const recentlyRemindedCount = (
+      await Promise.all(
+        audience.fallbackUsers.slice(0, 200).map(async (user) => {
+          const lastSent = await kv.get<string>(getReminderSentKey(user.email));
+          return lastSent ? 1 : 0;
+        })
+      )
+    ).reduce<number>((sum, count) => sum + count, 0);
 
-  // Find users enrolled in alerts but without NAICS codes
-  const { data: alertSettings, error } = await supabase
-    .from('user_alert_settings')
-    .select('user_email, naics_codes, keywords, business_type, created_at')
-    .eq('is_active', true)
-    .or('alerts_enabled.eq.true,briefings_enabled.eq.true');
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      message: `Found ${audience.usersWithFallback} beta briefing users using fallback targeting`,
+      audienceLabel: 'beta_briefing_fallback_pool',
+      totalAudience: audience.totalAudience,
+      usersWithProfileData: audience.usersWithProfileData,
+      usersWithFallback: audience.usersWithFallback,
+      fallbackEmails: audience.fallbackUsers.slice(0, 100).map((user) => ({
+        email: user.email,
+        source: user.source,
+      })),
+      reminderCooldownDays: REMINDER_COOLDOWN_DAYS,
+      defaultBatchLimit: DEFAULT_BATCH_LIMIT,
+      recentlyRemindedSampleCount: recentlyRemindedCount,
+      lastRun,
+      usage: {
+        preview: 'GET ?password=xxx (current)',
+        sendAll: 'POST ?password=xxx&mode=execute&limit=100',
+        sendOne: 'POST ?password=xxx&mode=execute&email=xxx',
+        retryFailed: 'POST ?password=xxx&mode=retry-failed',
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to build fallback audience' },
+      { status: 500 }
+    );
   }
-
-  // Filter to users without NAICS
-  const usersWithoutNaics = (alertSettings || []).filter(user => {
-    const naics = user.naics_codes;
-    return !naics || naics.length === 0;
-  });
-
-  // Also check notification settings table
-  const { data: notifSettings } = await supabase
-    .from('user_notification_settings')
-    .select('user_email, naics_codes, aggregated_profile')
-    .eq('is_active', true)
-    .eq('briefings_enabled', true);
-
-  const usersWithoutNaicsFromNotif = (notifSettings || []).filter(user => {
-    const naics = user.naics_codes;
-    const jsonb = user.aggregated_profile as Record<string, unknown> | null;
-    const jsonbNaics = jsonb?.naics_codes as string[] | null;
-    return (!naics || naics.length === 0) && (!jsonbNaics || jsonbNaics.length === 0);
-  });
-
-  // Combine and dedupe
-  const allEmails = new Set([
-    ...usersWithoutNaics.map(u => u.user_email.toLowerCase()),
-    ...usersWithoutNaicsFromNotif.map(u => u.user_email.toLowerCase()),
-  ]);
-
-  return NextResponse.json({
-    success: true,
-    message: `Found ${allEmails.size} users without NAICS codes`,
-    totalAlertUsers: alertSettings?.length || 0,
-    usersWithoutNaics: allEmails.size,
-    emails: Array.from(allEmails).slice(0, 50), // Preview first 50
-    usage: {
-      preview: 'GET ?password=xxx (current)',
-      sendAll: 'POST ?password=xxx&mode=execute',
-      sendOne: 'POST ?password=xxx&mode=execute&email=xxx',
-    },
-  });
 }
 
 export async function POST(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
   const mode = request.nextUrl.searchParams.get('mode');
   const specificEmail = request.nextUrl.searchParams.get('email');
+  const limitParam = request.nextUrl.searchParams.get('limit');
 
   if (password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (mode !== 'execute') {
+  if (mode !== 'execute' && mode !== 'retry-failed') {
     return NextResponse.json({
-      error: 'Use mode=execute to actually send emails',
-      usage: 'POST ?password=xxx&mode=execute'
+      error: 'Use mode=execute or mode=retry-failed',
+      usage: 'POST ?password=xxx&mode=execute | POST ?password=xxx&mode=retry-failed'
     }, { status: 400 });
   }
 
-  const supabase = getSupabase();
   const transporter = getTransporter();
+  const audience = await getBriefingFallbackAudience();
+  let emailsToSend = audience.fallbackUsers.map((user) => user.email);
+  const lastRun = await kv.get<ReminderRunRecord>(LAST_RUN_KEY);
+  const batchLimit = specificEmail
+    ? 1
+    : Math.min(
+        Math.max(parseInt(limitParam || String(DEFAULT_BATCH_LIMIT), 10) || DEFAULT_BATCH_LIMIT, 1),
+        MAX_BATCH_LIMIT
+      );
 
-  // Find users without NAICS
-  const { data: alertSettings } = await supabase
-    .from('user_alert_settings')
-    .select('user_email, naics_codes')
-    .eq('is_active', true)
-    .or('alerts_enabled.eq.true,briefings_enabled.eq.true');
-
-  const usersWithoutNaics = (alertSettings || []).filter(user => {
-    const naics = user.naics_codes;
-    return !naics || naics.length === 0;
-  });
-
-  let emailsToSend = usersWithoutNaics.map(u => u.user_email.toLowerCase());
+  if (mode === 'retry-failed') {
+    emailsToSend = lastRun?.failedEmails || [];
+    if (emailsToSend.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No failed reminder recipients found to retry',
+        lastRun,
+      });
+    }
+  }
 
   // Filter to specific email if provided
   if (specificEmail) {
@@ -245,19 +374,37 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let skippedRecentlyReminded = 0;
+  if (!specificEmail && mode === 'execute') {
+    const filteredEmails: string[] = [];
+    for (const email of emailsToSend) {
+      const lastSent = await kv.get<string>(getReminderSentKey(email));
+      if (lastSent) {
+        skippedRecentlyReminded++;
+        continue;
+      }
+      filteredEmails.push(email);
+      if (filteredEmails.length >= batchLimit) break;
+    }
+    emailsToSend = filteredEmails;
+  } else if (!specificEmail && mode === 'retry-failed') {
+    emailsToSend = emailsToSend.slice(0, batchLimit);
+  }
+
   const results = {
     sent: 0,
     failed: 0,
+    failedEmails: [] as string[],
     errors: [] as string[],
   };
 
-  // Process in batches
-  for (let i = 0; i < emailsToSend.length; i += BATCH_SIZE) {
-    const batch = emailsToSend.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < emailsToSend.length; i++) {
+    const email = emailsToSend[i];
 
-    const batchPromises = batch.map(async (email) => {
+    let sent = false;
+    for (let attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
       try {
-        const template = generateReminderEmail(email);
+        const template = await generateReminderEmail(email);
 
         await transporter.sendMail({
           from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
@@ -268,27 +415,65 @@ export async function POST(request: NextRequest) {
         });
 
         results.sent++;
+        sent = true;
+        await kv.set(getReminderSentKey(email), new Date().toISOString(), {
+          ex: REMINDER_COOLDOWN_DAYS * 24 * 60 * 60,
+        });
         console.log(`[NAICSReminder] ✅ Sent to ${email}`);
+        break;
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        const shouldRetry = attempt < MAX_SEND_ATTEMPTS && isConcurrencyLimitError(errorMessage);
+
+        if (shouldRetry) {
+          console.warn(`[NAICSReminder] Retrying ${email} after SMTP concurrency limit`);
+          await sleep(CONCURRENCY_RETRY_DELAY_MS);
+          continue;
+        }
+
         results.failed++;
-        results.errors.push(`${email}: ${err}`);
-        console.error(`[NAICSReminder] ❌ Failed for ${email}:`, err);
+        results.failedEmails.push(email);
+        results.errors.push(`${email}: ${errorMessage}`);
+        console.error(`[NAICSReminder] ❌ Failed for ${email}:`, errorMessage);
+        break;
       }
-    });
+    }
 
-    await Promise.all(batchPromises);
-
-    // Small delay between batches
-    if (i + BATCH_SIZE < emailsToSend.length) {
-      await new Promise(r => setTimeout(r, 1000));
+    if (sent && i + 1 < emailsToSend.length) {
+      await sleep(SEND_DELAY_MS);
     }
   }
 
-  return NextResponse.json({
-    success: true,
+  const runRecord: ReminderRunRecord = {
+    runAt: new Date().toISOString(),
+    mode: specificEmail ? 'single' : mode,
+    totalAudience: audience.totalAudience,
+    usersWithProfileData: audience.usersWithProfileData,
+    usersWithFallback: audience.usersWithFallback,
     totalTargeted: emailsToSend.length,
     sent: results.sent,
     failed: results.failed,
+    failedEmails: results.failedEmails,
+    sampleErrors: results.errors.slice(0, 20),
+    skippedRecentlyReminded,
+    batchLimit,
+  };
+
+  await kv.set(LAST_RUN_KEY, runRecord, { ex: 14 * 24 * 60 * 60 });
+
+  return NextResponse.json({
+    success: true,
+    audienceLabel: 'beta_briefing_fallback_pool',
+    totalAudience: audience.totalAudience,
+    usersWithProfileData: audience.usersWithProfileData,
+    usersWithFallback: audience.usersWithFallback,
+    mode: specificEmail ? 'single' : mode,
+    batchLimit,
+    skippedRecentlyReminded,
+    totalTargeted: emailsToSend.length,
+    sent: results.sent,
+    failed: results.failed,
+    failedEmails: results.failedEmails,
     errors: results.errors.slice(0, 10),
   });
 }

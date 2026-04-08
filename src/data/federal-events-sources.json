@@ -1,6 +1,50 @@
 {
   "lastUpdated": "2026-04-05",
   "eventSources": {
+    "apex_accelerators": {
+      "name": "APEX Accelerators (formerly PTAC)",
+      "url": "https://www.apexaccelerators.us/events",
+      "type": "official",
+      "frequency": "daily",
+      "categories": ["training", "counseling", "matchmaking"],
+      "agencies": ["DOD", "Multi-Agency"],
+      "notes": "Free procurement training, SAM registration help, capability statement reviews. Nationwide network of 90+ offices.",
+      "cost": "Free",
+      "value": "high"
+    },
+    "afcea_events": {
+      "name": "AFCEA International Events",
+      "url": "https://www.afcea.org/site/Events",
+      "type": "industry_association",
+      "frequency": "weekly",
+      "categories": ["conference", "industry_day", "networking"],
+      "agencies": ["DOD", "DHS", "Intelligence"],
+      "notes": "Premier IT/cyber/comms events. TechNet Cyber, TechNet Augusta, West/AFCEA conferences. Must-attend for IT contractors.",
+      "cost": "$200-$800",
+      "value": "very_high"
+    },
+    "same_events": {
+      "name": "SAME (Society of American Military Engineers)",
+      "url": "https://www.same.org/events",
+      "type": "industry_association",
+      "frequency": "weekly",
+      "categories": ["conference", "industry_day", "networking", "small_business"],
+      "agencies": ["USACE", "NAVFAC", "Air Force CE", "DOD"],
+      "notes": "Essential for A/E, construction, environmental contractors. Federal Small Business Conference, regional events, JETC.",
+      "cost": "$100-$600",
+      "value": "very_high"
+    },
+    "carahsoft_events": {
+      "name": "Carahsoft Technology Forums",
+      "url": "https://www.carahsoft.com/events",
+      "type": "reseller",
+      "frequency": "weekly",
+      "categories": ["technology_briefing", "training", "vendor_day"],
+      "agencies": ["Multi-Agency"],
+      "notes": "Free tech briefings, vendor showcases, government IT trends. Great for learning what agencies are buying.",
+      "cost": "Free",
+      "value": "high"
+    },
     "gsa_interact": {
       "name": "GSA Interact Events",
       "url": "https://interact.gsa.gov/events",
@@ -8,7 +52,9 @@
       "frequency": "daily",
       "categories": ["industry_day", "conference", "training"],
       "agencies": ["GSA"],
-      "notes": "Primary source for GSA Schedule holder events, buyer days"
+      "notes": "Primary source for GSA Schedule holder events, buyer days, reverse industry days.",
+      "cost": "Free-$300",
+      "value": "high"
     },
     "sba_events": {
       "name": "SBA Events Calendar",
@@ -17,25 +63,75 @@
       "frequency": "daily",
       "categories": ["training", "matchmaking", "certification"],
       "agencies": ["SBA"],
-      "notes": "8(a), HUBZone, WOSB certification workshops and matchmaking"
-    },
-    "ptac_events": {
-      "name": "PTAC Training Events",
-      "url": "https://www.aptac-us.org/events/",
-      "type": "official",
-      "frequency": "weekly",
-      "categories": ["training", "counseling"],
-      "agencies": ["DOD", "Multi-Agency"],
-      "notes": "Free procurement training, SAM registration help"
+      "notes": "8(a), HUBZone, WOSB certification workshops, matchmaking, National Small Business Week.",
+      "cost": "Free",
+      "value": "high"
     },
     "sam_gov_events": {
       "name": "SAM.gov Industry Days",
-      "url": "https://sam.gov/content/events",
+      "url": "https://sam.gov",
       "type": "official",
       "frequency": "daily",
       "categories": ["industry_day", "pre_solicitation"],
       "agencies": ["Multi-Agency"],
-      "notes": "Pre-solicitation conferences, industry days announced via SAM"
+      "notes": "Pre-solicitation conferences, industry days announced via SAM. Search notice type 'Special Notice'.",
+      "cost": "Usually Free",
+      "value": "very_high"
+    },
+    "govevents": {
+      "name": "GovEvents Calendar",
+      "url": "https://www.govevents.com",
+      "type": "aggregator",
+      "frequency": "daily",
+      "categories": ["conference", "industry_day", "training"],
+      "agencies": ["Multi-Agency"],
+      "notes": "Comprehensive aggregator of government events. Searchable by agency, topic, location.",
+      "cost": "Free to browse",
+      "value": "high"
+    },
+    "ndia_events": {
+      "name": "NDIA (National Defense Industrial Association)",
+      "url": "https://www.ndia.org/events",
+      "type": "industry_association",
+      "frequency": "weekly",
+      "categories": ["conference", "industry_day", "networking"],
+      "agencies": ["DOD", "Army", "Navy", "Air Force"],
+      "notes": "Defense industry conferences, chapter events. Ground Vehicle Systems, Armament Systems, Expeditionary Warfare.",
+      "cost": "$300-$1000",
+      "value": "high"
+    },
+    "ncma_events": {
+      "name": "NCMA (National Contract Management Association)",
+      "url": "https://www.ncmahq.org/events",
+      "type": "professional_association",
+      "frequency": "weekly",
+      "categories": ["training", "conference", "networking"],
+      "agencies": ["Multi-Agency"],
+      "notes": "Contract management training, World Congress, regional events. Great for meeting contracting officers.",
+      "cost": "$100-$800",
+      "value": "high"
+    },
+    "act_iac": {
+      "name": "ACT-IAC Events",
+      "url": "https://www.actiac.org/events",
+      "type": "industry_association",
+      "frequency": "weekly",
+      "categories": ["conference", "networking", "technology_briefing"],
+      "agencies": ["Multi-Agency"],
+      "notes": "American Council for Technology - Industry Advisory Council. IT modernization, shared services, acquisition innovation.",
+      "cost": "$100-$500",
+      "value": "high"
+    },
+    "psc_events": {
+      "name": "PSC (Professional Services Council)",
+      "url": "https://www.pscouncil.org/events",
+      "type": "industry_association",
+      "frequency": "weekly",
+      "categories": ["conference", "networking", "policy"],
+      "agencies": ["Multi-Agency"],
+      "notes": "Professional services industry events. Vision Federal Market Forecast, acquisition policy discussions.",
+      "cost": "$200-$600",
+      "value": "high"
     },
     "dla_events": {
       "name": "DLA Industry Engagement",
@@ -44,7 +140,9 @@
       "frequency": "monthly",
       "categories": ["industry_day", "training"],
       "agencies": ["DLA", "DOD"],
-      "notes": "Defense Logistics Agency events, commodity-specific"
+      "notes": "Defense Logistics Agency events, commodity-specific industry days.",
+      "cost": "Free",
+      "value": "medium"
     },
     "gsa_osdbu": {
       "name": "GSA OSDBU Events",
@@ -53,7 +151,9 @@
       "frequency": "weekly",
       "categories": ["matchmaking", "training", "certification"],
       "agencies": ["GSA"],
-      "notes": "Small business programs, mentor-protege, matchmaking"
+      "notes": "Small business programs, mentor-protege, Forecast of Opportunities briefings.",
+      "cost": "Free",
+      "value": "high"
     },
     "va_osdbu": {
       "name": "VA OSDBU Events",
@@ -62,7 +162,9 @@
       "frequency": "monthly",
       "categories": ["industry_day", "training", "certification"],
       "agencies": ["VA"],
-      "notes": "SDVOSB verification, VA-specific programs"
+      "notes": "SDVOSB verification, VA-specific programs, National Veterans Small Business Engagement.",
+      "cost": "Free",
+      "value": "high"
     },
     "dod_osbp": {
       "name": "DOD OSBP Events",
@@ -71,7 +173,9 @@
       "frequency": "monthly",
       "categories": ["industry_day", "training", "matchmaking"],
       "agencies": ["DOD"],
-      "notes": "DoD-wide small business programs and outreach"
+      "notes": "DoD-wide small business programs, Mentor-Protege events, Defense Manufacturing Conference.",
+      "cost": "Free-$200",
+      "value": "high"
     },
     "navy_osbp": {
       "name": "Navy OSBP Events",
@@ -80,7 +184,9 @@
       "frequency": "monthly",
       "categories": ["industry_day", "matchmaking"],
       "agencies": ["Navy", "DOD"],
-      "notes": "Navy-specific industry days, SeaPort events"
+      "notes": "Navy-specific industry days, SeaPort events, Navy Gold Coast.",
+      "cost": "Free-$300",
+      "value": "high"
     },
     "army_osbp": {
       "name": "Army OSBP Events",
@@ -89,7 +195,9 @@
       "frequency": "monthly",
       "categories": ["industry_day", "matchmaking"],
       "agencies": ["Army", "DOD"],
-      "notes": "Army OSBP events, market research days"
+      "notes": "Army OSBP events, market research days, Army Small Business Forum.",
+      "cost": "Free",
+      "value": "high"
     },
     "air_force_osbp": {
       "name": "Air Force OSBP Events",
@@ -98,7 +206,20 @@
       "frequency": "monthly",
       "categories": ["industry_day", "matchmaking"],
       "agencies": ["Air Force", "DOD"],
-      "notes": "USAF small business events, AFWERX challenges"
+      "notes": "USAF small business events, AFWERX challenges, SpaceWERX.",
+      "cost": "Free",
+      "value": "high"
+    },
+    "afwerx": {
+      "name": "AFWERX Innovation Events",
+      "url": "https://www.afwerx.com/events",
+      "type": "official",
+      "frequency": "weekly",
+      "categories": ["innovation", "sbir_sttr", "pitch_day"],
+      "agencies": ["Air Force", "Space Force"],
+      "notes": "SBIR/STTR open topics, Spark Tank, innovation challenges. Fast-track contracts.",
+      "cost": "Free",
+      "value": "very_high"
     },
     "hhs_osdbu": {
       "name": "HHS OSDBU Events",
@@ -107,7 +228,9 @@
       "frequency": "monthly",
       "categories": ["industry_day", "training"],
       "agencies": ["HHS"],
-      "notes": "NIH, CDC, FDA procurement events"
+      "notes": "NIH, CDC, FDA procurement events. HHS Small Business Expo.",
+      "cost": "Free",
+      "value": "high"
     },
     "nasa_osbp": {
       "name": "NASA OSBP Events",
@@ -116,7 +239,9 @@
       "frequency": "monthly",
       "categories": ["industry_day", "sbir_sttr", "matchmaking"],
       "agencies": ["NASA"],
-      "notes": "SBIR outreach, NASA industry days"
+      "notes": "SBIR outreach, NASA industry days, Small Business Industry Day.",
+      "cost": "Free",
+      "value": "high"
     },
     "dhs_osdbu": {
       "name": "DHS OSDBU Events",
@@ -125,7 +250,9 @@
       "frequency": "monthly",
       "categories": ["industry_day", "training"],
       "agencies": ["DHS"],
-      "notes": "CBP, FEMA, Coast Guard events"
+      "notes": "CBP, FEMA, Coast Guard events, DHS Industry Day.",
+      "cost": "Free",
+      "value": "high"
     },
     "doe_osdbu": {
       "name": "DOE OSDBU Events",
@@ -134,92 +261,195 @@
       "frequency": "monthly",
       "categories": ["industry_day", "sbir_sttr"],
       "agencies": ["DOE"],
-      "notes": "National Labs events, clean energy initiatives"
+      "notes": "National Labs events, clean energy initiatives, DOE Small Business Forum.",
+      "cost": "Free",
+      "value": "high"
+    },
+    "immixgroup": {
+      "name": "immixGroup Events",
+      "url": "https://www.immixgroup.com/events",
+      "type": "reseller",
+      "frequency": "weekly",
+      "categories": ["technology_briefing", "training"],
+      "agencies": ["Multi-Agency"],
+      "notes": "IT reseller events, vendor showcases, government market education.",
+      "cost": "Free",
+      "value": "medium"
+    },
+    "meritalk": {
+      "name": "MeriTalk Events",
+      "url": "https://www.meritalk.com/events",
+      "type": "media",
+      "frequency": "weekly",
+      "categories": ["conference", "technology_briefing"],
+      "agencies": ["Multi-Agency"],
+      "notes": "Government IT media events, cyber summits, cloud computing conferences.",
+      "cost": "Free-$200",
+      "value": "medium"
+    },
+    "govconwire": {
+      "name": "GovConWire Events",
+      "url": "https://www.govconwire.com/events",
+      "type": "media",
+      "frequency": "weekly",
+      "categories": ["conference", "networking"],
+      "agencies": ["Multi-Agency"],
+      "notes": "GovCon industry news events, executive spotlights, M&A discussions.",
+      "cost": "$100-$400",
+      "value": "medium"
+    },
+    "wipp": {
+      "name": "WIPP (Women Impacting Public Policy)",
+      "url": "https://www.wipp.org/events",
+      "type": "advocacy",
+      "frequency": "monthly",
+      "categories": ["networking", "advocacy", "training"],
+      "agencies": ["Multi-Agency"],
+      "notes": "Women-owned business advocacy, annual summit, policy updates.",
+      "cost": "$100-$500",
+      "value": "medium"
+    },
+    "wbenc": {
+      "name": "WBENC Events",
+      "url": "https://www.wbenc.org/events",
+      "type": "certification",
+      "frequency": "monthly",
+      "categories": ["conference", "matchmaking", "certification"],
+      "agencies": ["Multi-Agency"],
+      "notes": "Women's Business Enterprise certification, National Conference, matchmaking.",
+      "cost": "$200-$800",
+      "value": "high"
+    },
+    "nmsdc": {
+      "name": "NMSDC Events",
+      "url": "https://nmsdc.org/events",
+      "type": "certification",
+      "frequency": "monthly",
+      "categories": ["conference", "matchmaking", "certification"],
+      "agencies": ["Multi-Agency"],
+      "notes": "Minority Business Enterprise certification, annual conference, corporate matchmaking.",
+      "cost": "$200-$1000",
+      "value": "high"
     }
   },
   "eventCategories": {
     "industry_day": {
       "name": "Industry Day",
-      "description": "Pre-solicitation event where agencies brief potential contractors",
-      "value": "high",
-      "actionRequired": "Attend to learn requirements, network with agency",
-      "typical_lead_time": "30-90 days before solicitation"
+      "description": "Pre-solicitation event where agencies brief potential contractors on upcoming requirements",
+      "value": "very_high",
+      "actionRequired": "Attend to learn requirements, submit questions, network with agency",
+      "typical_lead_time": "30-90 days before solicitation",
+      "tip": "These are the MOST valuable events - you learn what the agency wants before RFP release"
     },
     "pre_solicitation": {
       "name": "Pre-Solicitation Conference",
-      "description": "Formal briefing on upcoming solicitation",
-      "value": "high",
-      "actionRequired": "Submit questions, understand evaluation criteria",
+      "description": "Formal briefing on upcoming solicitation details",
+      "value": "very_high",
+      "actionRequired": "Submit questions, understand evaluation criteria, identify teaming partners",
       "typical_lead_time": "14-45 days before solicitation"
     },
     "matchmaking": {
       "name": "Matchmaking Event",
-      "description": "Speed dating style meetings with agency buyers",
-      "value": "high",
-      "actionRequired": "Register early, prepare capability brief",
+      "description": "Speed dating style meetings with agency buyers and primes",
+      "value": "very_high",
+      "actionRequired": "Register early, prepare 60-second capability pitch, bring capability statements",
       "typical_lead_time": "Registration closes 2-4 weeks before"
     },
     "training": {
       "name": "Training/Workshop",
-      "description": "Educational session on procurement process",
+      "description": "Educational session on procurement process, compliance, proposals",
       "value": "medium",
-      "actionRequired": "Attend to learn, network with others",
+      "actionRequired": "Attend to learn, network with other contractors",
       "typical_lead_time": "Open registration"
     },
     "certification": {
       "name": "Certification Workshop",
-      "description": "Help with 8(a), HUBZone, WOSB, SDVOSB certification",
+      "description": "Help with 8(a), HUBZone, WOSB, SDVOSB, MBE certification",
       "value": "high",
-      "actionRequired": "Attend if pursuing certification",
+      "actionRequired": "Attend if pursuing certification, bring documentation questions",
       "typical_lead_time": "Open registration"
     },
     "conference": {
       "name": "Industry Conference",
-      "description": "Large multi-agency event",
-      "value": "medium",
-      "actionRequired": "Network, attend relevant sessions",
+      "description": "Large multi-agency event with exhibits, sessions, networking",
+      "value": "high",
+      "actionRequired": "Network strategically, attend relevant sessions, schedule meetings in advance",
       "typical_lead_time": "3-6 months registration"
     },
     "sbir_sttr": {
       "name": "SBIR/STTR Outreach",
-      "description": "Small business innovation research events",
+      "description": "Small business innovation research proposal guidance and networking",
       "value": "high",
-      "actionRequired": "Learn proposal process, meet program managers",
+      "actionRequired": "Learn proposal process, meet program managers, identify topics",
       "typical_lead_time": "Tied to SBIR solicitation cycles"
+    },
+    "technology_briefing": {
+      "name": "Technology Briefing",
+      "description": "Vendor/reseller events showcasing solutions agencies are buying",
+      "value": "medium",
+      "actionRequired": "Learn what technologies agencies are adopting, find teaming partners",
+      "typical_lead_time": "1-2 weeks registration"
+    },
+    "networking": {
+      "name": "Networking Event",
+      "description": "Informal gatherings for relationship building",
+      "value": "medium",
+      "actionRequired": "Build relationships, exchange cards, follow up within 48 hours",
+      "typical_lead_time": "Open registration"
+    },
+    "innovation": {
+      "name": "Innovation/Pitch Day",
+      "description": "Rapid contracting events, pitch competitions, challenge-based acquisition",
+      "value": "very_high",
+      "actionRequired": "Prepare concise pitch, demonstrate capability, be ready for same-day award",
+      "typical_lead_time": "Application deadline 4-8 weeks before"
     }
   },
   "majorAnnualConferences": [
     {
-      "name": "DoD Procurement Conference",
-      "typical_month": "December",
-      "location": "Washington DC area",
-      "audience": "All contractors",
+      "name": "AFCEA TechNet Cyber",
+      "typical_month": "May",
+      "location": "Baltimore, MD",
+      "audience": "IT/Cyber/Comms contractors",
+      "registration_cost": "$400-$800",
+      "value": "Very High - Premier cyber event, DOD/DHS/IC buyers",
+      "url": "https://events.afcea.org/TechNetCyber"
+    },
+    {
+      "name": "AFCEA West",
+      "typical_month": "February",
+      "location": "San Diego, CA",
+      "audience": "Navy/Marine Corps IT contractors",
+      "registration_cost": "$400-$800",
+      "value": "Very High - Navy/USMC focus, SeaPort opportunities",
+      "url": "https://events.afcea.org/AFCEAWest"
+    },
+    {
+      "name": "SAME Federal Small Business Conference",
+      "typical_month": "November",
+      "location": "Various",
+      "audience": "A/E, Construction, Environmental",
       "registration_cost": "$200-$500",
-      "value": "High - DoD-wide networking"
+      "value": "Very High - USACE, NAVFAC matchmaking",
+      "url": "https://www.same.org/fsbc"
+    },
+    {
+      "name": "SAME JETC (Joint Engineer Training Conference)",
+      "typical_month": "May",
+      "location": "Various",
+      "audience": "Engineering contractors",
+      "registration_cost": "$400-$800",
+      "value": "High - Military engineering community",
+      "url": "https://www.same.org/jetc"
     },
     {
       "name": "GSA Expo",
       "typical_month": "May",
-      "location": "San Antonio/Orlando rotation",
+      "location": "Rotates (San Antonio, Orlando)",
       "audience": "GSA Schedule holders",
       "registration_cost": "$300-$600",
-      "value": "High - GSA buyer access"
-    },
-    {
-      "name": "AFCEA TechNet",
-      "typical_month": "Multiple",
-      "location": "Various",
-      "audience": "IT/Cyber contractors",
-      "registration_cost": "$200-$400",
-      "value": "High - IT/Cyber focus"
-    },
-    {
-      "name": "GovCon Summit",
-      "typical_month": "October",
-      "location": "Washington DC",
-      "audience": "All contractors",
-      "registration_cost": "$400-$800",
-      "value": "Medium - General networking"
+      "value": "Very High - GSA buyer access, Schedule updates",
+      "url": "https://www.gsa.gov/events"
     },
     {
       "name": "NDIA Annual Conference",
@@ -227,27 +457,106 @@
       "location": "Various",
       "audience": "Defense contractors",
       "registration_cost": "$500-$1000",
-      "value": "High - Defense industry"
+      "value": "High - Defense industry wide",
+      "url": "https://www.ndia.org/events"
+    },
+    {
+      "name": "PSC Vision Federal Market Forecast",
+      "typical_month": "October",
+      "location": "Washington DC",
+      "audience": "Professional services contractors",
+      "registration_cost": "$400-$800",
+      "value": "High - Budget forecasts, agency priorities",
+      "url": "https://www.pscouncil.org/vision"
+    },
+    {
+      "name": "Navy Gold Coast",
+      "typical_month": "August",
+      "location": "San Diego, CA",
+      "audience": "Navy small business contractors",
+      "registration_cost": "$200-$400",
+      "value": "Very High - Direct Navy buyer access, matchmaking",
+      "url": "https://www.navygoldcoast.org"
+    },
+    {
+      "name": "ACT-IAC Imagine Nation ELC",
+      "typical_month": "October",
+      "location": "Hershey, PA",
+      "audience": "IT modernization contractors",
+      "registration_cost": "$400-$800",
+      "value": "High - Cross-agency IT leaders",
+      "url": "https://www.actiac.org/events"
+    },
+    {
+      "name": "NCMA World Congress",
+      "typical_month": "July",
+      "location": "Various",
+      "audience": "Contract management professionals",
+      "registration_cost": "$600-$1200",
+      "value": "High - Meet contracting officers",
+      "url": "https://www.ncmahq.org/events"
+    },
+    {
+      "name": "DHS Industry Day",
+      "typical_month": "Varies",
+      "location": "Washington DC",
+      "audience": "Homeland security contractors",
+      "registration_cost": "Free-$200",
+      "value": "Very High - DHS component buyers",
+      "url": "https://www.dhs.gov/small-business"
+    },
+    {
+      "name": "WBENC National Conference",
+      "typical_month": "June",
+      "location": "Various",
+      "audience": "Women-owned businesses",
+      "registration_cost": "$500-$1000",
+      "value": "High - Corporate and government matchmaking",
+      "url": "https://www.wbenc.org/events"
     }
   ],
   "recommendations": {
     "new_contractor": [
-      "Start with free PTAC training sessions",
+      "Start with FREE APEX Accelerator training (formerly PTAC) - find yours at apexaccelerators.us",
       "Attend SBA matchmaking events in your region",
-      "Don't pay for conferences until you have capability statement ready",
-      "Focus on Industry Days for your target agencies"
+      "Don't pay for expensive conferences until you have a polished capability statement",
+      "Focus on Industry Days announced on SAM.gov for your target agencies",
+      "Carahsoft events are free and teach you what agencies are buying"
     ],
     "established_contractor": [
-      "Prioritize Industry Days for expiring contracts (recompetes)",
-      "GSA Expo is essential if you have Schedule",
-      "Matchmaking events have highest ROI for direct buyer access",
-      "Set up SAM.gov alerts for Industry Day notices"
+      "AFCEA TechNet events are essential for IT/cyber contractors",
+      "SAME events are must-attend for A/E, construction, environmental",
+      "Prioritize Industry Days for recompete opportunities",
+      "GSA Expo is essential if you have a Schedule",
+      "Navy Gold Coast has excellent matchmaking for Navy work",
+      "Set up SAM.gov alerts for Industry Day notices in your NAICS"
+    ],
+    "defense_contractor": [
+      "AFCEA is the premier IT/cyber/comms networking organization",
+      "SAME is essential for engineering and construction",
+      "NDIA for weapons systems and defense platforms",
+      "AFWERX/SpaceWERX for innovation and rapid contracting",
+      "Service-specific OSBP events for targeted matchmaking"
     ],
     "certification_seeking": [
-      "VA OSDBU for SDVOSB verification events",
-      "SBA for 8(a) and HUBZone workshops",
-      "WBENC and NWBOC for WOSB certification help",
-      "PTACs offer free certification guidance"
+      "VA OSDBU for SDVOSB verification events and requirements",
+      "SBA for 8(a) and HUBZone certification workshops",
+      "WBENC for women-owned business certification",
+      "NMSDC for minority business enterprise certification",
+      "APEX Accelerators offer free certification guidance"
+    ],
+    "it_contractor": [
+      "AFCEA TechNet Cyber (May) - premier cyber event",
+      "AFCEA West (February) - Navy/USMC IT focus",
+      "ACT-IAC events for IT modernization trends",
+      "Carahsoft/immixGroup for free technology briefings",
+      "MeriTalk for cyber and cloud computing events"
+    ],
+    "construction_contractor": [
+      "SAME Federal Small Business Conference - matchmaking with USACE/NAVFAC",
+      "SAME JETC for military engineering community",
+      "GSA PBS events for civilian construction",
+      "APEX Accelerators for bonding and compliance training"
     ]
   }
 }

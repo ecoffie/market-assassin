@@ -26,6 +26,10 @@ function getSupabase() {
   );
 }
 
+function isIgnorableMissingTableError(message: string): boolean {
+  return message.includes('Could not find the table') || message.includes('schema cache');
+}
+
 interface PipelineStatus {
   component: string;
   status: 'healthy' | 'degraded' | 'failed';
@@ -34,6 +38,9 @@ interface PipelineStatus {
   usersWithNaics: number;
   usersWithFallback: number;
   recentDeliveries: number;
+  audienceLabel?: string;
+  usersWithProfileData?: number;
+  betaMode?: boolean;
   errors?: string[];
 }
 
@@ -125,22 +132,71 @@ async function checkAlertsStatus(supabase: ReturnType<typeof getSupabase>): Prom
 }
 
 async function checkBriefsStatus(supabase: ReturnType<typeof getSupabase>): Promise<PipelineStatus> {
-  // Count users from BOTH tables
-  const { count: notifCount } = await supabase
+  // Mirror the real beta send-briefings audience:
+  // 1. all active user_notification_settings
+  // 2. smart_user_profiles not already present by email
+  const { data: notificationSettings } = await supabase
     .from('user_notification_settings')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_active', true)
-    .eq('briefings_enabled', true);
+    .select('user_email, naics_codes, agencies, aggregated_profile')
+    .eq('is_active', true);
 
-  const { data: alertUsers, count: alertCount } = await supabase
-    .from('user_alert_settings')
-    .select('user_email, naics_codes', { count: 'exact' })
-    .eq('is_active', true)
-    .eq('briefings_enabled', true);
+  const { data: smartProfiles, error: smartProfilesError } = await supabase
+    .from('smart_user_profiles')
+    .select('email, naics_codes, agencies')
+;
 
-  const usersWithNaics = (alertUsers || []).filter(u =>
-    Array.isArray(u.naics_codes) && u.naics_codes.length > 0
-  ).length;
+  if (smartProfilesError && !isIgnorableMissingTableError(smartProfilesError.message)) {
+    throw smartProfilesError;
+  }
+  const seenEmails = new Set<string>();
+  let totalAudience = 0;
+  let usersWithProfileData = 0;
+  let usersUsingFallback = 0;
+
+  for (const profile of notificationSettings || []) {
+    const email = profile.user_email?.toLowerCase();
+    if (!email || seenEmails.has(email)) continue;
+    seenEmails.add(email);
+    totalAudience++;
+
+    const aggregated = profile.aggregated_profile as Record<string, unknown> | null;
+    const aggregatedNaics = aggregated && Array.isArray(aggregated.naics_codes)
+      ? aggregated.naics_codes
+      : [];
+    const aggregatedAgencies = aggregated && Array.isArray(aggregated.agencies)
+      ? aggregated.agencies
+      : [];
+    const naics = Array.isArray(profile.naics_codes) ? profile.naics_codes : [];
+    const agencies = Array.isArray(profile.agencies) ? profile.agencies : [];
+    const hasProfileData =
+      aggregatedNaics.length > 0 ||
+      aggregatedAgencies.length > 0 ||
+      naics.length > 0 ||
+      agencies.length > 0;
+
+    if (hasProfileData) {
+      usersWithProfileData++;
+    } else {
+      usersUsingFallback++;
+    }
+  }
+
+  for (const profile of smartProfiles || []) {
+    const email = profile.email?.toLowerCase();
+    if (!email || seenEmails.has(email)) continue;
+    seenEmails.add(email);
+    totalAudience++;
+
+    const naics = Array.isArray(profile.naics_codes) ? profile.naics_codes : [];
+    const agencies = Array.isArray(profile.agencies) ? profile.agencies : [];
+    const hasProfileData = naics.length > 0 || agencies.length > 0;
+
+    if (hasProfileData) {
+      usersWithProfileData++;
+    } else {
+      usersUsingFallback++;
+    }
+  }
 
   // Check recent deliveries
   const yesterday = new Date();
@@ -152,14 +208,15 @@ async function checkBriefsStatus(supabase: ReturnType<typeof getSupabase>): Prom
     .eq('delivery_status', 'sent')
     .gte('briefing_date', yesterday.toISOString().split('T')[0]);
 
-  const totalEligible = (notifCount || 0) + (alertCount || 0);
-
   return {
-    component: 'Daily Briefs (Market Intel)',
+    component: 'Daily Briefs (Beta Audience)',
     status: (recentCount || 0) > 0 ? 'healthy' : 'degraded',
-    usersEligible: totalEligible,
-    usersWithNaics,
-    usersWithFallback: totalEligible - usersWithNaics,
+    usersEligible: totalAudience,
+    usersWithNaics: usersWithProfileData,
+    usersWithFallback: usersUsingFallback,
+    usersWithProfileData,
+    audienceLabel: 'beta_briefing_pool',
+    betaMode: true,
     recentDeliveries: recentCount || 0,
   };
 }
@@ -293,6 +350,10 @@ function generateRecommendations(pipeline: PipelineStatus[]): string[] {
 
   if (briefs && briefs.recentDeliveries === 0) {
     recs.push('No briefs sent recently - check cron schedule and logs');
+  }
+
+  if (briefs && briefs.betaMode && briefs.usersWithFallback > 0) {
+    recs.push(`${briefs.usersWithFallback} beta users are receiving fallback briefings - encourage NAICS/agency setup`);
   }
 
   if (alerts && alerts.status === 'degraded') {

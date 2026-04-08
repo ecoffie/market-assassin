@@ -4,6 +4,171 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 37 (Apr 6, 2026)
+
+### Briefings Rollout - Full Program Cohorts
+
+**Goal:** Move briefings from broad beta to a controlled cohort rollout without rotating users before they experience the full product.
+
+#### What Changed
+
+1. **Production rollout deployed**
+   - Switched from `beta_all` to `rollout`
+   - First active cohort: 250 users
+   - All 250 were profile-ready, 0 fallback
+
+2. **Rollout model upgraded from daily-only to program-wide**
+   - Shared cohort now gates:
+     - Daily Brief
+     - Weekly Deep Dive
+     - Pursuit Brief
+   - Added KV-backed per-user progress tracking
+
+3. **Rotation rules tightened**
+   - Minimum cohort window: 14 days
+   - Required before normal rotation:
+     - `daily brief` sent 2 times
+     - `weekly deep dive` sent 2 times
+     - `pursuit brief` sent 2 times
+   - Manual rotation now blocked unless complete, unless forced
+
+4. **Admin rollout endpoint expanded**
+   - `/api/admin/briefing-rollout`
+   - Now returns:
+     - config
+     - active cohort
+     - cohort progress
+     - remaining users by brief type
+     - recommended next cohort sample
+
+#### Production Verification
+
+- Rollout config saved live:
+  - `mode=rollout`
+  - `cohortSize=250`
+  - `stickyDays=14`
+  - `cooldownDays=21`
+  - `maxFallbackPercent=15`
+  - `requiredDailyBriefs=2`
+  - `requiredWeeklyDeepDives=2`
+  - `requiredPursuitBriefs=2`
+- Live deployment:
+  - `market-assassin-2gzpzduq1-eric-coffies-projects.vercel.app`
+
+#### Key Files Modified
+
+- `src/lib/briefings/delivery/rollout.ts`
+- `src/app/api/admin/briefing-rollout/route.ts`
+- `src/app/api/cron/send-briefings/route.ts`
+- `src/app/api/cron/weekly-deep-dive/route.ts`
+- `src/app/api/cron/pursuit-brief/route.ts`
+- `docs/briefing-rollout-runbook.md`
+- `docs/briefings-system.md`
+- `DEPLOYMENT.md`
+- `API-REFERENCE.md`
+- `CLAUDE.md`
+
+#### Operational Note
+
+The current cohort was originally created under the earlier rollout version, but rotation is now guarded by completion, so it will not rotate early just because of the old timer value.
+
+---
+
+## Session 37 (Apr 6, 2026)
+
+### Forecast Intelligence - Phase 2-4 Scraper Testing
+
+**Goal:** Run Puppeteer scrapers for remaining agencies (GSA, VA, HHS, DHS, Treasury, EPA, USDA, DOD)
+
+#### Results
+
+**Working:**
+- ✅ **DHS** - 683 records imported via API interception method
+
+**Broken (page structures changed):**
+- ❌ GSA (acquisitiongateway.gov) - 0 records
+- ❌ VA (vendorportal.ecms.va.gov) - 0 records
+- ❌ HHS (procurementforecast.hhs.gov) - timeout
+- ❌ Treasury (osdbu.forecast.treasury.gov) - 0 records
+- ❌ EPA (ofmpub.epa.gov) - 0 records
+- ❌ USDA (forecast.edc.usda.gov) - 0 records
+- ❌ DOD (all 6 sub-sources) - 0 records
+
+#### Fixes Applied
+
+1. **Schema Mapping Fix** (`scripts/run-scrapers-tsx.ts:48-87`)
+   - Changed `agency` → `source_agency`
+   - Changed `id` → `external_id`
+   - Updated upsert conflict key from `id` to `source_agency,external_id`
+
+2. **Agency Key Mapping** (`scripts/run-scrapers-tsx.ts:20-32`)
+   - Added `agencyKeyMap` to handle case sensitivity (e.g., `TREASURY` → `Treasury`)
+
+#### Final Database State
+| Agency | Records | Notes |
+|--------|---------|-------|
+| DOE | 833 | Phase 1 Excel |
+| NASA | 294 | Phase 1 Excel |
+| DOJ | 3,140 | Phase 1 Excel |
+| DHS | 683 | Phase 3 Puppeteer (API interception) |
+| **Total** | **4,950** | |
+
+#### Key Files Modified
+- `scripts/run-scrapers-tsx.ts` — Schema mapping + agency key fixes
+
+---
+
+## Session 36 (Apr 5, 2026)
+
+### Forecast Intelligence - Phase 1 Import Fixes
+
+**Goal:** Complete Phase 1 forecast imports (DOE, NASA, DOJ)
+
+#### The Problem
+Initial imports failed with "ON CONFLICT DO UPDATE command cannot affect row a second time" error because `external_id` generation used `Date.now()`, which created identical IDs for all records in a batch.
+
+#### Fixes Applied
+
+1. **Fixed DOE Parser ID Generation** (`scripts/import-forecasts.js`)
+   - Changed from `Date.now()` to contract number as identifier
+   - Fixed header row from 16 to 17 (DOE Excel format change)
+   ```javascript
+   const contractNum = getCol('Current Contract') || getCol('Contract Number');
+   external_id: contractNum ? `DOE-${contractNum}` : null
+   ```
+
+2. **Fixed NASA Parser ID Generation**
+   ```javascript
+   external_id: id || null  // was: id || `NASA-${naicsCode}-${Date.now()}`
+   ```
+
+3. **Fixed DOJ Parser ID Generation**
+   ```javascript
+   external_id: trackingNum || null  // was: trackingNum || `DOJ-${naicsCode}-${Date.now()}`
+   ```
+
+4. **Added Deduplication Logic** - DOJ Excel had 245 actual duplicate rows
+   ```javascript
+   const deduped = new Map();
+   for (const record of records) {
+     deduped.set(record.external_id, record);
+   }
+   const uniqueRecords = Array.from(deduped.values());
+   ```
+
+#### Final Import Results
+| Agency | Records | Notes |
+|--------|---------|-------|
+| DOE | 833 | energy.gov Excel |
+| NASA | 294 | nasa.gov Excel |
+| DOJ | 3,140 | justice.gov Excel (245 dupes removed) |
+| **Total** | **4,267** | |
+
+#### Key Files Modified
+- `scripts/import-forecasts.js` — ID generation + deduplication
+
+---
+
 ## Session 35 (Mar 30, 2026)
 
 ### JTED 2026 Package - COMPLETE
@@ -162,7 +327,7 @@ Made daily alerts and briefings **FREE FOR EVERYONE** during beta. Complete syst
 #### Cron Schedule (vercel.json)
 | Job | Schedule (UTC) | Description |
 |-----|----------------|-------------|
-| send-briefings | 9 AM | Daily briefings |
+| send-briefings | 7 AM | Daily briefings |
 | daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | Timezone coverage (4 runs) |
 | weekly-alerts | 11 PM Sunday | Weekly digest |
 

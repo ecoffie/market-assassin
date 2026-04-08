@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { kv } from '@vercel/kv';
+import { hasBriefingsAccess } from '@/lib/briefings/access';
 
 interface RecompeteContract {
   contractNumber: string;
@@ -118,8 +118,8 @@ export async function GET(request: NextRequest) {
     }, { status: 400 });
   }
 
-  // Check access via KV (but don't block - just note it)
-  const hasAccess = await kv.get(`briefings:${email}`);
+  // Check access via KV and paid entitlement fallback (but don't block - just note it)
+  const hasAccess = await hasBriefingsAccess(email);
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
     const intelligence: LindyIntelligence & { has_full_access: boolean } = {
       as_of: now.toISOString(),
       user_email: email,
-      has_full_access: !!hasAccess,
+      has_full_access: hasAccess,
       profile_summary: profileSummary,
       briefing: null,
       recompetes: {
@@ -436,7 +436,7 @@ function formatRecompete(contract: RecompeteContract): RecompeteContract {
 }
 
 /**
- * Get next briefing time (9 AM UTC)
+ * Get next briefing time (7 AM UTC)
  */
 function getNextBriefingTime(): string {
   const now = new Date();

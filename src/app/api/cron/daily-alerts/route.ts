@@ -12,6 +12,7 @@ import {
   CircuitBreaker,
   postSendValidation,
 } from '@/lib/intelligence';
+import { createSecureAccessUrl } from '@/lib/access-links';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -745,7 +746,7 @@ async function sendDailyAlertEmail(
   grants: (GrantOpportunity & { score: number })[] = []
 ) {
   const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
-  const preferencesUrl = `https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
+  const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const maUrl = 'https://tools.govcongiants.org/market-assassin';
   const totalCount = opportunities.length + grants.length;
 

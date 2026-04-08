@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import nodemailer from 'nodemailer';
+import { createSecureAccessUrl } from '@/lib/access-links';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -237,7 +238,7 @@ function getDaysUntil(dateString: string): number {
 }
 
 async function sendWelcomeOnlyEmail(email: string, user: AlertUser) {
-  const preferencesUrl = `https://shop.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
+  const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const unsubscribeUrl = `https://shop.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const maUrl = 'https://tools.govcongiants.org/market-assassin';
 
@@ -314,7 +315,7 @@ async function sendCatchUpEmail(
   totalAvailable: number
 ) {
   const unsubscribeUrl = `https://shop.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
-  const preferencesUrl = `https://shop.govcongiants.org/alerts/preferences?email=${encodeURIComponent(email)}`;
+  const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
 
   const opportunitiesHtml = opportunities.map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);

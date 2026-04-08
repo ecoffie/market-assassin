@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -86,6 +86,7 @@ function AlertPreferencesContent() {
   const [email, setEmail] = useState(emailParam || '');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingLink, setSendingLink] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [settings, setSettings] = useState<AlertSettings | null>(null);
@@ -96,6 +97,7 @@ function AlertPreferencesContent() {
   const [naicsInput, setNaicsInput] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
+  const [targetAgenciesInput, setTargetAgenciesInput] = useState('');
   const [locationState, setLocationState] = useState('');
   const [locationStates, setLocationStates] = useState<string[]>([]); // Multi-state support
   const [showStateSelector, setShowStateSelector] = useState(false);
@@ -129,13 +131,7 @@ function AlertPreferencesContent() {
     return codes.filter(c => /^\d+$/.test(c.trim()));
   };
 
-  useEffect(() => {
-    if (emailParam) {
-      loadSettings(emailParam);
-    }
-  }, [emailParam]);
-
-  const loadSettings = async (emailToLoad: string) => {
+  const loadSettings = useCallback(async (emailToLoad: string) => {
     setLoading(true);
     setError('');
     setNotFound(false);
@@ -146,6 +142,7 @@ function AlertPreferencesContent() {
 
       if (data.success && data.data) {
         setSettings(data.data);
+        localStorage.setItem('preferences_access_email', emailToLoad.toLowerCase());
         // Load primary industry
         setPrimaryIndustry(data.data.primaryIndustry || '');
         // Clean NAICS codes - filter out non-numeric values
@@ -153,6 +150,7 @@ function AlertPreferencesContent() {
         setNaicsInput(cleanedNaics.join(', '));
         setKeywordsInput(data.data.keywords?.join(', ') || '');
         setBusinessType(data.data.businessType || '');
+        setTargetAgenciesInput(data.data.targetAgencies?.join(', ') || '');
         setLocationState(data.data.locationState || '');
         // Load multi-state selection (new feature)
         const savedStates = data.data.locationStates || (data.data.locationState ? [data.data.locationState] : []);
@@ -176,12 +174,59 @@ function AlertPreferencesContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const storedEmail = typeof window !== 'undefined'
+      ? localStorage.getItem('preferences_access_email') || localStorage.getItem('briefings_access_email')
+      : null;
+    const emailToLoad = emailParam || storedEmail || '';
+
+    if (emailToLoad) {
+      setEmail(emailToLoad);
+      loadSettings(emailToLoad);
+    }
+  }, [emailParam, loadSettings]);
 
   const handleLookup = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
       loadSettings(email);
+    }
+  };
+
+  const handleSendSecureLink = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('Enter your email first so we know where to send the secure link.');
+      return;
+    }
+
+    setSendingLink(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const res = await fetch('/api/access-links/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          destination: 'preferences',
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error || 'Failed to send secure link');
+        return;
+      }
+
+      setSuccess('Secure link sent. Check your email to manage your preferences.');
+    } catch {
+      setError('Failed to send secure link');
+    } finally {
+      setSendingLink(false);
     }
   };
 
@@ -204,6 +249,11 @@ function AlertPreferencesContent() {
         .map(k => k.trim())
         .filter(k => k.length > 0);
 
+      const targetAgencies = targetAgenciesInput
+        .split(/[,]+/)
+        .map(a => a.trim())
+        .filter(a => a.length > 0);
+
       const res = await fetch('/api/alerts/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -213,6 +263,7 @@ function AlertPreferencesContent() {
           naicsCodes,
           keywords,
           businessType: businessType || null,
+          targetAgencies,
           locationState: locationStates[0] || locationState || null, // Primary state for legacy
           locationStates: locationStates.length > 0 ? locationStates : (locationState ? [locationState] : []),
           frequency: frequency,
@@ -325,6 +376,14 @@ function AlertPreferencesContent() {
               >
                 {loading ? 'Loading...' : 'Look Up My Settings'}
               </button>
+              <button
+                type="button"
+                onClick={handleSendSecureLink}
+                disabled={sendingLink}
+                className="w-full border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 font-semibold py-3 px-6 rounded-lg transition-all disabled:opacity-50"
+              >
+                {sendingLink ? 'Sending secure link...' : 'Email Me a Secure Link'}
+              </button>
             </form>
           </div>
         )}
@@ -363,7 +422,12 @@ function AlertPreferencesContent() {
                   <p className="text-white font-medium">{settings.email}</p>
                 </div>
                 <button
-                  onClick={() => { setSettings(null); setEmail(''); setNotFound(false); }}
+                  onClick={() => {
+                    localStorage.removeItem('preferences_access_email');
+                    setSettings(null);
+                    setEmail('');
+                    setNotFound(false);
+                  }}
                   className="text-slate-400 hover:text-white text-sm"
                 >
                   Change
@@ -658,13 +722,62 @@ function AlertPreferencesContent() {
                   </select>
                 </div>
 
+                <div className="mb-5">
+                  <label htmlFor="targetAgencies" className="block text-sm font-medium text-slate-300 mb-1">
+                    Target Agencies
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    These are used directly by the briefing engine to prioritize agencies you care about most.
+                  </p>
+                  <textarea
+                    id="targetAgencies"
+                    value={targetAgenciesInput}
+                    onChange={(e) => setTargetAgenciesInput(e.target.value)}
+                    rows={2}
+                    placeholder="DHS, VA, Army Corps of Engineers, GSA"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {['DHS', 'VA', 'GSA', 'DoD', 'Army Corps', 'HHS', 'DOE', 'NASA'].map((agency) => {
+                      const currentAgencies = targetAgenciesInput
+                        .split(/[,]+/)
+                        .map(a => a.trim())
+                        .filter(Boolean);
+                      const isSelected = currentAgencies.some(a => a.toLowerCase() === agency.toLowerCase());
+
+                      return (
+                        <button
+                          key={agency}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setTargetAgenciesInput(
+                                currentAgencies.filter(a => a.toLowerCase() !== agency.toLowerCase()).join(', ')
+                              );
+                            } else {
+                              setTargetAgenciesInput([...currentAgencies, agency].join(', '));
+                            }
+                          }}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                            isSelected
+                              ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+                          }`}
+                        >
+                          {agency}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Location States - Multi-Select with Smart Expansion */}
                 <div className="mb-5">
                   <label className="block text-sm font-medium text-slate-300 mb-1">
                     📍 Place of Performance
                   </label>
                   <p className="text-xs text-slate-500 mb-2">
-                    Select multiple states. We auto-expand to include bordering states + DC.
+                    Select multiple states. These filters now flow into the opportunity snapshot pipeline used for briefing relevance. We also auto-expand to include bordering states + DC.
                   </p>
 
                   {/* Selected states chips */}

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
-import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
 /**
@@ -72,11 +71,12 @@ function getExpectedAccess(tier?: string, bundle?: string): { kvKeys: string[]; 
     supabaseFlags.access_contractor_db = true;
     supabaseFlags.access_briefings = true;
   } else if (bundle === 'pro' || bundle === 'pro-giant-bundle') {
-    kvKeys.push('ma:standard', 'contentgen', 'recompete', 'database');
+    kvKeys.push('ma:standard', 'contentgen', 'recompete', 'database', 'briefings');
     supabaseFlags.access_assassin_standard = true;
     supabaseFlags.access_content_standard = true;
     supabaseFlags.access_recompete = true;
     supabaseFlags.access_contractor_db = true;
+    supabaseFlags.access_briefings = true;
   } else if (bundle === 'starter' || bundle === 'govcon-starter-bundle') {
     kvKeys.push('ospro', 'recompete', 'database');
     supabaseFlags.access_hunter_pro = true;
@@ -112,6 +112,15 @@ function getExpectedAccess(tier?: string, bundle?: string): { kvKeys: string[]; 
   if (tier === 'contractor_db') {
     kvKeys.push('database');
     supabaseFlags.access_contractor_db = true;
+  }
+  if (tier === 'briefings' || tier === 'briefings_monthly' || tier === 'briefings_annual' || tier === 'briefings_lifetime') {
+    kvKeys.push('briefings');
+    supabaseFlags.access_briefings = true;
+  }
+  if (tier === 'fhc_membership') {
+    kvKeys.push('briefings');
+    supabaseFlags.access_assassin_standard = true;
+    supabaseFlags.access_briefings = true;
   }
 
   return { kvKeys, supabaseFlags };
@@ -378,6 +387,8 @@ export async function POST(request: NextRequest) {
                   await grantRecompeteAccess(email, name);
                 } else if (expectedKey === 'database') {
                   await createDatabaseToken(email, name);
+                } else if (expectedKey === 'briefings') {
+                  await kv.set(`briefings:${email}`, 'true');
                 }
                 fixes.push({ email, action, status: 'success' });
               } catch (err) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 
 // Top 30 most common NAICS codes in federal contracting
@@ -112,6 +112,12 @@ export default function StartPage() {
   const [error, setError] = useState('');
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loadingOpps, setLoadingOpps] = useState(false);
+
+  const rememberPreferencesEmail = () => {
+    if (email.trim()) {
+      localStorage.setItem('preferences_access_email', email.trim().toLowerCase());
+    }
+  };
 
   // Filter NAICS codes based on search
   const filteredNaics = POPULAR_NAICS.filter(n =>
@@ -308,7 +314,8 @@ export default function StartPage() {
           {/* Next steps */}
           <div className="text-center space-y-3">
             <Link
-              href={`/alerts/preferences?email=${encodeURIComponent(email)}`}
+              href="/alerts/preferences"
+              onClick={rememberPreferencesEmail}
               className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

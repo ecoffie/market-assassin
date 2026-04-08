@@ -6,7 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { hasBriefingsAccess } from '@/lib/briefings/access';
 
 export async function POST(request: Request) {
   try {
@@ -16,8 +16,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ hasAccess: false }, { status: 400 });
     }
 
-    const hasAccess = await kv.get(`briefings:${email.toLowerCase().trim()}`);
-    return NextResponse.json({ hasAccess: !!hasAccess });
+    const hasAccess = await hasBriefingsAccess(email);
+    return NextResponse.json({ hasAccess });
   } catch {
     return NextResponse.json({ hasAccess: false }, { status: 500 });
   }

@@ -183,68 +183,34 @@ export default function Home() {
               </span>
             </Link>
 
-            {/* Daily Briefings */}
+            {/* Market Intelligence */}
             <Link
-              href="/briefings"
+              href="/market-intelligence"
               className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-cyan-500 hover:shadow-xl"
             >
               <div className="text-4xl mb-4">&#128232;</div>
               <h3 className="text-xl font-bold text-white mb-3">
-                Daily Briefings
+                Market Intelligence
               </h3>
               <p className="text-slate-400 text-sm mb-5 leading-relaxed">
-                Personalized daily intelligence delivered to your inbox. Contract opportunities, agency news, recompetes, and budget updates — all tailored to your NAICS and agencies.
+                Access your personalized intelligence workspace with daily briefs, weekly deep dives, and pursuit briefs tailored to your market.
               </p>
               <ul className="text-slate-400 text-sm space-y-2 mb-6">
                 <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> AI-powered daily briefings
+                  <span className="text-green-500">✓</span> Daily, weekly, and pursuit briefings
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Email + SMS delivery
+                  <span className="text-green-500">✓</span> Verify access with your purchase email
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Web dashboard + API access
+                  <span className="text-green-500">✓</span> Monthly and annual direct checkout
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span> Lindy / Zapier integration
+                  <span className="text-green-500">✓</span> Built around your NAICS, agency, and geography profile
                 </li>
               </ul>
               <span className="text-cyan-400 font-semibold text-sm group-hover:text-cyan-300 transition-colors">
-                View Briefings →
-              </span>
-            </Link>
-
-            {/* DSBS Profile Scorer */}
-            <Link
-              href="/dsbs-scorer"
-              className="group bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-cyan-500 hover:shadow-xl"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="text-4xl">&#128202;</div>
-                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-bold rounded-full border border-green-500/30">FREE</span>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                DSBS Profile Scorer
-              </h3>
-              <p className="text-slate-400 text-sm mb-5 leading-relaxed">
-                Rate your Dynamic Small Business Search profile in 2 minutes. Get a score, section breakdowns, and see how you compare to competitors in your NAICS.
-              </p>
-              <ul className="text-slate-400 text-sm space-y-2 mb-6">
-                <li className="flex items-center gap-2">
-                  <span className="text-green-500">&#10003;</span> 8-section profile assessment
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-500">&#10003;</span> NAICS competitor benchmarking
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-500">&#10003;</span> Actionable improvement recommendations
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-green-500">&#10003;</span> Instant results — no signup required
-                </li>
-              </ul>
-              <span className="text-cyan-400 font-semibold text-sm group-hover:text-cyan-300 transition-colors">
-                Score My Profile →
+                Open Market Intelligence →
               </span>
             </Link>
           </div>

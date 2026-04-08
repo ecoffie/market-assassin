@@ -77,13 +77,13 @@ export async function GET() {
       },
       meta: {
         data_freshness: 'Timestamps showing when each data source was last updated',
-        next_briefing_at: 'When the next daily briefing will be generated (9 AM UTC)',
+        next_briefing_at: 'When the next daily briefing will be generated (7 AM UTC)',
         api_version: 'API version string',
       },
     },
 
     polling_recommendations: {
-      frequency: 'Poll once daily after 9:00 AM UTC when briefings are generated',
+      frequency: 'Poll once daily after 7:00 AM UTC when briefings are generated',
       best_time: '9:30 AM UTC (allows briefing generation to complete)',
       rate_limit: 'No strict rate limit, but recommend max 10 requests per hour',
     },

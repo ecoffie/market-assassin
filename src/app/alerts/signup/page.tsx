@@ -22,6 +22,12 @@ export default function AlertSignupPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const rememberPreferencesEmail = () => {
+    if (email.trim()) {
+      localStorage.setItem('preferences_access_email', email.trim().toLowerCase());
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -161,7 +167,8 @@ export default function AlertSignupPage() {
                 Search opportunities now
               </Link>
               <Link
-                href={`/alerts/preferences?email=${encodeURIComponent(email)}`}
+                href="/alerts/preferences"
+                onClick={rememberPreferencesEmail}
                 className="text-slate-400 hover:text-white text-sm flex items-center justify-center gap-1 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

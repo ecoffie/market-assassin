@@ -224,7 +224,7 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 ### 7. Daily Briefings
 **Location:** `/src/lib/briefings/`
 **Purpose:** Personalized daily GovCon intel emails with win probability scoring
-**Features:** Smart profiles, engagement tracking, Lindy AI integration
+**Features:** Smart profiles, engagement tracking, Lindy AI integration, shared cohort rollout across Daily Brief + Weekly Deep Dive + Pursuit Brief
 
 ### 8. Daily Alerts System
 **Location:** `/src/app/api/cron/daily-alerts/`, `/src/app/alerts/`
@@ -254,8 +254,80 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 | Job | Times | Purpose |
 |-----|-------|---------|
 | daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | Timezone coverage |
-| send-briefings | 9 AM | Daily briefings |
+| send-briefings | 7 AM | Daily briefings |
 | weekly-alerts | 11 PM Sunday | Weekly digest |
+
+**Briefing rollout model:**
+- `beta_all` = full eligible briefing audience
+- `rollout` = controlled 250-user program cohort
+- default cohort settings: `stickyDays=14`, `cooldownDays=21`, `maxFallbackPercent=15`
+- rotation requires the full program experience twice:
+  - `daily brief` x2
+  - `weekly deep dive` x2
+  - `pursuit brief` x2
+- admin endpoint: `/api/admin/briefing-rollout`
+
+### 9. Forecast Intelligence System
+**Location:** `/src/app/forecasts/`, `/src/lib/forecasts/`
+**Purpose:** Aggregate procurement forecasts from 13 federal agencies (6-18 months before solicitation)
+**Status:** Phase 1-2 complete (April 6, 2026) — **7,764 forecasts**
+**Live URL:** https://tools.govcongiants.org/forecasts
+
+**Database Tables:**
+- `agency_forecasts` — Main forecast data (unified schema)
+- `forecast_sync_runs` — Track sync operations
+- `forecast_sources` — Agency source configurations
+
+**Current Data (April 6, 2026):**
+| Agency | Source | Records |
+|--------|--------|---------|
+| DOJ | justice.gov Excel | 3,140 |
+| DOI | GSA Acquisition Gateway CSV | 2,039 |
+| DOE | energy.gov Excel | 833 |
+| DHS | Puppeteer scraper | 683 |
+| NASA | nasa.gov Excel | 294 |
+| VA | GSA Acquisition Gateway CSV | 268 |
+| GSA | GSA Acquisition Gateway CSV | 164 |
+| NRC | GSA Acquisition Gateway CSV | 79 |
+| DOT | GSA Acquisition Gateway CSV | 68 |
+| SSA | Excel (SBF Report) | 60 |
+| NSF | PDF (Acquisition Forecast) | 56 |
+| DOL | GSA Acquisition Gateway CSV | 47 |
+| **Total** | | **7,764** |
+
+**Phase 3-4 Sources (Puppeteer, pending):**
+| Agency | Source | Est. Coverage |
+|--------|--------|---------------|
+| HHS | procurementforecast.hhs.gov | $12B |
+| Treasury | osdbu.forecast.treasury.gov | $2B |
+| EPA | ordspub.epa.gov | $1.5B |
+| USDA | forecast.edc.usda.gov | $4B |
+| DOD | Multi-source | $40B |
+
+**Key Files:**
+| File | Purpose |
+|------|---------|
+| `src/app/forecasts/page.tsx` | Search UI with filters |
+| `src/app/api/forecasts/route.ts` | API endpoint |
+| `src/lib/forecasts/types.ts` | TypeScript types |
+| `src/lib/forecasts/scrapers/` | Puppeteer scrapers (DHS working, others pending) |
+| `scripts/import-forecasts.js` | Excel import script (DOE, NASA, DOJ) |
+| `scripts/import-gsa-forecasts.js` | GSA Acquisition Gateway CSV import |
+| `scripts/import-nsf-forecasts.js` | NSF PDF data import (hardcoded from PDF) |
+| `scripts/import-ssa-forecasts.js` | SSA Excel (.xlsm) import |
+| `supabase/migrations/20260405_forecast_intelligence.sql` | Schema |
+
+**Import Commands:**
+```bash
+# Preview (no database writes)
+node scripts/import-forecasts.js --dry-run
+
+# Import all Phase 1 sources
+node scripts/import-forecasts.js
+
+# Import specific source
+node scripts/import-forecasts.js --source=DOE
+```
 
 ---
 

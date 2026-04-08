@@ -8,7 +8,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
 import { RecompeteContract, fetchExpiringContractsFromLocal, fetchExpiringContracts } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
@@ -16,6 +15,7 @@ import { WebSignal } from '../web-intel/types';
 import { enrichContractsWithIntel, ContractIntelligence } from '../enrichment';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 import { fetchMultisiteForUser, MultisiteOpportunity, ScoredMultisiteOpportunity } from '../pipelines/multisite';
+import { extractAndParseJSON, generateBriefingJson } from './llm-router';
 
 // Types for AI-generated briefings
 export interface AIBriefingOpportunity {
@@ -166,11 +166,6 @@ export async function generateAIBriefing(
 
   if (!supabase) {
     throw new Error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-  }
-
-  const anthropic = getAnthropicClient();
-  if (!anthropic) {
-    throw new Error('Anthropic not configured - missing ANTHROPIC_API_KEY');
   }
 
   const briefingDate = new Date().toISOString().split('T')[0];
@@ -328,21 +323,12 @@ export async function generateAIBriefing(
     // Step 5: Call Claude for synthesis
     console.log(`[AIBriefingGen] Generating AI briefing for ${userEmail}...`);
 
-    const message = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
-      max_tokens: 4000,
-      messages: [
-        {
-          role: 'user',
-          content: `${SYSTEM_PROMPT}\n\n${userPrompt}\n\nRespond with valid JSON only.`,
-        },
-      ],
-    });
-
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : null;
-    if (!responseText) {
-      throw new Error('Empty response from Claude API - no text content returned');
-    }
+    const { text: responseText, provider, model } = await generateBriefingJson(
+      'daily',
+      SYSTEM_PROMPT,
+      userPrompt,
+      4000
+    );
 
     // Step 5: Parse and validate response (with robust JSON extraction)
     const aiResponse = extractAndParseJSON<{
@@ -371,7 +357,7 @@ export async function generateAIBriefing(
     };
 
     console.log(
-      `[AIBriefingGen] Generated briefing: ${briefing.opportunities.length} opportunities, ${briefing.teamingPlays.length} plays in ${briefing.processingTimeMs}ms`
+      `[AIBriefingGen] Generated briefing via ${provider}/${model}: ${briefing.opportunities.length} opportunities, ${briefing.teamingPlays.length} plays in ${briefing.processingTimeMs}ms`
     );
 
     return briefing;
@@ -577,90 +563,4 @@ function getSupabaseClient() {
 
   if (!url || !key) return null;
   return createClient(url, key);
-}
-
-/**
- * Get Anthropic client
- */
-function getAnthropicClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  return new Anthropic({ apiKey });
-}
-
-/**
- * Robust JSON extraction and parsing from AI response
- * Handles: markdown code blocks, control characters, truncated responses
- */
-function extractAndParseJSON<T>(responseText: string): T {
-  let jsonStr = responseText.trim();
-
-  // Step 1: Extract JSON from markdown code blocks if present
-  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    jsonStr = codeBlockMatch[1].trim();
-  }
-
-  // Step 2: Find JSON object boundaries (first { to last })
-  const firstBrace = jsonStr.indexOf('{');
-  const lastBrace = jsonStr.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
-  }
-
-  // Step 3: Sanitize control characters that break JSON.parse
-  // Remove control characters except \n, \r, \t (which are valid in JSON strings)
-  jsonStr = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
-
-  // Step 4: Replace ALL literal newlines with escaped newlines
-  // This handles the case where Claude outputs actual newlines in JSON strings
-  // First, normalize line endings
-  jsonStr = jsonStr.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  // Step 5: Replace newlines that appear inside string values with spaces
-  // Use a state machine approach to track whether we're inside a string
-  let result = '';
-  let inString = false;
-  let prevChar = '';
-
-  for (let i = 0; i < jsonStr.length; i++) {
-    const char = jsonStr[i];
-
-    // Track string boundaries (accounting for escaped quotes)
-    if (char === '"' && prevChar !== '\\') {
-      inString = !inString;
-    }
-
-    // Replace newlines inside strings with spaces
-    if (char === '\n' && inString) {
-      result += ' ';
-    } else {
-      result += char;
-    }
-
-    // Track previous character (handle double backslash)
-    prevChar = (char === '\\' && prevChar === '\\') ? '' : char;
-  }
-
-  jsonStr = result;
-
-  // Step 6: Try to parse
-  try {
-    return JSON.parse(jsonStr) as T;
-  } catch (firstError) {
-    // Step 7: Aggressive fallback - remove all newlines and extra whitespace
-    const sanitized = jsonStr
-      .replace(/\n/g, ' ')
-      .replace(/\s+/g, ' ');
-
-    try {
-      return JSON.parse(sanitized) as T;
-    } catch (secondError) {
-      // Log both errors for debugging
-      console.error('[extractAndParseJSON] First parse attempt failed:', firstError);
-      console.error('[extractAndParseJSON] Second parse attempt failed:', secondError);
-      console.error('[extractAndParseJSON] Original response (first 500 chars):', responseText.slice(0, 500));
-      throw new Error(`Failed to parse AI response as JSON: ${firstError instanceof Error ? firstError.message : String(firstError)}`);
-    }
-  }
 }

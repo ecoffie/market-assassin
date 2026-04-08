@@ -142,7 +142,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder:text-gray-400"
                   placeholder="you@example.com"
                   disabled={isLoading}
                 />
@@ -157,7 +157,7 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder:text-gray-400"
                   placeholder="••••••••"
                   disabled={isLoading}
                 />
@@ -173,7 +173,7 @@ export default function LoginPage() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all bg-white text-gray-900 placeholder:text-gray-400"
                     placeholder="••••••••"
                     disabled={isLoading}
                   />
@@ -190,7 +190,7 @@ export default function LoginPage() {
                     type="text"
                     value={accessCode}
                     onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all font-mono tracking-wider"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all font-mono tracking-wider bg-white text-gray-900 placeholder:text-gray-400"
                     placeholder="Enter your access code"
                     disabled={isLoading}
                   />

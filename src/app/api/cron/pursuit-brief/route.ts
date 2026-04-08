@@ -5,7 +5,7 @@
  * This is the simplified version - no user action needed.
  * Later we can add on-demand selection.
  *
- * Schedule: 10 AM UTC daily (after daily briefings at 9 AM)
+ * Schedule: 10 AM UTC every Monday
  *
  * Process:
  * 1. Get all users with briefings_enabled=true and NAICS codes
@@ -16,11 +16,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
 import { sendEmail } from '@/lib/send-email';
+import {
+  recordBriefingProgramDelivery,
+  resolveBriefingAudience,
+} from '@/lib/briefings/delivery/rollout';
+import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
 
 const BATCH_SIZE = 5;
-const MAX_USERS_PER_RUN = 50;
 const BRAND_COLOR = '#1e3a8a';
 const ACCENT_COLOR = '#7c3aed';
 const SUCCESS_COLOR = '#10b981';
@@ -62,7 +65,7 @@ export async function GET(request: NextRequest) {
           test: 'GET ?email=xxx&test=true to send test pursuit brief',
           manual: 'Triggered by Vercel cron or CRON_SECRET',
         },
-        schedule: 'Every day at 10 AM UTC',
+        schedule: 'Every Monday at 10 AM UTC',
         features: [
           'FREE for all users (no paywall)',
           'Auto-selects TOP opportunity from recent alerts',
@@ -78,52 +81,28 @@ export async function GET(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
   const startTime = Date.now();
   let briefingsSent = 0;
   let briefingsFailed = 0;
   let briefingsSkipped = 0;
   const errors: string[] = [];
+  let activeCohortId: string | null = null;
+  let audienceMode = 'beta_all';
 
   console.log('[PursuitBrief] Starting auto pursuit brief delivery...');
 
   try {
-    // Get users from unified notification settings table
-    const allUsers: BriefingUser[] = [];
-
-    const { data: notificationSettings } = await supabase
-      .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies, timezone, briefings_enabled, is_active')
-      .eq('is_active', true)
-      .eq('briefings_enabled', true)
-      .limit(MAX_USERS_PER_RUN);
-
-    if (notificationSettings) {
-      for (const p of notificationSettings) {
-        const email = p.user_email?.toLowerCase();
-        if (!email) continue;
-
-        let naics: string[] = [];
-        let agencies: string[] = [];
-
-        if (Array.isArray(p.naics_codes) && p.naics_codes.length > 0) {
-          naics = p.naics_codes;
-        }
-        if (Array.isArray(p.agencies) && p.agencies.length > 0) {
-          agencies = p.agencies;
-        }
-
-        if (naics.length === 0) continue;
-
-        allUsers.push({
-          email,
-          naics_codes: naics,
-          agencies,
-          timezone: p.timezone,
-        });
-      }
-    }
+    const audienceResolution = await resolveBriefingAudience(supabase);
+    const allUsers: BriefingUser[] = audienceResolution.users
+      .filter(user => user.naics_codes.length > 0)
+      .map(user => ({
+        email: user.email,
+        naics_codes: user.naics_codes,
+        agencies: user.agencies,
+        timezone: user.timezone,
+      }));
+    activeCohortId = audienceResolution.activeCohort?.id || null;
+    audienceMode = audienceResolution.config.mode;
 
     // Filter to test email if specified
     let usersToProcess = allUsers;
@@ -157,7 +136,6 @@ export async function GET(request: NextRequest) {
       for (const user of batch) {
         try {
           // Get user's most recent alert with opportunities
-          const today = new Date().toISOString().split('T')[0];
           const { data: recentAlert } = await supabase
             .from('alert_log')
             .select('opportunities_data')
@@ -173,17 +151,23 @@ export async function GET(request: NextRequest) {
             continue;
           }
 
-          // Check if we already sent a pursuit brief today
+          // Check if we already sent a pursuit brief this week
+          const startOfWeek = new Date();
+          const day = startOfWeek.getUTCDay();
+          const diffToMonday = day === 0 ? -6 : 1 - day;
+          startOfWeek.setUTCDate(startOfWeek.getUTCDate() + diffToMonday);
+          startOfWeek.setUTCHours(0, 0, 0, 0);
+
           const { data: existingBrief } = await supabase
             .from('pursuit_brief_log')
             .select('id')
             .eq('user_email', user.email)
-            .gte('created_at', today + 'T00:00:00Z')
+            .gte('created_at', startOfWeek.toISOString())
             .limit(1)
             .single();
 
           if (existingBrief) {
-            console.log(`[PursuitBrief] Already sent today for ${user.email}`);
+            console.log(`[PursuitBrief] Already sent this week for ${user.email}`);
             briefingsSkipped++;
             continue;
           }
@@ -206,7 +190,7 @@ export async function GET(request: NextRequest) {
           }
 
           // Generate Pursuit Brief with AI
-          const brief = await generatePursuitBrief(anthropic, topOpp, {
+          const brief = await generatePursuitBrief(topOpp, {
             naics: user.naics_codes,
             agencies: user.agencies,
           });
@@ -221,6 +205,9 @@ export async function GET(request: NextRequest) {
             html: emailHtml,
             text: emailText,
           });
+          if (!isTest) {
+            await recordBriefingProgramDelivery(activeCohortId, user.email, 'pursuit_brief');
+          }
 
           // Log the pursuit brief
           await supabase.from('pursuit_brief_log').insert({
@@ -254,6 +241,8 @@ export async function GET(request: NextRequest) {
       briefingsSkipped,
       briefingsFailed,
       totalUsers: usersToProcess.length,
+      audienceMode,
+      activeCohortId,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       elapsed,
     });
@@ -270,7 +259,6 @@ export async function GET(request: NextRequest) {
 }
 
 async function generatePursuitBrief(
-  anthropic: Anthropic,
   opportunity: Record<string, unknown>,
   userProfile: { naics: string[]; agencies: string[] }
 ): Promise<PursuitBrief> {
@@ -312,19 +300,30 @@ Be specific and actionable. This enables capture team decisions.
 
 Return ONLY valid JSON.`;
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 3000,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  const data = JSON.parse(jsonMatch?.[0] || '{}');
+  const { text, provider, model } = await generateBriefingJson(
+    'pursuit',
+    'You are a senior GovCon capture manager. Generate a 1-page Pursuit Brief for this opportunity.',
+    prompt,
+    3000
+  );
+  const data = extractAndParseJSON<{
+    contractName?: string;
+    agency?: string;
+    value?: string;
+    opportunityScore?: number;
+    whyWorthPursuing?: string;
+    workingHypothesis?: string;
+    priorityIntel?: string[];
+    outreachTargets?: { priority: number; name: string; role: string; company?: string; approach: string }[];
+    actionPlan?: { day: number; action: string; owner: string }[];
+    risks?: { risk: string; likelihood: string; impact: string; mitigation: string }[];
+    immediateNextMove?: { action: string; owner: string; deadline: string };
+  }>(text);
+  console.log(`[PursuitBriefCron] Generated via ${provider}/${model}`);
 
   return {
-    contractName: data.contractName || opportunity.title || 'Unknown Opportunity',
-    agency: data.agency || opportunity.agency || 'Unknown Agency',
+    contractName: data.contractName || String(opportunity.title || 'Unknown Opportunity'),
+    agency: data.agency || String(opportunity.agency || 'Unknown Agency'),
     value: data.value || 'TBD',
     opportunityScore: data.opportunityScore || 50,
     whyWorthPursuing: data.whyWorthPursuing || '',

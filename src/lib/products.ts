@@ -1,6 +1,22 @@
 // Product Configuration with Stripe Checkout URLs
 
 export const PRODUCTS = {
+  DAILY_BRIEFINGS: {
+    id: 'briefings',
+    name: 'Market Intelligence',
+    tiers: {
+      briefings: {
+        price: 49,
+        billing: 'monthly',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_CHECKOUT_URL || 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z',
+      },
+      briefings_annual: {
+        price: 497,
+        billing: 'annual',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_ANNUAL_CHECKOUT_URL || 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A',
+      },
+    },
+  },
   AI_CONTENT_GENERATOR: {
     id: 'ai-content-generator',
     name: 'Content Reaper',

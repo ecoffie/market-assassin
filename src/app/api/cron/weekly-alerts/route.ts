@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import nodemailer from 'nodemailer';
+import { createSecureAccessUrl } from '@/lib/access-links';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -109,6 +110,7 @@ interface AlertUser {
   alert_frequency: string;
   alerts_enabled: boolean;
   is_active: boolean;
+  total_alerts_sent?: number | null;
 }
 
 /**
@@ -250,17 +252,17 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
           .update({
             last_alert_sent: new Date().toISOString(),
             last_alert_count: topOpps.length,
-            total_alerts_sent: (user as any).total_alerts_sent + 1 || 1,
+            total_alerts_sent: (user.total_alerts_sent || 0) + 1,
           })
           .eq('user_email', user.user_email);
 
         console.log(`[Weekly Alerts] Sent ${topOpps.length} opportunities to ${user.user_email}`);
         results.sent++;
 
-      } catch (userError: any) {
+      } catch (userError: unknown) {
         console.error(`[Weekly Alerts] Error processing ${user.user_email}:`, userError);
         results.failed++;
-        results.errors.push(`${user.user_email}: ${userError.message}`);
+        results.errors.push(`${user.user_email}: ${userError instanceof Error ? userError.message : 'Unknown error'}`);
       }
     }
 
@@ -270,10 +272,10 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
       success: true,
       results,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Weekly Alerts] Error:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -384,8 +386,8 @@ async function sendAlertEmail(
   totalAvailable: number = 0
 ) {
   const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
-  const preferencesUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/alerts/preferences?email=${encodeURIComponent(email)}`;
-  const briefingsUpgradeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/briefings`;
+  const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
+  const briefingsUpgradeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org'}/market-intelligence`;
   const ohProUpgradeUrl = 'https://buy.stripe.com/7sIaGqevYeIcdri147'; // OH Pro payment link
 
   const showUpgradeToOHPro = tier === 'free' && totalAvailable > 5;
@@ -470,7 +472,7 @@ async function sendAlertEmail(
         competitor intel, and specific action steps. Every morning.
       </p>
       <a href="${briefingsUpgradeUrl}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        Upgrade to Daily Briefings - $19/mo
+        Upgrade to Market Intelligence - $49/mo
       </a>
     </div>
 

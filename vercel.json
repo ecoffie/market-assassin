@@ -42,6 +42,18 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/manage-briefing-rollout",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/check-briefing-health?email=true",
+      "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron/check-fms-health?email=true",
+      "schedule": "45 12 * * *"
+    },
+    {
       "path": "/api/cron/daily-alerts",
       "schedule": "0 11 * * *"
     },

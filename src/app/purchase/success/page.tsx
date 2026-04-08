@@ -1,36 +1,43 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const [productName, setProductName] = useState('your purchase');
-
-  useEffect(() => {
-    // Get product info from URL params (set by Stripe redirect)
-    const product = searchParams.get('product');
-    if (product) {
-      const productNames: Record<string, string> = {
-        'contractor-database': 'Contractor Database',
-        'recompete-contracts': 'Recompete Tracker',
-        'prime-lookup': 'Prime Lookup',
-        'ai-content-generator': 'Content Reaper',
-        'govcon-starter-bundle': 'GovCon Starter Bundle',
-        'pro-giant-bundle': 'Pro Giant Bundle',
-        'ultimate-govcon-bundle': 'Ultimate GovCon Bundle',
-        'opportunity-hunter-pro': 'Opportunity Hunter Pro',
-        'market-assassin-standard': 'Market Assassin Standard',
-        'market-assassin-premium': 'Market Assassin Premium',
-        'market-assassin-premium-upgrade': 'Market Assassin Premium Upgrade',
-        'content-engine': 'Content Reaper',
-        'full-fix': 'Content Reaper Full Fix',
-        'content-full-fix-upgrade': 'Content Reaper Full Fix Upgrade',
-      };
-      setProductName(productNames[product] || product);
-    }
-  }, [searchParams]);
+  const product = searchParams.get('product');
+  const productNames: Record<string, string> = {
+    'contractor-database': 'Contractor Database',
+    'recompete-contracts': 'Recompete Tracker',
+    'prime-lookup': 'Prime Lookup',
+    'ai-content-generator': 'Content Reaper',
+    'govcon-starter-bundle': 'GovCon Starter Bundle',
+    'pro-giant-bundle': 'Pro Giant Bundle',
+    'ultimate-govcon-bundle': 'Ultimate GovCon Bundle',
+    briefings: 'Market Intelligence',
+    briefings_monthly: 'Market Intelligence Monthly',
+    briefings_annual: 'Market Intelligence Annual',
+    briefings_lifetime: 'Market Intelligence Lifetime',
+    fhc_membership: 'Federal Help Center Membership',
+    'opportunity-hunter-pro': 'Opportunity Hunter Pro',
+    'market-assassin-standard': 'Market Assassin Standard',
+    'market-assassin-premium': 'Market Assassin Premium',
+    'market-assassin-premium-upgrade': 'Market Assassin Premium Upgrade',
+    'content-engine': 'Content Reaper',
+    'full-fix': 'Content Reaper Full Fix',
+    'content-full-fix-upgrade': 'Content Reaper Full Fix Upgrade',
+  };
+  const productName = product ? (productNames[product] || product) : 'your purchase';
+  const includesBriefings = product ? [
+    'pro-giant-bundle',
+    'ultimate-govcon-bundle',
+    'briefings',
+    'briefings_monthly',
+    'briefings_annual',
+    'briefings_lifetime',
+    'fhc_membership',
+  ].includes(product) : false;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -88,6 +95,14 @@ function SuccessContent() {
             >
               Access Your Tools
             </Link>
+            {includesBriefings && (
+              <Link
+                href="/briefings"
+                className="block w-full px-6 py-3 border border-blue-200 text-blue-700 font-semibold rounded-lg transition-colors text-center hover:bg-blue-50"
+              >
+                Open Your Briefings
+              </Link>
+            )}
             <p className="text-sm text-gray-500">
               Need help? Contact us at{' '}
               <a href="mailto:support@govcongiants.com" className="text-blue-600 hover:underline">
@@ -101,6 +116,14 @@ function SuccessContent() {
         <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
           <h3 className="font-bold text-gray-900 mb-4">Quick Access</h3>
           <div className="grid grid-cols-2 gap-3">
+            {includesBriefings && (
+              <Link
+                href="/briefings"
+                className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
+              >
+                Daily Briefings
+              </Link>
+            )}
             <Link
               href="/contractor-database"
               className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"

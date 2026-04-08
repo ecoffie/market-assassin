@@ -13,8 +13,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
 import { sendEmail } from '@/lib/send-email';
+import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -68,8 +68,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
     // Get user's profile for context
     const { data: userSettings } = await supabase
       .from('user_notification_settings')
@@ -84,7 +82,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Pursuit Brief] Generating for ${email}, notice ${noticeId}...`);
 
     // Generate the pursuit brief
-    const brief = await generatePursuitBrief(anthropic, opportunityData, {
+    const brief = await generatePursuitBrief(opportunityData, {
       naics: userNaics,
       agencies: userAgencies,
       keywords: userKeywords,
@@ -168,7 +166,6 @@ export async function POST(request: NextRequest) {
 }
 
 async function generatePursuitBrief(
-  anthropic: Anthropic,
   opportunity: Record<string, unknown>,
   userProfile: { naics: string[]; agencies: string[]; keywords: string[] }
 ): Promise<PursuitBrief> {
@@ -211,23 +208,34 @@ Be specific and actionable. This enables capture team decisions.
 
 Return ONLY valid JSON.`;
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 3000,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  const data = JSON.parse(jsonMatch?.[0] || '{}');
+  const { text, provider, model } = await generateBriefingJson(
+    'pursuit',
+    'You are a senior GovCon capture manager. Generate a 1-page Pursuit Brief for this opportunity.',
+    prompt,
+    3000
+  );
+  const data = extractAndParseJSON<{
+    contractName?: string;
+    agency?: string;
+    value?: string;
+    opportunityScore?: number;
+    whyWorthPursuing?: string;
+    workingHypothesis?: string;
+    priorityIntel?: string[];
+    outreachTargets?: { priority: number; name: string; role: string; company?: string; approach: string }[];
+    actionPlan?: { day: number; action: string; owner: string }[];
+    risks?: { risk: string; likelihood: string; impact: string; mitigation: string }[];
+    immediateNextMove?: { action: string; owner: string; deadline: string };
+  }>(text);
+  console.log(`[PursuitBriefOpportunity] Generated via ${provider}/${model}`);
 
   // Extract value from opportunity if AI didn't provide it
   const oppValue = opportunity.estimatedValue || opportunity.estimated_value || opportunity.value || 0;
   const formattedValue = formatValue(Number(oppValue));
 
   return {
-    contractName: data.contractName || opportunity.title || 'Unknown Opportunity',
-    agency: data.agency || opportunity.department || opportunity.agency || 'Unknown Agency',
+    contractName: data.contractName || String(opportunity.title || 'Unknown Opportunity'),
+    agency: data.agency || String(opportunity.department || opportunity.agency || 'Unknown Agency'),
     value: data.value || formattedValue,
     opportunityScore: data.opportunityScore || 50,
     whyWorthPursuing: data.whyWorthPursuing || '',

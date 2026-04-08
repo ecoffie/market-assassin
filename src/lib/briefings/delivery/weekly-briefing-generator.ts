@@ -8,12 +8,12 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
 import { RecompeteContract, fetchExpiringContractsFromLocal, fetchExpiringContracts } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
 import { WebSignal } from '../web-intel/types';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
+import { extractAndParseJSON, generateBriefingJson } from './llm-router';
 
 export interface WeeklyOpportunityAnalysis {
   rank: number;
@@ -203,11 +203,6 @@ export async function generateWeeklyBriefing(
     throw new Error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  const anthropic = getAnthropicClient();
-  if (!anthropic) {
-    throw new Error('Anthropic not configured - missing ANTHROPIC_API_KEY');
-  }
-
   // Get Monday of current week
   const today = new Date();
   const monday = new Date(today);
@@ -301,36 +296,18 @@ export async function generateWeeklyBriefing(
 
     console.log(`[WeeklyBriefing] Generating for ${userEmail}...`);
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 6000,
-      messages: [
-        {
-          role: 'user',
-          content: `${SYSTEM_PROMPT}\n\n${userPrompt}\n\nRespond with valid JSON only.`,
-        },
-      ],
-    });
-
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : null;
-    if (!responseText) {
-      console.error('[WeeklyBriefing] Empty response from Claude');
-      return null;
-    }
-
-    // Strip markdown code fences if present
-    let jsonText = responseText.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.slice(7);
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.slice(3);
-    }
-    if (jsonText.endsWith('```')) {
-      jsonText = jsonText.slice(0, -3);
-    }
-    jsonText = jsonText.trim();
-
-    const aiResponse = JSON.parse(jsonText);
+    const { text: responseText, provider, model } = await generateBriefingJson(
+      'weekly',
+      SYSTEM_PROMPT,
+      userPrompt,
+      6000
+    );
+    const aiResponse = extractAndParseJSON<{
+      opportunities?: WeeklyOpportunityAnalysis[];
+      teamingPlays?: WeeklyTeamingPlay[];
+      marketSignals?: WeeklyMarketSignal[];
+      calendar?: WeeklyCalendarItem[];
+    }>(responseText);
 
     const maxOpps = options.maxOpportunities || 10;
     const maxPlays = options.maxTeamingPlays || 3;
@@ -354,7 +331,7 @@ export async function generateWeeklyBriefing(
     };
 
     console.log(
-      `[WeeklyBriefing] Generated: ${briefing.opportunities.length} opps, ${briefing.teamingPlays.length} plays in ${briefing.processingTimeMs}ms`
+      `[WeeklyBriefing] Generated via ${provider}/${model}: ${briefing.opportunities.length} opps, ${briefing.teamingPlays.length} plays in ${briefing.processingTimeMs}ms`
     );
 
     return briefing;
@@ -485,10 +462,4 @@ function getSupabaseClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key);
-}
-
-function getAnthropicClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  return new Anthropic({ apiKey });
 }

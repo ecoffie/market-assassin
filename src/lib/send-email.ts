@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { createSecureAccessUrl } from '@/lib/access-links';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.office365.com',
@@ -71,6 +72,7 @@ export async function sendDatabaseAccessEmail({
   customerName,
   accessLink,
 }: SendDatabaseAccessEmailParams): Promise<boolean> {
+  const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -123,7 +125,7 @@ export async function sendDatabaseAccessEmail({
       <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
       <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
       <div style="text-align: center;">
-        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+        <a href="${dailyAlertsLink}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
       </div>
     </div>
 
@@ -189,6 +191,7 @@ export async function sendAccessCodeEmail({
   accessCode,
   accessLink,
 }: SendAccessCodeEmailParams): Promise<boolean> {
+  const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -258,7 +261,7 @@ export async function sendAccessCodeEmail({
       <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
       <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
       <div style="text-align: center;">
-        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+        <a href="${dailyAlertsLink}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
       </div>
     </div>
 
@@ -299,6 +302,7 @@ export async function sendOpportunityHunterProEmail({
   customerName,
 }: SendOpportunityHunterProEmailParams): Promise<boolean> {
   const accessLink = 'https://tools.govcongiants.org/opportunity-hunter';
+  const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -354,7 +358,7 @@ export async function sendOpportunityHunterProEmail({
       <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
       <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
       <div style="text-align: center;">
-        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+        <a href="${dailyAlertsLink}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
       </div>
     </div>
 
@@ -671,6 +675,7 @@ export async function sendContentReaperEmail({
 }: SendContentReaperEmailParams): Promise<boolean> {
   const accessLink = 'https://tools.govcongiants.org/content-generator';
   const isFullFix = tier === 'full_fix';
+  const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -728,7 +733,7 @@ export async function sendContentReaperEmail({
       <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
       <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
       <div style="text-align: center;">
-        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+        <a href="${dailyAlertsLink}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
       </div>
     </div>
 
@@ -799,6 +804,7 @@ export async function sendRecompeteEmail({
   customerName,
 }: SendRecompeteEmailParams): Promise<boolean> {
   const accessLink = 'https://tools.govcongiants.org/recompete';
+  const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -856,7 +862,7 @@ export async function sendRecompeteEmail({
       <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
       <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
       <div style="text-align: center;">
-        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+        <a href="${dailyAlertsLink}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
       </div>
     </div>
 
@@ -930,6 +936,7 @@ export async function sendBundleEmail({
   bundle,
 }: SendBundleEmailParams): Promise<boolean> {
   const activateUrl = 'https://shop.govcongiants.org/activate';
+  const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   // Define what's in each bundle
   const bundleContents: Record<string, { name: string; tools: { name: string; link: string; description: string }[] }> = {
@@ -1055,7 +1062,7 @@ export async function sendBundleEmail({
       <p style="color: #15803d; margin: 0 0 15px 0; text-align: center;">As a GovCon Giants customer, you're automatically enrolled in our <strong>FREE Daily Alerts</strong> beta!</p>
       <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">Get personalized federal contract opportunities delivered to your inbox every day. Set up your NAICS codes to receive opportunities matched to YOUR business:</p>
       <div style="text-align: center;">
-        <a href="https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
+        <a href="${dailyAlertsLink}" style="display: inline-block; background: #22c55e; color: white !important; text-decoration: none; padding: 14px 35px; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Daily Alerts</a>
       </div>
     </div>
 
@@ -1246,7 +1253,7 @@ export async function sendAlertProWelcomeEmail({
   to,
   customerName,
 }: SendAlertProWelcomeEmailParams): Promise<boolean> {
-  const preferencesLink = `https://tools.govcongiants.org/alerts/preferences?email=${encodeURIComponent(to)}`;
+  const preferencesLink = await createSecureAccessUrl(to, 'preferences');
   const maLink = 'https://tools.govcongiants.org/market-assassin';
 
   const htmlContent = `

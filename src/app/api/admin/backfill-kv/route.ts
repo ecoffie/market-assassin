@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import {
   createDatabaseToken,
+  grantBriefingAccess,
   grantOpportunityHunterProAccess,
   grantMarketAssassinAccess,
   grantContentGeneratorAccess,
@@ -45,6 +46,10 @@ async function grantByTier(tier: string, email: string, name?: string): Promise<
     await createDatabaseToken(email, name);
     grants.push('database');
   }
+  if (tier === 'briefings' || tier === 'briefings_monthly' || tier === 'briefings_annual' || tier === 'briefings_lifetime' || tier === 'fhc_membership') {
+    await grantBriefingAccess(email);
+    grants.push('briefings');
+  }
 
   return grants;
 }
@@ -63,13 +68,15 @@ async function grantByBundle(bundle: string, email: string, name?: string): Prom
     await grantRecompeteAccess(email, name);
     await grantMarketAssassinAccess(email, 'standard', name);
     await grantContentGeneratorAccess(email, 'content-engine', name);
-    grants.push('database', 'recompete', 'ma:standard', 'contentgen');
+    await grantBriefingAccess(email);
+    grants.push('database', 'recompete', 'ma:standard', 'contentgen', 'briefings');
   } else if (bundle === 'ultimate' || bundle === 'ultimate-govcon-bundle' || bundle === 'complete') {
     await grantContentGeneratorAccess(email, 'full-fix', name);
     await createDatabaseToken(email, name);
     await grantRecompeteAccess(email, name);
     await grantMarketAssassinAccess(email, 'premium', name);
-    grants.push('contentgen:full-fix', 'database', 'recompete', 'ma:premium');
+    await grantBriefingAccess(email);
+    grants.push('contentgen:full-fix', 'database', 'recompete', 'ma:premium', 'briefings');
   }
 
   return grants;

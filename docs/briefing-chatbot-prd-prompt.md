@@ -20,7 +20,7 @@ We already have a Daily Briefings system that:
 1. **Captures user searches** across tools → stored in `user_search_history` (tool, search_type, search_value, metadata)
 2. **Aggregates into a watchlist** → `user_notification_settings` with: naics_codes, agencies, zip_codes, keywords, watched_companies, watched_contracts (with frequency weights)
 3. **Generates personalized briefings** daily → opportunities, recompetes, contract awards, contractor changes, web intelligence — all filtered by their profile
-4. **Delivers via email** (and optionally SMS) — cron at 9 AM UTC
+4. **Delivers via email** (and optionally SMS) — cron at 7 AM UTC
 5. **Logs each briefing** → `briefing_log` stores `briefing_content` (JSONB), `briefing_html`, `briefing_sms` — designed for chatbot context
 
 ### User Engagement Model

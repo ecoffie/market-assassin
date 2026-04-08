@@ -13,6 +13,7 @@ import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-templ
 import { sendEmail } from '@/lib/send-email';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const hasAnthropicBriefingKey = () => !!(process.env.BRIEFING_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -32,14 +33,14 @@ export async function GET(request: NextRequest) {
     console.log(`[TestAIBriefing] Generating AI briefing for ${email}...`);
 
     // Check environment variables
-    const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+    const hasAnthropicKey = hasAnthropicBriefingKey();
     const hasSamKey = !!process.env.SAM_API_KEY;
     const hasSupabase = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!hasAnthropicKey) {
       return NextResponse.json({
         success: false,
-        error: 'ANTHROPIC_API_KEY not configured',
+        error: 'BRIEFING_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY not configured',
         envCheck: { hasAnthropicKey, hasSamKey, hasSupabase },
       });
     }

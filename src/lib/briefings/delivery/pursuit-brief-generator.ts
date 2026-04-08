@@ -8,10 +8,10 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
 import { RecompeteContract, fetchExpiringContractsFromLocal } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
+import { extractAndParseJSON, generateBriefingJson } from './llm-router';
 
 export interface PursuitOutreachTarget {
   priority: number;
@@ -179,11 +179,6 @@ export async function generatePursuitBrief(
     throw new Error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  const anthropic = getAnthropicClient();
-  if (!anthropic) {
-    throw new Error('Anthropic not configured - missing ANTHROPIC_API_KEY');
-  }
-
   // Fallback NAICS codes
   const FALLBACK_NAICS = ['541512', '541611', '541330', '541990', '561210'];
 
@@ -216,36 +211,25 @@ export async function generatePursuitBrief(
 
     console.log(`[PursuitBrief] Generating for ${opportunity.contractName || opportunity.contractNumber}...`);
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      messages: [
-        {
-          role: 'user',
-          content: `${SYSTEM_PROMPT}\n\n${userPrompt}\n\nRespond with valid JSON only.`,
-        },
-      ],
-    });
-
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : null;
-    if (!responseText) {
-      console.error('[PursuitBrief] Empty response from Claude');
-      return null;
-    }
-
-    // Strip markdown code fences if present
-    let jsonText = responseText.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.slice(7);
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.slice(3);
-    }
-    if (jsonText.endsWith('```')) {
-      jsonText = jsonText.slice(0, -3);
-    }
-    jsonText = jsonText.trim();
-
-    const aiResponse = JSON.parse(jsonText);
+    const { text: responseText, provider, model } = await generateBriefingJson(
+      'pursuit',
+      SYSTEM_PROMPT,
+      userPrompt,
+      4000
+    );
+    const aiResponse = extractAndParseJSON<{
+      contractName?: string;
+      agency?: string;
+      value?: string;
+      opportunityScore?: number;
+      whyWorthPursuing?: string;
+      workingHypothesis?: string;
+      priorityIntel?: string[];
+      outreachTargets?: PursuitOutreachTarget[];
+      actionPlan?: PursuitActionItem[];
+      risks?: PursuitRisk[];
+      immediateNextMove?: { action: string; owner: string; deadline: string };
+    }>(responseText);
 
     const brief: PursuitBrief = {
       id: `pursuit-${userEmail}-${Date.now()}`,
@@ -274,7 +258,7 @@ export async function generatePursuitBrief(
     };
 
     console.log(
-      `[PursuitBrief] Generated: Score ${brief.opportunityScore}/100 in ${brief.processingTimeMs}ms`
+      `[PursuitBrief] Generated via ${provider}/${model}: Score ${brief.opportunityScore}/100 in ${brief.processingTimeMs}ms`
     );
 
     return brief;
@@ -346,10 +330,4 @@ function getSupabaseClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key);
-}
-
-function getAnthropicClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  return new Anthropic({ apiKey });
 }

@@ -1,4 +1,9 @@
 import { kv } from '@vercel/kv';
+import {
+  grantBriefingsAccess as grantBriefingsKvAccess,
+  hasBriefingsAccess as hasBriefingsAccessFromSources,
+  revokeBriefingsAccess as revokeBriefingsKvAccess,
+} from '@/lib/briefings/access';
 
 export interface AccessCode {
   code: string;
@@ -736,13 +741,12 @@ export async function getAllRecompeteAccess(): Promise<RecompeteAccess[]> {
 
 // Check if an email has briefing access
 export async function hasBriefingAccess(email: string): Promise<boolean> {
-  const access = await kv.get(`briefings:${email.toLowerCase()}`);
-  return !!access;
+  return hasBriefingsAccessFromSources(email);
 }
 
 // Grant briefing access to a customer and seed a briefing profile if none exists
 export async function grantBriefingAccess(email: string): Promise<void> {
-  await kv.set(`briefings:${email.toLowerCase()}`, 'true');
+  await grantBriefingsKvAccess(email);
   console.log(`✅ Briefing access granted to: ${email}`);
 
   // Seed a briefing profile so user gets briefings even before searching
@@ -785,8 +789,8 @@ export async function grantBriefingAccess(email: string): Promise<void> {
 
 // Revoke briefing access
 export async function revokeBriefingAccess(email: string): Promise<boolean> {
-  const deleted = await kv.del(`briefings:${email.toLowerCase()}`);
-  return deleted > 0;
+  await revokeBriefingsKvAccess(email);
+  return true;
 }
 
 // Revoke Recompete access

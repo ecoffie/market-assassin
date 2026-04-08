@@ -3,7 +3,7 @@
  *
  * Generates and sends daily briefings to ALL users (FREE FOR EVERYONE).
  * Pulls from unified user_notification_settings table.
- * Schedule: 9 AM UTC daily (after all data gathering completes)
+ * Schedule: 7 AM UTC daily (before most users wake up)
  *
  * Process:
  * 1. Get all users with briefings_enabled=true
@@ -15,6 +15,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateAIBriefing, AIGeneratedBriefing } from '@/lib/briefings/delivery/ai-briefing-generator';
 import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-template';
+import {
+  recordBriefingProgramDelivery,
+  resolveBriefingAudience,
+} from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
 import {
   IntelligenceMetrics,
@@ -24,28 +28,7 @@ import {
   postSendValidation,
 } from '@/lib/intelligence';
 
-const MAX_USERS_PER_RUN = 1000;
 const DELAY_BETWEEN_USERS_MS = 3000; // 3 second delay between users to avoid Claude API rate limits (50k tokens/min)
-
-// Timezone offsets for delivery timing
-const TIMEZONE_OFFSETS: Record<string, number> = {
-  'America/New_York': -5,
-  'America/Chicago': -6,
-  'America/Denver': -7,
-  'America/Los_Angeles': -8,
-  'America/Phoenix': -7,
-  'Pacific/Honolulu': -10,
-  'America/Anchorage': -9,
-};
-
-function isDeliveryTimeForTimezone(timezone: string | undefined): boolean {
-  const currentHourUTC = new Date().getUTCHours();
-  const tz = timezone || 'America/New_York';
-  const offset = TIMEZONE_OFFSETS[tz] || -5;
-  const localHour = (currentHourUTC + offset + 24) % 24;
-  // Allow delivery if local time is between 6 AM and 10 AM
-  return localHour >= 6 && localHour <= 10;
-}
 
 interface BriefingUser {
   email: string;
@@ -75,7 +58,7 @@ export async function GET(request: NextRequest) {
           test: 'GET ?email=xxx&test=true to send test briefing',
           manual: 'Triggered by Vercel cron or CRON_SECRET',
         },
-        schedule: 'Every day at 9 AM UTC',
+        schedule: 'Every day at 7 AM UTC',
         features: [
           'FREE for all users (no paywall)',
           'Pulls from both briefing_profile AND alert_settings',
@@ -96,6 +79,17 @@ export async function GET(request: NextRequest) {
   let briefingsFailed = 0;
   let briefingsSkipped = 0;
   const errors: string[] = [];
+  let audienceSummary: {
+    totalCandidates: number;
+    profileReadyCandidates: number;
+    fallbackCandidates: number;
+    selectedUsers: number;
+    selectedProfileReady: number;
+    selectedFallback: number;
+  } | null = null;
+  let rolloutMode = 'beta_all';
+  let activeCohortId: string | null = null;
+  let cohortProgress = null;
 
   // Initialize metrics and guardrails
   const metrics = new IntelligenceMetrics('briefings');
@@ -124,109 +118,17 @@ export async function GET(request: NextRequest) {
       console.log(`[SendBriefings] Retried ${retryResults.retried} failed briefings, ${retryResults.succeeded} succeeded`);
     }
 
-    // Step 1: Get users from BOTH tables (user_notification_settings AND user_alert_settings)
-    const allUsers: BriefingUser[] = [];
-    const seenEmails = new Set<string>();
+    const audienceResolution = await resolveBriefingAudience(supabase);
+    const allUsers: BriefingUser[] = audienceResolution.users;
+    audienceSummary = audienceResolution.audienceSummary;
+    rolloutMode = audienceResolution.config.mode;
+    activeCohortId = audienceResolution.activeCohort?.id || null;
+    cohortProgress = audienceResolution.cohortProgress;
 
-    // Source 1: user_notification_settings (original source)
-    // BETA MODE: Send to ALL active users regardless of briefings_enabled flag
-    // TODO: After April 27, 2026 beta ends, restore .eq('briefings_enabled', true) filter
-    const { data: notificationSettings } = await supabase
-      .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies, timezone, sms_enabled, phone_number, briefings_enabled, is_active, aggregated_profile')
-      .eq('is_active', true)
-      // .eq('briefings_enabled', true) // BETA: Commented out - all active users get briefings
-      .limit(MAX_USERS_PER_RUN);
-
-    if (notificationSettings) {
-      for (const p of notificationSettings) {
-        const email = p.user_email?.toLowerCase();
-        if (!email || seenEmails.has(email)) continue;
-        seenEmails.add(email);
-
-        // Extract NAICS from either JSONB or columns
-        const jsonb = p.aggregated_profile as Record<string, unknown> | null;
-        let naics: string[] = [];
-        let agencies: string[] = [];
-
-        if (jsonb && Array.isArray(jsonb.naics_codes)) {
-          naics = jsonb.naics_codes as string[];
-        }
-        if (Array.isArray(p.naics_codes) && p.naics_codes.length > 0) {
-          naics = [...new Set([...naics, ...p.naics_codes])];
-        }
-        if (jsonb && Array.isArray(jsonb.agencies)) {
-          agencies = jsonb.agencies as string[];
-        }
-        if (Array.isArray(p.agencies) && p.agencies.length > 0) {
-          agencies = [...new Set([...agencies, ...p.agencies])];
-        }
-
-        // FALLBACK: If user has no NAICS and no agencies, use popular default NAICS codes
-        if (naics.length === 0 && agencies.length === 0) {
-          naics = [
-            '541512', // Computer Systems Design
-            '541611', // Management Consulting
-            '541330', // Engineering Services
-            '541990', // Other Professional Services
-            '561210', // Facilities Support Services
-          ];
-          console.log(`[SendBriefings] Using fallback NAICS for ${email} (from notification_settings)`);
-        }
-
-        allUsers.push({
-          email,
-          naics_codes: naics,
-          agencies,
-          timezone: p.timezone,
-          sms_enabled: p.sms_enabled,
-          phone_number: p.phone_number,
-          source: 'briefing_profile',
-        });
-      }
-    }
-
-    // Source 2: smart_user_profiles (users from search history aggregation)
-    // This catches users who have used tools but not explicitly set preferences
-    const { data: smartProfiles } = await supabase
-      .from('smart_user_profiles')
-      .select('email, naics_codes, keywords, agencies, timezone')
-      .limit(MAX_USERS_PER_RUN);
-
-    if (smartProfiles) {
-      for (const p of smartProfiles) {
-        const email = p.email?.toLowerCase();
-        if (!email || seenEmails.has(email)) continue; // Skip if already added from notification_settings
-        seenEmails.add(email);
-
-        let naics: string[] = Array.isArray(p.naics_codes) ? p.naics_codes : [];
-        const agencies: string[] = Array.isArray(p.agencies) ? p.agencies : [];
-
-        // FALLBACK: If user has no NAICS and no agencies, use popular default NAICS codes
-        if (naics.length === 0 && agencies.length === 0) {
-          naics = [
-            '541512', // Computer Systems Design
-            '541611', // Management Consulting
-            '541330', // Engineering Services
-            '541990', // Other Professional Services
-            '561210', // Facilities Support Services
-          ];
-          console.log(`[SendBriefings] Using fallback NAICS for ${email} (from smart_profiles)`);
-        }
-
-        allUsers.push({
-          email,
-          naics_codes: naics,
-          agencies,
-          timezone: p.timezone || 'America/New_York',
-          sms_enabled: false,
-          phone_number: undefined,
-          source: 'alert_settings' as const, // Keep for type compat
-        });
-      }
-    }
-
-    console.log(`[SendBriefings] Found ${allUsers.length} total users (${notificationSettings?.length || 0} from notification_settings, ${smartProfiles?.length || 0} from smart_profiles, ${seenEmails.size - allUsers.length} duplicates removed)`);
+    console.log(
+      `[SendBriefings] Audience mode=${rolloutMode}, selected=${audienceSummary.selectedUsers}/${audienceSummary.totalCandidates}, ` +
+      `profile-ready=${audienceSummary.selectedProfileReady}, fallback=${audienceSummary.selectedFallback}, cohort=${activeCohortId || 'none'}`
+    );
 
     // Filter to test email if specified
     let usersToProcess = allUsers;
@@ -257,6 +159,7 @@ export async function GET(request: NextRequest) {
     // With 892 users @ 3s delay = ~45 minutes, fits within Vercel Pro function limits
     for (let i = 0; i < usersToProcess.length; i++) {
       const user = usersToProcess[i];
+      metrics.recordUserEligible();
 
       // Log progress every 10 users
       if (i % 10 === 0) {
@@ -269,6 +172,7 @@ export async function GET(request: NextRequest) {
         if (!guardrailCheck.continue) {
           console.log(`[SendBriefings] Guardrail blocked: ${guardrailCheck.reason}`);
           briefingsSkipped++;
+          metrics.recordUserSkipped();
           continue;
         }
 
@@ -287,6 +191,7 @@ export async function GET(request: NextRequest) {
         if (existingBriefing?.delivery_status === 'sent') {
           console.log(`[SendBriefings] ${user.email} already received briefing today, skipping`);
           briefingsSkipped++;
+          metrics.recordUserSkipped();
           continue;
         }
 
@@ -299,6 +204,7 @@ export async function GET(request: NextRequest) {
         if (!briefing || briefing.opportunities.length === 0) {
           console.log(`[SendBriefings] No opportunities for ${user.email}`);
           briefingsSkipped++;
+          metrics.recordUserSkipped();
           continue;
         }
 
@@ -326,6 +232,7 @@ export async function GET(request: NextRequest) {
 
           // Send email (sendEmail returns boolean or throws on error)
           try {
+            metrics.recordEmailAttempted();
             await sendEmail({
               to: user.email,
               subject: emailTemplate.subject,
@@ -339,6 +246,9 @@ export async function GET(request: NextRequest) {
             metrics.recordOpportunityMatched(totalItems);
             guardrail.recordSuccess();
             circuitBreaker.record(true);
+            if (!isTest) {
+              await recordBriefingProgramDelivery(activeCohortId, user.email, 'daily_brief');
+            }
             console.log(`[SendBriefings] ✅ AI Briefing sent to ${user.email} (${briefing.opportunities.length} opps, ${briefing.teamingPlays.length} plays)`);
 
             await supabase.from('briefing_log').update({
@@ -420,6 +330,10 @@ export async function GET(request: NextRequest) {
       briefingsSkipped,
       briefingsFailed,
       totalUsers: usersToProcess.length,
+      audienceMode: rolloutMode,
+      activeCohortId,
+      cohortProgress,
+      audienceSummary,
       retryResults,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       elapsed,

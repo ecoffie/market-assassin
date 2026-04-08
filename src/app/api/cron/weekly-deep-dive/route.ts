@@ -16,11 +16,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
 import { sendEmail } from '@/lib/send-email';
+import {
+  recordBriefingProgramDelivery,
+  resolveBriefingAudience,
+} from '@/lib/briefings/delivery/rollout';
+import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
 
 const BATCH_SIZE = 5;
-const MAX_USERS_PER_RUN = 100;
 const BRAND_COLOR = '#1e3a8a';
 const ACCENT_COLOR = '#7c3aed';
 const SUCCESS_COLOR = '#10b981';
@@ -133,52 +136,28 @@ export async function GET(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
   const startTime = Date.now();
   let briefingsSent = 0;
   let briefingsFailed = 0;
   let briefingsSkipped = 0;
   const errors: string[] = [];
+  let activeCohortId: string | null = null;
+  let audienceMode = 'beta_all';
 
   console.log('[WeeklyDeepDive] Starting weekly deep dive delivery...');
 
   try {
-    // Get users from unified notification settings table
-    const allUsers: BriefingUser[] = [];
-
-    const { data: notificationSettings } = await supabase
-      .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies, timezone, briefings_enabled, is_active')
-      .eq('is_active', true)
-      .eq('briefings_enabled', true)
-      .limit(MAX_USERS_PER_RUN);
-
-    if (notificationSettings) {
-      for (const p of notificationSettings) {
-        const email = p.user_email?.toLowerCase();
-        if (!email) continue;
-
-        let naics: string[] = [];
-        let agencies: string[] = [];
-
-        if (Array.isArray(p.naics_codes) && p.naics_codes.length > 0) {
-          naics = p.naics_codes;
-        }
-        if (Array.isArray(p.agencies) && p.agencies.length > 0) {
-          agencies = p.agencies;
-        }
-
-        if (naics.length === 0) continue;
-
-        allUsers.push({
-          email,
-          naics_codes: naics,
-          agencies,
-          timezone: p.timezone,
-        });
-      }
-    }
+    const audienceResolution = await resolveBriefingAudience(supabase);
+    const allUsers: BriefingUser[] = audienceResolution.users
+      .filter(user => user.naics_codes.length > 0)
+      .map(user => ({
+        email: user.email,
+        naics_codes: user.naics_codes,
+        agencies: user.agencies,
+        timezone: user.timezone,
+      }));
+    activeCohortId = audienceResolution.activeCohort?.id || null;
+    audienceMode = audienceResolution.config.mode;
 
     // Filter to test email if specified
     let usersToProcess = allUsers;
@@ -222,7 +201,7 @@ export async function GET(request: NextRequest) {
           }
 
           // Generate weekly deep dive with AI
-          const briefing = await generateWeeklyDeepDive(anthropic, contracts);
+          const briefing = await generateWeeklyDeepDive(contracts);
 
           // Send email
           await sendEmail({
@@ -231,6 +210,9 @@ export async function GET(request: NextRequest) {
             html: generateWeeklyEmailHtml(briefing),
             text: generateWeeklyEmailText(briefing),
           });
+          if (!isTest) {
+            await recordBriefingProgramDelivery(activeCohortId, user.email, 'weekly_deep_dive');
+          }
 
           // Log to database
           await supabase.from('briefing_log').upsert({
@@ -264,6 +246,8 @@ export async function GET(request: NextRequest) {
       briefingsSkipped,
       briefingsFailed,
       totalUsers: usersToProcess.length,
+      audienceMode,
+      activeCohortId,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       elapsed,
     });
@@ -346,7 +330,7 @@ async function fetchContractsForNaics(naicsCodes: string[]): Promise<ContractFor
   return allContracts.sort((a, b) => b.value - a.value).slice(0, 10);
 }
 
-async function generateWeeklyDeepDive(anthropic: Anthropic, contracts: ContractForBriefing[]): Promise<WeeklyBriefing> {
+async function generateWeeklyDeepDive(contracts: ContractForBriefing[]): Promise<WeeklyBriefing> {
   const monday = new Date();
   monday.setDate(monday.getDate() - monday.getDay() + 1);
 
@@ -370,15 +354,19 @@ Be specific with dates, names, dollar amounts. This is for strategic planning.
 
 Return ONLY valid JSON.`;
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 6000,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  const data = JSON.parse(jsonMatch?.[0] || '{}');
+  const { text, provider, model } = await generateBriefingJson(
+    'weekly',
+    'You are a senior GovCon capture strategist. Generate a Weekly Deep Dive briefing with full analysis.',
+    prompt,
+    6000
+  );
+  const data = extractAndParseJSON<{
+    opportunities?: WeeklyOpportunity[];
+    teamingPlays?: WeeklyTeamingPlay[];
+    marketSignals?: { headline: string; source: string; implication: string; actionRequired: boolean }[];
+    calendar?: { date: string; event: string; type: string; priority: string }[];
+  }>(text);
+  console.log(`[WeeklyDeepDive] Generated via ${provider}/${model}`);
 
   return {
     weekOf: monday.toISOString().split('T')[0],

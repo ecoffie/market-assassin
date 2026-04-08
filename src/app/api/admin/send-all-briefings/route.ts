@@ -16,6 +16,7 @@ import { sendEmail } from '@/lib/send-email';
 import { fetchSamOpportunities, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const getAnthropicBriefingKey = () => process.env.BRIEFING_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 
 // NAICS prefix expansion for 3-digit codes
 const NAICS_EXPANSION: Record<string, string[]> = {
@@ -117,7 +118,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Email required (?email=...)' }, { status: 400 });
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropicKey = getAnthropicBriefingKey();
+  if (!anthropicKey) {
+    return NextResponse.json({ error: 'BRIEFING_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY not configured' }, { status: 500 });
+  }
+
+  const anthropic = new Anthropic({ apiKey: anthropicKey });
 
   // Get user's NAICS codes from settings
   const supabase = createClient(
