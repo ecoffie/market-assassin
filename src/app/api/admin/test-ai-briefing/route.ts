@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
   const password = searchParams.get('password');
   const email = searchParams.get('email')?.toLowerCase().trim();
   const sendIt = searchParams.get('send') === 'true';
+  const fastMode = searchParams.get('fast') === 'true'; // Skip ALL data fetches (fastest, but no real data)
+  const cronMode = searchParams.get('cron') === 'true'; // Mimics actual cron: skipEnrichment only (keeps data fetches)
 
   if (password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -51,6 +53,8 @@ export async function GET(request: NextRequest) {
       briefing = await generateAIBriefing(email, {
         maxOpportunities: 10,
         maxTeamingPlays: 3,
+        skipEnrichment: fastMode || cronMode, // Skip Perplexity when fast=true OR cron=true
+        skipDataFetch: fastMode, // Skip data fetches ONLY when fast=true (cron keeps data fetches)
       });
     } catch (genErr) {
       generationError = genErr instanceof Error ? genErr.message : String(genErr);
@@ -88,6 +92,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       email,
+      mode: fastMode ? 'fast' : cronMode ? 'cron' : 'normal',
+      fastMode, // true = skipped ALL data fetches (fastest but no data)
+      cronMode, // true = skipped Perplexity only (mimics actual cron behavior)
       briefingDate: briefing.briefingDate,
       opportunities: briefing.opportunities.length,
       teamingPlays: briefing.teamingPlays.length,

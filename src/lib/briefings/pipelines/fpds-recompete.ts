@@ -14,6 +14,9 @@ import {
 } from '@/lib/sam';
 import { expandNaicsPrefixes, hasNaicsPrefixes } from '@/lib/industry-presets';
 
+// Direct import of contracts data - eliminates ~30-40s HTTP fetch latency on Vercel
+import contractsDataJson from '@/data/contracts-data.json';
+
 interface RecompeteContract {
   contractNumber: string;
   orderNumber: string | null;
@@ -403,23 +406,13 @@ export async function fetchExpiringContractsFromLocal(
     baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org',
   } = params;
 
-  console.log(`[Recompete-Local] Fetching from contracts-data.js for NAICS: ${naicsCodes.join(', ') || 'all'}`);
+  console.log(`[Recompete-Local] Fetching from contracts-data.json for NAICS: ${naicsCodes.join(', ') || 'all'}`);
 
   try {
-    // Fetch the pre-populated contracts data
-    const dataUrl = `${baseUrl}/contracts-data.js?v=${Date.now()}`;
-    const response = await fetch(dataUrl, { signal: AbortSignal.timeout(15000) });
+    // Use direct import instead of HTTP fetch - eliminates ~30-40s latency on Vercel
+    const allContracts = contractsDataJson as LocalContract[];
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch contracts-data.js: ${response.status}`);
-    }
-
-    const text = await response.text();
-    // Parse: strip "const expiringContractsData = " prefix and trailing ";"
-    const jsonStr = text.replace(/^[^[]*/, '').replace(/;?\s*$/, '');
-    const allContracts = JSON.parse(jsonStr) as LocalContract[];
-
-    console.log(`[Recompete-Local] Loaded ${allContracts.length} contracts from local data`);
+    console.log(`[Recompete-Local] Loaded ${allContracts.length} contracts from direct import`);
 
     // Filter by NAICS codes (match prefix)
     const naicsPrefixes = naicsCodes.map(code => code.slice(0, 3)); // First 3 digits

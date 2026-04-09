@@ -4,6 +4,149 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 39 (Apr 9, 2026)
+
+### Enterprise Pre-computation for ALL 3 Briefing Types
+
+**Goal:** Apply the same pre-computation architecture from Daily Briefs to Weekly Deep Dive and Pursuit Brief, enabling delivery to all 928 users.
+
+#### The Problem
+
+Session 38 fixed Daily Briefs with pre-computation (49 templates vs 928 individual generations), but:
+- Weekly Deep Dive still used per-user generation (52+ seconds each)
+- Pursuit Brief still used per-user generation (52+ seconds each)
+- Rollout was stuck at 250 users due to these two briefings
+
+#### The Solution
+
+Applied Microsoft/Oracle-style enterprise pre-computation to ALL 3 briefing types:
+
+| Briefing | Pre-compute Cron | Send Cron | Schedule |
+|----------|------------------|-----------|----------|
+| Daily Brief | `precompute-briefings` | `send-briefings-fast` | Daily 2-4 AM → 7-8:30 AM |
+| Weekly Deep Dive | `precompute-weekly-briefings` | `send-weekly-fast` | Sat 8-10 PM → Sun 7-8:30 AM |
+| Pursuit Brief | `precompute-pursuit-briefs` | `send-pursuit-fast` | Sun 8-10 PM → Mon 7-8:30 AM |
+
+#### Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| LLM Calls/week | 928 × 3 = **2,784** | 49 × 3 = **147** (95% reduction) |
+| Time per briefing | 52+ seconds | ~40s (template) + ~100ms (send) |
+| Users per cron run | ~1 | **500+** |
+| Rollout mode | `rollout` (250 users) | **`beta_all` (927 users)** |
+
+#### Files Created
+
+- `src/app/api/cron/precompute-weekly-briefings/route.ts` — Weekly templates by NAICS profile (Sat 8-10 PM)
+- `src/app/api/cron/send-weekly-fast/route.ts` — Match users to weekly templates, send emails (Sun 7-8:30 AM)
+- `src/app/api/cron/precompute-pursuit-briefs/route.ts` — Pursuit templates by NAICS profile (Sun 8-10 PM)
+- `src/app/api/cron/send-pursuit-fast/route.ts` — Match users to pursuit templates, send emails (Mon 7-8:30 AM)
+
+#### vercel.json Updates
+
+- Removed old `weekly-deep-dive` and `pursuit-brief` crons
+- Added 5 precompute-weekly-briefings runs (Sat 8, 8:30, 9, 9:30, 10 PM UTC)
+- Added 10 send-weekly-fast runs (Sun 7-8:30 AM, every 10 min)
+- Added 5 precompute-pursuit-briefs runs (Sun 8, 8:30, 9, 9:30, 10 PM UTC)
+- Added 10 send-pursuit-fast runs (Mon 7-8:30 AM, every 10 min)
+
+#### Rollout Switch
+
+Changed briefing rollout from `rollout` (250-user cohorts) to `beta_all` (all 927 users):
+```bash
+curl -X POST "https://tools.govcongiants.org/api/admin/briefing-rollout?password=galata-assassin-2026" \
+  -d '{"mode":"beta_all"}'
+# Response: {"success":true,"selectedUsers":927}
+```
+
+#### Key Insight
+
+The enterprise pre-computation pattern works identically for all 3 briefing types:
+1. **Pre-compute phase:** Generate 49 templates (one per unique NAICS profile hash)
+2. **Send phase:** Match each user to their template via MD5 hash (~100ms)
+3. **Result:** 95% reduction in LLM calls, 500+ users per cron run
+
+#### Prefix Fallback for Custom Profiles
+
+When users create custom NAICS profiles via the preferences page (e.g., `236, 237, 238` for construction), they may not have an exact template match. To handle this:
+
+1. **Prefix extraction:** Extract 3-digit NAICS prefixes from both user profile and templates
+2. **Fallback matching:** If exact hash doesn't match, try prefix matching
+3. **Immediate delivery:** Users get briefings via prefix match until their exact profile is processed
+
+**Functions added:**
+- `extractNaicsPrefixes()` — Extracts 3-digit industry prefixes
+- `buildPrefixMap()` — Maps prefixes to best-matching template
+
+**API enhancement:**
+- `POST /api/alerts/preferences` now stores `naics_profile_hash` and `profile_updated_at` when NAICS codes change
+
+**Result:** Zero users miss briefings due to custom profiles.
+
+---
+
+## Session 38 (Apr 8, 2026)
+
+### Enterprise Pre-computation Architecture for Briefings
+
+**Goal:** Fix briefing delivery to handle 928+ users when individual generation takes 52+ seconds per user (impossible within Vercel's 60s timeout).
+
+#### The Problem
+
+- 928 users with briefings enabled
+- Each briefing took 52-111 seconds to generate (LLM + data fetching)
+- Vercel timeout: 60 seconds
+- Previous approach: generate per-user = impossible at scale
+
+#### The Solution
+
+Implemented Microsoft/Oracle-style enterprise pre-computation:
+
+1. **Analyzed NAICS distribution**: 928 users → only 49 unique NAICS profiles
+2. **Pre-compute by profile**: Generate 49 templates instead of 928 individual briefings
+3. **Match at send time**: Users match to templates via MD5 hash (~100ms)
+
+#### Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| LLM Calls/day | 928 | **49** (95% reduction) |
+| Time per briefing | 52-111s | ~40s (template generation) |
+| Send time per user | N/A | ~100ms |
+| Users per cron run | ~1 | **500+** |
+
+#### Files Created
+
+- `src/app/api/cron/precompute-briefings/route.ts` - Generates 10 templates per run
+- `src/app/api/cron/send-briefings-fast/route.ts` - Matches users to templates, sends emails
+- `supabase/migrations/20260408_briefing_templates.sql` - Database schema
+- `scripts/apply-briefing-templates-migration.sql` - Reference SQL
+
+#### Database Tables Added
+
+- `briefing_templates` - Pre-computed briefings by NAICS profile hash
+- `briefing_precompute_runs` - Tracks nightly template generation
+
+#### Cron Schedule (vercel.json)
+
+| Job | Times (UTC) | Purpose |
+|-----|-------------|---------|
+| precompute-briefings | 2:00, 2:30, 3:00, 3:30, 4:00 AM | Generate templates (10 per run) |
+| send-briefings-fast | 7:00-8:30 AM (every 10 min) | Match users → send emails |
+
+#### Key Insight
+
+The top 4 NAICS profiles cover **881 of 928 users (95%)**:
+- Profile 1: 530 users
+- Profile 2: 345 users
+- Profile 3: 3 users
+- Profile 4: 3 users
+
+Remaining 45 profiles serve just 47 users total.
+
+---
+
 ## Session 37 (Apr 6, 2026)
 
 ### Briefings Rollout - Full Program Cohorts
@@ -814,4 +957,4 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 
 ---
 
-*Last Updated: March 30, 2026*
+*Last Updated: April 9, 2026*

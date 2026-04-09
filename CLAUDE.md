@@ -221,10 +221,45 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 **Location:** `/src/app/planner/`
 **Purpose:** Task management — 5 phases, 36 tasks, progress tracking, PDF export
 
-### 7. Daily Briefings
+### 7. Daily Briefings (All 3 Types)
 **Location:** `/src/lib/briefings/`
-**Purpose:** Personalized daily GovCon intel emails with win probability scoring
-**Features:** Smart profiles, engagement tracking, Lindy AI integration, shared cohort rollout across Daily Brief + Weekly Deep Dive + Pursuit Brief
+**Purpose:** Personalized GovCon intel emails with win probability scoring
+**Features:** Smart profiles, engagement tracking, shared cohort rollout across all 3 briefing types
+
+**Enterprise Pre-computation Architecture (April 9, 2026):**
+Instead of generating 928 individual briefings per type, we pre-compute 49 templates (one per unique NAICS profile) for ALL 3 briefing types.
+
+| Metric | Before | After |
+|--------|--------|-------|
+| LLM Calls/week | 928 × 3 = **2,784** | 49 × 3 = **147** (95% reduction) |
+| Time per briefing | 52+ seconds | ~40 seconds (template) |
+| Sending time | N/A | ~100ms/user |
+| Total capacity | ~1 user/run | **500+ users/run** |
+| Rollout mode | `rollout` (250) | **`beta_all` (927 users)** |
+
+**All 3 Briefing Types Pre-computed:**
+
+| Briefing | Pre-compute Cron | Send Cron | Schedule |
+|----------|------------------|-----------|----------|
+| Daily Brief | `precompute-briefings` | `send-briefings-fast` | Daily 2-4 AM → 7-8:30 AM |
+| Weekly Deep Dive | `precompute-weekly-briefings` | `send-weekly-fast` | Sat 8-10 PM → Sun 7-8:30 AM |
+| Pursuit Brief | `precompute-pursuit-briefs` | `send-pursuit-fast` | Sun 8-10 PM → Mon 7-8:30 AM |
+
+**Prefix Fallback for Custom Profiles:**
+Users with custom NAICS profiles (via preferences page) get briefings immediately via 3-digit prefix matching. For example, a user with `236, 237, 238` matches templates with any construction code (`236xxx`, `237xxx`, `238xxx`).
+
+**Database Tables:**
+- `briefing_templates` — Pre-computed briefings by NAICS profile hash (supports `daily`, `weekly`, `pursuit` types)
+- `briefing_precompute_runs` — Tracks nightly template generation jobs
+
+**Key Files:**
+- `api/cron/precompute-briefings/route.ts` — Daily templates (2-4 AM)
+- `api/cron/send-briefings-fast/route.ts` — Send daily briefings (7-8:30 AM)
+- `api/cron/precompute-weekly-briefings/route.ts` — Weekly templates (Sat 8-10 PM)
+- `api/cron/send-weekly-fast/route.ts` — Send weekly briefings (Sun 7-8:30 AM)
+- `api/cron/precompute-pursuit-briefs/route.ts` — Pursuit templates (Sun 8-10 PM)
+- `api/cron/send-pursuit-fast/route.ts` — Send pursuit briefs (Mon 7-8:30 AM)
+- `src/lib/briefings/delivery/ai-briefing-generator.ts` — Supports `naicsOverride` for profile-based generation
 
 ### 8. Daily Alerts System
 **Location:** `/src/app/api/cron/daily-alerts/`, `/src/app/alerts/`
@@ -245,8 +280,9 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 - **NOT included:** Win Probability, AI analysis (reserved for $49/mo Market Intelligence)
 
 **Key Files:**
-- `api/cron/daily-alerts/route.ts` — Main cron handler
-- `api/cron/send-briefings/route.ts` — Briefings cron handler
+- `api/cron/daily-alerts/route.ts` — Main alerts cron handler
+- `api/cron/precompute-briefings/route.ts` — Pre-compute templates by NAICS profile
+- `api/cron/send-briefings-fast/route.ts` — Send using pre-computed templates (~100ms/user)
 - `alerts/preferences/page.tsx` — User preferences UI
 - `api/alerts/preferences/route.ts` — Preferences API
 
@@ -254,7 +290,12 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 | Job | Times | Purpose |
 |-----|-------|---------|
 | daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | Timezone coverage |
-| send-briefings | 7 AM | Daily briefings |
+| precompute-briefings | 2:00, 2:30, 3:00, 3:30, 4:00 AM | Daily templates by NAICS profile |
+| send-briefings-fast | 7:00-8:30 AM (every 10 min) | Send daily briefings |
+| precompute-weekly-briefings | Sat 8:00, 8:30, 9:00, 9:30, 10:00 PM | Weekly templates by NAICS profile |
+| send-weekly-fast | Sun 7:00-8:30 AM (every 10 min) | Send weekly briefings |
+| precompute-pursuit-briefs | Sun 8:00, 8:30, 9:00, 9:30, 10:00 PM | Pursuit templates by NAICS profile |
+| send-pursuit-fast | Mon 7:00-8:30 AM (every 10 min) | Send pursuit briefs |
 | weekly-alerts | 11 PM Sunday | Weekly digest |
 
 **Briefing rollout model:**
@@ -447,7 +488,12 @@ node scripts/import-forecasts.js --source=DOE
 | `src/lib/briefings/` | Daily briefing system |
 | `src/lib/smart-profile/` | User profile learning system |
 | `src/app/api/cron/daily-alerts/route.ts` | Daily alerts cron (FREE during beta) |
-| `src/app/api/cron/send-briefings/route.ts` | Daily briefings cron (FREE during beta) |
+| `src/app/api/cron/precompute-briefings/route.ts` | Pre-compute daily templates by NAICS |
+| `src/app/api/cron/send-briefings-fast/route.ts` | Send daily briefings (~100ms/user) |
+| `src/app/api/cron/precompute-weekly-briefings/route.ts` | Pre-compute weekly templates by NAICS |
+| `src/app/api/cron/send-weekly-fast/route.ts` | Send weekly briefings (~100ms/user) |
+| `src/app/api/cron/precompute-pursuit-briefs/route.ts` | Pre-compute pursuit templates by NAICS |
+| `src/app/api/cron/send-pursuit-fast/route.ts` | Send pursuit briefs (~100ms/user) |
 | `src/app/alerts/preferences/page.tsx` | Alert/briefing preferences UI |
 | `src/lib/utils/psc-crosswalk.ts` | PSC-NAICS crosswalk for broader search |
 | `docs/govcon-market-research.md` | GAO market research framework for AI prompts |
@@ -570,4 +616,4 @@ done
 
 ---
 
-*Last Updated: March 30, 2026*
+*Last Updated: April 9, 2026*

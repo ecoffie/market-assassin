@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
+
+/**
+ * Generate MD5 hash of NAICS profile for template matching
+ */
+function hashNaicsProfile(naicsCodes: string[]): string {
+  const sorted = [...naicsCodes].sort();
+  return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -212,6 +221,9 @@ export async function POST(request: NextRequest) {
         ? naicsCodes.filter((c: string) => /^\d+$/.test(c))
         : [];
       record.naics_codes = cleanCodes;
+      // Store profile hash for template matching
+      record.naics_profile_hash = cleanCodes.length > 0 ? hashNaicsProfile(cleanCodes) : null;
+      record.profile_updated_at = new Date().toISOString();
     }
 
     if (keywords !== undefined) {

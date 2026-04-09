@@ -6,10 +6,6 @@
       "schedule": "0 14 * * 1"
     },
     {
-      "path": "/api/cron/weekly-deep-dive",
-      "schedule": "0 10 * * 0"
-    },
-    {
       "path": "/api/cron/aggregate-profiles",
       "schedule": "0 6 * * *"
     },
@@ -30,16 +26,188 @@
       "schedule": "0 19 * * *"
     },
     {
-      "path": "/api/cron/pursuit-brief",
-      "schedule": "0 10 * * 1"
-    },
-    {
       "path": "/api/cron/weekly-alerts",
       "schedule": "0 23 * * 0"
     },
     {
-      "path": "/api/cron/send-briefings",
+      "path": "/api/cron/precompute-briefings",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/precompute-briefings",
+      "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/precompute-briefings",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/precompute-briefings",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/precompute-briefings",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "10 7 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "20 7 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "40 7 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "50 7 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "10 8 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "20 8 * * *"
+    },
+    {
+      "path": "/api/cron/send-briefings-fast",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/cron/precompute-weekly-briefings",
+      "schedule": "0 20 * * 6"
+    },
+    {
+      "path": "/api/cron/precompute-weekly-briefings",
+      "schedule": "30 20 * * 6"
+    },
+    {
+      "path": "/api/cron/precompute-weekly-briefings",
+      "schedule": "0 21 * * 6"
+    },
+    {
+      "path": "/api/cron/precompute-weekly-briefings",
+      "schedule": "30 21 * * 6"
+    },
+    {
+      "path": "/api/cron/precompute-weekly-briefings",
+      "schedule": "0 22 * * 6"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "0 7 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "10 7 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "20 7 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "30 7 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "40 7 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "50 7 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "0 8 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "10 8 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "20 8 * * 0"
+    },
+    {
+      "path": "/api/cron/send-weekly-fast",
+      "schedule": "30 8 * * 0"
+    },
+    {
+      "path": "/api/cron/precompute-pursuit-briefs",
+      "schedule": "0 20 * * 0"
+    },
+    {
+      "path": "/api/cron/precompute-pursuit-briefs",
+      "schedule": "30 20 * * 0"
+    },
+    {
+      "path": "/api/cron/precompute-pursuit-briefs",
+      "schedule": "0 21 * * 0"
+    },
+    {
+      "path": "/api/cron/precompute-pursuit-briefs",
+      "schedule": "30 21 * * 0"
+    },
+    {
+      "path": "/api/cron/precompute-pursuit-briefs",
+      "schedule": "0 22 * * 0"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "10 7 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "20 7 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "30 7 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "40 7 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "50 7 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "10 8 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "20 8 * * 1"
+    },
+    {
+      "path": "/api/cron/send-pursuit-fast",
+      "schedule": "30 8 * * 1"
     },
     {
       "path": "/api/cron/manage-briefing-rollout",

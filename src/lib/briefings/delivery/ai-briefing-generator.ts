@@ -159,9 +159,13 @@ export async function generateAIBriefing(
   options: {
     maxOpportunities?: number;
     maxTeamingPlays?: number;
+    skipEnrichment?: boolean; // Skip Perplexity enrichment for faster batch processing
+    skipDataFetch?: boolean; // Skip HTTP-based data fetches for faster batch processing
+    naicsOverride?: string[]; // Override NAICS codes (for pre-computation by profile)
   } = {}
 ): Promise<AIGeneratedBriefing | null> {
   const startTime = Date.now();
+  const timings: Record<string, number> = {};
   const supabase = getSupabaseClient();
 
   if (!supabase) {
@@ -175,42 +179,56 @@ export async function generateAIBriefing(
 
   try {
     // Step 1: Get user profile from unified table
+    let stepStart = Date.now();
     const { data: profileData } = await supabase
       .from('user_notification_settings')
       .select('aggregated_profile, naics_codes, agencies, keywords, primary_industry')
       .eq('user_email', userEmail)
       .single();
+    timings.profileFetch = Date.now() - stepStart;
 
-    // Use fallback if no profile
-    const effectiveProfile = profileData || {
-      naics_codes: FALLBACK_NAICS,
-      agencies: [],
-      keywords: [],
-      aggregated_profile: null,
-      primary_industry: null,
-    };
+    // Use naicsOverride if provided (for pre-computation), else use profile data or fallback
+    const effectiveProfile = options.naicsOverride
+      ? {
+          naics_codes: options.naicsOverride,
+          agencies: [],
+          keywords: [],
+          aggregated_profile: null,
+          primary_industry: null,
+        }
+      : profileData || {
+          naics_codes: FALLBACK_NAICS,
+          agencies: [],
+          keywords: [],
+          aggregated_profile: null,
+          primary_industry: null,
+        };
 
     const profile = buildProfile(effectiveProfile);
-    const primaryIndustry = (profileData?.primary_industry as string) || null;
+    const primaryIndustry = options.naicsOverride ? null : (profileData?.primary_industry as string) || null;
 
     // Prioritize NAICS codes by primary industry
     const prioritizedNaics = prioritizeNaicsByIndustry(profile.naics_codes, primaryIndustry);
     console.log(`[AIBriefingGen] Primary industry: ${primaryIndustry || 'none'}, prioritized NAICS: ${prioritizedNaics.slice(0, 5).join(', ')}...`);
 
     // Step 2: Get today's snapshots
+    stepStart = Date.now();
     const today = new Date().toISOString().split('T')[0];
     const { data: snapshots } = await supabase
       .from('briefing_snapshots')
       .select('tool, raw_data')
       .eq('user_email', userEmail)
       .eq('snapshot_date', today);
+    timings.snapshotsFetch = Date.now() - stepStart;
 
     let organizedData = organizeSnapshots(snapshots || []);
 
     console.log(`[AIBriefingGen] Snapshots: ${snapshots?.length || 0}, Recompetes: ${organizedData.recompetes.length}, Awards: ${organizedData.awards.length}`);
 
     // FALLBACK: If no snapshots, fetch from LOCAL FPDS data first (then USASpending as backup)
-    if (organizedData.recompetes.length === 0 && organizedData.awards.length === 0) {
+    // SKIP HTTP fetches in batch mode - they add ~30-40s per user on Vercel
+    if (!options.skipDataFetch && organizedData.recompetes.length === 0 && organizedData.awards.length === 0) {
+      stepStart = Date.now();
       console.log(`[AIBriefingGen] No snapshots found, fetching from LOCAL contracts-data.js (FPDS dump)...`);
       try {
         // Use prioritized NAICS codes (primary industry first)
@@ -255,7 +273,8 @@ export async function generateAIBriefing(
     }
 
     // FALLBACK: Always try to fetch multisite opportunities (NIH, DARPA, NSF)
-    if (organizedData.multisiteOpps.length === 0) {
+    // SKIP in batch mode - adds latency
+    if (!options.skipDataFetch && organizedData.multisiteOpps.length === 0) {
       console.log(`[AIBriefingGen] Fetching multisite opportunities (NIH, DARPA, NSF)...`);
       try {
         // Fetch directly from multisite pipeline without NAICS filtering
@@ -303,8 +322,9 @@ export async function generateAIBriefing(
     }
 
     // Step 3: Enrich top recompetes with Perplexity (real-time web intel)
+    // SKIP for batch processing (cron runs) - adds ~75-90s per user
     let enrichedIntel: Map<string, ContractIntelligence> = new Map();
-    if (organizedData.recompetes.length > 0 && process.env.PERPLEXITY_API_KEY) {
+    if (!options.skipEnrichment && organizedData.recompetes.length > 0 && process.env.PERPLEXITY_API_KEY) {
       console.log(`[AIBriefingGen] Enriching top contracts with Perplexity...`);
       try {
         enrichedIntel = await enrichContractsWithIntel(
@@ -315,6 +335,8 @@ export async function generateAIBriefing(
       } catch (err) {
         console.warn(`[AIBriefingGen] Perplexity enrichment failed:`, err);
       }
+    } else if (options.skipEnrichment) {
+      console.log(`[AIBriefingGen] Skipping Perplexity enrichment (batch mode)`);
     }
 
     // Step 4: Build user prompt with raw data + enriched intel

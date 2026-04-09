@@ -28,7 +28,18 @@ import {
   postSendValidation,
 } from '@/lib/intelligence';
 
-const DELAY_BETWEEN_USERS_MS = 3000; // 3 second delay between users to avoid Claude API rate limits (50k tokens/min)
+/**
+ * Batch Processing Configuration
+ *
+ * With Groq (10-50x faster than Claude), we can process users much faster.
+ * Each user takes ~3-8 seconds total (data fetch + LLM call).
+ * With 60s timeout and no delays, we can process ~8-20 users per run.
+ *
+ * Strategy: Run cron multiple times (5:00, 5:30, 6:00, 6:30 AM UTC)
+ * Each run processes users who haven't received today's briefing yet.
+ */
+const BATCH_SIZE = 15; // Process up to 15 users per cron run
+const DELAY_BETWEEN_USERS_MS = 500; // Minimal delay - Groq handles rate limits well
 
 interface BriefingUser {
   email: string;
@@ -153,7 +164,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    console.log(`[SendBriefings] Processing ${usersToProcess.length} users SEQUENTIALLY (${allUsers.length - usersToProcess.length} filtered/deduped)`);
+    // Limit to BATCH_SIZE users per run to stay within Vercel timeout (60s)
+    // Multiple cron runs throughout the morning will process all users
+    const totalEligible = usersToProcess.length;
+    usersToProcess = usersToProcess.slice(0, BATCH_SIZE);
+
+    console.log(`[SendBriefings] Processing ${usersToProcess.length}/${totalEligible} users (BATCH_SIZE=${BATCH_SIZE}, filtered/deduped=${allUsers.length - totalEligible})`);
 
     // Step 2: Process users SEQUENTIALLY to avoid Claude API rate limits (50k tokens/min)
     // With 892 users @ 3s delay = ~45 minutes, fits within Vercel Pro function limits
@@ -196,9 +212,13 @@ export async function GET(request: NextRequest) {
         }
 
           // Generate AI-powered briefing (Top 10 + 3 Teaming Plays)
+          // Skip Perplexity enrichment (~75-90s per user) during batch processing
+          // Keep data fetches to ensure real contract data is included
           const briefing = await generateAIBriefing(user.email, {
             maxOpportunities: 10,
             maxTeamingPlays: 3,
+            skipEnrichment: true, // Critical for batch processing - saves ~90s per user
+            // Note: Data fetches (~30-40s) are kept for real contract data
           });
 
         if (!briefing || briefing.opportunities.length === 0) {

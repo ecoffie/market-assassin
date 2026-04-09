@@ -1,39 +1,70 @@
 export type BriefingTask = 'daily' | 'weekly' | 'pursuit';
-export type LlmProvider = 'anthropic' | 'openai';
+export type LlmProvider = 'groq' | 'anthropic' | 'openai';
 
 interface RouteCandidate {
   provider: LlmProvider;
   model: string;
 }
 
+/**
+ * LLM Route Configuration
+ *
+ * Priority order for high-volume briefings:
+ * 1. Groq (Llama 3.1 70B) - ~10-50x faster than Claude, free tier available
+ * 2. Claude Haiku - Fast and reliable fallback
+ * 3. OpenAI GPT - Additional fallback
+ *
+ * For premium briefings (pursuit), Claude Opus is used for highest quality.
+ */
 const TASK_ROUTES: Record<BriefingTask, RouteCandidate[]> = {
   daily: [
+    // Primary: Groq for speed (10-50x faster than Claude)
     {
-      provider: (process.env.BRIEFING_DAILY_PRIMARY_PROVIDER as LlmProvider) || 'anthropic',
+      provider: 'groq',
+      model: process.env.BRIEFING_DAILY_GROQ_MODEL || 'llama-3.3-70b-versatile',
+    },
+    // Fallback 1: Claude Haiku (fast, reliable)
+    {
+      provider: 'anthropic',
       model: process.env.BRIEFING_DAILY_PRIMARY_MODEL || 'claude-3-5-haiku-latest',
     },
+    // Fallback 2: OpenAI
     {
-      provider: (process.env.BRIEFING_DAILY_FALLBACK_PROVIDER as LlmProvider) || 'openai',
+      provider: 'openai',
       model: process.env.BRIEFING_DAILY_FALLBACK_MODEL || 'gpt-5-mini',
     },
   ],
   weekly: [
+    // Primary: Groq for speed
     {
-      provider: (process.env.BRIEFING_WEEKLY_PRIMARY_PROVIDER as LlmProvider) || 'openai',
+      provider: 'groq',
+      model: process.env.BRIEFING_WEEKLY_GROQ_MODEL || 'llama-3.3-70b-versatile',
+    },
+    // Fallback 1: OpenAI
+    {
+      provider: 'openai',
       model: process.env.BRIEFING_WEEKLY_PRIMARY_MODEL || 'gpt-5-mini',
     },
+    // Fallback 2: Claude Sonnet (higher quality)
     {
-      provider: (process.env.BRIEFING_WEEKLY_FALLBACK_PROVIDER as LlmProvider) || 'anthropic',
+      provider: 'anthropic',
       model: process.env.BRIEFING_WEEKLY_FALLBACK_MODEL || 'claude-sonnet-4-20250514',
     },
   ],
   pursuit: [
+    // Primary: Claude Opus for highest quality strategic analysis
     {
-      provider: (process.env.BRIEFING_PURSUIT_PRIMARY_PROVIDER as LlmProvider) || 'anthropic',
+      provider: 'anthropic',
       model: process.env.BRIEFING_PURSUIT_PRIMARY_MODEL || 'claude-opus-4-20250514',
     },
+    // Fallback 1: Groq for speed if Opus unavailable
     {
-      provider: (process.env.BRIEFING_PURSUIT_FALLBACK_PROVIDER as LlmProvider) || 'openai',
+      provider: 'groq',
+      model: 'llama-3.3-70b-versatile',
+    },
+    // Fallback 2: OpenAI
+    {
+      provider: 'openai',
       model: process.env.BRIEFING_PURSUIT_FALLBACK_MODEL || 'gpt-5-mini',
     },
   ],
@@ -43,7 +74,12 @@ function getAnthropicApiKey() {
   return process.env.BRIEFING_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 }
 
+function getGroqApiKey() {
+  return process.env.GROQ_API_KEY;
+}
+
 function hasProviderKey(provider: LlmProvider) {
+  if (provider === 'groq') return !!getGroqApiKey();
   if (provider === 'anthropic') return !!getAnthropicApiKey();
   return !!process.env.OPENAI_API_KEY;
 }
@@ -89,6 +125,59 @@ async function generateWithAnthropic(
   const text = data.content?.find((item) => item.type === 'text')?.text;
   if (!text) {
     throw new Error('Anthropic returned no text content');
+  }
+
+  return text;
+}
+
+/**
+ * Generate with Groq API (Llama 3.1 70B)
+ *
+ * Groq is 10-50x faster than Claude, making it ideal for bulk briefing generation.
+ * Uses OpenAI-compatible API format.
+ */
+async function generateWithGroq(
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number
+) {
+  const apiKey = getGroqApiKey();
+  if (!apiKey) {
+    throw new Error('GROQ_API_KEY not configured');
+  }
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `${userPrompt}\n\nRespond with valid JSON only.` },
+      ],
+      temperature: 0.7,
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+    }),
+    signal: AbortSignal.timeout(30000), // 30s timeout (Groq is fast)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Groq ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error('Groq returned no message content');
   }
 
   return text;
@@ -150,10 +239,26 @@ export async function generateBriefingJson(
 
   for (const attempt of attempts) {
     try {
+      const startTime = Date.now();
       console.log(`[LLMRouter] ${task}: trying ${attempt.provider}/${attempt.model}`);
-      const text = attempt.provider === 'anthropic'
-        ? await generateWithAnthropic(attempt.model, prompt, maxTokens)
-        : await generateWithOpenAI(attempt.model, systemPrompt, userPrompt, maxTokens);
+
+      let text: string;
+      switch (attempt.provider) {
+        case 'groq':
+          text = await generateWithGroq(attempt.model, systemPrompt, userPrompt, maxTokens);
+          break;
+        case 'anthropic':
+          text = await generateWithAnthropic(attempt.model, prompt, maxTokens);
+          break;
+        case 'openai':
+          text = await generateWithOpenAI(attempt.model, systemPrompt, userPrompt, maxTokens);
+          break;
+        default:
+          throw new Error(`Unknown provider: ${attempt.provider}`);
+      }
+
+      const elapsed = Date.now() - startTime;
+      console.log(`[LLMRouter] ${task}: ${attempt.provider}/${attempt.model} succeeded in ${elapsed}ms`);
 
       return {
         text,
