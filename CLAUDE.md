@@ -308,6 +308,33 @@ Users with custom NAICS profiles (via preferences page) get briefings immediatel
   - `pursuit brief` x2
 - admin endpoint: `/api/admin/briefing-rollout`
 
+**Automated Backup System (April 9, 2026):**
+Enterprise-grade failsafe for 9,000+ users:
+
+| Component | Purpose |
+|-----------|---------|
+| Dead Letter Queue | Failed briefings retry up to 3x with exponential backoff |
+| Watchdog Cron | Runs 9 AM, 9:30 AM, 10 AM UTC daily to monitor health |
+| Self-Healing | Auto-triggers precompute if <80% template coverage |
+| Alert Escalation | Warning (5% failure) → Critical (15% failure) |
+
+**Database Tables:**
+- `briefing_dead_letter` — Retry queue with exponential backoff (15min × 2^retry)
+- `briefing_system_health` — Health metrics with auto-computed scores
+
+**Key Files:**
+- `api/cron/briefing-watchdog/route.ts` — Central monitoring and auto-recovery
+- `api/admin/briefing-dead-letter/route.ts` — Admin view/manage retry queue
+- `supabase/migrations/20260409_briefing_backup_system.sql` — Schema
+
+**Admin Endpoint:**
+```
+GET /api/admin/briefing-dead-letter?password=galata-assassin-2026
+POST { action: "retry", id: "xxx" } — Force retry specific entry
+POST { action: "clear", status: "exhausted" } — Clear by status
+POST { action: "stats" } — Get summary statistics
+```
+
 ### 9. Forecast Intelligence System
 **Location:** `/src/app/forecasts/`, `/src/lib/forecasts/`
 **Purpose:** Aggregate procurement forecasts from 13 federal agencies (6-18 months before solicitation)

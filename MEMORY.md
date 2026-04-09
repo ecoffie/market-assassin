@@ -6,7 +6,64 @@ This file contains detailed session history for the Market Assassin project. For
 
 ## Session 39 (Apr 9, 2026)
 
-### Enterprise Pre-computation for ALL 3 Briefing Types
+### Part 2: Automated Backup System for 9K+ Users
+
+**Goal:** Build a hands-off failsafe system that can handle 9,000+ users without manual intervention.
+
+#### The Problem
+
+With 9,000+ users expected to onboard, manual monitoring of briefing failures becomes impossible. Need automated:
+- Retry logic for transient failures
+- Health monitoring with alerting
+- Self-healing when templates are missing
+
+#### The Solution
+
+Enterprise-grade backup system with 4 components:
+
+| Component | Purpose |
+|-----------|---------|
+| Dead Letter Queue | Failed briefings retry up to 3x with exponential backoff (15min × 2^retry) |
+| Watchdog Cron | Runs 3x daily to monitor health, process retries, trigger self-healing |
+| Alert Escalation | Warning at 5% failure rate → Critical at 15% |
+| Self-Healing | Auto-triggers precompute if <80% template coverage |
+
+#### Files Created
+
+- `supabase/migrations/20260409_briefing_backup_system.sql` — Schema for dead letter queue + health tables
+- `src/app/api/cron/briefing-watchdog/route.ts` — Central monitoring and auto-recovery
+- `src/app/api/admin/briefing-dead-letter/route.ts` — Admin endpoint to view/manage retries
+
+#### Files Modified
+
+- `src/app/api/cron/send-briefings-fast/route.ts` — Added `queueForRetry()` function
+- `src/app/api/cron/send-weekly-fast/route.ts` — Added `queueForRetry()` function
+- `src/app/api/cron/send-pursuit-fast/route.ts` — Added `queueForRetry()` function
+- `vercel.json` — Added watchdog cron (9 AM, 9:30 AM, 10 AM UTC)
+
+#### Database Tables Added
+
+- `briefing_dead_letter` — Retry queue with status tracking
+- `briefing_system_health` — Health metrics with auto-computed scores
+
+#### Key Functions (RPC)
+
+- `queue_briefing_retry()` — Queue failed briefing for retry
+- `get_briefing_retries()` — Get pending retries ready to process
+- `complete_briefing_retry()` — Mark retry as succeeded/failed
+
+#### Results
+
+| Metric | Value |
+|--------|-------|
+| Health Score | 100% |
+| Users Sent Today | 200 |
+| Users Eligible | 927 |
+| Capacity | 9,000+ users |
+
+---
+
+### Part 1: Enterprise Pre-computation for ALL 3 Briefing Types
 
 **Goal:** Apply the same pre-computation architecture from Daily Briefs to Weekly Deep Dive and Pursuit Brief, enabling delivery to all 928 users.
 
