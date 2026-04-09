@@ -21,6 +21,30 @@ const BRAND_COLOR = '#1e3a8a';
 const ACCENT_COLOR = '#7c3aed';
 const SUCCESS_COLOR = '#10b981';
 
+/**
+ * Queue a failed briefing for automatic retry (dead letter queue)
+ */
+async function queueForRetry(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  userEmail: string,
+  naicsCodes: string[],
+  failureReason: string,
+  briefingDate: string
+): Promise<void> {
+  try {
+    await supabase.rpc('queue_briefing_retry', {
+      p_user_email: userEmail,
+      p_briefing_type: 'pursuit',
+      p_briefing_date: briefingDate,
+      p_naics_codes: JSON.stringify(naicsCodes),
+      p_failure_reason: failureReason,
+    });
+  } catch (err) {
+    console.error(`[SendPursuitFast] Failed to queue retry for ${userEmail}:`, err);
+  }
+}
+
 interface PursuitBrief {
   contractName: string;
   agency: string;
@@ -216,6 +240,7 @@ export async function GET(request: NextRequest) {
 
         if (!template) {
           noTemplateCount++;
+          await queueForRetry(supabase, user.email, userNaics, 'No matching template (exact or prefix)', getMondayDate());
           continue;
         }
 
@@ -262,6 +287,10 @@ export async function GET(request: NextRequest) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         errors.push(`${user.email}: ${errorMsg}`);
         console.error(`[SendPursuitFast] ❌ Failed for ${user.email}:`, err);
+
+        // Queue for automatic retry
+        const userNaics = user.naics_codes || [];
+        await queueForRetry(supabase, user.email, userNaics, errorMsg, getMondayDate());
       }
     }
 

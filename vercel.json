@@ -256,6 +256,18 @@
     {
       "path": "/api/cron/snapshot-multisite?source=nsf_sbir",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/briefing-watchdog",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/briefing-watchdog",
+      "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/briefing-watchdog",
+      "schedule": "0 10 * * *"
     }
   ]
 }

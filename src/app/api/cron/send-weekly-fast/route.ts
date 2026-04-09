@@ -18,6 +18,30 @@ import crypto from 'crypto';
 
 const BATCH_SIZE = 100;
 const BRAND_COLOR = '#1e3a8a';
+
+/**
+ * Queue a failed briefing for automatic retry (dead letter queue)
+ */
+async function queueForRetry(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  userEmail: string,
+  naicsCodes: string[],
+  failureReason: string,
+  briefingDate: string
+): Promise<void> {
+  try {
+    await supabase.rpc('queue_briefing_retry', {
+      p_user_email: userEmail,
+      p_briefing_type: 'weekly',
+      p_briefing_date: briefingDate,
+      p_naics_codes: JSON.stringify(naicsCodes),
+      p_failure_reason: failureReason,
+    });
+  } catch (err) {
+    console.error(`[SendWeeklyFast] Failed to queue retry for ${userEmail}:`, err);
+  }
+}
 const ACCENT_COLOR = '#7c3aed';
 const SUCCESS_COLOR = '#10b981';
 
@@ -226,6 +250,7 @@ export async function GET(request: NextRequest) {
 
         if (!template) {
           noTemplateCount++;
+          await queueForRetry(supabase, user.email, userNaics, 'No matching template (exact or prefix)', weekOf);
           continue;
         }
 
@@ -270,6 +295,10 @@ export async function GET(request: NextRequest) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         errors.push(`${user.email}: ${errorMsg}`);
         console.error(`[SendWeeklyFast] ❌ Failed for ${user.email}:`, err);
+
+        // Queue for automatic retry
+        const userNaics = user.naics_codes || [];
+        await queueForRetry(supabase, user.email, userNaics, errorMsg, weekOf);
       }
     }
 

@@ -29,6 +29,31 @@ import crypto from 'crypto';
 // Process up to 100 users per cron run (~100ms each = 10 seconds total)
 const BATCH_SIZE = 100;
 
+/**
+ * Queue a failed briefing for automatic retry (dead letter queue)
+ */
+async function queueForRetry(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  userEmail: string,
+  naicsCodes: string[],
+  failureReason: string,
+  briefingDate: string
+): Promise<void> {
+  try {
+    await supabase.rpc('queue_briefing_retry', {
+      p_user_email: userEmail,
+      p_briefing_type: 'daily',
+      p_briefing_date: briefingDate,
+      p_naics_codes: JSON.stringify(naicsCodes),
+      p_failure_reason: failureReason,
+    });
+  } catch (err) {
+    // Don't fail the main process if retry queue fails
+    console.error(`[SendBriefingsFast] Failed to queue retry for ${userEmail}:`, err);
+  }
+}
+
 function hashNaicsProfile(naicsCodes: string[]): string {
   const sorted = [...naicsCodes].sort();
   return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
@@ -198,6 +223,8 @@ export async function GET(request: NextRequest) {
         if (!template) {
           noTemplateCount++;
           console.log(`[SendBriefingsFast] No template for ${user.email} (hash: ${naicsHash.slice(0, 8)}, prefixes: ${extractNaicsPrefixes(userNaics).join(',')})`);
+          // Queue for retry - watchdog will regenerate or find fallback
+          await queueForRetry(supabase, user.email, userNaics, 'No matching template (exact or prefix)', today);
           continue;
         }
 
@@ -257,6 +284,10 @@ export async function GET(request: NextRequest) {
           delivery_status: 'failed',
           error_message: errorMsg,
         }).eq('user_email', user.email).eq('briefing_date', today);
+
+        // Queue for automatic retry
+        const userNaics = user.naics_codes || [];
+        await queueForRetry(supabase, user.email, userNaics, errorMsg, today);
       }
     }
 
