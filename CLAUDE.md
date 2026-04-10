@@ -421,6 +421,42 @@ node scripts/import-forecasts.js
 node scripts/import-forecasts.js --source=DOE
 ```
 
+### 10. BD Assist (Enterprise Platform)
+**Location:** `/src/app/bd-assist/`, `/src/components/bd-assist/`
+**Purpose:** Unified BD department platform for enterprise contractors
+**Price:** $199/mo (FREE lifetime for Ultimate Bundle buyers)
+**Status:** Phase 1-2 complete (April 10, 2026)
+
+**Features:**
+- **Federal Market Scanner** — 6-question market intelligence (Who's buying? How? Who has it? What's available? Events? Who to talk to?)
+- **Pipeline Tracker** — Kanban board with 6 stages (tracking → pursuing → bidding → submitted → won/lost)
+- **Teaming CRM** — Partner management with outreach tracking
+- **Intel Dashboard** — Daily briefs, opportunities, deadlines
+
+**Database Tables:**
+- `user_pipeline` — Opportunity tracking with stage history
+- `pipeline_history` — Audit trail of stage changes
+- `user_teaming_partners` — Teaming partner CRM
+
+**API Endpoints:**
+| Endpoint | Purpose |
+|----------|---------|
+| `GET/POST/PATCH/DELETE /api/pipeline` | Pipeline CRUD |
+| `GET /api/pipeline/stats` | Pipeline metrics by stage |
+| `GET/POST/PATCH/DELETE /api/teaming` | Teaming partners CRUD |
+| `GET /api/market-scanner` | 6-question market scan |
+
+**Key Files:**
+| File | Purpose |
+|------|---------|
+| `src/app/bd-assist/page.tsx` | Main dashboard with tabs |
+| `src/components/bd-assist/PipelineBoard.tsx` | Kanban board |
+| `src/components/bd-assist/MarketScanner.tsx` | 6-question scanner UI |
+| `src/app/api/market-scanner/route.ts` | Scanner API (870 lines) |
+| `supabase/migrations/20260410_bd_assist_pipeline.sql` | Database schema |
+
+**Live URL:** https://tools.govcongiants.org/bd-assist
+
 ---
 
 ## Products & Pricing

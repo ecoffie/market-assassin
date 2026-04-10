@@ -4,9 +4,57 @@
 
 ## Executive Summary
 
-Today we have 12+ separate tools. Enterprise BD teams have integrated workflows. The gap isn't features—it's **cohesion**.
+Today we have **2 tools** (Market Assassin, Content Reaper), **2 databases** (Recompete, Contractor DB), a **lead magnet** (Opportunity Hunter), and **add-ons** (Alerts, Briefings). SMBs buy what they need and own it forever.
 
-BD Assist unifies our tools into a single platform that simulates having a BD department, while keeping the simplicity SMBs need.
+But for firms ready to scale, they need more than tools—they need a **BD department**.
+
+**BD Assist** is the enterprise tier: a unified platform with Federal Market Scanner, Pipeline Tracker, Teaming CRM, and Capture AI. It's for contractors who want the full workflow, not just individual tools.
+
+**Key principle:** Keep tools separate for SMBs. BD Assist is the upgrade for firms who outgrow à la carte.
+
+---
+
+## User Acquisition Funnel
+
+**Goal:** Full cycle from free tools → hooked users → paid platform
+
+### The 45-Day Hook Strategy
+
+```
+FREE ENTRY POINTS                    HOOK PERIOD                     CONVERSION
+─────────────────                    ───────────                     ──────────
+
+Opportunity Hunter (Free)  ────┐
+                               │
+Market Scanner (Free)      ────┼──► 45 Days Free Alerts    ──► BD Assist ($49-199/mo)
+                               │    + Daily Briefings
+Federal Events (Free)      ────┤         │
+                               │         │
+Forecasts (Free)           ────┘         ▼
+                                   "You found 47 opportunities
+                                    last month. Upgrade to
+                                    track them all."
+```
+
+### Persistent Tracking (Key Differentiator)
+
+When users interact with any tool, the system should **remember and track indefinitely**:
+
+| Tool | What Gets Tracked | Updates User Receives |
+|------|-------------------|----------------------|
+| **Recompete Tracker** | Contracts user flags for monitoring | Expiration alerts, incumbent changes, solicitation posts |
+| **Contractor Database** | Companies saved as potential partners | SBLO changes, new certifications, teaming opportunities |
+| **Opportunity Hunter** | Searches and saved opportunities | Status changes, amendments, related postings |
+| **Federal Market Scanner** | NAICS + location combinations | New spending, forecasts, events in their market |
+
+### Conversion Triggers
+
+| Trigger | Message | Upgrade Path |
+|---------|---------|--------------|
+| 10+ saved opportunities | "You're tracking 10 opps. Upgrade to get win probability scores." | BD Assist Pro |
+| 5+ saved contractors | "Get instant alerts when your partners win contracts." | BD Assist Pro |
+| 3+ recompete flags | "These contracts expire soon. Get capture strategies." | BD Assist Enterprise |
+| Weekly brief opened 4x | "You love the intel. Unlock daily briefings + pursuit tracking." | BD Assist Pro |
 
 ---
 
@@ -117,18 +165,48 @@ SMBs can't afford this. BD Assist gives them 80% of the capability at 2% of the 
 
 #### C. User-Facing Products
 
+**Tools (Standalone, One-Time Purchase):**
+
 | Product | URL | Price | Purpose |
 |---------|-----|-------|---------|
-| Opportunity Hunter | `/opportunity-hunter` | Free + $19/mo Pro | Find SAM.gov opps |
-| Daily Alerts | Email | $19/mo (free beta) | Opp notifications |
-| Market Intelligence | `/briefings` | $49/mo | AI briefings |
-| Federal Market Scanner | APIs only | TBD | Unified market intel |
+| Market Assassin | `/market-assassin` | $297-497 | Strategic market reports |
+| Content Reaper | `/content-generator` | $197-397 | AI LinkedIn content |
+
+**Databases (Standalone, One-Time Purchase):**
+
+| Product | URL | Price | Purpose |
+|---------|-----|-------|---------|
 | Recompete Tracker | `/recompete` | $397 | Expiring contracts |
-| Market Assassin | `/market-assassin` | $297-497 | Strategic reports |
-| Contractor Database | `/contractor-database` | $497 | 3,500+ contractors |
-| Content Reaper | `/content-generator` | $197-397 | LinkedIn content |
+| Contractor Database | `/contractor-database` | $497 | 3,500+ contractors + SBLOs |
+
+**Lead Magnet (Free Entry Point):**
+
+| Product | URL | Price | Purpose |
+|---------|-----|-------|---------|
+| Opportunity Hunter | `/opportunity-hunter` | Free (+$19/mo Pro) | Find SAM.gov opps, hook users |
+
+**Add-Ons (Subscription, Enhances Tools):**
+
+| Product | URL | Price | Purpose |
+|---------|-----|-------|---------|
+| Daily Alerts | Email | $19/mo | Opportunity notifications |
+| Daily Briefings | `/briefings` | $49/mo | AI market intelligence |
+
+**Free Utilities:**
+
+| Product | URL | Price | Purpose |
+|---------|-----|-------|---------|
+| Forecasts | `/forecasts` | Free | Browse 7,764 agency forecasts |
 | Action Planner | `/planner` | Free | Task management |
-| Forecasts | `/forecasts` | Free | Browse forecasts |
+
+**BD Assist Exclusive (Coming):**
+
+| Product | URL | Price | Purpose |
+|---------|-----|-------|---------|
+| Federal Market Scanner | `/bd-assist` | $199/mo (BD Assist) | 6-question market intel |
+| Pipeline Tracker | `/bd-assist` | $199/mo (BD Assist) | Opportunity tracking |
+| Teaming CRM | `/bd-assist` | $199/mo (BD Assist) | Partner outreach management |
+| Capture AI | `/bd-assist` | $199/mo (BD Assist) | Win strategy guidance |
 
 #### D. Data Assets
 
@@ -224,6 +302,59 @@ Powered by:
 - Market Intelligence briefings
 - Federal Market Scanner APIs
 - Forecasts, Recompetes, Events
+
+**Federal Market Scanner Output Format:**
+
+For any NAICS + Location input, answer these 6 questions:
+
+```
+User Input: NAICS 238220 (HVAC), Georgia
+
+Output:
+├── WHO is buying HVAC in Georgia?
+│   ├── Fort Benning — $12M/year (DOD)
+│   ├── VA Atlanta Medical Center — $4M/year
+│   ├── CDC Campus — $8M/year (HHS)
+│   └── GSA Region 4 — $6M/year
+│
+├── HOW are they buying?
+│   ├── 40% GSA Schedule 56 (you need this)
+│   ├── 30% Direct contracts (posted on SAM)
+│   ├── 20% Existing BPAs (contact these COs)
+│   └── 10% Micro-purchases (get in vendor database)
+│
+├── WHO has the contracts now?
+│   ├── Johnson Controls — Fort Benning (expires 2027)
+│   ├── Trane — VA Atlanta (expires 2026) ← RECOMPETE
+│   └── Local contractor — CDC (8(a) set-aside)
+│
+├── WHAT opportunities exist RIGHT NOW?
+│   ├── SAM.gov: 3 active (RFQ, Sources Sought, Pre-sol)
+│   ├── Grants.gov: 0
+│   ├── GSA eBuy: 2 (if you have schedule)
+│   └── Forecasts: 5 planned in next 12 months
+│
+├── WHAT events should you attend?
+│   ├── VA Atlanta Industry Day — May 15
+│   ├── Fort Benning Small Business Fair — June 3
+│   └── Georgia APEX Matchmaking — April 22
+│
+└── WHO do I talk to?
+    ├── OSDBU contacts per agency
+    ├── Small Business Specialists
+    └── Contracting Officers
+```
+
+**Data Sources per Question:**
+
+| Question | Primary API | Fallback |
+|----------|-------------|----------|
+| Who's buying? | USASpending MCP | Agency Hierarchy API |
+| How are they buying? | USASpending (vehicle analysis) | Agency Sources API |
+| Who has it now? | USASpending (incumbents) | Recompete Tracker |
+| What's available? | SAM.gov + Grants.gov + Multisite MCPs | Forecasts API |
+| What events? | Federal Events API | Agency calendars |
+| Who to talk to? | Agency Hierarchy API | Contractor DB (SBLOs) |
 
 #### 2. PIPELINE Tab (New - Must Build)
 What it does:
@@ -511,43 +642,62 @@ CREATE INDEX idx_teaming_user ON user_teaming_partners(user_email);
 
 ## Part 7: Pricing Strategy
 
-### Current Pricing (Fragmented)
+### Current Product Structure (Keep As-Is)
 
-| Product | Price | Overlap |
-|---------|-------|---------|
-| Opportunity Hunter Pro | $19/mo | Opp search |
-| Daily Alerts | $19/mo | Notifications |
-| Market Intelligence | $49/mo | Briefings |
-| Recompete Tracker | $397 | Expiring contracts |
-| Market Assassin | $297-497 | Reports |
-| Contractor Database | $497 | Teaming |
-| Content Reaper | $197-397 | Content |
+| Type | Product | Price | What It Does |
+|------|---------|-------|--------------|
+| **Tool** | Market Assassin | $297-497 | Strategic market reports |
+| **Tool** | Content Reaper | $197-397 | AI LinkedIn content |
+| **Database** | Recompete Tracker | $397 | Expiring contracts |
+| **Database** | Contractor Database | $497 | 3,500+ contractors + SBLOs |
+| **Lead Magnet** | Opportunity Hunter | Free (+$19/mo Pro) | Find SAM.gov opps |
+| **Add-on** | Daily Alerts | $19/mo | Opportunity notifications |
+| **Add-on** | Daily Briefings | $49/mo | AI market intelligence |
 
-**Problem:** Customer buys 3 things, pays $700+, still no unified experience.
+**Philosophy:** SMBs buy what they need, own it forever. Tools stay separate.
 
-### BD Assist Pricing (Unified)
-
-| Tier | Price | Includes |
-|------|-------|----------|
-| **Starter** | $49/mo | Intel Hub only (briefings + scanner) |
-| **Professional** | $99/mo | + Pipeline + Teaming |
-| **Enterprise** | $199/mo | + Capture AI + Insights + Priority support |
-
-**Bundles (One-Time)**
+### Current Bundles (Keep As-Is)
 
 | Bundle | Price | Includes |
 |--------|-------|----------|
-| **Quick Start** | $497 | 6 months Professional + onboarding call |
-| **Annual Pro** | $997 | 12 months Professional (17% off) |
-| **Ultimate** | $1,497 | Lifetime Enterprise + all reports |
+| **Starter** | $697 | Opp Hunter Pro + Recompete + Contractor DB |
+| **Pro Giant** | $997 | Contractor DB + Recompete + MA Standard + Content Gen |
+| **Ultimate** | $1,497 | Everything + MA Premium + Lifetime Briefings |
 
-### Migration Path
+### BD Assist: Enterprise Tier (NEW)
 
-Existing customers:
-- Recompete Tracker owners → 12 months Professional free
-- Market Assassin owners → 6 months Professional free
-- Contractor DB owners → Permanent Teaming tab access
-- Bundlers → Lifetime Enterprise
+For firms ready to scale beyond individual tools.
+
+| Tier | Price | Includes |
+|------|-------|----------|
+| **BD Assist** | $199/mo | All tools + Federal Market Scanner + Pipeline + Teaming CRM + Capture AI + Insights |
+| **BD Assist Annual** | $1,997/yr | Same as above (17% discount) |
+
+**What BD Assist Adds (Beyond Tool Access):**
+
+| Feature | In Individual Tools? | In BD Assist? |
+|---------|---------------------|---------------|
+| Market Assassin reports | ✅ (if purchased) | ✅ Included |
+| Recompete data | ✅ (if purchased) | ✅ Included |
+| Contractor search | ✅ (if purchased) | ✅ Included |
+| Daily Briefings | ✅ (if purchased) | ✅ Included |
+| **Federal Market Scanner** | ❌ | ✅ **Exclusive** |
+| **Pipeline Tracker** | ❌ | ✅ **Exclusive** |
+| **Teaming CRM** | ❌ | ✅ **Exclusive** |
+| **Capture AI** | ❌ | ✅ **Exclusive** |
+| **Win/Loss Analytics** | ❌ | ✅ **Exclusive** |
+| **Unified Dashboard** | ❌ | ✅ **Exclusive** |
+
+### Early Adopter Rewards
+
+| Existing Purchase | BD Assist Benefit |
+|-------------------|-------------------|
+| **Ultimate Bundle ($1,497)** | 🎁 **FREE lifetime BD Assist** |
+| Pro Giant Bundle ($997) | 6 months BD Assist free |
+| Starter Bundle ($697) | 3 months BD Assist free |
+| Any single tool | 1 month BD Assist free |
+
+**Ultimate buyers get grandfathered in permanently.** They took the biggest bet on us early — they deserve the full platform.
 
 ---
 
