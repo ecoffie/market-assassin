@@ -276,7 +276,81 @@ Early-warning intel on upcoming procurement opportunities 6-18 months before sol
 
 ---
 
-## 10. General Platform Tasks
+## 10. BD Assist (Pipeline & Teaming)
+
+**Current:** Development complete (April 9, 2026)
+**Purpose:** Unified BD workflow — opportunity pipeline tracking, teaming partner suggestions, market intelligence
+
+### ✅ Completed Features (April 9, 2026)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Pipeline API | **DONE** | `/api/pipeline` - CRUD for opportunity tracking |
+| Pipeline Stages | **DONE** | tracking → pursuing → bidding → submitted → won/lost |
+| Pipeline Stats | **DONE** | Value by stage, overdue actions, win rate |
+| Teaming API | **DONE** | `/api/teaming` - Saved partners management |
+| Teaming Suggestions | **DONE** | `/api/teaming/suggest` - AI partner matching |
+| Partner Scoring | **DONE** | NAICS match (40), Agency (25), Location (15), Contact (10) |
+| Data Registry | **DONE** | `src/lib/data-sources/registry.ts` - Central source tracking |
+| Data Health API | **DONE** | `/api/admin/data-health` - Coverage dashboard |
+| bdassist-mcp | **DONE** | 14 tools for AI agent access |
+
+### Database Schema
+
+**Tables Created:**
+- `user_pipeline` — Opportunity tracking with stages, priority, win probability
+- `pipeline_history` — Audit trail for stage changes
+- `user_teaming_partners` — Saved partners with outreach status
+
+**Migration:** `supabase/migrations/20260410_pipeline_tracker.sql`
+
+### API Endpoints
+
+| Endpoint | Methods | Purpose |
+|----------|---------|---------|
+| `/api/pipeline` | GET, POST, PATCH, DELETE | Opportunity CRUD |
+| `/api/teaming` | GET, POST, PATCH, DELETE | Saved partners |
+| `/api/teaming/suggest` | GET | AI partner suggestions |
+| `/api/admin/data-health` | GET | Data coverage dashboard |
+
+### bdassist-mcp Tools (14 total)
+
+**Intel Tools:**
+- `get_market_scan`, `get_forecasts`, `get_recompetes`, `get_federal_events`, `get_agency_intel`
+
+**Pipeline Tools:**
+- `list_pipeline`, `add_to_pipeline`, `update_pipeline`, `remove_from_pipeline`
+
+**Teaming Tools:**
+- `suggest_teaming_partners`, `list_saved_partners`, `save_teaming_partner`, `search_contractors`
+
+### Data Extensibility
+
+Central registry at `src/lib/data-sources/registry.ts` tracks all data sources:
+
+| Category | API | Coverage | Active Sources |
+|----------|-----|----------|----------------|
+| Forecasts | `/api/forecasts` | 60% | 12 |
+| Events | `/api/federal-events` | 80% | 4 |
+| Recompetes | `/api/recompete` | 70% | 2 |
+| Agency Intel | `/api/agency-sources` | 90% | 4 |
+| Contractors | `/api/contractors` | 95% | 3 |
+| Market Scan | `/api/market-scan` | 85% | 2 |
+
+**To add new sources:** See `/api/admin/data-health` for instructions
+
+### Future Enhancements
+
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| BD Assist Dashboard UI | HIGH | Unified web interface |
+| Capture Strategy API | MEDIUM | AI-generated capture plans |
+| Market Share Analysis | MEDIUM | Agency/NAICS penetration |
+| DOD Forecast Scrapers | MEDIUM | Add $40B coverage |
+
+---
+
+## 11. General Platform Tasks
 
 | Task | Priority | Status | Notes |
 |------|----------|--------|-------|

@@ -1,6 +1,44 @@
 # GovCon Giants - Current Tasks
 
-## Session State (April 6, 2026)
+## Session State (April 9, 2026)
+
+### ✅ COMPLETED: BD Assist API & MCP Infrastructure
+
+**Status:** Deployed to production (April 9, 2026)
+
+**New APIs Live:**
+| Endpoint | Purpose | Status |
+|----------|---------|--------|
+| `/api/pipeline` | Opportunity tracking CRUD | ✅ Working |
+| `/api/teaming` | Saved partners management | ✅ Working |
+| `/api/teaming/suggest` | AI partner suggestions | ✅ Working |
+| `/api/admin/data-health` | Data coverage dashboard | ✅ Working (80% coverage) |
+
+**Database Tables Created:**
+- `user_pipeline` — Opportunity tracking with stages
+- `pipeline_history` — Audit trail for stage changes
+- `user_teaming_partners` — Saved teaming partners
+
+**Migration:** `supabase/migrations/20260410_pipeline_tracker.sql`
+
+**Data Extensibility System:**
+- Central registry: `src/lib/data-sources/registry.ts`
+- Documents all data sources with coverage tracking
+- Easy to add new sources following documented pattern
+
+**bdassist-mcp Server:**
+- Location: `/Users/ericcoffie/mcp-servers/bdassist/`
+- 14 tools: Intel (5), Pipeline (4), Teaming (5)
+- Added to Claude config at `~/.claude.json`
+
+**Next Steps:**
+- [ ] Build BD Assist dashboard UI
+- [ ] Add more forecast sources (DOD, HHS, USDA)
+- [ ] Capture strategy API
+
+---
+
+## Previous Session State (April 6, 2026)
 
 ### ✅ COMPLETED: Forecast Intelligence System - Phase 1-2
 

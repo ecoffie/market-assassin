@@ -123,4 +123,77 @@ Reference for building future GovCon tools using federal open data APIs.
 
 ---
 
-*Last Updated: March 29, 2026*
+---
+
+## Data Extensibility System (April 9, 2026)
+
+Central registry for all BD Assist data sources. Makes it easy to add new sources, track coverage, and manage updates.
+
+### Data Health Dashboard
+
+**Admin Endpoint:** `/api/admin/data-health?password=galata-assassin-2026`
+
+Returns:
+- Overall health score (Good/Fair/Needs Work)
+- Per-category coverage percentages
+- Active vs pending sources
+- Live record counts from database
+- Instructions for adding new sources
+
+### Registry Location
+
+**File:** `src/lib/data-sources/registry.ts`
+
+### Current Coverage (April 9, 2026)
+
+| Category | API | Coverage | Active | Pending | Records |
+|----------|-----|----------|--------|---------|---------|
+| Forecasts | `/api/forecasts` | 60% | 12 | 4 | 7,764 |
+| Events | `/api/federal-events` | 80% | 4 | 3 | ~500 |
+| Recompetes | `/api/recompete` | 70% | 2 | 2 | 9,450 |
+| Agency Intel | `/api/agency-sources` | 90% | 4 | 1 | 2,765 |
+| Contractors | `/api/contractors` | 95% | 3 | 0 | 3,500 |
+| Market Scan | `/api/market-scan` | 85% | 2 | 0 | Live API |
+
+### How to Add a New Source
+
+1. **Add to registry:** `src/lib/data-sources/registry.ts`
+2. **Create import script:** `scripts/import-[source].js` (if needed)
+3. **Create scraper:** `src/lib/forecasts/scrapers/` (if scraping)
+4. **Run import/scraper**
+5. **Verify:** `/api/admin/data-health`
+
+### Source Status Values
+
+| Status | Meaning |
+|--------|---------|
+| `active` | Working, data flowing |
+| `pending` | Planned, not yet implemented |
+| `broken` | Was working, needs fix |
+| `retired` | No longer available |
+
+### MCP Integration
+
+**bdassist-mcp** provides AI agent access to all data sources:
+
+```bash
+# Add to ~/.claude.json
+"bdassist": {
+  "command": "node",
+  "args": ["/Users/ericcoffie/mcp-servers/bdassist/index.js"]
+}
+```
+
+**Tools Available:**
+- `get_market_scan` — Federal spending analysis
+- `get_forecasts` — 7,700+ procurement forecasts
+- `get_recompetes` — Expiring contracts
+- `get_federal_events` — Industry days, conferences
+- `get_agency_intel` — Pain points + hierarchy
+- `list_pipeline` / `add_to_pipeline` / `update_pipeline` — Opportunity tracking
+- `suggest_teaming_partners` / `list_saved_partners` — Partner management
+- `search_contractors` — 3,500+ contractor database
+
+---
+
+*Last Updated: April 9, 2026*

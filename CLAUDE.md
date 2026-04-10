@@ -283,8 +283,32 @@ Users with custom NAICS profiles (via preferences page) get briefings immediatel
 - `api/cron/daily-alerts/route.ts` — Main alerts cron handler
 - `api/cron/precompute-briefings/route.ts` — Pre-compute templates by NAICS profile
 - `api/cron/send-briefings-fast/route.ts` — Send using pre-computed templates (~100ms/user)
-- `alerts/preferences/page.tsx` — User preferences UI
+- `alerts/preferences/page.tsx` — Redirects to `/briefings` (unified UI)
 - `api/alerts/preferences/route.ts` — Preferences API
+
+**Unified Market Intelligence UI (April 9, 2026):**
+- `/briefings` — Single unified dashboard with Market Intelligence branding
+- `/alerts/preferences` — Now redirects to `/briefings`
+- Settings panel accessible via gear icon in dashboard header
+- Onboarding wizard for new users (NAICS → Agencies → Geography → Delivery)
+- Demo video: `https://vimeo.com/1181569155`
+
+**Dashboard Features (April 9, 2026):**
+- **Search bar** — Find opportunities by title, agency, keywords with highlighting
+- **Filter buttons** — All, Urgent, Opportunities, Teaming with counts
+- **CSV export** — Download filtered briefing data as spreadsheet
+- **Print/PDF** — Browser print dialog for PDF export
+- **Email feedback** — Thumbs up/down buttons in emails track helpfulness
+
+**Feedback System:**
+- API: `/api/briefings/feedback` (GET for email links, POST for programmatic)
+- Pages: `/briefings/feedback/thanks`, `/briefings/feedback/error`
+- Table: `briefing_feedback` (user_email, briefing_date, briefing_type, rating)
+
+**UI Components:**
+- `src/components/briefings/MarketIntelligenceHeader.tsx` — Dashboard header with MI branding
+- `src/components/briefings/OnboardingWizard.tsx` — 4-step setup wizard
+- `src/components/briefings/SettingsPanel.tsx` — Slide-out settings panel (all preferences)
 
 **Cron Schedule (UTC):**
 | Job | Times | Purpose |

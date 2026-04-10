@@ -104,6 +104,21 @@ export default function MarketIntelligencePage() {
           </p>
         </div>
 
+        {/* Video Demo */}
+        <div className="mb-8 rounded-xl overflow-hidden border border-slate-700 bg-slate-900/50">
+          <div className="aspect-video">
+            <iframe
+              src="https://player.vimeo.com/video/1181569155?badge=0&autopause=0&player_id=0&app_id=58479&title=0&byline=0&portrait=0"
+              className="w-full h-full"
+              allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media"
+              title="Market Intelligence Brief Settings"
+            />
+          </div>
+          <div className="p-3 text-center border-t border-slate-700">
+            <p className="text-sm text-slate-400">See how to configure your personalized briefings in under a minute</p>
+          </div>
+        </div>
+
         <div className="border border-slate-700 rounded-xl p-4 mb-8 bg-slate-900/50">
           <p className="text-slate-400 text-sm mb-3 text-center">Already purchased? Enter your email to access:</p>
           <form onSubmit={handleVerifyAccess} className="flex gap-2">
