@@ -310,17 +310,17 @@ Users with custom NAICS profiles (via preferences page) get briefings immediatel
 - `src/components/briefings/OnboardingWizard.tsx` — 4-step setup wizard
 - `src/components/briefings/SettingsPanel.tsx` — Slide-out settings panel (all preferences)
 
-**Cron Schedule (UTC):**
-| Job | Times | Purpose |
-|-----|-------|---------|
-| daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | Timezone coverage |
-| precompute-briefings | 2:00, 2:30, 3:00, 3:30, 4:00 AM | Daily templates by NAICS profile |
-| send-briefings-fast | 7:00-8:30 AM (every 10 min) | Send daily briefings |
-| precompute-weekly-briefings | Sat 8:00, 8:30, 9:00, 9:30, 10:00 PM | Weekly templates by NAICS profile |
-| send-weekly-fast | Sun 7:00-8:30 AM (every 10 min) | Send weekly briefings |
-| precompute-pursuit-briefs | Sun 8:00, 8:30, 9:00, 9:30, 10:00 PM | Pursuit templates by NAICS profile |
-| send-pursuit-fast | Mon 7:00-8:30 AM (every 10 min) | Send pursuit briefs |
-| weekly-alerts | 11 PM Sunday | Weekly digest |
+**Cron Schedule (ET):**
+| Job | Times (ET) | Purpose |
+|-----|------------|---------|
+| daily-alerts | 7 AM, 8 AM, 10 AM, 12 PM | Timezone coverage |
+| precompute-briefings | 10:00-11:30 PM (prev night) | Daily templates by NAICS profile |
+| send-briefings-fast | 3:00-4:30 AM (every 10 min) | Send daily briefings |
+| precompute-weekly-briefings | Sat 4:00-6:00 PM | Weekly templates by NAICS profile |
+| send-weekly-fast | Sun 3:00-4:30 AM (every 10 min) | Send weekly briefings |
+| precompute-pursuit-briefs | Sun 4:00-6:00 PM | Pursuit templates by NAICS profile |
+| send-pursuit-fast | Mon 3:00-4:30 AM (every 10 min) | Send pursuit briefs |
+| weekly-alerts | 7 PM Sunday | Weekly digest |
 
 **Briefing rollout model:**
 - `beta_all` = full eligible briefing audience
@@ -338,7 +338,7 @@ Enterprise-grade failsafe for 9,000+ users:
 | Component | Purpose |
 |-----------|---------|
 | Dead Letter Queue | Failed briefings retry up to 3x with exponential backoff |
-| Watchdog Cron | Runs 9 AM, 9:30 AM, 10 AM UTC daily to monitor health |
+| Watchdog Cron | Runs 5 AM, 5:30 AM, 6 AM ET daily to monitor health |
 | Self-Healing | Auto-triggers precompute if <80% template coverage |
 | Alert Escalation | Warning (5% failure) → Critical (15% failure) |
 

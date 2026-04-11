@@ -121,9 +121,9 @@
 3. **NSF SBIR** (via SBIR.gov) - API rate limited (429), will retry automatically
 
 **Cron Jobs Configured (vercel.json):**
-- NIH Reporter: `0 4 * * *` (4 AM UTC daily)
-- DARPA BAA: `0 5 * * *` (5 AM UTC daily)
-- NSF SBIR: `0 6 * * *` (6 AM UTC daily)
+- NIH Reporter: `0 4 * * *` (12 AM ET daily)
+- DARPA BAA: `0 5 * * *` (1 AM ET daily)
+- NSF SBIR: `0 6 * * *` (2 AM ET daily)
 
 **Database State:**
 - `aggregated_opportunities`: **106 rows** (100 NIH + 6 DARPA)
@@ -272,8 +272,8 @@ curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buyi
 2. **Timezone Filter Blocking 90%+ Users** - Only sent if local time 6-10 AM, but cron ran at wrong time
    - **Fix:** Removed timezone filter entirely - briefings now go to ALL users
 
-3. **Cron Schedule Wrong** - Was running at 10 AM UTC (5-6 AM ET)
-   - **Fix:** Changed to 7 AM UTC (2-3 AM ET) so users see briefings when they wake up
+3. **Cron Schedule Wrong** - Was running at 6 AM ET
+   - **Fix:** Changed to 3 AM ET so users see briefings when they wake up
 
 4. **Small Batch Sizes** - Only 10 users/batch, max 200 users/run
    - **Fix:** Increased to 25/batch, 1000 max users per run
@@ -287,7 +287,7 @@ curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buyi
 **Verification:** 9 briefings sent successfully via trigger-briefings. Check if zach@govcongiants.com received email.
 
 **Current Cron Schedule:**
-| Job | Schedule (UTC) | Local (ET) |
+| Job | Schedule (ET) | Notes |
 |-----|----------------|------------|
 | send-briefings | 7 AM | 2-3 AM |
 | daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | 6-7 AM, 7-8 AM, 9-10 AM, 11 AM-12 PM |
@@ -478,9 +478,9 @@ done
 
 **Schedule:**
 - **Daily Alerts** (4x/day) - SAM.gov opportunities matching user NAICS
-- **Daily Briefs** (7 AM UTC) - Recompete intel, awards, teaming leads
-- **Weekly Pursuit Brief** (Monday 10 AM UTC) - Auto-selects TOP opportunity
-- **Weekly Deep Dive** (Sunday 10 AM UTC) - Comprehensive market analysis
+- **Daily Briefs** (3 AM ET) - Recompete intel, awards, teaming leads
+- **Weekly Pursuit Brief** (Monday 6 AM ET) - Auto-selects TOP opportunity
+- **Weekly Deep Dive** (Sunday 6 AM ET) - Comprehensive market analysis
 
 #### Test Endpoints
 ```bash

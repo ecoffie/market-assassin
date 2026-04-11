@@ -377,7 +377,7 @@ if (supabase) {
 
 **Data flow:**
 ```
-Crons (7 AM UTC)          →    briefing_snapshots table    →    generateBriefing()
+Crons (3 AM ET)           →    briefing_snapshots table    →    generateBriefing()
 snapshot-opportunities    →    tool: opportunity_hunter    →    items for user
 snapshot-recompetes      →    tool: recompete             →    items for user
 snapshot-awards          →    tool: market_assassin       →    items for user
@@ -607,7 +607,7 @@ function extractAndParseJSON<T>(responseText: string): T {
 
 **What happened:**
 - Code only sent briefings if user's local time was 6-10 AM
-- Cron ran at 10 AM UTC (5-6 AM ET)
+- Cron ran at 6 AM ET
 - Most users outside delivery window = silently skipped
 - 90%+ users never received briefings
 
@@ -616,7 +616,7 @@ function extractAndParseJSON<T>(responseText: string): T {
 - Looks like success in monitoring
 - Hard to diagnose
 
-**Fix:** Removed timezone filter. Send to ALL users at fixed UTC time (7 AM UTC = 2-3 AM ET).
+**Fix:** Removed timezone filter. Send to ALL users at fixed time (3 AM ET).
 Users wake up to see briefings instead of system trying to "guess" their wake time.
 
 **Pattern:** For non-critical notifications, prefer fixed send times over smart delivery windows.
@@ -630,24 +630,24 @@ Smart windows create silent failure modes.
 
 **Bad schedule:**
 ```json
-{ "path": "/api/cron/send-briefings", "schedule": "0 10 * * *" }  // 10 AM UTC = 5-6 AM ET
+{ "path": "/api/cron/send-briefings", "schedule": "0 10 * * *" }  // 6 AM ET
 ```
 Users might already be awake and checking email before briefings arrive.
 
 **Good schedule:**
 ```json
-{ "path": "/api/cron/send-briefings", "schedule": "0 7 * * *" }   // 7 AM UTC = 2-3 AM ET
+{ "path": "/api/cron/send-briefings", "schedule": "0 7 * * *" }   // 3 AM ET
 ```
 Briefings are in inbox when users wake up at 6-7 AM ET.
 
-**Current schedule:**
-| Job | UTC Time | ET Time | Purpose |
-|-----|----------|---------|---------|
-| send-briefings | 7 AM | 2-3 AM | Daily briefings (before wake) |
-| daily-alerts (1) | 11 AM | 6-7 AM | Morning alert (first check) |
-| daily-alerts (2) | 12 PM | 7-8 AM | Morning catch-up |
-| daily-alerts (3) | 2 PM | 9-10 AM | Mid-morning |
-| daily-alerts (4) | 4 PM | 11 AM-12 PM | Lunch catch-up |
+**Current schedule (ET):**
+| Job | ET Time | Purpose |
+|-----|---------|---------|
+| send-briefings | 3 AM | Daily briefings (before wake) |
+| daily-alerts (1) | 7 AM | Morning alert (first check) |
+| daily-alerts (2) | 8 AM | Morning catch-up |
+| daily-alerts (3) | 10 AM | Mid-morning |
+| daily-alerts (4) | 12 PM | Lunch catch-up |
 
 ---
 
