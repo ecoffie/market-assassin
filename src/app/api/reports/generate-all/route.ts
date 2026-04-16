@@ -3,7 +3,7 @@ import { suggestPrimesForAgencies, getPrimesByNAICS, suggestTier2ForAgencies } f
 import { suggestTribesForAgencies, getTribesByNAICS } from '@/lib/utils/tribal-businesses';
 import { getPainPointsForAgency, getPrioritiesForAgency, getSimilarAgencies, generateAgencyNeeds, generateAgencyNeedsWithCommands, getPainPointsForCommand } from '@/lib/utils/pain-points';
 import { getOpportunitiesByCoreInputs, getUrgencyLevel, getQuickWinStrategy } from '@/lib/utils/december-spend';
-import { getForecastsForSelectedAgencies, getUpcomingForecasts, getForecastStatistics } from '@/lib/utils/agency-forecasts';
+import { getLiveForecastsForSelectedAgencies, getUpcomingForecasts, getForecastStatistics } from '@/lib/utils/agency-forecasts-live';
 import { searchIDVContracts } from '@/lib/idv-search';
 import { getEnhancedAgencyInfo, isDoDAgency } from '@/lib/utils/command-info';
 import { ComprehensiveReport, CoreInputs, Agency, SimplifiedAcquisitionReport, SimplifiedAcquisitionAgency } from '@/types/federal-market-assassin';
@@ -481,10 +481,10 @@ export async function POST(request: NextRequest) {
           ],
         };
 
-    // Generate Forecast List Report using agency forecasts database with command-specific URLs
-    const forecastListReport = (() => {
+    // Generate Forecast List Report using LIVE Supabase forecasts (7,764+ records)
+    const forecastListReport = await (async () => {
       // Get forecasts for selected agencies, filtered by NAICS and business type
-      const allForecasts = getForecastsForSelectedAgencies(
+      const allForecasts = await getLiveForecastsForSelectedAgencies(
         selectedAgencies,
         inputs.naicsCode,
         inputs.businessType

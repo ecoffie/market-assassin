@@ -100,13 +100,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const supabase = createClient(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+  }
+  return _supabase;
+}
 
     // Get latest briefing data for this user
-    const { data: briefingData } = await supabase
+    const { data: briefingData } = await getSupabase()
       .from('briefing_log')
       .select('briefing_data')
       .eq('user_email', email)

@@ -169,10 +169,17 @@ export async function POST(request: NextRequest) {
   try {
     // Dynamic import to avoid loading puppeteer at build time
     const scraperModule = await import('@/lib/forecasts/scrapers');
-    const supabase = createClient(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+  }
+  return _supabase;
+}
 
     const results: Record<string, {
       success: boolean;
@@ -194,7 +201,7 @@ export async function POST(request: NextRequest) {
         let persisted = 0;
         let persistenceError: string | null = null;
         if (!dryRun) {
-          const persistence = await persistScraperResult(supabase, key, result);
+          const persistence = await persistScraperResult(getSupabase(), key, result);
           persisted = persistence.persisted;
           persistenceError = persistence.error;
         }
@@ -233,7 +240,7 @@ export async function POST(request: NextRequest) {
       let persisted = 0;
       let persistenceError: string | null = null;
       if (!dryRun) {
-        const persistence = await persistScraperResult(supabase, agencyUpper, result);
+        const persistence = await persistScraperResult(getSupabase(), agencyUpper, result);
         persisted = persistence.persisted;
         persistenceError = persistence.error;
       }

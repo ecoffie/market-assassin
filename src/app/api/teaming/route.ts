@@ -12,10 +12,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 export interface TeamingPartner {
   id?: string;
@@ -51,7 +58,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let query = supabase
+    let query = getSupabase()
       .from('user_teaming_partners')
       .select('*')
       .eq('user_email', email.toLowerCase())
@@ -133,7 +140,7 @@ export async function POST(request: NextRequest) {
     body.outreach_status = body.outreach_status || 'none';
     body.source = body.source || 'manual';
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_teaming_partners')
       .insert(body)
       .select()
@@ -181,7 +188,7 @@ export async function PATCH(request: NextRequest) {
       updates.last_contact = new Date().toISOString().split('T')[0];
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_teaming_partners')
       .update(updates)
       .eq('id', id)
@@ -217,7 +224,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('user_teaming_partners')
       .delete()
       .eq('id', id)

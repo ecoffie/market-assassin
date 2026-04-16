@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
         hasAccess: true,
         email: email.toLowerCase(),
         grantedAt: accessData?.createdAt,
-        productId: 'opportunity-scout-pro',
+        productId: 'opportunity-hunter-pro',
       });
     }
 

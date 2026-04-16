@@ -72,6 +72,15 @@ const sources = {
     headerRow: 0,
     parser: parseDOJ,
   },
+  ONR: {
+    name: 'Office of Naval Research',
+    url: 'https://www.onr.navy.mil/media/document/onr-and-nrl-long-range-acquisition-estimate',
+    localPath: path.join(__dirname, '..', 'tmp', 'forecasts', 'onr-nrl-lrae.xlsx'),
+    sheetName: 'ONR', // Also has 'NRL' sheet
+    headerRow: 6,
+    parser: parseONR,
+    multiSheet: ['ONR', 'NRL'], // Process both sheets
+  },
 };
 
 // ============================================================================
@@ -245,6 +254,79 @@ function parseDOJ(row, headers) {
     poc_phone: getCol('Requirement POC - Phone'),
 
     raw_data: JSON.stringify(row),
+  };
+}
+
+function parseONR(row, headers, sheetName = 'ONR') {
+  // ONR/NRL columns: Requirement Title, Requirement Description, Associated Program or Requirement Office,
+  // Anticipated Total Value (Including Options), Anticipated Procurement Method, Anticipated Contract Type,
+  // Anticipated Procurement Instrument, Contracting Office UIC, Anticipated Solicitation - Fiscal Year,
+  // Anticipated Solicitation - Quarter, Anticipated Award - Fiscal Year, Anticipated Award - Quarter,
+  // Anticipated Period of Performance (Months), Follow-on or New, Existing Contract Number, Incumbent Contractor,
+  // Anticipated Place of Performance, Anticipated NAICS Code, Anticipated Product or Service Code,
+  // Contracting POC Name, Contracting POC E-mail or Phone
+
+  const getCol = (name) => {
+    const idx = headers.findIndex(h => h && h.toString().toLowerCase().includes(name.toLowerCase()));
+    return idx >= 0 ? row[idx] : null;
+  };
+
+  const title = getCol('Requirement Title');
+  const naicsCode = getCol('NAICS Code') || getCol('NAICS');
+  if (!title && !naicsCode) return null;
+
+  const value = getCol('Anticipated Total Value') || getCol('Total Value');
+  const { min, max } = parseValueRange(value);
+
+  // Determine department based on sheet
+  const bureau = sheetName === 'NRL' ? 'Naval Research Laboratory' : 'Office of Naval Research';
+  const sourceAgency = sheetName === 'NRL' ? 'NRL' : 'ONR';
+
+  return {
+    source_agency: sourceAgency,
+    source_type: 'excel',
+    external_id: null, // Will be assigned by main loop
+
+    title: title || `${bureau} ${naicsCode} Opportunity`,
+    description: getCol('Requirement Description') || getCol('Description'),
+
+    department: 'Department of the Navy',
+    bureau: bureau,
+    program_office: getCol('Associated Program') || getCol('Requirement Office'),
+    contracting_office: getCol('Contracting Office UIC'),
+
+    naics_code: normalizeNaics(naicsCode),
+    psc_code: getCol('Product or Service Code') || getCol('PSC'),
+
+    fiscal_year: normalizeFY(getCol('Award - Fiscal Year') || getCol('Fiscal Year')),
+    anticipated_quarter: getCol('Award - Quarter') || getCol('Quarter'),
+
+    estimated_value_min: min,
+    estimated_value_max: max,
+    estimated_value_range: value ? value.toString() : null,
+
+    contract_type: getCol('Contract Type'),
+    set_aside_type: normalizeSetAside(getCol('Procurement Method')), // ONR uses procurement method for set-aside info
+
+    incumbent_name: getCol('Incumbent Contractor') || getCol('Incumbent'),
+    incumbent_contract_number: getCol('Existing Contract Number') || getCol('Contract Number'),
+
+    pop_state: getCol('Place of Performance'),
+
+    poc_name: getCol('Contracting POC Name') || getCol('POC Name'),
+    poc_email: getCol('POC E-mail') || getCol('POC Phone'),
+
+    // Store extra fields in raw_data
+    raw_data: JSON.stringify({
+      procurement_method: getCol('Procurement Method'),
+      procurement_instrument: getCol('Procurement Instrument'),
+      solicitation_fy: getCol('Solicitation - Fiscal Year'),
+      solicitation_quarter: getCol('Solicitation - Quarter'),
+      period_of_performance: getCol('Period of Performance'),
+      follow_on_or_new: getCol('Follow-on or New'),
+      clearance_required: getCol('Facilities Clearance') || getCol('Personnel Clearance'),
+      comments: getCol('Comments') || getCol('Special Requirements'),
+    }),
   };
 }
 
@@ -449,37 +531,53 @@ async function importSource(sourceKey, config) {
   try {
     // Read Excel
     const workbook = XLSX.readFile(config.localPath);
-    const sheetName = config.sheetName || workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    console.log(`  Sheet: ${sheetName}`);
-    console.log(`  Total rows: ${data.length}`);
+    // Handle multi-sheet sources (like ONR with ONR + NRL sheets)
+    const sheetsToProcess = config.multiSheet || [config.sheetName || workbook.SheetNames[0]];
 
-    // Get headers
-    const headers = data[config.headerRow] || [];
-    console.log(`  Headers: ${headers.slice(0, 5).join(', ')}...`);
-
-    // Parse records
     const records = [];
+    let totalRows = 0;
     let skipped = 0;
 
-    for (let i = config.headerRow + 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row || row.length < 3) {
-        skipped++;
+    for (const sheetName of sheetsToProcess) {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) {
+        console.log(`  ⚠️  Sheet "${sheetName}" not found, skipping`);
         continue;
       }
 
-      const parsed = config.parser(row, headers);
-      if (parsed && parsed.naics_code) {
-        // Generate consistent external_id for deduplication
-        parsed.external_id = parsed.external_id || `${sourceKey}-${i}-${parsed.naics_code}`;
-        records.push(parsed);
-      } else {
-        skipped++;
+      const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      totalRows += data.length;
+
+      console.log(`  Sheet: ${sheetName} (${data.length} rows)`);
+
+      // Get headers
+      const headers = data[config.headerRow] || [];
+      if (sheetsToProcess.length === 1) {
+        console.log(`  Headers: ${headers.slice(0, 5).join(', ')}...`);
+      }
+
+      // Parse records
+      for (let i = config.headerRow + 1; i < data.length; i++) {
+        const row = data[i];
+        if (!row || row.length < 3) {
+          skipped++;
+          continue;
+        }
+
+        // Pass sheetName to parser for multi-sheet sources
+        const parsed = config.parser(row, headers, sheetName);
+        if (parsed && parsed.naics_code) {
+          // Generate consistent external_id for deduplication (include sheet name)
+          parsed.external_id = parsed.external_id || `${parsed.source_agency || sourceKey}-${sheetName}-${i}-${parsed.naics_code}`;
+          records.push(parsed);
+        } else {
+          skipped++;
+        }
       }
     }
+
+    console.log(`  Total rows across all sheets: ${totalRows}`);
 
     console.log(`  Parsed: ${records.length} records`);
     console.log(`  Skipped: ${skipped} rows`);

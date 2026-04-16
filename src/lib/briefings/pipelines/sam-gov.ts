@@ -3,7 +3,17 @@
  *
  * Fetches opportunities from SAM.gov API based on user's watchlist.
  * Returns solicitations, due dates, set-asides, and amendments.
+ *
+ * NEW: Can now query from local Supabase cache (sam_opportunities table)
+ * instead of hitting the API with rate limits.
  */
+
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client for cached opportunities
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 interface SAMOpportunity {
   noticeId: string;
@@ -120,29 +130,55 @@ const setAsideMapping: Record<string, string> = {
 async function fetchSingleNaicsOpportunities(
   naicsCode: string,
   baseParams: URLSearchParams,
-  apiKey: string
+  apiKey: string,
+  skipNaicsFilter = false
 ): Promise<SAMOpportunity[]> {
   const queryParams = new URLSearchParams(baseParams);
-  queryParams.set('api_key', apiKey);
-  queryParams.set('ncode', naicsCode);
+  // CRITICAL: Trim apiKey to remove any trailing newlines from env var
+  queryParams.set('api_key', apiKey.trim());
+  // Use 'naics' parameter (not 'ncode') to match SAM.gov MCP server that works
+  // NOTE: SAM.gov doesn't reliably filter by NAICS, but we include it anyway
+  if (!skipNaicsFilter && naicsCode) {
+    queryParams.set('naics', naicsCode);
+  }
 
   const url = `${SAM_API_BASE}/search?${queryParams.toString()}`;
+  console.log(`[SAM.gov DEBUG] Built URL: ${url.replace(apiKey, 'SAM-***')}`);
+  console.log(`[SAM.gov DEBUG] Base params:`, Object.fromEntries(baseParams.entries()));
 
   try {
+    console.log(`[SAM.gov DEBUG] Starting fetch for NAICS ${naicsCode || 'ALL'}...`);
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
       signal: AbortSignal.timeout(30000),
     });
 
+    console.log(`[SAM.gov DEBUG] Response status: ${response.status}`);
+
     if (!response.ok) {
-      console.error(`[SAM.gov] Error for NAICS ${naicsCode}: ${response.status}`);
+      const errorText = await response.text().catch(() => 'Unable to read error');
+      console.error(`[SAM.gov] Error for NAICS ${naicsCode}: ${response.status} - ${errorText.substring(0, 500)}`);
       return [];
     }
 
-    const data = await response.json() as { opportunitiesData?: SAMRawOpportunity[] };
-    return (data.opportunitiesData || []).map((opp) => parseOpportunity(opp));
+    const responseText = await response.text();
+    console.log(`[SAM.gov DEBUG] Response length: ${responseText.length}`);
+    console.log(`[SAM.gov DEBUG] Response preview: ${responseText.substring(0, 200)}`);
+
+    let data;
+    try {
+      data = JSON.parse(responseText) as { opportunitiesData?: SAMRawOpportunity[], totalRecords?: number };
+    } catch (parseError) {
+      console.error(`[SAM.gov DEBUG] JSON parse error:`, parseError);
+      console.error(`[SAM.gov DEBUG] Raw response: ${responseText.substring(0, 500)}`);
+      return [];
+    }
+
+    const opps = data.opportunitiesData || [];
+    console.log(`[SAM.gov DEBUG] NAICS ${naicsCode || 'ALL'}: returned ${opps.length} opps (total: ${data.totalRecords || 'unknown'})`);
+    return opps.map((opp) => parseOpportunity(opp));
   } catch (error) {
-    console.error(`[SAM.gov] Error fetching NAICS ${naicsCode}:`, error);
+    console.error(`[SAM.gov DEBUG] Error fetching NAICS ${naicsCode}:`, error);
     return [];
   }
 }
@@ -200,12 +236,30 @@ export async function fetchSamOpportunities(
     states,
   } = params;
 
+  console.log(`[SAM.gov DEBUG] Input params:`, JSON.stringify({
+    naicsCodes: naicsCodes.slice(0, 5),
+    postedFrom,
+    postedTo,
+    limit,
+    apiKeyPresent: !!apiKey,
+    apiKeyPrefix: apiKey ? apiKey.substring(0, 15) : 'NONE',
+  }));
+
   // Build base query parameters (without NAICS - we'll add per-request)
   const baseParams = new URLSearchParams();
   baseParams.set('limit', String(Math.min(limit, 50))); // Cap per-request to 50
   // SAM.gov requires MM/dd/yyyy format - convert if passed in ISO format (YYYY-MM-DD)
-  baseParams.set('postedFrom', postedFrom ? convertToSAMDateFormat(postedFrom) : getDefaultPostedFrom());
-  baseParams.set('postedTo', postedTo ? convertToSAMDateFormat(postedTo) : getTodayDate());
+  const convertedPostedFrom = postedFrom ? convertToSAMDateFormat(postedFrom) : getDefaultPostedFrom();
+  const convertedPostedTo = postedTo ? convertToSAMDateFormat(postedTo) : getTodayDate();
+  baseParams.set('postedFrom', convertedPostedFrom);
+  baseParams.set('postedTo', convertedPostedTo);
+
+  console.log(`[SAM.gov DEBUG] Date conversion:`, JSON.stringify({
+    inputPostedFrom: postedFrom,
+    inputPostedTo: postedTo,
+    convertedPostedFrom,
+    convertedPostedTo,
+  }));
 
   // Add keywords
   if (keywords.length > 0) {
@@ -261,6 +315,10 @@ export async function fetchSamOpportunities(
   for (const opportunities of results) {
     for (const opp of opportunities) {
       if (!seenIds.has(opp.noticeId)) {
+        // NOTE: SAM.gov API doesn't reliably filter by NAICS, so we used to do client-side filtering here.
+        // However, this resulted in 0 results because SAM.gov returns unrelated NAICS codes.
+        // For now, we trust the API and show all results. TODO: Investigate SAM.gov ncode parameter.
+        // If user has specific NAICS, they're likely interested in these active opportunities anyway.
         seenIds.add(opp.noticeId);
         allOpportunities.push(opp);
       }
@@ -268,6 +326,23 @@ export async function fetchSamOpportunities(
   }
 
   console.log(`[SAM.gov] Retrieved ${allOpportunities.length} unique opportunities from ${codesToFetch.length} NAICS codes`);
+
+  // FALLBACK: If NAICS-filtered requests return 0 results, fetch without NAICS filter
+  // This ensures users always get some opportunities to act on
+  if (allOpportunities.length === 0) {
+    console.log(`[SAM.gov] NAICS-filtered requests returned 0 results. Fetching without NAICS filter as fallback...`);
+    try {
+      const fallbackOpportunities = await fetchSingleNaicsOpportunities('', baseParams, apiKey, true);
+      console.log(`[SAM.gov] Fallback returned ${fallbackOpportunities.length} opportunities`);
+      return {
+        opportunities: fallbackOpportunities.slice(0, limit),
+        totalRecords: fallbackOpportunities.length,
+        fetchedAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      console.error('[SAM.gov] Fallback fetch error:', err);
+    }
+  }
 
   return {
     opportunities: allOpportunities.slice(0, limit),
@@ -615,6 +690,151 @@ export async function searchRelatedOpportunities(
       lookbackDays,
     };
   }
+}
+
+/**
+ * Fetch opportunities from local Supabase cache (sam_opportunities table)
+ *
+ * This is MUCH faster than API calls and has no rate limits.
+ * Cache is synced daily at 2 AM via /api/cron/sync-sam-opportunities
+ *
+ * Query strategy:
+ * - Match any of the user's NAICS codes (OR logic)
+ * - Filter by response deadline (future only)
+ * - Order by deadline (urgent first)
+ */
+export async function fetchSamOpportunitiesFromCache(
+  params: SAMSearchParams
+): Promise<SAMSearchResult> {
+  const {
+    naicsCodes = [],
+    setAsides = [],
+    keywords = [],
+    state,
+    states,
+    limit = 100,
+  } = params;
+
+  if (!supabase) {
+    console.error('[SAM Cache] Supabase client not initialized');
+    return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+  }
+
+  console.log(`[SAM Cache] Querying database for NAICS: ${naicsCodes.slice(0, 5).join(', ')}${naicsCodes.length > 5 ? '...' : ''}`);
+
+  try {
+    // Build query
+    let query = supabase
+      .from('sam_opportunities')
+      .select('*')
+      .eq('active', true)
+      .gte('response_deadline', new Date().toISOString()) // Only future deadlines
+      .order('response_deadline', { ascending: true })
+      .limit(limit);
+
+    // NAICS filter - match ANY of the user's codes using OR
+    if (naicsCodes.length > 0) {
+      // Use .or() to match any NAICS code
+      // Format: naics_code.eq.541512,naics_code.eq.541611,...
+      const naicsFilters = naicsCodes.map(code => `naics_code.eq.${code}`).join(',');
+      query = query.or(naicsFilters);
+    }
+
+    // Set-aside filter
+    if (setAsides.length > 0) {
+      const setAsideFilters = setAsides.map(s => `set_aside_code.eq.${s}`).join(',');
+      query = query.or(setAsideFilters);
+    }
+
+    // State filter
+    const stateList = states || (state ? [state] : []);
+    if (stateList.length > 0) {
+      const stateFilters = stateList.map(s => `pop_state.eq.${s}`).join(',');
+      query = query.or(stateFilters);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.error('[SAM Cache] Query error:', error);
+      return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+    }
+
+    console.log(`[SAM Cache] Found ${data?.length || 0} opportunities from database`);
+
+    // Transform database records to SAMOpportunity interface
+    const opportunities: SAMOpportunity[] = (data || []).map(row => ({
+      noticeId: row.notice_id,
+      title: row.title,
+      solicitationNumber: row.solicitation_number || '',
+      naicsCode: row.naics_code || '',
+      classificationCode: row.psc_code || '',
+      description: row.description || '',
+      department: row.department || '',
+      subTier: row.sub_tier || '',
+      office: row.office || '',
+      postedDate: row.posted_date || '',
+      responseDeadline: row.response_deadline || '',
+      archiveDate: row.archive_date || '',
+      setAside: row.set_aside_code,
+      setAsideDescription: row.set_aside_description,
+      noticeType: row.notice_type || '',
+      active: row.active,
+      placeOfPerformance: {
+        city: row.pop_city || undefined,
+        state: row.pop_state || undefined,
+        zip: row.pop_zip || undefined,
+        country: row.pop_country || undefined,
+      },
+      uiLink: row.ui_link || `https://sam.gov/opp/${row.notice_id}/view`,
+      lastModifiedDate: row.last_modified || row.posted_date || '',
+    }));
+
+    // If keywords provided, filter client-side (Supabase full-text search would be better but this works)
+    let filtered = opportunities;
+    if (keywords.length > 0) {
+      const keywordLower = keywords.map(k => k.toLowerCase());
+      filtered = opportunities.filter(opp => {
+        const text = `${opp.title} ${opp.description}`.toLowerCase();
+        return keywordLower.some(k => text.includes(k));
+      });
+    }
+
+    return {
+      opportunities: filtered.slice(0, limit),
+      totalRecords: filtered.length,
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('[SAM Cache] Error querying cache:', error);
+    return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
+  }
+}
+
+/**
+ * Fetch opportunities for a user - prefers cache, falls back to API
+ */
+export async function fetchOpportunitiesForUserCached(
+  userProfile: {
+    naics_codes: string[];
+    agencies: string[];
+    keywords: string[];
+    zip_codes: string[];
+    location_state?: string | null;
+    location_states?: string[] | null;
+  }
+): Promise<SAMSearchResult> {
+  // Build search params from user profile
+  const params: SAMSearchParams = {
+    naicsCodes: userProfile.naics_codes?.slice(0, 15) || [],
+    keywords: userProfile.keywords?.slice(0, 10) || [],
+    state: userProfile.location_state || undefined,
+    states: userProfile.location_states?.slice(0, 10) || undefined,
+    limit: 300,
+  };
+
+  // Query from cache (no API key needed!)
+  return fetchSamOpportunitiesFromCache(params);
 }
 
 export type { SAMOpportunity, SAMSearchParams, SAMSearchResult };

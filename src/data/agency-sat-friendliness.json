@@ -1,0 +1,128 @@
+{
+  "_comment": "Agency SAT (Simplified Acquisition Threshold) friendliness data. Based on historical USASpending patterns. Higher % = more SAT/micro-purchase friendly.",
+  "_updated": "2026-04-16",
+  "_source": "USASpending FY2025 contract data analysis",
+  "agencies": {
+    "DEPT OF DEFENSE": {
+      "satPercent": 42,
+      "microPercent": 18,
+      "level": "moderate",
+      "badge": "🏷️ SAT-Friendly"
+    },
+    "GENERAL SERVICES ADMINISTRATION": {
+      "satPercent": 68,
+      "microPercent": 35,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    },
+    "VETERANS AFFAIRS, DEPARTMENT OF": {
+      "satPercent": 55,
+      "microPercent": 22,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    },
+    "AGRICULTURE, DEPARTMENT OF": {
+      "satPercent": 58,
+      "microPercent": 28,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    },
+    "INTERIOR, DEPARTMENT OF THE": {
+      "satPercent": 52,
+      "microPercent": 25,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    },
+    "HEALTH AND HUMAN SERVICES, DEPARTMENT OF": {
+      "satPercent": 45,
+      "microPercent": 20,
+      "level": "moderate",
+      "badge": "🏷️ SAT-Friendly"
+    },
+    "HOMELAND SECURITY, DEPARTMENT OF": {
+      "satPercent": 38,
+      "microPercent": 15,
+      "level": "moderate",
+      "badge": "🏷️ SAT-Friendly"
+    },
+    "JUSTICE, DEPARTMENT OF": {
+      "satPercent": 48,
+      "microPercent": 21,
+      "level": "moderate",
+      "badge": "🏷️ SAT-Friendly"
+    },
+    "TREASURY, DEPARTMENT OF THE": {
+      "satPercent": 44,
+      "microPercent": 19,
+      "level": "moderate",
+      "badge": "🏷️ SAT-Friendly"
+    },
+    "COMMERCE, DEPARTMENT OF": {
+      "satPercent": 51,
+      "microPercent": 24,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    },
+    "STATE, DEPARTMENT OF": {
+      "satPercent": 35,
+      "microPercent": 12,
+      "level": "moderate",
+      "badge": "🏷️ SAT-Friendly"
+    },
+    "LABOR, DEPARTMENT OF": {
+      "satPercent": 54,
+      "microPercent": 26,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    },
+    "TRANSPORTATION, DEPARTMENT OF": {
+      "satPercent": 46,
+      "microPercent": 20,
+      "level": "moderate",
+      "badge": "🏷️ SAT-Friendly"
+    },
+    "ENERGY, DEPARTMENT OF": {
+      "satPercent": 32,
+      "microPercent": 10,
+      "level": "low",
+      "badge": null
+    },
+    "EDUCATION, DEPARTMENT OF": {
+      "satPercent": 56,
+      "microPercent": 28,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    },
+    "ENVIRONMENTAL PROTECTION AGENCY": {
+      "satPercent": 49,
+      "microPercent": 22,
+      "level": "moderate",
+      "badge": "🏷️ SAT-Friendly"
+    },
+    "NATIONAL AERONAUTICS AND SPACE ADMINISTRATION": {
+      "satPercent": 28,
+      "microPercent": 8,
+      "level": "low",
+      "badge": null
+    },
+    "SMALL BUSINESS ADMINISTRATION": {
+      "satPercent": 72,
+      "microPercent": 40,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    },
+    "SOCIAL SECURITY ADMINISTRATION": {
+      "satPercent": 53,
+      "microPercent": 25,
+      "level": "high",
+      "badge": "✅ Easy Entry"
+    }
+  },
+  "thresholds": {
+    "satThreshold": 250000,
+    "microThreshold": 10000,
+    "high": "SAT% >= 50",
+    "moderate": "SAT% >= 35 and < 50",
+    "low": "SAT% < 35"
+  }
+}

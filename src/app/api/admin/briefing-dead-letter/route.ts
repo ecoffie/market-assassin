@@ -15,6 +15,18 @@ import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
+
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
 
@@ -22,18 +34,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   const status = request.nextUrl.searchParams.get('status');
   const briefingType = request.nextUrl.searchParams.get('type');
   const email = request.nextUrl.searchParams.get('email');
   const limit = parseInt(request.nextUrl.searchParams.get('limit') || '100');
 
   try {
-    let query = supabase
+    let query = getSupabase()
       .from('briefing_dead_letter')
       .select('*')
       .order('created_at', { ascending: false })
@@ -56,20 +63,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Get summary stats
-    const { data: stats } = await supabase
+    const { data: stats } = await getSupabase()
       .from('briefing_dead_letter')
       .select('status, briefing_type')
       .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
     const summary = {
-      pending: stats?.filter(s => s.status === 'pending').length || 0,
-      retrying: stats?.filter(s => s.status === 'retrying').length || 0,
-      succeeded: stats?.filter(s => s.status === 'succeeded').length || 0,
-      exhausted: stats?.filter(s => s.status === 'exhausted').length || 0,
+      pending: stats?.filter((s: { status: string }) => s.status === 'pending').length || 0,
+      retrying: stats?.filter((s: { status: string }) => s.status === 'retrying').length || 0,
+      succeeded: stats?.filter((s: { status: string }) => s.status === 'succeeded').length || 0,
+      exhausted: stats?.filter((s: { status: string }) => s.status === 'exhausted').length || 0,
       byType: {
-        daily: stats?.filter(s => s.briefing_type === 'daily').length || 0,
-        weekly: stats?.filter(s => s.briefing_type === 'weekly').length || 0,
-        pursuit: stats?.filter(s => s.briefing_type === 'pursuit').length || 0,
+        daily: stats?.filter((s: { briefing_type: string }) => s.briefing_type === 'daily').length || 0,
+        weekly: stats?.filter((s: { briefing_type: string }) => s.briefing_type === 'weekly').length || 0,
+        pursuit: stats?.filter((s: { briefing_type: string }) => s.briefing_type === 'pursuit').length || 0,
       },
     };
 
@@ -95,11 +102,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   try {
     switch (action) {
       case 'retry': {
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Reset the entry for retry
-        const { error } = await supabase
+        const { error } = await getSupabase()
           .from('briefing_dead_letter')
           .update({
             status: 'pending',
@@ -130,7 +132,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'status required' }, { status: 400 });
         }
 
-        const { data: deleted, error } = await supabase
+        const { data: deleted, error } = await getSupabase()
           .from('briefing_dead_letter')
           .delete()
           .eq('status', clearStatus)
@@ -146,14 +148,14 @@ export async function POST(request: NextRequest) {
 
       case 'stats': {
         // Get detailed stats
-        const { data: allEntries } = await supabase
+        const { data: allEntries } = await getSupabase()
           .from('briefing_dead_letter')
           .select('status, briefing_type, failure_reason, created_at')
           .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
         // Group by failure reason
         const failureReasons: Record<string, number> = {};
-        allEntries?.forEach(e => {
+        allEntries?.forEach((e: { failure_reason?: string }) => {
           const reason = e.failure_reason?.slice(0, 50) || 'Unknown';
           failureReasons[reason] = (failureReasons[reason] || 0) + 1;
         });
@@ -163,15 +165,15 @@ export async function POST(request: NextRequest) {
           stats: {
             total: allEntries?.length || 0,
             byStatus: {
-              pending: allEntries?.filter(e => e.status === 'pending').length || 0,
-              retrying: allEntries?.filter(e => e.status === 'retrying').length || 0,
-              succeeded: allEntries?.filter(e => e.status === 'succeeded').length || 0,
-              exhausted: allEntries?.filter(e => e.status === 'exhausted').length || 0,
+              pending: allEntries?.filter((e: { status: string }) => e.status === 'pending').length || 0,
+              retrying: allEntries?.filter((e: { status: string }) => e.status === 'retrying').length || 0,
+              succeeded: allEntries?.filter((e: { status: string }) => e.status === 'succeeded').length || 0,
+              exhausted: allEntries?.filter((e: { status: string }) => e.status === 'exhausted').length || 0,
             },
             byType: {
-              daily: allEntries?.filter(e => e.briefing_type === 'daily').length || 0,
-              weekly: allEntries?.filter(e => e.briefing_type === 'weekly').length || 0,
-              pursuit: allEntries?.filter(e => e.briefing_type === 'pursuit').length || 0,
+              daily: allEntries?.filter((e: { briefing_type: string }) => e.briefing_type === 'daily').length || 0,
+              weekly: allEntries?.filter((e: { briefing_type: string }) => e.briefing_type === 'weekly').length || 0,
+              pursuit: allEntries?.filter((e: { briefing_type: string }) => e.briefing_type === 'pursuit').length || 0,
             },
             topFailureReasons: Object.entries(failureReasons)
               .sort((a, b) => b[1] - a[1])

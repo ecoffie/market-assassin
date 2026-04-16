@@ -16,10 +16,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   // Check if tables exist by querying them
   const tables = ['agency_forecasts', 'forecast_sync_runs', 'forecast_sources'];
@@ -27,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   for (const table of tables) {
     try {
-      const { count, error } = await supabase
+      const { count, error } = await getSupabase()
         .from(table)
         .select('*', { count: 'exact', head: true });
 

@@ -16,20 +16,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   try {
     // Count before
-    const { count: beforeCount } = await supabase
+    const { count: beforeCount } = await getSupabase()
       .from('user_notification_settings')
       .select('*', { count: 'exact', head: true })
       .eq('briefings_enabled', true);
 
     // Update all users to have briefings_enabled = true
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('user_notification_settings')
       .update({
         briefings_enabled: true,
@@ -46,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Count after
-    const { count: afterCount } = await supabase
+    const { count: afterCount } = await getSupabase()
       .from('user_notification_settings')
       .select('*', { count: 'exact', head: true })
       .eq('briefings_enabled', true);
@@ -80,23 +87,30 @@ export async function GET(request: NextRequest) {
     }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   // Preview mode - show counts
-  const { count: totalActive } = await supabase
+  const { count: totalActive } = await getSupabase()
     .from('user_notification_settings')
     .select('*', { count: 'exact', head: true })
     .eq('is_active', true);
 
-  const { count: briefingsEnabled } = await supabase
+  const { count: briefingsEnabled } = await getSupabase()
     .from('user_notification_settings')
     .select('*', { count: 'exact', head: true })
     .eq('briefings_enabled', true);
 
-  const { count: briefingsDisabled } = await supabase
+  const { count: briefingsDisabled } = await getSupabase()
     .from('user_notification_settings')
     .select('*', { count: 'exact', head: true })
     .eq('briefings_enabled', false)

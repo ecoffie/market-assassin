@@ -6,10 +6,17 @@ import { createSecureAccessUrl } from '@/lib/access-links';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.office365.com',
@@ -63,7 +70,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Get users who have NEVER received an alert
-  const { data: users, error: usersError } = await supabase
+  const { data: users, error: usersError } = await getSupabase()
     .from('user_alert_settings')
     .select('*')
     .eq('is_active', true)
@@ -85,7 +92,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       mode: 'preview',
       users_needing_alerts: users.length,
-      users: users.map(u => ({
+      users: (users as AlertUser[]).map((u: AlertUser) => ({
         email: u.user_email,
         naics_count: u.naics_codes?.length || 0,
         business_type: u.business_type,
@@ -146,7 +153,7 @@ export async function GET(request: NextRequest) {
         await sendWelcomeOnlyEmail(user.user_email, user);
 
         // Mark as sent so they don't get another catch-up
-        await supabase
+        await getSupabase()
           .from('user_alert_settings')
           .update({
             last_alert_sent: new Date().toISOString(),
@@ -165,7 +172,7 @@ export async function GET(request: NextRequest) {
       await sendCatchUpEmail(user.user_email, topOpps, user, scoredOpps.length);
 
       // Log and update
-      await supabase.from('alert_log').upsert({
+      await getSupabase().from('alert_log').upsert({
         user_email: user.user_email,
         alert_date: new Date().toISOString().split('T')[0],
         opportunities_count: topOpps.length,
@@ -181,7 +188,7 @@ export async function GET(request: NextRequest) {
         onConflict: 'user_email,alert_date',
       });
 
-      await supabase
+      await getSupabase()
         .from('user_alert_settings')
         .update({
           last_alert_sent: new Date().toISOString(),

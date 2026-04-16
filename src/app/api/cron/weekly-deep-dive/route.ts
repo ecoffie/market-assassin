@@ -131,10 +131,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const startTime = Date.now();
   let briefingsSent = 0;
@@ -147,7 +154,7 @@ export async function GET(request: NextRequest) {
   console.log('[WeeklyDeepDive] Starting weekly deep dive delivery...');
 
   try {
-    const audienceResolution = await resolveBriefingAudience(supabase);
+    const audienceResolution = await resolveBriefingAudience(getSupabase());
     const allUsers: BriefingUser[] = audienceResolution.users
       .filter(user => user.naics_codes.length > 0)
       .map(user => ({
@@ -215,7 +222,7 @@ export async function GET(request: NextRequest) {
           }
 
           // Log to database
-          await supabase.from('briefing_log').upsert({
+          await getSupabase().from('briefing_log').upsert({
             user_email: user.email,
             briefing_date: briefing.weekOf,
             briefing_content: briefing,

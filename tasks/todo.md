@@ -1,6 +1,102 @@
 # GovCon Giants - Current Tasks
 
-## Session State (April 11, 2026)
+## Session State (April 16, 2026)
+
+### ✅ COMPLETED: SBIR + Grants Tabs for MI Dashboard
+
+**Status:** Deployed to production (April 16, 2026)
+
+**What Was Built:**
+
+Added 2 new tabs to the Market Intelligence dashboard (`/briefings`), expanding from 2 tabs to 4:
+
+| Tab | Color | Purpose | Data Source |
+|-----|-------|---------|-------------|
+| BRIEFINGS | Purple | Daily/Weekly/Pursuit intel | Pre-computed templates |
+| FORECASTS | Amber | 7,764 agency forecasts 6-18mo ahead | `agency_forecasts` table |
+| **SBIR** | Blue | SBIR/STTR small business R&D | NIH RePORTER API + Multisite |
+| **GRANTS** | Emerald | $700B+ federal grant funding | Grants.gov REST API |
+
+**Files Created:**
+| File | Purpose |
+|------|---------|
+| `src/app/api/grants/route.ts` | Grants.gov API wrapper (no auth required) |
+| `src/app/api/sbir/route.ts` | NIH RePORTER + Multisite SBIR/STTR wrapper |
+| `src/components/briefings/GrantsPanel.tsx` | Grants search UI with filters |
+| `src/components/briefings/SbirPanel.tsx` | SBIR/STTR search UI with phase info |
+
+**Files Modified:**
+- `src/app/briefings/page.tsx` — Added 2 new tabs with color-coded navigation
+
+**APIs:**
+- `/api/grants` — Grants.gov search (keyword, agency, category, status)
+- `/api/sbir` — NIH RePORTER search (keyword, agency, phase, source)
+
+**Key Implementation Details:**
+
+**Grants.gov API:**
+- No API key required - public REST API
+- Endpoint: `https://apply07.grants.gov/grantsws/rest/opportunities/search`
+- Response format: `totalHits` is array of opportunities (not a count)
+- 14 agency codes, 10 funding categories supported
+
+**NIH RePORTER API:**
+- Activity codes: R43 (SBIR Phase I), R44 (SBIR Phase II), R41/R42 (STTR)
+- Typical awards: Phase I $275K, Phase II $1.1M
+- Eligibility: US small business, <500 employees, 51%+ US-owned
+
+**Live URL:** https://tools.govcongiants.org/briefings
+
+---
+
+## Previous Session State (April 14, 2026)
+
+### ✅ COMPLETED: SAM.gov Data Infrastructure - Phase 2
+
+**Status:** Deployed to production (April 14, 2026)
+
+**What Was Built:**
+
+#### Build Error Fixes (Supabase Lazy Initialization)
+Fixed module-scope Supabase client initialization causing `Error: supabaseUrl is required` during Next.js build.
+
+**Pattern Applied:**
+```typescript
+// Before (causes build error)
+const supabase = createClient(url, key);
+
+// After (lazy initialization)
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key, { auth: { persistSession: false } });
+  return _supabase;
+}
+```
+
+**Files Fixed:**
+| File | Functions Updated |
+|------|-------------------|
+| `src/lib/intelligence/guardrails.ts` | `logEvent()`, `isOpen()`, `trip()`, `logReset()`, `manualReset()`, `postSendValidation()`, `getGuardrailStatus()` |
+| `src/lib/intelligence/metrics.ts` | `save()`, `saveDirectly()`, `logIntelligenceDelivery()`, `recordUserFeedback()`, `getMetricsDashboard()` |
+| `src/app/api/search-capture/route.ts` | `POST()`, `GET()` |
+
+#### New Database Tables Created
+| Table | Purpose |
+|-------|---------|
+| `usaspending_awards` | Contract award data with winners/amounts from USASpending.gov |
+| `sam_events` | Industry days, webinars, RFIs extracted from SAM.gov Special Notices |
+
+**Migration File:** `supabase/migrations/20260414_usaspending_awards.sql`
+
+**Deployment:** Build succeeded, deployed to `tools.govcongiants.org`
+
+---
+
+## Previous Session State (April 11, 2026)
 
 ### ✅ COMPLETED: BD Assist Platform - Phase 1 & 2
 
@@ -619,4 +715,4 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 
 **Resume command:** `/continue`
 
-**Last updated:** April 11, 2026
+**Last updated:** April 14, 2026

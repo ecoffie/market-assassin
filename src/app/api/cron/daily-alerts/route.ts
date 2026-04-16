@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
+import { fetchSamOpportunities, fetchSamOpportunitiesFromCache, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { searchGrantsByNAICS, scoreGrant, GrantOpportunity } from '@/lib/briefings/pipelines/grants-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import nodemailer from 'nodemailer';
+import Anthropic from '@anthropic-ai/sdk';
 import {
   IntelligenceMetrics,
   logIntelligenceDelivery,
@@ -446,27 +447,55 @@ async function runDailyAlertJob(options?: {
             ? [user.location_state]
             : undefined;
 
-        // Fetch opportunities using NAICS + keywords (primary search)
+        // Fetch opportunities from Supabase cache (much faster, no rate limits)
         metrics.recordApiCall();
-        let searchResult;
+        let newOpportunities: SAMOpportunity[] = [];
+        let allActiveOpportunities: SAMOpportunity[] = [];
         try {
-          searchResult = await fetchSamOpportunities({
+          const cacheResult = await fetchSamOpportunitiesFromCache({
             naicsCodes: expandedNaics,
             keywords: userKeywords.length > 0 ? userKeywords : undefined,
             setAsides,
-            states: userStates, // Multi-state support
-            noticeTypes: ['p', 'r', 'k', 'o'],
-            postedFrom: getDateDaysAgo(1), // Last 24 hours
-            limit: 100,
-          }, samApiKey);
-        } catch (apiError: any) {
+            states: userStates,
+            limit: 200, // Get more from cache, filter locally
+          });
+
+          allActiveOpportunities = cacheResult.opportunities;
+
+          // Filter for "new" opportunities (posted in last 24 hours)
+          const oneDayAgo = new Date();
+          oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+          newOpportunities = allActiveOpportunities.filter(opp => {
+            const postedDate = new Date(opp.postedDate);
+            return postedDate >= oneDayAgo;
+          });
+
+          console.log(`[Daily Alerts] ${user.user_email}: Found ${allActiveOpportunities.length} from cache, ${newOpportunities.length} new (last 24h)`);
+        } catch (cacheError: any) {
           metrics.recordApiError();
-          guardrails.recordApiError('SAM.gov');
-          throw apiError;
+          guardrails.recordApiError('SAM Cache');
+          console.error(`[Daily Alerts] SAM cache error for ${user.user_email}:`, cacheError.message);
+
+          // Fallback to live API if cache fails
+          try {
+            const newResult = await fetchSamOpportunities({
+              naicsCodes: expandedNaics,
+              keywords: userKeywords.length > 0 ? userKeywords : undefined,
+              setAsides,
+              states: userStates,
+              noticeTypes: ['p', 'r', 'k', 'o'],
+              postedFrom: getDateDaysAgo(1),
+              limit: 50,
+            }, samApiKey);
+            newOpportunities = newResult.opportunities;
+            console.log(`[Daily Alerts] ${user.user_email}: Fallback to API, found ${newOpportunities.length} new`);
+          } catch (apiError: any) {
+            console.error(`[Daily Alerts] API fallback also failed for ${user.user_email}:`, apiError.message);
+          }
         }
 
-        let opportunities = searchResult.opportunities;
-        metrics.recordOpportunitiesTotal(opportunities.length);
+        let opportunities = newOpportunities;
+        metrics.recordOpportunitiesTotal(newOpportunities.length);
 
         // DEDUPLICATE: Filter out opportunities already sent in last 7 days
         const beforeDedup = opportunities.length;
@@ -518,20 +547,32 @@ async function runDailyAlertJob(options?: {
           // Continue without grants - don't fail the whole alert
         }
 
-        if (scoredOpps.length === 0 && scoredGrants.length === 0) {
-          console.log(`[Daily Alerts] No new opportunities for ${user.user_email}`);
+        // Even if no NEW opportunities, we still want to send if there are deadlines or active opportunities
+        const hasNewOpps = scoredOpps.length > 0 || scoredGrants.length > 0;
+        const hasActiveDeadlines = allActiveOpportunities.length > 0;
+
+        if (!hasNewOpps && !hasActiveDeadlines) {
+          console.log(`[Daily Alerts] No new or active opportunities for ${user.user_email}`);
           results.noOpps++;
           metrics.recordUserSkipped();
           continue;
         }
 
         // Track matched opportunities
-        metrics.recordOpportunityMatched(scoredOpps.length + scoredGrants.length, scoredOpps[0]?.score);
+        if (hasNewOpps) {
+          metrics.recordOpportunityMatched(scoredOpps.length + scoredGrants.length, scoredOpps[0]?.score);
+        }
 
-        // Send email
+        // Generate AI action tips based on all active opportunities
+        const actionTips = await generateActionTips(
+          allActiveOpportunities.length > 0 ? allActiveOpportunities : scoredOpps,
+          user.business_type || undefined
+        );
+
+        // Send email - now includes all active opportunities for deadline tracking and action tips
         try {
           metrics.recordEmailAttempted();
-          await sendDailyAlertEmail(user.user_email, scoredOpps, user, scoredGrants);
+          await sendDailyAlertEmail(user.user_email, scoredOpps, user, scoredGrants, allActiveOpportunities, actionTips);
 
           // Track successful send
           metrics.recordEmailSent();
@@ -666,12 +707,26 @@ export async function POST(request: NextRequest) {
   });
 }
 
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+
 /**
  * GET endpoint - runs the cron job when called by Vercel cron
  */
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   const test = request.nextUrl.searchParams.get('test') === 'true';
+  const password = request.nextUrl.searchParams.get('password');
+  const skipTimezone = request.nextUrl.searchParams.get('skipTimezone') === 'true';
+  const limit = parseInt(request.nextUrl.searchParams.get('limit') || '0');
+
+  // Admin override - allows manual triggering with timezone skip
+  if (password === ADMIN_PASSWORD) {
+    console.log('[Daily Alerts] Admin override triggered', { skipTimezone, limit: limit || 'all' });
+    return runDailyAlertJob({
+      skipTimezoneCheck: skipTimezone,
+      testEmail: email || undefined,
+    });
+  }
 
   // If checking/testing for a specific email
   if (email && test) {
@@ -694,6 +749,7 @@ export async function GET(request: NextRequest) {
     usage: {
       test: 'GET ?email=xxx&test=true to send test alert',
       manual: 'POST with Authorization: Bearer {CRON_SECRET}',
+      admin: 'GET ?password=xxx&skipTimezone=true to send all (bypass timezone)',
     },
     schedule: 'Every day at 6 AM local time (based on user timezone)',
     tiers: {
@@ -770,29 +826,94 @@ function getUrgencyLabel(days: number): string {
   return `${days} days`;
 }
 
+// Generate AI action tips based on opportunities
+async function generateActionTips(
+  opportunities: SAMOpportunity[],
+  userBusinessType?: string
+): Promise<string[]> {
+  const defaultTips = [
+    'Review solicitation documents within 48 hours of receiving this brief',
+    'Identify teaming partners for larger opportunities',
+    'Check SAM.gov for amendments and Q&A updates',
+  ];
+
+  if (opportunities.length === 0) {
+    return defaultTips;
+  }
+
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const oppSummary = opportunities.slice(0, 5).map(o => ({
+      title: o.title?.slice(0, 80),
+      agency: o.department,
+      deadline: o.responseDeadline,
+      setAside: o.setAside,
+      noticeType: o.noticeType,
+    }));
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [{
+        role: 'user',
+        content: `Based on these federal opportunities, provide 2-3 brief, actionable tips for a ${userBusinessType || 'small business'} contractor:
+
+${JSON.stringify(oppSummary, null, 2)}
+
+Return ONLY a JSON array of strings, each tip under 100 characters:
+["tip 1", "tip 2", "tip 3"]`,
+      }],
+    });
+
+    const text = message.content[0].type === 'text' ? message.content[0].text : '';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const tips = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(tips) && tips.length > 0) {
+        return tips.slice(0, 3);
+      }
+    }
+  } catch (err) {
+    console.error('[Daily Alerts] Action tips generation error:', err);
+  }
+
+  return defaultTips;
+}
+
 // Send daily alert email - NEW "Active Solicitations" format
 async function sendDailyAlertEmail(
   email: string,
   opportunities: (SAMOpportunity & { score: number })[],
   user: AlertUser,
-  grants: (GrantOpportunity & { score: number })[] = []
+  grants: (GrantOpportunity & { score: number })[] = [],
+  allActiveOpportunities: SAMOpportunity[] = [],
+  actionTips: string[] = []
 ) {
   const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const maUrl = 'https://tools.govcongiants.org/market-assassin';
   const totalCount = opportunities.length + grants.length;
 
-  // Count notice types for summary badges
+  // Count notice types for summary badges (from new opportunities)
   const noticeCounts = countNoticeTypes(opportunities);
 
-  // Get deadlines this week (7 days)
-  const deadlinesThisWeek = opportunities
+  // Get deadlines this week from ALL active opportunities (not just new ones)
+  const oppsForDeadlines = allActiveOpportunities.length > 0 ? allActiveOpportunities : opportunities;
+  const deadlinesThisWeek = oppsForDeadlines
     .filter(opp => {
       const days = getDaysUntil(opp.responseDeadline);
       return days >= 0 && days <= 7;
     })
     .sort((a, b) => getDaysUntil(a.responseDeadline) - getDaysUntil(b.responseDeadline))
     .slice(0, 5);
+
+  // Default action tips if none provided
+  const finalActionTips = actionTips.length > 0 ? actionTips : [
+    'Review solicitation documents within 48 hours of receiving this brief',
+    'Identify teaming partners for larger opportunities',
+    'Check SAM.gov for amendments and Q&A updates',
+  ];
 
   // Format today's date
   const todayFormatted = new Date().toLocaleDateString('en-US', {
@@ -941,10 +1062,11 @@ async function sendDailyAlertEmail(
   </div>
   ` : ''}
 
+  ${opportunities.length > 0 ? `
   <!-- Section Header -->
   <div style="background: #ffffff; padding: 20px 24px 12px 24px; border-bottom: 2px solid #e5e7eb;">
     <h2 style="margin: 0; font-size: 16px; color: #059669; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-      🎯 TOP ${Math.min(opportunities.length, 10)} OPPORTUNITIES TO BID
+      🎯 TOP ${Math.min(opportunities.length, 10)} NEW OPPORTUNITIES TO BID
     </h2>
   </div>
 
@@ -957,6 +1079,19 @@ async function sendDailyAlertEmail(
     </div>
     ` : ''}
   </div>
+  ` : `
+  <!-- No New Opportunities Message -->
+  <div style="background: #ffffff; padding: 24px;">
+    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 20px; text-align: center;">
+      <div style="font-size: 36px; margin-bottom: 12px;">📭</div>
+      <h3 style="color: #0369a1; margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">No New Opportunities Today</h3>
+      <p style="color: #0c4a6e; margin: 0; font-size: 14px; line-height: 1.5;">
+        No new opportunities matching your NAICS codes were posted in the last 24 hours.
+        ${deadlinesThisWeek.length > 0 ? '<br><strong>But check the deadlines above!</strong>' : ''}
+      </p>
+    </div>
+  </div>
+  `}
 
   ${grants.length > 0 ? `
   <!-- Grants Section -->
@@ -1003,7 +1138,16 @@ async function sendDailyAlertEmail(
   </div>
   ` : ''}
 
-  <!-- Market Assassin Upsell -->
+  <!-- Action Tips Section -->
+  <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 20px 24px; margin: 20px 0;">
+    <div style="font-size: 14px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;">
+      💡 ACTION TIPS
+    </div>
+    <ul style="margin: 0; padding: 0 0 0 20px; color: #78350f;">
+      ${finalActionTips.map(tip => `<li style="margin-bottom: 8px; font-size: 14px; line-height: 1.5;">${tip}</li>`).join('')}
+    </ul>
+  </div>
+
   <!-- Feedback Section -->
   <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 16px 20px; margin-top: 20px; text-align: center;">
     <p style="color: #166534; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
@@ -1050,10 +1194,21 @@ async function sendDailyAlertEmail(
 `;
 
   const urgentCount = deadlinesThisWeek.length;
+
+  // Build subject line based on content
+  let subject: string;
+  if (totalCount > 0) {
+    subject = `📋 ${totalCount} Active Solicitations${urgentCount > 0 ? ` (${urgentCount} due soon!)` : ''} - ${formatDate(new Date().toISOString())}`;
+  } else if (urgentCount > 0) {
+    subject = `⏰ ${urgentCount} Deadline${urgentCount > 1 ? 's' : ''} Coming Up - ${formatDate(new Date().toISOString())}`;
+  } else {
+    subject = `📊 Your Daily GovCon Intel - ${formatDate(new Date().toISOString())}`;
+  }
+
   await getTransporter().sendMail({
     from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
-    subject: `📋 ${totalCount} Active Solicitations${urgentCount > 0 ? ` (${urgentCount} due soon!)` : ''} - ${formatDate(new Date().toISOString())}`,
+    subject,
     html: htmlContent,
   });
 }

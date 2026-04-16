@@ -80,10 +80,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const startTime = Date.now();
   let briefingsSent = 0;
@@ -124,12 +131,12 @@ export async function GET(request: NextRequest) {
 
   try {
     // Retry failed briefings from previous runs
-    const retryResults = await retryFailedBriefings(supabase);
+    const retryResults = await retryFailedBriefings(getSupabase());
     if (retryResults.retried > 0) {
       console.log(`[SendBriefings] Retried ${retryResults.retried} failed briefings, ${retryResults.succeeded} succeeded`);
     }
 
-    const audienceResolution = await resolveBriefingAudience(supabase);
+    const audienceResolution = await resolveBriefingAudience(getSupabase());
     const allUsers: BriefingUser[] = audienceResolution.users;
     audienceSummary = audienceResolution.audienceSummary;
     rolloutMode = audienceResolution.config.mode;
@@ -197,7 +204,7 @@ export async function GET(request: NextRequest) {
 
           // Check for recent briefing (deduplication)
           const today = new Date().toISOString().split('T')[0];
-          const { data: existingBriefing } = await supabase
+          const { data: existingBriefing } = await getSupabase()
             .from('briefing_log')
             .select('delivery_status')
             .eq('user_email', user.email)
@@ -233,7 +240,7 @@ export async function GET(request: NextRequest) {
 
           // Persist briefing to briefing_log
           try {
-            await supabase.from('briefing_log').upsert({
+            await getSupabase().from('briefing_log').upsert({
               user_email: user.email,
               briefing_date: briefingDate,
               briefing_content: briefing,
@@ -271,7 +278,7 @@ export async function GET(request: NextRequest) {
             }
             console.log(`[SendBriefings] ✅ AI Briefing sent to ${user.email} (${briefing.opportunities.length} opps, ${briefing.teamingPlays.length} plays)`);
 
-            await supabase.from('briefing_log').update({
+            await getSupabase().from('briefing_log').update({
               delivery_status: 'sent',
               email_sent_at: new Date().toISOString(),
             }).eq('user_email', user.email)
@@ -293,7 +300,7 @@ export async function GET(request: NextRequest) {
             const errorMsg = emailErr instanceof Error ? emailErr.message : 'Unknown email error';
             errors.push(`${user.email}: ${errorMsg}`);
 
-            await supabase.from('briefing_log').update({
+            await getSupabase().from('briefing_log').update({
               delivery_status: 'failed',
               error_message: errorMsg,
             }).eq('user_email', user.email)

@@ -131,31 +131,13 @@ export default function RecompeteLockedPage() {
         <h1 className="text-amber-800 mb-3 text-3xl font-bold">
           Recompete Tracker
         </h1>
-        <p className="text-gray-600 mb-8 text-base leading-relaxed">
+        <p className="text-gray-600 mb-6 text-base leading-relaxed">
           Track expiring federal contracts and identify recompete opportunities before they hit the market.
         </p>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-8 text-left">
-          <h3 className="text-amber-800 mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
-          <ul className="text-amber-700 m-0 pl-5 leading-loose text-sm">
-            <li><strong>6,900+</strong> expiring contracts</li>
-            <li><strong>36</strong> federal agencies</li>
-            <li><strong>435</strong> NAICS codes</li>
-            <li>Filter by agency, NAICS, prime contractor</li>
-            <li>Contract value filtering</li>
-            <li>Lifetime access</li>
-          </ul>
-        </div>
-
-        <a
-          href="https://buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k"
-          className="inline-block bg-amber-600 hover:bg-amber-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
-        >
-          Get Access - $397
-        </a>
-
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-gray-500 text-sm mb-4">Already have access?</p>
+        {/* Already have access? - MOVED TO TOP */}
+        <div className="mb-8 pb-6 border-b border-gray-200">
+          <p className="text-gray-600 text-sm mb-4 font-medium">Already have access?</p>
 
           {/* Toggle between email and password */}
           <div className="flex justify-center gap-2 mb-4">
@@ -223,6 +205,25 @@ export default function RecompeteLockedPage() {
             <p className="text-red-600 text-sm mt-3">{error}</p>
           )}
         </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-8 text-left">
+          <h3 className="text-amber-800 mt-0 mb-3 font-semibold">What&apos;s Included:</h3>
+          <ul className="text-amber-700 m-0 pl-5 leading-loose text-sm">
+            <li><strong>6,900+</strong> expiring contracts</li>
+            <li><strong>36</strong> federal agencies</li>
+            <li><strong>435</strong> NAICS codes</li>
+            <li>Filter by agency, NAICS, prime contractor</li>
+            <li>Contract value filtering</li>
+            <li>Lifetime access</li>
+          </ul>
+        </div>
+
+        <a
+          href="https://buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k"
+          className="inline-block bg-amber-600 hover:bg-amber-700 text-white py-4 px-8 rounded-lg font-bold text-lg mb-4 transition-colors"
+        >
+          Get Access - $397
+        </a>
 
         <p className="text-gray-400 text-xs mt-6">
           <Link href="/" className="text-amber-600 hover:underline">

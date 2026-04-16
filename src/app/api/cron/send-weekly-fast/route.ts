@@ -19,6 +19,9 @@ import crypto from 'crypto';
 const BATCH_SIZE = 100;
 const BRAND_COLOR = '#1e3a8a';
 
+// Type for briefing templates from Supabase
+type BriefingTemplate = { naics_profile_hash: string; naics_profile: string; [key: string]: unknown };
+
 /**
  * Queue a failed briefing for automatic retry (dead letter queue)
  */
@@ -150,10 +153,32 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
+
+  // DAY-OF-WEEK GUARD: Weekly Deep Dive only sends on Sunday (UTC)
+  const today = new Date();
+  const dayOfWeek = today.getUTCDay(); // 0 = Sunday
+  const isTestMode = testEmail && isTest;
+
+  if (dayOfWeek !== 0 && !isTestMode) {
+    console.log(`[SendWeeklyFast] Skipped - not Sunday (day ${dayOfWeek})`);
+    return NextResponse.json({
+      success: true,
+      message: `Weekly Deep Dive only sends on Sunday. Today is day ${dayOfWeek}.`,
+      skipped: true,
+      dayOfWeek,
+    });
+  }
 
   const startTime = Date.now();
   const weekOf = getWeekOfDate();
@@ -168,7 +193,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Step 1: Get all pre-computed weekly templates
-    const { data: templates, error: templatesError } = await supabase
+    const { data: templates, error: templatesError } = await getSupabase()
       .from('briefing_templates')
       .select('*')
       .eq('template_date', weekOf)
@@ -186,8 +211,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const templateMap = new Map<string, typeof templates[0]>();
-    templates.forEach(t => templateMap.set(t.naics_profile_hash, t));
+    const templateMap = new Map<string, BriefingTemplate>();
+    templates.forEach((t: BriefingTemplate) => templateMap.set(t.naics_profile_hash, t));
 
     // Build prefix fallback map
     const prefixMap = buildPrefixMap(templates);
@@ -195,7 +220,7 @@ export async function GET(request: NextRequest) {
     console.log(`[SendWeeklyFast] Loaded ${templates.length} weekly templates, ${prefixMap.size} prefix mappings`);
 
     // Step 2: Get users to process
-    const audienceResolution = await resolveBriefingAudience(supabase);
+    const audienceResolution = await resolveBriefingAudience(getSupabase());
     let usersToProcess = audienceResolution.users.filter(u => u.naics_codes.length > 0);
     activeCohortId = audienceResolution.activeCohort?.id || null;
 
@@ -210,13 +235,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Check for already sent this week
-    const { data: sentThisWeek } = await supabase
+    const { data: sentThisWeek } = await getSupabase()
       .from('briefing_log')
       .select('user_email')
       .eq('briefing_date', weekOf)
       .contains('tools_included', ['weekly_deep_dive']);
 
-    const sentEmails = new Set((sentThisWeek || []).map(s => s.user_email));
+    const sentEmails = new Set((sentThisWeek || []).map((s: { user_email: string }) => s.user_email));
     usersToProcess = usersToProcess
       .filter(u => !sentEmails.has(u.email))
       .slice(0, BATCH_SIZE);
@@ -250,7 +275,7 @@ export async function GET(request: NextRequest) {
 
         if (!template) {
           noTemplateCount++;
-          await queueForRetry(supabase, user.email, userNaics, 'No matching template (exact or prefix)', weekOf);
+          await queueForRetry(getSupabase(), user.email, userNaics, 'No matching template (exact or prefix)', weekOf);
           continue;
         }
 
@@ -274,7 +299,7 @@ export async function GET(request: NextRequest) {
         briefingsSent++;
 
         // Log to database (track match type for analytics)
-        await supabase.from('briefing_log').upsert({
+        await getSupabase().from('briefing_log').upsert({
           user_email: user.email,
           briefing_date: weekOf,
           briefing_content: briefing,
@@ -298,7 +323,7 @@ export async function GET(request: NextRequest) {
 
         // Queue for automatic retry
         const userNaics = user.naics_codes || [];
-        await queueForRetry(supabase, user.email, userNaics, errorMsg, weekOf);
+        await queueForRetry(getSupabase(), user.email, userNaics, errorMsg, weekOf);
       }
     }
 

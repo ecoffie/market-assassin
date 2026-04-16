@@ -33,10 +33,17 @@ export async function GET(request: Request) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const startTime = Date.now();
   let usersProcessed = 0;
@@ -54,7 +61,7 @@ export async function GET(request: Request) {
     }
 
     // Step 2: Get active briefing profiles
-    const { data: profiles, error: profileError } = await supabase
+    const { data: profiles, error: profileError } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email, aggregated_profile')
       .not('aggregated_profile', 'is', null)
@@ -81,7 +88,7 @@ export async function GET(request: Request) {
     for (let i = 0; i < profiles.length; i += BATCH_SIZE) {
       const batch = profiles.slice(i, i + BATCH_SIZE);
 
-      const batchPromises = batch.map(async (profile) => {
+      const batchPromises = batch.map(async (profile: { user_email: string; aggregated_profile: Record<string, unknown> }) => {
         try {
           const userProfile = buildWebIntelProfile(profile.aggregated_profile);
 
@@ -92,7 +99,7 @@ export async function GET(request: Request) {
 
           // Store results in briefing_snapshots
           if (result.signals.length > 0) {
-            await supabase.from('briefing_snapshots').insert({
+            await getSupabase().from('briefing_snapshots').insert({
               user_email: profile.user_email,
               tool: 'web_intelligence',
               data_hash: generateDataHash(result),

@@ -4,10 +4,17 @@ import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/b
 import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.office365.com',
@@ -126,7 +133,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
 
     // Get all active alert users who want alerts (weekly OR daily)
     // Daily-alerts cron skips free tier users, so we include them here
-    const { data: allUsers, error: usersError } = await supabase
+    const { data: allUsers, error: usersError } = await getSupabase()
       .from('user_notification_settings')
       .select('*')
       .eq('is_active', true)
@@ -230,7 +237,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
         await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
 
         // Log the alert
-        await supabase.from('alert_log').upsert({
+        await getSupabase().from('alert_log').upsert({
           user_email: user.user_email,
           alert_date: new Date().toISOString().split('T')[0],
           opportunities_count: topOpps.length,
@@ -247,7 +254,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
         });
 
         // Update user's alert stats
-        await supabase
+        await getSupabase()
           .from('user_notification_settings')
           .update({
             last_alert_sent: new Date().toISOString(),
@@ -311,6 +318,20 @@ export async function GET(request: NextRequest) {
 
   // Run the job if triggered by Vercel cron or has CRON_SECRET
   if (isVercelCron || hasCronSecret) {
+    // DAY-OF-WEEK GUARD: Weekly alerts only send on Sunday (UTC)
+    const today = new Date();
+    const dayOfWeek = today.getUTCDay(); // 0 = Sunday
+
+    if (dayOfWeek !== 0) {
+      console.log(`[Weekly Alerts] Skipped - not Sunday (day ${dayOfWeek})`);
+      return NextResponse.json({
+        success: true,
+        message: `Weekly alerts only send on Sunday. Today is day ${dayOfWeek}.`,
+        skipped: true,
+        dayOfWeek,
+      });
+    }
+
     return runWeeklyAlertJob();
   }
 
@@ -324,7 +345,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Test mode for specific user
-  const { data: user } = await supabase
+  const { data: user } = await getSupabase()
     .from('user_notification_settings')
     .select('*')
     .eq('user_email', email.toLowerCase())

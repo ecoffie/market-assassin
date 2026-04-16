@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PipelineBoard } from '@/components/bd-assist';
 import MarketScanner from '@/components/bd-assist/MarketScanner';
+import ForecastsPanel from '@/components/bd-assist/ForecastsPanel';
 
 interface PipelineStats {
   totalCount: number;
@@ -28,7 +29,7 @@ interface PipelineStats {
   winRate: number;
 }
 
-type TabType = 'intel' | 'pipeline' | 'teaming' | 'scanner';
+type TabType = 'intel' | 'pipeline' | 'teaming' | 'scanner' | 'forecasts';
 
 // Loading fallback for Suspense
 function LoadingFallback() {
@@ -321,6 +322,16 @@ function BDAssistDashboard() {
             >
               SCANNER
             </button>
+            <button
+              onClick={() => setActiveTab('forecasts')}
+              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+                activeTab === 'forecasts'
+                  ? 'border-violet-500 text-violet-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              FORECASTS
+            </button>
           </nav>
         </div>
 
@@ -356,6 +367,10 @@ function BDAssistDashboard() {
 
           {activeTab === 'scanner' && (
             <MarketScanner email={email} />
+          )}
+
+          {activeTab === 'forecasts' && (
+            <ForecastsPanel email={email} />
           )}
         </div>
       </div>

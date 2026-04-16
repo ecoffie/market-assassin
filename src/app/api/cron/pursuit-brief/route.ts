@@ -76,10 +76,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const startTime = Date.now();
   let briefingsSent = 0;
@@ -92,7 +99,7 @@ export async function GET(request: NextRequest) {
   console.log('[PursuitBrief] Starting auto pursuit brief delivery...');
 
   try {
-    const audienceResolution = await resolveBriefingAudience(supabase);
+    const audienceResolution = await resolveBriefingAudience(getSupabase());
     const allUsers: BriefingUser[] = audienceResolution.users
       .filter(user => user.naics_codes.length > 0)
       .map(user => ({
@@ -136,7 +143,7 @@ export async function GET(request: NextRequest) {
       for (const user of batch) {
         try {
           // Get user's most recent alert with opportunities
-          const { data: recentAlert } = await supabase
+          const { data: recentAlert } = await getSupabase()
             .from('alert_log')
             .select('opportunities_data')
             .eq('user_email', user.email)
@@ -158,7 +165,7 @@ export async function GET(request: NextRequest) {
           startOfWeek.setUTCDate(startOfWeek.getUTCDate() + diffToMonday);
           startOfWeek.setUTCHours(0, 0, 0, 0);
 
-          const { data: existingBrief } = await supabase
+          const { data: existingBrief } = await getSupabase()
             .from('pursuit_brief_log')
             .select('id')
             .eq('user_email', user.email)
@@ -210,7 +217,7 @@ export async function GET(request: NextRequest) {
           }
 
           // Log the pursuit brief
-          await supabase.from('pursuit_brief_log').insert({
+          await getSupabase().from('pursuit_brief_log').insert({
             user_email: user.email,
             notice_id: topOpp.noticeId,
             brief_data: brief,

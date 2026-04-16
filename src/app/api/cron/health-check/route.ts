@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { createClient } from '@supabase/supabase-js';
 
 const BASE_URL = 'https://tools.govcongiants.org';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+
+// Lazy init Supabase
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 interface TestResult {
   name: string;
@@ -325,6 +334,80 @@ const tests = [
           ? `Hierarchy API OK (${data.elapsedMs}ms)`
           : data.error || 'Failed',
         details: data.rateLimits ? `Rate limit: ${JSON.stringify(data.rateLimits)}` : undefined,
+      };
+    },
+  },
+
+  // Cron Job Health - Check if daily alerts ran today
+  {
+    name: 'Daily Alerts Cron',
+    category: 'Cron Health',
+    critical: true,
+    fn: async () => {
+      // Check if any alerts were sent today
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await getSupabase()
+        .from('alert_log')
+        .select('id')
+        .eq('alert_date', today)
+        .limit(1);
+
+      if (error) {
+        return {
+          passed: false,
+          message: `DB error: ${error.message}`,
+        };
+      }
+
+      // Also check current UTC hour - alerts should run at 11, 12, 14, 16 UTC
+      const currentHourUTC = new Date().getUTCHours();
+      const alertWindowPassed = currentHourUTC >= 13; // By 1 PM UTC (9 AM ET), morning alerts should have run
+
+      if (!alertWindowPassed) {
+        return {
+          passed: true,
+          message: 'Alert window not yet passed (before 9 AM ET)',
+          details: `Current UTC hour: ${currentHourUTC}`,
+        };
+      }
+
+      const alertsRan = data && data.length > 0;
+      return {
+        passed: alertsRan,
+        message: alertsRan
+          ? 'Daily alerts ran today'
+          : '⚠️ DAILY ALERTS DID NOT RUN TODAY - Manual trigger needed',
+        details: alertsRan ? undefined : 'Run: /api/cron/daily-alerts?password=xxx&skipTimezone=true',
+      };
+    },
+  },
+
+  // Check briefing precompute ran
+  {
+    name: 'Briefing Templates',
+    category: 'Cron Health',
+    critical: false,
+    fn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await getSupabase()
+        .from('briefing_templates')
+        .select('id')
+        .eq('template_date', today)
+        .limit(1);
+
+      if (error) {
+        return {
+          passed: false,
+          message: `DB error: ${error.message}`,
+        };
+      }
+
+      const templatesExist = data && data.length > 0;
+      return {
+        passed: templatesExist,
+        message: templatesExist
+          ? 'Briefing templates generated today'
+          : 'No briefing templates for today (precompute may not have run)',
       };
     },
   },

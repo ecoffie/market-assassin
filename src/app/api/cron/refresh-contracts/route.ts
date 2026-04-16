@@ -352,12 +352,19 @@ export async function GET(request: NextRequest) {
     console.log(`[RefreshContracts] Final count: ${merged.length}`);
 
     // Log refresh to database
-    const supabase = createClient(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+  }
+  return _supabase;
+}
 
-    await supabase.from('cron_logs').insert({
+    await getSupabase().from('cron_logs').insert({
       job_name: 'refresh-contracts',
       run_date: new Date().toISOString(),
       status: 'success',

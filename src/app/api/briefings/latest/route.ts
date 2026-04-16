@@ -28,12 +28,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'No briefing access' }, { status: 403 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('briefing_log')
     .select('briefing_date, briefing_content, items_count, created_at')
     .eq('user_email', email)
@@ -65,7 +72,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     success: true,
     count: data.length,
-    briefings: data.map((d) => ({
+    briefings: data.map((d: { briefing_date: string; created_at: string; items_count: number; briefing_content: unknown }) => ({
       briefing_date: d.briefing_date,
       generated_at: d.created_at,
       items_count: d.items_count,

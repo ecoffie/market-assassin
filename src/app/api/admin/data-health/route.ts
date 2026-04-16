@@ -11,10 +11,17 @@ import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
@@ -70,7 +77,7 @@ async function getLiveCounts(): Promise<Record<string, number>> {
 
   // Forecasts
   try {
-    const { count } = await supabase
+    const { count } = await getSupabase()
       .from('agency_forecasts')
       .select('*', { count: 'exact', head: true });
     counts['/api/forecasts'] = count || 0;
@@ -91,7 +98,7 @@ async function getLiveCounts(): Promise<Record<string, number>> {
 
   // Pipeline (user data)
   try {
-    const { count } = await supabase
+    const { count } = await getSupabase()
       .from('user_pipeline')
       .select('*', { count: 'exact', head: true });
     counts['/api/pipeline'] = count || 0;
@@ -99,7 +106,7 @@ async function getLiveCounts(): Promise<Record<string, number>> {
 
   // Teaming partners (user data)
   try {
-    const { count } = await supabase
+    const { count } = await getSupabase()
       .from('user_teaming_partners')
       .select('*', { count: 'exact', head: true });
     counts['/api/teaming'] = count || 0;

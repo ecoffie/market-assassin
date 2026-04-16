@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 /**
  * GET /api/alerts/unsubscribe?email=xxx
@@ -22,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Deactivate alerts for this user (unified table)
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('user_notification_settings')
       .update({
         alerts_enabled: false,
@@ -67,7 +74,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('user_notification_settings')
       .update({
         alerts_enabled: false,

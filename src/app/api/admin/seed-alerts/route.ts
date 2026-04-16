@@ -14,10 +14,17 @@ import { createClient } from '@supabase/supabase-js';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 const SHOP_ADMIN_PASSWORD = 'admin123';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 interface ShopPurchase {
   email: string;
@@ -75,12 +82,12 @@ export async function GET(request: NextRequest) {
   const buyerEmails = [...new Set(purchases.map(p => p.email.toLowerCase()))];
 
   // Check which already have alert settings
-  const { data: existingAlerts } = await supabase
+  const { data: existingAlerts } = await getSupabase()
     .from('user_alert_settings')
     .select('user_email')
     .in('user_email', buyerEmails);
 
-  const existingEmails = new Set(existingAlerts?.map(a => a.user_email.toLowerCase()) || []);
+  const existingEmails = new Set(existingAlerts?.map((a: { user_email: string }) => a.user_email.toLowerCase()) || []);
   const needsSeeding = buyerEmails.filter(email => !existingEmails.has(email));
 
   if (mode === 'preview') {
@@ -103,7 +110,7 @@ export async function GET(request: NextRequest) {
 
   for (const email of needsSeeding) {
     try {
-      const { error } = await supabase
+      const { error } = await getSupabase()
         .from('user_alert_settings')
         .upsert({
           user_email: email,

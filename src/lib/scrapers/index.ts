@@ -36,6 +36,14 @@ export {
   DARPA_OFFICES
 } from './apis/darpa-baa';
 
+// API-based scrapers - Grants.gov (all federal grants)
+export {
+  searchGrantsGov,
+  fetchGovConRelevantGrants,
+  checkGrantsGovHealth,
+  GRANTSGOV_SOURCE_ID
+} from './apis/grantsgov-all';
+
 // Re-export types
 export type {
   NIHSearchParams,

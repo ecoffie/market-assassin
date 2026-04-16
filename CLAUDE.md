@@ -245,6 +245,24 @@ Instead of generating 928 individual briefings per type, we pre-compute 49 templ
 | Weekly Deep Dive | `precompute-weekly-briefings` | `send-weekly-fast` | Sat 8-10 PM → Sun 7-8:30 AM |
 | Pursuit Brief | `precompute-pursuit-briefs` | `send-pursuit-fast` | Sun 8-10 PM → Mon 7-8:30 AM |
 
+**Day-of-Week Guards (April 16, 2026):**
+All cron endpoints have **explicit day guards** that prevent sending on wrong days:
+
+| Endpoint | Allowed Day | UTC Day # | Guard Response |
+|----------|-------------|-----------|----------------|
+| `precompute-weekly-briefings` | Saturday | 6 | `{"skipped": true, "dayOfWeek": X}` |
+| `send-weekly-fast` | Sunday | 0 | `{"skipped": true, "dayOfWeek": X}` |
+| `precompute-pursuit-briefs` | Sunday | 0 | `{"skipped": true, "dayOfWeek": X}` |
+| `send-pursuit-fast` | Monday | 1 | `{"skipped": true, "dayOfWeek": X}` |
+
+Test mode (`?test=true&email=...`) bypasses day guards for manual testing.
+
+**Monitor Briefing Health:**
+```bash
+# Check what was sent today
+curl "https://tools.govcongiants.org/api/admin/briefing-status?password=galata-assassin-2026"
+```
+
 **Prefix Fallback for Custom Profiles:**
 Users with custom NAICS profiles (via preferences page) get briefings immediately via 3-digit prefix matching. For example, a user with `236, 237, 238` matches templates with any construction code (`236xxx`, `237xxx`, `238xxx`).
 
@@ -260,6 +278,54 @@ Users with custom NAICS profiles (via preferences page) get briefings immediatel
 - `api/cron/precompute-pursuit-briefs/route.ts` — Pursuit templates (Sun 8-10 PM)
 - `api/cron/send-pursuit-fast/route.ts` — Send pursuit briefs (Mon 7-8:30 AM)
 - `src/lib/briefings/delivery/ai-briefing-generator.ts` — Supports `naicsOverride` for profile-based generation
+
+**Email Products (April 16, 2026):**
+
+| Product | Price | Emails Included |
+|---------|-------|-----------------|
+| **Daily Alerts** | $19/mo | Daily Alerts (simple opportunity list) |
+| **Market Intelligence** | $49/mo | Daily Market Intel + Weekly Deep Dive + Pursuit Brief |
+
+**Email Template Generators:**
+
+| Email | Function | Colors | Header |
+|-------|----------|--------|--------|
+| Daily Alerts ($19/mo) | `send-notifications/route.ts` | Purple banner | "🎯 X New Opportunities" |
+| Daily Market Intel ($49/mo) | `generateDailyEmailHtmlFromSam()` | **Green** `#059669→#10b981` | "📋 Active Solicitations" |
+| Weekly Deep Dive ($49/mo) | `generateAIEmailTemplate()` | Navy→Purple `#1e3a8a→#7c3aed` | "📊 Weekly Deep Dive" |
+| Pursuit Brief ($49/mo) | `generateCombinedPursuitEmailHtml()` | Navy→Purple | "YOUR TOP 3 PURSUIT TARGETS" |
+| ~~Bid Target~~ | `bid-target-email-template.ts` | DEPRECATED | Not sending |
+
+**Design Systems:**
+- **GREEN** (`#059669→#10b981`): Daily Market Intel — "bid now" SAM.gov opportunities
+- **NAVY→PURPLE** (`#1e3a8a→#7c3aed`): Weekly Deep Dive + Pursuit — strategic intelligence
+- **PURPLE BANNER**: Daily Alerts — simple opportunity list
+- **RED BANNER** (`#dc2626→#ef4444`): "🎯 Market Intelligence • FREE PREVIEW during beta" — on all $49/mo emails
+
+**SAM.gov Recompete Matching (April 16, 2026):**
+
+Weekly Deep Dive cross-references USASpending expiring contracts with SAM.gov opportunities using score-based matching:
+
+| Factor | Points | Description |
+|--------|--------|-------------|
+| NAICS match | +20 | Required baseline |
+| Agency match | +15 | First word of agency name |
+| Incumbent name | +30 | SAM.gov mentions the incumbent |
+| 50%+ keywords | +25 | At least half of significant words match |
+| 30-49% keywords | +10 | Partial keyword match |
+| Timing (≤12 mo) | +15 | SAM.gov posted within 12 months of expiration |
+| Timing (≤18 mo) | +10 | Posted within 18 months |
+| Timing (≤24 mo) | +5 | Posted within 24 months |
+| Contract # ref | +40 | SAM.gov mentions predecessor contract number |
+
+**Minimum score: 40** (NAICS + one strong factor) to show "SAM.gov STATUS" in email.
+
+**Recompete Timeline Research:**
+- Agencies start planning: 12-18 months before expiration
+- Sources Sought/RFI: 6-12 months before RFP
+- Pre-solicitation: 3-6 months before
+- RFP posting: 2-4 months before expiration
+- Total window: Solicitations appear **6-18 months** before contract expires
 
 ### 8. Daily Alerts System
 **Location:** `/src/app/api/cron/daily-alerts/`, `/src/app/alerts/`
@@ -286,12 +352,30 @@ Users with custom NAICS profiles (via preferences page) get briefings immediatel
 - `alerts/preferences/page.tsx` — Redirects to `/briefings` (unified UI)
 - `api/alerts/preferences/route.ts` — Preferences API
 
-**Unified Market Intelligence UI (April 9, 2026):**
-- `/briefings` — Single unified dashboard with Market Intelligence branding
+**Unified Market Intelligence UI (April 16, 2026):**
+- `/briefings` — Single unified dashboard with 4 tabs: **BRIEFINGS | FORECASTS | SBIR | GRANTS**
 - `/alerts/preferences` — Now redirects to `/briefings`
 - Settings panel accessible via gear icon in dashboard header
 - Onboarding wizard for new users (NAICS → Agencies → Geography → Delivery)
 - Demo video: `https://vimeo.com/1181569155`
+
+**MI Dashboard Tabs:**
+| Tab | Color | Purpose | Data Source |
+|-----|-------|---------|-------------|
+| BRIEFINGS | Purple | Daily/Weekly/Pursuit intel | Pre-computed templates |
+| FORECASTS | Amber | 7,764 agency forecasts 6-18mo ahead | `agency_forecasts` table |
+| SBIR | Blue | SBIR/STTR small business R&D | NIH RePORTER API + Multisite |
+| GRANTS | Emerald | $700B+ federal grant funding | Grants.gov REST API |
+
+**New APIs (April 16, 2026):**
+| API | Purpose | Auth Required |
+|-----|---------|---------------|
+| `/api/grants` | Grants.gov search wrapper | No |
+| `/api/sbir` | NIH RePORTER + Multisite SBIR/STTR | No |
+
+**New Components:**
+- `src/components/briefings/GrantsPanel.tsx` — Grants search UI
+- `src/components/briefings/SbirPanel.tsx` — SBIR/STTR search UI
 
 **Dashboard Features (April 9, 2026):**
 - **Search bar** — Find opportunities by title, agency, keywords with highlighting
@@ -313,7 +397,7 @@ Users with custom NAICS profiles (via preferences page) get briefings immediatel
 **Cron Schedule (ET):**
 | Job | Times (ET) | Purpose |
 |-----|------------|---------|
-| daily-alerts | 7 AM, 8 AM, 10 AM, 12 PM | Timezone coverage |
+| daily-alerts | 7 AM, 8 AM, 10 AM, 12 PM | Timezone coverage (1 email/user/day, deduped) |
 | precompute-briefings | 10:00-11:30 PM (prev night) | Daily templates by NAICS profile |
 | send-briefings-fast | 3:00-4:30 AM (every 10 min) | Send daily briefings |
 | precompute-weekly-briefings | Sat 4:00-6:00 PM | Weekly templates by NAICS profile |
@@ -703,4 +787,4 @@ done
 
 ---
 
-*Last Updated: April 9, 2026*
+*Last Updated: April 16, 2026*

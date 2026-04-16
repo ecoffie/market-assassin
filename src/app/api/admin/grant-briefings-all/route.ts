@@ -20,13 +20,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   // Get ALL user profiles
-  const { data: profiles, error } = await supabase
+  const { data: profiles, error } = await getSupabase()
     .from('user_profiles')
     .select('email, access_briefings');
 
@@ -34,8 +41,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const withoutBriefings = profiles?.filter(p => !p.access_briefings) || [];
-  const withBriefings = profiles?.filter(p => p.access_briefings) || [];
+  const withoutBriefings = profiles?.filter((p: { access_briefings: boolean }) => !p.access_briefings) || [];
+  const withBriefings = profiles?.filter((p: { access_briefings: boolean }) => p.access_briefings) || [];
 
   if (mode === 'preview') {
     return NextResponse.json({
@@ -43,7 +50,7 @@ export async function GET(request: NextRequest) {
       total_profiles: profiles?.length || 0,
       already_have_access: withBriefings.length,
       need_access: withoutBriefings.length,
-      will_grant_to: withoutBriefings.map(p => p.email),
+      will_grant_to: withoutBriefings.map((p: { email: string }) => p.email),
       instructions: 'Add ?mode=execute to grant access to all',
     });
   }
@@ -54,7 +61,7 @@ export async function GET(request: NextRequest) {
   for (const profile of withoutBriefings) {
     try {
       // Update Supabase
-      await supabase
+      await getSupabase()
         .from('user_profiles')
         .update({ access_briefings: true })
         .eq('email', profile.email);

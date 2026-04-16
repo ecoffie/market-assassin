@@ -74,10 +74,31 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // DAY-OF-WEEK GUARD: Pursuit precompute only runs on Sunday (UTC)
+  const today = new Date();
+  const dayOfWeek = today.getUTCDay(); // 0 = Sunday
+
+  if (dayOfWeek !== 0 && !isTest) {
+    console.log(`[PrecomputePursuit] Skipped - not Sunday (day ${dayOfWeek})`);
+    return NextResponse.json({
+      success: true,
+      message: `Pursuit precompute only runs on Sunday. Today is day ${dayOfWeek}.`,
+      skipped: true,
+      dayOfWeek,
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const startTime = Date.now();
   const mondayDate = getMondayDate();
@@ -89,7 +110,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Step 1: Get all unique NAICS profiles
-    const { data: users, error: usersError } = await supabase
+    const { data: users, error: usersError } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email, naics_codes')
       .eq('briefings_enabled', true);
@@ -123,13 +144,13 @@ export async function GET(request: NextRequest) {
     console.log(`[PrecomputePursuit] Found ${allProfiles.length} unique NAICS profiles`);
 
     // Step 2: Check which profiles already have pursuit templates
-    const { data: existingTemplates } = await supabase
+    const { data: existingTemplates } = await getSupabase()
       .from('briefing_templates')
       .select('naics_profile_hash')
       .eq('template_date', mondayDate)
       .eq('briefing_type', 'pursuit');
 
-    const existingHashes = new Set((existingTemplates || []).map(t => t.naics_profile_hash));
+    const existingHashes = new Set((existingTemplates || []).map((t: { naics_profile_hash: string }) => t.naics_profile_hash));
 
     const profilesToProcess = allProfiles
       .filter(p => !existingHashes.has(p.naics_profile_hash))
@@ -156,15 +177,16 @@ export async function GET(request: NextRequest) {
         console.log(`[PrecomputePursuit] Generating template for ${profile.user_count} users...`);
 
         // Get recent alerts for users in this NAICS profile
-        const usersWithProfile = (users || []).filter(u => {
+        type UserRow = { naics_codes: string[]; user_email: string };
+        const usersWithProfile = (users || []).filter((u: UserRow) => {
           const hash = hashNaicsProfile(u.naics_codes || []);
           return hash === profile.naics_profile_hash;
         });
 
-        const userEmails = usersWithProfile.map(u => u.user_email).slice(0, 50);
+        const userEmails = usersWithProfile.map((u: UserRow) => u.user_email).slice(0, 50);
 
         // Get recent opportunities from alerts
-        const { data: recentAlerts } = await supabase
+        const { data: recentAlerts } = await getSupabase()
           .from('alert_log')
           .select('opportunities_data')
           .in('user_email', userEmails)
@@ -220,7 +242,7 @@ export async function GET(request: NextRequest) {
         brief.sourceNoticeId = topOpp.noticeId;
 
         // Store template
-        const { error: insertError } = await supabase.from('briefing_templates').upsert({
+        const { error: insertError } = await getSupabase().from('briefing_templates').upsert({
           naics_profile: profile.naics_profile,
           naics_profile_hash: profile.naics_profile_hash,
           template_date: mondayDate,

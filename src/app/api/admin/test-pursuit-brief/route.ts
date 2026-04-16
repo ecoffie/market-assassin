@@ -31,17 +31,24 @@ export async function GET(request: NextRequest) {
   }
 
   // Create Supabase client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   // If contract number provided, look it up in snapshots
   let opportunity: Record<string, unknown> = {};
 
   if (contractNumber) {
     // Search in recompete snapshots
-    const { data: snapshots } = await supabase
+    const { data: snapshots } = await getSupabase()
       .from('briefing_snapshots')
       .select('raw_data')
       .eq('user_email', email)
@@ -67,7 +74,7 @@ export async function GET(request: NextRequest) {
     console.log(`[TestPursuitBrief] No contract in snapshots, fetching live recompete data from USASpending...`);
     try {
       // Get user's NAICS codes and primary industry
-      const { data: profileData } = await supabase
+      const { data: profileData } = await getSupabase()
         .from('user_notification_settings')
         .select('naics_codes, primary_industry')
         .eq('user_email', email)

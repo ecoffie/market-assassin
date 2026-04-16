@@ -141,11 +141,11 @@ export async function POST(request: NextRequest) {
     console.error('[Pursuit Brief] Error:', error);
 
     // Log the failure
-    const supabase = getSupabase();
-    if (supabase) {
+    const catchSupabase = getSupabase();
+    if (catchSupabase) {
       const body = await request.clone().json().catch(() => ({}));
       try {
-        await supabase.from('pursuit_brief_log').insert({
+        await catchSupabase.from('pursuit_brief_log').insert({
           user_email: body.email?.toLowerCase() || 'unknown',
           notice_id: body.noticeId || 'unknown',
           brief_data: {},

@@ -7,6 +7,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
+
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
 
@@ -14,17 +26,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   const results: string[] = [];
   const errors: string[] = [];
 
   try {
     // Check if briefing_templates exists
-    const { error: checkError } = await supabase
+    const { error: checkError } = await getSupabase()
       .from('briefing_templates')
       .select('id')
       .limit(1);
@@ -39,7 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if briefing_precompute_runs exists
-    const { error: checkError2 } = await supabase
+    const { error: checkError2 } = await getSupabase()
       .from('briefing_precompute_runs')
       .select('id')
       .limit(1);

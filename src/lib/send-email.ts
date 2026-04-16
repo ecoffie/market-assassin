@@ -1,6 +1,11 @@
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
+// Primary: Resend (more reliable)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+// Fallback: Office365 SMTP
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.office365.com',
   port: parseInt(process.env.SMTP_PORT || '587'),
@@ -12,7 +17,7 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Generic email sending function
+ * Generic email sending function - uses Resend as primary, Office365 as fallback
  */
 interface SendEmailParams {
   to: string;
@@ -29,21 +34,49 @@ export async function sendEmail({
   text,
   from,
 }: SendEmailParams): Promise<boolean> {
+  // Use alerts@govcongiants.com (verified in Resend)
+  const fromEmail = process.env.EMAIL_FROM || 'alerts@govcongiants.com';
+  const fromName = 'GovCon Giants AI';
+
+  // Try Resend first (primary)
+  if (resend) {
+    try {
+      const { error } = await resend.emails.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: [to],
+        subject,
+        html,
+        text: text || html.replace(/<[^>]*>/g, ''),
+      });
+
+      if (error) {
+        console.error(`[SendEmail] Resend error for ${to}:`, error);
+        throw new Error(error.message);
+      }
+
+      console.log(`[SendEmail] ✅ Sent via Resend to ${to}: ${subject}`);
+      return true;
+    } catch (resendError: any) {
+      console.error(`[SendEmail] Resend failed, trying Office365 fallback:`, resendError.message);
+    }
+  }
+
+  // Fallback to Office365 SMTP
   try {
-    const fromAddress = from || `"GovCon Giants AI" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`;
+    const fromAddress = from || `"${fromName}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`;
 
     await transporter.sendMail({
       from: fromAddress,
       to,
       subject,
       html,
-      text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML if no text provided
+      text: text || html.replace(/<[^>]*>/g, ''),
     });
 
-    console.log(`[SendEmail] Sent to ${to}: ${subject}`);
+    console.log(`[SendEmail] ✅ Sent via Office365 to ${to}: ${subject}`);
     return true;
   } catch (error) {
-    console.error(`[SendEmail] Failed to send to ${to}:`, error);
+    console.error(`[SendEmail] ❌ Both providers failed for ${to}:`, error);
     throw error;
   }
 }

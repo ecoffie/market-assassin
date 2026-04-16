@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     // If this is Opportunity Hunter Pro, grant access immediately
-    if (product === 'opportunity-scout-pro') {
+    if (product === 'opportunity-hunter-pro') {
       const alreadyHasAccess = await hasOpportunityHunterProAccess(email);
 
       if (!alreadyHasAccess) {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         email: email.toLowerCase(),
-        product: 'opportunity-scout-pro',
+        product: 'opportunity-hunter-pro',
         hasAccess: true,
         customerName: session.customer_details?.name || null,
       });

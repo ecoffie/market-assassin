@@ -8,12 +8,19 @@
  *   await metrics.save();
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-loaded Supabase client to avoid build-time errors
+let _supabase: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key, { auth: { persistSession: false } });
+  return _supabase;
+}
 
 export type MetricType = 'daily_alerts' | 'weekly_alerts' | 'briefings' | 'unified';
 
@@ -133,8 +140,14 @@ export class IntelligenceMetrics {
   async save(): Promise<void> {
     this.finalize();
 
+    const sb = getSupabase();
+    if (!sb) {
+      console.warn('[Metrics] Supabase not available, skipping save');
+      return;
+    }
+
     try {
-      const { error } = await supabase.rpc('upsert_intelligence_metrics', {
+      const { error } = await sb.rpc('upsert_intelligence_metrics', {
         p_date: this.date,
         p_metric_type: this.metricType,
         p_data: this.data,
@@ -154,7 +167,9 @@ export class IntelligenceMetrics {
   }
 
   private async saveDirectly(): Promise<void> {
-    const { error } = await supabase
+    const sb = getSupabase();
+    if (!sb) return;
+    const { error } = await sb
       .from('intelligence_metrics')
       .upsert(
         {
@@ -190,7 +205,9 @@ export async function logIntelligenceDelivery(params: {
   errorMessage?: string;
 }): Promise<void> {
   try {
-    const { error } = await supabase.from('intelligence_log').insert({
+    const sb = getSupabase();
+    if (!sb) return;
+    const { error } = await sb.from('intelligence_log').insert({
       user_email: params.userEmail,
       intelligence_type: params.intelligenceType,
       delivery_status: params.deliveryStatus,
@@ -218,9 +235,12 @@ export async function recordUserFeedback(params: {
   source?: 'email' | 'dashboard' | 'survey';
 }): Promise<void> {
   try {
+    const sb = getSupabase();
+    if (!sb) return;
+
     const isPositive = params.feedbackType === 'helpful' || (params.rating && params.rating >= 4);
 
-    const { error } = await supabase.from('user_feedback').insert({
+    const { error } = await sb.from('user_feedback').insert({
       user_email: params.userEmail,
       feedback_type: params.feedbackType,
       intelligence_type: params.intelligenceType,
@@ -239,7 +259,7 @@ export async function recordUserFeedback(params: {
     const today = new Date().toISOString().split('T')[0];
     const field = isPositive ? 'user_feedback_positive' : 'user_feedback_negative';
 
-    await supabase.rpc('upsert_intelligence_metrics', {
+    await sb.rpc('upsert_intelligence_metrics', {
       p_date: today,
       p_metric_type: params.intelligenceType || 'daily_alerts',
       p_data: { [field]: 1 },
@@ -260,10 +280,15 @@ export async function getMetricsDashboard(days: number = 7): Promise<{
     feedbackPositiveRate: number;
   };
 }> {
+  const sb = getSupabase();
+  if (!sb) {
+    return { daily: [], summary: { totalSent: 0, avgDeliveryRate: 0, avgOpenRate: 0, avgClickRate: 0, feedbackPositiveRate: 0 } };
+  }
+
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  const { data: metrics, error } = await supabase
+  const { data: metrics, error } = await sb
     .from('intelligence_metrics')
     .select('*')
     .gte('date', startDate.toISOString().split('T')[0])

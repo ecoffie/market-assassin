@@ -28,10 +28,10 @@ export function generateAIEmailTemplate(briefing: AIGeneratedBriefing, userEmail
 
   // Subject line with top opportunity hook
   const subject = topOpp
-    ? `🎯 ${oppCount} Displacement Opportunities - ${topOpp.agency.split('/')[0]} ${topOpp.value} recompete`
-    : `🎯 ${oppCount} Displacement Opportunities - ${date}`;
+    ? `📊 Weekly: ${oppCount} Recompete Opportunities - ${topOpp.agency.split('/')[0]} ${topOpp.value}`
+    : `📊 Weekly: ${oppCount} Recompete Opportunities - ${date}`;
 
-  const preheader = topOpp?.displacementAngle || 'Your daily competitive intel briefing';
+  const preheader = topOpp?.displacementAngle || 'Your weekly recompete intel briefing';
 
   return {
     subject,
@@ -108,16 +108,16 @@ function generateHtmlBody(briefing: AIGeneratedBriefing, date: string, userEmail
 </head>
 <body>
   <div class="container">
-    <!-- Free Preview Banner -->
-    <div style="background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%); padding: 10px 20px; text-align: center;">
-      <p style="color: white; margin: 0; font-size: 12px; font-weight: 600;">
-        🎁 FREE PREVIEW • Exclusive displacement intel + teaming plays
+    <!-- Market Intelligence FREE PREVIEW Banner -->
+    <div style="background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%); padding: 12px 20px; text-align: center;">
+      <p style="color: white; margin: 0; font-size: 13px; font-weight: 600;">
+        🎯 Market Intelligence • FREE PREVIEW during beta • Displacement intel + teaming plays
       </p>
     </div>
 
     <!-- Header -->
     <div class="header">
-      <h1>🎯 Daily Market Intel</h1>
+      <h1>📊 Weekly Deep Dive</h1>
       <p>${date}</p>
     </div>
 
@@ -241,10 +241,10 @@ function generateTextBody(briefing: AIGeneratedBriefing, date: string, userEmail
     ? `?email=${encodeURIComponent(userEmail)}&date=${briefing.briefingDate}&type=daily`
     : '';
   let text = `
-🎁 FREE PREVIEW - Exclusive displacement intel + teaming plays
+🎯 MARKET INTELLIGENCE - FREE PREVIEW during beta - Displacement intel + teaming plays
 ========================================
 
-🎯 DAILY MARKET INTEL
+📊 WEEKLY DEEP DIVE
 ${date}
 ========================================
 

@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client with service role for server-side operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Lazy-loaded Supabase client to avoid build-time errors
+let _supabase: SupabaseClient | null = null;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key, { auth: { persistSession: false } });
+  return _supabase;
+}
 
 // Valid tool names
 const VALID_TOOLS = [
@@ -99,6 +105,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert into user_search_history
+    const supabase = getSupabase();
+    if (!supabase) {
+      return NextResponse.json({ success: false, error: 'Database not configured' });
+    }
     const { error: insertError } = await supabase
       .from('user_search_history')
       .insert({
@@ -198,6 +208,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing email parameter' },
         { status: 400 }
+      );
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
       );
     }
 

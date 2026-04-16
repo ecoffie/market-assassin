@@ -26,14 +26,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Email required (?email=...)' }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   try {
     // Ensure user has a notification settings profile (auto-create default if missing)
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email')
       .eq('user_email', email)
@@ -50,7 +57,7 @@ export async function GET(request: NextRequest) {
         'Department of Health and Human Services',
       ];
 
-      await supabase.from('user_notification_settings').upsert({
+      await getSupabase().from('user_notification_settings').upsert({
         user_email: email,
         naics_codes: defaultNaics,
         agencies: defaultAgencies,
@@ -80,7 +87,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Save to briefing_log
-    const { error: upsertError } = await supabase.from('briefing_log').upsert({
+    const { error: upsertError } = await getSupabase().from('briefing_log').upsert({
       user_email: email,
       briefing_date: briefing.briefingDate,
       briefing_content: briefing,

@@ -24,30 +24,37 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Email required (?email=...)' }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const today = new Date().toISOString().split('T')[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
   // 1. Get user profile from unified table
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await getSupabase()
     .from('user_notification_settings')
     .select('*')
     .eq('user_email', email)
     .single();
 
   // 2. Get today's snapshots
-  const { data: todaySnapshots, error: todayError } = await supabase
+  const { data: todaySnapshots, error: todayError } = await getSupabase()
     .from('briefing_snapshots')
     .select('tool, snapshot_date, raw_data, created_at')
     .eq('user_email', email)
     .eq('snapshot_date', today);
 
   // 3. Get yesterday's snapshots
-  const { data: yesterdaySnapshots, error: yesterdayError } = await supabase
+  const { data: yesterdaySnapshots, error: yesterdayError } = await getSupabase()
     .from('briefing_snapshots')
     .select('tool, snapshot_date, raw_data, created_at')
     .eq('user_email', email)
@@ -76,9 +83,10 @@ export async function GET(request: NextRequest) {
     todaySnapshots: {
       count: todaySnapshots?.length || 0,
       error: todayError?.message,
-      tools: todaySnapshots?.map(s => s.tool) || [],
+      tools: todaySnapshots?.map((s: { tool: string }) => s.tool) || [],
       organized: organizedToday,
-      raw: todaySnapshots?.map(s => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      raw: todaySnapshots?.map((s: any) => ({
         tool: s.tool,
         date: s.snapshot_date,
         dataType: typeof s.raw_data,
@@ -94,7 +102,7 @@ export async function GET(request: NextRequest) {
     yesterdaySnapshots: {
       count: yesterdaySnapshots?.length || 0,
       error: yesterdayError?.message,
-      tools: yesterdaySnapshots?.map(s => s.tool) || [],
+      tools: yesterdaySnapshots?.map((s: { tool: string }) => s.tool) || [],
     },
   });
 }

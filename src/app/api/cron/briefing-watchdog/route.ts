@@ -16,10 +16,17 @@ import { sendEmail } from '@/lib/send-email';
  *           Plus 9 AM Sunday (after weekly), 9 AM Monday (after pursuit)
  */
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 const ALERT_EMAIL = 'eric@govcongiants.com';
 const BASE_URL = process.env.VERCEL_URL
@@ -149,43 +156,44 @@ export async function GET(request: NextRequest) {
 
 async function checkBriefingHealth(briefingType: string, date: string): Promise<HealthMetrics> {
   // Get template count
-  const { count: templatesAvailable } = await supabase
+  const { count: templatesAvailable } = await getSupabase()
     .from('briefing_templates')
     .select('*', { count: 'exact', head: true })
     .eq('briefing_type', briefingType)
     .gte('generated_at', `${date}T00:00:00Z`);
 
   // Get unique NAICS profiles (expected templates)
-  const { data: profiles } = await supabase
+  const { data: profiles } = await getSupabase()
     .from('user_notification_settings')
     .select('naics_profile_hash')
     .eq('briefings_enabled', true)
     .eq('is_active', true)
     .not('naics_profile_hash', 'is', null);
 
-  const uniqueProfiles = new Set(profiles?.map(p => p.naics_profile_hash) || []);
+  const uniqueProfiles = new Set(profiles?.map((p: { naics_profile_hash: string }) => p.naics_profile_hash) || []);
   const templatesExpected = uniqueProfiles.size;
 
   // Get eligible users
-  const { count: usersEligible } = await supabase
+  const { count: usersEligible } = await getSupabase()
     .from('user_notification_settings')
     .select('*', { count: 'exact', head: true })
     .eq('briefings_enabled', true)
     .eq('is_active', true);
 
   // Get delivery stats from briefing_log
-  const { data: logs } = await supabase
+  const { data: logs } = await getSupabase()
     .from('briefing_log')
     .select('delivery_status, user_email')
     .eq('briefing_date', date)
     .gte('created_at', `${date}T00:00:00Z`);
 
-  const usersSent = logs?.filter(l => l.delivery_status === 'sent').length || 0;
-  const usersFailed = logs?.filter(l => l.delivery_status === 'failed').length || 0;
-  const usersSkipped = logs?.filter(l => l.delivery_status === 'skipped').length || 0;
+  type LogRow = { delivery_status: string; user_email: string };
+  const usersSent = logs?.filter((l: LogRow) => l.delivery_status === 'sent').length || 0;
+  const usersFailed = logs?.filter((l: LogRow) => l.delivery_status === 'failed').length || 0;
+  const usersSkipped = logs?.filter((l: LogRow) => l.delivery_status === 'skipped').length || 0;
 
   // Get no-template count from dead letter queue
-  const { count: usersNoTemplate } = await supabase
+  const { count: usersNoTemplate } = await getSupabase()
     .from('briefing_dead_letter')
     .select('*', { count: 'exact', head: true })
     .eq('briefing_type', briefingType)
@@ -229,7 +237,7 @@ async function checkBriefingHealth(briefingType: string, date: string): Promise<
 }
 
 async function logHealthMetrics(metrics: HealthMetrics, date: string): Promise<void> {
-  await supabase.from('briefing_system_health').upsert({
+  await getSupabase().from('briefing_system_health').upsert({
     check_date: date,
     briefing_type: metrics.briefingType,
     templates_available: metrics.templatesAvailable,
@@ -247,7 +255,7 @@ async function logHealthMetrics(metrics: HealthMetrics, date: string): Promise<v
 }
 
 async function getRetryQueue(): Promise<RetryCandidate[]> {
-  const { data } = await supabase.rpc('get_briefing_retries', { p_limit: MAX_RETRIES_PER_RUN });
+  const { data } = await getSupabase().rpc('get_briefing_retries', { p_limit: MAX_RETRIES_PER_RUN });
   return data || [];
 }
 
@@ -255,7 +263,7 @@ async function processRetry(retry: RetryCandidate): Promise<boolean> {
   console.log(`[Watchdog] Retrying ${retry.briefing_type} for ${retry.user_email} (attempt ${retry.retry_count + 1})`);
 
   // Mark as retrying
-  await supabase
+  await getSupabase()
     .from('briefing_dead_letter')
     .update({ status: 'retrying' })
     .eq('id', retry.id);
@@ -277,7 +285,7 @@ async function processRetry(retry: RetryCandidate): Promise<boolean> {
 
     if (result.success && result.briefingsSent > 0) {
       // Mark success
-      await supabase.rpc('complete_briefing_retry', {
+      await getSupabase().rpc('complete_briefing_retry', {
         p_id: retry.id,
         p_success: true,
       });
@@ -285,7 +293,7 @@ async function processRetry(retry: RetryCandidate): Promise<boolean> {
       return true;
     } else {
       // Mark failure
-      await supabase.rpc('complete_briefing_retry', {
+      await getSupabase().rpc('complete_briefing_retry', {
         p_id: retry.id,
         p_success: false,
         p_error: result.error || 'No briefing sent',
@@ -294,7 +302,7 @@ async function processRetry(retry: RetryCandidate): Promise<boolean> {
       return false;
     }
   } catch (error) {
-    await supabase.rpc('complete_briefing_retry', {
+    await getSupabase().rpc('complete_briefing_retry', {
       p_id: retry.id,
       p_success: false,
       p_error: error instanceof Error ? error.message : 'Unknown error',
@@ -304,7 +312,7 @@ async function processRetry(retry: RetryCandidate): Promise<boolean> {
 }
 
 async function checkExhaustedRetries(): Promise<number> {
-  const { count } = await supabase
+  const { count } = await getSupabase()
     .from('briefing_dead_letter')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'exhausted')

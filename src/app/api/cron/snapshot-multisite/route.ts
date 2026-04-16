@@ -29,6 +29,9 @@ import {
   searchSBIRAwards,
   checkSBIRHealth,
   SBIR_SOURCE_ID,
+  fetchGovConRelevantGrants,
+  checkGrantsGovHealth,
+  GRANTSGOV_SOURCE_ID,
 } from '@/lib/scrapers';
 
 import {
@@ -91,7 +94,7 @@ export async function GET(request: NextRequest) {
   if (mode === 'all') {
     // Get all enabled sources from database
     const supabase = getSupabase();
-    const { data: sources } = await supabase
+    const { data: sources } = await getSupabase()
       .from('multisite_sources')
       .select('id')
       .eq('is_enabled', true);
@@ -148,6 +151,10 @@ export async function GET(request: NextRequest) {
 
         case 'darpa_baa':
           result = await fetchDARPAOpportunities({ limit });
+          break;
+
+        case 'grants_gov':
+          result = await fetchGovConRelevantGrants({ limit });
           break;
 
         default:
@@ -248,7 +255,7 @@ async function upsertOpportunities(
     const contentHash = generateContentHash(opp);
 
     // Check if opportunity already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await getSupabase()
       .from('aggregated_opportunities')
       .select('id, content_hash')
       .eq('source', opp.source)
@@ -257,7 +264,7 @@ async function upsertOpportunities(
 
     if (!existing) {
       // New opportunity - insert
-      const { error } = await supabase
+      const { error } = await getSupabase()
         .from('aggregated_opportunities')
         .insert({
           source: opp.source,
@@ -296,7 +303,7 @@ async function upsertOpportunities(
       }
     } else if (existing.content_hash !== contentHash) {
       // Existing opportunity changed - update
-      const { error } = await supabase
+      const { error } = await getSupabase()
         .from('aggregated_opportunities')
         .update({
           title: opp.title,
@@ -363,7 +370,7 @@ function generateContentHash(opp: ScrapedOpportunity): string {
 async function logScrapeStart(entry: ScrapeLogEntry): Promise<string | null> {
   const supabase = getSupabase();
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('scrape_log')
     .insert({
       source_id: entry.sourceId,
@@ -394,7 +401,7 @@ async function logScrapeComplete(
 
   const supabase = getSupabase();
 
-  await supabase
+  await getSupabase()
     .from('scrape_log')
     .update({
       completed_at: new Date().toISOString(),
@@ -422,7 +429,7 @@ async function updateSourceHealth(
   const supabase = getSupabase();
 
   if (success) {
-    await supabase
+    await getSupabase()
       .from('multisite_sources')
       .update({
         last_scrape_at: new Date().toISOString(),
@@ -431,21 +438,21 @@ async function updateSourceHealth(
         last_scrape_duration_ms: responseTimeMs,
         consecutive_failures: 0,
         avg_response_time_ms: responseTimeMs, // TODO: Calculate rolling average
-        total_scrapes: supabase.rpc('increment', { row_id: sourceId }),
-        total_opportunities_found: supabase.rpc('add_count', { row_id: sourceId, add_value: count }),
+        total_scrapes: getSupabase().rpc('increment', { row_id: sourceId }),
+        total_opportunities_found: getSupabase().rpc('add_count', { row_id: sourceId, add_value: count }),
         last_error: null,
         last_error_at: null,
         updated_at: new Date().toISOString()
       })
       .eq('id', sourceId);
   } else {
-    await supabase
+    await getSupabase()
       .from('multisite_sources')
       .update({
         last_scrape_at: new Date().toISOString(),
         last_scrape_status: 'failed',
         last_scrape_duration_ms: responseTimeMs,
-        consecutive_failures: supabase.rpc('increment_failures', { source_id: sourceId }),
+        consecutive_failures: getSupabase().rpc('increment_failures', { source_id: sourceId }),
         last_error: errorMessage,
         last_error_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -481,6 +488,9 @@ export async function POST(request: NextRequest) {
       break;
     case 'darpa_baa':
       healthResult = await checkDARPAGrantsHealth();
+      break;
+    case 'grants_gov':
+      healthResult = await checkGrantsGovHealth();
       break;
     default:
       healthResult = { healthy: false, message: `Health check not implemented for ${source}` };

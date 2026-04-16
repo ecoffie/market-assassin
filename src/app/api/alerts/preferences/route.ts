@@ -10,10 +10,17 @@ function hashNaicsProfile(naicsCodes: string[]): string {
   return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 // Valid timezones for delivery
 const VALID_TIMEZONES = [
@@ -41,7 +48,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_notification_settings')
       .select('*')
       .eq('user_email', email.toLowerCase())
@@ -145,7 +152,7 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.toLowerCase();
 
     // Check if user exists
-    const { data: existing } = await supabase
+    const { data: existing } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email')
       .eq('user_email', normalizedEmail)
@@ -243,11 +250,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (locationStates !== undefined) {
-      // Store as JSON array of state codes
       record.location_states = Array.isArray(locationStates) ? locationStates : [];
     }
 
-    // Primary industry
     if (primaryIndustry !== undefined) {
       record.primary_industry = primaryIndustry || null;
     }
@@ -257,7 +262,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       // Update existing record
-      const result = await supabase
+      const result = await getSupabase()
         .from('user_notification_settings')
         .update(record)
         .eq('user_email', normalizedEmail)
@@ -275,7 +280,7 @@ export async function POST(request: NextRequest) {
       record.timezone = record.timezone ?? 'America/New_York';
       record.is_active = record.is_active ?? true;
 
-      const result = await supabase
+      const result = await getSupabase()
         .from('user_notification_settings')
         .insert(record)
         .select()

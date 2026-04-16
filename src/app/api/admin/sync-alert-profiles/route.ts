@@ -13,10 +13,17 @@ import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 // Default NAICS codes for users without search history
 const DEFAULT_NAICS_CODES = [
@@ -123,7 +130,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Get all alert settings
-  const { data: alertSettings, error: alertError } = await supabase
+  const { data: alertSettings, error: alertError } = await getSupabase()
     .from('user_alert_settings')
     .select('user_email, naics_codes, business_type, location_state, location_zip')
     .eq('is_active', true);
@@ -133,7 +140,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Get all briefing profiles (actual search history)
-  const { data: briefingProfiles, error: profileError } = await supabase
+  const { data: briefingProfiles, error: profileError } = await getSupabase()
     .from('user_briefing_profile')
     .select('user_email, naics_codes, zip_codes, keywords');
 
@@ -230,7 +237,7 @@ export async function GET(request: NextRequest) {
 
   for (const update of updates) {
     try {
-      const { error } = await supabase
+      const { error } = await getSupabase()
         .from('user_alert_settings')
         .update({
           naics_codes: update.proposed.naics,

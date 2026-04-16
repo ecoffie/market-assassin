@@ -4,6 +4,151 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 41 (Apr 16, 2026)
+
+### SBIR + Grants Tabs for Market Intelligence Dashboard
+
+**Goal:** Expand the MI dashboard (`/briefings`) from 2 tabs to 4 tabs, adding SBIR and Grants search capabilities similar to how Forecasts was integrated.
+
+#### The Problem
+
+Market Intelligence dashboard only had 2 tabs (BRIEFINGS, FORECASTS). Users requested SBIR and Grants search integrated into the same paid dashboard rather than as standalone free tools.
+
+#### The Solution
+
+Added 2 new tabs following progressive disclosure principles:
+
+| Tab | Color | Data Source | Key Features |
+|-----|-------|-------------|--------------|
+| SBIR (new) | Blue | NIH RePORTER API | Phase I/II search, 10 NIH institutes, eligibility info |
+| GRANTS (new) | Emerald | Grants.gov REST API | $700B+ funding, 14 agencies, 10 categories |
+
+#### Files Created
+
+**API Routes:**
+- `src/app/api/grants/route.ts` — Wraps Grants.gov public REST API
+  - No auth required
+  - Endpoint: `https://apply07.grants.gov/grantsws/rest/opportunities/search`
+  - Note: `totalHits` in response is the array of opportunities (not a count)
+
+- `src/app/api/sbir/route.ts` — Wraps NIH RePORTER + Multisite
+  - Activity codes: R43/R44 (SBIR), R41/R42 (STTR)
+  - Supports keyword, agency (NIH institute), phase, source filters
+
+**UI Components:**
+- `src/components/briefings/GrantsPanel.tsx` — Grants search panel
+  - Summary cards: $700B+ funding, 14 agencies, 10 categories
+  - Search filters: keyword, agency, category, status
+  - Results with urgency badges for close dates
+
+- `src/components/briefings/SbirPanel.tsx` — SBIR/STTR search panel
+  - Summary cards: Phase I $275K, Phase II $1.1M
+  - Eligibility banner: "US small business, <500 employees, 51%+ US-owned"
+  - Search filters: keyword, agency, phase, data source
+  - Educational "What is SBIR/STTR?" section
+
+#### Files Modified
+
+- `src/app/briefings/page.tsx`
+  - Added imports for `SbirPanel` and `GrantsPanel`
+  - Extended `MainTab` type to include `'sbir' | 'grants'`
+  - Added 2 new tab buttons with color coding
+  - Added content rendering for new tabs
+
+#### API Issues & Fixes
+
+1. **Grants.gov response format:**
+   - Expected `opportunities` array but got `totalHits` as array
+   - Fixed by updating interface: `totalHits?: GrantsGovOpp[]`
+   - Transformation: `const rawOpportunities = data.totalHits || data.oppHits || [];`
+
+2. **Wrong endpoint attempt:**
+   - Tried `search2` endpoint → returned 404
+   - Reverted to original: `https://apply07.grants.gov/grantsws/rest/opportunities/search`
+
+#### Documentation Updated
+
+- `CLAUDE.md` — Added MI Dashboard Tabs section with tab descriptions and new APIs
+- `tasks/todo.md` — Added session state for SBIR + Grants completion
+- `MEMORY.md` — This entry
+
+#### Key Takeaways
+
+1. **Progressive disclosure works:** 4 top-level tabs are cleaner than nested sub-menus
+2. **Grants.gov API quirks:** `totalHits` is misleadingly named - it's the data array, not a count
+3. **NIH RePORTER returns few results:** SBIR activity codes (R43/R44) have limited results per fiscal year
+
+---
+
+## Session 40 (Apr 14, 2026)
+
+### SAM.gov Data Infrastructure - Phase 2
+
+**Goal:** Add USASpending award data sync, event extraction from Special Notices, and fix build errors.
+
+#### Build Error Fixes (Supabase Lazy Initialization)
+
+Fixed module-scope Supabase client initialization causing `Error: supabaseUrl is required` during Next.js page data collection phase.
+
+**Pattern Applied:**
+```typescript
+// Before (causes build error)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+// After (lazy initialization)
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key, { auth: { persistSession: false } });
+  return _supabase;
+}
+```
+
+**Files Fixed:**
+| File | Functions Updated |
+|------|-------------------|
+| `src/lib/intelligence/guardrails.ts` | `logEvent()`, `isOpen()`, `trip()`, `logReset()`, `manualReset()`, `postSendValidation()`, `getGuardrailStatus()` |
+| `src/lib/intelligence/metrics.ts` | `save()`, `saveDirectly()`, `logIntelligenceDelivery()`, `recordUserFeedback()`, `getMetricsDashboard()` |
+| `src/app/api/search-capture/route.ts` | `POST()`, `GET()` |
+
+#### New Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `usaspending_awards` | Contract award data with winners/amounts from USASpending.gov |
+| `sam_events` | Industry days, webinars, RFIs extracted from SAM.gov Special Notices |
+
+**Migration File:** `supabase/migrations/20260414_usaspending_awards.sql`
+
+#### Table Schemas
+
+**usaspending_awards:**
+- `award_id` (TEXT, UNIQUE) — Award identifier
+- `recipient_name` (TEXT) — Contract winner
+- `award_amount` (DECIMAL) — Award value
+- `awarding_agency`, `awarding_sub_agency` — Agency info
+- `naics_code`, `naics_description` — Classification
+- `pop_state` — Place of performance
+- `start_date`, `end_date` — Contract period
+
+**sam_events:**
+- `notice_id` (TEXT, UNIQUE) — Source SAM.gov notice
+- `title` (TEXT) — Event title
+- `event_type` (TEXT) — `industry_day`, `rfi`, `forecast`, `webinar`, `other`
+- `event_date` (DATE) — When the event occurs
+- `event_location`, `registration_url`, `contact_info` — Event details
+
+#### Deployment
+
+- Build succeeded after lazy init fixes
+- Deployed to `tools.govcongiants.org`
+- SQL migration run via Supabase Dashboard
+
+---
+
 ## Session 39 (Apr 9, 2026)
 
 ### Part 2: Automated Backup System for 9K+ Users
@@ -1014,4 +1159,4 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 
 ---
 
-*Last Updated: April 9, 2026*
+*Last Updated: April 16, 2026*

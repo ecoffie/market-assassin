@@ -10,7 +10,8 @@
     "test": "bash tests/run-all-tests.sh",
     "test:pre-deploy": "bash tests/test-pre-deploy.sh",
     "test:local": "bash tests/test-pre-deploy.sh --local",
-    "predeploy": "npm run test:pre-deploy",
+    "test:schema": "node tests/test-schema-sync.js",
+    "predeploy": "npm run test:schema && npm run test:pre-deploy",
     "deploy": "npm run predeploy && vercel --prod"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.6.0",
+    "resend": "^6.10.0",
     "stripe": "^20.1.0",
     "twilio": "^5.12.2"
   },
@@ -36,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "jsdom": "^27.3.0",
+    "pg": "^8.20.0",
     "puppeteer": "^24.40.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",

@@ -27,12 +27,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('user_notification_settings')
     .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number')
     .eq('user_email', email)
@@ -85,10 +92,17 @@ export async function POST(request: Request) {
     updates.phone_number = null;
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   // Map email_frequency to briefing_frequency for unified table
   const mappedUpdates = { ...updates };
@@ -98,7 +112,7 @@ export async function POST(request: Request) {
   }
 
   // Upsert user notification settings (unified table)
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('user_notification_settings')
     .upsert(
       {

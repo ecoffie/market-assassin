@@ -13,6 +13,18 @@ import { kv } from '@vercel/kv';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
+
 const KV_KEYS = [
   { key: 'ma', label: 'Market Assassin' },
   { key: 'contentgen', label: 'Content Reaper' },
@@ -58,7 +70,6 @@ export async function GET(request: NextRequest) {
   }
 
   // Also check dbtoken (Contractor DB uses token-based access)
-  const dbTokenKeys = await kv.keys(`dbtoken:*`);
   let dbTokenFound: string | null = null;
   // Check if any dbtoken maps to this email
   const dbAccessVal = await kv.get(`dbaccess:${email}`);
@@ -67,12 +78,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 2. Check Supabase user_profiles
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await getSupabase()
     .from('user_profiles')
     .select('*')
     .eq('email', email)
@@ -86,21 +92,21 @@ export async function GET(request: NextRequest) {
   }
 
   // 3. Check Supabase purchases
-  const { data: purchases } = await supabase
+  const { data: purchases } = await getSupabase()
     .from('purchases')
     .select('product_id, amount_paid, status, created_at, stripe_session_id')
     .eq('user_email', email)
     .order('created_at', { ascending: false });
 
   // 4. Check briefing profile
-  const { data: briefingProfile } = await supabase
+  const { data: briefingProfile } = await getSupabase()
     .from('user_briefing_profile')
     .select('user_email, created_at, updated_at')
     .eq('user_email', email)
     .single();
 
   // 5. Check briefing log
-  const { data: recentBriefings } = await supabase
+  const { data: recentBriefings } = await getSupabase()
     .from('briefing_log')
     .select('briefing_date, items_count, delivery_status')
     .eq('user_email', email)

@@ -10,10 +10,18 @@ import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization to avoid build-time errors
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 export async function POST(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
@@ -25,7 +33,7 @@ export async function POST(request: NextRequest) {
   const results: { step: string; success: boolean; error?: string }[] = [];
 
   // Step 1: Create user_pipeline table
-  const { error: pipelineError } = await supabase.rpc('exec_migration', {
+  const { error: pipelineError } = await getSupabase().rpc('exec_migration', {
     sql_query: `
       CREATE TABLE IF NOT EXISTS user_pipeline (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Try to verify table exists by inserting and deleting a test row
-  const { error: testError } = await supabase
+  const { error: testError } = await getSupabase()
     .from('user_pipeline')
     .insert({
       user_email: 'test@migration.check',
@@ -154,7 +162,7 @@ CREATE INDEX IF NOT EXISTS idx_teaming_user ON user_teaming_partners(user_email)
   }
 
   // Clean up test row
-  await supabase
+  await getSupabase()
     .from('user_pipeline')
     .delete()
     .eq('user_email', 'test@migration.check');
@@ -178,7 +186,7 @@ export async function GET(request: NextRequest) {
   const status: { table: string; exists: boolean }[] = [];
 
   for (const table of tables) {
-    const { error } = await supabase.from(table).select('id').limit(1);
+    const { error } = await getSupabase().from(table).select('id').limit(1);
     status.push({
       table,
       exists: !error || error.code !== '42P01'

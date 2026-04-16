@@ -9,10 +9,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 interface PipelineOpportunity {
   stage?: string;
@@ -33,7 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data: opportunities, error } = await supabase
+    const { data: opportunities, error } = await getSupabase()
       .from('user_pipeline')
       .select('stage, priority, value_estimate, response_deadline')
       .eq('user_email', email.toLowerCase());

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import MarketIntelligenceHeader from '@/components/briefings/MarketIntelligenceHeader';
 import OnboardingWizard from '@/components/briefings/OnboardingWizard';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
+import ForecastsPanel from '@/components/bd-assist/ForecastsPanel';
+import SbirPanel from '@/components/briefings/SbirPanel';
+import GrantsPanel from '@/components/briefings/GrantsPanel';
 
 interface QuickStat {
   label: string;
@@ -161,6 +164,8 @@ type PageStatus = 'loading' | 'gate' | 'verifying' | 'onboarding' | 'denied' | '
 
 type FilterType = 'all' | 'urgent' | 'opportunity' | 'teaming';
 
+type MainTab = 'briefings' | 'forecasts' | 'sbir' | 'grants';
+
 export default function BriefingsDashboard() {
   const [email, setEmail] = useState('');
   const [inputEmail, setInputEmail] = useState('');
@@ -174,6 +179,7 @@ export default function BriefingsDashboard() {
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [mainTab, setMainTab] = useState<MainTab>('briefings');
 
   const selectedBriefing = briefings.find(b => b.briefing_date === selectedDate)?.content ?? null;
 
@@ -592,28 +598,112 @@ export default function BriefingsDashboard() {
         email={email}
       />
 
-      {briefings.length === 0 ? (
-        /* Empty state */
-        <div className="flex items-center justify-center py-32 px-4">
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-800/20 flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl">📨</span>
-            </div>
-            <h2 className="text-xl font-semibold mb-2">No Briefings Yet</h2>
-            <p className="text-gray-400 max-w-md">
-              Your first briefing will appear here after the next daily delivery (7 AM UTC).
-              Check your email — it may already be in your inbox.
-            </p>
+      {/* Main Tab Navigation */}
+      <div className="border-b border-gray-800 bg-gray-900/50">
+        <div className="max-w-7xl mx-auto px-4">
+          <nav className="flex gap-1">
             <button
-              onClick={() => setSettingsPanelOpen(true)}
-              className="mt-6 px-6 py-2 bg-purple-600/20 text-purple-400 rounded-lg hover:bg-purple-600/30 transition-colors"
+              onClick={() => setMainTab('briefings')}
+              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+                mainTab === 'briefings'
+                  ? 'border-purple-500 text-purple-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
             >
-              Review your settings
+              📋 BRIEFINGS
             </button>
-          </div>
+            <button
+              onClick={() => setMainTab('forecasts')}
+              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+                mainTab === 'forecasts'
+                  ? 'border-purple-500 text-purple-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              🔮 FORECASTS
+            </button>
+            <button
+              onClick={() => setMainTab('sbir')}
+              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+                mainTab === 'sbir'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              🔬 SBIR
+            </button>
+            <button
+              onClick={() => setMainTab('grants')}
+              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+                mainTab === 'grants'
+                  ? 'border-emerald-500 text-emerald-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              💰 GRANTS
+            </button>
+          </nav>
         </div>
-      ) : (
-        <div className="flex flex-col lg:flex-row">
+      </div>
+
+      {/* Forecasts Tab */}
+      {mainTab === 'forecasts' && (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-white mb-2">Procurement Forecasts</h2>
+            <p className="text-gray-400">Early-warning intel on upcoming opportunities 6-18 months before solicitation.</p>
+          </div>
+          <ForecastsPanel email={email} />
+        </div>
+      )}
+
+      {/* SBIR Tab */}
+      {mainTab === 'sbir' && (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-white mb-2">SBIR/STTR Opportunities</h2>
+            <p className="text-gray-400">Small business R&D funding from NIH, NSF, DOD, and other federal agencies.</p>
+          </div>
+          <SbirPanel email={email} />
+        </div>
+      )}
+
+      {/* Grants Tab */}
+      {mainTab === 'grants' && (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-white mb-2">Federal Grants</h2>
+            <p className="text-gray-400">Access $700B+ in annual federal grant funding from Grants.gov.</p>
+          </div>
+          <GrantsPanel email={email} />
+        </div>
+      )}
+
+      {/* Briefings Tab */}
+      {mainTab === 'briefings' && (
+        <>
+          {briefings.length === 0 ? (
+            /* Empty state */
+            <div className="flex items-center justify-center py-32 px-4">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-800/20 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-4xl">📨</span>
+                </div>
+                <h2 className="text-xl font-semibold mb-2">No Briefings Yet</h2>
+                <p className="text-gray-400 max-w-md">
+                  Your first briefing will appear here after the next daily delivery (7 AM UTC).
+                  Check your email — it may already be in your inbox.
+                </p>
+                <button
+                  onClick={() => setSettingsPanelOpen(true)}
+                  className="mt-6 px-6 py-2 bg-purple-600/20 text-purple-400 rounded-lg hover:bg-purple-600/30 transition-colors"
+                >
+                  Review your settings
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col lg:flex-row">
           {/* Date sidebar - horizontal on mobile, vertical on desktop */}
           <aside className="lg:w-64 border-b lg:border-b-0 lg:border-r border-gray-800 lg:min-h-[calc(100vh-65px)]">
             {/* Mobile: horizontal scroll */}
@@ -849,6 +939,8 @@ export default function BriefingsDashboard() {
             )}
           </main>
         </div>
+          )}
+        </>
       )}
     </div>
   );

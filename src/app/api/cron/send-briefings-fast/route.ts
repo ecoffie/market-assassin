@@ -18,12 +18,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-template';
+import { generateBidTargetEmail, BidTargetOpportunity, BidTargetEmailData } from '@/lib/briefings/delivery/bid-target-email-template';
 import { AIGeneratedBriefing } from '@/lib/briefings/delivery/ai-briefing-generator';
 import {
   recordBriefingProgramDelivery,
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
+import { hasBriefingAccess } from '@/lib/access-codes';
+import { calculateBidScore, generateWinReasons, generateActionSteps } from '@/lib/briefings/win-probability';
 import crypto from 'crypto';
 
 // Process up to 100 users per cron run (~100ms each = 10 seconds total)
@@ -120,10 +123,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const startTime = Date.now();
   const today = new Date().toISOString().split('T')[0];
@@ -137,7 +147,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Step 1: Get all pre-computed templates for today
-    const { data: templates, error: templatesError } = await supabase
+    const { data: templates, error: templatesError } = await getSupabase()
       .from('briefing_templates')
       .select('*')
       .eq('template_date', today)
@@ -156,8 +166,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Build template lookup maps (exact hash + prefix fallback)
-    const templateMap = new Map<string, typeof templates[0]>();
-    templates.forEach(t => templateMap.set(t.naics_profile_hash, t));
+    type BriefingTemplate = { naics_profile_hash: string; naics_profile: string; [key: string]: unknown };
+    const templateMap = new Map<string, BriefingTemplate>();
+    templates.forEach((t: BriefingTemplate) => templateMap.set(t.naics_profile_hash, t));
 
     // Build prefix fallback map for custom profiles
     const prefixMap = buildPrefixMap(templates);
@@ -165,7 +176,7 @@ export async function GET(request: NextRequest) {
     console.log(`[SendBriefingsFast] Loaded ${templates.length} templates, ${prefixMap.size} prefix mappings`);
 
     // Step 2: Get users to process
-    const audienceResolution = await resolveBriefingAudience(supabase);
+    const audienceResolution = await resolveBriefingAudience(getSupabase());
     let usersToProcess = audienceResolution.users;
 
     // Filter to test email if specified
@@ -180,13 +191,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Check for already sent today
-    const { data: sentToday } = await supabase
+    const { data: sentToday } = await getSupabase()
       .from('briefing_log')
       .select('user_email')
       .eq('briefing_date', today)
       .eq('delivery_status', 'sent');
 
-    const sentEmails = new Set((sentToday || []).map(s => s.user_email));
+    const sentEmails = new Set((sentToday || []).map((s: { user_email: string }) => s.user_email));
 
     // Filter out already sent and limit batch
     usersToProcess = usersToProcess
@@ -224,7 +235,7 @@ export async function GET(request: NextRequest) {
           noTemplateCount++;
           console.log(`[SendBriefingsFast] No template for ${user.email} (hash: ${naicsHash.slice(0, 8)}, prefixes: ${extractNaicsPrefixes(userNaics).join(',')})`);
           // Queue for retry - watchdog will regenerate or find fallback
-          await queueForRetry(supabase, user.email, userNaics, 'No matching template (exact or prefix)', today);
+          await queueForRetry(getSupabase(), user.email, userNaics, 'No matching template (exact or prefix)', today);
           continue;
         }
 
@@ -236,7 +247,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Log briefing attempt (record match type for analytics)
-        await supabase.from('briefing_log').upsert({
+        await getSupabase().from('briefing_log').upsert({
           user_email: user.email,
           briefing_date: today,
           briefing_content: briefing,
@@ -247,23 +258,166 @@ export async function GET(request: NextRequest) {
           created_at: new Date().toISOString(),
         }, { onConflict: 'user_email,briefing_date' });
 
-        // Generate personalized email
-        const emailTemplate = generateAIEmailTemplate(briefing);
+        // Check if user has paid briefings access (Bid Target tier)
+        const hasPaidAccess = await hasBriefingAccess(user.email);
+
+        let emailSubject: string;
+        let emailHtml: string;
+        let emailText: string;
+        let emailType: 'bid_target' | 'daily_alerts';
+
+        if (hasPaidAccess && briefing.opportunities.length > 0) {
+          // PAID USER: Send Bid Target email (THE ONE + win scoring)
+          emailType = 'bid_target';
+
+          // Get user profile for scoring
+          const { data: userProfile } = await getSupabase()
+            .from('user_notification_settings')
+            .select('*')
+            .eq('user_email', user.email)
+            .single();
+
+          // Build a complete BriefingUserProfile for scoring
+          const profile = userProfile ? {
+            email: user.email,
+            naicsCodes: userProfile.naics_codes || [],
+            topNaics: [],
+            certifications: userProfile.certifications || [],
+            targetAgencies: userProfile.target_agencies || [],
+            topAgencies: [],
+            watchedCompanies: [],
+            topCompanies: [],
+            keywords: userProfile.keywords || [],
+            capabilityKeywords: [],
+            state: userProfile.state || null,
+            zipCode: userProfile.zip_code || null,
+            geographicPreference: 'national' as const,
+            setAsidePreferences: [],
+            companySize: userProfile.company_size || 'small',
+            maxContractSize: userProfile.max_contract_size || null,
+            minContractValue: 0,
+            mutedAgencies: [],
+            mutedNaics: [],
+            engagementScore: 50,
+          } : null;
+
+          // Convert AIBriefingOpportunity to BidTargetOpportunity format
+          // Note: AIBriefingOpportunity has: rank, contractName, agency, incumbent, value, window, displacementAngle
+          const scoredOpps = briefing.opportunities.map((opp, index) => {
+            // Parse value to extract amount (e.g., "$2.5M" -> 2500000)
+            const valueStr = opp.value || '0';
+            const valueMatch = valueStr.match(/\$?([\d.]+)\s*(M|K|B)?/i);
+            let amount = 0;
+            if (valueMatch) {
+              amount = parseFloat(valueMatch[1]);
+              const multiplier = valueMatch[2]?.toUpperCase();
+              if (multiplier === 'K') amount *= 1000;
+              else if (multiplier === 'M') amount *= 1_000_000;
+              else if (multiplier === 'B') amount *= 1_000_000_000;
+            }
+
+            // Parse window for deadline hints (e.g., "RFP expected Q2 2026")
+            const windowText = opp.window || '';
+            let daysLeft = 30; // Default
+            if (windowText.toLowerCase().includes('urgent') || windowText.toLowerCase().includes('immediate')) {
+              daysLeft = 7;
+            } else if (windowText.toLowerCase().includes('week')) {
+              daysLeft = 14;
+            } else if (windowText.toLowerCase().includes('month')) {
+              daysLeft = 30;
+            } else if (windowText.toLowerCase().includes('q1') || windowText.toLowerCase().includes('q2')) {
+              daysLeft = 60;
+            }
+
+            // Use NAICS from user profile if available (opportunity doesn't have it)
+            const userNaics = profile?.naicsCodes?.[0] || '';
+
+            const bidOppData = {
+              naicsCode: userNaics,
+              setAside: '', // Not available in AI briefing format
+              amount,
+              responseDeadline: new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000),
+              title: opp.contractName,
+            };
+
+            const bidScore = calculateBidScore(bidOppData, profile);
+
+            // Use displacementAngle as primary win reason, add generic ones
+            const winReasons = [
+              opp.displacementAngle, // Strategic insight from AI
+              ...(bidScore.factors.filter(f => f.isPositive && f.points >= f.maxPoints * 0.5).map(f => f.description)),
+            ].filter(Boolean).slice(0, 5);
+
+            const actionSteps = generateActionSteps({
+              ...bidOppData,
+              agency: opp.agency,
+              samLink: `https://sam.gov/search/?q=${encodeURIComponent(opp.contractName)}`,
+            }, profile);
+
+            // Calculate close date
+            const closeDate = new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000);
+
+            return {
+              title: opp.contractName,
+              agency: opp.agency || '',
+              value: opp.value || 'TBD',
+              daysLeft,
+              closeDate: closeDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              naicsCode: userNaics,
+              setAside: 'TBD',
+              noticeType: windowText.includes('RFI') ? 'Sources Sought' : windowText.includes('RFP') ? 'Solicitation' : 'Pre-Solicitation',
+              samLink: `https://sam.gov/search/?q=${encodeURIComponent(opp.contractName)}`,
+              bidScore: Math.max(50, 100 - (opp.rank * 5)), // Score based on AI ranking (rank 1 = 95, rank 2 = 90, etc.)
+              winReasons,
+              actionSteps,
+            } as BidTargetOpportunity;
+          }).sort((a, b) => b.bidScore - a.bidScore);
+
+          // THE ONE is the highest scored opportunity
+          const bidTarget = scoredOpps[0];
+          const alsoOnRadar = scoredOpps.slice(1, 4); // Next 3 as "also on radar"
+
+          // Extract a name from email if possible (e.g., "john.doe@email.com" -> "John")
+          const emailPrefix = user.email.split('@')[0].split(/[._]/)[0];
+          const derivedName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+
+          const bidTargetData: BidTargetEmailData = {
+            userName: derivedName || '',
+            userEmail: user.email,
+            briefingDate: today,
+            bidTarget,
+            alsoOnRadar,
+          };
+
+          const bidTargetEmail = generateBidTargetEmail(bidTargetData);
+          emailSubject = bidTargetEmail.subject;
+          emailHtml = bidTargetEmail.htmlBody;
+          emailText = bidTargetEmail.textBody;
+
+        } else {
+          // FREE USER: Send Daily Alerts email (existing template)
+          emailType = 'daily_alerts';
+          const emailTemplate = generateAIEmailTemplate(briefing);
+          emailSubject = emailTemplate.subject;
+          emailHtml = emailTemplate.htmlBody;
+          emailText = emailTemplate.textBody;
+        }
 
         // Send email
         await sendEmail({
           to: user.email,
-          subject: emailTemplate.subject,
-          html: emailTemplate.htmlBody,
-          text: emailTemplate.textBody,
+          subject: emailSubject,
+          html: emailHtml,
+          text: emailText,
         });
 
         briefingsSent++;
 
-        // Update log
-        await supabase.from('briefing_log').update({
+        // Update log with email type
+        await getSupabase().from('briefing_log').update({
           delivery_status: 'sent',
           email_sent_at: new Date().toISOString(),
+          tools_included: [matchType === 'exact' ? 'pre_computed_template' : 'prefix_fallback_template', emailType],
         }).eq('user_email', user.email).eq('briefing_date', today);
 
         // Record delivery
@@ -280,14 +434,14 @@ export async function GET(request: NextRequest) {
         console.error(`[SendBriefingsFast] ❌ Failed for ${user.email}:`, err);
 
         // Update log with failure
-        await supabase.from('briefing_log').update({
+        await getSupabase().from('briefing_log').update({
           delivery_status: 'failed',
           error_message: errorMsg,
         }).eq('user_email', user.email).eq('briefing_date', today);
 
         // Queue for automatic retry
         const userNaics = user.naics_codes || [];
-        await queueForRetry(supabase, user.email, userNaics, errorMsg, today);
+        await queueForRetry(getSupabase(), user.email, userNaics, errorMsg, today);
       }
     }
 

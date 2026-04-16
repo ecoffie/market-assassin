@@ -8,10 +8,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -26,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Record feedback - gracefully handle if table doesn't exist yet
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('briefing_feedback')
       .upsert({
         user_email: email.toLowerCase(),
@@ -66,7 +73,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('briefing_feedback')
       .upsert({
         user_email: email.toLowerCase(),

@@ -16,7 +16,7 @@ import {
 } from './types';
 import { generateEmailTemplate } from './email-template';
 
-const FROM_EMAIL = process.env.SMTP_USER || 'alerts@govcongiants.com';
+const FROM_EMAIL = process.env.EMAIL_FROM || process.env.SMTP_USER || 'alerts@govcongiants.com';
 const FROM_NAME = 'GovCon Giants';
 
 /**

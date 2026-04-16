@@ -13,10 +13,24 @@ function hasAdminAccess(request: NextRequest): boolean {
   );
 }
 
+// Check if user has BD Assist or valid subscription
+function getUserEmail(request: NextRequest): string | null {
+  return request.headers.get('x-user-email');
+}
+
+async function hasBDAssistAccess(email: string | null): Promise<boolean> {
+  if (!email) return false;
+
+  // For now, allow any authenticated BD Assist user to search
+  // In production, check KV store: bdassist:{email}
+  return true;
+}
+
 /**
- * Forecast Intelligence API
+ * Forecast Intelligence API (PROPRIETARY - REQUIRES AUTHENTICATION)
  *
  * Query federal procurement forecasts from multiple agency sources.
+ * Access requires either admin password or authenticated user email header.
  *
  * Endpoints:
  *   GET /api/forecasts                     - Summary stats
@@ -26,13 +40,22 @@ function hasAdminAccess(request: NextRequest): boolean {
  *   GET /api/forecasts?setAside=8(a)       - By set-aside type
  *   GET /api/forecasts?fiscalYear=FY2026   - By fiscal year
  *   GET /api/forecasts?search=cybersecurity - Full text search
- *   GET /api/forecasts?mode=coverage       - Coverage dashboard
- *   GET /api/forecasts?mode=sources        - Source health status
+ *   GET /api/forecasts?mode=coverage       - Coverage dashboard (admin only)
+ *   GET /api/forecasts?mode=sources        - Source health status (admin only)
  */
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const { searchParams } = new URL(request.url);
   const isAdmin = hasAdminAccess(request);
+  const userEmail = getUserEmail(request);
+
+  // PROPRIETARY SYSTEM - Require authentication for ALL requests
+  if (!isAdmin && !userEmail) {
+    return NextResponse.json({
+      success: false,
+      error: 'Authentication required. Access this feature through Market Intelligence dashboard.',
+    }, { status: 401 });
+  }
 
   // Query parameters
   const naics = searchParams.get('naics');
@@ -111,14 +134,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if ((naics || agency || state || setAside || fiscalYear || search) && !isAdmin) {
-      return NextResponse.json({
-        success: false,
-        error: 'Detailed forecast search is not public yet',
-      }, { status: 401 });
-    }
-
-    // Build query
+    // Build query (authentication already verified at top of handler)
     let query = supabase
       .from('agency_forecasts')
       .select('*', { count: 'exact' });

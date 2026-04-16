@@ -125,10 +125,31 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // DAY-OF-WEEK GUARD: Weekly precompute only runs on Saturday (UTC)
+  const today = new Date();
+  const dayOfWeek = today.getUTCDay(); // 6 = Saturday
+
+  if (dayOfWeek !== 6 && !isTest) {
+    console.log(`[PrecomputeWeekly] Skipped - not Saturday (day ${dayOfWeek})`);
+    return NextResponse.json({
+      success: true,
+      message: `Weekly precompute only runs on Saturday. Today is day ${dayOfWeek}.`,
+      skipped: true,
+      dayOfWeek,
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const startTime = Date.now();
   const weekOf = getWeekOfDate();
@@ -140,7 +161,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Step 1: Get all unique NAICS profiles
-    const { data: users, error: usersError } = await supabase
+    const { data: users, error: usersError } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email, naics_codes')
       .eq('briefings_enabled', true);
@@ -174,13 +195,13 @@ export async function GET(request: NextRequest) {
     console.log(`[PrecomputeWeekly] Found ${allProfiles.length} unique NAICS profiles`);
 
     // Step 2: Check which profiles already have weekly templates
-    const { data: existingTemplates } = await supabase
+    const { data: existingTemplates } = await getSupabase()
       .from('briefing_templates')
       .select('naics_profile_hash')
       .eq('template_date', weekOf)
       .eq('briefing_type', 'weekly');
 
-    const existingHashes = new Set((existingTemplates || []).map(t => t.naics_profile_hash));
+    const existingHashes = new Set((existingTemplates || []).map((t: { naics_profile_hash: string }) => t.naics_profile_hash));
 
     const profilesToProcess = allProfiles
       .filter(p => !existingHashes.has(p.naics_profile_hash))
@@ -220,7 +241,7 @@ export async function GET(request: NextRequest) {
         briefing.processingTimeMs = Date.now() - profileStartTime;
 
         // Store template
-        const { error: insertError } = await supabase.from('briefing_templates').upsert({
+        const { error: insertError } = await getSupabase().from('briefing_templates').upsert({
           naics_profile: profile.naics_profile,
           naics_profile_hash: profile.naics_profile_hash,
           template_date: weekOf,

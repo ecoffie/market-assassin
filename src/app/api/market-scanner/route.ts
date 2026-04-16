@@ -437,10 +437,17 @@ async function getWhoHasItNow(naics: string, states: string[]): Promise<MarketSc
  */
 async function getWhatIsAvailable(naics: string, state?: string): Promise<AvailableOpportunities> {
   try {
-    const supabase = createClient(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+  }
+  return _supabase;
+}
 
     // SAM.gov opportunities
     let samCount = 0;
@@ -493,21 +500,23 @@ async function getWhatIsAvailable(naics: string, state?: string): Promise<Availa
       }
     }
 
-    // Grants.gov
+    // Grants.gov (using v1 API - POST to api.grants.gov/v1/api/search2)
     let grantsCount = 0;
     try {
       const naicsDesc = getNaicsDescription(naics);
       const keywords = naicsDesc.toLowerCase().split(/[\s,]+/).filter((w) => w.length > 3);
 
       const grantsResponse = await fetch(
-        'https://apply07.grants.gov/grantsws/rest/opportunities/search',
+        'https://api.grants.gov/v1/api/search2',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({
             oppStatuses: 'posted',
-            rows: 25,
-            sortBy: 'openDate|desc',
+            rows: 50,
             keyword: keywords.slice(0, 3).join(' '),
           }),
           signal: AbortSignal.timeout(15000),
@@ -516,7 +525,8 @@ async function getWhatIsAvailable(naics: string, state?: string): Promise<Availa
 
       if (grantsResponse.ok) {
         const grantsData = await grantsResponse.json();
-        grantsCount = grantsData.oppHits?.length || 0;
+        // v1 API returns data.oppHits array
+        grantsCount = grantsData.data?.oppHits?.length || grantsData.data?.hitCount || 0;
       }
     } catch (grantsError) {
       console.error('[Grants.gov fetch error]', grantsError);
@@ -525,7 +535,7 @@ async function getWhatIsAvailable(naics: string, state?: string): Promise<Availa
     // Forecasts
     let forecastsCount = 0;
     try {
-      const { count } = await supabase
+      const { count } = await getSupabase()
         .from('agency_forecasts')
         .select('*', { count: 'exact', head: true })
         .eq('naics_code', naics);
@@ -606,21 +616,28 @@ async function getWhoToTalkTo(
   state?: string
 ): Promise<MarketScannerResponse['whoToTalkTo']> {
   try {
-    const supabase = createClient(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+  }
+  return _supabase;
+}
 
     // OSDBU contacts from contractor database
     const osdubuContacts: Contact[] = [];
-    const { data: contractors } = await supabase
+    const { data: contractors } = await getSupabase()
       .from('federal_contractors')
       .select('company, sblo_name, sblo_email, sblo_phone, agency')
       .in('agency', topAgencies.slice(0, 5))
       .limit(10);
 
     if (contractors) {
-      contractors.forEach((c) => {
+      contractors.forEach((c: { company: string; sblo_name: string; sblo_email: string; sblo_phone: string; agency: string }) => {
         osdubuContacts.push({
           agency: c.agency,
           name: c.sblo_name,
@@ -715,30 +732,18 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Market Scanner] NAICS: ${naics}, States: ${searchStates.join(', ') || 'nationwide'}`);
 
-    // Fetch all 6 questions in parallel
-    const [whoIsBuying, howAreTheyBuying, whoHasItNow, whatIsAvailable, whatEvents, whoToTalkTo] =
+    // Phase 1: Get WHO IS BUYING first (needed for HOW and WHO TO TALK TO)
+    const whoIsBuying = await getWhoIsBuying(naics, searchStates);
+    const topAgencies = whoIsBuying.agencies.slice(0, 5).map((a) => a.name);
+
+    // Phase 2: Fetch remaining 5 questions in parallel (now that we have top agencies)
+    const [howAreTheyBuying, whoHasItNow, whatIsAvailable, whatEvents, whoToTalkTo] =
       await Promise.all([
-        getWhoIsBuying(naics, searchStates),
-        // Pass top agencies once we have them
-        Promise.resolve(null).then(async () => {
-          const buyers = await getWhoIsBuying(naics, searchStates);
-          return getHowTheyAreBuying(
-            naics,
-            buyers.agencies.slice(0, 5).map((a) => a.name)
-          );
-        }),
+        getHowTheyAreBuying(naics, topAgencies),
         getWhoHasItNow(naics, searchStates),
         getWhatIsAvailable(naics, state || undefined),
         getWhatEvents(naics, state || undefined),
-        // Pass top agencies once we have them
-        Promise.resolve(null).then(async () => {
-          const buyers = await getWhoIsBuying(naics, searchStates);
-          return getWhoToTalkTo(
-            naics,
-            buyers.agencies.slice(0, 5).map((a) => a.name),
-            state || undefined
-          );
-        }),
+        getWhoToTalkTo(naics, topAgencies, state || undefined),
       ]);
 
     const response: MarketScannerResponse = {

@@ -773,3 +773,119 @@ ADD COLUMN excluded_sources TEXT[] DEFAULT ARRAY[]::TEXT[];
 ---
 
 *Last Updated: April 5, 2026*
+
+---
+
+## Database Schema Sync
+
+**Lesson (Apr 15, 2026):** Always run migrations before deploying code that references new columns.
+
+**Problem:** API code was updated to write to 4 new columns (`location_states`, `naics_profile_hash`, `profile_updated_at`, `primary_industry`) but the migration was never run. Users got "Failed to save preferences" errors.
+
+**Prevention:**
+1. Schema sync test added: `npm run test:schema`
+2. Runs automatically before deploy: `npm run deploy`
+3. Update `tests/test-schema-sync.js` when adding new columns
+
+**Pattern:**
+```typescript
+// When adding a new column to API code:
+// 1. Create migration in supabase/migrations/
+// 2. Add column to EXPECTED_SCHEMA in tests/test-schema-sync.js
+// 3. Run migration in Supabase Dashboard
+// 4. Deploy code
+```
+
+**Rule:** Never deploy code that writes to columns without verifying they exist first.
+
+---
+
+## Vercel Cron Disruption During Deployments
+
+**Lesson (Apr 16, 2026):** Vercel cron jobs can be disrupted when deployments happen during scheduled cron windows.
+
+**What happened:**
+- Daily alerts cron was scheduled at 11:00, 12:00, 14:00, 16:00 UTC
+- Multiple deployments happened during the morning
+- Cron jobs silently failed to execute
+- No error logs, no failures - jobs just didn't run
+- 947 users didn't receive daily alerts
+
+**Detection added:**
+- Health check now includes "Daily Alerts Cron" test
+- Checks `alert_log` table for today's alerts
+- If no alerts by 1 PM UTC (9 AM ET), flags as critical failure
+- Also checks "Briefing Templates" were generated
+
+**Recovery mechanism:**
+- Admin can manually trigger with timezone skip:
+```bash
+curl "https://tools.govcongiants.org/api/cron/daily-alerts?password=xxx&skipTimezone=true"
+```
+
+**Prevention:**
+1. **Don't deploy during cron windows** (7-12 PM ET for alerts)
+2. **Check health endpoint** after deploying: `/api/cron/health-check?password=xxx&email=true`
+3. **Monitor alert_log table** - should have entries for each day
+4. **Use admin override** if crons missed: `?password=xxx&skipTimezone=true`
+
+**Files:**
+- `api/cron/daily-alerts/route.ts` - Added admin override with `skipTimezone=true`
+- `api/cron/health-check/route.ts` - Added cron health tests
+
+**Rule:** After any production deployment, verify cron jobs ran by checking health check endpoint or database.
+
+---
+
+## Cron Day-of-Week Guards
+
+**Lesson (Apr 16, 2026):** Cron endpoints should have explicit day-of-week guards, not rely solely on Vercel schedule.
+
+**What happened:**
+- Weekly Deep Dive and Pursuit Brief emails arrived on Wednesday at 6:46 AM
+- Should only send on Sunday (Weekly) and Monday (Pursuit)
+- Endpoints had no day validation - relied 100% on Vercel's cron schedule
+- Something triggered them on wrong day (possibly admin endpoint or misconfigured cron)
+
+**Fix - Add defensive guards:**
+```typescript
+export async function GET(request: NextRequest) {
+  // ... auth checks ...
+
+  // DAY-OF-WEEK GUARD: Weekly only sends on Sunday (UTC)
+  const today = new Date();
+  const dayOfWeek = today.getUTCDay(); // 0 = Sunday
+  const isTestMode = testEmail && isTest;
+
+  if (dayOfWeek !== 0 && !isTestMode) {
+    console.log(`[SendWeeklyFast] Skipped - not Sunday (day ${dayOfWeek})`);
+    return NextResponse.json({
+      success: true,
+      message: `Weekly only sends on Sunday. Today is day ${dayOfWeek}.`,
+      skipped: true,
+      dayOfWeek,
+    });
+  }
+
+  // ... actual job logic ...
+}
+```
+
+**Schedule with guards:**
+| Endpoint | Day | UTC Day # |
+|----------|-----|-----------|
+| `precompute-weekly-briefings` | Saturday | 6 |
+| `send-weekly-fast` | Sunday | 0 |
+| `precompute-pursuit-briefs` | Sunday | 0 |
+| `send-pursuit-fast` | Monday | 1 |
+
+**Test mode bypass:** `?test=true&email=xxx` bypasses day guard for manual testing.
+
+**Monitor with:**
+```bash
+curl "https://tools.govcongiants.org/api/admin/briefing-status?password=galata-assassin-2026"
+```
+
+**Rule:** Day-specific crons need TWO protections:
+1. Vercel cron schedule (primary)
+2. In-code day guard (defensive - catches wrong-day triggers)

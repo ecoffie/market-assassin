@@ -8,12 +8,19 @@
  * - Post-send validation: Alert on issues after sending
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-loaded Supabase client to avoid build-time errors
+let _supabase: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient | null {
+  if (_supabase) return _supabase;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key, { auth: { persistSession: false } });
+  return _supabase;
+}
 
 // Configuration
 const GUARDRAIL_CONFIG = {
@@ -136,7 +143,9 @@ export class GuardrailMonitor {
   // Log guardrail event to database
   async logEvent(eventType: 'warning' | 'trip' | 'reset', reason: string): Promise<void> {
     try {
-      await supabase.from('guardrail_events').insert({
+      const sb = getSupabase();
+      if (!sb) return;
+      await sb.from('guardrail_events').insert({
         event_type: eventType,
         cron_name: this.cronName,
         reason,
@@ -184,7 +193,9 @@ export class CircuitBreaker {
     }
 
     // Also check database for persisted state
-    const { data } = await supabase
+    const sb = getSupabase();
+    if (!sb) return false;
+    const { data } = await sb
       .from('guardrail_events')
       .select('created_at')
       .eq('cron_name', this.cronName)
@@ -235,12 +246,15 @@ export class CircuitBreaker {
     console.error(`[CircuitBreaker] TRIPPED for ${this.cronName} - ${(failureRate * 100).toFixed(1)}% failure rate`);
 
     // Log to database
-    await supabase.from('guardrail_events').insert({
-      event_type: 'trip',
-      cron_name: this.cronName,
-      reason: `Failure rate ${(failureRate * 100).toFixed(1)}% exceeded threshold ${GUARDRAIL_CONFIG.failureRateThreshold * 100}%`,
-      failure_rate: failureRate,
-    });
+    const sb = getSupabase();
+    if (sb) {
+      await sb.from('guardrail_events').insert({
+        event_type: 'trip',
+        cron_name: this.cronName,
+        reason: `Failure rate ${(failureRate * 100).toFixed(1)}% exceeded threshold ${GUARDRAIL_CONFIG.failureRateThreshold * 100}%`,
+        failure_rate: failureRate,
+      });
+    }
 
     // Alert ops (could integrate with Slack/email)
     console.error(`[ALERT] Circuit breaker tripped for ${this.cronName}. Paused for ${GUARDRAIL_CONFIG.cooldownMinutes} minutes.`);
@@ -250,7 +264,9 @@ export class CircuitBreaker {
     console.log(`[CircuitBreaker] Reset for ${this.cronName}`);
 
     // Mark previous trip as resolved
-    await supabase
+    const sb = getSupabase();
+    if (!sb) return;
+    await sb
       .from('guardrail_events')
       .update({ resolved_at: new Date().toISOString(), resolved_by: 'auto' })
       .eq('cron_name', this.cronName)
@@ -264,12 +280,15 @@ export class CircuitBreaker {
     state.trippedAt = null;
     state.attempts = [];
 
-    await supabase
-      .from('guardrail_events')
-      .update({ resolved_at: new Date().toISOString(), resolved_by: adminEmail })
-      .eq('cron_name', this.cronName)
-      .eq('event_type', 'trip')
-      .is('resolved_at', null);
+    const sb = getSupabase();
+    if (sb) {
+      await sb
+        .from('guardrail_events')
+        .update({ resolved_at: new Date().toISOString(), resolved_by: adminEmail })
+        .eq('cron_name', this.cronName)
+        .eq('event_type', 'trip')
+        .is('resolved_at', null);
+    }
 
     console.log(`[CircuitBreaker] Manually reset by ${adminEmail}`);
   }
@@ -371,30 +390,36 @@ export async function postSendValidation(
 ): Promise<void> {
   const failureRate = results.failed / Math.max(results.attempted, 1);
 
+  const sb = getSupabase();
+
   // Alert on high failure rate
   if (failureRate > 0.1) {
     console.warn(`[PostSend] High failure rate for ${cronName}: ${(failureRate * 100).toFixed(1)}%`);
 
-    await supabase.from('guardrail_events').insert({
-      event_type: 'warning',
-      cron_name: cronName,
-      reason: `High failure rate: ${(failureRate * 100).toFixed(1)}%`,
-      failure_rate: failureRate,
-      total_failures: results.failed,
-    });
+    if (sb) {
+      await sb.from('guardrail_events').insert({
+        event_type: 'warning',
+        cron_name: cronName,
+        reason: `High failure rate: ${(failureRate * 100).toFixed(1)}%`,
+        failure_rate: failureRate,
+        total_failures: results.failed,
+      });
+    }
   }
 
   // Critical: Zero emails sent
   if (results.sent === 0 && results.attempted > 0) {
     console.error(`[PostSend] CRITICAL: Zero emails sent for ${cronName} despite ${results.attempted} attempts`);
 
-    await supabase.from('guardrail_events').insert({
-      event_type: 'warning',
-      cron_name: cronName,
-      reason: `Zero emails sent despite ${results.attempted} attempts`,
-      failure_rate: 1.0,
-      total_failures: results.failed,
-    });
+    if (sb) {
+      await sb.from('guardrail_events').insert({
+        event_type: 'warning',
+        cron_name: cronName,
+        reason: `Zero emails sent despite ${results.attempted} attempts`,
+        failure_rate: 1.0,
+        total_failures: results.failed,
+      });
+    }
   }
 
   console.log(`[PostSend] ${cronName}: ${results.sent}/${results.attempted} sent (${results.failed} failed) in ${results.duration}ms`);
@@ -408,15 +433,20 @@ export async function getGuardrailStatus(): Promise<{
   recentEvents: any[];
   activeWarnings: number;
 }> {
+  const sb = getSupabase();
+  if (!sb) {
+    return { circuitBreakers: [], recentEvents: [], activeWarnings: 0 };
+  }
+
   // Get recent events
-  const { data: events } = await supabase
+  const { data: events } = await sb
     .from('guardrail_events')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(20);
 
   // Get open circuit breakers
-  const { data: openBreakers } = await supabase
+  const { data: openBreakers } = await sb
     .from('guardrail_events')
     .select('cron_name, created_at')
     .eq('event_type', 'trip')
@@ -425,7 +455,7 @@ export async function getGuardrailStatus(): Promise<{
   // Count active warnings (last 24h)
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const { count } = await supabase
+  const { count } = await sb
     .from('guardrail_events')
     .select('*', { count: 'exact', head: true })
     .eq('event_type', 'warning')

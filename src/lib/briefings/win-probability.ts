@@ -592,3 +592,550 @@ export function getWinProbabilityBadge(score: number): string {
   if (score >= 45) return `${score}%`;
   return '';
 }
+
+// ============================================================================
+// BID TARGET SCORING - Simplified 4-Factor Algorithm for Daily Bid Target
+// ============================================================================
+
+export interface BidScoreResult {
+  score: number; // 0-100
+  tier: 'excellent' | 'good' | 'moderate' | 'low';
+  factors: BidFactor[];
+}
+
+export interface BidFactor {
+  name: string;
+  points: number;
+  maxPoints: number;
+  description: string;
+  isPositive: boolean;
+}
+
+export interface BidOpportunityData {
+  naicsCode?: string;
+  setAside?: string;
+  amount?: number;
+  responseDeadline?: string | Date;
+  title?: string;
+}
+
+/**
+ * Calculate Bid Score - Simplified 4-factor algorithm for Daily Bid Target
+ *
+ * Factors:
+ * 1. NAICS Match (0-30 points) - How well does the work align with your capabilities
+ * 2. Accessibility (0-30 points) - How easy is it to compete (micro-purchase, SAP, set-aside)
+ * 3. Size Fit (0-20 points) - Is the contract size right for your company
+ * 4. Timing (0-20 points) - Is there enough time to prepare a quality bid
+ *
+ * Total: 100 points
+ */
+export function calculateBidScore(
+  opportunity: BidOpportunityData,
+  profile: BriefingUserProfile | null
+): BidScoreResult {
+  const factors: BidFactor[] = [];
+  let totalScore = 0;
+
+  // If no profile, return base score
+  if (!profile) {
+    return {
+      score: 30,
+      tier: 'low',
+      factors: [{
+        name: 'Profile Missing',
+        points: 0,
+        maxPoints: 100,
+        description: 'Complete your profile to get personalized bid scores',
+        isPositive: false,
+      }],
+    };
+  }
+
+  // 1. NAICS Match (0-30 points)
+  const naicsFactor = scoreBidNaicsMatch(opportunity.naicsCode, profile);
+  factors.push(naicsFactor);
+  totalScore += naicsFactor.points;
+
+  // 2. Accessibility (0-30 points) - Micro-purchase, SAP, Set-aside
+  const accessibilityFactor = scoreBidAccessibility(opportunity.amount, opportunity.setAside, profile);
+  factors.push(accessibilityFactor);
+  totalScore += accessibilityFactor.points;
+
+  // 3. Size Fit (0-20 points)
+  const sizeFactor = scoreBidSizeFit(opportunity.amount, profile);
+  factors.push(sizeFactor);
+  totalScore += sizeFactor.points;
+
+  // 4. Timing (0-20 points)
+  const timingFactor = scoreBidTiming(opportunity.responseDeadline);
+  factors.push(timingFactor);
+  totalScore += timingFactor.points;
+
+  // Determine tier
+  const tier = getBidTier(totalScore);
+
+  return {
+    score: totalScore,
+    tier,
+    factors,
+  };
+}
+
+/**
+ * Score NAICS match for bid scoring (0-30 points)
+ */
+function scoreBidNaicsMatch(
+  oppNaics: string | undefined,
+  profile: BriefingUserProfile
+): BidFactor {
+  if (!oppNaics) {
+    return {
+      name: 'NAICS Match',
+      points: 15,
+      maxPoints: 30,
+      description: 'No NAICS specified',
+      isPositive: true,
+    };
+  }
+
+  const userNaics = [...profile.naicsCodes, ...profile.topNaics];
+
+  // Exact match = 30 points
+  if (userNaics.includes(oppNaics)) {
+    return {
+      name: 'NAICS Match',
+      points: 30,
+      maxPoints: 30,
+      description: `Exact NAICS match: ${oppNaics}`,
+      isPositive: true,
+    };
+  }
+
+  // Prefix match (4-digit) = 20 points
+  const oppPrefix = oppNaics.substring(0, 4);
+  const hasPrefix = userNaics.some(n => n.startsWith(oppPrefix) || oppNaics.startsWith(n.substring(0, 4)));
+  if (hasPrefix) {
+    return {
+      name: 'NAICS Match',
+      points: 20,
+      maxPoints: 30,
+      description: `Related NAICS: ${oppNaics}`,
+      isPositive: true,
+    };
+  }
+
+  // Sector match (2-digit) = 10 points
+  const oppSector = oppNaics.substring(0, 2);
+  const hasSector = userNaics.some(n => n.startsWith(oppSector));
+  if (hasSector) {
+    return {
+      name: 'NAICS Match',
+      points: 10,
+      maxPoints: 30,
+      description: `Same sector: ${oppSector}xx`,
+      isPositive: true,
+    };
+  }
+
+  // No match = 0 points
+  return {
+    name: 'NAICS Match',
+    points: 0,
+    maxPoints: 30,
+    description: `NAICS ${oppNaics} not in your profile`,
+    isPositive: false,
+  };
+}
+
+/**
+ * Score accessibility - how easy is it to compete (0-30 points)
+ *
+ * This is KEY for SMBs who often start with micro-purchase and SAP to build past performance.
+ *
+ * - Micro-purchase (<$10K) = 30 pts (easiest entry, minimal competition)
+ * - SAP (<$250K) = 25 pts (simplified procedures, faster award)
+ * - Set-aside (user qualifies) = 20 pts (limited competition pool)
+ * - Full & Open = 10 pts (maximum competition)
+ * - Set-aside (user lacks cert) = 5 pts (may not qualify)
+ */
+function scoreBidAccessibility(
+  amount: number | undefined,
+  setAside: string | undefined,
+  profile: BriefingUserProfile
+): BidFactor {
+  const MICRO_PURCHASE_THRESHOLD = 10_000; // $10K
+  const SAP_THRESHOLD = 250_000; // $250K
+
+  // Micro-purchase: easiest entry point
+  if (amount && amount > 0 && amount <= MICRO_PURCHASE_THRESHOLD) {
+    return {
+      name: 'Accessibility',
+      points: 30,
+      maxPoints: 30,
+      description: `Micro-purchase under $10K — minimal competition`,
+      isPositive: true,
+    };
+  }
+
+  // SAP (Simplified Acquisition Procedures): still favorable
+  if (amount && amount > MICRO_PURCHASE_THRESHOLD && amount <= SAP_THRESHOLD) {
+    return {
+      name: 'Accessibility',
+      points: 25,
+      maxPoints: 30,
+      description: `SAP threshold — simplified procedures`,
+      isPositive: true,
+    };
+  }
+
+  // Check set-aside qualification
+  const userCerts = profile.certifications || [];
+  const normalizedSetAside = setAside?.toLowerCase() || '';
+
+  // No set-aside = full & open
+  if (!setAside || setAside === 'None' || normalizedSetAside.includes('full and open')) {
+    return {
+      name: 'Accessibility',
+      points: 10,
+      maxPoints: 30,
+      description: 'Full & open — maximum competition',
+      isPositive: true,
+    };
+  }
+
+  // Check if user qualifies for the set-aside
+  const requiredCerts = SET_ASIDE_CERT_MAP[setAside] || [];
+  const hasCert = userCerts.some(cert => requiredCerts.includes(cert));
+
+  // Also check generic small business eligibility
+  const isSmallBiz = setAside.toLowerCase().includes('small');
+  const hasSomeCert = userCerts.length > 0;
+
+  if (hasCert || (isSmallBiz && hasSomeCert)) {
+    return {
+      name: 'Accessibility',
+      points: 20,
+      maxPoints: 30,
+      description: `${setAside} set-aside — you qualify`,
+      isPositive: true,
+    };
+  }
+
+  // User doesn't have the required certification
+  return {
+    name: 'Accessibility',
+    points: 5,
+    maxPoints: 30,
+    description: `${setAside} — certification required`,
+    isPositive: false,
+  };
+}
+
+/**
+ * Score contract size fit (0-20 points)
+ */
+function scoreBidSizeFit(
+  amount: number | undefined,
+  profile: BriefingUserProfile
+): BidFactor {
+  if (!amount || amount === 0) {
+    return {
+      name: 'Size Fit',
+      points: 12,
+      maxPoints: 20,
+      description: 'Value TBD',
+      isPositive: true,
+    };
+  }
+
+  // Get user's capacity threshold
+  const threshold = SIZE_THRESHOLDS[profile.companySize || 'small'] || 25_000_000;
+
+  // Parse max contract size if specified
+  let maxSize = threshold;
+  if (profile.maxContractSize) {
+    const parsed = parseContractSize(profile.maxContractSize);
+    if (parsed) maxSize = parsed;
+  }
+
+  // Under threshold = good fit
+  if (amount <= maxSize) {
+    return {
+      name: 'Size Fit',
+      points: 20,
+      maxPoints: 20,
+      description: `${formatCurrency(amount)} fits your capacity`,
+      isPositive: true,
+    };
+  }
+
+  // Slightly over = stretch but achievable
+  if (amount <= maxSize * 1.5) {
+    return {
+      name: 'Size Fit',
+      points: 15,
+      maxPoints: 20,
+      description: `${formatCurrency(amount)} — achievable stretch`,
+      isPositive: true,
+    };
+  }
+
+  // Way over = needs teaming
+  if (amount <= maxSize * 3) {
+    return {
+      name: 'Size Fit',
+      points: 8,
+      maxPoints: 20,
+      description: `${formatCurrency(amount)} — may need teaming`,
+      isPositive: false,
+    };
+  }
+
+  // Far beyond capacity
+  return {
+    name: 'Size Fit',
+    points: 3,
+    maxPoints: 20,
+    description: `${formatCurrency(amount)} — above capacity`,
+    isPositive: false,
+  };
+}
+
+/**
+ * Score timing - is there enough time to prepare (0-20 points)
+ *
+ * Optimal: 7-21 days (enough time but still urgent)
+ * Good: 22-45 days (time to prepare)
+ * Urgent: <7 days (may be rushed)
+ * Far out: >45 days (plan ahead)
+ */
+function scoreBidTiming(deadline: string | Date | undefined): BidFactor {
+  if (!deadline) {
+    return {
+      name: 'Timing',
+      points: 10,
+      maxPoints: 20,
+      description: 'No deadline specified',
+      isPositive: true,
+    };
+  }
+
+  const deadlineDate = typeof deadline === 'string' ? new Date(deadline) : deadline;
+  const today = new Date();
+  const daysLeft = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Already passed
+  if (daysLeft < 0) {
+    return {
+      name: 'Timing',
+      points: 0,
+      maxPoints: 20,
+      description: 'Deadline has passed',
+      isPositive: false,
+    };
+  }
+
+  // Too urgent (<7 days)
+  if (daysLeft < 7) {
+    return {
+      name: 'Timing',
+      points: 8,
+      maxPoints: 20,
+      description: `${daysLeft} days left — urgent`,
+      isPositive: false,
+    };
+  }
+
+  // Optimal window (7-21 days)
+  if (daysLeft <= 21) {
+    return {
+      name: 'Timing',
+      points: 20,
+      maxPoints: 20,
+      description: `${daysLeft} days left — optimal timing`,
+      isPositive: true,
+    };
+  }
+
+  // Good (22-45 days)
+  if (daysLeft <= 45) {
+    return {
+      name: 'Timing',
+      points: 12,
+      maxPoints: 20,
+      description: `${daysLeft} days left — good timeline`,
+      isPositive: true,
+    };
+  }
+
+  // Far out (>45 days)
+  return {
+    name: 'Timing',
+    points: 5,
+    maxPoints: 20,
+    description: `${daysLeft} days out — plan ahead`,
+    isPositive: true,
+  };
+}
+
+/**
+ * Determine bid tier from score
+ */
+function getBidTier(score: number): BidScoreResult['tier'] {
+  if (score >= 80) return 'excellent';
+  if (score >= 60) return 'good';
+  if (score >= 40) return 'moderate';
+  return 'low';
+}
+
+/**
+ * Generate "Why You Can Win This" bullet points
+ *
+ * Returns 3-5 compelling reasons based on scoring factors
+ */
+export function generateWinReasons(
+  opportunity: BidOpportunityData,
+  profile: BriefingUserProfile | null,
+  bidScore?: BidScoreResult
+): string[] {
+  const reasons: string[] = [];
+
+  if (!profile) {
+    return ['Complete your profile for personalized win analysis'];
+  }
+
+  // Calculate score if not provided
+  const score = bidScore || calculateBidScore(opportunity, profile);
+
+  // Generate reasons from each positive factor
+  for (const factor of score.factors) {
+    if (factor.isPositive && factor.points >= factor.maxPoints * 0.5) {
+      // Translate factor descriptions to compelling win reasons
+      switch (factor.name) {
+        case 'NAICS Match':
+          if (factor.points === 30) {
+            reasons.push(`Exact NAICS match: ${opportunity.naicsCode}`);
+          } else if (factor.points >= 20) {
+            reasons.push(`Related NAICS to your capabilities`);
+          }
+          break;
+
+        case 'Accessibility':
+          if (factor.description.includes('Micro-purchase')) {
+            reasons.push('Micro-purchase under $10K — minimal competition');
+          } else if (factor.description.includes('SAP')) {
+            reasons.push('SAP threshold — simplified procedures, faster award');
+          } else if (factor.description.includes('you qualify')) {
+            const setAsideMatch = opportunity.setAside || 'set-aside';
+            reasons.push(`${setAsideMatch} — you qualify`);
+          }
+          break;
+
+        case 'Size Fit':
+          if (factor.points >= 15) {
+            reasons.push(factor.description.replace(' fits your capacity', ' — no teaming needed'));
+          }
+          break;
+
+        case 'Timing':
+          if (factor.points >= 15) {
+            const daysMatch = factor.description.match(/(\d+) days/);
+            if (daysMatch) {
+              reasons.push(`Closes in ${daysMatch[1]} days — time to prepare quality bid`);
+            }
+          }
+          break;
+      }
+    }
+  }
+
+  // Add opportunity-specific insights
+  if (opportunity.setAside && opportunity.setAside !== 'None' && opportunity.setAside !== 'Full and Open') {
+    const userCerts = profile.certifications || [];
+    const hasMatchingCert = userCerts.some(cert => {
+      const required = SET_ASIDE_CERT_MAP[opportunity.setAside || ''] || [];
+      return required.includes(cert);
+    });
+    if (hasMatchingCert && !reasons.some(r => r.includes('qualify'))) {
+      reasons.push(`${opportunity.setAside} set-aside — limited competition`);
+    }
+  }
+
+  // Add a generic positive if we have few reasons
+  if (reasons.length < 2) {
+    if (score.score >= 60) {
+      reasons.push('Strong match for your company profile');
+    } else if (score.score >= 40) {
+      reasons.push('Good opportunity to build past performance');
+    }
+  }
+
+  // Limit to 5 reasons
+  return reasons.slice(0, 5);
+}
+
+/**
+ * Generate action steps for the bid target
+ *
+ * Returns 2-3 specific action items based on timing and opportunity type
+ */
+export function generateActionSteps(
+  opportunity: BidOpportunityData & { agency?: string; samLink?: string },
+  profile: BriefingUserProfile | null
+): string[] {
+  const steps: string[] = [];
+
+  // Calculate days left
+  let daysLeft = 14; // default
+  if (opportunity.responseDeadline) {
+    const deadline = typeof opportunity.responseDeadline === 'string'
+      ? new Date(opportunity.responseDeadline)
+      : opportunity.responseDeadline;
+    daysLeft = Math.ceil((deadline.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  // First step: Always review the solicitation
+  if (daysLeft <= 3) {
+    steps.push('URGENT: Download and review solicitation documents immediately');
+  } else if (daysLeft <= 7) {
+    steps.push('Download the RFP/RFQ and review Section C requirements today');
+  } else {
+    steps.push('Review the solicitation and identify key requirements (30 min)');
+  }
+
+  // Second step: Agency contact
+  if (opportunity.agency) {
+    const agencyShort = opportunity.agency.split('/')[0].trim();
+    steps.push(`Research ${agencyShort} OSDBU and identify the contracting officer`);
+  } else {
+    steps.push('Identify the contracting officer and OSDBU contact');
+  }
+
+  // Third step: Based on timing
+  if (daysLeft > 14) {
+    steps.push('Add to your pipeline tracker and set bid/no-bid review for next week');
+  } else if (daysLeft > 7) {
+    steps.push('Make bid/no-bid decision by end of day');
+  } else {
+    steps.push('Begin proposal outline if pursuing');
+  }
+
+  return steps;
+}
+
+/**
+ * Get bid score badge text
+ */
+export function getBidScoreBadge(score: number): { text: string; color: string } {
+  if (score >= 80) {
+    return { text: 'EXCELLENT FIT', color: '#10b981' }; // Green
+  }
+  if (score >= 60) {
+    return { text: 'GOOD FIT', color: '#f59e0b' }; // Amber
+  }
+  if (score >= 40) {
+    return { text: 'POSSIBLE FIT', color: '#6b7280' }; // Gray
+  }
+  return { text: 'REVIEW NEEDED', color: '#6b7280' }; // Gray
+}

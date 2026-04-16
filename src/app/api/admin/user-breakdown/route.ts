@@ -49,22 +49,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   // Fetch shop purchases in parallel with local queries
   const shopPurchasesPromise = fetchShopPurchases();
 
   // Get leads (free users)
-  const { data: leads, error: leadsError } = await supabase
+  const { data: leads, error: leadsError } = await getSupabase()
     .from('leads')
     .select('email, name, company, source, resources_accessed, created_at')
     .order('created_at', { ascending: false });
 
   // Get user_profiles (paying customers)
-  const { data: profiles, error: profilesError } = await supabase
+  const { data: profiles, error: profilesError } = await getSupabase()
     .from('user_profiles')
     .select('email, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_briefings, created_at')
     .order('created_at', { ascending: false });
@@ -83,26 +90,26 @@ export async function GET(request: NextRequest) {
   const purchasesError = shopPurchases.length === 0 ? { message: 'No purchases from shop or fetch failed' } : null;
 
   // Get user_briefing_profile (alert configurations)
-  const { data: briefingProfiles, error: bpError } = await supabase
+  const { data: briefingProfiles, error: bpError } = await getSupabase()
     .from('user_briefing_profile')
     .select('user_email, naics_codes, agencies, created_at')
     .order('created_at', { ascending: false });
 
   // Get user_alert_settings (MA Premium weekly alerts)
-  const { data: alertSettings, error: asError } = await supabase
+  const { data: alertSettings, error: asError } = await getSupabase()
     .from('user_alert_settings')
     .select('user_email, naics_codes, business_type, is_active, total_alerts_sent, created_at')
     .order('created_at', { ascending: false });
 
   // Get unique users from search history (OH users who searched)
-  const { data: searchUsers, error: suError } = await supabase
+  const { data: searchUsers, error: suError } = await getSupabase()
     .from('user_search_history')
     .select('user_email, tool, search_type')
     .order('created_at', { ascending: false });
 
   // Dedupe search users
   const uniqueSearchUsers = new Map<string, { tools: Set<string>, searches: number }>();
-  searchUsers?.forEach(s => {
+  searchUsers?.forEach((s: { user_email: string | null; tool: string; search_type: string }) => {
     if (!s.user_email) return;
     if (!uniqueSearchUsers.has(s.user_email)) {
       uniqueSearchUsers.set(s.user_email, { tools: new Set(), searches: 0 });
@@ -113,14 +120,14 @@ export async function GET(request: NextRequest) {
   });
 
   // Build summary
-  const leadEmails = new Set(leads?.map(l => l.email?.toLowerCase()).filter(Boolean) || []);
-  const profileEmails = new Set(profiles?.map(p => p.email?.toLowerCase()).filter(Boolean) || []);
-  const purchaseEmails = new Set(purchases?.map(p => p.email?.toLowerCase()).filter(Boolean) || []);
+  const leadEmails = new Set<string>(leads?.map((l: { email?: string | null }) => l.email?.toLowerCase()).filter((x: string | undefined): x is string => Boolean(x)) || []);
+  const profileEmails = new Set<string>(profiles?.map((p: { email?: string | null }) => p.email?.toLowerCase()).filter((x: string | undefined): x is string => Boolean(x)) || []);
+  const purchaseEmails = new Set<string>(purchases?.map((p: { email?: string | null }) => p.email?.toLowerCase()).filter((x: string | undefined): x is string => Boolean(x)) || []);
   const searchEmails = new Set([...uniqueSearchUsers.keys()].map(e => e.toLowerCase()));
 
   // Group purchases by email
   const purchasesByEmail = new Map<string, Array<{ product: string; productId: string; amount: number; date: string }>>();
-  purchases?.forEach(p => {
+  purchases?.forEach((p: { email?: string | null; product_name?: string | null; product_id: string; amount?: number | null; created_at: string }) => {
     if (!p.email) return;
     const email = p.email.toLowerCase();
     if (!purchasesByEmail.has(email)) {
@@ -195,14 +202,15 @@ export async function GET(request: NextRequest) {
   });
 
   // Legacy: Paying customers breakdown from profiles (may be outdated)
-  const withHunterPro = profiles?.filter(p => p.access_hunter_pro) || [];
-  const withMAStandard = profiles?.filter(p => p.access_assassin_standard) || [];
-  const withMAPremium = profiles?.filter(p => p.access_assassin_premium) || [];
-  const withRecompete = profiles?.filter(p => p.access_recompete) || [];
-  const withContractorDB = profiles?.filter(p => p.access_contractor_db) || [];
-  const withContentStandard = profiles?.filter(p => p.access_content_standard) || [];
-  const withContentFullFix = profiles?.filter(p => p.access_content_full_fix) || [];
-  const withAnyPaidTool = profiles?.filter(p =>
+  type ProfileAccess = { access_hunter_pro?: boolean; access_assassin_standard?: boolean; access_assassin_premium?: boolean; access_recompete?: boolean; access_contractor_db?: boolean; access_content_standard?: boolean; access_content_full_fix?: boolean };
+  const withHunterPro = profiles?.filter((p: ProfileAccess) => p.access_hunter_pro) || [];
+  const withMAStandard = profiles?.filter((p: ProfileAccess) => p.access_assassin_standard) || [];
+  const withMAPremium = profiles?.filter((p: ProfileAccess) => p.access_assassin_premium) || [];
+  const withRecompete = profiles?.filter((p: ProfileAccess) => p.access_recompete) || [];
+  const withContractorDB = profiles?.filter((p: ProfileAccess) => p.access_contractor_db) || [];
+  const withContentStandard = profiles?.filter((p: ProfileAccess) => p.access_content_standard) || [];
+  const withContentFullFix = profiles?.filter((p: ProfileAccess) => p.access_content_full_fix) || [];
+  const withAnyPaidTool = profiles?.filter((p: ProfileAccess) =>
     p.access_hunter_pro || p.access_assassin_standard || p.access_assassin_premium ||
     p.access_recompete || p.access_contractor_db || p.access_content_standard || p.access_content_full_fix
   ) || [];

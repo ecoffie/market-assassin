@@ -13,7 +13,48 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
-import { fetchSamOpportunities, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
+import { fetchSamOpportunities, fetchSamOpportunitiesFromCache, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
+import agencySatData from '@/data/agency-sat-friendliness.json';
+
+// Helper: Get SAT "Easy Entry" badge for an agency
+interface SatAgencyInfo {
+  satPercent: number;
+  microPercent: number;
+  level: string;
+  badge: string | null;
+}
+
+function getSatBadgeForAgency(agencyName: string): { badge: string | null; level: string; satPercent: number } {
+  if (!agencyName) return { badge: null, level: 'unknown', satPercent: 0 };
+
+  const agencies = agencySatData.agencies as Record<string, SatAgencyInfo>;
+  const normalizedAgency = agencyName.toUpperCase().trim();
+
+  // Try exact match first
+  if (agencies[normalizedAgency]) {
+    const data = agencies[normalizedAgency];
+    return { badge: data.badge, level: data.level, satPercent: data.satPercent };
+  }
+
+  // Try partial matching for common variations
+  for (const [key, data] of Object.entries(agencies)) {
+    const keyWords = key.split(/[\s,]+/).filter(w => w.length > 3);
+    const agencyWords = normalizedAgency.split(/[\s,]+/).filter(w => w.length > 3);
+
+    // Check if key contains agency name or vice versa
+    if (normalizedAgency.includes(key) || key.includes(normalizedAgency)) {
+      return { badge: data.badge, level: data.level, satPercent: data.satPercent };
+    }
+
+    // Check for significant word overlap (e.g., "DEFENSE" or "AGRICULTURE")
+    const matchingWords = keyWords.filter(kw => agencyWords.some(aw => aw.includes(kw) || kw.includes(aw)));
+    if (matchingWords.length >= 1 && keyWords.length > 0) {
+      return { badge: data.badge, level: data.level, satPercent: data.satPercent };
+    }
+  }
+
+  return { badge: null, level: 'unknown', satPercent: 0 };
+}
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 const getAnthropicBriefingKey = () => process.env.BRIEFING_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
@@ -109,6 +150,12 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const password = searchParams.get('password');
   const toEmail = searchParams.get('email')?.toLowerCase().trim();
+  // Optional: filter which briefing type(s) to send
+  // type=daily | type=weekly | type=pursuit | type=all (default)
+  const briefingType = searchParams.get('type')?.toLowerCase() || 'all';
+  const sendDaily = briefingType === 'all' || briefingType === 'daily';
+  const sendWeekly = briefingType === 'all' || briefingType === 'weekly';
+  const sendPursuit = briefingType === 'all' || briefingType === 'pursuit';
 
   if (password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -126,12 +173,19 @@ export async function GET(request: NextRequest) {
   const anthropic = new Anthropic({ apiKey: anthropicKey });
 
   // Get user's NAICS codes from settings
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
-  const { data: userSettings } = await supabase
+  const { data: userSettings } = await getSupabase()
     .from('user_notification_settings')
     .select('naics_codes, agencies, keywords')
     .eq('user_email', toEmail)
@@ -152,20 +206,26 @@ export async function GET(request: NextRequest) {
   // 1. SAM.gov Opportunities for Daily Brief (ACTIVE solicitations)
   const SAM_API_KEY = process.env.SAM_API_KEY || '';
   let samOpportunities: SAMOpportunity[] = [];
+  let samDebug: { keyPresent: boolean; keyPrefix: string; fetchError?: string; totalRecords?: number } = {
+    keyPresent: !!SAM_API_KEY,
+    keyPrefix: SAM_API_KEY ? SAM_API_KEY.substring(0, 15) + '...' : 'NO KEY',
+  };
 
   console.log(`[SendAllBriefings] SAM_API_KEY present: ${SAM_API_KEY ? 'YES (' + SAM_API_KEY.substring(0, 15) + '...)' : 'NO'}`);
 
   try {
-    console.log(`[SendAllBriefings] Fetching SAM.gov opportunities for NAICS: ${expandedNaics.slice(0, 5).join(', ')}...`);
-    const samResult = await fetchSamOpportunities({
+    console.log(`[SendAllBriefings] Fetching SAM.gov opportunities from CACHE for NAICS: ${expandedNaics.slice(0, 5).join(', ')}...`);
+    // Use Supabase cache instead of live API (24,468 cached opportunities)
+    const samResult = await fetchSamOpportunitiesFromCache({
       naicsCodes: expandedNaics.slice(0, 10),
-      postedFrom: getDateDaysAgo(30), // Last 30 days
       limit: 50,
-    }, SAM_API_KEY);
+    });
     samOpportunities = samResult.opportunities;
-    console.log(`[SendAllBriefings] SAM.gov: ${samOpportunities.length} active opportunities found (total: ${samResult.totalRecords})`);
+    samDebug.totalRecords = samResult.totalRecords;
+    console.log(`[SendAllBriefings] SAM.gov CACHE: ${samOpportunities.length} active opportunities found (total: ${samResult.totalRecords})`);
   } catch (err) {
-    console.error('[SendAllBriefings] SAM.gov fetch error:', err);
+    console.error('[SendAllBriefings] SAM.gov cache fetch error:', err);
+    samDebug.fetchError = err instanceof Error ? err.message : String(err);
   }
 
   // 2. USASpending for Weekly Deep Dive (RECOMPETE intel)
@@ -263,104 +323,130 @@ export async function GET(request: NextRequest) {
   };
 
   // 1. Generate and send Daily Brief (NEW: SAM.gov Active Solicitations)
-  try {
-    if (samOpportunities.length > 0) {
-      console.log(`[SendAllBriefings] Generating Daily Brief with ${samOpportunities.length} SAM.gov opportunities...`);
-      const dailyBriefing = await generateDailyBriefFromSam(anthropic, samOpportunities);
-      const dailyHtml = generateDailyEmailHtmlFromSam(dailyBriefing);
-      const dailyText = generateDailyEmailTextFromSam(dailyBriefing);
+  if (sendDaily) {
+    try {
+      if (samOpportunities.length > 0) {
+        console.log(`[SendAllBriefings] Generating Daily Brief with ${samOpportunities.length} SAM.gov opportunities...`);
+        const dailyBriefing = await generateDailyBriefFromSam(anthropic, samOpportunities);
+        const dailyHtml = generateDailyEmailHtmlFromSam(dailyBriefing, toEmail);
+        const dailyText = generateDailyEmailTextFromSam(dailyBriefing, toEmail);
 
-      const urgentCount = dailyBriefing.opportunities.filter(o => o.daysRemaining <= 14).length;
-      await sendEmail({
-        to: toEmail,
-        subject: `[1/3] DAILY BRIEF: 📋 ${dailyBriefing.opportunities.length} Active Solicitations${urgentCount > 0 ? ` (${urgentCount} due soon!)` : ''} - BID NOW`,
-        html: dailyHtml,
-        text: dailyText,
-      });
+        const urgentCount = dailyBriefing.opportunities.filter(o => o.daysRemaining <= 14).length;
+        await sendEmail({
+          to: toEmail,
+          subject: `[1/3] DAILY BRIEF: 📋 ${dailyBriefing.opportunities.length} Active Solicitations${urgentCount > 0 ? ` (${urgentCount} due soon!)` : ''} - BID NOW`,
+          html: dailyHtml,
+          text: dailyText,
+        });
 
-      results.daily = { success: true, error: '' };
-      console.log(`[SendAllBriefings] Daily Brief (SAM.gov) sent`);
-    } else {
-      // Fallback to old USASpending-based Daily Brief if no SAM.gov opps
-      console.log(`[SendAllBriefings] No SAM.gov opps, using USASpending fallback...`);
-      const dailyBriefing = await generateDailyBrief(anthropic, topContracts);
-      const dailyHtml = generateDailyEmailHtml(dailyBriefing);
-      const dailyText = generateDailyEmailText(dailyBriefing);
+        results.daily = { success: true, error: '' };
+        console.log(`[SendAllBriefings] Daily Brief (SAM.gov) sent`);
+      } else {
+        // Fallback to old USASpending-based Daily Brief if no SAM.gov opps
+        console.log(`[SendAllBriefings] No SAM.gov opps, using USASpending fallback...`);
+        const dailyBriefing = await generateDailyBrief(anthropic, topContracts);
+        const dailyHtml = generateDailyEmailHtml(dailyBriefing, toEmail);
+        const dailyText = generateDailyEmailText(dailyBriefing, toEmail);
 
-      await sendEmail({
-        to: toEmail,
-        subject: `[1/3] DAILY BRIEF: 🎯 ${dailyBriefing.opportunities.length} Displacement Opportunities`,
-        html: dailyHtml,
-        text: dailyText,
-      });
+        await sendEmail({
+          to: toEmail,
+          subject: `[1/3] DAILY BRIEF: 🎯 ${dailyBriefing.opportunities.length} Displacement Opportunities`,
+          html: dailyHtml,
+          text: dailyText,
+        });
 
-      results.daily = { success: true, error: '' };
-      console.log(`[SendAllBriefings] Daily Brief (fallback) sent`);
+        results.daily = { success: true, error: '' };
+        console.log(`[SendAllBriefings] Daily Brief (fallback) sent`);
+      }
+    } catch (err) {
+      console.error('[SendAllBriefings] Daily Brief error:', err);
+      results.daily = { success: false, error: String(err) };
     }
-  } catch (err) {
-    console.error('[SendAllBriefings] Daily Brief error:', err);
-    results.daily = { success: false, error: String(err) };
+  } else {
+    results.daily = { success: true, error: 'skipped' };
   }
 
   // 2. Generate and send Weekly Deep Dive (with SAM.gov status enrichment)
-  try {
-    console.log(`[SendAllBriefings] Generating Weekly Deep Dive with SAM.gov status...`);
-    const weeklyBriefing = await generateWeeklyDeepDive(anthropic, topContracts, samOpportunities);
-    const weeklyHtml = generateWeeklyEmailHtml(weeklyBriefing);
-    const weeklyText = generateWeeklyEmailText(weeklyBriefing);
+  if (sendWeekly) {
+    try {
+      console.log(`[SendAllBriefings] Generating Weekly Deep Dive with SAM.gov status...`);
+      const weeklyBriefing = await generateWeeklyDeepDive(anthropic, topContracts, samOpportunities);
+      const weeklyHtml = generateWeeklyEmailHtml(weeklyBriefing);
+      const weeklyText = generateWeeklyEmailText(weeklyBriefing);
 
-    await sendEmail({
-      to: toEmail,
-      subject: `[2/3] WEEKLY DEEP DIVE: ${weeklyBriefing.opportunities.length} Opportunities Analyzed - Week of ${weeklyBriefing.weekOf}`,
-      html: weeklyHtml,
-      text: weeklyText,
-    });
+      await sendEmail({
+        to: toEmail,
+        subject: `[2/3] WEEKLY DEEP DIVE: ${weeklyBriefing.opportunities.length} Opportunities Analyzed - Week of ${weeklyBriefing.weekOf}`,
+        html: weeklyHtml,
+        text: weeklyText,
+      });
 
-    results.weekly = { success: true, error: '' };
-    console.log(`[SendAllBriefings] Weekly Deep Dive sent`);
-  } catch (err) {
-    console.error('[SendAllBriefings] Weekly error:', err);
-    results.weekly = { success: false, error: String(err) };
+      results.weekly = { success: true, error: '' };
+      console.log(`[SendAllBriefings] Weekly Deep Dive sent`);
+    } catch (err) {
+      console.error('[SendAllBriefings] Weekly error:', err);
+      results.weekly = { success: false, error: String(err) };
+    }
+  } else {
+    results.weekly = { success: true, error: 'skipped' };
   }
 
   // 3. Generate and send Pursuit Brief (COMBINED: Top 3 from SAM.gov + USASpending)
-  try {
-    console.log(`[SendAllBriefings] Generating Pursuit Brief - combining SAM.gov + USASpending sources...`);
+  if (sendPursuit) {
+    try {
+      console.log(`[SendAllBriefings] Generating Pursuit Brief - combining SAM.gov + USASpending sources...`);
 
-    // Combine opportunities from both sources for AI to evaluate
-    const combinedOpportunities = buildCombinedPursuitCandidates(samOpportunities, topContracts);
-    console.log(`[SendAllBriefings] Combined ${combinedOpportunities.length} opportunities for pursuit analysis`);
+      // Combine opportunities from both sources for AI to evaluate
+      const combinedOpportunities = buildCombinedPursuitCandidates(samOpportunities, topContracts);
+      console.log(`[SendAllBriefings] Combined ${combinedOpportunities.length} opportunities for pursuit analysis`);
 
-    // Generate comprehensive TOP 3 pursuit brief
-    const pursuitBriefTop3 = await generateCombinedPursuitBrief(anthropic, combinedOpportunities);
-    const pursuitHtml = generateCombinedPursuitEmailHtml(pursuitBriefTop3);
-    const pursuitText = generateCombinedPursuitEmailText(pursuitBriefTop3);
+      // Generate comprehensive TOP 3 pursuit brief
+      const pursuitBriefTop3 = await generateCombinedPursuitBrief(anthropic, combinedOpportunities);
+      const pursuitHtml = generateCombinedPursuitEmailHtml(pursuitBriefTop3);
+      const pursuitText = generateCombinedPursuitEmailText(pursuitBriefTop3);
 
-    await sendEmail({
-      to: toEmail,
-      subject: `[3/3] YOUR TOP 3 PURSUIT TARGETS - Combined SAM.gov + Recompete Intel`,
-      html: pursuitHtml,
-      text: pursuitText,
-    });
+      await sendEmail({
+        to: toEmail,
+        subject: `[3/3] YOUR TOP 3 PURSUIT TARGETS - Combined SAM.gov + Recompete Intel`,
+        html: pursuitHtml,
+        text: pursuitText,
+      });
 
-    results.pursuit = { success: true, error: '' };
-    console.log(`[SendAllBriefings] Pursuit Brief (Top 3) sent`);
-  } catch (err) {
-    console.error('[SendAllBriefings] Pursuit error:', err);
-    results.pursuit = { success: false, error: String(err) };
+      results.pursuit = { success: true, error: '' };
+      console.log(`[SendAllBriefings] Pursuit Brief (Top 3) sent`);
+    } catch (err) {
+      console.error('[SendAllBriefings] Pursuit error:', err);
+      results.pursuit = { success: false, error: String(err) };
+    }
+  } else {
+    results.pursuit = { success: true, error: 'skipped' };
   }
 
   const allSuccess = results.daily.success && results.weekly.success && results.pursuit.success;
 
+  // Build message based on which briefings were actually sent
+  const sentTypes: string[] = [];
+  if (sendDaily && results.daily.error !== 'skipped') sentTypes.push('daily');
+  if (sendWeekly && results.weekly.error !== 'skipped') sentTypes.push('weekly');
+  if (sendPursuit && results.pursuit.error !== 'skipped') sentTypes.push('pursuit');
+
+  const message = sentTypes.length === 0
+    ? 'No briefings sent (all skipped)'
+    : sentTypes.length === 3
+    ? `All 3 briefings sent to ${toEmail}`
+    : `${sentTypes.join(', ')} briefing(s) sent to ${toEmail}`;
+
   return NextResponse.json({
     success: allSuccess,
     toEmail,
+    briefingType,
     naicsUsed: userNaics,
     expandedNaics,
     samOpportunities: samOpportunities.length,
+    samDebug, // Debug info for SAM.gov API
     usaSpendingContracts: topContracts.length,
     results,
-    message: allSuccess ? `All 3 briefings sent to ${toEmail}` : 'Some briefings failed - check results',
+    message,
   });
 }
 
@@ -384,7 +470,7 @@ interface SamDailyOpportunity {
 interface SamDailyBriefing {
   date: string;
   opportunities: SamDailyOpportunity[];
-  deadlinesThisWeek: { title: string; deadline: string; daysRemaining: number; samLink: string; noticeType: string }[];
+  deadlinesThisWeek: { title: string; fullTitle: string; deadline: string; daysRemaining: number; samLink: string; noticeType: string; noticeId: string; agency: string; naicsCode: string; setAside: string }[];
   actionTips: string[];
   noticeSummary: { rfp: number; rfq: number; sourcesSought: number; preSol: number; combined: number; other: number };
 }
@@ -472,10 +558,15 @@ Return ONLY valid JSON.`;
     .filter(o => getDaysUntil(o.responseDeadline) <= weekFromNow && getDaysUntil(o.responseDeadline) >= 0)
     .map(o => ({
       title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
+      fullTitle: o.title,
       deadline: o.responseDeadline,
       daysRemaining: getDaysUntil(o.responseDeadline),
       samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
       noticeType: o.noticeType || 'Notice',
+      noticeId: o.solicitationNumber || o.noticeId || '',
+      agency: o.department || o.subTier || '',
+      naicsCode: o.naicsCode || '',
+      setAside: o.setAside || '',
     }));
 
   // Count notice types for summary
@@ -511,7 +602,8 @@ Return ONLY valid JSON.`;
 }
 
 // SAM.gov Daily Brief Email HTML
-function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
+function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing, userEmail?: string): string {
+  const actionBaseUrl = 'https://tools.govcongiants.org/api/actions/add-to-pipeline';
   const getUrgencyColor = (days: number) => {
     if (days <= 3) return '#dc2626'; // Red
     if (days <= 7) return '#f97316'; // Orange
@@ -607,10 +699,20 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
     .type-presol { background: #f3e8ff; color: #6b21a8; }
     .type-combined { background: #fce7f3; color: #9d174d; }
     .type-other { background: #f3f4f6; color: #374151; }
+    .sat-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; margin-left: 4px; }
+    .sat-high { background: #dcfce7; color: #166534; }
+    .sat-moderate { background: #fef9c3; color: #854d0e; }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- Market Intelligence FREE PREVIEW Banner -->
+    <div style="background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%); padding: 12px 20px; text-align: center;">
+      <p style="color: white; margin: 0; font-size: 13px; font-weight: 600;">
+        🎯 Market Intelligence • FREE PREVIEW during beta • Personalized win analysis + strategic teaming plays
+      </p>
+    </div>
+
     <div class="header">
       <h1>📋 Active Solicitations</h1>
       <p>${briefing.date}</p>
@@ -635,13 +737,15 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
       </div>
       ${briefing.opportunities.map(opp => {
         const oppTypeInfo = getNoticeTypeInfo(opp.noticeType);
+        const satInfo = getSatBadgeForAgency(opp.agency);
+        const satBadgeHtml = satInfo.badge ? `<span class="sat-badge sat-${satInfo.level}">${satInfo.badge}</span>` : '';
         return `
         <div class="opp-card">
           <div class="opp-header">
             <div style="display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px;">
               <span class="opp-rank">${opp.rank}</span>
               <h3 class="opp-title">${escapeHtml(opp.title)}</h3>
-              <span class="opp-type-badge ${oppTypeInfo.cssClass}">${oppTypeInfo.label}</span>
+              <span class="opp-type-badge ${oppTypeInfo.cssClass}">${oppTypeInfo.label}</span>${satBadgeHtml}
             </div>
             <span class="urgency-badge" style="background: ${getUrgencyColor(opp.daysRemaining)};">${getUrgencyLabel(opp.daysRemaining)}</span>
           </div>
@@ -671,7 +775,12 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
             <div class="assessment-label">Quick Win Assessment</div>
             <p class="assessment-text">${escapeHtml(opp.quickWinAssessment)}</p>
           </div>
-          <a href="${opp.samLink}" class="sam-link" target="_blank">View on SAM.gov →</a>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;">
+            <a href="${opp.samLink}" class="sam-link" target="_blank" style="margin-top: 0;">View on SAM.gov →</a>
+            ${userEmail ? `
+            <a href="https://tools.govcongiants.org/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}" style="display: inline-block; background: #475569; color: white; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;">🔇 Not Interested</a>
+            ` : ''}
+          </div>
         </div>
       `}).join('')}
     </div>
@@ -682,10 +791,21 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
         <h3 class="deadline-header">⏰ DEADLINES THIS WEEK</h3>
         ${briefing.deadlinesThisWeek.map(d => {
           const typeInfo = getNoticeTypeInfo(d.noticeType);
+          const deadlineSatInfo = getSatBadgeForAgency(d.agency);
+          const deadlineSatBadgeHtml = deadlineSatInfo.badge ? `<span class="sat-badge sat-${deadlineSatInfo.level}" style="font-size: 9px; padding: 2px 5px;">${deadlineSatInfo.badge}</span>` : '';
+          const deadlineMuteUrl = userEmail ? `https://tools.govcongiants.org/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(d.fullTitle)}&notice_id=${encodeURIComponent(d.noticeId)}` : '';
           return `
-          <div class="deadline-item">
-            <span class="deadline-title">${escapeHtml(d.title)}<span class="deadline-type ${typeInfo.cssClass}">${typeInfo.label}</span></span>
-            <span class="deadline-days" style="background: ${getUrgencyColor(d.daysRemaining)};">${d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : d.daysRemaining + ' days'}</span>
+          <div class="deadline-item" style="flex-direction: column; align-items: flex-start;">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <span class="deadline-title">${escapeHtml(d.title)}<span class="deadline-type ${typeInfo.cssClass}">${typeInfo.label}</span>${deadlineSatBadgeHtml}</span>
+              <span class="deadline-days" style="background: ${getUrgencyColor(d.daysRemaining)};">${d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : d.daysRemaining + ' days'}</span>
+            </div>
+            ${userEmail ? `
+            <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+              <a href="${d.samLink}" style="display: inline-block; background: #059669; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-decoration: none;">View →</a>
+              <a href="${deadlineMuteUrl}" style="display: inline-block; background: #475569; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-decoration: none;">🔇</a>
+            </div>
+            ` : ''}
           </div>
         `}).join('')}
       </div>
@@ -710,7 +830,7 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing): string {
 `;
 }
 
-function generateDailyEmailTextFromSam(briefing: SamDailyBriefing): string {
+function generateDailyEmailTextFromSam(briefing: SamDailyBriefing, userEmail?: string): string {
   let text = `📋 ACTIVE SOLICITATIONS - BID NOW\n${briefing.date}\n${'='.repeat(50)}\n\n`;
   text += `✅ Data verified from SAM.gov\n\n`;
 
@@ -720,13 +840,18 @@ function generateDailyEmailTextFromSam(briefing: SamDailyBriefing): string {
     text += `   NAICS: ${opp.naicsCode} | Set-Aside: ${opp.setAside || 'Full & Open'}\n`;
     text += `   Response Due: ${opp.responseDeadline} (${opp.daysRemaining} days remaining)\n`;
     text += `   Assessment: ${opp.quickWinAssessment}\n`;
-    text += `   SAM.gov: ${opp.samLink}\n\n`;
+    text += `   SAM.gov: ${opp.samLink}\n`;
+    if (userEmail) {
+      text += `   → Not Interested: https://tools.govcongiants.org/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}\n`;
+    }
+    text += `\n`;
   }
 
   if (briefing.deadlinesThisWeek.length > 0) {
     text += `\n⏰ DEADLINES THIS WEEK\n${'─'.repeat(30)}\n`;
     for (const d of briefing.deadlinesThisWeek) {
       text += `• ${d.title} - ${d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining + ' days'}\n`;
+      text += `  SAM.gov: ${d.samLink}\n`;
     }
   }
 
@@ -820,33 +945,109 @@ async function checkSamStatusForContract(
   contract: ContractForBriefing,
   samOpportunities: SAMOpportunity[]
 ): Promise<SamStatusResult> {
-  // Search through already-fetched SAM.gov opportunities for matches
-  // Match by: agency name similarity, NAICS code, or keywords from contract description
+  // IMPROVED MATCHING: Score-based system with multiple factors
+  // Must reach confidence threshold to be considered a match
 
   const agencyLower = contract.agency.toLowerCase();
-  const descWords = contract.contractName.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+  const incumbentLower = (contract.incumbent || '').toLowerCase();
+  const contractNameLower = contract.contractName.toLowerCase();
 
-  // Find matches in SAM.gov opportunities
-  const matches = samOpportunities.filter(opp => {
+  // Extract significant words (>4 chars, not common words)
+  const stopWords = ['contract', 'service', 'services', 'support', 'program', 'project', 'federal', 'government', 'department', 'agency', 'office', 'center', 'national'];
+  const descWords = contractNameLower.split(/\s+/)
+    .filter(w => w.length > 4 && !stopWords.includes(w));
+
+  // Contract expiration date for timing check
+  const expirationDate = contract.expirationDate ? new Date(contract.expirationDate) : null;
+
+  // Score each SAM.gov opportunity
+  const scoredMatches = samOpportunities.map(opp => {
     const oppAgencyLower = (opp.department || '').toLowerCase();
     const oppTitleLower = (opp.title || '').toLowerCase();
     const oppDescLower = (opp.description || '').toLowerCase();
+    const oppFullText = `${oppTitleLower} ${oppDescLower}`;
 
-    // Agency match
-    const agencyMatch = oppAgencyLower.includes(agencyLower.split(' ')[0]) ||
-                       agencyLower.includes(oppAgencyLower.split(' ')[0]);
+    let score = 0;
+    const matchReasons: string[] = [];
 
-    // NAICS match
+    // 1. NAICS match (required baseline)
     const naicsMatch = opp.naicsCode === contract.naicsCode;
+    if (!naicsMatch) return { opp, score: 0, reasons: [] }; // NAICS is required
+    score += 20;
+    matchReasons.push('NAICS');
 
-    // Keyword match (at least 2 significant words)
-    const keywordMatches = descWords.filter(word =>
-      oppTitleLower.includes(word) || oppDescLower.includes(word)
-    ).length;
-    const keywordMatch = keywordMatches >= 2;
+    // 2. Agency match (partial agency name match)
+    const agencyFirstWord = agencyLower.split(' ')[0];
+    const oppAgencyFirstWord = oppAgencyLower.split(' ')[0];
+    if (oppAgencyLower.includes(agencyFirstWord) || agencyLower.includes(oppAgencyFirstWord)) {
+      score += 15;
+      matchReasons.push('agency');
+    }
 
-    return naicsMatch && (agencyMatch || keywordMatch);
+    // 3. INCUMBENT NAME CHECK (strong signal!)
+    if (incumbentLower && incumbentLower.length > 3) {
+      const incumbentWords = incumbentLower.split(/\s+/).filter(w => w.length > 3);
+      const incumbentMatch = incumbentWords.some(word => oppFullText.includes(word));
+      if (incumbentMatch) {
+        score += 30; // Strong signal - incumbent mentioned
+        matchReasons.push('incumbent');
+      }
+    }
+
+    // 4. KEYWORD MATCH (50% threshold instead of just 2 words)
+    if (descWords.length > 0) {
+      const matchedWords = descWords.filter(word => oppFullText.includes(word));
+      const keywordRatio = matchedWords.length / descWords.length;
+      if (keywordRatio >= 0.5) {
+        score += 25;
+        matchReasons.push(`keywords(${Math.round(keywordRatio * 100)}%)`);
+      } else if (keywordRatio >= 0.3) {
+        score += 10;
+        matchReasons.push(`keywords(${Math.round(keywordRatio * 100)}%)`);
+      }
+    }
+
+    // 5. TIMING ALIGNMENT (SAM.gov opp posted within 18 months of contract expiration)
+    // Research shows agencies post Sources Sought 6-12 months before, RFP 2-6 months before
+    // Total window: solicitations can appear 6-18 months before contract expires
+    if (expirationDate && opp.postedDate) {
+      const oppPostedDate = new Date(opp.postedDate);
+      const monthsDiff = Math.abs(
+        (expirationDate.getTime() - oppPostedDate.getTime()) / (1000 * 60 * 60 * 24 * 30)
+      );
+      if (monthsDiff <= 12) {
+        score += 15;
+        matchReasons.push('timing');
+      } else if (monthsDiff <= 18) {
+        score += 10;
+        matchReasons.push('timing-18mo');
+      } else if (monthsDiff <= 24) {
+        score += 5;
+        matchReasons.push('timing-24mo');
+      }
+    }
+
+    // 6. Contract number reference (check if SAM.gov mentions old contract #)
+    const contractNum = contract.contractNumber || '';
+    if (contractNum && contractNum.length > 5 && oppFullText.includes(contractNum.toLowerCase())) {
+      score += 40; // Very strong signal
+      matchReasons.push('contract#');
+    }
+
+    return { opp, score, reasons: matchReasons };
   });
+
+  // Filter to matches with minimum confidence score (40 = NAICS + one other strong factor)
+  const qualifiedMatches = scoredMatches
+    .filter(m => m.score >= 40)
+    .sort((a, b) => b.score - a.score);
+
+  // Log for debugging
+  if (qualifiedMatches.length > 0) {
+    console.log(`[SAM Match] "${contract.contractName.substring(0, 40)}..." → ${qualifiedMatches.length} matches, best: ${qualifiedMatches[0].score} (${qualifiedMatches[0].reasons.join(', ')})`);
+  }
+
+  const matches = qualifiedMatches.map(m => m.opp);
 
   if (matches.length === 0) {
     return {
@@ -1300,7 +1501,7 @@ function escapeHtml(text: string): string {
 }
 
 // Daily Brief Email
-function generateDailyEmailHtml(briefing: DailyBriefing): string {
+function generateDailyEmailHtml(briefing: DailyBriefing, userEmail?: string): string {
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -1336,6 +1537,11 @@ function generateDailyEmailHtml(briefing: DailyBriefing): string {
     .play-opener-text { font-size: 13px; color: #1f2937; line-height: 1.5; margin: 0; font-style: italic; }
     .must-watch { background: #fff7ed; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #f97316; }
     .must-watch-item { font-size: 14px; color: #9a3412; margin: 8px 0; }
+    .action-btns { margin-top: 16px; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; }
+    .action-btn { display: inline-block; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; margin-right: 8px; }
+    .btn-track { background: #3b82f6; color: white; }
+    .btn-pursue { background: #7c3aed; color: white; }
+    .btn-mute { background: #64748b; color: white; }
     .footer { background: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb; }
     .footer p { margin: 0 0 8px; font-size: 12px; color: #6b7280; }
     .footer a { color: ${ACCENT_COLOR}; text-decoration: none; }
@@ -1368,6 +1574,11 @@ function generateDailyEmailHtml(briefing: DailyBriefing): string {
             <div class="displacement-label">Displacement Angle</div>
             <p class="displacement-text">${escapeHtml(opp.displacementAngle)}</p>
           </div>
+          ${userEmail ? `
+          <div class="action-btns">
+            <a href="https://tools.govcongiants.org/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.contractName)}" class="action-btn btn-mute">🔇 Not Interested</a>
+          </div>
+          ` : ''}
         </div>
       `).join('')}
     </div>
@@ -1411,7 +1622,7 @@ function generateDailyEmailHtml(briefing: DailyBriefing): string {
 `;
 }
 
-function generateDailyEmailText(briefing: DailyBriefing): string {
+function generateDailyEmailText(briefing: DailyBriefing, userEmail?: string): string {
   let text = `🎯 DAILY MARKET INTEL\n${briefing.date}\n${'='.repeat(40)}\n\n`;
   text += `TOP ${briefing.opportunities.length} RECOMPETE OPPORTUNITIES\n${'='.repeat(40)}\n\n`;
 
@@ -1422,6 +1633,9 @@ function generateDailyEmailText(briefing: DailyBriefing): string {
     text += `   Value: $${formatValue(opp.value)}\n`;
     text += `   Window: ${opp.window}\n\n`;
     text += `   DISPLACEMENT ANGLE: ${opp.displacementAngle}\n\n`;
+    if (userEmail) {
+      text += `   → Not Interested: https://tools.govcongiants.org/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.contractName)}\n`;
+    }
     text += `${'─'.repeat(40)}\n\n`;
   }
 
@@ -1509,6 +1723,13 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
 </head>
 <body>
   <div class="container">
+    <!-- Market Intelligence FREE PREVIEW Banner -->
+    <div style="background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%); padding: 12px 20px; text-align: center;">
+      <p style="color: white; margin: 0; font-size: 13px; font-weight: 600;">
+        🎯 Market Intelligence • FREE PREVIEW during beta • Displacement intel + teaming plays
+      </p>
+    </div>
+
     <div class="header">
       <h1>📊 Weekly Deep Dive</h1>
       <p>Week of ${briefing.weekOf} • ${briefing.opportunities.length} Opportunities Analyzed</p>
@@ -1949,6 +2170,13 @@ function generateCombinedPursuitEmailHtml(brief: CombinedPursuitBrief): string {
 </head>
 <body>
   <div class="container">
+    <!-- Market Intelligence FREE PREVIEW Banner -->
+    <div style="background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%); padding: 12px 20px; text-align: center;">
+      <p style="color: white; margin: 0; font-size: 13px; font-weight: 600;">
+        🎯 Market Intelligence • FREE PREVIEW during beta • Go/No-Go pursuit analysis
+      </p>
+    </div>
+
     <div class="header">
       <h1>YOUR TOP 3 PURSUIT TARGETS</h1>
       <p>Combined intelligence from SAM.gov + USASpending</p>

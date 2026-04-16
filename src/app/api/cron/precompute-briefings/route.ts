@@ -55,10 +55,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const startTime = Date.now();
   const today = new Date().toISOString().split('T')[0];
@@ -70,7 +77,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Step 1: Get all unique NAICS profiles from enabled users
-    const { data: users, error: usersError } = await supabase
+    const { data: users, error: usersError } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email, naics_codes')
       .eq('briefings_enabled', true);
@@ -102,13 +109,13 @@ export async function GET(request: NextRequest) {
     console.log(`[PrecomputeBriefings] Found ${allProfiles.length} unique NAICS profiles for ${users?.length} users`);
 
     // Step 2: Check which profiles already have templates for today
-    const { data: existingTemplates } = await supabase
+    const { data: existingTemplates } = await getSupabase()
       .from('briefing_templates')
       .select('naics_profile_hash')
       .eq('template_date', today)
       .eq('briefing_type', 'daily');
 
-    const existingHashes = new Set((existingTemplates || []).map(t => t.naics_profile_hash));
+    const existingHashes = new Set((existingTemplates || []).map((t: { naics_profile_hash: string }) => t.naics_profile_hash));
 
     // Filter to profiles that need templates
     const profilesToProcess = allProfiles
@@ -146,7 +153,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Store template
-        const { error: insertError } = await supabase.from('briefing_templates').upsert({
+        const { error: insertError } = await getSupabase().from('briefing_templates').upsert({
           naics_profile: profile.naics_profile,
           naics_profile_hash: profile.naics_profile_hash,
           template_date: today,
@@ -183,7 +190,7 @@ export async function GET(request: NextRequest) {
     const remaining = allProfiles.length - existingHashes.size - templatesGenerated;
 
     // Log run stats
-    await supabase.from('briefing_precompute_runs').upsert({
+    await getSupabase().from('briefing_precompute_runs').upsert({
       run_date: today,
       briefing_type: 'daily',
       unique_profiles_found: allProfiles.length,

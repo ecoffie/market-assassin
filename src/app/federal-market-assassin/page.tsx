@@ -869,6 +869,33 @@ function FederalMarketAssassinContent() {
           )}
         </div>
 
+        {/* Related Intel Section */}
+        <div className="max-w-4xl mx-auto mt-12 mb-8">
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 text-center">Related Intel</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link
+              href="/briefings"
+              className="p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-purple-500/50 transition-colors group"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">📊</span>
+                <h4 className="font-semibold text-white group-hover:text-purple-400 transition-colors">Market Intelligence</h4>
+              </div>
+              <p className="text-sm text-slate-400">Daily briefs, weekly deep dives, and pursuit guidance tailored to your profile.</p>
+            </Link>
+            <Link
+              href="/briefings"
+              className="p-5 bg-slate-900/50 border border-slate-800 rounded-xl hover:border-violet-500/50 transition-colors group"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">🔮</span>
+                <h4 className="font-semibold text-white group-hover:text-violet-400 transition-colors">Procurement Forecasts</h4>
+              </div>
+              <p className="text-sm text-slate-400">Early intel on 7,700+ upcoming opportunities 6-18 months before solicitation.</p>
+            </Link>
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="text-center mt-12 pt-8 border-t border-slate-800">
           <div className="mb-2">

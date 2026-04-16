@@ -21,6 +21,9 @@ const BRAND_COLOR = '#1e3a8a';
 const ACCENT_COLOR = '#7c3aed';
 const SUCCESS_COLOR = '#10b981';
 
+// Type for briefing templates from Supabase
+type BriefingTemplate = { naics_profile_hash: string; naics_profile: string; [key: string]: unknown };
+
 /**
  * Queue a failed briefing for automatic retry (dead letter queue)
  */
@@ -134,10 +137,32 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
+
+  // DAY-OF-WEEK GUARD: Pursuit Brief only sends on Monday (UTC)
+  const today = new Date();
+  const dayOfWeek = today.getUTCDay(); // 1 = Monday
+  const isTestMode = testEmail && isTest;
+
+  if (dayOfWeek !== 1 && !isTestMode) {
+    console.log(`[SendPursuitFast] Skipped - not Monday (day ${dayOfWeek})`);
+    return NextResponse.json({
+      success: true,
+      message: `Pursuit Brief only sends on Monday. Today is day ${dayOfWeek}.`,
+      skipped: true,
+      dayOfWeek,
+    });
+  }
 
   const startTime = Date.now();
   const mondayDate = getMondayDate();
@@ -152,7 +177,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Step 1: Get all pre-computed pursuit templates
-    const { data: templates, error: templatesError } = await supabase
+    const { data: templates, error: templatesError } = await getSupabase()
       .from('briefing_templates')
       .select('*')
       .eq('template_date', mondayDate)
@@ -171,8 +196,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const templateMap = new Map<string, typeof templates[0]>();
-    templates.forEach(t => templateMap.set(t.naics_profile_hash, t));
+    const templateMap = new Map<string, BriefingTemplate>();
+    templates.forEach((t: BriefingTemplate) => templateMap.set(t.naics_profile_hash, t));
 
     // Build prefix fallback map
     const prefixMap = buildPrefixMap(templates);
@@ -180,7 +205,7 @@ export async function GET(request: NextRequest) {
     console.log(`[SendPursuitFast] Loaded ${templates.length} pursuit templates, ${prefixMap.size} prefix mappings`);
 
     // Step 2: Get users to process
-    const audienceResolution = await resolveBriefingAudience(supabase);
+    const audienceResolution = await resolveBriefingAudience(getSupabase());
     let usersToProcess = audienceResolution.users.filter(u => u.naics_codes.length > 0);
     activeCohortId = audienceResolution.activeCohort?.id || null;
 
@@ -201,12 +226,12 @@ export async function GET(request: NextRequest) {
     startOfWeek.setUTCDate(startOfWeek.getUTCDate() + diffToMonday);
     startOfWeek.setUTCHours(0, 0, 0, 0);
 
-    const { data: sentThisWeek } = await supabase
+    const { data: sentThisWeek } = await getSupabase()
       .from('pursuit_brief_log')
       .select('user_email')
       .gte('created_at', startOfWeek.toISOString());
 
-    const sentEmails = new Set((sentThisWeek || []).map(s => s.user_email));
+    const sentEmails = new Set((sentThisWeek || []).map((s: { user_email: string }) => s.user_email));
     usersToProcess = usersToProcess
       .filter(u => !sentEmails.has(u.email))
       .slice(0, BATCH_SIZE);
@@ -240,7 +265,7 @@ export async function GET(request: NextRequest) {
 
         if (!template) {
           noTemplateCount++;
-          await queueForRetry(supabase, user.email, userNaics, 'No matching template (exact or prefix)', getMondayDate());
+          await queueForRetry(getSupabase(), user.email, userNaics, 'No matching template (exact or prefix)', getMondayDate());
           continue;
         }
 
@@ -265,7 +290,7 @@ export async function GET(request: NextRequest) {
         briefingsSent++;
 
         // Log to pursuit_brief_log (track match type for analytics)
-        await supabase.from('pursuit_brief_log').insert({
+        await getSupabase().from('pursuit_brief_log').insert({
           user_email: user.email,
           notice_id: brief.sourceNoticeId || `template-${naicsHash.slice(0, 8)}`,
           brief_data: brief,
@@ -290,7 +315,7 @@ export async function GET(request: NextRequest) {
 
         // Queue for automatic retry
         const userNaics = user.naics_codes || [];
-        await queueForRetry(supabase, user.email, userNaics, errorMsg, getMondayDate());
+        await queueForRetry(getSupabase(), user.email, userNaics, errorMsg, getMondayDate());
       }
     }
 

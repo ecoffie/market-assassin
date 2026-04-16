@@ -12,10 +12,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 export interface PipelineOpportunity {
   id?: string;
@@ -58,7 +65,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let query = supabase
+    let query = getSupabase()
       .from('user_pipeline')
       .select('*')
       .eq('user_email', email.toLowerCase())
@@ -128,7 +135,7 @@ export async function POST(request: NextRequest) {
     body.source = body.source || 'manual';
     body.is_prime = body.is_prime ?? true;
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_pipeline')
       .insert(body)
       .select()
@@ -173,7 +180,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Verify ownership
-    const { data: existing } = await supabase
+    const { data: existing } = await getSupabase()
       .from('user_pipeline')
       .select('id, stage')
       .eq('id', id)
@@ -191,7 +198,7 @@ export async function PATCH(request: NextRequest) {
     const oldStage = existing.stage;
     const newStage = updates.stage;
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_pipeline')
       .update(updates)
       .eq('id', id)
@@ -233,7 +240,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('user_pipeline')
       .delete()
       .eq('id', id)

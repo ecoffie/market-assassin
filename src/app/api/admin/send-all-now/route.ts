@@ -31,23 +31,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const today = new Date().toISOString().split('T')[0];
 
   // Get total counts
   // BETA MODE: Send to ALL active users regardless of briefings_enabled flag
   // TODO: After April 27, 2026 beta ends, restore .eq('briefings_enabled', true) filter
-  const { count: totalUsers } = await supabase
+  const { count: totalUsers } = await getSupabase()
     .from('user_notification_settings')
     .select('*', { count: 'exact', head: true })
     .eq('is_active', true);
     // .eq('briefings_enabled', true) // BETA: Commented out
 
-  const { count: alreadySent } = await supabase
+  const { count: alreadySent } = await getSupabase()
     .from('briefing_log')
     .select('*', { count: 'exact', head: true })
     .eq('briefing_date', today)
@@ -74,7 +81,7 @@ export async function GET(request: NextRequest) {
   // Optionally clear today's log
   let deletedCount = 0;
   if (clearLog) {
-    const { error: deleteError, count } = await supabase
+    const { error: deleteError, count } = await getSupabase()
       .from('briefing_log')
       .delete({ count: 'exact' })
       .eq('briefing_date', today);
@@ -89,7 +96,7 @@ export async function GET(request: NextRequest) {
 
   // Get users to process (skip those already sent today)
   // BETA MODE: Send to ALL active users regardless of briefings_enabled flag
-  const { data: users, error } = await supabase
+  const { data: users, error } = await getSupabase()
     .from('user_notification_settings')
     .select('user_email, naics_codes, agencies')
     .eq('is_active', true)
@@ -114,7 +121,7 @@ export async function GET(request: NextRequest) {
     const email = user.user_email;
 
     // Check if already sent today
-    const { data: existingLog } = await supabase
+    const { data: existingLog } = await getSupabase()
       .from('briefing_log')
       .select('delivery_status')
       .eq('user_email', email)
@@ -143,7 +150,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Log the briefing
-      await supabase.from('briefing_log').upsert({
+      await getSupabase().from('briefing_log').upsert({
         user_email: email,
         briefing_date: today,
         briefing_content: briefing,
@@ -163,7 +170,7 @@ export async function GET(request: NextRequest) {
       });
 
       // Mark as sent
-      await supabase.from('briefing_log').update({
+      await getSupabase().from('briefing_log').update({
         delivery_status: 'sent',
         email_sent_at: new Date().toISOString(),
       }).eq('user_email', email).eq('briefing_date', today);

@@ -16,10 +16,17 @@ import { createSecureAccessUrl } from '@/lib/access-links';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 const SHOP_ADMIN_PASSWORD = 'admin123';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.office365.com',
@@ -116,7 +123,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Get all active alert users (unified table)
-  let query = supabase.from('user_notification_settings').select('*').eq('is_active', true).eq('alerts_enabled', true);
+  let query = getSupabase().from('user_notification_settings').select('*').eq('is_active', true).eq('alerts_enabled', true);
 
   if (singleEmail) {
     query = query.eq('user_email', singleEmail.toLowerCase());
@@ -154,8 +161,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       mode: 'preview',
       total_users: users.length,
-      pro_users: preview.filter(p => p.tier === 'pro').length,
-      free_users: preview.filter(p => p.tier === 'free').length,
+      pro_users: preview.filter((p: { tier: string }) => p.tier === 'pro').length,
+      free_users: preview.filter((p: { tier: string }) => p.tier === 'free').length,
       users: preview,
       instructions: 'Add ?mode=execute to send alerts',
     });
@@ -183,7 +190,7 @@ export async function GET(request: NextRequest) {
       let userNaics = user.naics_codes || [];
 
       // Always check smart_user_profiles for potentially better NAICS data
-      const { data: smartProfile } = await supabase
+      const { data: smartProfile } = await getSupabase()
         .from('smart_user_profiles')
         .select('naics_codes')
         .eq('email', user.user_email.toLowerCase())
@@ -246,7 +253,7 @@ export async function GET(request: NextRequest) {
       await sendAlertEmail(user.user_email, topOpps, user, tier, totalAvailable);
 
       // Log the alert
-      await supabase.from('alert_log').upsert({
+      await getSupabase().from('alert_log').upsert({
         user_email: user.user_email,
         alert_date: new Date().toISOString().split('T')[0],
         opportunities_count: topOpps.length,
@@ -255,7 +262,7 @@ export async function GET(request: NextRequest) {
       }, { onConflict: 'user_email,alert_date' });
 
       // Update user stats (unified table)
-      await supabase.from('user_notification_settings').update({
+      await getSupabase().from('user_notification_settings').update({
         last_alert_sent: new Date().toISOString(),
         total_alerts_sent: (user as any).total_alerts_sent + 1 || 1,
       }).eq('user_email', user.user_email);

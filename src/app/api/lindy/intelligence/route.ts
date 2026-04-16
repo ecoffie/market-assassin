@@ -121,17 +121,24 @@ export async function GET(request: NextRequest) {
   // Check access via KV and paid entitlement fallback (but don't block - just note it)
   const hasAccess = await hasBriefingsAccess(email);
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
   const now = new Date();
   const today = now.toISOString().split('T')[0];
 
   try {
     // Fetch user profile
-    const { data: profile } = await supabase
+    const { data: profile } = await getSupabase()
       .from('user_briefing_profile')
       .select('naics_codes, agencies, watched_companies, watched_contracts')
       .eq('user_email', email)
@@ -177,7 +184,7 @@ export async function GET(request: NextRequest) {
     // Fetch briefing if requested
     if (includeSections.includes('briefing')) {
       // Try to get both recompete and MA briefings
-      const { data: briefings } = await supabase
+      const { data: briefings } = await getSupabase()
         .from('briefing_log')
         .select('briefing_date, briefing_type, briefing_data, generated_at')
         .eq('user_email', email)
@@ -186,8 +193,9 @@ export async function GET(request: NextRequest) {
 
       if (briefings && briefings.length > 0) {
         // Find most recent recompete briefing
-        const recompeteBriefing = briefings.find(b => b.briefing_type === 'recompete' || !b.briefing_type);
-        const maBriefing = briefings.find(b => b.briefing_type === 'market_assassin');
+        type BriefingRecord = { briefing_date: string; briefing_type?: string; briefing_data?: unknown; generated_at?: string };
+        const recompeteBriefing = briefings.find((b: BriefingRecord) => b.briefing_type === 'recompete' || !b.briefing_type);
+        const maBriefing = briefings.find((b: BriefingRecord) => b.briefing_type === 'market_assassin');
 
         // Handle recompete briefing format
         if (recompeteBriefing?.briefing_data) {
@@ -295,7 +303,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch recompetes if requested
     if (includeSections.includes('recompetes')) {
-      const { data: recompeteSnapshot } = await supabase
+      const { data: recompeteSnapshot } = await getSupabase()
         .from('briefing_snapshots')
         .select('snapshot_data, created_at')
         .eq('user_email', email)
@@ -329,7 +337,7 @@ export async function GET(request: NextRequest) {
     // Fetch contractor activity if requested
     if (includeSections.includes('contractors')) {
       // Get awards snapshot for contractor activity
-      const { data: awardsSnapshot } = await supabase
+      const { data: awardsSnapshot } = await getSupabase()
         .from('briefing_snapshots')
         .select('snapshot_data, created_at')
         .eq('user_email', email)
@@ -383,7 +391,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Get web intel for additional contractor signals
-      const { data: webIntelSnapshot } = await supabase
+      const { data: webIntelSnapshot } = await getSupabase()
         .from('briefing_snapshots')
         .select('snapshot_data, created_at')
         .eq('user_email', email)
