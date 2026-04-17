@@ -7,28 +7,32 @@
 
 /**
  * Default NAICS codes for users who haven't configured preferences.
- * Covers broad professional services categories.
  *
- * 541 = Professional, Scientific, and Technical Services
- * 561 = Administrative and Support Services
+ * INTENTIONALLY set to HEALTHCARE codes to encourage users to configure
+ * their actual NAICS codes. Most GovCon users are NOT in healthcare,
+ * so seeing healthcare opps will prompt them to set up their preferences.
+ *
+ * 621 = Ambulatory Health Care Services
+ * 622 = Hospitals
+ * 623 = Nursing and Residential Care
  */
 export const DEFAULT_NAICS_CODES = [
-  // IT & Computer Services
-  '541511', // Custom Computer Programming Services
-  '541512', // Computer Systems Design Services
-  '541519', // Other Computer Related Services
+  // Healthcare - Ambulatory Services
+  '621111', // Offices of Physicians
+  '621210', // Offices of Dentists
+  '621511', // Medical Laboratories
+  '621610', // Home Health Care Services
 
-  // Consulting Services
-  '541611', // Administrative Management Consulting
-  '541618', // Other Management Consulting
-  '541690', // Other Scientific and Technical Consulting
+  // Healthcare - Hospitals
+  '622110', // General Medical and Surgical Hospitals
+  '622310', // Specialty Hospitals (Psychiatric, Rehab, etc.)
 
-  // Engineering & Technical
-  '541330', // Engineering Services
-  '541990', // All Other Professional, Scientific, and Technical Services
+  // Healthcare - Nursing/Care Facilities
+  '623110', // Nursing Care Facilities (Skilled Nursing)
+  '623312', // Assisted Living Facilities for the Elderly
 
-  // Support Services
-  '561210', // Facilities Support Services
+  // Healthcare - Social Assistance
+  '624120', // Services for the Elderly and Persons with Disabilities
 ];
 
 /**
