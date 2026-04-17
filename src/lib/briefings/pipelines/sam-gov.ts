@@ -732,12 +732,26 @@ export async function fetchSamOpportunitiesFromCache(
       .order('response_deadline', { ascending: true })
       .limit(limit);
 
-    // NAICS filter - match ANY of the user's codes using OR
+    // NAICS filter - match ANY of the user's codes using OR with prefix matching
+    // SAM.gov stores NAICS codes in various lengths (2-6 digits), so we use LIKE
+    // to match all related codes (e.g., "236" matches "236", "236115", "236220", etc.)
     if (naicsCodes.length > 0) {
-      // Use .or() to match any NAICS code
-      // Format: naics_code.eq.541512,naics_code.eq.541611,...
-      const naicsFilters = naicsCodes.map(code => `naics_code.eq.${code}`).join(',');
-      query = query.or(naicsFilters);
+      // Get unique 3-digit prefixes from all codes for broader matching
+      const prefixes = new Set<string>();
+      for (const code of naicsCodes) {
+        // Use 3-digit prefix for consistent matching
+        const prefix = code.slice(0, 3);
+        if (prefix.length === 3 && /^\d{3}$/.test(prefix)) {
+          prefixes.add(prefix);
+        }
+      }
+
+      // Build LIKE filter for each prefix
+      // Format: naics_code.like.236*,naics_code.like.237*,...
+      const naicsFilters = Array.from(prefixes).map(prefix => `naics_code.like.${prefix}*`).join(',');
+      if (naicsFilters) {
+        query = query.or(naicsFilters);
+      }
     }
 
     // Set-aside filter
