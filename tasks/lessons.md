@@ -957,4 +957,69 @@ if (isUsingFallback && opportunities.length > 15) {
 
 ---
 
+## Daily Alerts Now Sends to ALL Users (No Timezone Filtering)
+
+**Lesson (Apr 17, 2026):** Timezone-based filtering for Daily Alerts was removed. All 953 users now receive alerts in the same batch.
+
+**What happened:**
+- Daily Alerts previously filtered by timezone (deliver at 6 AM local time)
+- This meant only ~60-80 users processed per cron run
+- Result: Some users NEVER received alerts if their timezone wasn't covered by cron runs
+- Only 60 alerts sent per day instead of 953
+
+**Fix:**
+- Removed timezone filtering entirely from `daily-alerts/route.ts`
+- All users now receive alerts when cron runs (same as briefings)
+- 100% daily coverage for all paying subscribers
+
+**Old (60-80 users/day):**
+```typescript
+// Check timezone (skip if not delivery time for this user)
+if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
+  results.wrongTimezone++;
+  continue;
+}
+```
+
+**New (ALL users):**
+```typescript
+// DISABLED: Timezone filtering removed Apr 17, 2026
+// All users now receive alerts in same batch (100% daily coverage)
+```
+
+**Rule:** For paid email products, don't filter by timezone. Send to everyone at once. Users expect 100% daily delivery.
+
+---
+
+## Default NAICS Codes = Healthcare (Nudge Strategy)
+
+**Lesson (Apr 17, 2026):** Default NAICS codes are intentionally set to HEALTHCARE to encourage users to configure their actual preferences.
+
+**Strategy:**
+- Most GovCon users are NOT in healthcare
+- If they see healthcare opportunities, they'll think "this isn't relevant"
+- This prompts them to configure their actual NAICS codes
+- Result: Better engagement, more accurate preferences
+
+**Centralized config:** `src/lib/config/defaults.ts`
+
+**Current defaults (Healthcare):**
+```typescript
+export const DEFAULT_NAICS_CODES = [
+  '621111', // Offices of Physicians
+  '621210', // Offices of Dentists
+  '621511', // Medical Laboratories
+  '621610', // Home Health Care Services
+  '622110', // General Medical and Surgical Hospitals
+  '622310', // Specialty Hospitals
+  '623110', // Nursing Care Facilities
+  '623312', // Assisted Living Facilities
+  '624120', // Services for Elderly/Disabled
+];
+```
+
+**Rule:** Default values should nudge users toward proper configuration, not accidentally be useful.
+
+---
+
 *Last Updated: April 17, 2026*
