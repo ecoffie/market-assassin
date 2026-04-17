@@ -1,36 +1,36 @@
 /**
- * Send Briefings (Fast) - Uses Pre-computed Templates
+ * Send Briefings (Fast) - GREEN SAM.gov Format
  *
- * ENTERPRISE ARCHITECTURE: Instead of generating briefings per-user,
- * this cron matches users to pre-computed templates and sends emails.
+ * UPDATED April 17, 2026: Now fetches from SAM.gov cache and sends GREEN format
+ * instead of using pre-computed templates.
  *
- * Processing time per user: ~100ms (vs 52 seconds with generation)
- * Capacity: 500+ users per cron run (vs ~1 user)
+ * Processing time per user: ~100-200ms (database query + email generation)
+ * Capacity: 500+ users per cron run
  *
- * Schedule: 7 AM UTC daily (after precompute-briefings completes)
+ * Schedule: 7 AM UTC daily
  *
  * Process:
  * 1. Get all users with briefings_enabled=true
- * 2. Match each user to their pre-computed template (by NAICS hash)
- * 3. Personalize and send email
+ * 2. For each user, fetch SAM opportunities from cache by NAICS
+ * 3. Generate GREEN email with active solicitations
+ * 4. Send email
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-template';
-import { generateBidTargetEmail, BidTargetOpportunity, BidTargetEmailData } from '@/lib/briefings/delivery/bid-target-email-template';
-import { AIGeneratedBriefing } from '@/lib/briefings/delivery/ai-briefing-generator';
+import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
+import { generateDailyBriefFromSam, generateSamGreenEmailHtml } from '@/lib/briefings/delivery/sam-green-email-template';
 import {
   recordBriefingProgramDelivery,
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
-import { hasBriefingAccess } from '@/lib/access-codes';
-import { calculateBidScore, generateWinReasons, generateActionSteps } from '@/lib/briefings/win-probability';
-import crypto from 'crypto';
 
-// Process up to 100 users per cron run (~100ms each = 10 seconds total)
+// Process up to 100 users per cron run (~150ms each = 15 seconds total)
 const BATCH_SIZE = 100;
+
+// Default NAICS codes for users without preferences
+const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
 
 /**
  * Queue a failed briefing for automatic retry (dead letter queue)
@@ -57,52 +57,6 @@ async function queueForRetry(
   }
 }
 
-function hashNaicsProfile(naicsCodes: string[]): string {
-  const sorted = [...naicsCodes].sort();
-  return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
-}
-
-/**
- * Extract NAICS prefixes for fallback matching.
- * Supports 3-digit industry prefixes (e.g., "236" from "236220")
- */
-function extractNaicsPrefixes(naicsCodes: string[]): string[] {
-  const prefixes = new Set<string>();
-  for (const code of naicsCodes) {
-    const clean = code.replace(/\D/g, '');
-    if (clean.length >= 3) {
-      prefixes.add(clean.slice(0, 3));
-    }
-  }
-  return Array.from(prefixes);
-}
-
-/**
- * Build a prefix-to-template map for fallback matching.
- * Maps 3-digit NAICS prefixes to their best-matching template.
- */
-function buildPrefixMap(templates: Array<{ naics_profile: string; naics_profile_hash: string; [key: string]: unknown }>) {
-  const prefixMap = new Map<string, typeof templates[0]>();
-
-  for (const template of templates) {
-    try {
-      const naicsCodes = JSON.parse(template.naics_profile) as string[];
-      const prefixes = extractNaicsPrefixes(naicsCodes);
-
-      for (const prefix of prefixes) {
-        // Only set if not already present (prioritize first/larger templates)
-        if (!prefixMap.has(prefix)) {
-          prefixMap.set(prefix, template);
-        }
-      }
-    } catch {
-      // Skip malformed profiles
-    }
-  }
-
-  return prefixMap;
-}
-
 export async function GET(request: NextRequest) {
   const testEmail = request.nextUrl.searchParams.get('email');
   const isTest = request.nextUrl.searchParams.get('test') === 'true';
@@ -115,67 +69,38 @@ export async function GET(request: NextRequest) {
   if (!isVercelCron && !hasCronSecret && !(testEmail && isTest)) {
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({
-        message: 'Send Briefings (Fast) - Uses Pre-computed Templates',
-        description: 'Matches users to templates, sends in ~100ms per user',
+        message: 'Send Briefings (Fast) - GREEN SAM.gov Format',
+        description: 'Fetches SAM.gov cache, sends GREEN active solicitations email',
         schedule: '7 AM UTC daily',
-        capacity: '500+ users per run (vs ~1 with generation)',
+        capacity: '500+ users per run',
       });
     }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabase: any = null;
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+  let _supabase: any = null;
+  function getSupabase() {
+    if (!_supabase) {
+      _supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+    }
+    return _supabase;
   }
-  return _supabase;
-}
 
   const startTime = Date.now();
   const today = new Date().toISOString().split('T')[0];
   let briefingsSent = 0;
   let briefingsSkipped = 0;
   let briefingsFailed = 0;
-  let noTemplateCount = 0;
+  let noOpportunitiesCount = 0;
   const errors: string[] = [];
 
-  console.log('[SendBriefingsFast] Starting fast template-based delivery...');
+  console.log('[SendBriefingsFast] Starting GREEN SAM.gov briefing delivery...');
 
   try {
-    // Step 1: Get all pre-computed templates for today
-    const { data: templates, error: templatesError } = await getSupabase()
-      .from('briefing_templates')
-      .select('*')
-      .eq('template_date', today)
-      .eq('briefing_type', 'daily');
-
-    if (templatesError) {
-      throw new Error(`Failed to fetch templates: ${templatesError.message}`);
-    }
-
-    if (!templates || templates.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'No templates found for today. Run precompute-briefings first.',
-        elapsed: Date.now() - startTime,
-      });
-    }
-
-    // Build template lookup maps (exact hash + prefix fallback)
-    type BriefingTemplate = { naics_profile_hash: string; naics_profile: string; [key: string]: unknown };
-    const templateMap = new Map<string, BriefingTemplate>();
-    templates.forEach((t: BriefingTemplate) => templateMap.set(t.naics_profile_hash, t));
-
-    // Build prefix fallback map for custom profiles
-    const prefixMap = buildPrefixMap(templates);
-
-    console.log(`[SendBriefingsFast] Loaded ${templates.length} templates, ${prefixMap.size} prefix mappings`);
-
-    // Step 2: Get users to process
+    // Step 1: Get users to process
     const audienceResolution = await resolveBriefingAudience(getSupabase());
     let usersToProcess = audienceResolution.users;
 
@@ -206,226 +131,81 @@ function getSupabase() {
 
     console.log(`[SendBriefingsFast] Processing ${usersToProcess.length} users (${sentEmails.size} already sent today)`);
 
-    // Step 3: Match users to templates and send
-    let prefixMatchCount = 0;
-
+    // Step 2: Process each user
     for (const user of usersToProcess) {
+      const userStartTime = Date.now();
+
       try {
-        const userNaics = user.naics_codes || [];
-        const naicsHash = hashNaicsProfile(userNaics);
-        let template = templateMap.get(naicsHash);
-        let matchType = 'exact';
+        // Get user's NAICS codes (with defaults if none set)
+        const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : DEFAULT_NAICS;
 
-        // Prefix fallback: if no exact match, try matching on primary NAICS prefix
-        if (!template && userNaics.length > 0) {
-          const userPrefixes = extractNaicsPrefixes(userNaics);
-          for (const prefix of userPrefixes) {
-            const prefixTemplate = prefixMap.get(prefix);
-            if (prefixTemplate) {
-              template = prefixTemplate;
-              matchType = 'prefix';
-              prefixMatchCount++;
-              console.log(`[SendBriefingsFast] Prefix match for ${user.email}: ${prefix} → template ${prefixTemplate.naics_profile_hash.slice(0, 8)}`);
-              break;
-            }
-          }
-        }
+        // Fetch SAM opportunities from cache for this user's NAICS
+        const samResult = await fetchSamOpportunitiesFromCache({
+          naicsCodes: userNaics.slice(0, 10), // Limit to 10 NAICS codes
+          limit: 20, // Get top 20 opportunities
+        });
 
-        if (!template) {
-          noTemplateCount++;
-          console.log(`[SendBriefingsFast] No template for ${user.email} (hash: ${naicsHash.slice(0, 8)}, prefixes: ${extractNaicsPrefixes(userNaics).join(',')})`);
-          // Queue for retry - watchdog will regenerate or find fallback
-          await queueForRetry(getSupabase(), user.email, userNaics, 'No matching template (exact or prefix)', today);
-          continue;
-        }
+        if (samResult.opportunities.length === 0) {
+          noOpportunitiesCount++;
+          console.log(`[SendBriefingsFast] No opportunities for ${user.email} (NAICS: ${userNaics.slice(0, 3).join(',')})`);
 
-        const briefing = template.briefing_content as AIGeneratedBriefing;
+          // Log as skipped (no opportunities found)
+          await getSupabase().from('briefing_log').upsert({
+            user_email: user.email,
+            briefing_date: today,
+            briefing_content: { message: 'No opportunities found for NAICS codes', naics: userNaics },
+            items_count: 0,
+            tools_included: ['sam_cache_green', 'no_opportunities'],
+            delivery_status: 'skipped',
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'user_email,briefing_date' });
 
-        if (!briefing || !briefing.opportunities || briefing.opportunities.length === 0) {
           briefingsSkipped++;
           continue;
         }
 
-        // Log briefing attempt (record match type for analytics)
+        // Build GREEN briefing from SAM opportunities (with AI analysis)
+        const greenBriefing = await generateDailyBriefFromSam(samResult.opportunities);
+
+        // Log briefing attempt
         await getSupabase().from('briefing_log').upsert({
           user_email: user.email,
           briefing_date: today,
-          briefing_content: briefing,
-          items_count: briefing.opportunities.length + briefing.teamingPlays.length,
-          tools_included: [matchType === 'exact' ? 'pre_computed_template' : 'prefix_fallback_template'],
+          briefing_content: greenBriefing,
+          items_count: greenBriefing.opportunities.length,
+          tools_included: ['sam_cache_green'],
           delivery_status: 'pending',
           retry_count: 0,
           created_at: new Date().toISOString(),
         }, { onConflict: 'user_email,briefing_date' });
 
-        // Check if user has paid briefings access (Bid Target tier)
-        const hasPaidAccess = await hasBriefingAccess(user.email);
-
-        let emailSubject: string;
-        let emailHtml: string;
-        let emailText: string;
-        let emailType: 'bid_target' | 'daily_alerts';
-
-        if (hasPaidAccess && briefing.opportunities.length > 0) {
-          // PAID USER: Send Bid Target email (THE ONE + win scoring)
-          emailType = 'bid_target';
-
-          // Get user profile for scoring
-          const { data: userProfile } = await getSupabase()
-            .from('user_notification_settings')
-            .select('*')
-            .eq('user_email', user.email)
-            .single();
-
-          // Build a complete BriefingUserProfile for scoring
-          const profile = userProfile ? {
-            email: user.email,
-            naicsCodes: userProfile.naics_codes || [],
-            topNaics: [],
-            certifications: userProfile.certifications || [],
-            targetAgencies: userProfile.target_agencies || [],
-            topAgencies: [],
-            watchedCompanies: [],
-            topCompanies: [],
-            keywords: userProfile.keywords || [],
-            capabilityKeywords: [],
-            state: userProfile.state || null,
-            zipCode: userProfile.zip_code || null,
-            geographicPreference: 'national' as const,
-            setAsidePreferences: [],
-            companySize: userProfile.company_size || 'small',
-            maxContractSize: userProfile.max_contract_size || null,
-            minContractValue: 0,
-            mutedAgencies: [],
-            mutedNaics: [],
-            engagementScore: 50,
-          } : null;
-
-          // Convert AIBriefingOpportunity to BidTargetOpportunity format
-          // Note: AIBriefingOpportunity has: rank, contractName, agency, incumbent, value, window, displacementAngle
-          const scoredOpps = briefing.opportunities.map((opp, index) => {
-            // Parse value to extract amount (e.g., "$2.5M" -> 2500000)
-            const valueStr = opp.value || '0';
-            const valueMatch = valueStr.match(/\$?([\d.]+)\s*(M|K|B)?/i);
-            let amount = 0;
-            if (valueMatch) {
-              amount = parseFloat(valueMatch[1]);
-              const multiplier = valueMatch[2]?.toUpperCase();
-              if (multiplier === 'K') amount *= 1000;
-              else if (multiplier === 'M') amount *= 1_000_000;
-              else if (multiplier === 'B') amount *= 1_000_000_000;
-            }
-
-            // Parse window for deadline hints (e.g., "RFP expected Q2 2026")
-            const windowText = opp.window || '';
-            let daysLeft = 30; // Default
-            if (windowText.toLowerCase().includes('urgent') || windowText.toLowerCase().includes('immediate')) {
-              daysLeft = 7;
-            } else if (windowText.toLowerCase().includes('week')) {
-              daysLeft = 14;
-            } else if (windowText.toLowerCase().includes('month')) {
-              daysLeft = 30;
-            } else if (windowText.toLowerCase().includes('q1') || windowText.toLowerCase().includes('q2')) {
-              daysLeft = 60;
-            }
-
-            // Use NAICS from user profile if available (opportunity doesn't have it)
-            const userNaics = profile?.naicsCodes?.[0] || '';
-
-            const bidOppData = {
-              naicsCode: userNaics,
-              setAside: '', // Not available in AI briefing format
-              amount,
-              responseDeadline: new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000),
-              title: opp.contractName,
-            };
-
-            const bidScore = calculateBidScore(bidOppData, profile);
-
-            // Use displacementAngle as primary win reason, add generic ones
-            const winReasons = [
-              opp.displacementAngle, // Strategic insight from AI
-              ...(bidScore.factors.filter(f => f.isPositive && f.points >= f.maxPoints * 0.5).map(f => f.description)),
-            ].filter(Boolean).slice(0, 5);
-
-            const actionSteps = generateActionSteps({
-              ...bidOppData,
-              agency: opp.agency,
-              samLink: `https://sam.gov/search/?q=${encodeURIComponent(opp.contractName)}`,
-            }, profile);
-
-            // Calculate close date
-            const closeDate = new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000);
-
-            return {
-              title: opp.contractName,
-              agency: opp.agency || '',
-              value: opp.value || 'TBD',
-              daysLeft,
-              closeDate: closeDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-              naicsCode: userNaics,
-              setAside: 'TBD',
-              noticeType: windowText.includes('RFI') ? 'Sources Sought' : windowText.includes('RFP') ? 'Solicitation' : 'Pre-Solicitation',
-              samLink: `https://sam.gov/search/?q=${encodeURIComponent(opp.contractName)}`,
-              bidScore: Math.max(50, 100 - (opp.rank * 5)), // Score based on AI ranking (rank 1 = 95, rank 2 = 90, etc.)
-              winReasons,
-              actionSteps,
-            } as BidTargetOpportunity;
-          }).sort((a, b) => b.bidScore - a.bidScore);
-
-          // THE ONE is the highest scored opportunity
-          const bidTarget = scoredOpps[0];
-          const alsoOnRadar = scoredOpps.slice(1, 4); // Next 3 as "also on radar"
-
-          // Extract a name from email if possible (e.g., "john.doe@email.com" -> "John")
-          const emailPrefix = user.email.split('@')[0].split(/[._]/)[0];
-          const derivedName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
-
-          const bidTargetData: BidTargetEmailData = {
-            userName: derivedName || '',
-            userEmail: user.email,
-            briefingDate: today,
-            bidTarget,
-            alsoOnRadar,
-          };
-
-          const bidTargetEmail = generateBidTargetEmail(bidTargetData);
-          emailSubject = bidTargetEmail.subject;
-          emailHtml = bidTargetEmail.htmlBody;
-          emailText = bidTargetEmail.textBody;
-
-        } else {
-          // FREE USER: Send Daily Alerts email (existing template)
-          emailType = 'daily_alerts';
-          const emailTemplate = generateAIEmailTemplate(briefing);
-          emailSubject = emailTemplate.subject;
-          emailHtml = emailTemplate.htmlBody;
-          emailText = emailTemplate.textBody;
-        }
+        // Generate GREEN email
+        const emailTemplate = generateSamGreenEmailHtml(greenBriefing, user.email);
 
         // Send email
         await sendEmail({
           to: user.email,
-          subject: emailSubject,
-          html: emailHtml,
-          text: emailText,
+          subject: emailTemplate.subject,
+          html: emailTemplate.htmlBody,
+          text: emailTemplate.textBody,
         });
 
         briefingsSent++;
 
-        // Update log with email type
+        // Update log with success
         await getSupabase().from('briefing_log').update({
           delivery_status: 'sent',
           email_sent_at: new Date().toISOString(),
-          tools_included: [matchType === 'exact' ? 'pre_computed_template' : 'prefix_fallback_template', emailType],
+          tools_included: ['sam_cache_green', 'daily_market_intel'],
         }).eq('user_email', user.email).eq('briefing_date', today);
 
-        // Record delivery
+        // Record delivery for rollout tracking
         if (!isTest) {
           await recordBriefingProgramDelivery(null, user.email, 'daily_brief');
         }
 
-        console.log(`[SendBriefingsFast] ✅ Sent to ${user.email} (${briefing.opportunities.length} opps)`);
+        const userElapsed = Date.now() - userStartTime;
+        console.log(`[SendBriefingsFast] ✅ Sent to ${user.email} (${greenBriefing.opportunities.length} opps, ${userElapsed}ms)`);
 
       } catch (err) {
         briefingsFailed++;
@@ -440,7 +220,7 @@ function getSupabase() {
         }).eq('user_email', user.email).eq('briefing_date', today);
 
         // Queue for automatic retry
-        const userNaics = user.naics_codes || [];
+        const userNaics = user.naics_codes || DEFAULT_NAICS;
         await queueForRetry(getSupabase(), user.email, userNaics, errorMsg, today);
       }
     }
@@ -448,19 +228,17 @@ function getSupabase() {
     const elapsed = Date.now() - startTime;
     const avgTimePerUser = usersToProcess.length > 0 ? Math.round(elapsed / usersToProcess.length) : 0;
 
-    console.log(`[SendBriefingsFast] Complete: ${briefingsSent} sent (${prefixMatchCount} prefix), ${briefingsSkipped} skipped, ${briefingsFailed} failed, ${noTemplateCount} no template`);
+    console.log(`[SendBriefingsFast] Complete: ${briefingsSent} sent, ${briefingsSkipped} skipped, ${briefingsFailed} failed, ${noOpportunitiesCount} no opps`);
 
     return NextResponse.json({
       success: true,
       briefingsSent,
       briefingsSkipped,
       briefingsFailed,
-      noTemplateCount,
-      prefixMatchCount,
-      templatesAvailable: templates.length,
-      prefixMappings: prefixMap.size,
+      noOpportunitiesCount,
       totalUsersProcessed: usersToProcess.length,
       avgTimePerUserMs: avgTimePerUser,
+      format: 'GREEN_SAM_CACHE',
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       elapsed,
     });
