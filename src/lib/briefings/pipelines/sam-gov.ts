@@ -747,10 +747,12 @@ export async function fetchSamOpportunitiesFromCache(
       }
 
       // Build LIKE filter for each prefix
-      // Format: naics_code.like.236*,naics_code.like.237*,...
-      const naicsFilters = Array.from(prefixes).map(prefix => `naics_code.like.${prefix}*`).join(',');
+      // Format: naics_code.like.236%,naics_code.like.237%,...
+      // NOTE: Supabase PostgREST uses % as wildcard (not *)
+      const naicsFilters = Array.from(prefixes).map(prefix => `naics_code.like.${prefix}%`).join(',');
       if (naicsFilters) {
         query = query.or(naicsFilters);
+        console.log(`[SAM Cache] Using NAICS prefix filters: ${naicsFilters}`);
       }
     }
 

@@ -494,8 +494,18 @@ async function runDailyAlertJob(options?: {
           }
         }
 
+        // FAILSAFE: If no NEW opportunities, fall back to ALL active opportunities
+        // Users paying $19/mo expect something - 3-day-old data is better than 0 results
         let opportunities = newOpportunities;
-        metrics.recordOpportunitiesTotal(newOpportunities.length);
+        let isUsingFallback = false;
+
+        if (newOpportunities.length === 0 && allActiveOpportunities.length > 0) {
+          console.log(`[Daily Alerts] ${user.user_email}: No new opps, using ${allActiveOpportunities.length} ACTIVE opportunities as fallback`);
+          opportunities = allActiveOpportunities;
+          isUsingFallback = true;
+        }
+
+        metrics.recordOpportunitiesTotal(opportunities.length);
 
         // DEDUPLICATE: Filter out opportunities already sent in last 7 days
         const beforeDedup = opportunities.length;
@@ -507,7 +517,7 @@ async function runDailyAlertJob(options?: {
         }
 
         // Score and rank - use ORIGINAL codes for scoring (exact matches rank higher)
-        const scoredOpps = opportunities.map(opp => ({
+        let scoredOpps = opportunities.map(opp => ({
           ...opp,
           score: scoreOpportunity(opp, {
             naics_codes: userNaics, // Original codes, not expanded
@@ -515,6 +525,11 @@ async function runDailyAlertJob(options?: {
             keywords: userKeywords,
           }),
         })).sort((a, b) => b.score - a.score);
+
+        // Limit fallback results to top 15 to avoid overwhelming users
+        if (isUsingFallback && scoredOpps.length > 15) {
+          scoredOpps = scoredOpps.slice(0, 15);
+        }
 
         // Fetch Grants.gov opportunities (parallel to contracts)
         let scoredGrants: (GrantOpportunity & { score: number })[] = [];
