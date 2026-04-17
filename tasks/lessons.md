@@ -889,3 +889,72 @@ curl "https://tools.govcongiants.org/api/admin/briefing-status?password=galata-a
 **Rule:** Day-specific crons need TWO protections:
 1. Vercel cron schedule (primary)
 2. In-code day guard (defensive - catches wrong-day triggers)
+
+---
+
+## Supabase LIKE Wildcard Character
+
+**Lesson (Apr 17, 2026):** Supabase PostgREST uses `%` for LIKE wildcards, NOT `*`.
+
+**What happened:**
+- Code used `naics_code.like.236*` to match all construction codes (236xxx)
+- This returned 0 results - Supabase doesn't recognize `*` as wildcard
+- Daily Alerts and Daily Briefings both failed silently (0 opportunities found)
+- 954 users received nothing for over a week
+
+**Wrong:**
+```typescript
+const naicsFilters = prefixes.map(p => `naics_code.like.${p}*`).join(',');
+// naics_code.like.236* → returns 0 results
+```
+
+**Correct:**
+```typescript
+const naicsFilters = prefixes.map(p => `naics_code.like.${p}%`).join(',');
+// naics_code.like.236% → returns all 236xxx codes
+```
+
+**File fixed:** `src/lib/briefings/pipelines/sam-gov.ts`
+
+**Rule:** Supabase LIKE uses SQL wildcards: `%` (any chars) and `_` (single char). Never use `*`.
+
+---
+
+## Daily Alerts Failsafe - Stale Data > No Data
+
+**Lesson (Apr 17, 2026):** Users paying $19/mo expect SOMETHING. 3-day-old data is better than 0 results.
+
+**What happened:**
+- Daily Alerts filtered for "new" opportunities (last 24 hours)
+- SAM.gov API rate limited, cache stale
+- No NEW opportunities → users received 0 results
+- Users complained: "I paid for alerts but got nothing"
+
+**Fix - Add failsafe:**
+```typescript
+// Fetch NEW opportunities (last 24h)
+const newOpps = await fetchOpportunities({ postedAfter: yesterday });
+
+// FAILSAFE: If no NEW, use ACTIVE from cache
+let opportunities = newOpps;
+let isUsingFallback = false;
+
+if (newOpps.length === 0 && activeOpps.length > 0) {
+  console.log(`No new opps, using ${activeOpps.length} ACTIVE as fallback`);
+  opportunities = activeOpps;
+  isUsingFallback = true;
+}
+
+// Limit fallback results to avoid overwhelming users
+if (isUsingFallback && opportunities.length > 15) {
+  opportunities = opportunities.slice(0, 15);
+}
+```
+
+**File fixed:** `src/app/api/cron/daily-alerts/route.ts`
+
+**Rule:** For paid email products, always have a fallback. Empty emails = complaints. Something relevant (even if stale) is better than nothing.
+
+---
+
+*Last Updated: April 17, 2026*

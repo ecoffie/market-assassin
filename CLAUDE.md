@@ -711,6 +711,7 @@ node scripts/import-forecasts.js --source=DOE
 6. **Never `.slice()` user data silently** — make caps explicit or configurable.
 7. **Use unified `user_notification_settings` table** — Old tables (`user_alert_settings`, `user_briefing_profile`) were dropped. All code uses unified table now.
 8. **Always add fallback NAICS** — If user has no NAICS, use defaults: `541512, 541611, 541330, 541990, 561210`.
+9. **Supabase LIKE uses `%` not `*`** — For pattern matching, use `naics_code.like.236%` not `naics_code.like.236*`. The `*` wildcard returns 0 results.
 
 ---
 
