@@ -25,12 +25,10 @@ import {
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
+import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
 
 // Process up to 100 users per cron run (~150ms each = 15 seconds total)
 const BATCH_SIZE = 100;
-
-// Default NAICS codes for users without preferences
-const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
 
 /**
  * Queue a failed briefing for automatic retry (dead letter queue)
@@ -137,7 +135,7 @@ export async function GET(request: NextRequest) {
 
       try {
         // Get user's NAICS codes (with defaults if none set)
-        const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : DEFAULT_NAICS;
+        const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : DEFAULT_NAICS_CODES;
 
         // Fetch SAM opportunities from cache for this user's NAICS
         const samResult = await fetchSamOpportunitiesFromCache({
@@ -220,7 +218,7 @@ export async function GET(request: NextRequest) {
         }).eq('user_email', user.email).eq('briefing_date', today);
 
         // Queue for automatic retry
-        const userNaics = user.naics_codes || DEFAULT_NAICS;
+        const userNaics = user.naics_codes || DEFAULT_NAICS_CODES;
         await queueForRetry(getSupabase(), user.email, userNaics, errorMsg, today);
       }
     }

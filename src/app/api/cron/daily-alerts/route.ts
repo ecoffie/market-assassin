@@ -372,13 +372,12 @@ async function runDailyAlertJob(options?: {
       }
 
       try {
-        // Check timezone (skip if not delivery time for this user)
-        if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
-          console.log(`[Daily Alerts] ${user.user_email} timezone ${user.timezone || 'ET'} - not delivery time, skipping`);
-          results.wrongTimezone++;
-          metrics.recordUserSkipped();
-          continue;
-        }
+        // DISABLED: Timezone filtering removed Apr 17, 2026
+        // All users now receive alerts in same batch (100% daily coverage)
+        // See: tasks/lessons.md - "Daily Alerts must send to ALL users daily"
+        // if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
+        //   continue;
+        // }
 
         // Check tier - free tier users should get weekly alerts, not daily
         const tier = await getUserAlertTier(user.user_email);
