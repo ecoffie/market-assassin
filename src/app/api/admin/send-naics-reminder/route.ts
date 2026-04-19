@@ -108,7 +108,8 @@ async function generateReminderEmail(email: string): Promise<{ subject: string; 
     <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 25px 0;">
       <h3 style="color: #92400e; margin: 0 0 15px 0;">⚠️ Your Current Status:</h3>
       <p style="color: #78350f; margin: 0;">You're enrolled in our <strong>FREE Daily Alerts</strong> and <strong>Market Intelligence</strong> system, but you haven't set your NAICS codes yet.</p>
-      <p style="color: #78350f; margin: 10px 0 0 0;">Right now, you're receiving <em>generic</em> opportunities. Set your NAICS to get opportunities <strong>matched to YOUR business</strong>.</p>
+      <p style="color: #78350f; margin: 10px 0 0 0;">Right now, you're receiving <em>healthcare-related</em> opportunities (hospitals, nursing homes, medical labs) as placeholders. Unless you're in healthcare, these probably aren't relevant!</p>
+      <p style="color: #78350f; margin: 10px 0 0 0;"><strong>Set your NAICS codes</strong> to get opportunities <strong>matched to YOUR business</strong>.</p>
     </div>
 
     <div style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px; padding: 20px; margin: 25px 0;">
@@ -159,7 +160,7 @@ You're Missing Out on Personalized GovCon Intel!
 Take 30 seconds to unlock the full power of your GovCon Giants alerts.
 
 YOUR CURRENT STATUS:
-You're enrolled in our FREE Daily Alerts and Market Intelligence system, but you haven't set your NAICS codes yet. Right now, you're receiving generic opportunities. Set your NAICS to get opportunities matched to YOUR business.
+You're enrolled in our FREE Daily Alerts and Market Intelligence system, but you haven't set your NAICS codes yet. Right now, you're receiving healthcare-related opportunities (hospitals, nursing homes, medical labs) as placeholders. Unless you're in healthcare, these probably aren't relevant! Set your NAICS codes to get opportunities matched to YOUR business.
 
 WHAT YOU'LL GET (FREE):
 - Daily Opportunity Alerts - Live SAM.gov opportunities in YOUR NAICS codes

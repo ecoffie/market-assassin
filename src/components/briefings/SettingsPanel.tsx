@@ -1,6 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import SampleOpportunitiesPicker from './SampleOpportunitiesPicker';
+
+interface CodeSuggestion {
+  code: string;
+  name: string;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
 
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], icon: '🏗️', description: 'Building, heavy civil, specialty trades' },
@@ -89,6 +97,17 @@ export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelP
   const [briefingsEnabled, setBriefingsEnabled] = useState(true);
   const [showStateSelector, setShowStateSelector] = useState(false);
   const [showIndustrySelector, setShowIndustrySelector] = useState(false);
+
+  // AI Code Suggestion state
+  const [showCodeAssistant, setShowCodeAssistant] = useState(false);
+  const [businessDescription, setBusinessDescription] = useState('');
+  const [suggestingCodes, setSuggestingCodes] = useState(false);
+  const [naicsSuggestions, setNaicsSuggestions] = useState<CodeSuggestion[]>([]);
+  const [pscSuggestions, setPscSuggestions] = useState<CodeSuggestion[]>([]);
+  const [suggestionError, setSuggestionError] = useState('');
+
+  // Sample Opportunities Picker state
+  const [showSamplePicker, setShowSamplePicker] = useState(false);
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
@@ -223,6 +242,118 @@ export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelP
       .map(p => p.label);
   };
 
+  // AI Code Suggestion handler
+  const handleSuggestCodes = async () => {
+    if (businessDescription.trim().length < 10) {
+      setSuggestionError('Please describe your business in more detail (at least 10 characters)');
+      return;
+    }
+
+    setSuggestingCodes(true);
+    setSuggestionError('');
+    setNaicsSuggestions([]);
+    setPscSuggestions([]);
+
+    try {
+      const res = await fetch('/api/suggest-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: businessDescription.trim(),
+          maxResults: 5,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setNaicsSuggestions(data.naicsSuggestions || []);
+        setPscSuggestions(data.pscSuggestions || []);
+      } else {
+        setSuggestionError(data.error || 'Failed to get suggestions');
+      }
+    } catch {
+      setSuggestionError('Failed to get suggestions. Please try again.');
+    } finally {
+      setSuggestingCodes(false);
+    }
+  };
+
+  // Add suggested NAICS code to input
+  const addSuggestedCode = (code: string) => {
+    const existingCodes = naicsInput.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
+    if (!existingCodes.includes(code)) {
+      const newCodes = [...existingCodes, code];
+      setNaicsInput(newCodes.join(', '));
+    }
+  };
+
+  // Add suggested PSC code as keyword (since we use NAICS primarily)
+  const addPscAsKeyword = (code: string, name: string) => {
+    const existingKeywords = keywordsInput.split(/[,]+/).map(k => k.trim()).filter(Boolean);
+    // Add both the code and a keyword from the name
+    const newKeyword = name.split(' - ')[1]?.split(' ').slice(0, 3).join(' ') || name;
+    if (!existingKeywords.includes(code) && !existingKeywords.includes(newKeyword)) {
+      const newKeywords = [...existingKeywords, newKeyword];
+      setKeywordsInput(newKeywords.join(', '));
+    }
+  };
+
+  // Handle profile extracted from Sample Opportunities Picker
+  interface ExtractedProfile {
+    naicsCodes: Array<{ code: string; name: string; count: number }>;
+    pscCodes: Array<{ code: string; count: number }>;
+    keywords: string[];
+    agencies: Array<{ name: string; count: number }>;
+    setAsides: Array<{ code: string; description: string; count: number }>;
+  }
+
+  const handleProfileExtracted = (profile: ExtractedProfile) => {
+    // Add NAICS codes
+    if (profile.naicsCodes.length > 0) {
+      const newCodes = profile.naicsCodes.map(n => n.code);
+      const existingCodes = naicsInput.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
+      const mergedCodes = [...new Set([...existingCodes, ...newCodes])];
+      setNaicsInput(mergedCodes.join(', '));
+    }
+
+    // Add keywords
+    if (profile.keywords.length > 0) {
+      const existingKeywords = keywordsInput.split(/[,]+/).map(k => k.trim()).filter(Boolean);
+      const mergedKeywords = [...new Set([...existingKeywords, ...profile.keywords])];
+      setKeywordsInput(mergedKeywords.join(', '));
+    }
+
+    // Add agencies (take top 3)
+    if (profile.agencies.length > 0) {
+      const agencyNames = profile.agencies.slice(0, 3).map(a => {
+        // Match to quick agencies if possible
+        const matchedQuick = QUICK_AGENCIES.find(qa =>
+          a.name.toLowerCase().includes(qa.toLowerCase()) ||
+          qa.toLowerCase().includes(a.name.split(' ')[0].toLowerCase())
+        );
+        return matchedQuick || a.name.split(',')[0].split(' ').slice(0, 2).join(' ');
+      });
+
+      const matchedQuickAgencies = agencyNames.filter(a => QUICK_AGENCIES.includes(a));
+      const customAgencyNames = agencyNames.filter(a => !QUICK_AGENCIES.includes(a));
+
+      if (matchedQuickAgencies.length > 0) {
+        setSelectedAgencies(prev => [...new Set([...prev, ...matchedQuickAgencies])]);
+      }
+      if (customAgencyNames.length > 0) {
+        const existing = customAgencies.split(/[,]+/).map(a => a.trim()).filter(Boolean);
+        const merged = [...new Set([...existing, ...customAgencyNames])];
+        setCustomAgencies(merged.join(', '));
+      }
+    }
+
+    // Close picker and show success
+    setShowSamplePicker(false);
+    setSuccess('Profile updated from your selections! Review and save.');
+    setTimeout(() => setSuccess(''), 5000);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -268,6 +399,26 @@ export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelP
                 {success}
               </div>
             )}
+
+            {/* Smart Profile Setup */}
+            <div className="p-4 bg-gradient-to-r from-purple-600/10 to-blue-600/10 border border-purple-500/20 rounded-xl">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">🎯</div>
+                <div className="flex-1">
+                  <h3 className="text-white font-medium text-sm">Not sure which codes to pick?</h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Browse real opportunities and pick ones that fit. We'll auto-calibrate your profile.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowSamplePicker(true)}
+                    className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Browse Sample Opportunities
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Industry Presets */}
             <div>
@@ -343,6 +494,126 @@ export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelP
               <p className="text-xs text-gray-500 mt-1">
                 Short codes (236) match entire categories
               </p>
+
+              {/* AI Code Assistant */}
+              <button
+                type="button"
+                onClick={() => setShowCodeAssistant(!showCodeAssistant)}
+                className="mt-3 text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1"
+              >
+                <span className="text-lg">✨</span>
+                <span>{showCodeAssistant ? 'Hide' : "Need help finding codes?"}</span>
+              </button>
+
+              {showCodeAssistant && (
+                <div className="mt-3 p-4 bg-gray-800/70 border border-purple-500/20 rounded-lg">
+                  <p className="text-sm text-gray-300 mb-3">
+                    Describe what your company does, and we'll suggest the best NAICS and PSC codes:
+                  </p>
+                  <textarea
+                    value={businessDescription}
+                    onChange={e => setBusinessDescription(e.target.value)}
+                    rows={3}
+                    placeholder="Example: We provide IT security consulting, penetration testing, and vulnerability assessments for federal agencies..."
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-sm mb-3"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSuggestCodes}
+                    disabled={suggestingCodes || businessDescription.trim().length < 10}
+                    className="w-full py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    {suggestingCodes ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <span>✨</span> Suggest Codes
+                      </>
+                    )}
+                  </button>
+
+                  {suggestionError && (
+                    <div className="mt-3 p-2 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs">
+                      {suggestionError}
+                    </div>
+                  )}
+
+                  {/* NAICS Suggestions */}
+                  {naicsSuggestions.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                        Suggested NAICS Codes
+                      </h4>
+                      <div className="space-y-2">
+                        {naicsSuggestions.map((suggestion, idx) => (
+                          <div
+                            key={idx}
+                            className="p-2 bg-gray-900/50 border border-gray-700 rounded-lg"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-purple-400 text-sm">{suggestion.code}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                    suggestion.confidence === 'high'
+                                      ? 'bg-green-500/20 text-green-400'
+                                      : suggestion.confidence === 'medium'
+                                      ? 'bg-yellow-500/20 text-yellow-400'
+                                      : 'bg-gray-500/20 text-gray-400'
+                                  }`}>
+                                    {suggestion.confidence}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-400 truncate">{suggestion.name}</p>
+                                <p className="text-[11px] text-gray-500 mt-1">{suggestion.reason}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => addSuggestedCode(suggestion.code)}
+                                className="shrink-0 px-2 py-1 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 text-xs rounded transition-colors"
+                              >
+                                + Add
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PSC Suggestions */}
+                  {pscSuggestions.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                        Related PSC Codes <span className="font-normal">(added as keywords)</span>
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {pscSuggestions.map((suggestion, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => addPscAsKeyword(suggestion.code, suggestion.name)}
+                            className="group px-2 py-1 bg-gray-700/50 hover:bg-purple-600/20 border border-gray-600 hover:border-purple-500/40 rounded text-xs transition-colors"
+                            title={suggestion.reason}
+                          >
+                            <span className="font-mono text-gray-300 group-hover:text-purple-400">{suggestion.code}</span>
+                            <span className="text-gray-500 ml-1">+</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-2">
+                        PSC codes help the government classify services. Click to add related keywords.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Keywords */}
@@ -577,6 +848,14 @@ export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelP
           </div>
         )}
       </div>
+
+      {/* Sample Opportunities Picker Modal */}
+      {showSamplePicker && (
+        <SampleOpportunitiesPicker
+          onProfileExtracted={handleProfileExtracted}
+          onClose={() => setShowSamplePicker(false)}
+        />
+      )}
     </>
   );
 }

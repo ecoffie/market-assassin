@@ -176,16 +176,46 @@ export default function AdminPurchasesPage() {
     );
   }
 
+  const adminTabs = [
+    { href: '/admin/dashboard', label: 'Operations', icon: '📊' },
+    { href: '/admin', label: 'Access Control', icon: '🔐' },
+    { href: '/admin/purchases', label: 'Purchases', icon: '💳' },
+    { href: '/admin/emails', label: 'Email History', icon: '📧' },
+    { href: '/admin/feedback', label: 'Feedback', icon: '💬' },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Navigation Tabs */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-1 py-2">
+            <span className="text-gray-500 text-sm mr-4">Admin:</span>
+            {adminTabs.map((tab) => {
+              const isActive = tab.href === '/admin/purchases';
+              return (
+                <a
+                  key={tab.href}
+                  href={tab.href}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {tab.icon} {tab.label}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <nav className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              <Link href="/admin" className="text-gray-600 hover:text-gray-900">
-                &larr; Admin
-              </Link>
               <h1 className="text-xl font-bold text-gray-900">Purchase Management</h1>
             </div>
 

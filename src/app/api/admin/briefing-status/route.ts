@@ -36,11 +36,12 @@ export async function GET(request: NextRequest) {
   const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek];
 
   // Get today's briefing sends
+  // Note: briefing_log uses email_sent_at (not sent_at) and tools_included (not briefing_type)
   const { data: todayBriefings, error: briefingError } = await supabase
     .from('briefing_log')
-    .select('user_email, briefing_type, sent_at, delivery_status, tools_included')
-    .gte('sent_at', `${todayUTC}T00:00:00Z`)
-    .order('sent_at', { ascending: false })
+    .select('user_email, email_sent_at, delivery_status, tools_included')
+    .gte('email_sent_at', `${todayUTC}T00:00:00Z`)
+    .order('email_sent_at', { ascending: false })
     .limit(100);
 
   // Get today's alerts
@@ -51,13 +52,11 @@ export async function GET(request: NextRequest) {
     .order('sent_at', { ascending: false })
     .limit(100);
 
-  // Get pursuit briefs sent today
-  const { data: todayPursuits, error: pursuitError } = await supabase
-    .from('pursuit_brief_log')
-    .select('user_email, sent_at, delivery_status, opportunity_score')
-    .gte('sent_at', `${todayUTC}T00:00:00Z`)
-    .order('sent_at', { ascending: false })
-    .limit(100);
+  // Get pursuit briefs sent today (they're in briefing_log with tools_included containing 'pursuit_brief')
+  // Note: pursuit_brief_log table doesn't exist - pursuit briefs are tracked in briefing_log
+  const todayPursuits = (todayBriefings || []).filter(b =>
+    b.tools_included?.includes('pursuit_brief')
+  );
 
   // Analyze for anomalies
   const anomalies: string[] = [];
@@ -83,7 +82,7 @@ export async function GET(request: NextRequest) {
     dayNumber: dayOfWeek,
     counts: {
       dailyBriefings: (todayBriefings || []).filter(b =>
-        b.tools_included?.includes('daily_brief') || b.briefing_type === 'daily'
+        b.tools_included?.includes('daily_brief')
       ).length,
       weeklyBriefings: weeklyCount,
       pursuitBriefs: pursuitCount,
@@ -102,8 +101,8 @@ export async function GET(request: NextRequest) {
   const recentSends = {
     briefings: (todayBriefings || []).slice(0, 10).map(b => ({
       email: b.user_email,
-      type: b.tools_included?.join(', ') || b.briefing_type,
-      sentAt: b.sent_at,
+      type: b.tools_included?.join(', ') || 'unknown',
+      sentAt: b.email_sent_at,
       status: b.delivery_status,
     })),
     alerts: (todayAlerts || []).slice(0, 10).map(a => ({
@@ -112,10 +111,10 @@ export async function GET(request: NextRequest) {
       sentAt: a.sent_at,
       status: a.delivery_status,
     })),
-    pursuits: (todayPursuits || []).slice(0, 10).map(p => ({
+    pursuits: todayPursuits.slice(0, 10).map(p => ({
       email: p.user_email,
-      score: p.opportunity_score,
-      sentAt: p.sent_at,
+      type: p.tools_included?.join(', ') || 'pursuit_brief',
+      sentAt: p.email_sent_at,
       status: p.delivery_status,
     })),
   };
@@ -127,7 +126,7 @@ export async function GET(request: NextRequest) {
     errors: {
       briefing: briefingError?.message,
       alert: alertError?.message,
-      pursuit: pursuitError?.message,
+      // pursuit briefs are now tracked in briefing_log, not a separate table
     },
   });
 }

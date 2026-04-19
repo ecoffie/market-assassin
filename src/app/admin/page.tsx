@@ -302,14 +302,47 @@ export default function AdminDashboard() {
     );
   }
 
+  const adminTabs = [
+    { href: '/admin/dashboard', label: 'Operations', icon: '📊' },
+    { href: '/admin', label: 'Access Control', icon: '🔐' },
+    { href: '/admin/purchases', label: 'Purchases', icon: '💳' },
+    { href: '/admin/emails', label: 'Email History', icon: '📧' },
+    { href: '/admin/feedback', label: 'Feedback', icon: '💬' },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Navigation Tabs */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center gap-1 py-2">
+            <span className="text-slate-500 text-sm mr-4">Admin:</span>
+            {adminTabs.map((tab) => {
+              const isActive = tab.href === '/admin';
+              return (
+                <a
+                  key={tab.href}
+                  href={tab.href}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {tab.icon} {tab.label}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">Admin Dashboard</h1>
+              <h1 className="text-3xl font-bold text-slate-900">Access Control</h1>
               <p className="text-slate-600 mt-1">Manage user access for all products</p>
             </div>
             <button

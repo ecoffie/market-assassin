@@ -184,18 +184,21 @@ function getSupabase() {
     // Fetch briefing if requested
     if (includeSections.includes('briefing')) {
       // Try to get both recompete and MA briefings
+      // Note: briefing_log uses tools_included array, not briefing_type column
       const { data: briefings } = await getSupabase()
         .from('briefing_log')
-        .select('briefing_date, briefing_type, briefing_data, generated_at')
+        .select('briefing_date, tools_included, briefing_data, generated_at')
         .eq('user_email', email)
         .order('briefing_date', { ascending: false })
         .limit(days * 2); // Get more in case of mixed types
 
       if (briefings && briefings.length > 0) {
-        // Find most recent recompete briefing
-        type BriefingRecord = { briefing_date: string; briefing_type?: string; briefing_data?: unknown; generated_at?: string };
-        const recompeteBriefing = briefings.find((b: BriefingRecord) => b.briefing_type === 'recompete' || !b.briefing_type);
-        const maBriefing = briefings.find((b: BriefingRecord) => b.briefing_type === 'market_assassin');
+        // Find most recent recompete briefing (weekly_deep_dive includes recompete data) or daily
+        type BriefingRecord = { briefing_date: string; tools_included?: string[]; briefing_data?: unknown; generated_at?: string };
+        const recompeteBriefing = briefings.find((b: BriefingRecord) =>
+          b.tools_included?.includes('weekly_deep_dive') || b.tools_included?.includes('daily_brief') || !b.tools_included
+        );
+        const maBriefing = briefings.find((b: BriefingRecord) => b.tools_included?.includes('pursuit_brief'));
 
         // Handle recompete briefing format
         if (recompeteBriefing?.briefing_data) {

@@ -393,6 +393,33 @@ Weekly Deep Dive cross-references USASpending expiring contracts with SAM.gov op
 - `src/components/briefings/MarketIntelligenceHeader.tsx` — Dashboard header with MI branding
 - `src/components/briefings/OnboardingWizard.tsx` — 4-step setup wizard
 - `src/components/briefings/SettingsPanel.tsx` — Slide-out settings panel (all preferences)
+- `src/components/briefings/SampleOpportunitiesPicker.tsx` — Sample opportunity picker wizard
+
+**Profile Calibration Features (April 19, 2026):**
+
+| Feature | API | Purpose |
+|---------|-----|---------|
+| AI Code Suggestions | `POST /api/suggest-codes` | Generate NAICS/PSC suggestions from business description |
+| PSC/NAICS Search | `GET /api/suggest-codes?q=` | Direct keyword search for codes |
+| Sample Opportunities | `POST /api/sample-opportunities` | Browse 29K+ real opportunities by description |
+| Profile Extraction | `POST /api/sample-opportunities` (action: extract) | Extract NAICS/PSC/keywords from user selections |
+
+**Sample Opportunities Picker Flow:**
+1. User clicks "Browse Sample Opportunities" in Settings
+2. Describes their business in free text
+3. System shows 30 diverse real opportunities from `sam_opportunities` table
+4. User selects opportunities that fit (minimum 3)
+5. System extracts patterns (NAICS, PSC, keywords, agencies, set-asides)
+6. User applies extracted profile to their settings
+
+**Key Files:**
+| File | Purpose |
+|------|---------|
+| `src/app/api/suggest-codes/route.ts` | AI code suggestion API (Groq Llama 3.3 70B) |
+| `src/app/api/sample-opportunities/route.ts` | Sample opportunity picker API |
+| `src/components/briefings/SampleOpportunitiesPicker.tsx` | 3-step picker wizard UI |
+| `tests/test-suggest-codes.sh` | 23 test cases for code suggestions |
+| `tests/test-sample-opportunities.sh` | 17 test cases for sample picker |
 
 **Cron Schedule (ET):**
 | Job | Times (ET) | Purpose |
@@ -667,6 +694,8 @@ node scripts/import-forecasts.js --source=DOE
 | `src/app/api/cron/send-pursuit-fast/route.ts` | Send pursuit briefs (~100ms/user) |
 | `src/app/alerts/preferences/page.tsx` | Alert/briefing preferences UI |
 | `src/lib/utils/psc-crosswalk.ts` | PSC-NAICS crosswalk for broader search |
+| `src/app/api/suggest-codes/route.ts` | AI code suggestion (Groq Llama 3.3 70B) |
+| `src/app/api/sample-opportunities/route.ts` | Sample opportunity picker for profile calibration |
 | `docs/govcon-market-research.md` | GAO market research framework for AI prompts |
 | `docs/PRD-market-research-intelligence.md` | PRD for market research integration |
 
@@ -788,4 +817,4 @@ done
 
 ---
 
-*Last Updated: April 16, 2026*
+*Last Updated: April 19, 2026*
