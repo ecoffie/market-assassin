@@ -727,6 +727,101 @@ node scripts/import-forecasts.js --source=DOE
 | `/api/admin/sync-alert-to-notification` | Sync users between alert/notif tables |
 | `/api/admin/send-naics-reminder` | Send NAICS setup reminder emails |
 | `/api/cron/health-check` | Automated API health tests |
+| `/api/admin/tool-health` | **AI Tool Health Dashboard** — unified monitoring |
+| `/api/admin/apply-tool-errors-migration` | Apply tool_errors database migration |
+
+---
+
+## AI Tool Health Dashboard (April 19, 2026)
+
+**Purpose:** Unified monitoring for all AI-powered tools to track errors, success rates, and API provider health.
+
+### Dashboard API
+
+```bash
+# Get dashboard data (last 7 days)
+curl "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026"
+
+# Get specific tool data
+curl "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026&tool=content_reaper"
+
+# Include resolved errors
+curl "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026&unresolvedOnly=false"
+
+# Resolve an error
+curl -X POST "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "resolve", "errorId": "uuid", "notes": "Fixed by..."}'
+
+# Check all provider health
+curl -X POST "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "check_providers"}'
+```
+
+### Monitored Tools
+
+| Tool Name | API Endpoint | AI Provider |
+|-----------|--------------|-------------|
+| `content_reaper` | `/api/content-generator/generate` | Groq |
+| `code_suggestions` | `/api/suggest-codes` | Groq |
+| `briefings` | `/api/cron/*-briefings` | Groq |
+| `market_scanner` | `/api/market-scanner` | Groq |
+| `sample_opportunities` | `/api/sample-opportunities` | Groq |
+
+### Error Types
+
+| Type | Description |
+|------|-------------|
+| `ai_timeout` | AI provider didn't respond in time |
+| `ai_rate_limit` | Hit API rate limits (429 errors) |
+| `ai_token_limit` | Exceeded token limits |
+| `api_error` | External API failures |
+| `validation` | Invalid input/request |
+| `internal` | Server-side errors |
+
+### Provider Status
+
+Tracks health of external APIs:
+- **groq** — Primary AI provider
+- **openai** — Secondary AI provider
+- **sam_gov** — SAM.gov Opportunities API
+- **usaspending** — USASpending.gov API
+- **grants_gov** — Grants.gov API
+
+### Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `tool_errors` | Per-error log with stack traces |
+| `tool_health_metrics` | Daily aggregates by tool |
+| `api_provider_status` | Real-time provider health |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/tool-errors.ts` | Error logging library |
+| `src/app/api/admin/tool-health/route.ts` | Dashboard API |
+| `supabase/migrations/20260419_tool_errors.sql` | Database schema |
+
+### Integration Example
+
+```typescript
+import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
+
+// Log an error
+await logToolError({
+  tool: ToolNames.CONTENT_REAPER,
+  errorType: classifyError(error),
+  errorMessage: error.message,
+  aiProvider: AIProviders.GROQ,
+  aiModel: 'llama-3.3-70b-versatile',
+});
+
+// Record success
+recordToolSuccess(ToolNames.CONTENT_REAPER).catch(() => {});
+```
 
 ---
 
