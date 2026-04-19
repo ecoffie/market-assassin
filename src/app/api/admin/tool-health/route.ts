@@ -281,9 +281,21 @@ export async function POST(request: NextRequest) {
           }).eq('provider', 'openai');
         } else {
           results['openai'] = { status: 'down', error: `HTTP ${openaiRes.status}` };
+          await supabase.from('api_provider_status').update({
+            status: 'down',
+            last_check_at: new Date().toISOString(),
+            last_error_at: new Date().toISOString(),
+            last_error_message: `HTTP ${openaiRes.status}`,
+          }).eq('provider', 'openai');
         }
       } catch (e) {
         results['openai'] = { status: 'down', error: String(e) };
+        await supabase.from('api_provider_status').update({
+          status: 'down',
+          last_check_at: new Date().toISOString(),
+          last_error_at: new Date().toISOString(),
+          last_error_message: String(e).substring(0, 200),
+        }).eq('provider', 'openai');
       }
 
       // Check SAM.gov
@@ -301,10 +313,95 @@ export async function POST(request: NextRequest) {
             avg_latency_ms: latency,
           }).eq('provider', 'sam_gov');
         } else {
-          results['sam_gov'] = { status: 'degraded', error: `HTTP ${samRes.status}` };
+          const status = samRes.status === 429 ? 'degraded' : 'down';
+          results['sam_gov'] = { status, error: `HTTP ${samRes.status}` };
+          await supabase.from('api_provider_status').update({
+            status,
+            last_check_at: new Date().toISOString(),
+            last_error_at: new Date().toISOString(),
+            last_error_message: `HTTP ${samRes.status}`,
+          }).eq('provider', 'sam_gov');
         }
       } catch (e) {
         results['sam_gov'] = { status: 'down', error: String(e) };
+        await supabase.from('api_provider_status').update({
+          status: 'down',
+          last_check_at: new Date().toISOString(),
+          last_error_at: new Date().toISOString(),
+          last_error_message: String(e).substring(0, 200),
+        }).eq('provider', 'sam_gov');
+      }
+
+      // Check USASpending
+      try {
+        const start = Date.now();
+        const usaRes = await fetch('https://api.usaspending.gov/api/v2/references/agency/', {
+          method: 'GET',
+        });
+        const latency = Date.now() - start;
+
+        if (usaRes.ok) {
+          results['usaspending'] = { status: 'healthy', latency };
+          await supabase.from('api_provider_status').update({
+            status: 'healthy',
+            last_check_at: new Date().toISOString(),
+            last_success_at: new Date().toISOString(),
+            avg_latency_ms: latency,
+          }).eq('provider', 'usaspending');
+        } else {
+          results['usaspending'] = { status: 'down', error: `HTTP ${usaRes.status}` };
+          await supabase.from('api_provider_status').update({
+            status: 'down',
+            last_check_at: new Date().toISOString(),
+            last_error_at: new Date().toISOString(),
+            last_error_message: `HTTP ${usaRes.status}`,
+          }).eq('provider', 'usaspending');
+        }
+      } catch (e) {
+        results['usaspending'] = { status: 'down', error: String(e) };
+        await supabase.from('api_provider_status').update({
+          status: 'down',
+          last_check_at: new Date().toISOString(),
+          last_error_at: new Date().toISOString(),
+          last_error_message: String(e).substring(0, 200),
+        }).eq('provider', 'usaspending');
+      }
+
+      // Check Grants.gov
+      try {
+        const start = Date.now();
+        const grantsRes = await fetch('https://api.grants.gov/v1/api/opportunities/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fundingInstruments: 'G', rows: 1 }),
+        });
+        const latency = Date.now() - start;
+
+        if (grantsRes.ok) {
+          results['grants_gov'] = { status: 'healthy', latency };
+          await supabase.from('api_provider_status').update({
+            status: 'healthy',
+            last_check_at: new Date().toISOString(),
+            last_success_at: new Date().toISOString(),
+            avg_latency_ms: latency,
+          }).eq('provider', 'grants_gov');
+        } else {
+          results['grants_gov'] = { status: 'down', error: `HTTP ${grantsRes.status}` };
+          await supabase.from('api_provider_status').update({
+            status: 'down',
+            last_check_at: new Date().toISOString(),
+            last_error_at: new Date().toISOString(),
+            last_error_message: `HTTP ${grantsRes.status}`,
+          }).eq('provider', 'grants_gov');
+        }
+      } catch (e) {
+        results['grants_gov'] = { status: 'down', error: String(e) };
+        await supabase.from('api_provider_status').update({
+          status: 'down',
+          last_check_at: new Date().toISOString(),
+          last_error_at: new Date().toISOString(),
+          last_error_message: String(e).substring(0, 200),
+        }).eq('provider', 'grants_gov');
       }
 
       return NextResponse.json({ success: true, providers: results });
