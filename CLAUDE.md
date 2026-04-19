@@ -688,10 +688,32 @@ node scripts/import-forecasts.js --source=DOE
 
 ## Data Systems
 
-### Agency Pain Points
-- **Database:** `src/data/agency-pain-points.json` — 250 agencies, 2,765 pain points, 2,500 priorities
-- **Admin:** `/api/admin/build-pain-points?password=galata-assassin-2026`
-- **API:** `/api/pain-points`
+### Agency Pain Points & Intelligence (April 19, 2026)
+
+**Static Data:** `src/data/agency-pain-points.json`
+- **307 agencies** (expanded from 250)
+- **3,045 pain points** (+280 from GAO reports)
+- **2,611 priorities** (+111 from spending patterns)
+
+**Database:** `agency_intelligence` table in Supabase
+- **557 records** from real public APIs
+- **446 gao_high_risk** records (GovInfo API)
+- **111 contract_pattern** records (USASpending API)
+
+**Unified API:** `src/lib/agency-intelligence/index.ts`
+```typescript
+import { getUnifiedAgencyIntelligence, getAgencyPainPointsUnified } from '@/lib/agency-intelligence';
+const intel = await getUnifiedAgencyIntelligence('Department of Defense');
+```
+
+**Merge Script:**
+```bash
+node scripts/merge-agency-intelligence.js --preview  # Preview
+node scripts/merge-agency-intelligence.js --merge    # Apply
+```
+
+**Admin:** `/api/admin/sync-agency-intel?password=xxx`
+**API:** `/api/pain-points`
 
 ### FY2026 Budget Authority
 - **Cached data:** `src/data/agency-budget-data.json` — 47 toptier agencies
@@ -945,4 +967,4 @@ done
 
 ---
 
-*Last Updated: April 19, 2026 — Added Business Intelligence Storage, PSC/Keywords in Briefings*
+*Last Updated: April 19, 2026 — Agency Intelligence Expansion (307 agencies, 3,045 pain points), Unified API*
