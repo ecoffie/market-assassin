@@ -4,6 +4,7 @@ import { getBudgetForAgency } from '@/lib/utils/budget-authority';
 import { checkContentRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { trackGeneration } from '@/lib/abuse-detection';
 import { humanizePost, trimPost, getPostMetrics, POST_LENGTH_LIMITS } from '@/lib/utils/humanize-post';
+import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
 
 // Fisher-Yates shuffle — returns a new array in random order
 function shuffleArray<T>(arr: T[]): T[] {
@@ -654,6 +655,9 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       }
     }
 
+    // Record successful generation for monitoring
+    recordToolSuccess(ToolNames.CONTENT_REAPER).catch(() => {});
+
     return NextResponse.json({
       success: true,
       posts: posts,
@@ -667,9 +671,23 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
 
   } catch (error) {
     console.error('[Content Reaper] Error:', error);
+
+    // Log error to monitoring dashboard
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate content';
+    await logToolError({
+      tool: ToolNames.CONTENT_REAPER,
+      errorType: classifyError(errorMessage),
+      errorMessage,
+      userEmail: undefined, // Could extract from request if available
+      requestPath: '/api/content-generator/generate',
+      aiProvider: AIProviders.GROQ,
+      aiModel: GROK_MODEL,
+      errorStack: error instanceof Error ? error.stack : undefined,
+    });
+
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to generate content'
+      error: errorMessage
     }, { status: 500, headers: corsHeaders });
   }
 }

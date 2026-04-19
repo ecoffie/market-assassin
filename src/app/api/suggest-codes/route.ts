@@ -16,6 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
 
 // Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -298,6 +299,14 @@ Return ONLY valid JSON, no other text.`;
 
     if (!response.ok) {
       console.error('[suggest-codes] Groq API error:', response.status, response.statusText);
+      await logToolError({
+        tool: ToolNames.CODE_SUGGESTIONS,
+        errorType: response.status === 429 ? 'ai_rate_limit' : 'api_error',
+        errorMessage: `Groq API error: ${response.status} ${response.statusText}`,
+        requestPath: '/api/suggest-codes',
+        aiProvider: AIProviders.GROQ,
+        aiModel: GROQ_MODEL,
+      });
       return NextResponse.json({
         success: false,
         naicsSuggestions: [],
@@ -349,6 +358,9 @@ Return ONLY valid JSON, no other text.`;
         }))
       : [];
 
+    // Record successful generation
+    recordToolSuccess(ToolNames.CODE_SUGGESTIONS).catch(() => {});
+
     return NextResponse.json({
       success: true,
       naicsSuggestions,
@@ -357,6 +369,19 @@ Return ONLY valid JSON, no other text.`;
 
   } catch (error) {
     console.error('[suggest-codes] Error:', error);
+
+    // Log error to monitoring dashboard
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate suggestions';
+    await logToolError({
+      tool: ToolNames.CODE_SUGGESTIONS,
+      errorType: classifyError(errorMessage),
+      errorMessage,
+      requestPath: '/api/suggest-codes',
+      aiProvider: AIProviders.GROQ,
+      aiModel: GROQ_MODEL,
+      errorStack: error instanceof Error ? error.stack : undefined,
+    });
+
     return NextResponse.json({
       success: false,
       naicsSuggestions: [],
