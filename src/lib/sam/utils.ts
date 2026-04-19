@@ -2,10 +2,100 @@
  * Shared SAM.gov API Utilities
  *
  * Rate limiting, caching, error handling for all SAM APIs
+ * Includes API key rotation for rate limit management
  */
 
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+
+// ============================================
+// API KEY ROTATION SYSTEM
+// ============================================
+
+/**
+ * Get all available SAM API keys from environment
+ * Supports: SAM_API_KEY, SAM_API_KEY_1, SAM_API_KEY_2, etc.
+ */
+function getAvailableSAMKeys(): string[] {
+  const keys: string[] = [];
+
+  // Check numbered keys first (SAM_API_KEY_1, SAM_API_KEY_2, etc.)
+  for (let i = 1; i <= 10; i++) {
+    const key = process.env[`SAM_API_KEY_${i}`];
+    if (key && key.trim()) {
+      keys.push(key.trim());
+    }
+  }
+
+  // If no numbered keys, fall back to single key
+  if (keys.length === 0) {
+    const singleKey = process.env.SAM_API_KEY;
+    if (singleKey && singleKey.trim()) {
+      keys.push(singleKey.trim());
+    }
+  }
+
+  return keys;
+}
+
+/**
+ * Get the rotated SAM API key for today
+ * Rotates based on day of year to spread load across keys
+ */
+export function getRotatedSAMKey(): string {
+  const keys = getAvailableSAMKeys();
+
+  if (keys.length === 0) {
+    console.warn('[SAM Key Rotation] No SAM API keys configured');
+    return '';
+  }
+
+  if (keys.length === 1) {
+    return keys[0];
+  }
+
+  // Get day of year (1-366)
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - start.getTime();
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  // Rotate based on day
+  const keyIndex = dayOfYear % keys.length;
+  const selectedKey = keys[keyIndex];
+
+  console.log(`[SAM Key Rotation] Day ${dayOfYear}, using key ${keyIndex + 1} of ${keys.length}`);
+
+  return selectedKey;
+}
+
+/**
+ * Get key rotation status for monitoring
+ */
+export function getKeyRotationStatus(): {
+  totalKeys: number;
+  currentKeyIndex: number;
+  dayOfYear: number;
+  nextRotation: string;
+} {
+  const keys = getAvailableSAMKeys();
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - start.getTime();
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  // Calculate next rotation (midnight)
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+
+  return {
+    totalKeys: keys.length,
+    currentKeyIndex: keys.length > 0 ? (dayOfYear % keys.length) + 1 : 0,
+    dayOfYear,
+    nextRotation: tomorrow.toISOString()
+  };
+}
 
 // Types
 export interface SAMAPIConfig {
@@ -33,37 +123,77 @@ export interface SAMError {
   fallbackAvailable: boolean;
 }
 
-// Constants
+// Constants - Use getter to get fresh rotated key on each call
+export function getSAMAPIConfig(apiType: string): SAMAPIConfig {
+  const rotatedKey = getRotatedSAMKey();
+
+  const configs: Record<string, SAMAPIConfig> = {
+    opportunities: {
+      apiType: 'opportunities',
+      baseUrl: 'https://api.sam.gov/opportunities/v2',
+      apiKey: rotatedKey,
+      cacheTTLHours: 1
+    },
+    awards: {
+      apiType: 'awards',
+      baseUrl: 'https://api.sam.gov/contract-awards/v1',
+      apiKey: process.env.SAM_CONTRACT_AWARDS_API_KEY || rotatedKey,
+      cacheTTLHours: 24
+    },
+    entity: {
+      apiType: 'entity',
+      baseUrl: 'https://api.sam.gov/entity-information/v3',
+      apiKey: process.env.SAM_ENTITY_API_KEY || rotatedKey,
+      cacheTTLHours: 24
+    },
+    subaward: {
+      apiType: 'subaward',
+      baseUrl: 'https://api.sam.gov/prod/subaward/v1',
+      apiKey: process.env.SAM_SUBAWARD_API_KEY || rotatedKey,
+      cacheTTLHours: 24
+    },
+    hierarchy: {
+      apiType: 'hierarchy',
+      baseUrl: 'https://api.sam.gov/prod/federalorganizations/v1',
+      apiKey: process.env.SAM_HIERARCHY_API_KEY || rotatedKey,
+      cacheTTLHours: 168 // 7 days
+    }
+  };
+
+  return configs[apiType] || configs.opportunities;
+}
+
+// Legacy constant for backward compatibility (uses rotated key)
 export const SAM_API_CONFIGS: Record<string, SAMAPIConfig> = {
   opportunities: {
     apiType: 'opportunities',
     baseUrl: 'https://api.sam.gov/opportunities/v2',
-    apiKey: process.env.SAM_API_KEY || '',
+    apiKey: '', // Will be set dynamically
     cacheTTLHours: 1
   },
   awards: {
     apiType: 'awards',
     baseUrl: 'https://api.sam.gov/contract-awards/v1',
-    apiKey: process.env.SAM_CONTRACT_AWARDS_API_KEY || process.env.SAM_API_KEY || '',
+    apiKey: '',
     cacheTTLHours: 24
   },
   entity: {
     apiType: 'entity',
     baseUrl: 'https://api.sam.gov/entity-information/v3',
-    apiKey: process.env.SAM_ENTITY_API_KEY || process.env.SAM_API_KEY || '',
+    apiKey: '',
     cacheTTLHours: 24
   },
   subaward: {
     apiType: 'subaward',
     baseUrl: 'https://api.sam.gov/prod/subaward/v1',
-    apiKey: process.env.SAM_SUBAWARD_API_KEY || process.env.SAM_API_KEY || '',
+    apiKey: '',
     cacheTTLHours: 24
   },
   hierarchy: {
     apiType: 'hierarchy',
     baseUrl: 'https://api.sam.gov/prod/federalorganizations/v1',
-    apiKey: process.env.SAM_HIERARCHY_API_KEY || process.env.SAM_API_KEY || '',
-    cacheTTLHours: 168 // 7 days
+    apiKey: '',
+    cacheTTLHours: 168
   }
 };
 

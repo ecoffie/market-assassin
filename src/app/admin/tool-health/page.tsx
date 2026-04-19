@@ -31,6 +31,18 @@ interface RecentError {
   is_resolved: boolean;
 }
 
+interface DatabaseStat {
+  count: number;
+  description: string;
+}
+
+interface KeyRotation {
+  totalKeys: number;
+  currentKeyIndex: number;
+  dayOfYear: number;
+  nextRotation: string;
+}
+
 interface DashboardData {
   success: boolean;
   period: string;
@@ -38,6 +50,8 @@ interface DashboardData {
   alerts: string[];
   tools: Record<string, ToolStats>;
   providers: Record<string, ProviderStatus>;
+  databaseStats: Record<string, DatabaseStat>;
+  keyRotation: KeyRotation;
   recentErrors: RecentError[];
   dailyMetrics: unknown[];
 }
@@ -131,15 +145,18 @@ export default function ToolHealthDashboard() {
     degraded: 'bg-yellow-500',
     down: 'bg-red-500',
     unknown: 'bg-gray-500',
+    not_configured: 'bg-blue-500',
   };
 
   const providerNames: Record<string, string> = {
     groq: 'Groq (AI)',
-    openai: 'OpenAI',
     sam_gov: 'SAM.gov',
     usaspending: 'USASpending',
     grants_gov: 'Grants.gov',
   };
+
+  // Filter out OpenAI from display (it's only a fallback, not monitored)
+  const filteredProviders = Object.entries(data.providers).filter(([key]) => key !== 'openai');
 
   const toolNames: Record<string, string> = {
     content_reaper: 'Content Reaper',
@@ -189,8 +206,8 @@ export default function ToolHealthDashboard() {
         {/* Provider Status */}
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4">API Providers</h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {Object.entries(data.providers).map(([key, provider]) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {filteredProviders.map(([key, provider]) => (
               <div key={key} className="bg-gray-800 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className={`w-3 h-3 rounded-full ${statusColors[provider.status]}`} />
@@ -338,6 +355,53 @@ export default function ToolHealthDashboard() {
             </div>
           )}
         </div>
+
+        {/* Database Stats */}
+        {data.databaseStats && Object.keys(data.databaseStats).length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4">Data Intelligence</h2>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {Object.entries(data.databaseStats).map(([table, stats]) => (
+                <div key={table} className="bg-gray-800 rounded-lg p-4 text-center">
+                  <div className="text-3xl font-bold text-cyan-400">
+                    {stats.count.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-400 mt-1">{stats.description}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Key Rotation Status */}
+        {data.keyRotation && data.keyRotation.totalKeys > 1 && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4">SAM.gov Key Rotation</h2>
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center gap-6">
+                <div>
+                  <div className="text-2xl font-bold text-purple-400">
+                    Key {data.keyRotation.currentKeyIndex} / {data.keyRotation.totalKeys}
+                  </div>
+                  <div className="text-sm text-gray-400">Currently Active</div>
+                </div>
+                <div className="border-l border-gray-700 pl-6">
+                  <div className="text-sm text-gray-400">Day of Year</div>
+                  <div className="text-lg font-medium">{data.keyRotation.dayOfYear}</div>
+                </div>
+                <div className="border-l border-gray-700 pl-6">
+                  <div className="text-sm text-gray-400">Next Rotation</div>
+                  <div className="text-lg font-medium">
+                    {new Date(data.keyRotation.nextRotation).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 text-xs text-gray-500">
+                Keys rotate daily at midnight to spread API load across accounts
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="mt-8 text-center text-gray-500 text-sm">

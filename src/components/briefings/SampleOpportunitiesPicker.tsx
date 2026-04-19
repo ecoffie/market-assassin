@@ -23,11 +23,13 @@ interface ExtractedProfile {
 }
 
 interface SampleOpportunitiesPickerProps {
+  email: string; // User's email for storing business intelligence
   onProfileExtracted: (profile: ExtractedProfile) => void;
   onClose: () => void;
 }
 
 export default function SampleOpportunitiesPicker({
+  email,
   onProfileExtracted,
   onClose,
 }: SampleOpportunitiesPickerProps) {
@@ -49,7 +51,7 @@ export default function SampleOpportunitiesPicker({
       const res = await fetch('/api/sample-opportunities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: description.trim() }),
+        body: JSON.stringify({ description: description.trim(), email }),
       });
 
       const data = await res.json();
@@ -95,6 +97,7 @@ export default function SampleOpportunitiesPicker({
         body: JSON.stringify({
           action: 'extract',
           selectedIds: Array.from(selectedIds),
+          email,
         }),
       });
 

@@ -55,6 +55,7 @@ export const ErrorTypes = {
   API_ERROR: 'api_error',
   VALIDATION: 'validation',
   INTERNAL: 'internal',
+  EMAIL_FAILURE: 'email_failure', // Email send failures (SMTP, delivery issues)
 } as const;
 
 export type ErrorType = (typeof ErrorTypes)[keyof typeof ErrorTypes];

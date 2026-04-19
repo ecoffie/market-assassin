@@ -852,6 +852,7 @@ export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelP
       {/* Sample Opportunities Picker Modal */}
       {showSamplePicker && (
         <SampleOpportunitiesPicker
+          email={email}
           onProfileExtracted={handleProfileExtracted}
           onClose={() => setShowSamplePicker(false)}
         />

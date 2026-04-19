@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getRotatedSAMKey, getKeyRotationStatus } from '@/lib/sam/utils';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -155,6 +156,38 @@ export async function GET(request: NextRequest) {
     // 7. Generate alerts/flags
     const alerts = generateAlerts(toolStats, providerStatus, errors || []);
 
+    // 8. Get database stats
+    const databaseStats: Record<string, { count: number; description: string }> = {};
+    const tablesToCount = [
+      { table: 'sam_opportunities', description: 'SAM.gov Opportunities' },
+      { table: 'agency_forecasts', description: 'Agency Forecasts' },
+      { table: 'aggregated_opportunities', description: 'Multisite Opportunities' },
+      { table: 'federal_contractors', description: 'Federal Contractors' },
+      { table: 'user_notification_settings', description: 'Alert Subscribers' },
+      { table: 'briefing_templates', description: 'Briefing Templates' },
+      { table: 'briefing_log', description: 'Briefings Sent' },
+      { table: 'alert_log', description: 'Alerts Sent' },
+      { table: 'sam_api_cache', description: 'SAM API Cache' },
+    ];
+
+    for (const { table, description } of tablesToCount) {
+      try {
+        const { count, error: countError } = await supabase
+          .from(table)
+          .select('*', { count: 'exact', head: true });
+
+        databaseStats[table] = {
+          count: countError ? 0 : (count || 0),
+          description
+        };
+      } catch {
+        databaseStats[table] = { count: 0, description };
+      }
+    }
+
+    // 9. Get key rotation status
+    const keyRotation = getKeyRotationStatus();
+
     return NextResponse.json({
       success: true,
       period: `Last ${days} days`,
@@ -162,6 +195,8 @@ export async function GET(request: NextRequest) {
       alerts,
       tools: toolStats,
       providers: providerStatus,
+      databaseStats,
+      keyRotation,
       recentErrors: (errors || []).slice(0, 20).map(e => ({
         id: e.id,
         tool: e.tool_name,
@@ -232,7 +267,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'check_providers') {
       // Check each provider's health
-      const results: Record<string, { status: string; latency?: number; error?: string }> = {};
+      const results: Record<string, { status: string; latency?: number; error?: string; keyRotation?: string }> = {};
 
       // Check Groq
       try {
@@ -263,49 +298,23 @@ export async function POST(request: NextRequest) {
         results['groq'] = { status: 'down', error: String(e) };
       }
 
-      // Check OpenAI
-      try {
-        const start = Date.now();
-        const openaiRes = await fetch('https://api.openai.com/v1/models', {
-          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-        });
-        const latency = Date.now() - start;
+      // OpenAI removed - Groq is primary, OpenAI only used as fallback
+      // No need to monitor OpenAI since Groq handles everything
 
-        if (openaiRes.ok) {
-          results['openai'] = { status: 'healthy', latency };
-          await supabase.from('api_provider_status').update({
-            status: 'healthy',
-            last_check_at: new Date().toISOString(),
-            last_success_at: new Date().toISOString(),
-            avg_latency_ms: latency,
-          }).eq('provider', 'openai');
-        } else {
-          results['openai'] = { status: 'down', error: `HTTP ${openaiRes.status}` };
-          await supabase.from('api_provider_status').update({
-            status: 'down',
-            last_check_at: new Date().toISOString(),
-            last_error_at: new Date().toISOString(),
-            last_error_message: `HTTP ${openaiRes.status}`,
-          }).eq('provider', 'openai');
-        }
-      } catch (e) {
-        results['openai'] = { status: 'down', error: String(e) };
-        await supabase.from('api_provider_status').update({
-          status: 'down',
-          last_check_at: new Date().toISOString(),
-          last_error_at: new Date().toISOString(),
-          last_error_message: String(e).substring(0, 200),
-        }).eq('provider', 'openai');
-      }
-
-      // Check SAM.gov
+      // Check SAM.gov (using rotated key)
       try {
+        const samApiKey = getRotatedSAMKey();
+        const keyStatus = getKeyRotationStatus();
         const start = Date.now();
-        const samRes = await fetch('https://api.sam.gov/opportunities/v2/search?api_key=' + process.env.SAM_API_KEY + '&limit=1&postedFrom=01/01/2026&postedTo=01/02/2026');
+        const samRes = await fetch('https://api.sam.gov/opportunities/v2/search?api_key=' + samApiKey + '&limit=1&postedFrom=01/01/2026&postedTo=01/02/2026');
         const latency = Date.now() - start;
 
         if (samRes.ok) {
-          results['sam_gov'] = { status: 'healthy', latency };
+          results['sam_gov'] = {
+            status: 'healthy',
+            latency,
+            keyRotation: `Key ${keyStatus.currentKeyIndex}/${keyStatus.totalKeys}`
+          };
           await supabase.from('api_provider_status').update({
             status: 'healthy',
             last_check_at: new Date().toISOString(),
@@ -314,16 +323,25 @@ export async function POST(request: NextRequest) {
           }).eq('provider', 'sam_gov');
         } else {
           const status = samRes.status === 429 ? 'degraded' : 'down';
-          results['sam_gov'] = { status, error: `HTTP ${samRes.status}` };
+          results['sam_gov'] = {
+            status,
+            error: `HTTP ${samRes.status}`,
+            keyRotation: `Key ${keyStatus.currentKeyIndex}/${keyStatus.totalKeys}`
+          };
           await supabase.from('api_provider_status').update({
             status,
             last_check_at: new Date().toISOString(),
             last_error_at: new Date().toISOString(),
-            last_error_message: `HTTP ${samRes.status}`,
+            last_error_message: `HTTP ${samRes.status} (Key ${keyStatus.currentKeyIndex})`,
           }).eq('provider', 'sam_gov');
         }
       } catch (e) {
-        results['sam_gov'] = { status: 'down', error: String(e) };
+        const keyStatus = getKeyRotationStatus();
+        results['sam_gov'] = {
+          status: 'down',
+          error: String(e),
+          keyRotation: `Key ${keyStatus.currentKeyIndex}/${keyStatus.totalKeys}`
+        };
         await supabase.from('api_provider_status').update({
           status: 'down',
           last_check_at: new Date().toISOString(),
@@ -335,7 +353,7 @@ export async function POST(request: NextRequest) {
       // Check USASpending
       try {
         const start = Date.now();
-        const usaRes = await fetch('https://api.usaspending.gov/api/v2/references/agency/', {
+        const usaRes = await fetch('https://api.usaspending.gov/api/v2/references/naics/', {
           method: 'GET',
         });
         const latency = Date.now() - start;
@@ -370,7 +388,7 @@ export async function POST(request: NextRequest) {
       // Check Grants.gov
       try {
         const start = Date.now();
-        const grantsRes = await fetch('https://api.grants.gov/v1/api/opportunities/search', {
+        const grantsRes = await fetch('https://apply07.grants.gov/grantsws/rest/opportunities/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fundingInstruments: 'G', rows: 1 }),
@@ -422,7 +440,7 @@ function determineOverallHealth(
   providers: Record<string, { status: string }>,
   errors: unknown[]
 ): 'healthy' | 'warning' | 'critical' {
-  // Critical if any provider is down
+  // Critical if any required provider is down (not_configured is OK)
   for (const p of Object.values(providers)) {
     if (p.status === 'down') return 'critical';
   }

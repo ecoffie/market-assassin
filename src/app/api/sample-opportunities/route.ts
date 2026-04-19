@@ -7,15 +7,84 @@
  *
  * POST /api/sample-opportunities
  * - description: User's business description (used for initial search)
+ * - email: User's email (for storing business intelligence)
  * - Returns: 30 diverse sample opportunities
  *
- * POST /api/sample-opportunities { action: 'extract', selectedIds: [...] }
+ * POST /api/sample-opportunities { action: 'extract', selectedIds: [...], email: '...' }
  * - selectedIds: Array of notice_ids the user picked as relevant
+ * - email: User's email (for storing extracted profile)
  * - Returns: Extracted NAICS codes, PSC codes, keywords, agencies
+ *
+ * BUSINESS INTELLIGENCE: Stores description and extracted profile to user_business_profiles
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+// Helper to store business intelligence
+async function storeBusinessIntelligence(
+  supabase: SupabaseClient,
+  email: string,
+  data: {
+    businessDescription?: string;
+    extractedProfile?: ExtractedProfile;
+    opportunitiesShown?: number;
+    opportunitiesSelected?: number;
+    selectedOpportunityIds?: string[];
+  }
+): Promise<void> {
+  if (!email) return;
+
+  try {
+    const updates: Record<string, unknown> = {
+      user_email: email.toLowerCase().trim(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (data.businessDescription) {
+      updates.business_description = data.businessDescription;
+      updates.business_description_updated_at = new Date().toISOString();
+    }
+
+    if (data.extractedProfile) {
+      updates.extracted_naics_codes = data.extractedProfile.naicsCodes;
+      updates.extracted_psc_codes = data.extractedProfile.pscCodes;
+      updates.extracted_keywords = data.extractedProfile.keywords;
+      updates.extracted_agencies = data.extractedProfile.agencies;
+      updates.extracted_set_asides = data.extractedProfile.setAsides;
+      updates.calibration_completed_at = new Date().toISOString();
+    }
+
+    if (data.opportunitiesShown !== undefined) {
+      updates.opportunities_shown = data.opportunitiesShown;
+    }
+
+    if (data.opportunitiesSelected !== undefined) {
+      updates.opportunities_selected = data.opportunitiesSelected;
+    }
+
+    if (data.selectedOpportunityIds) {
+      updates.selected_opportunity_ids = data.selectedOpportunityIds;
+    }
+
+    await supabase
+      .from('user_business_profiles')
+      .upsert(updates, { onConflict: 'user_email' });
+
+    // Also update business_description in user_notification_settings if it exists
+    if (data.businessDescription) {
+      await supabase
+        .from('user_notification_settings')
+        .update({ business_description: data.businessDescription })
+        .eq('user_email', email.toLowerCase().trim());
+    }
+
+    console.log(`[sample-opportunities] Stored business intel for ${email}`);
+  } catch (err) {
+    // Don't fail the main flow if storage fails
+    console.error('[sample-opportunities] Failed to store business intel:', err);
+  }
+}
 
 interface SampleOpportunity {
   notice_id: string;
@@ -132,17 +201,18 @@ const NAICS_NAMES: Record<string, string> = {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = await request.json();
+  const email = body.email || '';
 
   // Check if this is an extraction request
   if (body.action === 'extract') {
-    return handleExtraction(body.selectedIds || []);
+    return handleExtraction(body.selectedIds || [], email);
   }
 
   // Otherwise, it's a sample request
-  return handleSampleSearch(body.description || '');
+  return handleSampleSearch(body.description || '', email);
 }
 
-async function handleSampleSearch(description: string): Promise<NextResponse> {
+async function handleSampleSearch(description: string, email?: string): Promise<NextResponse> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -155,6 +225,13 @@ async function handleSampleSearch(description: string): Promise<NextResponse> {
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
+
+  // Store the business description if provided
+  if (email && description) {
+    await storeBusinessIntelligence(supabase, email, {
+      businessDescription: description,
+    });
+  }
 
   try {
     // Extract potential keywords from description
@@ -305,6 +382,13 @@ async function handleSampleSearch(description: string): Promise<NextResponse> {
     // Shuffle final results for variety
     const shuffledSamples = samples.sort(() => Math.random() - 0.5).slice(0, 30);
 
+    // Store opportunities shown count
+    if (email) {
+      await storeBusinessIntelligence(supabase, email, {
+        opportunitiesShown: shuffledSamples.length,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       count: shuffledSamples.length,
@@ -322,7 +406,7 @@ async function handleSampleSearch(description: string): Promise<NextResponse> {
   }
 }
 
-async function handleExtraction(selectedIds: string[]): Promise<NextResponse> {
+async function handleExtraction(selectedIds: string[], email: string): Promise<NextResponse> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -446,6 +530,15 @@ async function handleExtraction(selectedIds: string[]): Promise<NextResponse> {
       agencies,
       setAsides,
     };
+
+    // Store the extracted profile for business intelligence
+    if (email) {
+      await storeBusinessIntelligence(supabase, email, {
+        extractedProfile: profile,
+        opportunitiesSelected: selectedIds.length,
+        selectedOpportunityIds: selectedIds,
+      });
+    }
 
     return NextResponse.json({
       success: true,

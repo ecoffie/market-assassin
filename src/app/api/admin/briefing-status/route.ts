@@ -81,8 +81,11 @@ export async function GET(request: NextRequest) {
     dayOfWeek: dayName,
     dayNumber: dayOfWeek,
     counts: {
+      // Count daily briefings by looking for 'daily_market_intel' or 'sam_cache_green'
+      // (which is what send-briefings-fast actually logs)
       dailyBriefings: (todayBriefings || []).filter(b =>
-        b.tools_included?.includes('daily_brief')
+        b.tools_included?.includes('daily_market_intel') ||
+        b.tools_included?.includes('sam_cache_green')
       ).length,
       weeklyBriefings: weeklyCount,
       pursuitBriefs: pursuitCount,

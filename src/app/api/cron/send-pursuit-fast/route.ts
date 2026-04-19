@@ -16,7 +16,7 @@ import {
 } from '@/lib/briefings/delivery/rollout';
 import crypto from 'crypto';
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 200; // Increased for better coverage
 const BRAND_COLOR = '#1e3a8a';
 const ACCENT_COLOR = '#7c3aed';
 const SUCCESS_COLOR = '#10b981';

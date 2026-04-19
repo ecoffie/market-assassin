@@ -421,6 +421,39 @@ Weekly Deep Dive cross-references USASpending expiring contracts with SAM.gov op
 | `tests/test-suggest-codes.sh` | 23 test cases for code suggestions |
 | `tests/test-sample-opportunities.sh` | 17 test cases for sample picker |
 
+**Business Intelligence Storage (April 19, 2026):**
+
+User profile data from the calibration wizard is now stored for:
+- Better opportunity matching across all tools
+- Customer insights and product intelligence
+- Understanding user needs for fine-tuned products
+
+**Database Table: `user_business_profiles`**
+| Column | Type | Purpose |
+|--------|------|---------|
+| `business_description` | TEXT | Free-text business description from wizard |
+| `extracted_naics_codes` | JSONB | NAICS codes from opportunity selections |
+| `extracted_psc_codes` | JSONB | PSC codes from opportunity selections |
+| `extracted_keywords` | JSONB | Keywords extracted from selections |
+| `extracted_agencies` | JSONB | Target agencies from selections |
+| `extracted_set_asides` | JSONB | Set-aside preferences |
+| `opportunities_shown` | INT | How many samples were shown |
+| `opportunities_selected` | INT | How many the user selected |
+| `tools_used` | TEXT[] | Which tools the user has accessed |
+| `reports_generated` | INT | Behavioral tracking |
+
+**PSC Codes + Keywords in Briefings:**
+
+Daily briefings now use the user's full profile for matching:
+- NAICS codes (primary)
+- PSC codes (industry classification)
+- Keywords (catch mislabeled opportunities)
+
+The `fetchSamOpportunitiesFromCache` function accepts all three and uses OR logic for broader matching.
+
+**Admin Endpoint:**
+`/api/admin/apply-business-intel-migration?password=xxx` — Check migration status
+
 **Cron Schedule (ET):**
 | Job | Times (ET) | Purpose |
 |-----|------------|---------|
@@ -912,4 +945,4 @@ done
 
 ---
 
-*Last Updated: April 19, 2026*
+*Last Updated: April 19, 2026 — Added Business Intelligence Storage, PSC/Keywords in Briefings*

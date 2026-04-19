@@ -58,6 +58,7 @@ interface SAMOpportunity {
 
 interface SAMSearchParams {
   naicsCodes?: string[];
+  pscCodes?: string[]; // Product/Service Classification codes
   agencies?: string[];
   keywords?: string[];
   zipCodes?: string[];
@@ -708,6 +709,7 @@ export async function fetchSamOpportunitiesFromCache(
 ): Promise<SAMSearchResult> {
   const {
     naicsCodes = [],
+    pscCodes = [],
     setAsides = [],
     keywords = [],
     state,
@@ -720,7 +722,12 @@ export async function fetchSamOpportunitiesFromCache(
     return { opportunities: [], totalRecords: 0, fetchedAt: new Date().toISOString() };
   }
 
-  console.log(`[SAM Cache] Querying database for NAICS: ${naicsCodes.slice(0, 5).join(', ')}${naicsCodes.length > 5 ? '...' : ''}`);
+  const searchCriteria = [
+    naicsCodes.length > 0 ? `NAICS: ${naicsCodes.slice(0, 3).join(', ')}${naicsCodes.length > 3 ? '...' : ''}` : null,
+    pscCodes.length > 0 ? `PSC: ${pscCodes.slice(0, 3).join(', ')}${pscCodes.length > 3 ? '...' : ''}` : null,
+    keywords.length > 0 ? `Keywords: ${keywords.slice(0, 2).join(', ')}${keywords.length > 2 ? '...' : ''}` : null,
+  ].filter(Boolean);
+  console.log(`[SAM Cache] Querying database for ${searchCriteria.join(' | ') || 'all opportunities'}`);
 
   try {
     // Build query
@@ -753,6 +760,17 @@ export async function fetchSamOpportunitiesFromCache(
       if (naicsFilters) {
         query = query.or(naicsFilters);
         console.log(`[SAM Cache] Using NAICS prefix filters: ${naicsFilters}`);
+      }
+    }
+
+    // PSC filter - match ANY of the user's PSC codes using prefix matching
+    // PSC codes can be 1-4 characters (e.g., "R" for R&D, "R4" for more specific)
+    if (pscCodes.length > 0) {
+      // Use prefix matching for flexibility (e.g., "R4" matches "R405", "R499")
+      const pscFilters = pscCodes.map(psc => `psc_code.like.${psc}%`).join(',');
+      if (pscFilters) {
+        query = query.or(pscFilters);
+        console.log(`[SAM Cache] Using PSC prefix filters: ${pscFilters}`);
       }
     }
 

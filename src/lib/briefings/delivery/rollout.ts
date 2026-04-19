@@ -20,12 +20,16 @@ type AudienceSource = 'notification_settings' | 'smart_profile';
 interface NotificationSettingsRow {
   user_email: string | null;
   naics_codes: string[] | null;
+  psc_codes: string[] | null;
+  keywords: string[] | null;
   agencies: string[] | null;
   timezone?: string | null;
   sms_enabled?: boolean | null;
   phone_number?: string | null;
   aggregated_profile?: {
     naics_codes?: string[];
+    psc_codes?: string[];
+    keywords?: string[];
     agencies?: string[];
   } | null;
 }
@@ -46,6 +50,8 @@ interface BriefingEntitlementRow {
 export interface BriefingAudienceUser {
   email: string;
   naics_codes: string[];
+  psc_codes: string[];
+  keywords: string[];
   agencies: string[];
   timezone?: string;
   sms_enabled?: boolean;
@@ -168,7 +174,7 @@ async function fetchNotificationSettings(supabase: SupabaseClient): Promise<Noti
   return fetchAllRows(async (from, to) => {
     const { data, error } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies, timezone, sms_enabled, phone_number, aggregated_profile')
+      .select('user_email, naics_codes, psc_codes, keywords, agencies, timezone, sms_enabled, phone_number, aggregated_profile')
       .eq('is_active', true)
       .order('user_email')
       .range(from, to);
@@ -238,6 +244,8 @@ function buildCandidate(
   next: {
     email: string;
     naics_codes: string[];
+    psc_codes: string[];
+    keywords: string[];
     agencies: string[];
     timezone?: string;
     sms_enabled?: boolean;
@@ -246,12 +254,16 @@ function buildCandidate(
   }
 ): BriefingAudienceUser {
   const mergedNaics = Array.from(new Set([...(existing?.naics_codes || []), ...next.naics_codes]));
+  const mergedPsc = Array.from(new Set([...(existing?.psc_codes || []), ...next.psc_codes]));
+  const mergedKeywords = Array.from(new Set([...(existing?.keywords || []), ...next.keywords]));
   const mergedAgencies = Array.from(new Set([...(existing?.agencies || []), ...next.agencies]));
-  const hasProfileData = mergedNaics.length > 0 || mergedAgencies.length > 0;
+  const hasProfileData = mergedNaics.length > 0 || mergedAgencies.length > 0 || mergedPsc.length > 0 || mergedKeywords.length > 0;
 
   return {
     email: next.email,
     naics_codes: mergedNaics,
+    psc_codes: mergedPsc,
+    keywords: mergedKeywords,
     agencies: mergedAgencies,
     timezone: next.timezone || existing?.timezone,
     sms_enabled: next.sms_enabled ?? existing?.sms_enabled,
@@ -276,10 +288,14 @@ export async function fetchBriefingAudienceCandidates(
     if (!email) continue;
 
     const aggregatedNaics = normalizeArray(row.aggregated_profile?.naics_codes);
+    const aggregatedPsc = normalizeArray(row.aggregated_profile?.psc_codes);
+    const aggregatedKeywords = normalizeArray(row.aggregated_profile?.keywords);
     const aggregatedAgencies = normalizeArray(row.aggregated_profile?.agencies);
     const candidate = buildCandidate(usersByEmail.get(email), {
       email,
       naics_codes: Array.from(new Set([...normalizeArray(row.naics_codes), ...aggregatedNaics])),
+      psc_codes: Array.from(new Set([...normalizeArray(row.psc_codes), ...aggregatedPsc])),
+      keywords: Array.from(new Set([...normalizeArray(row.keywords), ...aggregatedKeywords])),
       agencies: Array.from(new Set([...normalizeArray(row.agencies), ...aggregatedAgencies])),
       timezone: row.timezone || undefined,
       sms_enabled: Boolean(row.sms_enabled),
@@ -298,6 +314,8 @@ export async function fetchBriefingAudienceCandidates(
       const candidate = buildCandidate(usersByEmail.get(email), {
         email,
         naics_codes: normalizeArray(row.naics_codes),
+        psc_codes: [], // Smart profiles don't have PSC codes yet
+        keywords: [], // Smart profiles don't have keywords yet
         agencies: normalizeArray(row.agencies),
         timezone: row.timezone || undefined,
         source: 'smart_profile',

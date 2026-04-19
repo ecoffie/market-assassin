@@ -26,9 +26,11 @@ import {
 } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
+import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 
-// Process up to 100 users per cron run (~150ms each = 15 seconds total)
-const BATCH_SIZE = 100;
+// Process up to 200 users per cron run (~150ms each = 30 seconds total)
+// Increased from 100 to ensure all 958+ users are covered in 10 cron runs
+const BATCH_SIZE = 200;
 
 /**
  * Queue a failed briefing for automatic retry (dead letter queue)
@@ -113,21 +115,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Check for already sent today
-    const { data: sentToday } = await getSupabase()
+    // Check for already processed today (sent OR skipped)
+    // Must exclude skipped users too, otherwise they get re-processed every run
+    const { data: processedToday } = await getSupabase()
       .from('briefing_log')
-      .select('user_email')
+      .select('user_email, delivery_status')
       .eq('briefing_date', today)
-      .eq('delivery_status', 'sent');
+      .in('delivery_status', ['sent', 'skipped']);
 
-    const sentEmails = new Set((sentToday || []).map((s: { user_email: string }) => s.user_email));
+    const processedEmails = new Set((processedToday || []).map((s: { user_email: string }) => s.user_email));
+    const sentCount = (processedToday || []).filter((s: { delivery_status: string }) => s.delivery_status === 'sent').length;
+    const skippedCount = (processedToday || []).filter((s: { delivery_status: string }) => s.delivery_status === 'skipped').length;
 
-    // Filter out already sent and limit batch
+    // Filter out already processed and limit batch
     usersToProcess = usersToProcess
-      .filter(u => !sentEmails.has(u.email))
+      .filter(u => !processedEmails.has(u.email))
       .slice(0, BATCH_SIZE);
 
-    console.log(`[SendBriefingsFast] Processing ${usersToProcess.length} users (${sentEmails.size} already sent today)`);
+    console.log(`[SendBriefingsFast] Processing ${usersToProcess.length} users (${sentCount} sent, ${skippedCount} skipped today)`);
 
     // Step 2: Process each user
     for (const user of usersToProcess) {
@@ -136,22 +141,32 @@ export async function GET(request: NextRequest) {
       try {
         // Get user's NAICS codes (with defaults if none set)
         const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : DEFAULT_NAICS_CODES;
+        const userPsc = user.psc_codes || [];
+        const userKeywords = user.keywords || [];
 
-        // Fetch SAM opportunities from cache for this user's NAICS
+        // Fetch SAM opportunities from cache using user's full profile
+        // Includes: NAICS codes, PSC codes (industry classification), and keywords
         const samResult = await fetchSamOpportunitiesFromCache({
           naicsCodes: userNaics.slice(0, 10), // Limit to 10 NAICS codes
-          limit: 20, // Get top 20 opportunities
+          pscCodes: userPsc.slice(0, 10), // Limit to 10 PSC codes
+          keywords: userKeywords.slice(0, 10), // Limit to 10 keywords
+          limit: 25, // Get top 25 opportunities (slightly more to account for filtering)
         });
 
         if (samResult.opportunities.length === 0) {
           noOpportunitiesCount++;
-          console.log(`[SendBriefingsFast] No opportunities for ${user.email} (NAICS: ${userNaics.slice(0, 3).join(',')})`);
+          const profileSummary = [
+            userNaics.length > 0 ? `NAICS: ${userNaics.slice(0, 3).join(',')}` : null,
+            userPsc.length > 0 ? `PSC: ${userPsc.slice(0, 2).join(',')}` : null,
+            userKeywords.length > 0 ? `KW: ${userKeywords.slice(0, 2).join(',')}` : null,
+          ].filter(Boolean).join(' | ');
+          console.log(`[SendBriefingsFast] No opportunities for ${user.email} (${profileSummary || 'no profile'})`);
 
           // Log as skipped (no opportunities found)
           await getSupabase().from('briefing_log').upsert({
             user_email: user.email,
             briefing_date: today,
-            briefing_content: { message: 'No opportunities found for NAICS codes', naics: userNaics },
+            briefing_content: { message: 'No opportunities found for profile', naics: userNaics, psc: userPsc, keywords: userKeywords },
             items_count: 0,
             tools_included: ['sam_cache_green', 'no_opportunities'],
             delivery_status: 'skipped',
@@ -208,8 +223,19 @@ export async function GET(request: NextRequest) {
       } catch (err) {
         briefingsFailed++;
         const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorStack = err instanceof Error ? err.stack : undefined;
         errors.push(`${user.email}: ${errorMsg}`);
         console.error(`[SendBriefingsFast] ❌ Failed for ${user.email}:`, err);
+
+        // Log to tool_errors for dashboard visibility (critical tracking)
+        await logToolError({
+          tool: ToolNames.BRIEFINGS,
+          errorType: ErrorTypes.EMAIL_FAILURE,
+          errorMessage: errorMsg,
+          userEmail: user.email,
+          errorStack,
+          requestPath: '/api/cron/send-briefings-fast',
+        }).catch(() => {}); // Don't let logging failure break the flow
 
         // Update log with failure
         await getSupabase().from('briefing_log').update({

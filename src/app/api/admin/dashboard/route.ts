@@ -85,8 +85,12 @@ export async function GET(request: NextRequest) {
 
 async function getEmailStats(today: string) {
   const stats = {
+    date: today,
     alerts: { sent: 0, failed: 0, skipped: 0, successRate: '0%' },
-    briefings: { sent: 0, failed: 0, skipped: 0, pending: 0, successRate: '0%' }
+    briefings: {
+      sent: 0, failed: 0, skipped: 0, pending: 0, successRate: '0%',
+      byType: { daily: 0, weekly: 0, pursuit: 0 }
+    }
   };
 
   try {
@@ -112,24 +116,63 @@ async function getEmailStats(today: string) {
   }
 
   try {
-    // Briefing stats for today
-    const { data: briefingData } = await getSupabase()
+    // Briefing stats for today - query by email_sent_at timestamp for accuracy
+    // (briefing_date may be from a previous day if briefing was created then sent later)
+    // Use same query as briefing-status: filter by email_sent_at >= today midnight UTC
+    const todayMidnight = `${today}T00:00:00Z`;
+    const tomorrowMidnight = new Date(new Date(today).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] + 'T00:00:00Z';
+
+    // Note: briefing_type column doesn't exist yet - only use tools_included for type detection
+    const { data: briefingData, error: briefingError } = await getSupabase()
+      .from('briefing_log')
+      .select('delivery_status, tools_included')
+      .gte('email_sent_at', todayMidnight)
+      .lt('email_sent_at', tomorrowMidnight);
+
+    // Log any query errors for debugging
+    if (briefingError) {
+      console.error('[Dashboard] Briefing query error:', briefingError);
+    }
+
+    // Also get pending/failed/skipped for today by briefing_date (they don't have email_sent_at)
+    const { data: pendingData } = await getSupabase()
       .from('briefing_log')
       .select('delivery_status')
-      .eq('briefing_date', today);
+      .eq('briefing_date', today)
+      .in('delivery_status', ['pending', 'failed', 'skipped']);
 
+    // Count sent briefings (by email_sent_at)
     if (briefingData) {
       for (const row of briefingData) {
-        if (row.delivery_status === 'sent') stats.briefings.sent++;
-        else if (row.delivery_status === 'failed') stats.briefings.failed++;
+        if (row.delivery_status === 'sent') {
+          stats.briefings.sent++;
+          // Count by type using tools_included array
+          if (row.tools_included) {
+            if (row.tools_included.includes('daily_market_intel') || row.tools_included.includes('sam_cache_green')) {
+              stats.briefings.byType.daily++;
+            } else if (row.tools_included.includes('weekly_deep_dive')) {
+              stats.briefings.byType.weekly++;
+            } else if (row.tools_included.includes('pursuit_brief')) {
+              stats.briefings.byType.pursuit++;
+            }
+          }
+        }
+      }
+    }
+
+    // Count pending/failed/skipped (by briefing_date)
+    if (pendingData) {
+      for (const row of pendingData) {
+        if (row.delivery_status === 'failed') stats.briefings.failed++;
         else if (row.delivery_status === 'skipped') stats.briefings.skipped++;
         else if (row.delivery_status === 'pending') stats.briefings.pending++;
       }
-      const total = stats.briefings.sent + stats.briefings.failed;
-      stats.briefings.successRate = total > 0
-        ? `${Math.round((stats.briefings.sent / total) * 100)}%`
-        : 'N/A';
     }
+
+    const total = stats.briefings.sent + stats.briefings.failed;
+    stats.briefings.successRate = total > 0
+      ? `${Math.round((stats.briefings.sent / total) * 100)}%`
+      : 'N/A';
   } catch (e) {
     console.error('Error fetching briefing stats:', e);
   }
@@ -292,13 +335,20 @@ async function getForecastStats() {
   };
 
   try {
-    // Forecast counts by agency
+    // Total forecast count (use count query to avoid 1000 row limit)
+    const { count: totalCount } = await getSupabase()
+      .from('agency_forecasts')
+      .select('*', { count: 'exact', head: true });
+
+    stats.totalForecasts = totalCount || 0;
+
+    // Forecast counts by agency (still need to fetch for grouping)
     const { data: forecasts } = await getSupabase()
       .from('agency_forecasts')
-      .select('source_agency');
+      .select('source_agency')
+      .limit(10000); // Explicit limit to get all
 
     if (forecasts) {
-      stats.totalForecasts = forecasts.length;
       for (const row of forecasts) {
         const agency = row.source_agency || 'Unknown';
         stats.byAgency[agency] = (stats.byAgency[agency] || 0) + 1;

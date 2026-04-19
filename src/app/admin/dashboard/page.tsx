@@ -7,8 +7,12 @@ interface DashboardData {
   timestamp: string;
   today: string;
   emailOperations: {
+    date: string;
     alerts: { sent: number; failed: number; skipped: number; successRate: string };
-    briefings: { sent: number; failed: number; skipped: number; pending: number; successRate: string };
+    briefings: {
+      sent: number; failed: number; skipped: number; pending: number; successRate: string;
+      byType?: { daily: number; weekly: number; pursuit: number };
+    };
   };
   userHealth: {
     totalUsers: number;
@@ -234,7 +238,12 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Today's Alerts */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Daily Alerts ($19/mo)</h2>
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-lg font-semibold text-white">Daily Alerts ($19/mo)</h2>
+              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
+                {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Today'}
+              </span>
+            </div>
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-400">Sent</span>
@@ -257,12 +266,34 @@ export default function AdminDashboard() {
 
           {/* Today's Briefings */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Daily Briefings ($49/mo)</h2>
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-lg font-semibold text-white">Market Intel ($49/mo)</h2>
+              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
+                {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Today'}
+              </span>
+            </div>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-400">Sent</span>
+                <span className="text-gray-400">Sent (Total)</span>
                 <span className="text-green-400 font-mono">{data.emailOperations.briefings.sent}</span>
               </div>
+              {/* Breakdown by type */}
+              {data.emailOperations.briefings.byType && (
+                <div className="pl-4 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">↳ Daily Brief</span>
+                    <span className="text-gray-400 font-mono">{data.emailOperations.briefings.byType.daily || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">↳ Weekly Deep Dive</span>
+                    <span className="text-gray-400 font-mono">{data.emailOperations.briefings.byType.weekly || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">↳ Pursuit Brief</span>
+                    <span className="text-gray-400 font-mono">{data.emailOperations.briefings.byType.pursuit || 0}</span>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-400">Failed</span>
                 <span className="text-red-400 font-mono">{data.emailOperations.briefings.failed}</span>
