@@ -342,16 +342,21 @@ async function getForecastStats() {
 
     stats.totalForecasts = totalCount || 0;
 
-    // Forecast counts by agency (still need to fetch for grouping)
-    const { data: forecasts } = await getSupabase()
-      .from('agency_forecasts')
-      .select('source_agency')
-      .limit(10000); // Explicit limit to get all
+    // Forecast counts by agency - use individual COUNT queries to bypass 1000 row limit
+    const knownAgencies = ['DHS', 'DOE', 'DOJ', 'DOI', 'NASA', 'VA', 'GSA', 'NRC', 'DOT', 'SSA', 'NSF', 'DOL', 'HHS', 'Treasury', 'EPA', 'USDA', 'DOD'];
 
-    if (forecasts) {
-      for (const row of forecasts) {
-        const agency = row.source_agency || 'Unknown';
-        stats.byAgency[agency] = (stats.byAgency[agency] || 0) + 1;
+    const agencyCountPromises = knownAgencies.map(agency =>
+      getSupabase()
+        .from('agency_forecasts')
+        .select('id', { count: 'exact', head: true })
+        .eq('source_agency', agency)
+        .then(({ count }: { count: number | null }) => ({ agency, count: count || 0 }))
+    );
+
+    const agencyCounts = await Promise.all(agencyCountPromises);
+    for (const { agency, count } of agencyCounts) {
+      if (count > 0) {
+        stats.byAgency[agency] = count;
       }
     }
   } catch (e) {
