@@ -379,16 +379,23 @@ async function runDailyAlertJob(options?: {
         //   continue;
         // }
 
-        // Check tier - free tier users should get weekly alerts, not daily
-        const tier = await getUserAlertTier(user.user_email);
-        if (tier === 'free') {
-          // Free tier users get weekly alerts (handled by weekly-alerts cron)
-          // Skip them in daily alerts to save them for the weekly digest
-          console.log(`[Daily Alerts] ${user.user_email} is free tier - will receive weekly alerts instead`);
-          results.freeTierSkipped++;
-          metrics.recordUserSkipped();
-          continue;
+        // BETA MODE: Send daily alerts to ALL users with NAICS (Apr 19, 2026)
+        // After beta ends (Apr 27, 2026), re-enable tier check to limit free users to weekly
+        // See: tasks/lessons.md - "Users need to receive emails to see value and upgrade"
+        const BETA_END_DATE = new Date('2026-05-28');
+        const isBetaPeriod = new Date() < BETA_END_DATE;
+
+        if (!isBetaPeriod) {
+          // Post-beta: Check tier - free tier users get weekly alerts, not daily
+          const tier = await getUserAlertTier(user.user_email);
+          if (tier === 'free') {
+            console.log(`[Daily Alerts] ${user.user_email} is free tier - will receive weekly alerts instead`);
+            results.freeTierSkipped++;
+            metrics.recordUserSkipped();
+            continue;
+          }
         }
+        // During beta: Everyone with NAICS gets daily alerts
 
         // Get NAICS codes - try user_notification_settings first, then fall back to smart_user_profiles
         let userNaics = user.naics_codes || [];

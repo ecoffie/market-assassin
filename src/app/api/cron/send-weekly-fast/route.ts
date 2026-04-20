@@ -118,8 +118,27 @@ function buildPrefixMap(templates: Array<{ naics_profile: string; naics_profile_
 }
 
 function getWeekOfDate(): string {
-  const monday = new Date();
-  monday.setDate(monday.getDate() - monday.getDay() + 1);
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // 0=Sunday, 6=Saturday
+
+  // Calculate Monday of the target week
+  // If running Saturday (6), we need NEXT Monday (tomorrow is Sunday, +2 to Monday)
+  // If running Sunday (0), we need TODAY's Monday (+1)
+  // If running any other day, use current week's Monday
+  let daysToAdd: number;
+  if (dayOfWeek === 6) {
+    // Saturday: next Monday is in 2 days
+    daysToAdd = 2;
+  } else if (dayOfWeek === 0) {
+    // Sunday: today's Monday is tomorrow
+    daysToAdd = 1;
+  } else {
+    // Weekday: current week's Monday
+    daysToAdd = 1 - dayOfWeek;
+  }
+
+  const monday = new Date(now);
+  monday.setUTCDate(monday.getUTCDate() + daysToAdd);
   return monday.toISOString().split('T')[0];
 }
 

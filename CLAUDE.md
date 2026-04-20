@@ -327,6 +327,36 @@ Weekly Deep Dive cross-references USASpending expiring contracts with SAM.gov op
 - RFP posting: 2-4 months before expiration
 - Total window: Solicitations appear **6-18 months** before contract expires
 
+**Two-Stage Fetch & Score System (April 19, 2026):**
+
+Weekly briefing precompute now uses a two-stage approach for better opportunity matching:
+
+**Stage 1: Cast Wide Net (Fetch)**
+For each NAICS profile, aggregates search criteria from ALL users in that group:
+- NAICS codes (primary, from user profiles)
+- PSC codes (derived via crosswalk from NAICS)
+- Keywords (aggregated from all users in group)
+- Target agencies (aggregated from all users in group)
+
+Fetches from USASpending using OR logic across NAICS + PSC + keywords.
+
+**Stage 2: Score & Rank (Filter)**
+
+| Factor | Points |
+|--------|--------|
+| NAICS match | +25 |
+| PSC match in description | +15 |
+| Keyword in title | +20 |
+| Keyword in description | +10 |
+| Target agency match | +15 |
+| Expiring <6 months | +10 |
+| Expiring <1 year | +5 |
+| Low bids (1-2) | +15 |
+| Value $10M+ | +10 |
+| Value $1M+ | +5 |
+
+Top 15 highest-scoring opportunities selected for each template.
+
 ### 8. Daily Alerts System
 **Location:** `/src/app/api/cron/daily-alerts/`, `/src/app/alerts/`
 **Purpose:** Automated opportunity alert emails based on user NAICS/keywords
@@ -967,4 +997,4 @@ done
 
 ---
 
-*Last Updated: April 19, 2026 — Agency Intelligence Expansion (307 agencies, 3,045 pain points), Unified API*
+*Last Updated: April 19, 2026 — Two-Stage Fetch & Score for Weekly Briefings, Agency Intelligence Expansion (307 agencies)*

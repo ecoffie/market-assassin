@@ -1023,3 +1023,19 @@ export const DEFAULT_NAICS_CODES = [
 ---
 
 *Last Updated: April 17, 2026*
+
+## April 19, 2026 - Daily Alerts Beta Mode Fix
+
+**Problem:** Only 103 users receiving daily alerts out of 613 eligible (17%)
+
+**Root Cause:** 
+- `getUserAlertTier()` checks `user_profiles` table for paid flags
+- Only 31 users exist in `user_profiles` (vs 960 in `user_notification_settings`)
+- 929 users were classified as "free" tier and skipped
+
+**Fix Applied:**
+- Added beta mode check in `daily-alerts/route.ts`
+- During beta (until Apr 28, 2026): ALL users with NAICS get daily alerts
+- After beta: Tier check re-enables (free tier → weekly alerts only)
+
+**Rule:** "Always verify user tables are in sync before implementing tiered features"

@@ -43,6 +43,23 @@ interface KeyRotation {
   nextRotation: string;
 }
 
+interface MultisiteSource {
+  source: string;
+  status: string;
+  lastScrape: string | null;
+  count: number;
+}
+
+interface MultisiteHealth {
+  sources: MultisiteSource[];
+  summary: { healthy: number; warning: number; failed: number };
+}
+
+interface JsonDatabaseStat {
+  count: number;
+  description: string;
+}
+
 interface DashboardData {
   success: boolean;
   period: string;
@@ -51,6 +68,8 @@ interface DashboardData {
   tools: Record<string, ToolStats>;
   providers: Record<string, ProviderStatus>;
   databaseStats: Record<string, DatabaseStat>;
+  jsonDatabaseStats?: Record<string, JsonDatabaseStat>;
+  multisiteHealth?: MultisiteHealth;
   keyRotation: KeyRotation;
   recentErrors: RecentError[];
   dailyMetrics: unknown[];
@@ -158,6 +177,9 @@ export default function ToolHealthDashboard() {
   // Filter out OpenAI from display (it's only a fallback, not monitored)
   const filteredProviders = Object.entries(data.providers).filter(([key]) => key !== 'openai');
 
+  // Filter out OpenAI-related alerts
+  const filteredAlerts = data.alerts.filter(alert => !alert.toLowerCase().includes('openai'));
+
   const toolNames: Record<string, string> = {
     content_reaper: 'Content Reaper',
     code_suggestions: 'AI Code Suggestions',
@@ -169,34 +191,46 @@ export default function ToolHealthDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">AI Tool Health Dashboard</h1>
-            <p className="text-gray-400 mt-1">{data.period} • Auto-refreshes every 30s</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={checkProviders}
-              disabled={checkingProviders}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
-            >
-              {checkingProviders ? 'Checking...' : 'Check Providers'}
-            </button>
-            <div className={`px-4 py-2 rounded-lg font-bold ${healthColors[data.health]}`}>
-              {data.health.toUpperCase()}
+    <div className="min-h-screen bg-gray-950 text-white">
+      {/* Header matching MI dashboard */}
+      <header className="bg-gradient-to-r from-gray-900 via-gray-900 to-gray-800 border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg flex items-center justify-center">
+                <span className="text-lg font-bold">TH</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold">Tool Health</h1>
+                <p className="text-xs text-gray-400">GovCon Giants</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={checkProviders}
+                disabled={checkingProviders}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {checkingProviders ? 'Checking...' : 'Check Providers'}
+              </button>
+              <div className={`px-4 py-2 rounded-lg font-bold ${healthColors[data.health]}`}>
+                {data.health.toUpperCase()}
+              </div>
             </div>
           </div>
         </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Period info */}
+        <p className="text-gray-400 text-sm mb-6">{data.period} • Auto-refreshes every 30s</p>
 
         {/* Alerts */}
-        {data.alerts.length > 0 && (
+        {filteredAlerts.length > 0 && (
           <div className="mb-8 p-4 bg-red-900/50 border border-red-500 rounded-lg">
             <h2 className="text-lg font-bold text-red-400 mb-2">⚠️ Alerts</h2>
             <ul className="space-y-1">
-              {data.alerts.map((alert, i) => (
+              {filteredAlerts.map((alert, i) => (
                 <li key={i} className="text-red-300">• {alert}</li>
               ))}
             </ul>
@@ -205,24 +239,24 @@ export default function ToolHealthDashboard() {
 
         {/* Provider Status */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">API Providers</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-200">API Providers</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {filteredProviders.map(([key, provider]) => (
-              <div key={key} className="bg-gray-800 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className={`w-3 h-3 rounded-full ${statusColors[provider.status]}`} />
-                  <span className="font-medium">{providerNames[key] || key}</span>
+              <div key={key} className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-purple-500/30 transition-colors">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className={`w-2.5 h-2.5 rounded-full ${statusColors[provider.status]}`} />
+                  <span className="font-medium text-white">{providerNames[key] || key}</span>
                 </div>
                 <div className="text-sm text-gray-400">
-                  Status: <span className="text-white">{provider.status}</span>
+                  Status: <span className={provider.status === 'healthy' ? 'text-green-400' : provider.status === 'degraded' ? 'text-yellow-400' : 'text-red-400'}>{provider.status}</span>
                 </div>
                 {provider.latency_ms && (
                   <div className="text-sm text-gray-400">
-                    Latency: <span className="text-white">{provider.latency_ms}ms</span>
+                    Latency: <span className="text-purple-400">{provider.latency_ms}ms</span>
                   </div>
                 )}
                 {provider.last_error && (
-                  <div className="text-sm text-red-400 mt-1 truncate" title={provider.last_error}>
+                  <div className="text-sm text-red-400 mt-2 truncate" title={provider.last_error}>
                     {provider.last_error}
                   </div>
                 )}
@@ -367,6 +401,72 @@ export default function ToolHealthDashboard() {
                     {stats.count.toLocaleString()}
                   </div>
                   <div className="text-sm text-gray-400 mt-1">{stats.description}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* JSON Databases (Static Data Assets) */}
+        {data.jsonDatabaseStats && Object.keys(data.jsonDatabaseStats).length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold mb-4 text-gray-200">Static Data Assets</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {Object.entries(data.jsonDatabaseStats).map(([key, stats]) => (
+                <div key={key} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center hover:border-purple-500/30 transition-colors">
+                  <div className="text-2xl font-bold text-amber-400">
+                    {stats.count.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">{stats.description}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Multisite Scrapers Health */}
+        {data.multisiteHealth && (
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold mb-4 text-gray-200">
+              Multisite Scrapers
+              <span className="ml-3 text-sm font-normal">
+                <span className="text-green-400">{data.multisiteHealth.summary.healthy} healthy</span>
+                {data.multisiteHealth.summary.warning > 0 && (
+                  <span className="text-yellow-400 ml-2">{data.multisiteHealth.summary.warning} warning</span>
+                )}
+                {data.multisiteHealth.summary.failed > 0 && (
+                  <span className="text-red-400 ml-2">{data.multisiteHealth.summary.failed} failed</span>
+                )}
+              </span>
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {data.multisiteHealth.sources.map((source) => (
+                <div
+                  key={source.source}
+                  className={`bg-gray-900 border rounded-xl p-4 hover:border-purple-500/30 transition-colors ${
+                    source.status === 'healthy' ? 'border-green-500/30' :
+                    source.status === 'warning' ? 'border-yellow-500/30' :
+                    source.status === 'failed' ? 'border-red-500/30' : 'border-gray-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      source.status === 'healthy' ? 'bg-green-500' :
+                      source.status === 'warning' ? 'bg-yellow-500' :
+                      source.status === 'failed' ? 'bg-red-500' : 'bg-gray-500'
+                    }`} />
+                    <span className="font-medium text-white text-sm truncate" title={source.source}>
+                      {source.source.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold text-cyan-400">
+                    {source.count.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {source.lastScrape
+                      ? `Last: ${new Date(source.lastScrape).toLocaleDateString()}`
+                      : 'No scrape yet'}
+                  </div>
                 </div>
               ))}
             </div>

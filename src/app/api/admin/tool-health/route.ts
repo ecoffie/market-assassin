@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey, getKeyRotationStatus } from '@/lib/sam/utils';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -188,6 +190,12 @@ export async function GET(request: NextRequest) {
     // 9. Get key rotation status
     const keyRotation = getKeyRotationStatus();
 
+    // 10. Get JSON database stats (pain points, priorities, contractors)
+    const jsonDatabaseStats = getJsonDatabaseStats();
+
+    // 11. Get multisite scraper health
+    const multisiteHealth = await getMultisiteHealth(supabase);
+
     return NextResponse.json({
       success: true,
       period: `Last ${days} days`,
@@ -196,6 +204,8 @@ export async function GET(request: NextRequest) {
       tools: toolStats,
       providers: providerStatus,
       databaseStats,
+      jsonDatabaseStats,
+      multisiteHealth,
       keyRotation,
       recentErrors: (errors || []).slice(0, 20).map(e => ({
         id: e.id,
@@ -501,4 +511,152 @@ function generateAlerts(
   }
 
   return alerts;
+}
+
+/**
+ * Get JSON database stats (pain points, priorities, contractors, etc.)
+ */
+function getJsonDatabaseStats(): Record<string, { count: number; description: string }> {
+  const stats: Record<string, { count: number; description: string }> = {};
+  const dataDir = join(process.cwd(), 'src', 'data');
+
+  // Pain Points & Priorities
+  try {
+    const painPointsPath = join(dataDir, 'agency-pain-points.json');
+    const painPointsData = JSON.parse(readFileSync(painPointsPath, 'utf-8'));
+    const agencies = painPointsData.agencies || painPointsData;
+    let totalPainPoints = 0;
+    let totalPriorities = 0;
+    let agencyCount = 0;
+
+    for (const data of Object.values(agencies) as Array<{ painPoints?: string[]; priorities?: string[] }>) {
+      totalPainPoints += data.painPoints?.length || 0;
+      totalPriorities += data.priorities?.length || 0;
+      agencyCount++;
+    }
+
+    stats['pain_points'] = { count: totalPainPoints, description: 'Agency Pain Points' };
+    stats['priorities'] = { count: totalPriorities, description: 'Agency Priorities' };
+    stats['agencies_with_intel'] = { count: agencyCount, description: 'Agencies with Intel' };
+  } catch {
+    stats['pain_points'] = { count: 0, description: 'Agency Pain Points' };
+    stats['priorities'] = { count: 0, description: 'Agency Priorities' };
+  }
+
+  // Contractors Database (main - with SBLO contacts)
+  try {
+    const contractorsPath = join(dataDir, 'contractors.json');
+    const contractors = JSON.parse(readFileSync(contractorsPath, 'utf-8'));
+    stats['contractors'] = { count: Array.isArray(contractors) ? contractors.length : 0, description: 'Contractors (SBLO)' };
+  } catch {
+    stats['contractors'] = { count: 0, description: 'Contractors (SBLO)' };
+  }
+
+  // Prime Contractors Database (nested under .primes)
+  try {
+    const primePath = join(dataDir, 'prime-contractors-database.json');
+    const primesData = JSON.parse(readFileSync(primePath, 'utf-8'));
+    const primes = primesData.primes || primesData;
+    stats['prime_contractors'] = { count: Array.isArray(primes) ? primes.length : 0, description: 'Prime Contractors' };
+  } catch {
+    stats['prime_contractors'] = { count: 0, description: 'Prime Contractors' };
+  }
+
+  // Tier 2 Contractors Database (nested under .tier2Contractors)
+  try {
+    const tier2Path = join(dataDir, 'tier2-contractors-database.json');
+    const tier2Data = JSON.parse(readFileSync(tier2Path, 'utf-8'));
+    const tier2 = tier2Data.tier2Contractors || tier2Data;
+    stats['tier2_contractors'] = { count: Array.isArray(tier2) ? tier2.length : 0, description: 'Tier 2 Subs' };
+  } catch {
+    stats['tier2_contractors'] = { count: 0, description: 'Tier 2 Subs' };
+  }
+
+  // Tribal Businesses Database (nested under .tribes)
+  try {
+    const tribalPath = join(dataDir, 'tribal-businesses-database.json');
+    const tribalData = JSON.parse(readFileSync(tribalPath, 'utf-8'));
+    const tribal = tribalData.tribes || tribalData;
+    stats['tribal_businesses'] = { count: Array.isArray(tribal) ? tribal.length : 0, description: 'Tribal 8(a)' };
+  } catch {
+    stats['tribal_businesses'] = { count: 0, description: 'Tribal 8(a)' };
+  }
+
+  // Recompete Contracts
+  try {
+    const contractsPath = join(dataDir, 'contracts-data.json');
+    const contracts = JSON.parse(readFileSync(contractsPath, 'utf-8'));
+    stats['recompete_contracts'] = { count: Array.isArray(contracts) ? contracts.length : 0, description: 'Recompete Contracts' };
+  } catch {
+    stats['recompete_contracts'] = { count: 0, description: 'Recompete Contracts' };
+  }
+
+  // PSC-NAICS Crosswalk (nested under .naicsToPsc and .pscToNaics)
+  try {
+    const crosswalkPath = join(dataDir, 'psc-naics-crosswalk.json');
+    const crosswalk = JSON.parse(readFileSync(crosswalkPath, 'utf-8'));
+    const naicsCount = crosswalk.naicsToPsc ? Object.keys(crosswalk.naicsToPsc).length : 0;
+    const pscCount = crosswalk.pscToNaics ? Object.keys(crosswalk.pscToNaics).length : 0;
+    stats['psc_naics_mappings'] = { count: naicsCount + pscCount, description: 'PSC-NAICS Mappings' };
+  } catch {
+    stats['psc_naics_mappings'] = { count: 0, description: 'PSC-NAICS Mappings' };
+  }
+
+  return stats;
+}
+
+/**
+ * Get multisite scraper health status
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getMultisiteHealth(supabase: any): Promise<{
+  sources: Array<{ source: string; status: string; lastScrape: string | null; count: number }>;
+  summary: { healthy: number; warning: number; failed: number };
+}> {
+  const sources: Array<{ source: string; status: string; lastScrape: string | null; count: number }> = [];
+  let healthy = 0, warning = 0, failed = 0;
+
+  // Get aggregated opportunity counts by source
+  try {
+    const { data: opps } = await supabase
+      .from('aggregated_opportunities')
+      .select('source, created_at')
+      .order('created_at', { ascending: false });
+
+    // Group by source
+    const sourceCounts: Record<string, { count: number; lastScrape: string | null }> = {};
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    for (const opp of opps || []) {
+      if (!sourceCounts[opp.source]) {
+        sourceCounts[opp.source] = { count: 0, lastScrape: opp.created_at };
+      }
+      sourceCounts[opp.source].count++;
+    }
+
+    // Evaluate health for each source
+    for (const [source, data] of Object.entries(sourceCounts)) {
+      const lastScrapeDate = data.lastScrape ? new Date(data.lastScrape) : null;
+      let status = 'healthy';
+
+      if (!lastScrapeDate || lastScrapeDate < sevenDaysAgo) {
+        status = 'warning';
+        warning++;
+      } else {
+        healthy++;
+      }
+
+      sources.push({
+        source,
+        status,
+        lastScrape: data.lastScrape,
+        count: data.count,
+      });
+    }
+  } catch {
+    failed++;
+  }
+
+  return { sources, summary: { healthy, warning, failed } };
 }
