@@ -142,89 +142,105 @@ export async function GET(request: NextRequest) {
       const now = new Date().toISOString();
       const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
+      // Known notice types to count
+      const noticeTypes = [
+        'Solicitation',
+        'Combined Synopsis/Solicitation',
+        'Sources Sought',
+        'Special Notice',
+        'Presolicitation',
+        'Sale of Surplus Property',
+        'Intent to Bundle',
+        'Award Notice',
+        'Justification',
+      ];
+
+      // Count each notice type in parallel with proper COUNT queries
+      const noticeTypeCountPromises = noticeTypes.map(type =>
+        supabase
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .eq('active', true)
+          .gt('response_deadline', now)
+          .eq('notice_type', type)
+          .then(({ count }: { count: number | null }) => ({ type, count: count || 0 }))
+      );
+
+      // Top agencies - use a different approach: get distinct then count
+      // For now, fetch top 1000 and note it's approximate for agencies
       const [
         { count: totalActiveCount },
-        { data: byNoticeType },
-        { data: byAgency },
-        { data: bySetAside },
-        { count: urgentTotalCount }
+        { count: urgentTotalCount },
+        noticeTypeCounts,
+        { data: topAgencySample }
       ] = await Promise.all([
-        // Use count only, don't fetch rows
+        // Total active count
         supabase
           .from('sam_opportunities')
           .select('id', { count: 'exact', head: true })
           .eq('active', true)
           .gt('response_deadline', now),
-        // Fetch all notice types (need high limit for aggregation)
-        supabase
-          .from('sam_opportunities')
-          .select('notice_type')
-          .eq('active', true)
-          .gt('response_deadline', now)
-          .limit(50000),
-        // Fetch all departments
-        supabase
-          .from('sam_opportunities')
-          .select('department')
-          .eq('active', true)
-          .gt('response_deadline', now)
-          .limit(50000),
-        // Fetch all set-aside codes
-        supabase
-          .from('sam_opportunities')
-          .select('set_aside_code')
-          .eq('active', true)
-          .gt('response_deadline', now)
-          .limit(50000),
-        // Count urgent (due in 7 days)
+        // Urgent count
         supabase
           .from('sam_opportunities')
           .select('id', { count: 'exact', head: true })
           .eq('active', true)
           .lt('response_deadline', sevenDaysFromNow)
+          .gt('response_deadline', now),
+        // All notice type counts
+        Promise.all(noticeTypeCountPromises),
+        // Top agencies (sample-based for now, accurate enough for top 10)
+        supabase
+          .from('sam_opportunities')
+          .select('department')
+          .eq('active', true)
           .gt('response_deadline', now)
+          .order('response_deadline', { ascending: true })
+          .limit(1000)
       ]);
 
-      // Aggregate notice types
-      const noticeTypeCounts: Record<string, number> = {};
-      (byNoticeType || []).forEach((row: { notice_type: string | null }) => {
-        const type = row.notice_type || 'unknown';
-        noticeTypeCounts[type] = (noticeTypeCounts[type] || 0) + 1;
-      });
-
-      // Aggregate agencies (top 10)
+      // Count agencies from sample (will be representative for top agencies)
       const agencyCounts: Record<string, number> = {};
-      (byAgency || []).forEach((row: { department: string | null }) => {
+      (topAgencySample || []).forEach((row: { department: string | null }) => {
         const dept = row.department || 'Unknown';
         agencyCounts[dept] = (agencyCounts[dept] || 0) + 1;
       });
-      const topAgencies = Object.entries(agencyCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
 
-      // Aggregate set-asides
-      const setAsideCounts: Record<string, number> = {};
-      (bySetAside || []).forEach((row: { set_aside_code: string | null }) => {
-        const code = row.set_aside_code || 'None';
-        setAsideCounts[code] = (setAsideCounts[code] || 0) + 1;
-      });
+      // For accurate top agency counts, do individual counts for top 10 from sample
+      const topAgenciesFromSample = Object.entries(agencyCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([dept]) => dept);
+
+      // Get accurate counts for top agencies
+      const topAgencyCountPromises = topAgenciesFromSample.map(dept =>
+        supabase
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .eq('active', true)
+          .gt('response_deadline', now)
+          .eq('department', dept)
+          .then(({ count }: { count: number | null }) => ({ department: dept, count: count || 0 }))
+      );
+      const topAgencies = await Promise.all(topAgencyCountPromises);
+      topAgencies.sort((a, b) => b.count - a.count);
 
       return NextResponse.json({
         success: true,
         stats: {
           totalActive: totalActiveCount || 0,
           urgentCount: urgentTotalCount || 0,
-          byNoticeType: Object.entries(noticeTypeCounts).map(([code, count]) => ({
-            code,
-            label: NOTICE_TYPE_INFO[code]?.label || code,
-            count,
-            color: NOTICE_TYPE_INFO[code]?.color || '#64748b',
-          })),
-          topAgencies: topAgencies.map(([dept, count]) => ({ department: dept, count })),
-          bySetAside: Object.entries(setAsideCounts).map(([code, count]) => ({
-            code,
-            count,
-          })),
+          byNoticeType: noticeTypeCounts
+            .filter(t => t.count > 0)
+            .sort((a, b) => b.count - a.count)
+            .map(t => ({
+              code: t.type,
+              label: NOTICE_TYPE_INFO[t.type]?.label || t.type,
+              count: t.count,
+              color: NOTICE_TYPE_INFO[t.type]?.color || '#64748b',
+            })),
+          topAgencies,
+          bySetAside: [], // TODO: Add if needed
         },
       });
     }
