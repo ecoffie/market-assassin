@@ -278,13 +278,13 @@ export default function MIDashboard() {
             </div>
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
               <div className="text-3xl font-bold text-green-400">
-                {stats.byNoticeType.find(t => t.code === 'o')?.count.toLocaleString() || 0}
+                {(stats.byNoticeType.find(t => t.code === 'o' || t.code === 'Solicitation')?.count || 0).toLocaleString()}
               </div>
               <div className="text-sm text-gray-500 mt-1">Solicitations</div>
             </div>
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
               <div className="text-3xl font-bold text-purple-400">
-                {stats.byNoticeType.find(t => t.code === 'r')?.count.toLocaleString() || 0}
+                {(stats.byNoticeType.find(t => t.code === 'r' || t.code === 'Sources Sought')?.count || 0).toLocaleString()}
               </div>
               <div className="text-sm text-gray-500 mt-1">Sources Sought</div>
             </div>
