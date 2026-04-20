@@ -139,39 +139,50 @@ export async function GET(request: NextRequest) {
 
     // Stats mode - return aggregations
     if (mode === 'stats') {
+      const now = new Date().toISOString();
+      const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
       const [
-        { data: allOpps },
+        { count: totalActiveCount },
         { data: byNoticeType },
         { data: byAgency },
         { data: bySetAside },
-        { data: urgentCount }
+        { count: urgentTotalCount }
       ] = await Promise.all([
+        // Use count only, don't fetch rows
         supabase
           .from('sam_opportunities')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('active', true)
-          .gt('response_deadline', new Date().toISOString()),
+          .gt('response_deadline', now),
+        // Fetch all notice types (need high limit for aggregation)
         supabase
           .from('sam_opportunities')
           .select('notice_type')
           .eq('active', true)
-          .gt('response_deadline', new Date().toISOString()),
+          .gt('response_deadline', now)
+          .limit(50000),
+        // Fetch all departments
         supabase
           .from('sam_opportunities')
           .select('department')
           .eq('active', true)
-          .gt('response_deadline', new Date().toISOString()),
+          .gt('response_deadline', now)
+          .limit(50000),
+        // Fetch all set-aside codes
         supabase
           .from('sam_opportunities')
           .select('set_aside_code')
           .eq('active', true)
-          .gt('response_deadline', new Date().toISOString()),
+          .gt('response_deadline', now)
+          .limit(50000),
+        // Count urgent (due in 7 days)
         supabase
           .from('sam_opportunities')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('active', true)
-          .lt('response_deadline', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
-          .gt('response_deadline', new Date().toISOString())
+          .lt('response_deadline', sevenDaysFromNow)
+          .gt('response_deadline', now)
       ]);
 
       // Aggregate notice types
@@ -201,8 +212,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         stats: {
-          totalActive: allOpps?.length || 0,
-          urgentCount: urgentCount?.length || 0,
+          totalActive: totalActiveCount || 0,
+          urgentCount: urgentTotalCount || 0,
           byNoticeType: Object.entries(noticeTypeCounts).map(([code, count]) => ({
             code,
             label: NOTICE_TYPE_INFO[code]?.label || code,
