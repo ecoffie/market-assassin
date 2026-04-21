@@ -14,6 +14,12 @@ import {
   postSendValidation,
 } from '@/lib/intelligence';
 import { createSecureAccessUrl } from '@/lib/access-links';
+import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
+
+// BATCH_SIZE: Process this many users per cron run
+// With 4 runs/day (11, 12, 14, 16 UTC), 100 users × 4 = 400 users/day
+// If more users, increase runs or batch size
+const BATCH_SIZE = 100;
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -341,8 +347,45 @@ async function runDailyAlertJob(options?: {
       });
     }
 
-    console.log(`[Daily Alerts] Processing ${users.length} daily users...`);
+    const totalEligible = users.length;
+    console.log(`[Daily Alerts] Found ${totalEligible} total eligible users`);
     metrics.recordUserEligible(); // Track total eligible before filtering
+
+    // =====================================================
+    // BATCHING: Only process users who haven't received alerts today
+    // Multiple cron runs (11, 12, 14, 16 UTC) will process all users
+    // =====================================================
+    const today = new Date().toISOString().split('T')[0];
+    const { data: alreadySentToday } = await getSupabase()
+      .from('alert_log')
+      .select('user_email')
+      .eq('alert_date', today)
+      .eq('delivery_status', 'sent');
+
+    const alreadySentEmails = new Set((alreadySentToday || []).map((s: { user_email: string }) => s.user_email));
+    const alreadySentCount = alreadySentEmails.size;
+
+    // Filter out already-sent users and apply BATCH_SIZE limit
+    let usersToProcess = (users as AlertUser[])
+      .filter(u => !alreadySentEmails.has(u.user_email))
+      .slice(0, BATCH_SIZE);
+
+    const remainingAfterFilter = (users as AlertUser[]).filter(u => !alreadySentEmails.has(u.user_email)).length;
+    const remainingAfterBatch = remainingAfterFilter - usersToProcess.length;
+
+    console.log(`[Daily Alerts] Batching: ${alreadySentCount} already sent today, processing ${usersToProcess.length} of ${remainingAfterFilter} remaining (${remainingAfterBatch} for next run)`);
+
+    if (usersToProcess.length === 0) {
+      console.log('[Daily Alerts] All users already processed today');
+      return NextResponse.json({
+        success: true,
+        message: 'All users already received alerts today',
+        sent: 0,
+        alreadySent: alreadySentCount,
+        totalEligible,
+        retryResults
+      });
+    }
 
     const samApiKey = process.env.SAM_API_KEY;
     if (!samApiKey) {
@@ -361,7 +404,7 @@ async function runDailyAlertJob(options?: {
       errors: [] as string[],
     };
 
-    for (const user of users as AlertUser[]) {
+    for (const user of usersToProcess) {
       // Check guardrails before processing each user
       const guardrailCheck = guardrails.check();
       if (!guardrailCheck.continue) {
@@ -397,29 +440,15 @@ async function runDailyAlertJob(options?: {
         }
         // During beta: Everyone with NAICS gets daily alerts
 
-        // Get NAICS codes - try user_notification_settings first, then fall back to smart_user_profiles
+        // Get NAICS codes - use defaults if user has none configured
+        // Note: smart_user_profiles table was removed, using default NAICS as fallback
+        const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
         let userNaics = user.naics_codes || [];
 
         if (userNaics.length === 0) {
-          // Fall back to smart_user_profiles
-          const { data: smartProfile } = await getSupabase()
-            .from('smart_user_profiles')
-            .select('naics_codes')
-            .eq('email', user.user_email.toLowerCase())
-            .single();
-
-          if (smartProfile?.naics_codes && smartProfile.naics_codes.length > 0) {
-            userNaics = smartProfile.naics_codes;
-            console.log(`[Daily Alerts] Using smart profile NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
-          }
-        }
-
-        // Skip if still no NAICS codes
-        if (userNaics.length === 0) {
-          console.log(`[Daily Alerts] ${user.user_email} has no NAICS codes, skipping`);
-          results.noNaics++;
-          metrics.recordUserSkipped();
-          continue;
+          // Use default NAICS codes for users without profile
+          userNaics = DEFAULT_NAICS;
+          console.log(`[Daily Alerts] Using default NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
         }
 
         // EXPAND NAICS codes to include related codes (e.g., 541 → all 541xxx)
@@ -613,6 +642,7 @@ async function runDailyAlertJob(options?: {
           await getSupabase().from('alert_log').upsert({
             user_email: user.user_email,
             alert_date: new Date().toISOString().split('T')[0],
+            alert_type: 'daily',
             opportunities_count: scoredOpps.length,
             opportunities_data: scoredOpps.slice(0, 20).map(o => ({
               noticeId: o.noticeId,
@@ -624,10 +654,9 @@ async function runDailyAlertJob(options?: {
             })),
             sent_at: new Date().toISOString(),
             delivery_status: 'sent',
-            alert_type: 'daily',
             retry_count: 0,
           }, {
-            onConflict: 'user_email,alert_date',
+            onConflict: 'user_email,alert_date,alert_type',
           });
 
           // Update user stats (unified table)
@@ -667,16 +696,31 @@ async function runDailyAlertJob(options?: {
         }
 
       } catch (userError: any) {
+        const errorMsg = userError instanceof Error
+          ? userError.message
+          : (typeof userError === 'object' && userError !== null && 'message' in userError)
+            ? String((userError as { message: unknown }).message)
+            : JSON.stringify(userError);
         console.error(`[Daily Alerts] Error processing ${user.user_email}:`, userError);
         metrics.recordEmailFailed();
-        guardrails.recordFailure(userError.message);
+        guardrails.recordFailure(errorMsg);
         circuitBreaker.record(false);
         results.failed++;
-        results.errors.push(`${user.user_email}: ${userError.message}`);
+        results.errors.push(`${user.user_email}: ${errorMsg}`);
+
+        // Log to tool_errors for dashboard visibility
+        await logToolError({
+          tool: ToolNames.ALERTS,
+          errorType: ErrorTypes.EMAIL_FAILURE,
+          errorMessage: errorMsg,
+          userEmail: user.user_email,
+          errorStack: userError instanceof Error ? userError.stack : undefined,
+          requestPath: '/api/cron/daily-alerts',
+        }).catch(() => {}); // Don't let logging failure break the flow
       }
     }
 
-    console.log(`[Daily Alerts] Complete. Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Wrong TZ: ${results.wrongTimezone}, Free Tier: ${results.freeTierSkipped}, Failed: ${results.failed}, Deduplicated: ${results.deduplicated}`);
+    console.log(`[Daily Alerts] Complete. Batch: ${usersToProcess.length}/${totalEligible}, Sent: ${results.sent}, No Opps: ${results.noOpps}, No NAICS: ${results.noNaics}, Free Tier: ${results.freeTierSkipped}, Failed: ${results.failed}, Remaining: ${remainingAfterBatch}`);
 
     // Save metrics to database
     await metrics.save();
@@ -693,6 +737,13 @@ async function runDailyAlertJob(options?: {
     return NextResponse.json({
       success: true,
       results,
+      batching: {
+        batchSize: BATCH_SIZE,
+        totalEligible,
+        alreadySentToday: alreadySentCount,
+        processedThisRun: usersToProcess.length,
+        remainingForNextRun: remainingAfterBatch,
+      },
       retryResults,
       metrics: metrics.getSnapshot(),
       guardrailStats: guardrails.getStats(),
@@ -700,11 +751,27 @@ async function runDailyAlertJob(options?: {
   } catch (error: any) {
     console.error('[Daily Alerts] Error:', error);
 
+    // Properly serialize errors
+    const errorMessage = error instanceof Error
+      ? error.message
+      : (typeof error === 'object' && error !== null && 'message' in error)
+        ? String((error as { message: unknown }).message)
+        : JSON.stringify(error);
+
+    // Log to tool_errors for dashboard visibility
+    await logToolError({
+      tool: ToolNames.ALERTS,
+      errorType: ErrorTypes.INTERNAL,
+      errorMessage,
+      errorStack: error instanceof Error ? error.stack : undefined,
+      requestPath: '/api/cron/daily-alerts',
+    }).catch(() => {});
+
     // Still try to save metrics on error
     metrics.recordGuardrailWarning();
     await metrics.save();
 
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
 

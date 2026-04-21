@@ -20,6 +20,7 @@ import {
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
+import { createEmailTrackingToken } from '@/lib/engagement';
 import {
   IntelligenceMetrics,
   logIntelligenceDelivery,
@@ -108,6 +109,7 @@ function getSupabase() {
   let rolloutMode = 'beta_all';
   let activeCohortId: string | null = null;
   let cohortProgress = null;
+  let retryResults = { retried: 0, succeeded: 0 }; // Initialize before try block
 
   // Initialize metrics and guardrails
   const metrics = new IntelligenceMetrics('briefings');
@@ -131,7 +133,7 @@ function getSupabase() {
 
   try {
     // Retry failed briefings from previous runs
-    const retryResults = await retryFailedBriefings(getSupabase());
+    retryResults = await retryFailedBriefings(getSupabase());
     if (retryResults.retried > 0) {
       console.log(`[SendBriefings] Retried ${retryResults.retried} failed briefings, ${retryResults.succeeded} succeeded`);
     }
@@ -243,19 +245,29 @@ function getSupabase() {
             await getSupabase().from('briefing_log').upsert({
               user_email: user.email,
               briefing_date: briefingDate,
+              briefing_type: 'daily',
               briefing_content: briefing,
               items_count: totalItems,
               tools_included: ['ai_briefing', 'recompetes', 'teaming_plays'],
               delivery_status: 'pending',
               retry_count: 0,
               created_at: new Date().toISOString(),
-            }, { onConflict: 'user_email,briefing_date' });
+            }, { onConflict: 'user_email,briefing_date,briefing_type' });
           } catch (logErr) {
             console.error(`[SendBriefings] Failed to log briefing for ${user.email}:`, logErr);
           }
 
-          // Generate AI email template
-          const emailTemplate = generateAIEmailTemplate(briefing);
+          // Create tracking token for email opens (graceful failure if table doesn't exist)
+          let trackingToken: string | undefined;
+          try {
+            const tokenResult = await createEmailTrackingToken(user.email, 'weekly_deep_dive', briefing.briefingDate);
+            trackingToken = tokenResult?.token;
+          } catch (tokenErr) {
+            console.warn(`[SendBriefings] Tracking token creation failed for ${user.email}, continuing without pixel:`, tokenErr);
+          }
+
+          // Generate AI email template with tracking pixel
+          const emailTemplate = generateAIEmailTemplate(briefing, user.email, trackingToken);
 
           // Send email (sendEmail returns boolean or throws on error)
           try {
@@ -377,12 +389,20 @@ function getSupabase() {
       // Ignore metrics save failure on fatal error
     }
 
+    // Properly serialize Supabase errors (which are plain objects, not Error instances)
+    const errorMessage = error instanceof Error
+      ? error.message
+      : (typeof error === 'object' && error !== null && 'message' in error)
+        ? String((error as { message: unknown }).message)
+        : JSON.stringify(error);
+
     return NextResponse.json(
       {
         success: false,
-        error: String(error),
+        error: errorMessage,
         briefingsSent,
         briefingsFailed,
+        retryResults,
         elapsed: Date.now() - startTime,
       },
       { status: 500 }
@@ -417,8 +437,14 @@ async function retryFailedBriefings(supabase: any): Promise<{ retried: number; s
     try {
       if (!briefing.briefing_content) continue;
 
-      // Re-generate email template from stored briefing content
-      const emailTemplate = generateAIEmailTemplate(briefing.briefing_content as AIGeneratedBriefing);
+      const briefingContent = briefing.briefing_content as AIGeneratedBriefing;
+
+      // Create tracking token for email opens (retry)
+      const tokenResult = await createEmailTrackingToken(briefing.user_email, 'weekly_deep_dive_retry', briefingContent.briefingDate);
+      const trackingToken = tokenResult?.token;
+
+      // Re-generate email template from stored briefing content with tracking
+      const emailTemplate = generateAIEmailTemplate(briefingContent, briefing.user_email, trackingToken);
 
       // Re-send email (sendEmail returns boolean or throws)
       await sendEmail({

@@ -1,5 +1,47 @@
 # GovCon Giants - Current Tasks
 
+## Session State (April 20, 2026)
+
+### ✅ COMPLETED: Cron Bug Fixes (All 5 Bugs Fixed)
+
+**Status:** Deployed to production (April 20, 2026)
+
+**Bugs Fixed:**
+
+| Bug | Severity | Fix |
+|-----|----------|-----|
+| **Briefing Type Collision** | CRITICAL | Changed unique constraint from `(user_email, briefing_date)` to `(user_email, briefing_date, briefing_type)` |
+| **Daily Briefings Dedupe** | HIGH | Fixed `send-briefings-fast` to filter by `briefing_type='daily'` |
+| **Pursuit Logging** | HIGH | Changed from non-existent `pursuit_brief_log` to `briefing_log` with `briefing_type='pursuit'` |
+| **Weekly-Alerts Batching** | HIGH | Added `BATCH_SIZE=15`, deduplication via `alert_type='weekly'` |
+| **Precompute Capacity** | HIGH | Increased `PROFILES_PER_RUN` from 10 to 25 in both precompute routes |
+| **Rollout Tracking** | MEDIUM | Fixed to use actual `activeCohortId` instead of `null` |
+
+**Files Modified:**
+| File | Changes |
+|------|---------|
+| `supabase/migrations/20260420_fix_briefing_log_unique_constraint.sql` | New migration for unique constraint |
+| `src/app/api/cron/send-briefings-fast/route.ts` | Filter by `briefing_type='daily'`, updated `onConflict` |
+| `src/app/api/cron/send-weekly-fast/route.ts` | Filter by `briefing_type='weekly'`, updated `onConflict` |
+| `src/app/api/cron/send-pursuit-fast/route.ts` | Changed from `pursuit_brief_log` to `briefing_log` |
+| `src/app/api/cron/weekly-alerts/route.ts` | Added `BATCH_SIZE=15`, deduplication, `alert_type='weekly'` |
+| `src/app/api/cron/precompute-weekly-briefings/route.ts` | `PROFILES_PER_RUN=25` |
+| `src/app/api/cron/precompute-pursuit-briefs/route.ts` | `PROFILES_PER_RUN=25` |
+
+**Database Migration Applied:**
+```sql
+-- Change unique constraint to include briefing_type
+ALTER TABLE briefing_log DROP CONSTRAINT IF EXISTS briefing_log_user_email_briefing_date_key;
+ALTER TABLE briefing_log ADD CONSTRAINT briefing_log_user_email_date_type_key
+  UNIQUE (user_email, briefing_date, briefing_type);
+```
+
+**Key Architecture Rules (Updated in CLAUDE.md):**
+- Rule #11: Briefing log MUST include `briefing_type` in all queries
+- Rule #12: Weekly-alerts uses `BATCH_SIZE=15` with deduplication
+
+---
+
 ## Session State (April 19, 2026)
 
 ### ✅ COMPLETED: Agency Intelligence Expansion

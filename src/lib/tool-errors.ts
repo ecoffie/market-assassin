@@ -40,6 +40,7 @@ export const ToolNames = {
   CODE_SUGGESTIONS: 'code_suggestions',
   SAMPLE_OPPORTUNITIES: 'sample_opportunities',
   BRIEFINGS: 'briefings',
+  ALERTS: 'daily_alerts', // Daily opportunity alert emails
   MARKET_SCANNER: 'market_scanner',
   OPPORTUNITY_HUNTER: 'opportunity_hunter',
   REPORTS: 'reports',

@@ -14,6 +14,7 @@ import {
   recordBriefingProgramDelivery,
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
+import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import crypto from 'crypto';
 
 const BATCH_SIZE = 200; // Increased for better coverage
@@ -185,11 +186,15 @@ function getSupabase() {
 }
 
   // DAY-OF-WEEK GUARD: Weekly Deep Dive only sends on Sunday (UTC)
+  // Can be bypassed with: ?password=xxx&skipDayCheck=true (admin override)
   const today = new Date();
   const dayOfWeek = today.getUTCDay(); // 0 = Sunday
   const isTestMode = testEmail && isTest;
+  const skipDayCheck = request.nextUrl.searchParams.get('skipDayCheck') === 'true';
+  const adminPassword = request.nextUrl.searchParams.get('password');
+  const isAdminOverride = skipDayCheck && adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
 
-  if (dayOfWeek !== 0 && !isTestMode) {
+  if (dayOfWeek !== 0 && !isTestMode && !isAdminOverride) {
     console.log(`[SendWeeklyFast] Skipped - not Sunday (day ${dayOfWeek})`);
     return NextResponse.json({
       success: true,
@@ -197,6 +202,10 @@ function getSupabase() {
       skipped: true,
       dayOfWeek,
     });
+  }
+
+  if (isAdminOverride) {
+    console.log(`[SendWeeklyFast] Admin override - bypassing Sunday check (day ${dayOfWeek})`);
   }
 
   const startTime = Date.now();
@@ -253,12 +262,14 @@ function getSupabase() {
       }
     }
 
-    // Check for already sent this week
+    // Check for already sent this week - FILTER BY briefing_type='weekly'
+    // CRITICAL: Filter by briefing_type to avoid collision with daily briefings
     const { data: sentThisWeek } = await getSupabase()
       .from('briefing_log')
       .select('user_email')
       .eq('briefing_date', weekOf)
-      .contains('tools_included', ['weekly_deep_dive']);
+      .eq('briefing_type', 'weekly')
+      .in('delivery_status', ['sent', 'skipped']);
 
     const sentEmails = new Set((sentThisWeek || []).map((s: { user_email: string }) => s.user_email));
     usersToProcess = usersToProcess
@@ -321,12 +332,13 @@ function getSupabase() {
         await getSupabase().from('briefing_log').upsert({
           user_email: user.email,
           briefing_date: weekOf,
+          briefing_type: 'weekly',
           briefing_content: briefing,
           items_count: briefing.opportunities.length,
           tools_included: ['weekly_deep_dive', matchType === 'exact' ? 'pre_computed_template' : 'prefix_fallback_template'],
           delivery_status: 'sent',
           email_sent_at: new Date().toISOString(),
-        }, { onConflict: 'user_email,briefing_date' });
+        }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
         if (!isTest) {
           await recordBriefingProgramDelivery(activeCohortId, user.email, 'weekly_deep_dive');
@@ -336,9 +348,24 @@ function getSupabase() {
 
       } catch (err) {
         briefingsFailed++;
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = err instanceof Error
+          ? err.message
+          : (typeof err === 'object' && err !== null && 'message' in err)
+            ? String((err as { message: unknown }).message)
+            : JSON.stringify(err);
+        const errorStack = err instanceof Error ? err.stack : undefined;
         errors.push(`${user.email}: ${errorMsg}`);
         console.error(`[SendWeeklyFast] ❌ Failed for ${user.email}:`, err);
+
+        // Log to tool_errors for dashboard visibility
+        await logToolError({
+          tool: ToolNames.BRIEFINGS,
+          errorType: ErrorTypes.EMAIL_FAILURE,
+          errorMessage: errorMsg,
+          userEmail: user.email,
+          errorStack,
+          requestPath: '/api/cron/send-weekly-fast',
+        }).catch(() => {}); // Don't let logging failure break the flow
 
         // Queue for automatic retry
         const userNaics = user.naics_codes || [];
@@ -364,9 +391,25 @@ function getSupabase() {
 
   } catch (error) {
     console.error('[SendWeeklyFast] Fatal error:', error);
+    // Properly serialize errors (handles Supabase errors which are plain objects)
+    const errorMessage = error instanceof Error
+      ? error.message
+      : (typeof error === 'object' && error !== null && 'message' in error)
+        ? String((error as { message: unknown }).message)
+        : JSON.stringify(error);
+
+    // Log to tool_errors for dashboard visibility
+    await logToolError({
+      tool: ToolNames.BRIEFINGS,
+      errorType: ErrorTypes.INTERNAL,
+      errorMessage,
+      errorStack: error instanceof Error ? error.stack : undefined,
+      requestPath: '/api/cron/send-weekly-fast',
+    }).catch(() => {});
+
     return NextResponse.json({
       success: false,
-      error: String(error),
+      error: errorMessage,
       briefingsSent,
       briefingsFailed,
       elapsed: Date.now() - startTime,

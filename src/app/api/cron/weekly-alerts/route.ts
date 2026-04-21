@@ -45,6 +45,10 @@ const ALERT_LIMITS = {
   pro: 15,      // Any paid product: 15 opps/week
 };
 
+// Batch size to avoid Vercel timeout (60s limit)
+// Each user takes ~2-3s for SAM.gov fetch + email send
+const BATCH_SIZE = 15;
+
 // Products that grant Pro tier (15 opps)
 const PRO_TIER_PRODUCTS = [
   'opportunity-hunter-pro',
@@ -171,7 +175,37 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
       return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
     }
 
-    console.log(`[Weekly Alerts] Processing ${users.length} users (includes free tier daily users)...`);
+    // Check for already processed this week (deduplication)
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    const dayOfWeek = startOfWeek.getUTCDay();
+    const daysToSubtract = dayOfWeek === 0 ? 0 : dayOfWeek; // Go back to Sunday
+    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - daysToSubtract);
+    startOfWeek.setUTCHours(0, 0, 0, 0);
+
+    const { data: processedThisWeek } = await getSupabase()
+      .from('alert_log')
+      .select('user_email')
+      .gte('sent_at', startOfWeek.toISOString())
+      .eq('alert_type', 'weekly');
+
+    const processedEmails = new Set((processedThisWeek || []).map((r: { user_email: string }) => r.user_email.toLowerCase()));
+
+    // Filter out already processed and limit to batch size
+    const usersToProcess = users
+      .filter(u => !processedEmails.has(u.user_email.toLowerCase()))
+      .slice(0, BATCH_SIZE);
+
+    console.log(`[Weekly Alerts] Processing ${usersToProcess.length}/${users.length} users (${processedEmails.size} already processed this week)...`);
+
+    if (usersToProcess.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'All users already processed this week',
+        sent: 0,
+        alreadyProcessed: processedEmails.size,
+      });
+    }
 
     const samApiKey = process.env.SAM_API_KEY;
     if (!samApiKey) {
@@ -189,8 +223,8 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
     // Clear buyer cache for fresh data
     buyerEmailsCache = null;
 
-    // Process each user
-    for (const user of users as AlertUser[]) {
+    // Process each user in this batch
+    for (const user of usersToProcess) {
       try {
         // Determine user's alert tier based on purchase history
         const { limit: alertLimit, tier } = await getAlertLimit(user.user_email);
@@ -236,10 +270,11 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
         // Send email with tier info
         await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
 
-        // Log the alert
+        // Log the alert (include alert_type for proper deduplication)
         await getSupabase().from('alert_log').upsert({
           user_email: user.user_email,
           alert_date: new Date().toISOString().split('T')[0],
+          alert_type: 'weekly',
           opportunities_count: topOpps.length,
           opportunities_data: topOpps.slice(0, 5).map(o => ({
             title: o.title,
@@ -250,7 +285,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
           sent_at: new Date().toISOString(),
           delivery_status: 'sent',
         }, {
-          onConflict: 'user_email,alert_date',
+          onConflict: 'user_email,alert_date,alert_type',
         });
 
         // Update user's alert stats
@@ -273,11 +308,18 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
       }
     }
 
-    console.log(`[Weekly Alerts] Complete. Sent: ${results.sent}, Skipped: ${results.skipped}, Failed: ${results.failed}`);
+    const remainingUsers = users.length - processedEmails.size - usersToProcess.length;
+    console.log(`[Weekly Alerts] Complete. Sent: ${results.sent}, Skipped: ${results.skipped}, Failed: ${results.failed}, Remaining: ${remainingUsers}`);
 
     return NextResponse.json({
       success: true,
       results,
+      batch: {
+        processed: usersToProcess.length,
+        alreadyProcessed: processedEmails.size,
+        remaining: remainingUsers,
+        totalEligible: users.length,
+      },
     });
   } catch (error: unknown) {
     console.error('[Weekly Alerts] Error:', error);

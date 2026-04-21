@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateAIBriefing } from '@/lib/briefings/delivery/ai-briefing-generator';
 import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-template';
 import { sendEmail } from '@/lib/send-email';
+import { createEmailTrackingToken } from '@/lib/engagement';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 const DEFAULT_LIMIT = 10; // Process 10 users at a time (sequential, not parallel)
@@ -153,15 +154,20 @@ function getSupabase() {
       await getSupabase().from('briefing_log').upsert({
         user_email: email,
         briefing_date: today,
+        briefing_type: 'daily',
         briefing_content: briefing,
         items_count: briefing.opportunities.length + briefing.teamingPlays.length,
         tools_included: ['ai_briefing'],
         delivery_status: 'pending',
         created_at: new Date().toISOString(),
-      }, { onConflict: 'user_email,briefing_date' });
+      }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
-      // Generate and send email
-      const emailTemplate = generateAIEmailTemplate(briefing);
+      // Create tracking token for email opens
+      const tokenResult = await createEmailTrackingToken(email, 'admin_briefing', today);
+      const trackingToken = tokenResult?.token;
+
+      // Generate and send email with tracking pixel
+      const emailTemplate = generateAIEmailTemplate(briefing, email, trackingToken);
       await sendEmail({
         to: email,
         subject: emailTemplate.subject,

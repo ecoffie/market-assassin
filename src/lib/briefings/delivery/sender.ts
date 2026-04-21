@@ -15,6 +15,7 @@ import {
   SMSMessage,
 } from './types';
 import { generateEmailTemplate } from './email-template';
+import { createEmailTrackingToken } from '@/lib/engagement';
 
 const FROM_EMAIL = process.env.EMAIL_FROM || process.env.SMTP_USER || 'alerts@govcongiants.com';
 const FROM_NAME = 'GovCon Giants';
@@ -67,7 +68,12 @@ export async function sendBriefingEmail(
   }
 
   const transporter = getTransporter();
-  const template = generateEmailTemplate(briefing, toEmail);
+
+  // Create email tracking token
+  const tokenResult = await createEmailTrackingToken(toEmail, 'daily_briefing', briefing.briefingDate);
+  const trackingToken = tokenResult?.token;
+
+  const template = generateEmailTemplate(briefing, toEmail, trackingToken);
 
   try {
     const info = await transporter.sendMail({

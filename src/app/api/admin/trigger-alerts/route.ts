@@ -256,10 +256,11 @@ export async function GET(request: NextRequest) {
       await getSupabase().from('alert_log').upsert({
         user_email: user.user_email,
         alert_date: new Date().toISOString().split('T')[0],
+        alert_type: 'daily',
         opportunities_count: topOpps.length,
         sent_at: new Date().toISOString(),
         delivery_status: 'sent',
-      }, { onConflict: 'user_email,alert_date' });
+      }, { onConflict: 'user_email,alert_date,alert_type' });
 
       // Update user stats (unified table)
       await getSupabase().from('user_notification_settings').update({

@@ -158,7 +158,7 @@ function getSupabase() {
             continue;
           }
 
-          // Check if we already sent a pursuit brief this week
+          // Check if we already sent a pursuit brief this week (using unified briefing_log)
           const startOfWeek = new Date();
           const day = startOfWeek.getUTCDay();
           const diffToMonday = day === 0 ? -6 : 1 - day;
@@ -166,9 +166,10 @@ function getSupabase() {
           startOfWeek.setUTCHours(0, 0, 0, 0);
 
           const { data: existingBrief } = await getSupabase()
-            .from('pursuit_brief_log')
+            .from('briefing_log')
             .select('id')
             .eq('user_email', user.email)
+            .eq('briefing_type', 'pursuit')
             .gte('created_at', startOfWeek.toISOString())
             .limit(1)
             .single();
@@ -216,16 +217,22 @@ function getSupabase() {
             await recordBriefingProgramDelivery(activeCohortId, user.email, 'pursuit_brief');
           }
 
-          // Log the pursuit brief
-          await getSupabase().from('pursuit_brief_log').insert({
+          // Log the pursuit brief (unified to briefing_log)
+          await getSupabase().from('briefing_log').upsert({
             user_email: user.email,
-            notice_id: topOpp.noticeId,
-            brief_data: brief,
-            opportunity_score: brief.opportunityScore,
-            sent_at: new Date().toISOString(),
+            briefing_date: new Date().toISOString().split('T')[0],
+            briefing_type: 'pursuit',
+            briefing_content: {
+              ...brief,
+              noticeId: topOpp.noticeId,
+              processingTimeMs: Date.now() - startTime,
+            },
+            items_count: 1,
+            tools_included: ['pursuit_brief_cron'],
             delivery_status: 'sent',
-            processing_time_ms: Date.now() - startTime,
-          });
+            email_sent_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
           briefingsSent++;
           console.log(`[PursuitBrief] ✅ Sent to ${user.email} for ${topOpp.title?.slice(0, 40)}`);

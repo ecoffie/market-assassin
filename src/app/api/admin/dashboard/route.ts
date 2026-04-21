@@ -29,8 +29,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // Use yesterday's date for "most recent completed day" stats
+  // This avoids showing zeros for current day that hasn't finished yet
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   // Gather all metrics in parallel
   const [
@@ -43,27 +47,27 @@ export async function GET(request: NextRequest) {
     revenueMetrics,
     alerts
   ] = await Promise.all([
-    getEmailStats(today),
+    getEmailStats(yesterdayStr),  // Show yesterday's completed stats
     getUserHealth(),
     getAlertTrend(sevenDaysAgo),
     getBriefingTrend(sevenDaysAgo),
     getDeadLetterStats(),
     getForecastStats(),
     getRevenueMetrics(),
-    getSystemAlerts(today)
+    getSystemAlerts(yesterdayStr)
   ]);
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),
-    today,
+    displayDate: yesterdayStr,  // Renamed from 'today' for clarity
 
-    // Section 1: Today's Email Operations
+    // Section 1: Most Recent Email Operations (yesterday's completed data)
     emailOperations: emailStats,
 
     // Section 2: User Health
     userHealth,
 
-    // Section 3: 7-Day Trends
+    // Section 3: 7-Day Trends (both alerts AND briefings)
     trends: {
       alerts: alertTrend,
       briefings: briefingTrend

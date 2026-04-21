@@ -90,12 +90,13 @@ function getSupabase() {
     const { error: upsertError } = await getSupabase().from('briefing_log').upsert({
       user_email: email,
       briefing_date: briefing.briefingDate,
+      briefing_type: 'daily',
       briefing_content: briefing,
       items_count: briefing.totalItems,
       tools_included: briefing.sourcesIncluded,
       delivery_status: 'sent',
       created_at: new Date().toISOString(),
-    }, { onConflict: 'user_email,briefing_date' });
+    }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
     if (upsertError) {
       console.error('[TestBriefing] Upsert error:', upsertError);

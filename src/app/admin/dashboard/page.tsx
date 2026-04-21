@@ -353,11 +353,11 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Second Row */}
+        {/* Second Row - 7-Day Trends */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* 7-Day Trend */}
+          {/* 7-Day Alert Trend */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">7-Day Alert Trend</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">7-Day Alert Trend ($19/mo)</h2>
             {data.trends.alerts.length > 0 ? (
               <div className="space-y-2">
                 {data.trends.alerts.map((day) => (
@@ -386,6 +386,40 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* 7-Day Briefing Trend */}
+          <div className="bg-gray-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">7-Day Briefing Trend ($49/mo)</h2>
+            {data.trends.briefings.length > 0 ? (
+              <div className="space-y-2">
+                {data.trends.briefings.map((day) => (
+                  <div key={day.date} className="flex items-center gap-4">
+                    <span className="text-gray-400 w-24 text-sm">{day.date}</span>
+                    <div className="flex-1 flex items-center gap-2">
+                      <div
+                        className="h-4 bg-purple-600 rounded"
+                        style={{ width: `${Math.max(day.sent / 10, 2)}%` }}
+                        title={`Sent: ${day.sent}`}
+                      />
+                      {day.failed > 0 && (
+                        <div
+                          className="h-4 bg-red-600 rounded"
+                          style={{ width: `${Math.max(day.failed / 10, 2)}%` }}
+                          title={`Failed: ${day.failed}`}
+                        />
+                      )}
+                    </div>
+                    <span className="text-white font-mono text-sm w-12 text-right">{day.sent}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500">No briefing data for this period</p>
+            )}
+          </div>
+        </div>
+
+        {/* Third Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Dead Letter Queue */}
           <div className="bg-gray-800 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-white mb-4">Dead Letter Queue</h2>

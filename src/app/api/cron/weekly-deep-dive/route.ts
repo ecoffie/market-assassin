@@ -238,12 +238,13 @@ function getSupabase() {
           await getSupabase().from('briefing_log').upsert({
             user_email: user.email,
             briefing_date: briefing.weekOf,
+            briefing_type: 'weekly',
             briefing_content: briefing,
             items_count: briefing.opportunities.length,
             tools_included: ['weekly_deep_dive'],
             delivery_status: 'sent',
             email_sent_at: new Date().toISOString(),
-          }, { onConflict: 'user_email,briefing_date' });
+          }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
           briefingsSent++;
           console.log(`[WeeklyDeepDive] ✅ Sent to ${user.email}`);

@@ -19,7 +19,7 @@ import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/deliv
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import crypto from 'crypto';
 
-const PROFILES_PER_RUN = 10;
+const PROFILES_PER_RUN = 25; // Increased from 10 to ensure 125 profiles covered across 5 cron windows
 const DELAY_BETWEEN_PROFILES_MS = 1000;
 
 // NAICS prefix expansion for 3-digit codes (comprehensive version)
@@ -688,8 +688,10 @@ async function fetchContractsForNaics(naicsCodes: string[]): Promise<ContractFor
 }
 
 async function generateWeeklyDeepDive(contracts: ContractForBriefing[]): Promise<WeeklyBriefing> {
-  const monday = new Date();
-  monday.setDate(monday.getDate() - monday.getDay() + 1);
+  // Use the same getWeekOfDate() calculation as the main function
+  // On Saturday: next Monday (weekOf = this Sunday's Monday)
+  // On Sunday: tomorrow (Monday)
+  const weekOfDate = getWeekOfDate();
 
   const prompt = `You are a senior GovCon capture strategist. Generate a Weekly Deep Dive briefing with full analysis.
 
@@ -721,7 +723,7 @@ Return ONLY valid JSON.`;
   }>(text);
 
   return {
-    weekOf: monday.toISOString().split('T')[0],
+    weekOf: weekOfDate,
     opportunities: data.opportunities || [],
     teamingPlays: data.teamingPlays || [],
     marketSignals: data.marketSignals || [],

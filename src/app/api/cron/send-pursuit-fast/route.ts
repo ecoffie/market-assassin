@@ -150,11 +150,15 @@ function getSupabase() {
 }
 
   // DAY-OF-WEEK GUARD: Pursuit Brief only sends on Monday (UTC)
+  // Can be bypassed with: ?password=xxx&skipDayCheck=true (admin override)
   const today = new Date();
   const dayOfWeek = today.getUTCDay(); // 1 = Monday
   const isTestMode = testEmail && isTest;
+  const skipDayCheck = request.nextUrl.searchParams.get('skipDayCheck') === 'true';
+  const adminPassword = request.nextUrl.searchParams.get('password');
+  const isAdminOverride = skipDayCheck && adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
 
-  if (dayOfWeek !== 1 && !isTestMode) {
+  if (dayOfWeek !== 1 && !isTestMode && !isAdminOverride) {
     console.log(`[SendPursuitFast] Skipped - not Monday (day ${dayOfWeek})`);
     return NextResponse.json({
       success: true,
@@ -162,6 +166,10 @@ function getSupabase() {
       skipped: true,
       dayOfWeek,
     });
+  }
+
+  if (isAdminOverride) {
+    console.log(`[SendPursuitFast] Admin override - bypassing Monday check (day ${dayOfWeek})`);
   }
 
   const startTime = Date.now();
@@ -219,17 +227,16 @@ function getSupabase() {
       }
     }
 
-    // Check for already sent this week
-    const startOfWeek = new Date();
-    const day = startOfWeek.getUTCDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    startOfWeek.setUTCDate(startOfWeek.getUTCDate() + diffToMonday);
-    startOfWeek.setUTCHours(0, 0, 0, 0);
+    // Check for already sent this week - use briefing_log with briefing_type='pursuit'
+    // CRITICAL: Use unified briefing_log table (pursuit_brief_log does not exist)
+    // Note: mondayDate is already defined above at function start
 
     const { data: sentThisWeek } = await getSupabase()
-      .from('pursuit_brief_log')
+      .from('briefing_log')
       .select('user_email')
-      .gte('created_at', startOfWeek.toISOString());
+      .eq('briefing_date', mondayDate)
+      .eq('briefing_type', 'pursuit')
+      .in('delivery_status', ['sent', 'skipped']);
 
     const sentEmails = new Set((sentThisWeek || []).map((s: { user_email: string }) => s.user_email));
     usersToProcess = usersToProcess
@@ -289,17 +296,18 @@ function getSupabase() {
 
         briefingsSent++;
 
-        // Log to pursuit_brief_log (track match type for analytics)
-        await getSupabase().from('pursuit_brief_log').insert({
+        // Log to briefing_log with briefing_type='pursuit'
+        // UNIFIED: Use same table as daily/weekly for consistency
+        await getSupabase().from('briefing_log').upsert({
           user_email: user.email,
-          notice_id: brief.sourceNoticeId || `template-${naicsHash.slice(0, 8)}`,
-          brief_data: brief,
-          opportunity_score: brief.opportunityScore,
-          sent_at: new Date().toISOString(),
+          briefing_date: mondayDate,
+          briefing_type: 'pursuit',
+          briefing_content: brief,
+          items_count: 1,
+          tools_included: ['pursuit_brief', matchType === 'exact' ? 'pre_computed_template' : 'prefix_fallback_template'],
           delivery_status: 'sent',
-          processing_time_ms: Date.now() - startTime,
-          match_type: matchType,
-        });
+          email_sent_at: new Date().toISOString(),
+        }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
         if (!isTest) {
           await recordBriefingProgramDelivery(activeCohortId, user.email, 'pursuit_brief');

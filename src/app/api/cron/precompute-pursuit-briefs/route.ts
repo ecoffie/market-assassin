@@ -18,7 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
 import crypto from 'crypto';
 
-const PROFILES_PER_RUN = 10;
+const PROFILES_PER_RUN = 25; // Increased from 10 to ensure 125 profiles covered across 5 cron windows
 const DELAY_BETWEEN_PROFILES_MS = 1000;
 
 interface NaicsProfile {

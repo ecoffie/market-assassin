@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS alert_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_email TEXT NOT NULL,
   alert_date DATE NOT NULL,
+  alert_type TEXT DEFAULT 'daily' CHECK (alert_type IN ('daily', 'weekly')),
 
   -- Content
   opportunities_count INTEGER DEFAULT 0,
@@ -87,6 +88,7 @@ CREATE TABLE IF NOT EXISTS alert_log (
   -- Delivery
   sent_at TIMESTAMPTZ,
   delivery_status TEXT DEFAULT 'pending', -- 'pending' | 'sent' | 'delivered' | 'bounced' | 'failed'
+  retry_count INTEGER DEFAULT 0,
 
   -- Engagement
   opened_at TIMESTAMPTZ,
@@ -98,12 +100,14 @@ CREATE TABLE IF NOT EXISTS alert_log (
 
   created_at TIMESTAMPTZ DEFAULT NOW(),
 
-  UNIQUE(user_email, alert_date)
+  UNIQUE(user_email, alert_date, alert_type)
 );
 
 CREATE INDEX IF NOT EXISTS idx_alert_log_email ON alert_log(user_email);
 CREATE INDEX IF NOT EXISTS idx_alert_log_date ON alert_log(alert_date DESC);
 CREATE INDEX IF NOT EXISTS idx_alert_log_status ON alert_log(delivery_status);
+CREATE INDEX IF NOT EXISTS idx_alert_log_email_date_type ON alert_log(user_email, alert_date, alert_type);
+CREATE INDEX IF NOT EXISTS idx_alert_log_type ON alert_log(alert_type, alert_date);
 
 -- RLS
 ALTER TABLE alert_log ENABLE ROW LEVEL SECURITY;

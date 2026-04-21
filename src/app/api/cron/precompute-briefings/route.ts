@@ -18,6 +18,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateAIBriefing } from '@/lib/briefings/delivery/ai-briefing-generator';
+import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
+import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
 import crypto from 'crypto';
 
 // Process up to 10 profiles per cron run (52s each = ~9 minutes)
@@ -219,9 +221,25 @@ function getSupabase() {
 
   } catch (error) {
     console.error('[PrecomputeBriefings] Fatal error:', error);
+    // Properly serialize errors (handles Supabase errors which are plain objects)
+    const errorMessage = error instanceof Error
+      ? error.message
+      : (typeof error === 'object' && error !== null && 'message' in error)
+        ? String((error as { message: unknown }).message)
+        : JSON.stringify(error);
+
+    // Log to tool_errors for dashboard visibility
+    await logToolError({
+      tool: ToolNames.BRIEFINGS,
+      errorType: ErrorTypes.INTERNAL,
+      errorMessage,
+      errorStack: error instanceof Error ? error.stack : undefined,
+      requestPath: '/api/cron/precompute-briefings',
+    }).catch(() => {});
+
     return NextResponse.json({
       success: false,
-      error: String(error),
+      error: errorMessage,
       templatesGenerated,
       templatesFailed,
       elapsed: Date.now() - startTime,

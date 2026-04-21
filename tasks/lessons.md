@@ -1039,3 +1039,103 @@ export const DEFAULT_NAICS_CODES = [
 - After beta: Tier check re-enables (free tier → weekly alerts only)
 
 **Rule:** "Always verify user tables are in sync before implementing tiered features"
+
+---
+
+## April 20, 2026 - Briefing Log Unique Constraint Must Include briefing_type
+
+**Problem:** Daily, Weekly, and Pursuit briefings collide in `briefing_log` table because unique constraint was only on `(user_email, briefing_date)`.
+
+**Impact:**
+- When daily briefing runs, it overwrites weekly briefing from same day
+- Pursuit briefs overwrite both daily and weekly
+- 90%+ of users missing weekly/pursuit emails
+
+**Root Cause:**
+- Original schema: `UNIQUE (user_email, briefing_date)`
+- Doesn't account for multiple briefing types per day
+- All upserts collided, overwriting each other
+
+**Fix Applied:**
+```sql
+-- Drop old constraint
+ALTER TABLE briefing_log DROP CONSTRAINT IF EXISTS briefing_log_user_email_briefing_date_key;
+
+-- Add new constraint including briefing_type
+ALTER TABLE briefing_log ADD CONSTRAINT briefing_log_user_email_date_type_key
+  UNIQUE (user_email, briefing_date, briefing_type);
+
+-- Index for faster queries
+CREATE INDEX IF NOT EXISTS idx_briefing_log_email_date_type
+  ON briefing_log(user_email, briefing_date, briefing_type);
+```
+
+**Code Changes:**
+- All `briefing_log` queries must filter by `briefing_type`
+- All `onConflict` clauses must include `briefing_type`
+- Example: `{ onConflict: 'user_email,briefing_date,briefing_type' }`
+
+**Rule:** "Any table with multiple record types per user/date MUST include type in unique constraint"
+
+---
+
+## April 20, 2026 - Weekly-Alerts Needs Batching
+
+**Problem:** Weekly alerts cron processed all 950+ users sequentially in one run.
+
+**Impact:**
+- Vercel 60s timeout could kill job mid-execution
+- No checkpointing = job restarts from beginning if interrupted
+- Live SAM.gov API calls per user (~2-3s each) = 40+ minutes total
+
+**Fix Applied:**
+- Added `BATCH_SIZE = 15` constant
+- Added deduplication query against `alert_log` table
+- Added `alert_type: 'weekly'` to upsert for proper tracking
+- Response now includes batch progress stats
+
+**Code Pattern:**
+```typescript
+const BATCH_SIZE = 15;
+
+// Check for already processed this week
+const { data: processedThisWeek } = await getSupabase()
+  .from('alert_log')
+  .select('user_email')
+  .gte('sent_at', startOfWeek.toISOString())
+  .eq('alert_type', 'weekly');
+
+const processedEmails = new Set(processedThisWeek.map(r => r.user_email));
+
+const usersToProcess = users
+  .filter(u => !processedEmails.has(u.user_email))
+  .slice(0, BATCH_SIZE);
+```
+
+**Rule:** "Cron jobs with per-user API calls MUST batch to avoid Vercel timeout"
+
+---
+
+## April 20, 2026 - Pursuit Brief Log Table Doesn't Exist
+
+**Problem:** `send-pursuit-fast` tried to write to `pursuit_brief_log` table which doesn't exist.
+
+**Impact:**
+- All pursuit briefs silently failed
+- No deduplication = users could receive duplicates if job reran
+- Console errors but no data persisted
+
+**Root Cause:**
+- Code referenced `pursuit_brief_log` (never created)
+- Should use `briefing_log` with `briefing_type='pursuit'`
+
+**Fix Applied:**
+- Changed from `pursuit_brief_log` to `briefing_log`
+- Added `briefing_type: 'pursuit'` to all upserts
+- Fixed dedupe query to filter by `briefing_type='pursuit'`
+
+**Rule:** "Before referencing a table, verify it exists. Use unified logging tables with type columns."
+
+---
+
+*Last Updated: April 20, 2026*

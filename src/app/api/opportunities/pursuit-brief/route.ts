@@ -101,17 +101,23 @@ export async function POST(request: NextRequest) {
 
     const processingTime = Date.now() - startTime;
 
-    // Log the pursuit brief
-    await supabase.from('pursuit_brief_log').insert({
+    // Log the pursuit brief (unified to briefing_log)
+    await supabase.from('briefing_log').upsert({
       user_email: email.toLowerCase(),
-      saved_opportunity_id: savedOpportunityId || null,
-      notice_id: noticeId,
-      brief_data: brief,
-      opportunity_score: brief.opportunityScore,
-      sent_at: new Date().toISOString(),
+      briefing_date: new Date().toISOString().split('T')[0],
+      briefing_type: 'pursuit',
+      briefing_content: {
+        ...brief,
+        noticeId,
+        savedOpportunityId,
+        processingTimeMs: processingTime,
+      },
+      items_count: 1,
+      tools_included: ['pursuit_brief_api'],
       delivery_status: 'sent',
-      processing_time_ms: processingTime,
-    });
+      email_sent_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
     // Update saved opportunity if we have the ID
     if (savedOpportunityId) {
@@ -140,19 +146,22 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Pursuit Brief] Error:', error);
 
-    // Log the failure
+    // Log the failure (unified to briefing_log)
     const catchSupabase = getSupabase();
     if (catchSupabase) {
       const body = await request.clone().json().catch(() => ({}));
       try {
-        await catchSupabase.from('pursuit_brief_log').insert({
+        await catchSupabase.from('briefing_log').upsert({
           user_email: body.email?.toLowerCase() || 'unknown',
-          notice_id: body.noticeId || 'unknown',
-          brief_data: {},
+          briefing_date: new Date().toISOString().split('T')[0],
+          briefing_type: 'pursuit',
+          briefing_content: { noticeId: body.noticeId },
+          items_count: 0,
+          tools_included: ['pursuit_brief_api'],
           delivery_status: 'failed',
           error_message: error instanceof Error ? error.message : String(error),
-          processing_time_ms: Date.now() - startTime,
-        });
+          created_at: new Date().toISOString(),
+        }, { onConflict: 'user_email,briefing_date,briefing_type' });
       } catch {
         // Ignore logging errors
       }

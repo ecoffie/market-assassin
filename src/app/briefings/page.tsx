@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import MarketIntelligenceHeader from '@/components/briefings/MarketIntelligenceHeader';
+import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
 import OnboardingWizard from '@/components/briefings/OnboardingWizard';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
 import ForecastsPanel from '@/components/bd-assist/ForecastsPanel';
 import SbirPanel from '@/components/briefings/SbirPanel';
 import GrantsPanel from '@/components/briefings/GrantsPanel';
+import ShareButton from '@/components/briefings/ShareButton';
 
 interface QuickStat {
   label: string;
@@ -591,6 +593,9 @@ export default function BriefingsDashboard() {
         onSwitchAccount={handleSwitchAccount}
       />
 
+      {/* Profile Stats Bar - Shows opportunity match stats */}
+      <ProfileStatsBar email={email} />
+
       {/* Settings Panel */}
       <SettingsPanel
         isOpen={settingsPanelOpen}
@@ -883,6 +888,7 @@ export default function BriefingsDashboard() {
                           expanded={expandedItems.has(item.id)}
                           onToggle={() => toggleItem(item.id)}
                           searchTerm={searchTerm}
+                          email={email}
                         />
                       ))}
                     </div>
@@ -903,6 +909,7 @@ export default function BriefingsDashboard() {
                             expanded={expandedItems.has(item.id)}
                             onToggle={() => toggleItem(item.id)}
                             searchTerm={searchTerm}
+                            email={email}
                           />
                         ))}
                       </div>
@@ -963,11 +970,13 @@ function ItemCard({
   expanded,
   onToggle,
   searchTerm = '',
+  email,
 }: {
   item: BriefingItemFormatted;
   expanded: boolean;
   onToggle: () => void;
   searchTerm?: string;
+  email: string;
 }) {
   const isUrgent = item.urgencyBadge === 'URGENT' || item.urgencyBadge === 'HIGH';
 
@@ -1017,15 +1026,31 @@ function ItemCard({
               ))}
             </div>
           )}
-          <a
-            href={item.actionUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-block text-sm font-medium text-purple-400 hover:text-purple-300"
-          >
-            {item.actionLabel} &rarr;
-          </a>
+          <div className="flex items-center gap-4">
+            <a
+              href={item.actionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-block text-sm font-medium text-purple-400 hover:text-purple-300"
+            >
+              {item.actionLabel} &rarr;
+            </a>
+            <div onClick={(e) => e.stopPropagation()}>
+              <ShareButton
+                opportunity={{
+                  id: item.id,
+                  title: item.title,
+                  agency: item.subtitle,
+                  description: item.description,
+                  deadline: item.deadline,
+                  ui_link: item.actionUrl,
+                }}
+                email={email}
+                variant="small"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

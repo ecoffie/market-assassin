@@ -19,7 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
-import { generateDailyBriefFromSam, generateSamGreenEmailHtml } from '@/lib/briefings/delivery/sam-green-email-template';
+import { buildSamGreenBriefing, generateSamGreenEmailHtml } from '@/lib/briefings/delivery/sam-green-email-template';
 import {
   recordBriefingProgramDelivery,
   resolveBriefingAudience,
@@ -103,6 +103,7 @@ export async function GET(request: NextRequest) {
     // Step 1: Get users to process
     const audienceResolution = await resolveBriefingAudience(getSupabase());
     let usersToProcess = audienceResolution.users;
+    const activeCohortId = audienceResolution.activeCohort?.id || null;
 
     // Filter to test email if specified
     if (testEmail) {
@@ -115,12 +116,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Check for already processed today (sent OR skipped)
+    // Check for already processed today (sent OR skipped) - FILTER BY briefing_type='daily'
     // Must exclude skipped users too, otherwise they get re-processed every run
+    // CRITICAL: Filter by briefing_type to avoid collision with weekly/pursuit briefings
     const { data: processedToday } = await getSupabase()
       .from('briefing_log')
       .select('user_email, delivery_status')
       .eq('briefing_date', today)
+      .eq('briefing_type', 'daily')
       .in('delivery_status', ['sent', 'skipped']);
 
     const processedEmails = new Set((processedToday || []).map((s: { user_email: string }) => s.user_email));
@@ -166,31 +169,34 @@ export async function GET(request: NextRequest) {
           await getSupabase().from('briefing_log').upsert({
             user_email: user.email,
             briefing_date: today,
+            briefing_type: 'daily',
             briefing_content: { message: 'No opportunities found for profile', naics: userNaics, psc: userPsc, keywords: userKeywords },
             items_count: 0,
             tools_included: ['sam_cache_green', 'no_opportunities'],
             delivery_status: 'skipped',
             created_at: new Date().toISOString(),
-          }, { onConflict: 'user_email,briefing_date' });
+          }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
           briefingsSkipped++;
           continue;
         }
 
-        // Build GREEN briefing from SAM opportunities (with AI analysis)
-        const greenBriefing = await generateDailyBriefFromSam(samResult.opportunities);
+        // Build GREEN briefing from SAM opportunities (NO AI - fast path)
+        // Uses buildSamGreenBriefing (instant) instead of generateDailyBriefFromSam (4s/user)
+        const greenBriefing = buildSamGreenBriefing(samResult.opportunities);
 
         // Log briefing attempt
         await getSupabase().from('briefing_log').upsert({
           user_email: user.email,
           briefing_date: today,
+          briefing_type: 'daily',
           briefing_content: greenBriefing,
           items_count: greenBriefing.opportunities.length,
           tools_included: ['sam_cache_green'],
           delivery_status: 'pending',
           retry_count: 0,
           created_at: new Date().toISOString(),
-        }, { onConflict: 'user_email,briefing_date' });
+        }, { onConflict: 'user_email,briefing_date,briefing_type' });
 
         // Generate GREEN email
         const emailTemplate = generateSamGreenEmailHtml(greenBriefing, user.email);
@@ -205,16 +211,16 @@ export async function GET(request: NextRequest) {
 
         briefingsSent++;
 
-        // Update log with success
+        // Update log with success (filter by briefing_type to avoid collision)
         await getSupabase().from('briefing_log').update({
           delivery_status: 'sent',
           email_sent_at: new Date().toISOString(),
           tools_included: ['sam_cache_green', 'daily_market_intel'],
-        }).eq('user_email', user.email).eq('briefing_date', today);
+        }).eq('user_email', user.email).eq('briefing_date', today).eq('briefing_type', 'daily');
 
-        // Record delivery for rollout tracking
+        // Record delivery for rollout tracking (use actual cohortId for proper rotation)
         if (!isTest) {
-          await recordBriefingProgramDelivery(null, user.email, 'daily_brief');
+          await recordBriefingProgramDelivery(activeCohortId, user.email, 'daily_brief');
         }
 
         const userElapsed = Date.now() - userStartTime;
@@ -237,11 +243,11 @@ export async function GET(request: NextRequest) {
           requestPath: '/api/cron/send-briefings-fast',
         }).catch(() => {}); // Don't let logging failure break the flow
 
-        // Update log with failure
+        // Update log with failure (filter by briefing_type to avoid collision)
         await getSupabase().from('briefing_log').update({
           delivery_status: 'failed',
           error_message: errorMsg,
-        }).eq('user_email', user.email).eq('briefing_date', today);
+        }).eq('user_email', user.email).eq('briefing_date', today).eq('briefing_type', 'daily');
 
         // Queue for automatic retry
         const userNaics = user.naics_codes || DEFAULT_NAICS_CODES;

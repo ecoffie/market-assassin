@@ -164,12 +164,12 @@ export async function GET(request: NextRequest) {
       { table: 'sam_opportunities', description: 'SAM.gov Opportunities' },
       { table: 'agency_forecasts', description: 'Agency Forecasts' },
       { table: 'aggregated_opportunities', description: 'Multisite Opportunities' },
-      { table: 'federal_contractors', description: 'Federal Contractors' },
       { table: 'user_notification_settings', description: 'Alert Subscribers' },
       { table: 'briefing_templates', description: 'Briefing Templates' },
       { table: 'briefing_log', description: 'Briefings Sent' },
       { table: 'alert_log', description: 'Alerts Sent' },
-      { table: 'sam_api_cache', description: 'SAM API Cache' },
+      // Note: federal_contractors removed - stored in JSON files, not Supabase
+      // Note: sam_api_cache removed - SAM data stored in sam_opportunities
     ];
 
     for (const { table, description } of tablesToCount) {

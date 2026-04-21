@@ -305,7 +305,6 @@ export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelP
     pscCodes: Array<{ code: string; count: number }>;
     keywords: string[];
     agencies: Array<{ name: string; count: number }>;
-    setAsides: Array<{ code: string; description: string; count: number }>;
   }
 
   const handleProfileExtracted = (profile: ExtractedProfile) => {

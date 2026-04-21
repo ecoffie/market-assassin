@@ -237,11 +237,12 @@ async function saveBriefing(
     await supabase.from('briefing_log').upsert({
       user_email: email,
       briefing_date: briefing.briefingDate,
+      briefing_type: 'weekly',
       briefing_data: briefing,
       generated_at: briefing.generatedAt,
       delivery_status: 'generated',
     }, {
-      onConflict: 'user_email,briefing_date',
+      onConflict: 'user_email,briefing_date,briefing_type',
     });
 
     console.log(`[RecompeteGen] Saved briefing for ${email}`);

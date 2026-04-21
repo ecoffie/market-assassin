@@ -172,14 +172,30 @@ async function fetchAllRows<T>(
 
 async function fetchNotificationSettings(supabase: SupabaseClient): Promise<NotificationSettingsRow[]> {
   return fetchAllRows(async (from, to) => {
+    // Note: psc_codes column removed from query - column doesn't exist in production yet
+    // Users can still get PSC codes via NAICS crosswalk (see psc-crosswalk.ts)
     const { data, error } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, psc_codes, keywords, agencies, timezone, sms_enabled, phone_number, aggregated_profile')
+      .select('user_email, naics_codes, keywords, agencies, timezone, sms_enabled, phone_number, aggregated_profile')
       .eq('is_active', true)
       .order('user_email')
       .range(from, to);
 
-    if (error) throw error;
+    if (error) {
+      // Handle missing column gracefully
+      if (error.message.includes('does not exist')) {
+        console.warn('[rollout] Column missing in user_notification_settings, using minimal query');
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('user_notification_settings')
+          .select('user_email, naics_codes, timezone, sms_enabled, phone_number')
+          .eq('is_active', true)
+          .order('user_email')
+          .range(from, to);
+        if (fallbackError) throw fallbackError;
+        return (fallbackData || []) as NotificationSettingsRow[];
+      }
+      throw error;
+    }
     return (data || []) as NotificationSettingsRow[];
   });
 }

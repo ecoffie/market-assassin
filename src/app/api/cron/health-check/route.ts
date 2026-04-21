@@ -411,6 +411,120 @@ const tests = [
       };
     },
   },
+
+  // CRITICAL: Check daily briefings delivery
+  {
+    name: 'Daily Briefings Delivery',
+    category: 'Cron Health',
+    critical: true,
+    fn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const currentHourUTC = new Date().getUTCHours();
+
+      // Briefings run at 7-8:30 AM UTC (3-4:30 AM ET)
+      const briefingWindowPassed = currentHourUTC >= 9; // By 9 AM UTC (5 AM ET), briefings should be done
+
+      if (!briefingWindowPassed) {
+        return {
+          passed: true,
+          message: 'Briefing window not yet passed (before 5 AM ET)',
+          details: `Current UTC hour: ${currentHourUTC}`,
+        };
+      }
+
+      // Check briefing_log for today's deliveries
+      const { data: sentBriefings, error } = await getSupabase()
+        .from('briefing_log')
+        .select('delivery_status')
+        .eq('briefing_date', today)
+        .eq('briefing_type', 'daily');
+
+      if (error) {
+        // briefing_type column may not exist, try without it
+        const { data: fallbackData, error: fallbackError } = await getSupabase()
+          .from('briefing_log')
+          .select('delivery_status')
+          .eq('briefing_date', today);
+
+        if (fallbackError) {
+          return { passed: false, message: `DB error: ${fallbackError.message}` };
+        }
+
+        const sent = (fallbackData || []).filter((b: { delivery_status: string }) => b.delivery_status === 'sent').length;
+        const failed = (fallbackData || []).filter((b: { delivery_status: string }) => b.delivery_status === 'failed').length;
+        const total = fallbackData?.length || 0;
+
+        if (total === 0) {
+          return {
+            passed: false,
+            message: '⚠️ NO BRIEFINGS SENT TODAY - Check send-briefings-fast cron',
+            details: 'Run: /api/admin/trigger-catchup-briefings?password=xxx&mode=execute',
+          };
+        }
+
+        const passRate = total > 0 ? ((sent / total) * 100).toFixed(1) : '0';
+        return {
+          passed: failed === 0 && sent > 0,
+          message: `${sent} sent, ${failed} failed (${passRate}% success)`,
+          details: failed > 0 ? 'Check /api/admin/briefing-dead-letter for retries' : undefined,
+        };
+      }
+
+      const sent = (sentBriefings || []).filter((b: { delivery_status: string }) => b.delivery_status === 'sent').length;
+      const failed = (sentBriefings || []).filter((b: { delivery_status: string }) => b.delivery_status === 'failed').length;
+      const total = sentBriefings?.length || 0;
+
+      if (total === 0) {
+        return {
+          passed: false,
+          message: '⚠️ NO BRIEFINGS SENT TODAY - Check send-briefings-fast cron',
+          details: 'Run: /api/admin/trigger-catchup-briefings?password=xxx&mode=execute',
+        };
+      }
+
+      const passRate = total > 0 ? ((sent / total) * 100).toFixed(1) : '0';
+      return {
+        passed: failed === 0 && sent > 0,
+        message: `${sent} sent, ${failed} failed (${passRate}% success)`,
+        details: failed > 0 ? 'Check /api/admin/briefing-dead-letter for retries' : undefined,
+      };
+    },
+  },
+
+  // Check for dead letter queue items (failed briefings awaiting retry)
+  {
+    name: 'Briefing Dead Letter Queue',
+    category: 'Cron Health',
+    critical: false,
+    fn: async () => {
+      const { data, error } = await getSupabase()
+        .from('briefing_dead_letter')
+        .select('status')
+        .in('status', ['pending', 'retrying']);
+
+      if (error) {
+        // Table may not exist
+        return {
+          passed: true,
+          message: 'Dead letter table not found (optional feature)',
+        };
+      }
+
+      const pendingCount = data?.length || 0;
+      if (pendingCount === 0) {
+        return {
+          passed: true,
+          message: 'No items in dead letter queue',
+        };
+      }
+
+      return {
+        passed: pendingCount < 10, // Warn if more than 10 items
+        message: `${pendingCount} items awaiting retry`,
+        details: pendingCount >= 10 ? '⚠️ Many failed briefings - check system health' : undefined,
+      };
+    },
+  },
 ];
 
 // ============================================================

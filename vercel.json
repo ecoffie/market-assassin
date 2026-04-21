@@ -231,15 +231,39 @@
     },
     {
       "path": "/api/cron/daily-alerts",
+      "schedule": "10 11 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "20 11 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "30 11 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "40 11 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "50 11 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
       "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/daily-alerts",
-      "schedule": "0 14 * * *"
+      "schedule": "10 12 * * *"
     },
     {
       "path": "/api/cron/daily-alerts",
-      "schedule": "0 16 * * *"
+      "schedule": "20 12 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "30 12 * * *"
     },
     {
       "path": "/api/cron/health-check?email=true",

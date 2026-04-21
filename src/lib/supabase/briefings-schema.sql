@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS briefing_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_email TEXT NOT NULL,
   briefing_date DATE NOT NULL,
+  briefing_type TEXT DEFAULT 'daily' CHECK (briefing_type IN ('daily', 'weekly', 'pursuit')),
 
   -- Briefing content (for chatbot to reference)
   briefing_content JSONB, -- Full structured briefing data
@@ -230,13 +231,16 @@ CREATE TABLE IF NOT EXISTS briefing_log (
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
 
-  UNIQUE(user_email, briefing_date)
+  -- CRITICAL: Unique on (email, date, type) allows daily/weekly/pursuit to coexist
+  UNIQUE(user_email, briefing_date, briefing_type)
 );
 
 CREATE INDEX IF NOT EXISTS idx_briefing_log_email ON briefing_log(user_email);
 CREATE INDEX IF NOT EXISTS idx_briefing_log_date ON briefing_log(briefing_date DESC);
 CREATE INDEX IF NOT EXISTS idx_briefing_log_email_date ON briefing_log(user_email, briefing_date DESC);
 CREATE INDEX IF NOT EXISTS idx_briefing_log_status ON briefing_log(delivery_status);
+CREATE INDEX IF NOT EXISTS idx_briefing_log_email_date_type ON briefing_log(user_email, briefing_date, briefing_type);
+CREATE INDEX IF NOT EXISTS idx_briefing_log_type ON briefing_log(briefing_type, briefing_date);
 
 -- RLS
 ALTER TABLE briefing_log ENABLE ROW LEVEL SECURITY;

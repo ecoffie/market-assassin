@@ -344,6 +344,7 @@ async function runNotificationJob(options?: {
             await getSupabase().from('alert_log').upsert({
               user_email: user.user_email,
               alert_date: new Date().toISOString().split('T')[0],
+              alert_type: 'daily',
               opportunities_count: newOpps.length,
               opportunities_data: newOpps.slice(0, 20).map(o => ({
                 noticeId: o.noticeId,
@@ -355,7 +356,7 @@ async function runNotificationJob(options?: {
               })),
               sent_at: new Date().toISOString(),
               delivery_status: 'sent',
-            }, { onConflict: 'user_email,alert_date' });
+            }, { onConflict: 'user_email,alert_date,alert_type' });
 
             // Update stats
             await getSupabase()

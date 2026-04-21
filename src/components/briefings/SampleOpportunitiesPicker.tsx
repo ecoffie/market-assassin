@@ -19,7 +19,6 @@ interface ExtractedProfile {
   pscCodes: Array<{ code: string; count: number }>;
   keywords: string[];
   agencies: Array<{ name: string; count: number }>;
-  setAsides: Array<{ code: string; description: string; count: number }>;
 }
 
 interface SampleOpportunitiesPickerProps {
@@ -377,22 +376,6 @@ export default function SampleOpportunitiesPicker({
                 </div>
               )}
 
-              {/* Set-Asides */}
-              {extractedProfile.setAsides.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-300 mb-2">Matching Set-Asides</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {extractedProfile.setAsides.map((sa) => (
-                      <span
-                        key={sa.code}
-                        className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded"
-                      >
-                        {sa.code}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="px-6 py-4 border-t border-gray-800 flex items-center justify-between">

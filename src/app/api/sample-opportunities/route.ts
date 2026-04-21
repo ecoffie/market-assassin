@@ -51,7 +51,7 @@ async function storeBusinessIntelligence(
       updates.extracted_psc_codes = data.extractedProfile.pscCodes;
       updates.extracted_keywords = data.extractedProfile.keywords;
       updates.extracted_agencies = data.extractedProfile.agencies;
-      updates.extracted_set_asides = data.extractedProfile.setAsides;
+      // Note: set-asides removed - users select their own SB status
       updates.calibration_completed_at = new Date().toISOString();
     }
 
@@ -103,7 +103,6 @@ interface ExtractedProfile {
   pscCodes: Array<{ code: string; count: number }>;
   keywords: string[];
   agencies: Array<{ name: string; count: number }>;
-  setAsides: Array<{ code: string; description: string; count: number }>;
 }
 
 // Common words to exclude from keyword extraction
@@ -444,7 +443,6 @@ async function handleExtraction(selectedIds: string[], email: string): Promise<N
     const naicsCount: Record<string, number> = {};
     const pscCount: Record<string, number> = {};
     const agencyCount: Record<string, number> = {};
-    const setAsideCount: Record<string, { code: string; description: string; count: number }> = {};
     const allTitles: string[] = [];
 
     for (const opp of selectedOpps) {
@@ -464,17 +462,7 @@ async function handleExtraction(selectedIds: string[], email: string): Promise<N
         agencyCount[agency] = (agencyCount[agency] || 0) + 1;
       }
 
-      // Count set-asides
-      if (opp.set_aside_code) {
-        if (!setAsideCount[opp.set_aside_code]) {
-          setAsideCount[opp.set_aside_code] = {
-            code: opp.set_aside_code,
-            description: opp.set_aside_description || opp.set_aside_code,
-            count: 0,
-          };
-        }
-        setAsideCount[opp.set_aside_code].count++;
-      }
+      // Note: Set-aside extraction removed - users select their own SB status
 
       // Collect titles for keyword extraction
       if (opp.title) {
@@ -513,9 +501,6 @@ async function handleExtraction(selectedIds: string[], email: string): Promise<N
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
 
-    const setAsides = Object.values(setAsideCount)
-      .sort((a, b) => b.count - a.count);
-
     // Get top keywords (appearing in at least 2 selections)
     const keywords = Object.entries(wordCount)
       .filter(([, count]) => count >= 2)
@@ -528,7 +513,6 @@ async function handleExtraction(selectedIds: string[], email: string): Promise<N
       pscCodes,
       keywords,
       agencies,
-      setAsides,
     };
 
     // Store the extracted profile for business intelligence
@@ -573,11 +557,6 @@ function buildRecommendation(profile: ExtractedProfile): string {
   if (profile.agencies.length > 0) {
     const topAgencies = profile.agencies.slice(0, 2).map(a => a.name).join(' and ');
     parts.push(`You seem interested in opportunities from ${topAgencies}`);
-  }
-
-  if (profile.setAsides.length > 0) {
-    const topSetAside = profile.setAsides[0].description;
-    parts.push(`Most common set-aside: ${topSetAside}`);
   }
 
   return parts.join('. ') + '.';
