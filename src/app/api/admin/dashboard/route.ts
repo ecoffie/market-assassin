@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const EMAIL_OPERATIONS_COMPLETE_HOUR_UTC = 13; // After briefings (08:30 UTC) and daily alerts (12:30 UTC) are done
 const PAID_TIER_ACCESS_FLAGS = [
   'access_hunter_pro',
   'access_assassin_standard',
@@ -50,11 +51,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Use yesterday's date for "most recent completed day" stats
-  // This avoids showing zeros for current day that hasn't finished yet
+  // Show today's stats only after the daily send windows should be complete.
+  // Before then, keep the dashboard pinned to yesterday to avoid misleading zeros.
   const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const reportDate = now.getUTCHours() >= EMAIL_OPERATIONS_COMPLETE_HOUR_UTC ? todayStr : yesterdayStr;
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   // Gather all metrics in parallel
@@ -68,21 +71,21 @@ export async function GET(request: NextRequest) {
     revenueMetrics,
     alerts
   ] = await Promise.all([
-    getEmailStats(yesterdayStr),  // Show yesterday's completed stats
+    getEmailStats(reportDate),
     getUserHealth(),
     getAlertTrend(sevenDaysAgo),
     getBriefingTrend(sevenDaysAgo),
     getDeadLetterStats(),
     getForecastStats(),
     getRevenueMetrics(),
-    getSystemAlerts(yesterdayStr)
+    getSystemAlerts(reportDate)
   ]);
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),
-    displayDate: yesterdayStr,  // Renamed from 'today' for clarity
+    displayDate: reportDate,
 
-    // Section 1: Most Recent Email Operations (yesterday's completed data)
+    // Section 1: Most Recent completed email operations for the current reporting date
     emailOperations: emailStats,
 
     // Section 2: User Health
