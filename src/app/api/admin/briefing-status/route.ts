@@ -12,11 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const EXPECTED_SCHEDULE = {
-  daily: [0, 1, 2, 3, 4, 5, 6], // Every day
-  weekly: [0],                   // Sunday only
-  pursuit: [1],                  // Monday only
-};
+// Schedule constants: daily = every day, weekly = Sunday (0), pursuit = Monday (1)
 
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
@@ -52,40 +48,40 @@ export async function GET(request: NextRequest) {
     .order('sent_at', { ascending: false })
     .limit(100);
 
-  // Get pursuit briefs sent today (stored in briefing_log with briefing_type='pursuit')
-  const todayPursuits = (todayBriefings || []).filter(b =>
-    b.briefing_type === 'pursuit' || b.tools_included?.includes('pursuit_brief')
-  );
+  // Count by briefing_type (primary) with tools_included fallback for legacy records
+  const dailyCount = (todayBriefings || []).filter(b =>
+    b.briefing_type === 'daily' ||
+    (!b.briefing_type && (b.tools_included?.includes('daily_market_intel') || b.tools_included?.includes('sam_cache_green')))
+  ).length;
+
+  const weeklyCount = (todayBriefings || []).filter(b =>
+    b.briefing_type === 'weekly' ||
+    (!b.briefing_type && b.tools_included?.includes('weekly_deep_dive'))
+  ).length;
+
+  const pursuitCount = (todayBriefings || []).filter(b =>
+    b.briefing_type === 'pursuit' ||
+    (!b.briefing_type && b.tools_included?.includes('pursuit_brief'))
+  ).length;
 
   // Analyze for anomalies
   const anomalies: string[] = [];
-
-  // Check if weekly briefings sent on wrong day
-  const weeklyCount = (todayBriefings || []).filter(b =>
-    b.tools_included?.includes('weekly_deep_dive')
-  ).length;
   if (weeklyCount > 0 && dayOfWeek !== 0) {
     anomalies.push(`⚠️ ${weeklyCount} Weekly Deep Dive emails sent on ${dayName} (should be Sunday only)`);
   }
 
   // Check if pursuit briefs sent on wrong day
-  const pursuitCount = (todayPursuits || []).length;
   if (pursuitCount > 0 && dayOfWeek !== 1) {
     anomalies.push(`⚠️ ${pursuitCount} Pursuit Briefs sent on ${dayName} (should be Monday only)`);
   }
 
-  // Summary counts
+  // Summary counts - use briefing_type as primary discriminator
   const summary = {
     date: todayUTC,
     dayOfWeek: dayName,
     dayNumber: dayOfWeek,
     counts: {
-      // Count daily briefings by looking for 'daily_market_intel' or 'sam_cache_green'
-      // (which is what send-briefings-fast actually logs)
-      dailyBriefings: (todayBriefings || []).filter(b =>
-        b.tools_included?.includes('daily_market_intel') ||
-        b.tools_included?.includes('sam_cache_green')
-      ).length,
+      dailyBriefings: dailyCount,
       weeklyBriefings: weeklyCount,
       pursuitBriefs: pursuitCount,
       dailyAlerts: (todayAlerts || []).length,
@@ -99,11 +95,11 @@ export async function GET(request: NextRequest) {
     health: anomalies.length === 0 ? '✅ HEALTHY' : '⚠️ CHECK ANOMALIES',
   };
 
-  // Recent sends sample
+  // Recent sends sample - use briefing_type for display
   const recentSends = {
     briefings: (todayBriefings || []).slice(0, 10).map(b => ({
       email: b.user_email,
-      type: b.tools_included?.join(', ') || 'unknown',
+      type: b.briefing_type || b.tools_included?.join(', ') || 'unknown',
       sentAt: b.email_sent_at,
       status: b.delivery_status,
     })),
@@ -113,12 +109,16 @@ export async function GET(request: NextRequest) {
       sentAt: a.sent_at,
       status: a.delivery_status,
     })),
-    pursuits: todayPursuits.slice(0, 10).map(p => ({
-      email: p.user_email,
-      type: p.tools_included?.join(', ') || 'pursuit_brief',
-      sentAt: p.email_sent_at,
-      status: p.delivery_status,
-    })),
+    // Pursuit briefs filtered by briefing_type
+    pursuits: (todayBriefings || [])
+      .filter(b => b.briefing_type === 'pursuit' || (!b.briefing_type && b.tools_included?.includes('pursuit_brief')))
+      .slice(0, 10)
+      .map(p => ({
+        email: p.user_email,
+        type: p.briefing_type || 'pursuit',
+        sentAt: p.email_sent_at,
+        status: p.delivery_status,
+      })),
   };
 
   return NextResponse.json({
