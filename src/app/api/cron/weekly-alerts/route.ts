@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
+import { persistSentAlert } from '@/lib/alerts/delivery-log';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -270,33 +271,20 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
         // Send email with tier info
         await sendAlertEmail(user.user_email, topOpps, user, tier, scoredOpps.length);
 
-        // Log the alert (include alert_type for proper deduplication)
-        await getSupabase().from('alert_log').upsert({
-          user_email: user.user_email,
-          alert_date: new Date().toISOString().split('T')[0],
-          alert_type: 'weekly',
-          opportunities_count: topOpps.length,
-          opportunities_data: topOpps.slice(0, 5).map(o => ({
+        await persistSentAlert({
+          supabase: getSupabase(),
+          email: user.user_email,
+          alertType: 'weekly',
+          opportunitiesCount: topOpps.length,
+          opportunitiesData: topOpps.slice(0, 5).map(o => ({
             title: o.title,
             agency: o.department,
             naics: o.naicsCode,
             deadline: o.responseDeadline,
           })),
-          sent_at: new Date().toISOString(),
-          delivery_status: 'sent',
-        }, {
-          onConflict: 'user_email,alert_date,alert_type',
+          currentTotalAlertsSent: user.total_alerts_sent,
+          lastAlertCount: topOpps.length,
         });
-
-        // Update user's alert stats
-        await getSupabase()
-          .from('user_notification_settings')
-          .update({
-            last_alert_sent: new Date().toISOString(),
-            last_alert_count: topOpps.length,
-            total_alerts_sent: (user.total_alerts_sent || 0) + 1,
-          })
-          .eq('user_email', user.user_email);
 
         console.log(`[Weekly Alerts] Sent ${topOpps.length} opportunities to ${user.user_email}`);
         results.sent++;

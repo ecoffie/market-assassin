@@ -122,33 +122,36 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Calculate stats
-  const totalFeedback = feedback?.length || 0;
-  const helpful = feedback?.filter(f => f.rating === 'helpful').length || 0;
-  const notHelpful = feedback?.filter(f => f.rating === 'not_helpful').length || 0;
+  // Calculate stats - exclude outreach_sent from satisfaction metrics
+  // outreach_sent is an admin action, not user feedback
+  const userFeedback = feedback?.filter(f => f.rating !== 'outreach_sent') || [];
+  const totalFeedback = userFeedback.length;
+  const helpful = userFeedback.filter(f => f.rating === 'helpful').length;
+  const notHelpful = userFeedback.filter(f => f.rating === 'not_helpful').length;
   const helpfulRate = totalFeedback > 0 ? Math.round((helpful / totalFeedback) * 100) : 0;
 
-  // Get feedback by type
+  // Get feedback by type - only count actual user ratings (helpful/not_helpful)
   const byType = {
     daily: { helpful: 0, notHelpful: 0 },
     weekly: { helpful: 0, notHelpful: 0 },
     pursuit: { helpful: 0, notHelpful: 0 },
   };
 
-  for (const f of feedback || []) {
+  for (const f of userFeedback) {
     const type = f.briefing_type as keyof typeof byType;
     if (byType[type]) {
       if (f.rating === 'helpful') {
         byType[type].helpful++;
-      } else {
+      } else if (f.rating === 'not_helpful') {
         byType[type].notHelpful++;
       }
+      // Skip any other ratings (shouldn't happen but defensive)
     }
   }
 
   // Find repeat negative feedback (users who marked not helpful 2+ times)
   const negativeByUser: Record<string, number> = {};
-  for (const f of feedback || []) {
+  for (const f of userFeedback) {
     if (f.rating === 'not_helpful') {
       negativeByUser[f.user_email] = (negativeByUser[f.user_email] || 0) + 1;
     }
@@ -195,9 +198,9 @@ export async function GET(request: NextRequest) {
     })
     .sort((a, b) => b.count - a.count);
 
-  // Get last 7 days stats
+  // Get last 7 days stats - exclude outreach_sent
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const last7Days = feedback?.filter(f => f.created_at >= sevenDaysAgo) || [];
+  const last7Days = userFeedback.filter(f => f.created_at >= sevenDaysAgo);
   const last7DaysHelpful = last7Days.filter(f => f.rating === 'helpful').length;
   const last7DaysNotHelpful = last7Days.filter(f => f.rating === 'not_helpful').length;
 

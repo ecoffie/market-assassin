@@ -46,6 +46,7 @@ export interface SamDailyBriefing {
   }[];
   actionTips: string[];
   noticeSummary: {
+    totalMatched: number;
     rfp: number;
     rfq: number;
     sourcesSought: number;
@@ -53,6 +54,22 @@ export interface SamDailyBriefing {
     combined: number;
     other: number;
   };
+}
+
+export interface SamStrategicRankingContext {
+  naicsCodes?: string[];
+  agencies?: string[];
+  keywords?: string[];
+}
+
+export interface NoticeSummary {
+  totalMatched: number;
+  rfp: number;
+  rfq: number;
+  sourcesSought: number;
+  preSol: number;
+  combined: number;
+  other: number;
 }
 
 // Legacy exports for backwards compatibility
@@ -130,6 +147,219 @@ export function formatSamDate(isoDateString: string): string {
 export function escapeHtml(text: string): string {
   if (!text) return '';
   return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+interface StrategicScoreResult {
+  score: number;
+  summary: string;
+}
+
+function normalizeTextList(values: string[] | undefined): string[] {
+  return Array.isArray(values)
+    ? values.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : [];
+}
+
+function scoreNoticeType(noticeType: string | undefined): { score: number; label: string } {
+  const type = (noticeType || '').toLowerCase();
+
+  if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
+    return { score: 35, label: 'Open market research window' };
+  }
+
+  if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
+    return { score: 28, label: 'Presolicitation positioning window' };
+  }
+
+  if (type.includes('combined')) {
+    return { score: 18, label: 'Combined synopsis/solicitation' };
+  }
+
+  if (type.includes('rfq') || type.includes('quote')) {
+    return { score: 16, label: 'RFQ with near-term action' };
+  }
+
+  if (type.includes('solicitation') || type.includes('rfp')) {
+    return { score: 14, label: 'Active solicitation' };
+  }
+
+  return { score: 8, label: 'Active federal opportunity' };
+}
+
+function scoreNaicsFit(oppNaics: string | undefined, userNaics: string[]): { score: number; label: string } {
+  if (!oppNaics || userNaics.length === 0) {
+    return { score: 6, label: 'General profile alignment' };
+  }
+
+  if (userNaics.includes(oppNaics)) {
+    return { score: 18, label: 'Exact NAICS match' };
+  }
+
+  const oppPrefix = oppNaics.slice(0, 4);
+  if (oppPrefix && userNaics.some(code => code.startsWith(oppPrefix) || oppNaics.startsWith(code.slice(0, 4)))) {
+    return { score: 12, label: 'Related NAICS match' };
+  }
+
+  const oppSector = oppNaics.slice(0, 2);
+  if (oppSector && userNaics.some(code => code.startsWith(oppSector))) {
+    return { score: 7, label: 'Same NAICS sector' };
+  }
+
+  return { score: 0, label: 'Weak NAICS fit' };
+}
+
+function scoreAgencyFit(agency: string | undefined, targetAgencies: string[]): { score: number; label: string } {
+  if (!agency || targetAgencies.length === 0) {
+    return { score: 0, label: 'No explicit agency target' };
+  }
+
+  const normalizedAgency = agency.toLowerCase();
+  const match = targetAgencies.find(target =>
+    normalizedAgency.includes(target.toLowerCase()) || target.toLowerCase().includes(normalizedAgency)
+  );
+
+  if (match) {
+    return { score: 14, label: `Target agency match: ${match}` };
+  }
+
+  return { score: 0, label: 'New agency' };
+}
+
+function scoreKeywordFit(opportunity: SAMOpportunity, keywords: string[]): { score: number; label: string } {
+  if (keywords.length === 0) {
+    return { score: 0, label: 'No strategic keywords configured' };
+  }
+
+  const searchableText = `${opportunity.title} ${opportunity.description || ''}`.toLowerCase();
+  const matches = keywords.filter(keyword => searchableText.includes(keyword.toLowerCase()));
+
+  if (matches.length >= 3) {
+    return { score: 15, label: `Strong keyword match: ${matches.slice(0, 3).join(', ')}` };
+  }
+
+  if (matches.length >= 1) {
+    return { score: 8, label: `Keyword match: ${matches.slice(0, 2).join(', ')}` };
+  }
+
+  return { score: 0, label: 'No keyword overlap' };
+}
+
+function scoreSetAside(setAside: string | null | undefined): { score: number; label: string } {
+  if (!setAside) {
+    return { score: 4, label: 'Full and open opportunity' };
+  }
+
+  const normalized = setAside.toLowerCase();
+
+  if (normalized.includes('8') || normalized.includes('sdvosb') || normalized.includes('wosb') || normalized.includes('hub')) {
+    return { score: 12, label: `Set-aside opportunity: ${setAside}` };
+  }
+
+  if (normalized.includes('small')) {
+    return { score: 10, label: `Small business set-aside: ${setAside}` };
+  }
+
+  return { score: 6, label: `Restricted opportunity: ${setAside}` };
+}
+
+function scoreTiming(deadline: string): { score: number; label: string } {
+  const daysRemaining = getDaysUntil(deadline);
+
+  if (daysRemaining < 0) {
+    return { score: -20, label: 'Deadline has passed' };
+  }
+
+  if (daysRemaining <= 2) {
+    return { score: 4, label: 'Very short response window' };
+  }
+
+  if (daysRemaining <= 7) {
+    return { score: 14, label: 'Immediate action window' };
+  }
+
+  if (daysRemaining <= 21) {
+    return { score: 18, label: 'Strong action window' };
+  }
+
+  if (daysRemaining <= 45) {
+    return { score: 12, label: 'Good time to position' };
+  }
+
+  return { score: 6, label: 'Longer-term opportunity' };
+}
+
+function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStrategicRankingContext): StrategicScoreResult {
+  const naicsCodes = normalizeTextList(context?.naicsCodes);
+  const agencies = normalizeTextList(context?.agencies);
+  const keywords = normalizeTextList(context?.keywords);
+
+  const noticeTypeFactor = scoreNoticeType(opportunity.noticeType);
+  const naicsFactor = scoreNaicsFit(opportunity.naicsCode, naicsCodes);
+  const agencyFactor = scoreAgencyFit(opportunity.department || opportunity.subTier, agencies);
+  const keywordFactor = scoreKeywordFit(opportunity, keywords);
+  const setAsideFactor = scoreSetAside(opportunity.setAsideDescription || opportunity.setAside);
+  const timingFactor = scoreTiming(opportunity.responseDeadline);
+
+  const totalScore =
+    noticeTypeFactor.score +
+    naicsFactor.score +
+    agencyFactor.score +
+    keywordFactor.score +
+    setAsideFactor.score +
+    timingFactor.score;
+
+  const topReasons = [
+    noticeTypeFactor,
+    naicsFactor,
+    agencyFactor,
+    keywordFactor,
+    setAsideFactor,
+    timingFactor,
+  ]
+    .filter(factor => factor.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map(factor => factor.label.toLowerCase());
+
+  const summary = topReasons.length > 0
+    ? `${topReasons.join(' • ')}.`
+    : 'Active opportunity worth a quick review.';
+
+  return {
+    score: totalScore,
+    summary: summary.charAt(0).toUpperCase() + summary.slice(1),
+  };
+}
+
+function buildNoticeSummary(opportunities: SAMOpportunity[]): NoticeSummary {
+  const summary: NoticeSummary = {
+    totalMatched: opportunities.length,
+    rfp: 0,
+    rfq: 0,
+    sourcesSought: 0,
+    preSol: 0,
+    combined: 0,
+    other: 0,
+  };
+
+  for (const opp of opportunities) {
+    const type = (opp.noticeType || '').toLowerCase();
+    if (type.includes('solicitation') || type.includes('rfp')) {
+      summary.rfp++;
+    } else if (type.includes('rfq') || type.includes('quote')) {
+      summary.rfq++;
+    } else if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
+      summary.sourcesSought++;
+    } else if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
+      summary.preSol++;
+    } else if (type.includes('combined')) {
+      summary.combined++;
+    } else {
+      summary.other++;
+    }
+  }
+
+  return summary;
 }
 
 // ============ BRIEFING GENERATOR (WITH ANTHROPIC) ============
@@ -250,23 +480,7 @@ Return ONLY valid JSON.`;
     }));
 
   // Count notice types for summary
-  const noticeSummary = { rfp: 0, rfq: 0, sourcesSought: 0, preSol: 0, combined: 0, other: 0 };
-  for (const opp of sorted) {
-    const type = (opp.noticeType || '').toLowerCase();
-    if (type.includes('solicitation') || type.includes('rfp')) {
-      noticeSummary.rfp++;
-    } else if (type.includes('rfq') || type.includes('quote')) {
-      noticeSummary.rfq++;
-    } else if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
-      noticeSummary.sourcesSought++;
-    } else if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
-      noticeSummary.preSol++;
-    } else if (type.includes('combined')) {
-      noticeSummary.combined++;
-    } else {
-      noticeSummary.other++;
-    }
-  }
+  const noticeSummary = buildNoticeSummary(sorted);
 
   return {
     date: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
@@ -283,14 +497,30 @@ Return ONLY valid JSON.`;
 
 // ============ BUILD BRIEFING FROM RAW OPPORTUNITIES (NO AI) ============
 
-export function buildSamGreenBriefing(opportunities: SAMOpportunity[]): SamDailyBriefing {
-  // This is a simplified version without AI - use generateDailyBriefFromSam for AI version
-  const sorted = [...opportunities]
+export function buildSamGreenBriefing(
+  opportunities: SAMOpportunity[],
+  context?: SamStrategicRankingContext,
+  noticeSummaryOverride?: NoticeSummary
+): SamDailyBriefing {
+  // Fast deterministic strategic ranking for beta delivery.
+  // This keeps the hot path fast while improving over pure deadline sorting.
+  const ranked = [...opportunities]
     .filter(o => o.active && o.responseDeadline)
-    .sort((a, b) => new Date(a.responseDeadline).getTime() - new Date(b.responseDeadline).getTime())
+    .map(opportunity => ({
+      opportunity,
+      strategic: buildStrategicAssessment(opportunity, context),
+    }))
+    .sort((a, b) => {
+      if (b.strategic.score !== a.strategic.score) {
+        return b.strategic.score - a.strategic.score;
+      }
+      return new Date(a.opportunity.responseDeadline).getTime() - new Date(b.opportunity.responseDeadline).getTime();
+    })
     .slice(0, 10);
 
-  const briefingOpportunities: SamDailyOpportunity[] = sorted.slice(0, 5).map((opp, idx) => ({
+  const sorted = ranked.map(entry => entry.opportunity);
+
+  const briefingOpportunities: SamDailyOpportunity[] = ranked.slice(0, 5).map(({ opportunity: opp, strategic }, idx) => ({
     rank: idx + 1,
     title: opp.title,
     agency: opp.department || opp.subTier || 'Federal',
@@ -301,7 +531,7 @@ export function buildSamGreenBriefing(opportunities: SAMOpportunity[]): SamDaily
     noticeType: opp.noticeType,
     solicitationNumber: opp.solicitationNumber,
     samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
-    quickWinAssessment: 'Active opportunity matching your NAICS - review requirements and deadline.',
+    quickWinAssessment: strategic.summary,
     postedDate: formatSamDate(opp.postedDate),
   }));
 
@@ -321,23 +551,9 @@ export function buildSamGreenBriefing(opportunities: SAMOpportunity[]): SamDaily
       setAside: o.setAside || '',
     }));
 
-  const noticeSummary = { rfp: 0, rfq: 0, sourcesSought: 0, preSol: 0, combined: 0, other: 0 };
-  for (const opp of sorted) {
-    const type = (opp.noticeType || '').toLowerCase();
-    if (type.includes('solicitation') || type.includes('rfp')) {
-      noticeSummary.rfp++;
-    } else if (type.includes('rfq') || type.includes('quote')) {
-      noticeSummary.rfq++;
-    } else if (type.includes('source') || type.includes('rfi') || type.includes('market research')) {
-      noticeSummary.sourcesSought++;
-    } else if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) {
-      noticeSummary.preSol++;
-    } else if (type.includes('combined')) {
-      noticeSummary.combined++;
-    } else {
-      noticeSummary.other++;
-    }
-  }
+  const noticeSummary = noticeSummaryOverride || buildNoticeSummary(
+    ranked.map(entry => entry.opportunity)
+  );
 
   return {
     date: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
@@ -471,7 +687,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
     </div>
 
     <div class="notice-summary">
-      <div class="notice-summary-title">📊 Notice Type Summary (Top 10 Active)</div>
+      <div class="notice-summary-title">📊 Notice Type Summary (${briefing.noticeSummary.totalMatched} matched active)</div>
       <div class="notice-pills">
         ${briefing.noticeSummary.rfp > 0 ? `<span class="notice-pill pill-rfp"><span class="notice-pill-count">${briefing.noticeSummary.rfp}</span> RFP/Solicitation</span>` : ''}
         ${briefing.noticeSummary.rfq > 0 ? `<span class="notice-pill pill-rfq"><span class="notice-pill-count">${briefing.noticeSummary.rfq}</span> RFQ</span>` : ''}
@@ -570,10 +786,13 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
       </div>
     </div>
 
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${trackingToken ? generateTrackedLink(trackingToken, 'https://tools.govcongiants.org/briefings/dashboard', 'browse_all_opportunities') : 'https://tools.govcongiants.org/briefings/dashboard'}" style="display: inline-block; background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Browse All ${briefing.noticeSummary.totalMatched} Opportunities →</a>
+    </div>
     <div class="footer">
       <p>Generated by <strong>GovCon Giants AI</strong></p>
       <span class="source-badge">Data Source: SAM.gov Opportunities API</span>
-      <p style="margin-top: 12px;"><a href="${trackingToken ? generateTrackedLink(trackingToken, 'https://tools.govcongiants.org/alerts/preferences', 'manage_preferences') : 'https://tools.govcongiants.org/alerts/preferences'}">Manage Preferences</a> | <a href="${trackingToken ? generateTrackedLink(trackingToken, 'https://shop.govcongiants.org/briefings', 'view_all_briefings') : 'https://shop.govcongiants.org/briefings'}">View All Briefings</a></p>
+      <p style="margin-top: 12px;"><a href="${trackingToken ? generateTrackedLink(trackingToken, 'https://tools.govcongiants.org/alerts/preferences', 'manage_preferences') : 'https://tools.govcongiants.org/alerts/preferences'}">Manage Preferences</a> | <a href="${trackingToken ? generateTrackedLink(trackingToken, 'https://tools.govcongiants.org/briefings/dashboard', 'view_dashboard') : 'https://tools.govcongiants.org/briefings/dashboard'}">View Dashboard</a></p>
     </div>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}

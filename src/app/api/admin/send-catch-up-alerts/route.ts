@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
+import { persistSentAlert } from '@/lib/alerts/delivery-log';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -171,32 +172,21 @@ export async function GET(request: NextRequest) {
       // Send email
       await sendCatchUpEmail(user.user_email, topOpps, user, scoredOpps.length);
 
-      // Log and update
-      await getSupabase().from('alert_log').upsert({
-        user_email: user.user_email,
-        alert_date: new Date().toISOString().split('T')[0],
-        opportunities_count: topOpps.length,
-        opportunities_data: topOpps.slice(0, 5).map(o => ({
+      await persistSentAlert({
+        supabase: getSupabase(),
+        email: user.user_email,
+        alertType: 'daily',
+        opportunitiesCount: topOpps.length,
+        opportunitiesData: topOpps.slice(0, 5).map(o => ({
           title: o.title,
           agency: o.department,
           naics: o.naicsCode,
           deadline: o.responseDeadline,
         })),
-        sent_at: new Date().toISOString(),
-        delivery_status: 'sent',
-        alert_type: 'daily',
-      }, {
-        onConflict: 'user_email,alert_date,alert_type',
+        currentTotalAlertsSent: 0,
+        lastAlertCount: topOpps.length,
+        profileTable: 'user_alert_settings',
       });
-
-      await getSupabase()
-        .from('user_alert_settings')
-        .update({
-          last_alert_sent: new Date().toISOString(),
-          last_alert_count: topOpps.length,
-          total_alerts_sent: 1,
-        })
-        .eq('user_email', user.user_email);
 
       results.sent++;
       results.sent_to.push(user.user_email);

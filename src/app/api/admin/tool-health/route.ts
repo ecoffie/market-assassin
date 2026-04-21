@@ -80,9 +80,19 @@ export async function GET(request: NextRequest) {
 
     const { data: errors, error: errorsError } = await errorsQuery;
 
-    // Handle any errors
-    if (metricsError || providerError || errorsError) {
-      console.error('[ToolHealth] Query errors:', { metricsError, providerError, errorsError });
+    // Track query errors for health determination
+    const queryErrors: string[] = [];
+    if (metricsError) {
+      console.error('[ToolHealth] Metrics query error:', metricsError);
+      queryErrors.push(`Metrics: ${metricsError.message}`);
+    }
+    if (providerError) {
+      console.error('[ToolHealth] Provider query error:', providerError);
+      queryErrors.push(`Providers: ${providerError.message}`);
+    }
+    if (errorsError) {
+      console.error('[ToolHealth] Errors query error:', errorsError);
+      queryErrors.push(`Errors: ${errorsError.message}`);
     }
 
     // 4. Aggregate tool stats
@@ -153,10 +163,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 6. Determine overall health
-    const overallHealth = determineOverallHealth(toolStats, providerStatus, errors || []);
+    const overallHealth = determineOverallHealth(toolStats, providerStatus, errors || [], queryErrors);
 
     // 7. Generate alerts/flags
-    const alerts = generateAlerts(toolStats, providerStatus, errors || []);
+    const alerts = generateAlerts(toolStats, providerStatus, errors || [], queryErrors);
 
     // 8. Get database stats
     const databaseStats: Record<string, { count: number; description: string }> = {};
@@ -201,6 +211,7 @@ export async function GET(request: NextRequest) {
       period: `Last ${days} days`,
       health: overallHealth,
       alerts,
+      queryErrors: queryErrors.length > 0 ? queryErrors : undefined,
       tools: toolStats,
       providers: providerStatus,
       databaseStats,
@@ -448,8 +459,12 @@ export async function POST(request: NextRequest) {
 function determineOverallHealth(
   tools: Record<string, { success_rate: number; requests_failed: number }>,
   providers: Record<string, { status: string }>,
-  errors: unknown[]
+  errors: unknown[],
+  queryErrors: string[] = []
 ): 'healthy' | 'warning' | 'critical' {
+  // Critical if any database query failed - can't trust the data
+  if (queryErrors.length > 0) return 'critical';
+
   // Critical if any required provider is down (not_configured is OK)
   for (const p of Object.values(providers)) {
     if (p.status === 'down') return 'critical';
@@ -477,9 +492,15 @@ function determineOverallHealth(
 function generateAlerts(
   tools: Record<string, { success_rate: number; requests_failed: number; errors_by_type: Record<string, number> }>,
   providers: Record<string, { status: string; last_error: string | null }>,
-  errors: unknown[]
+  errors: unknown[],
+  queryErrors: string[] = []
 ): string[] {
   const alerts: string[] = [];
+
+  // Database query errors - critical
+  if (queryErrors.length > 0) {
+    alerts.push(`DATABASE QUERY FAILED: ${queryErrors.join(', ')}`);
+  }
 
   // Provider alerts
   for (const [name, p] of Object.entries(providers)) {

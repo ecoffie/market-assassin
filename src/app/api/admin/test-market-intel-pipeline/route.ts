@@ -100,12 +100,13 @@ export async function GET(request: NextRequest) {
 }
 
 async function checkAlertsStatus(supabase: ReturnType<typeof getSupabase>): Promise<PipelineStatus> {
-  // Count users in user_alert_settings
+  // Count users in the unified notification settings table to mirror the live daily-alerts cron
   const { data: alertUsers, count: alertCount } = await supabase
-    .from('user_alert_settings')
-    .select('user_email, naics_codes', { count: 'exact' })
+    .from('user_notification_settings')
+    .select('user_email, naics_codes, alert_frequency', { count: 'exact' })
     .eq('is_active', true)
-    .eq('alerts_enabled', true);
+    .eq('alerts_enabled', true)
+    .eq('alert_frequency', 'daily');
 
   const usersWithNaics = (alertUsers || []).filter(u =>
     Array.isArray(u.naics_codes) && u.naics_codes.length > 0
@@ -269,13 +270,6 @@ async function checkDeepDiveStatus(supabase: ReturnType<typeof getSupabase>): Pr
 async function testUserEligibility(supabase: ReturnType<typeof getSupabase>, email: string) {
   const normalizedEmail = email.toLowerCase();
 
-  // Check user_alert_settings
-  const { data: alertSettings } = await supabase
-    .from('user_alert_settings')
-    .select('*')
-    .eq('user_email', normalizedEmail)
-    .single();
-
   // Check user_notification_settings
   const { data: notifSettings } = await supabase
     .from('user_notification_settings')
@@ -301,17 +295,15 @@ async function testUserEligibility(supabase: ReturnType<typeof getSupabase>, ema
 
   const eligibility = {
     dailyAlerts: {
-      eligible: alertSettings?.is_active && alertSettings?.alerts_enabled,
-      hasNaics: Array.isArray(alertSettings?.naics_codes) && alertSettings.naics_codes.length > 0,
-      naicsCodes: alertSettings?.naics_codes || [],
-      willUseFallback: !alertSettings?.naics_codes || alertSettings.naics_codes.length === 0,
+      eligible: notifSettings?.is_active && notifSettings?.alerts_enabled && notifSettings?.alert_frequency === 'daily',
+      hasNaics: Array.isArray(notifSettings?.naics_codes) && notifSettings.naics_codes.length > 0,
+      naicsCodes: notifSettings?.naics_codes || [],
+      willUseFallback: !notifSettings?.naics_codes || notifSettings.naics_codes.length === 0,
     },
     dailyBriefs: {
-      eligible: (alertSettings?.is_active && alertSettings?.briefings_enabled) ||
-                (notifSettings?.is_active && notifSettings?.briefings_enabled),
-      hasNaics: (Array.isArray(alertSettings?.naics_codes) && alertSettings.naics_codes.length > 0) ||
-                (Array.isArray(notifSettings?.naics_codes) && notifSettings.naics_codes.length > 0),
-      willUseFallback: !(alertSettings?.naics_codes?.length > 0 || notifSettings?.naics_codes?.length > 0),
+      eligible: notifSettings?.is_active && notifSettings?.briefings_enabled,
+      hasNaics: Array.isArray(notifSettings?.naics_codes) && notifSettings.naics_codes.length > 0,
+      willUseFallback: !(notifSettings?.naics_codes?.length > 0),
     },
     pursuitBrief: {
       eligible: notifSettings?.is_active && notifSettings?.briefings_enabled,
@@ -325,15 +317,13 @@ async function testUserEligibility(supabase: ReturnType<typeof getSupabase>, ema
     success: true,
     email: normalizedEmail,
     eligibility,
-    alertSettings: alertSettings || null,
     notificationSettings: notifSettings || null,
     recentDeliveries: {
       alerts: recentAlerts || [],
       briefs: recentBriefs || [],
     },
     recommendations: [
-      !alertSettings && 'User not in alert_settings - run backfill or have them sign up',
-      !notifSettings && 'User not in notification_settings - will be added on first brief run',
+      !notifSettings && 'User not in notification_settings - run backfill or have them sign up',
       eligibility.dailyAlerts.willUseFallback && 'User will receive generic alerts - encourage NAICS setup',
       eligibility.dailyBriefs.willUseFallback && 'User will receive generic briefs - encourage NAICS setup',
     ].filter(Boolean),

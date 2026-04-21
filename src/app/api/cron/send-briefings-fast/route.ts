@@ -18,7 +18,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
+import { fetchSamOpportunitiesFromCache, fetchSamOpportunityNoticeSummaryFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { buildSamGreenBriefing, generateSamGreenEmailHtml } from '@/lib/briefings/delivery/sam-green-email-template';
 import {
   recordBriefingProgramDelivery,
@@ -31,6 +31,7 @@ import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 // Process up to 200 users per cron run (~150ms each = 30 seconds total)
 // Increased from 100 to ensure all 958+ users are covered in 10 cron runs
 const BATCH_SIZE = 200;
+const BRIEFING_MARKET_FETCH_LIMIT = 250;
 
 /**
  * Queue a failed briefing for automatic retry (dead letter queue)
@@ -153,7 +154,13 @@ export async function GET(request: NextRequest) {
           naicsCodes: userNaics.slice(0, 10), // Limit to 10 NAICS codes
           pscCodes: userPsc.slice(0, 10), // Limit to 10 PSC codes
           keywords: userKeywords.slice(0, 10), // Limit to 10 keywords
-          limit: 25, // Get top 25 opportunities (slightly more to account for filtering)
+          limit: BRIEFING_MARKET_FETCH_LIMIT, // Pull a broader matched market set for strategic ranking + notice summaries
+        });
+
+        const noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
+          naicsCodes: userNaics.slice(0, 10),
+          pscCodes: userPsc.slice(0, 10),
+          keywords: userKeywords.slice(0, 10),
         });
 
         if (samResult.opportunities.length === 0) {
@@ -183,7 +190,11 @@ export async function GET(request: NextRequest) {
 
         // Build GREEN briefing from SAM opportunities (NO AI - fast path)
         // Uses buildSamGreenBriefing (instant) instead of generateDailyBriefFromSam (4s/user)
-        const greenBriefing = buildSamGreenBriefing(samResult.opportunities);
+        const greenBriefing = buildSamGreenBriefing(samResult.opportunities, {
+          naicsCodes: userNaics,
+          agencies: user.agencies || [],
+          keywords: userKeywords,
+        }, noticeSummary);
 
         // Log briefing attempt
         await getSupabase().from('briefing_log').upsert({

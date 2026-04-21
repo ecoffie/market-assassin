@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 interface DashboardData {
   timestamp: string;
-  today: string;
+  displayDate: string;  // Shows yesterday's data (most recent completed day)
   emailOperations: {
     date: string;
     alerts: { sent: number; failed: number; skipped: number; successRate: string };
@@ -20,7 +20,11 @@ interface DashboardData {
     naicsPercent: string;
     businessTypeSet: number;
     businessTypePercent: string;
-    alertsEnabled: number;
+    alertsEnabledTotal: number;
+    dailyFrequencyConfigured: number;
+    weeklyFrequencyConfigured: number;
+    postBetaPaidDailyEligible: number;
+    postBetaFreeWeeklyFallback: number;
     briefingsEnabled: number;
     unconfiguredEmails: string[];
   };
@@ -236,12 +240,12 @@ export default function AdminDashboard() {
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* Today's Alerts */}
+          {/* Yesterday's Alerts (most recent completed day) */}
           <div className="bg-gray-800 rounded-lg p-6">
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-lg font-semibold text-white">Daily Alerts ($19/mo)</h2>
               <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
-                {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Today'}
+                {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Yesterday'}
               </span>
             </div>
             <div className="space-y-3">
@@ -264,12 +268,12 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Today's Briefings */}
+          {/* Yesterday's Briefings */}
           <div className="bg-gray-800 rounded-lg p-6">
             <div className="flex justify-between items-start mb-4">
               <h2 className="text-lg font-semibold text-white">Market Intel ($49/mo)</h2>
               <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
-                {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Today'}
+                {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Yesterday'}
               </span>
             </div>
             <div className="space-y-3">
@@ -342,13 +346,33 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Alerts Enabled</span>
-                <span className="text-white font-mono">{data.userHealth.alertsEnabled}</span>
+                <span className="text-gray-400">Alerts Enabled (Total)</span>
+                <span className="text-white font-mono">{data.userHealth.alertsEnabledTotal}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Daily Frequency Configured</span>
+                <span className="text-white font-mono">{data.userHealth.dailyFrequencyConfigured}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Weekly Frequency Configured</span>
+                <span className="text-white font-mono">{data.userHealth.weeklyFrequencyConfigured}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Post-Beta Paid Daily Eligible</span>
+                <span className="text-white font-mono">{data.userHealth.postBetaPaidDailyEligible}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Post-Beta Free Weekly Fallback</span>
+                <span className="text-white font-mono">{data.userHealth.postBetaFreeWeeklyFallback}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Briefings Enabled</span>
                 <span className="text-white font-mono">{data.userHealth.briefingsEnabled}</span>
               </div>
+              <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
+                Frequency counts show user configuration. Actual daily sends depend on fresh matches,
+                deduplication, and active deadlines.
+              </p>
             </div>
           </div>
         </div>

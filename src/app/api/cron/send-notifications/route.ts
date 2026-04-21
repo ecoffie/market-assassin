@@ -18,6 +18,7 @@ import { expandStateForSearch } from '@/lib/utils/state-expansion';
 import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import agencySatData from '@/data/agency-sat-friendliness.json';
+import { persistSentAlert } from '@/lib/alerts/delivery-log';
 
 // SAT Badge helper
 interface SatAgencyInfo {
@@ -340,13 +341,12 @@ async function runNotificationJob(options?: {
           try {
             await sendAlertEmail(user.user_email, newOpps);
 
-            // Log alert
-            await getSupabase().from('alert_log').upsert({
-              user_email: user.user_email,
-              alert_date: new Date().toISOString().split('T')[0],
-              alert_type: 'daily',
-              opportunities_count: newOpps.length,
-              opportunities_data: newOpps.slice(0, 20).map(o => ({
+            await persistSentAlert({
+              supabase: getSupabase(),
+              email: user.user_email,
+              alertType: 'daily',
+              opportunitiesCount: newOpps.length,
+              opportunitiesData: newOpps.slice(0, 20).map(o => ({
                 noticeId: o.noticeId,
                 title: o.title,
                 agency: o.department,
@@ -354,18 +354,8 @@ async function runNotificationJob(options?: {
                 deadline: o.responseDeadline,
                 score: o.score,
               })),
-              sent_at: new Date().toISOString(),
-              delivery_status: 'sent',
-            }, { onConflict: 'user_email,alert_date,alert_type' });
-
-            // Update stats
-            await getSupabase()
-              .from('user_notification_settings')
-              .update({
-                last_alert_sent: new Date().toISOString(),
-                total_alerts_sent: (user.total_alerts_sent || 0) + 1,
-              })
-              .eq('user_email', user.user_email);
+              currentTotalAlertsSent: user.total_alerts_sent,
+            });
 
             results.alertsSent++;
             console.log(`[Notifications] ✅ Alert sent to ${user.user_email} (${newOpps.length} opps)`);

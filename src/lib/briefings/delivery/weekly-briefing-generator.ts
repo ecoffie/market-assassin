@@ -13,6 +13,7 @@ import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
 import { WebSignal } from '../web-intel/types';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
+import { SAMNoticeSummary } from '../pipelines/sam-gov';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
 
 export interface WeeklyOpportunityAnalysis {
@@ -76,6 +77,87 @@ export interface WeeklyBriefing {
     webSignalsAnalyzed: number;
   };
   processingTimeMs: number;
+}
+
+export interface PrecomputedWeeklyBriefing {
+  weekOf: string;
+  opportunities: Array<{
+    rank: number;
+    contractName: string;
+    agency: string;
+    incumbent: string;
+    value: number;
+    window: string;
+    displacementAngle: string;
+    keyDates: { label: string; date: string }[];
+    competitiveLandscape: string[];
+    recommendedApproach: string;
+  }>;
+  teamingPlays: WeeklyTeamingPlay[];
+  marketSignals: WeeklyMarketSignal[];
+  calendar: Array<{ date: string; event: string; type: string; priority: string }>;
+  processingTimeMs: number;
+}
+
+function getWeekOfDate(): string {
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay();
+  let daysToAdd: number;
+  if (dayOfWeek === 6) {
+    daysToAdd = 2;
+  } else if (dayOfWeek === 0) {
+    daysToAdd = 1;
+  } else {
+    daysToAdd = 1 - dayOfWeek;
+  }
+
+  const monday = new Date(now);
+  monday.setUTCDate(monday.getUTCDate() + daysToAdd);
+  return monday.toISOString().split('T')[0];
+}
+
+function buildWeeklyNoticeSignals(summary?: SAMNoticeSummary): WeeklyMarketSignal[] {
+  if (!summary || summary.totalMatched === 0) {
+    return [];
+  }
+
+  const signals: WeeklyMarketSignal[] = [
+    {
+      headline: `${summary.totalMatched} matched active SAM notices in this market`,
+      source: 'SAM.gov Cache',
+      implication: 'The weekly deep dive is grounded in an active federal market, not just expiring-contract data.',
+      actionRequired: false,
+    },
+  ];
+
+  if (summary.sourcesSought > 0) {
+    signals.push({
+      headline: `${summary.sourcesSought} Sources Sought / RFI notices are open`,
+      source: 'SAM.gov Cache',
+      implication: 'Market research windows are open now. Shape requirements early and request capability conversations before solicitation.',
+      actionRequired: true,
+    });
+  }
+
+  if (summary.preSol > 0) {
+    signals.push({
+      headline: `${summary.preSol} presolicitation notices signal upcoming bids`,
+      source: 'SAM.gov Cache',
+      implication: 'This is the positioning phase for teaming, agency outreach, and forecast monitoring before the RFP lands.',
+      actionRequired: true,
+    });
+  }
+
+  if (summary.rfp + summary.rfq + summary.combined > 0) {
+    signals.push({
+      headline: `${summary.rfp + summary.rfq + summary.combined} active solicitation-stage notices are already live`,
+      source: 'SAM.gov Cache',
+      implication: 'Balance long-range positioning with nearer-term bids already in motion.',
+      actionRequired: summary.rfp + summary.rfq + summary.combined >= 5,
+    });
+  }
+
+  return signals.slice(0, 4);
 }
 
 const SYSTEM_PROMPT = `You are a senior GovCon capture strategist writing a weekly market intelligence deep dive for federal contractors. This is the comprehensive weekly briefing that enables strategic planning.
@@ -384,6 +466,67 @@ Generate:
 Focus on strategic planning value. Be specific with dates, names, and recommendations.
 
 Return JSON only.`;
+}
+
+export async function generateWeeklyDeepDiveFromContracts(
+  contracts: Array<{
+    contractNumber: string;
+    contractName: string;
+    agency: string;
+    incumbent: string;
+    value: number;
+    naicsCode: string;
+    expirationDate: string;
+    daysUntilExpiration: number;
+    setAside: string;
+    description: string;
+    numberOfBids?: number;
+    competitionLevel?: string;
+  }>,
+  noticeSummary?: SAMNoticeSummary
+): Promise<PrecomputedWeeklyBriefing> {
+  const weekOfDate = getWeekOfDate();
+
+  const prompt = `You are a senior GovCon capture strategist. Generate a Weekly Deep Dive briefing with full analysis.
+
+CONTRACT DATA (REAL DATA FROM USASPENDING):
+${JSON.stringify(contracts, null, 2)}
+
+Generate JSON with:
+1. "opportunities" - Top 10 with FULL analysis. Each needs: rank, contractName, agency, incumbent, value (number), window, displacementAngle, keyDates (array of {label, date}), competitiveLandscape (array of 3-4 insights), recommendedApproach (string)
+2. "teamingPlays" - 3 DETAILED plays. Each: playNumber, strategyName, targetCompany, whyTarget (array), whoToContact (array), suggestedOpener, followUpMessage
+3. "marketSignals" - 4 news items. Each: headline, source, implication, actionRequired (boolean)
+4. "calendar" - 6 key dates. Each: date, event, type (deadline/industry_day/rfi_due/award_expected), priority (high/medium/low)
+
+Focus on contracts with low numberOfBids (1-2 bids = vulnerable incumbent) and near-term expiration.
+
+Return ONLY valid JSON.`;
+
+  const { text } = await generateBriefingJson(
+    'weekly',
+    'You are a senior GovCon capture strategist.',
+    prompt,
+    6000
+  );
+
+  const data = extractAndParseJSON<{
+    opportunities?: PrecomputedWeeklyBriefing['opportunities'];
+    teamingPlays?: WeeklyTeamingPlay[];
+    marketSignals?: WeeklyMarketSignal[];
+    calendar?: PrecomputedWeeklyBriefing['calendar'];
+  }>(text);
+
+  return {
+    weekOf: weekOfDate,
+    opportunities: data.opportunities || [],
+    teamingPlays: data.teamingPlays || [],
+    marketSignals: [
+      ...buildWeeklyNoticeSignals(noticeSummary),
+      ...(data.marketSignals || []),
+    ].slice(0, 6),
+    calendar: data.calendar || [],
+    processingTimeMs: 0,
+  };
 }
 
 function buildProfile(profileData: Record<string, unknown>) {

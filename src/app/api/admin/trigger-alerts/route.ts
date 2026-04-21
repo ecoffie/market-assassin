@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
+import { persistSentAlert } from '@/lib/alerts/delivery-log';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 const SHOP_ADMIN_PASSWORD = 'admin123';
@@ -252,21 +253,13 @@ export async function GET(request: NextRequest) {
       // Send email
       await sendAlertEmail(user.user_email, topOpps, user, tier, totalAvailable);
 
-      // Log the alert
-      await getSupabase().from('alert_log').upsert({
-        user_email: user.user_email,
-        alert_date: new Date().toISOString().split('T')[0],
-        alert_type: 'daily',
-        opportunities_count: topOpps.length,
-        sent_at: new Date().toISOString(),
-        delivery_status: 'sent',
-      }, { onConflict: 'user_email,alert_date,alert_type' });
-
-      // Update user stats (unified table)
-      await getSupabase().from('user_notification_settings').update({
-        last_alert_sent: new Date().toISOString(),
-        total_alerts_sent: (user as any).total_alerts_sent + 1 || 1,
-      }).eq('user_email', user.user_email);
+      await persistSentAlert({
+        supabase: getSupabase(),
+        email: user.user_email,
+        alertType: 'daily',
+        opportunitiesCount: topOpps.length,
+        currentTotalAlertsSent: (user as any).total_alerts_sent,
+      });
 
       results.sent.push({ email: user.user_email, opps: topOpps.length, tier });
 

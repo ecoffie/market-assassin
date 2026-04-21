@@ -60,6 +60,7 @@ interface PursuitBrief {
   actionPlan: { day: number; action: string; owner: string }[];
   risks: { risk: string; likelihood: string; impact: string; mitigation: string }[];
   immediateNextMove: { action: string; owner: string; deadline: string };
+  relatedMarketSignals?: { headline: string; source: string; implication: string; actionRequired: boolean }[];
   sourceNoticeId?: string;
 }
 
@@ -391,6 +392,11 @@ function generatePursuitEmailHtml(brief: PursuitBrief): string {
     .outreach-name { font-size: 15px; font-weight: 700; color: #111827; margin: 0 0 4px; }
     .outreach-role { font-size: 13px; color: #6b7280; margin: 0 0 8px; }
     .outreach-approach { font-size: 13px; color: #374151; font-style: italic; }
+    .signal-card { background: #eff6ff; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #2563eb; }
+    .signal-headline { font-size: 15px; font-weight: 700; color: #1e3a8a; margin: 0 0 6px; }
+    .signal-meta { font-size: 11px; color: #1d4ed8; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
+    .signal-text { font-size: 13px; color: #1e3a8a; line-height: 1.5; margin: 0; }
+    .signal-required { display: inline-block; margin-top: 10px; font-size: 11px; font-weight: 700; color: #92400e; background: #fef3c7; padding: 4px 8px; border-radius: 999px; }
     .action-timeline { background: #f0fdf4; border-radius: 8px; padding: 16px; }
     .action-item { display: flex; padding: 8px 0; border-bottom: 1px dashed #d1fae5; }
     .action-item:last-child { border-bottom: none; }
@@ -452,6 +458,20 @@ function generatePursuitEmailHtml(brief: PursuitBrief): string {
         `).join('')}
       </ul>
     </div>
+
+    ${brief.relatedMarketSignals && brief.relatedMarketSignals.length > 0 ? `
+      <div class="section">
+        <h2 class="section-title">Related Market Signals</h2>
+        ${brief.relatedMarketSignals.map(signal => `
+          <div class="signal-card">
+            <h4 class="signal-headline">${escapeHtml(signal.headline)}</h4>
+            <div class="signal-meta">${escapeHtml(signal.source)}</div>
+            <p class="signal-text">${escapeHtml(signal.implication)}</p>
+            ${signal.actionRequired ? '<span class="signal-required">ACTION REQUIRED</span>' : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
 
     <div class="section">
       <h2 class="section-title">First Outreach Targets</h2>
@@ -537,6 +557,15 @@ ${'='.repeat(40)}
 PRIORITY INTELLIGENCE REQUIREMENTS
 ${'='.repeat(40)}
 ${brief.priorityIntel.map((intel, i) => `${i + 1}. ${intel}`).join('\n')}
+
+${brief.relatedMarketSignals && brief.relatedMarketSignals.length > 0 ? `
+${'='.repeat(40)}
+RELATED MARKET SIGNALS
+${'='.repeat(40)}
+${brief.relatedMarketSignals.map(signal =>
+  `- ${signal.headline}\n  Source: ${signal.source}\n  ${signal.implication}${signal.actionRequired ? '\n  ACTION REQUIRED' : ''}`
+).join('\n\n')}
+` : ''}
 
 ${'='.repeat(40)}
 5-DAY ACTION PLAN

@@ -9,6 +9,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const PAID_TIER_ACCESS_FLAGS = [
+  'access_hunter_pro',
+  'access_assassin_standard',
+  'access_assassin_premium',
+  'access_recompete',
+  'access_contractor_db',
+  'access_content_standard',
+  'access_content_full_fix',
+  'access_briefings',
+];
+const PRO_TIER_PRODUCTS = [
+  'opportunity-hunter-pro',
+  'market-assassin-standard',
+  'market-assassin-premium',
+  'ultimate-govcon-bundle',
+  'contractor-database',
+  'recompete-contracts',
+  'ai-content-generator',
+  'starter-govcon-bundle',
+  'pro-giant-bundle',
+];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -199,15 +220,35 @@ async function getUserHealth() {
     naicsPercent: '0%',
     businessTypeSet: 0,
     businessTypePercent: '0%',
-    alertsEnabled: 0,
+    alertsEnabledTotal: 0,
+    dailyFrequencyConfigured: 0,
+    weeklyFrequencyConfigured: 0,
+    postBetaPaidDailyEligible: 0,
+    postBetaFreeWeeklyFallback: 0,
     briefingsEnabled: 0,
     unconfiguredEmails: [] as string[]
   };
 
   try {
-    const { data } = await getSupabase()
-      .from('user_notification_settings')
-      .select('user_email, naics_codes, business_type, alerts_enabled, briefings_enabled');
+    const supabase = getSupabase();
+    const [settingsResult, profilesResult, proBuyerEmails] = await Promise.all([
+      supabase
+        .from('user_notification_settings')
+        .select('user_email, naics_codes, business_type, alerts_enabled, alert_frequency, briefings_enabled, is_active'),
+      supabase
+        .from('user_profiles')
+        .select('email, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_briefings'),
+      fetchWeeklyAlertBuyerEmails(),
+    ]);
+
+    const { data } = settingsResult;
+    const paidDailyEmails = new Set(
+      (profilesResult.data || [])
+        .filter((profile: Record<string, unknown>) =>
+          PAID_TIER_ACCESS_FLAGS.some(flag => profile[flag] === true)
+        )
+        .map((profile: { email: string }) => profile.email.toLowerCase())
+    );
 
     if (data) {
       health.totalUsers = data.length;
@@ -215,12 +256,33 @@ async function getUserHealth() {
       for (const user of data) {
         const hasNaics = user.naics_codes && user.naics_codes.length > 0;
         const hasBusinessType = user.business_type && user.business_type.trim() !== '';
+        const normalizedEmail = user.user_email.toLowerCase();
 
         if (hasNaics) health.naicsConfigured++;
         else health.unconfiguredEmails.push(user.user_email);
 
         if (hasBusinessType) health.businessTypeSet++;
-        if (user.alerts_enabled) health.alertsEnabled++;
+        if (user.alerts_enabled) {
+          health.alertsEnabledTotal++;
+
+          if (user.is_active) {
+            if (user.alert_frequency === 'daily') {
+              health.dailyFrequencyConfigured++;
+
+              if (paidDailyEmails.has(normalizedEmail)) {
+                health.postBetaPaidDailyEligible++;
+              }
+
+              if (!proBuyerEmails.has(normalizedEmail)) {
+                health.postBetaFreeWeeklyFallback++;
+              }
+            }
+
+            if (user.alert_frequency === 'weekly') {
+              health.weeklyFrequencyConfigured++;
+            }
+          }
+        }
         if (user.briefings_enabled) health.briefingsEnabled++;
       }
 
@@ -235,6 +297,37 @@ async function getUserHealth() {
   }
 
   return health;
+}
+
+async function fetchWeeklyAlertBuyerEmails(): Promise<Set<string>> {
+  try {
+    const res = await fetch('https://shop.govcongiants.org/api/admin/purchases-report?days=365', {
+      headers: { 'x-admin-password': 'admin123' },
+    });
+
+    if (!res.ok) {
+      console.log('[Dashboard] Could not fetch weekly-alert buyer list, defaulting to no pro buyers');
+      return new Set();
+    }
+
+    const data = await res.json();
+    const purchases = data.purchases || [];
+    const proEmails = new Set<string>();
+
+    for (const purchase of purchases) {
+      const productId = String(purchase.productId || '').toLowerCase();
+      const email = String(purchase.email || '').toLowerCase();
+
+      if (email && PRO_TIER_PRODUCTS.some(tier => productId.includes(tier))) {
+        proEmails.add(email);
+      }
+    }
+
+    return proEmails;
+  } catch (error) {
+    console.error('[Dashboard] Error fetching weekly-alert buyer list:', error);
+    return new Set();
+  }
 }
 
 async function getAlertTrend(sinceDate: string) {
@@ -497,12 +590,13 @@ async function getSystemAlerts(today: string) {
   const userHealth = await getUserHealth();
   const deadLetter = await getDeadLetterStats();
 
-  // Critical: No sends today (after 8 AM)
+  // Critical: No sends yesterday (shown after 8 AM today)
+  // Note: Dashboard shows yesterday's data since today isn't complete yet
   const hour = new Date().getUTCHours();
   if (hour >= 12 && emailStats.alerts.sent === 0 && emailStats.briefings.sent === 0) {
     alerts.push({
       level: 'critical',
-      message: 'No emails sent today - check cron jobs'
+      message: 'No emails sent yesterday - check cron jobs'
     });
   }
 

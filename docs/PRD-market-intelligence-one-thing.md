@@ -1,60 +1,197 @@
-# PRD: Market Intelligence — ONE Thing
+# PRD: Market Intelligence — Low Floor, High Ceiling
 
-**Version:** 1.0
+**Version:** 2.0
 **Created:** April 13, 2026
-**Strategic Model:** Option D + A (Salesforce Disruption + Calendly Simplicity)
+**Revised:** April 21, 2026
+**Strategic Model:** Airtable/HubSpot "Low Floor, High Ceiling" + LinkedIn Sales Navigator Access Model
 
 ---
 
 ## Executive Summary
 
-GovCon Giants will become the "Salesforce of GovCon Intelligence" by serving small business contractors who can't afford Deltek ($10K+/year) with a brutally simple product: **one daily email that tells them their #1 priority.**
+GovCon Giants will become the "Salesforce of GovCon Intelligence" by serving small business contractors who can't afford Deltek ($29K+/year average) with a product that combines **curated daily intelligence** with **full data access**.
 
-**Core premise:** Deltek serves enterprises with complex dashboards. We serve SMBs with one answer: "Here's who to target today."
-
----
-
-## The Opportunity
-
-### Market Gap Analysis
-
-| Segment | Deltek | GovCon Giants |
-|---------|--------|---------------|
-| Target | Enterprise (1,000+ employees) | SMB (1-50 employees) |
-| Price | $10K-$100K+/year | $49/month |
-| Complexity | Dashboards, reports, integrations | One email |
-| Onboarding | Weeks/months | 3 questions, 60 seconds |
-| Value Prop | "Complete GovCon ERP" | "Your #1 priority today" |
-
-### The Salesforce Playbook
-
-**Siebel (2000):**
-- 45% market share
-- Average 1,000 seats/customer
-- Complex, expensive, required IT
-
-**Salesforce (2000):**
-- Targeted SMBs with 24 seats average
-- "No Software" — just log in
-- $50/user/month vs $1000s for Siebel
-
-**Result:** Salesforce didn't out-feature Siebel. They served who Siebel couldn't serve.
-
-### Our Version
-
-**Deltek (2026):**
-- 30,000+ organizations
-- Enterprise focus
-- Complex dashboards, steep learning curve
-
-**GovCon Giants (2026):**
-- Target SMBs who ARE the BD team
-- One email, one action
-- $49/month vs $10K+/year
+**Core premise:** GovWin gives you a complex dashboard with everything. SAM.gov gives you raw data with nothing. We give you **the best of both**: smart recommendations PLUS the ability to browse everything.
 
 ---
 
-## User Persona
+## Version 2.0 Changes (April 21, 2026)
+
+### What Changed
+
+The original "ONE Thing" philosophy was based on flawed assumptions:
+
+| v1.0 Assumption | Reality |
+|-----------------|---------|
+| "Users want ONE answer" | Users want access to ALL opportunities + help prioritizing |
+| "No dashboard needed" | Users asked "how do I see all 1,373 opportunities?" |
+| "Email IS the product" | Email is the HOOK, dashboard is the POWER |
+| "Calendly analogy works" | Calendly = low-stakes scheduling; GovCon = $100K+ decisions |
+
+### Founder Research That Changed Our Thinking
+
+| Company | Key Lesson |
+|---------|------------|
+| **[Shopify](https://www.founderoo.co/playbooks/tobi-lutke-shopify)** | "Made commerce accessible" — gave merchants CONTROL, not curation |
+| **[HubSpot](https://www.saastr.com/hubspots-journey-to-the-first-2-billion-in-arr-how-co-founders-dharmesh-shah-and-brian-halligan-scaled-an-smb-saas-giant/)** | "Low floor, high ceiling" — simple to start, powerful when needed |
+| **[Airtable](https://www.madrona.com/airtable-howie-liu-no-code-apps-product-led-growth-ai-enabled-workflows/)** | "Progressive disclosure" — hide complexity at first, reveal as needed |
+| **[Notion](https://www.lennysnewsletter.com/p/inside-notion-ivan-zhao)** | "Most people don't want to build apps" but ALSO want flexibility |
+| **[LinkedIn Sales Navigator](https://www.tribalimpact.com/blog/linkedin-basic-vs-sales-navigator-worth-the-money/)** | Users pay for ACCESS to full database + advanced filters |
+| **[Zillow/Redfin](https://www.redfin.com/news/buyers-should-see-all-the-listings-sellers-should-control-how-their-listing-appears-online/)** | "Buyers should see ALL the listings" — transparency in high-stakes decisions |
+| **[Spotify](https://newsroom.spotify.com/2019-05-02/five-ways-to-make-your-discover-weekly-playlists-even-more-personalized/)** | Curated playlists (Discover Weekly) PLUS full library access |
+
+**None of these successful companies said "We'll tell you the ONE thing."**
+
+They all said: **"We'll make everything accessible, then guide you."**
+
+---
+
+## The Real Opportunity
+
+### Why "ONE Thing" Fails in GovCon
+
+| Calendly (Original Model) | GovCon Opportunities |
+|---------------------------|---------------------|
+| Scheduling ONE meeting | Winning contracts worth $50K-$5M |
+| Low stakes, reversible | High stakes, months of pursuit |
+| 30 minutes of your time | 6-18 months of BD effort |
+| Pick wrong? Reschedule | Miss opportunity? It's gone forever |
+| Infinite supply of times | Limited supply of matching contracts |
+
+**Nobody wants to gamble their business on ONE email recommendation when hundreds of thousands of dollars are on the line.**
+
+### What Users Actually Want
+
+Based on user feedback showing "1,373 opportunities match your profile":
+
+| Need | What They Asked |
+|------|-----------------|
+| "Don't overwhelm me" | ✅ Curated daily email with TOP priorities |
+| "But I want to see everything" | ❌ v1.0 said "no dashboard" |
+| "Help me filter" | ❌ v1.0 said "we filter FOR them" |
+| "Tell me what's hot" | ✅ Highlight urgent deadlines, Sources Sought |
+
+### The GovWin Pricing Reality
+
+[GovWin IQ pricing](https://www.vendr.com/buyer-guides/govwin-iq) for context:
+
+| Plan | Cost |
+|------|------|
+| Minimum | $13,000/year |
+| Average | $29,000/year |
+| Maximum | $119,000/year |
+| Per-user (small team) | $2,400-$6,000/year |
+
+We're competing at **$588/year** ($49/mo) — that's **98% cheaper** than GovWin's minimum.
+
+---
+
+## Product Definition (v2.0)
+
+### The "Low Floor, High Ceiling" Model
+
+Inspired by [Airtable's design philosophy](https://fortune.com/2022/03/29/airtable-design-open-ended-use-case-database-platform-cloud-collaboration/):
+
+> "The gravitational pull of the business is to make it more complex and add more features. We have to make sure we aren't doing that at the cost of product simplicity: the low floor and the high ceiling."
+
+**Low Floor (Easy Start):**
+- Daily email: Top 3-5 opportunities with scores
+- Works without logging in
+- Value delivered in 60 seconds of reading
+
+**High Ceiling (Power When Needed):**
+- Full searchable dashboard with ALL matching opportunities
+- Advanced filters: deadline, agency, set-aside, NAICS, type
+- Export to CSV/PDF for pipeline tracking
+
+### Layer Architecture
+
+| Layer | Purpose | Interface | Who Uses It |
+|-------|---------|-----------|-------------|
+| **Email (Hook)** | Surface top priorities daily | Inbox | Everyone (100%) |
+| **Dashboard (Power)** | Browse all opportunities | Web app | Power users (40%) |
+| **Intelligence (Premium)** | Win probability, competitor intel | Dashboard + Email | Paid users (20%) |
+
+### The Email
+
+**Subject line:** `🎯 [Maria] 5 opportunities matched today (3 urgent)`
+
+**Body structure:**
+```
+Good morning, Maria.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR TOP PRIORITIES TODAY
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔥 #1 — HUD Program Management Support
+   💰 $2.5M - $5M | ⏰ 5 days left | 🎯 Score: 87
+   ✅ 8(a) set-aside • 541611 exact match • No incumbent
+   → Download RFP, call HUD OSDBU: (202) 708-1428
+
+⚡ #2 — VA IT Modernization
+   💰 $1M - $2M | ⏰ 12 days left | 🎯 Score: 82
+   ✅ SDVOSB eligible • 541512 match • Recompete (Booz Allen incumbent)
+   → Review SOW Section C, research incumbent pricing
+
+📋 #3 — GSA Schedule Refresh
+   💰 $500K - $1M | ⏰ 21 days left | 🎯 Score: 74
+   ✅ Small business • 541330 match • Multiple award
+   → Check vehicle requirements, verify GSA schedule active
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 1,370 MORE OPPORTUNITIES MATCH YOUR PROFILE
+[Browse All Opportunities →]
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+[Manage Preferences] | [Unsubscribe]
+
+GovCon Giants AI • shop.govcongiants.org
+```
+
+**Key design changes from v1.0:**
+
+| v1.0 | v2.0 | Why |
+|------|------|-----|
+| ONE priority | 3-5 priorities | Reduces risk of bad recommendation |
+| No dashboard link | "Browse All" CTA | Users wanted access |
+| "Also on radar" (2-3) | Full count + link | Transparency builds trust |
+| "THE answer" | "Top priorities + full access" | Honest positioning |
+
+### The Dashboard
+
+**URL:** `/briefings/dashboard`
+
+**Features:**
+- Full searchable list of ALL matching opportunities
+- Filters: Deadline (urgent/this week/this month), Type (RFP/RFQ/SS/Pre-Sol), Agency, Set-Aside
+- Sort: Score, Deadline, Value
+- Export: CSV, PDF
+- Save: Add to pipeline tracker
+
+**Progressive Disclosure:**
+- New users see simplified view (top 10 + "load more")
+- Power users can toggle "show all" + advanced filters
+- Settings accessible via gear icon, not prominent
+
+### What We DON'T Do (Scope Guard)
+
+To prevent feature creep while supporting access:
+
+| Feature | Include? | Reason |
+|---------|----------|--------|
+| Full opportunity browsing | ✅ Yes | Users demanded it |
+| Pipeline tracker | ✅ Yes (BD Assist) | Separate product, integrated |
+| Advanced filters | ✅ Yes | Power users need them |
+| CSV/PDF export | ✅ Yes | Standard expectation |
+| Teaming CRM | ❌ No | BD Assist scope |
+| Proposal templates | ❌ No | Different product |
+| Complex rule builders | ❌ No | Keeps onboarding simple |
+| Multiple saved searches | ❌ No (v3?) | Adds complexity |
+
+---
+
+## User Personas (Unchanged)
 
 ### Primary: "The Owner-Operator"
 
@@ -64,185 +201,158 @@ GovCon Giants will become the "Salesforce of GovCon Intelligence" by serving sma
 **Revenue:** $800K/year (goal: $2M)
 **NAICS:** 541611 (Management Consulting)
 
-**Current Reality:**
-- She IS the BD team, sales, delivery, HR, and accounting
-- Checks SAM.gov manually 2-3x/week
-- Misses opportunities because she's too busy delivering work
-- Can't afford GovWin IQ ($500/month+)
-- Attended a GovCon Giants bootcamp, wants help but overwhelmed
-
-**Pain Points:**
-- "I don't know who I should be calling"
-- "There are too many opportunities, I can't evaluate them all"
-- "I found out about that contract after it closed"
-- "I waste time on opportunities I can't win"
-
-**What She Needs:**
+**v1.0 assumed she wanted:**
 > "Just tell me the ONE thing I should do today."
+
+**What she actually wants:**
+> "Show me the best opportunities, but let me browse everything so I don't miss anything."
+
+**Pain points (updated):**
+- "I don't know who I should be calling" → **Top priorities email**
+- "There are too many opportunities" → **Scored rankings**
+- "I found out about that contract after it closed" → **Deadline alerts**
+- "What if I'm missing something?" → **Full dashboard access**
 
 ### Secondary: "The One-Person BD Team"
 
 **Name:** James Chen
 **Company:** TechServe Federal (SDVOSB)
 **Size:** 25 employees, 1 BD person (him)
-**Revenue:** $4M/year
-**NAICS:** 541512 (IT Services)
 
-**Current Reality:**
-- Has Deltek Costpoint for accounting but not GovWin
-- Manually tracks opportunities in spreadsheets
-- Spends 15+ hours/week on market research
-- Boss wants more pipeline but no budget for tools
+**What he actually wants:**
+> "Give me a system that surfaces the best opportunities but doesn't hide the rest."
 
-**Pain Points:**
-- "I'm drowning in data but starving for insight"
-- "My spreadsheet has 200 opportunities but which ones matter?"
-- "I need to prioritize but don't have a system"
-
-**What He Needs:**
-> "Cut through the noise. Tell me my top priority."
+He's accountable to his boss. He can't say "the AI only showed me one opportunity."
 
 ---
 
-## Product Definition
+## Onboarding Flow
 
-### The ONE Thing
+### Current: Simple (Keep It)
 
-**Product name:** GovCon Daily Intel (or just "The Daily")
+The 3-question flow works. Don't complicate it.
 
-**Core value prop:**
-> "Every morning, we tell you the ONE federal contract you should focus on today."
+**Screen 1:** What's your email?
+**Screen 2:** What do you do? (pick ONE industry)
+**Screen 3:** What's your certification? (pick ONE)
 
-**Why ONE, not five or ten:**
-- Calendly doesn't give you 10 scheduling options
-- Slack doesn't show 10 channels — it shows the one with activity
-- Paradox of choice: more options = less action
-- "The ONE Thing" by Gary Keller: "What's the ONE thing I can do such that by doing it everything else will be easier or unnecessary?"
+### Post-Onboarding: Progressive Disclosure
 
-### The Email
-
-**Subject line:** `🎯 [Maria] Your priority today: HUD needs 8(a) consulting`
-
-**Body structure:**
-```
-Good morning, Maria.
-
-YOUR #1 PRIORITY TODAY
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📋 HUD Program Management Support
-   Department of Housing & Urban Development
-
-💰 $2.5M - $5M (estimated)
-⏰ Closes in 12 days (April 25)
-🎯 Win Score: 82/100 — EXCELLENT
-
-WHY THIS ONE:
-✅ 8(a) set-aside (you qualify)
-✅ 541611 exact NAICS match
-✅ HUD has pain point: "modernize grant management"
-✅ No incumbent — new requirement
-✅ Your past performance aligns
-
-YOUR ACTION TODAY:
-→ Download the RFP and read Section C (15 min)
-→ Call HUD OSDBU: (202) 708-1428
-
-[View Full Details →]
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📊 Also on your radar (but not today):
-• VA IT Support — closes Apr 28 — Score: 74
-• GSA Schedule refresh — closes May 5 — Score: 68
-
-[Manage Preferences] | [Unsubscribe]
-
-GovCon Giants AI • shop.govcongiants.org
-```
-
-**Key design decisions:**
-1. **ONE priority** — not a list, THE priority
-2. **WHY this one** — reasoning builds trust
-3. **YOUR ACTION TODAY** — specific, time-boxed
-4. **"Also on radar"** — acknowledges others exist, but de-prioritized
-5. **No dashboard link** — the email IS the product
-
-### What We DON'T Do
-
-To maintain brutal simplicity:
-
-| Feature | Include? | Reason |
-|---------|----------|--------|
-| Pipeline tracker | ❌ No | Adds complexity, different product |
-| Teaming CRM | ❌ No | Adds complexity, different product |
-| Proposal templates | ❌ No | Different problem |
-| Complex filters | ❌ No | We filter FOR them |
-| Dashboard | ❌ No | Email IS the interface |
-| Multiple briefing types | ❌ No | ONE type, ONE format |
-| "Add to pipeline" buttons | ❌ No | Action should be external (call, download) |
-
-### The Viral Loop
-
-**Calendly's loop:** Share link → recipient sees Calendly → signs up → shares their link
-
-**Our loop:**
-1. Maria gets email
-2. Email includes: "Know someone who needs this? [Forward to a friend]"
-3. Friend sees email, clicks link to sign up
-4. Friend gets their own personalized email
-5. Friend forwards to their network
-
-**Referral program:**
-- Free users: 1 referral = 1 extra week of trial
-- Paid users: 3 referrals = 1 month free
-- Make sharing as easy as Calendly link sharing
+**Day 1-7:** Email only, no dashboard prompts
+**Day 8+:** "See all opportunities →" link in email footer
+**Power users:** Self-discover dashboard, add filters
 
 ---
 
-## Technical Implementation
+## Pricing (Unchanged)
 
-### What Changes
+| Tier | Price | Features |
+|------|-------|----------|
+| **Free** | $0 | Daily email (top 3), GCG branding, no dashboard |
+| **Pro** | $49/mo | Daily email (top 5), full dashboard, advanced filters, export |
+| **Team** | $149/mo | Up to 5 users, shared pipeline, team alerts |
 
-**Current state:** 7 email templates, 6 briefing types, complex formatting
+### Why $49/month Still Works
 
-**Future state:** 1 email template, 1 briefing type, simple format
+- GovWin average: $29,000/year
+- We're $588/year = **98% cheaper**
+- Low enough for owner-operators
+- High enough to filter serious users
 
-### Email Template (Single)
+---
+
+## Success Metrics (Updated)
+
+### North Star Metric
+
+**"Opportunity Engagement Rate"** — % of users who view opportunity details (click) or save to pipeline within 24 hours
+
+Target: 40%+ (was 30% "Priority Action Rate")
+
+### Supporting Metrics
+
+| Metric | Target | Why |
+|--------|--------|-----|
+| Email open rate | 60%+ | Shows relevance |
+| Email → Dashboard CTR | 15%+ | **NEW:** Shows desire for more |
+| Dashboard return visits | 3+/week | **NEW:** Shows stickiness |
+| Opportunities viewed/user | 10+/week | **NEW:** Shows exploration |
+| Free → Paid conversion | 10%+ | Shows value |
+| Monthly churn | <5% | Shows stickiness |
+
+---
+
+## Competitive Positioning (Updated)
+
+### vs. Deltek GovWin IQ
+
+| | GovWin IQ | GovCon Market Intel |
+|--|-----------|---------------------|
+| Price | $29K/year average | $588/year |
+| Interface | Complex dashboard | Email + simple dashboard |
+| Learning curve | Weeks | 60 seconds |
+| Data access | Full | Full |
+| Curation | Manual filters | AI-scored priorities |
+| Value | "All the data, figure it out" | "Priorities + access to all" |
+
+**Positioning:** "GovWin gives you everything and expects you to figure it out. We give you priorities AND everything else."
+
+### vs. SAM.gov
+
+| | SAM.gov | GovCon Market Intel |
+|--|---------|---------------------|
+| Price | Free | $49/month |
+| Interface | Search-based | Pushed + searchable |
+| Analysis | None | Win scoring |
+| Personalization | Manual filters | AI-curated |
+| Access | Full | Full |
+| Value | "Find it yourself" | "We find it + you verify" |
+
+**Positioning:** "SAM.gov gives you access but no intelligence. We give you both."
+
+---
+
+## Implementation Changes
+
+### Email Template
 
 ```typescript
-// src/lib/briefings/templates/the-one-thing.ts
+// src/lib/briefings/templates/market-intel-v2.ts
 
-interface OnePriorityEmail {
+interface MarketIntelEmail {
   user: {
     name: string;
     email: string;
     naics: string[];
     setAside: string;
-    state: string;
   };
-  priority: {
+  priorities: { // Changed from single "priority"
     title: string;
     agency: string;
     value: string;
     daysLeft: number;
     winScore: number;
     whyReasons: string[];
-    actionToday: string[];
+    actionToday: string;
     samLink: string;
-  };
-  alsoOnRadar: {
-    title: string;
-    daysLeft: number;
-    score: number;
-  }[]; // max 2-3
+  }[]; // 3-5 items
+  totalMatching: number; // "1,373 more opportunities"
+  dashboardLink: string;
 }
 ```
 
-### Scoring Algorithm (Simplified)
+### Dashboard (Unhide It)
 
-Current: 6 factors, complex weighting
-Future: 3 factors that actually matter
+Current state: Dashboard exists at `/briefings/dashboard` but not linked.
+
+Action: Add "Browse All Opportunities →" link to:
+1. Daily email footer
+2. `/briefings` main page
+3. Alert preferences page
+
+### Scoring Algorithm (Simplified, Keep It)
+
+The current 3-factor scoring works:
 
 ```typescript
 function calculatePriorityScore(opp: Opportunity, user: User): number {
@@ -255,7 +365,6 @@ function calculatePriorityScore(opp: Opportunity, user: User): number {
                         opp.setAside === 'SBA' && user.setAside ? 20 : 0;
 
   // Factor 3: Timing (0-20 points)
-  // Prioritize 7-21 day window (not too urgent, not too far)
   const daysLeft = daysBetween(new Date(), opp.closeDate);
   const timingScore = daysLeft >= 7 && daysLeft <= 21 ? 20 :
                       daysLeft > 21 && daysLeft <= 45 ? 10 : 5;
@@ -264,242 +373,84 @@ function calculatePriorityScore(opp: Opportunity, user: User): number {
 }
 ```
 
-### Daily Cron Job
+---
 
-```
-1. 2:00 AM ET: Fetch opportunities from SAM.gov, Grants.gov, Forecasts
-2. 2:30 AM ET: Score all opportunities for all users
-3. 3:00 AM ET: For each user, select THE ONE highest-scoring opportunity
-4. 6:00 AM ET: Send emails (one email per user, ONE priority)
-```
+## Phase 1 Implementation (Updated)
 
-### Database Simplification
+### Week 1-2: Email + Dashboard Link
 
-**Drop:** `briefing_templates` multi-type complexity
-**Keep:** Simple user preferences + daily email log
+- [ ] Update email template: show 3-5 priorities (not 1)
+- [ ] Add "Browse All X Opportunities →" link to email
+- [ ] Link `/briefings/dashboard` from main `/briefings` page
+- [ ] Add total matching count to email
 
-```sql
--- Simplified user preferences
-CREATE TABLE user_intel_profile (
-  email TEXT PRIMARY KEY,
-  name TEXT,
-  naics_codes TEXT[], -- max 3
-  set_aside TEXT, -- one primary
-  state TEXT,
-  created_at TIMESTAMP,
-  last_email_at TIMESTAMP
-);
+### Week 3-4: Dashboard Polish
 
--- Simple email log
-CREATE TABLE daily_intel_log (
-  id UUID PRIMARY KEY,
-  user_email TEXT,
-  sent_at TIMESTAMP,
-  priority_opp_id TEXT,
-  priority_score INTEGER,
-  opened BOOLEAN DEFAULT FALSE,
-  clicked BOOLEAN DEFAULT FALSE
-);
-```
+- [ ] Add basic filters: deadline, type, agency
+- [ ] Add sort options: score, deadline, value
+- [ ] Add CSV export
+- [ ] Optimize for mobile
+
+### Week 5-6: Metrics + Iterate
+
+- [ ] Instrument dashboard engagement tracking
+- [ ] A/B test: email with/without dashboard link
+- [ ] Interview 10 users: "Do you browse the dashboard?"
+- [ ] Adjust based on data
 
 ---
 
-## Onboarding Flow
-
-### Current: Complex
-
-- Multiple NAICS codes
-- Multiple agencies
-- Keywords
-- Delivery preferences
-- Timezone
-- Frequency options
-
-### Future: 3 Questions, 60 Seconds
-
-**Screen 1:**
-```
-What's your email?
-[email input]
-```
-
-**Screen 2:**
-```
-What do you do? (pick ONE)
-○ IT Services
-○ Management Consulting
-○ Engineering
-○ Construction
-○ Professional Services
-○ Other: [input]
-```
-
-**Screen 3:**
-```
-What's your certification? (pick ONE)
-○ 8(a)
-○ WOSB/EDWOSB
-○ SDVOSB
-○ HUBZone
-○ Small Business (no certification)
-○ Large Business
-```
-
-**Done.**
-
-We infer NAICS from their selection. We can always ask for refinement later.
-
----
-
-## Pricing
-
-### The Calendly Model
-
-**Calendly:**
-- Free: Basic scheduling, Calendly branding
-- Pro: $12/month — removes branding, integrations
-- Team: $20/month — team features
-
-**GovCon Daily Intel:**
-
-| Tier | Price | Features |
-|------|-------|----------|
-| **Free** | $0 | Daily email, top 1 priority, GCG branding |
-| **Pro** | $49/mo | Daily email, top 1 + "on radar" 3, no branding, priority support |
-| **Team** | $149/mo | Up to 5 users, shared view, team Slack notifications |
-
-### Why $49/month
-
-- Deltek GovWin IQ: $500+/month
-- We're 10x cheaper
-- Low enough for owner-operators to pay personally
-- High enough to filter serious users
-
-### Revenue Math
-
-Current: 9,000 leads
-- 5% convert to free trial = 450
-- 10% of free convert to paid = 45 paying users
-- 45 × $49 = $2,205/month
-
-**Growth target:**
-- 12 months: 500 paid users = $24,500/month
-- 24 months: 2,000 paid users = $98,000/month
-- 36 months: 10,000 paid users = $490,000/month
-
-At 10,000 paid users, we're a $6M ARR business with one product.
-
----
-
-## Success Metrics
-
-### North Star Metric
-
-**"Priority Action Rate"** — % of users who take action on their #1 priority within 24 hours
-
-Target: 30%+ (measured via link clicks + feedback)
-
-### Supporting Metrics
-
-| Metric | Target | Why |
-|--------|--------|-----|
-| Email open rate | 60%+ | Shows relevance |
-| Click rate | 20%+ | Shows action |
-| Free → Paid conversion | 10%+ | Shows value |
-| Monthly churn | <5% | Shows stickiness |
-| Referrals per user | 0.5+ | Shows viral potential |
-| Time to first value | <60 seconds | Shows simplicity |
-
----
-
-## Competitive Positioning
-
-### vs. Deltek GovWin IQ
-
-| | GovWin IQ | GovCon Daily Intel |
-|--|-----------|-------------------|
-| Price | $500+/month | $49/month |
-| Interface | Complex dashboard | One email |
-| Learning curve | Weeks | 60 seconds |
-| Data | Comprehensive | Curated for you |
-| Value | "All the data" | "THE one thing" |
-
-**Positioning:** "GovWin gives you everything. We give you THE answer."
-
-### vs. SAM.gov
-
-| | SAM.gov | GovCon Daily Intel |
-|--|---------|-------------------|
-| Price | Free | $49/month |
-| Interface | Search-based | Pushed to you |
-| Analysis | None | Win scoring |
-| Personalization | Manual filters | AI-curated |
-| Value | "Find opportunities" | "We find YOUR opportunity" |
-
-**Positioning:** "SAM.gov makes you hunt. We bring the prey to you."
-
----
-
-## Phase 1 Implementation (MVP)
-
-### Week 1-2: Simplify
-
-- [ ] Consolidate 7 email templates → 1
-- [ ] Remove dashboard/tracking features from emails
-- [ ] Implement "ONE priority" scoring algorithm
-- [ ] Create 3-question onboarding flow
-
-### Week 3-4: Launch
-
-- [ ] Migrate existing users to new format
-- [ ] A/B test: old format vs new "ONE thing" format
-- [ ] Implement referral tracking ("Forward to friend")
-- [ ] Set up metrics dashboard (opens, clicks, actions)
-
-### Week 5-6: Iterate
-
-- [ ] Analyze Priority Action Rate
-- [ ] Interview 10 users: "Did you take action? Why/why not?"
-- [ ] Adjust scoring algorithm based on feedback
-- [ ] Implement feedback loop in email ("Was this helpful?")
-
-### Week 7-8: Monetize
-
-- [ ] Launch Pro tier ($49/month)
-- [ ] Implement Stripe subscription
-- [ ] Create upgrade prompts in free tier emails
-- [ ] Track conversion metrics
-
----
-
-## Risks & Mitigations
+## Risks & Mitigations (Updated)
 
 | Risk | Mitigation |
 |------|------------|
-| Users want more data, not less | Test with segment; some will upgrade to Deltek and that's ok |
-| ONE priority is wrong/irrelevant | Strong feedback loop, rapid algorithm iteration |
-| Low viral coefficient | Add explicit referral incentives, make sharing frictionless |
-| Deltek copies us | They won't — it cannibalizes their enterprise model |
-| Revenue too low at $49/mo | Volume play; also opens door for upsells (BD Dept product) |
+| Dashboard reduces email engagement | Track both; email is hook, dashboard is power |
+| Users overwhelmed by full list | Progressive disclosure; default to top 10 |
+| Dashboard becomes Deltek-complex | Strict scope guard; resist feature creep |
+| Free users abuse dashboard | Rate limit API; require login for full access |
 
 ---
 
-## Appendix: The "No Software" Parallel
+## Appendix: Why We Changed
 
-**Salesforce's genius insight (1999):**
-> "Companies don't need their own CRM installed on-premise."
+### The Honest Realization
 
-They weren't anti-software. They were anti-complexity.
+The original PRD said:
+> "No dashboard link — the email IS the product"
 
-**Our insight (2026):**
-> "Contractors don't need dashboards. They need answers."
+Users said:
+> "This shows 1,373 opportunities but how do I see them all?"
 
-We're not anti-tool. We're anti-overwhelm.
+We were wrong. Users looking to win government contracts worth hundreds of thousands of dollars don't want to be locked out of data. They want:
 
-The email IS the product. No login required. No dashboard to check. No learning curve.
+1. **Help prioritizing** (email does this)
+2. **Full access to verify** (dashboard does this)
+3. **Tools to filter** (dashboard filters do this)
 
-Open email → See priority → Take action → Done.
+### The Spotify Model
+
+Spotify doesn't say "Here's ONE song for today, trust us."
+
+Spotify says:
+- Here's Discover Weekly (30 curated songs) → **Our daily email**
+- PLUS your full library with smart filters → **Our dashboard**
+- PLUS search across 100M+ tracks → **SAM.gov integration**
+
+We should follow this pattern: **Curation + Access**.
 
 ---
 
-*Last Updated: April 13, 2026*
+## Sources
+
+- [Shopify Founder Story](https://www.founderoo.co/playbooks/tobi-lutke-shopify)
+- [HubSpot's SMB Strategy](https://www.saastr.com/hubspots-journey-to-the-first-2-billion-in-arr-how-co-founders-dharmesh-shah-and-brian-halligan-scaled-an-smb-saas-giant/)
+- [Airtable Design Philosophy](https://www.madrona.com/airtable-howie-liu-no-code-apps-product-led-growth-ai-enabled-workflows/)
+- [Notion Product Evolution](https://www.lennysnewsletter.com/p/inside-notion-ivan-zhao)
+- [LinkedIn Sales Navigator Value](https://www.tribalimpact.com/blog/linkedin-basic-vs-sales-navigator-worth-the-money/)
+- [Redfin on Listing Access](https://www.redfin.com/news/buyers-should-see-all-the-listings-sellers-should-control-how-their-listing-appears-online/)
+- [Spotify Discover Weekly](https://newsroom.spotify.com/2019-05-02/five-ways-to-make-your-discover-weekly-playlists-even-more-personalized/)
+- [GovWin IQ Pricing](https://www.vendr.com/buyer-guides/govwin-iq)
+
+---
+
+*Last Updated: April 21, 2026 — v2.0 "Low Floor, High Ceiling" rewrite*

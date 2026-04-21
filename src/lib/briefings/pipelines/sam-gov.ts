@@ -78,6 +78,16 @@ interface SAMSearchResult {
   fetchedAt: string;
 }
 
+interface SAMNoticeSummary {
+  totalMatched: number;
+  rfp: number;
+  rfq: number;
+  sourcesSought: number;
+  preSol: number;
+  combined: number;
+  other: number;
+}
+
 interface SAMRawOpportunity {
   noticeId?: string;
   title?: string;
@@ -108,6 +118,37 @@ interface SAMRawOpportunity {
   uiLink?: string;
   lastModifiedDate?: string;
   [key: string]: unknown;
+}
+
+interface SAMCacheOpportunityRow {
+  notice_id: string;
+  title: string;
+  solicitation_number: string | null;
+  naics_code: string | null;
+  psc_code: string | null;
+  description: string | null;
+  department: string | null;
+  sub_tier: string | null;
+  office: string | null;
+  posted_date: string | null;
+  response_deadline: string | null;
+  archive_date: string | null;
+  set_aside_code: string | null;
+  set_aside_description: string | null;
+  notice_type: string | null;
+  active: boolean;
+  pop_city: string | null;
+  pop_state: string | null;
+  pop_zip: string | null;
+  pop_country: string | null;
+  ui_link: string | null;
+  last_modified: string | null;
+}
+
+interface SAMCacheNoticeSummaryRow {
+  notice_type: string | null;
+  title: string | null;
+  description: string | null;
 }
 
 // SAM.gov API base URL
@@ -730,62 +771,14 @@ export async function fetchSamOpportunitiesFromCache(
   console.log(`[SAM Cache] Querying database for ${searchCriteria.join(' | ') || 'all opportunities'}`);
 
   try {
-    // Build query
-    let query = supabase
-      .from('sam_opportunities')
-      .select('*')
-      .eq('active', true)
-      .gte('response_deadline', new Date().toISOString()) // Only future deadlines
-      .order('response_deadline', { ascending: true })
-      .limit(limit);
-
-    // NAICS filter - match ANY of the user's codes using OR with prefix matching
-    // SAM.gov stores NAICS codes in various lengths (2-6 digits), so we use LIKE
-    // to match all related codes (e.g., "236" matches "236", "236115", "236220", etc.)
-    if (naicsCodes.length > 0) {
-      // Get unique 3-digit prefixes from all codes for broader matching
-      const prefixes = new Set<string>();
-      for (const code of naicsCodes) {
-        // Use 3-digit prefix for consistent matching
-        const prefix = code.slice(0, 3);
-        if (prefix.length === 3 && /^\d{3}$/.test(prefix)) {
-          prefixes.add(prefix);
-        }
-      }
-
-      // Build LIKE filter for each prefix
-      // Format: naics_code.like.236%,naics_code.like.237%,...
-      // NOTE: Supabase PostgREST uses % as wildcard (not *)
-      const naicsFilters = Array.from(prefixes).map(prefix => `naics_code.like.${prefix}%`).join(',');
-      if (naicsFilters) {
-        query = query.or(naicsFilters);
-        console.log(`[SAM Cache] Using NAICS prefix filters: ${naicsFilters}`);
-      }
-    }
-
-    // PSC filter - match ANY of the user's PSC codes using prefix matching
-    // PSC codes can be 1-4 characters (e.g., "R" for R&D, "R4" for more specific)
-    if (pscCodes.length > 0) {
-      // Use prefix matching for flexibility (e.g., "R4" matches "R405", "R499")
-      const pscFilters = pscCodes.map(psc => `psc_code.like.${psc}%`).join(',');
-      if (pscFilters) {
-        query = query.or(pscFilters);
-        console.log(`[SAM Cache] Using PSC prefix filters: ${pscFilters}`);
-      }
-    }
-
-    // Set-aside filter
-    if (setAsides.length > 0) {
-      const setAsideFilters = setAsides.map(s => `set_aside_code.eq.${s}`).join(',');
-      query = query.or(setAsideFilters);
-    }
-
-    // State filter
-    const stateList = states || (state ? [state] : []);
-    if (stateList.length > 0) {
-      const stateFilters = stateList.map(s => `pop_state.eq.${s}`).join(',');
-      query = query.or(stateFilters);
-    }
+    let query = applySamCacheFilters(
+      supabase
+        .from('sam_opportunities')
+        .select('*')
+        .order('response_deadline', { ascending: true })
+        .limit(limit),
+      params
+    );
 
     const { data, error, count } = await query;
 
@@ -797,7 +790,8 @@ export async function fetchSamOpportunitiesFromCache(
     console.log(`[SAM Cache] Found ${data?.length || 0} opportunities from database`);
 
     // Transform database records to SAMOpportunity interface
-    const opportunities: SAMOpportunity[] = (data || []).map(row => ({
+    const rows = (data || []) as SAMCacheOpportunityRow[];
+    const opportunities: SAMOpportunity[] = rows.map(row => ({
       noticeId: row.notice_id,
       title: row.title,
       solicitationNumber: row.solicitation_number || '',
@@ -845,6 +839,138 @@ export async function fetchSamOpportunitiesFromCache(
   }
 }
 
+// Supabase query builders use complex fluent generics; keep this helper permissive.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applySamCacheFilters(query: any, params: SAMSearchParams) {
+  const {
+    naicsCodes = [],
+    pscCodes = [],
+    setAsides = [],
+    state,
+    states,
+  } = params;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let filteredQuery = query as any;
+
+  filteredQuery = filteredQuery.eq('active', true);
+  filteredQuery = filteredQuery.gte('response_deadline', new Date().toISOString());
+
+  if (naicsCodes.length > 0) {
+    const prefixes = new Set<string>();
+    for (const code of naicsCodes) {
+      const prefix = code.slice(0, 3);
+      if (prefix.length === 3 && /^\d{3}$/.test(prefix)) {
+        prefixes.add(prefix);
+      }
+    }
+
+    const naicsFilters = Array.from(prefixes).map(prefix => `naics_code.like.${prefix}%`).join(',');
+    if (naicsFilters) {
+      filteredQuery = filteredQuery.or(naicsFilters);
+      console.log(`[SAM Cache] Using NAICS prefix filters: ${naicsFilters}`);
+    }
+  }
+
+  if (pscCodes.length > 0) {
+    const pscFilters = pscCodes.map(psc => `psc_code.like.${psc}%`).join(',');
+    if (pscFilters) {
+      filteredQuery = filteredQuery.or(pscFilters);
+      console.log(`[SAM Cache] Using PSC prefix filters: ${pscFilters}`);
+    }
+  }
+
+  if (setAsides.length > 0) {
+    const setAsideFilters = setAsides.map(s => `set_aside_code.eq.${s}`).join(',');
+    filteredQuery = filteredQuery.or(setAsideFilters);
+  }
+
+  const stateList = states || (state ? [state] : []);
+  if (stateList.length > 0) {
+    const stateFilters = stateList.map(s => `pop_state.eq.${s}`).join(',');
+    filteredQuery = filteredQuery.or(stateFilters);
+  }
+
+  return filteredQuery;
+}
+
+function classifyNoticeType(noticeType: string | null | undefined): keyof Omit<SAMNoticeSummary, 'totalMatched'> {
+  const type = (noticeType || '').toLowerCase();
+  if (type.includes('solicitation') || type.includes('rfp')) return 'rfp';
+  if (type.includes('rfq') || type.includes('quote')) return 'rfq';
+  if (type.includes('source') || type.includes('rfi') || type.includes('market research')) return 'sourcesSought';
+  if (type.includes('presol') || type.includes('intent') || type.includes('pre-sol')) return 'preSol';
+  if (type.includes('combined')) return 'combined';
+  return 'other';
+}
+
+export async function fetchSamOpportunityNoticeSummaryFromCache(
+  params: SAMSearchParams
+): Promise<SAMNoticeSummary> {
+  if (!supabase) {
+    console.error('[SAM Cache] Supabase client not initialized');
+    return { totalMatched: 0, rfp: 0, rfq: 0, sourcesSought: 0, preSol: 0, combined: 0, other: 0 };
+  }
+
+  const summary: SAMNoticeSummary = {
+    totalMatched: 0,
+    rfp: 0,
+    rfq: 0,
+    sourcesSought: 0,
+    preSol: 0,
+    combined: 0,
+    other: 0,
+  };
+
+  const keywordLower = (params.keywords || []).map(keyword => keyword.toLowerCase());
+  const pageSize = 1000;
+
+  try {
+    for (let from = 0; ; from += pageSize) {
+      let query = applySamCacheFilters(
+        supabase
+          .from('sam_opportunities')
+          .select('notice_type,title,description')
+          .order('response_deadline', { ascending: true })
+          .range(from, from + pageSize - 1),
+        params
+      );
+
+      const { data, error } = await query;
+      if (error) {
+        console.error('[SAM Cache] Notice summary query error:', error);
+        return summary;
+      }
+
+      const rows = (data || []) as SAMCacheNoticeSummaryRow[];
+      if (rows.length === 0) {
+        break;
+      }
+
+      for (const row of rows) {
+        if (keywordLower.length > 0) {
+          const text = `${row.title || ''} ${row.description || ''}`.toLowerCase();
+          if (!keywordLower.some(keyword => text.includes(keyword))) {
+            continue;
+          }
+        }
+
+        summary.totalMatched++;
+        summary[classifyNoticeType(row.notice_type)]++;
+      }
+
+      if (rows.length < pageSize) {
+        break;
+      }
+    }
+
+    return summary;
+  } catch (error) {
+    console.error('[SAM Cache] Error building notice summary:', error);
+    return summary;
+  }
+}
+
 /**
  * Fetch opportunities for a user - prefers cache, falls back to API
  */
@@ -871,4 +997,4 @@ export async function fetchOpportunitiesForUserCached(
   return fetchSamOpportunitiesFromCache(params);
 }
 
-export type { SAMOpportunity, SAMSearchParams, SAMSearchResult };
+export type { SAMOpportunity, SAMSearchParams, SAMSearchResult, SAMNoticeSummary };

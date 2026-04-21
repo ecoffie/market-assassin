@@ -101,14 +101,29 @@ export async function GET(request: NextRequest) {
   const agency = searchParams.get('agency') || '';
   const urgency = searchParams.get('urgency') || '';
   const setAside = searchParams.get('setAside') || '';
-  const naics = searchParams.get('naics') || '';
+  let naics = searchParams.get('naics') || '';
   const state = searchParams.get('state') || '';
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
   const mode = searchParams.get('mode') || 'list'; // list | stats | export
+  const email = searchParams.get('email')?.toLowerCase().trim() || '';
 
   try {
     const supabase = getSupabase();
+
+    // If email provided, load user's NAICS profile for filtering
+    let userNaicsCodes: string[] = [];
+    if (email && !naics) {
+      const { data: profile } = await supabase
+        .from('user_notification_settings')
+        .select('naics_codes')
+        .ilike('user_email', email)
+        .maybeSingle();
+
+      if (profile?.naics_codes?.length > 0) {
+        userNaicsCodes = profile.naics_codes;
+      }
+    }
 
     // Build base query
     let query = supabase
@@ -132,6 +147,25 @@ export async function GET(request: NextRequest) {
     }
     if (naics) {
       query = query.or(`naics_code.eq.${naics},naics_code.like.${naics.substring(0, 3)}%`);
+    }
+    // Apply user's profile NAICS codes if loaded from email
+    if (userNaicsCodes.length > 0) {
+      // Build OR filter for all user's NAICS codes
+      // Combines exact matches for full codes + prefix matches for short codes
+      const conditions: string[] = [];
+      for (const code of userNaicsCodes) {
+        const trimmed = String(code).trim();
+        if (trimmed.length <= 4) {
+          // Short code - prefix match
+          conditions.push(`naics_code.like.${trimmed}%`);
+        } else {
+          // Full code - exact match
+          conditions.push(`naics_code.eq.${trimmed}`);
+        }
+      }
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      }
     }
     if (state) {
       query = query.eq('pop_state', state.toUpperCase());

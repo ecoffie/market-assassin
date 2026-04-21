@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 interface ProfileStatsBarProps {
   email: string;
+  onTabChange?: (tab: string) => void;
 }
 
 interface ProfileStats {
@@ -27,7 +29,7 @@ interface ProfileStatsResponse {
   };
 }
 
-export default function ProfileStatsBar({ email }: ProfileStatsBarProps) {
+export default function ProfileStatsBar({ email, onTabChange }: ProfileStatsBarProps) {
   const [stats, setStats] = useState<ProfileStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -96,15 +98,19 @@ export default function ProfileStatsBar({ email }: ProfileStatsBarProps) {
     <div className="bg-gradient-to-r from-purple-900/30 via-purple-800/20 to-purple-900/30 border-b border-purple-500/20">
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          {/* Main headline stat */}
-          <div className="flex items-center gap-2">
+          {/* Main headline stat - clickable to dashboard with profile filter */}
+          <Link
+            href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
+            className="flex items-center gap-2 hover:bg-purple-500/10 rounded-lg px-2 py-1 -mx-2 transition-colors group"
+          >
             <span className="text-lg">🎯</span>
-            <span className="text-white font-semibold">
+            <span className="text-white font-semibold group-hover:text-purple-300">
               {profileStats.totalActiveMatching.toLocaleString()}
             </span>
-            <span className="text-gray-300 text-sm">opportunities match your profile</span>
+            <span className="text-gray-300 text-sm group-hover:text-purple-200">opportunities match your profile</span>
             {getTrendIcon()}
-          </div>
+            <span className="text-gray-500 group-hover:text-purple-400 text-xs">→</span>
+          </Link>
 
           {/* Divider */}
           <div className="hidden sm:block w-px h-4 bg-gray-700"></div>
@@ -118,16 +124,22 @@ export default function ProfileStatsBar({ email }: ProfileStatsBarProps) {
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 text-gray-400">
+            <Link
+              href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
+              className="flex items-center gap-1.5 text-gray-400 hover:text-purple-300 transition-colors"
+            >
               <span>📅</span>
               <span>{profileStats.matchesThisWeek} this week</span>
-            </div>
+            </Link>
 
             {profileStats.forecastsMatching > 0 && (
-              <div className="flex items-center gap-1.5 text-amber-400">
+              <button
+                onClick={() => onTabChange?.('forecasts')}
+                className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+              >
                 <span>🔮</span>
                 <span>{profileStats.forecastsMatching} forecasts</span>
-              </div>
+              </button>
             )}
           </div>
         </div>

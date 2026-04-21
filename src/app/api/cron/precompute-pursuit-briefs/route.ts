@@ -15,7 +15,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
+import { fetchSamOpportunityNoticeSummaryFromCache, SAMNoticeSummary } from '@/lib/briefings/pipelines/sam-gov';
+import { generatePursuitBriefFromProfileInput } from '@/lib/briefings/delivery/pursuit-brief-generator';
 import crypto from 'crypto';
 
 const PROFILES_PER_RUN = 25; // Increased from 10 to ensure 125 profiles covered across 5 cron windows
@@ -40,8 +41,66 @@ interface PursuitBrief {
   actionPlan: { day: number; action: string; owner: string }[];
   risks: { risk: string; likelihood: string; impact: string; mitigation: string }[];
   immediateNextMove: { action: string; owner: string; deadline: string };
+  relatedMarketSignals: { headline: string; source: string; implication: string; actionRequired: boolean }[];
   processingTimeMs: number;
   sourceNoticeId?: string;
+}
+
+function extractOpportunityKeywords(title: string | undefined): string[] {
+  if (!title) return [];
+  const stopWords = new Set(['the', 'and', 'for', 'with', 'from', 'into', 'support', 'services', 'contract', 'opportunity']);
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length >= 5 && !stopWords.has(word))
+    .slice(0, 4);
+}
+
+function buildPursuitMarketSignals(
+  summary: SAMNoticeSummary,
+  opportunity: { agency?: string; title?: string; naics?: string }
+): Array<{ headline: string; source: string; implication: string; actionRequired: boolean }> {
+  if (summary.totalMatched === 0) return [];
+
+  const targetLabel = opportunity.agency || opportunity.naics || 'this lane';
+  const signals: Array<{ headline: string; source: string; implication: string; actionRequired: boolean }> = [
+    {
+      headline: `${summary.totalMatched} matched active SAM notices around ${targetLabel}`,
+      source: 'SAM.gov Cache',
+      implication: 'This pursuit sits inside a broader active market. Calibrate your bid/no-bid against nearby demand and timing.',
+      actionRequired: false,
+    },
+  ];
+
+  if (summary.sourcesSought > 0) {
+    signals.push({
+      headline: `${summary.sourcesSought} related Sources Sought / RFI notices remain open`,
+      source: 'SAM.gov Cache',
+      implication: 'There may still be a requirements-shaping window nearby. Capture should check for response or briefing opportunities immediately.',
+      actionRequired: true,
+    });
+  }
+
+  if (summary.preSol > 0) {
+    signals.push({
+      headline: `${summary.preSol} presolicitation notices suggest follow-on activity`,
+      source: 'SAM.gov Cache',
+      implication: 'Use presol activity to map likely follow-ons, teaming posture, and agency buying sequence before final solicitation.',
+      actionRequired: true,
+    });
+  }
+
+  if (summary.rfp + summary.rfq + summary.combined > 0) {
+    signals.push({
+      headline: `${summary.rfp + summary.rfq + summary.combined} adjacent solicitation-stage notices are already active`,
+      source: 'SAM.gov Cache',
+      implication: 'Competitors may already be mobilized in this market. Positioning speed and outreach urgency matter more now.',
+      actionRequired: summary.rfp + summary.rfq + summary.combined >= 3,
+    });
+  }
+
+  return signals.slice(0, 4);
 }
 
 function hashNaicsProfile(naicsCodes: string[]): string {
@@ -233,11 +292,37 @@ function getSupabase() {
           };
         }
 
-        // Generate pursuit brief with AI
-        const brief = await generatePursuitBrief(topOpp, {
-          naics: profile.naics_codes,
-          agencies: [],
+        const marketKeywords = extractOpportunityKeywords(topOpp.title);
+        const noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
+          naicsCodes: profile.naics_codes,
+          keywords: marketKeywords.length > 0 ? marketKeywords : undefined,
         });
+
+        // Generate pursuit brief with AI
+        const brief = await generatePursuitBriefFromProfileInput(
+          profile.naics_profile_hash,
+          {
+            naics_codes: profile.naics_codes,
+            agencies: [],
+            keywords: [],
+            watched_companies: [],
+            primary_industry: null,
+          },
+          {
+            contractNumber: typeof topOpp.noticeId === 'string' ? topOpp.noticeId : undefined,
+            contractName: typeof topOpp.title === 'string' ? topOpp.title : undefined,
+            agency: typeof topOpp.agency === 'string' ? topOpp.agency : undefined,
+            naicsCode: typeof topOpp.naics === 'string' ? topOpp.naics : undefined,
+            deadline: typeof topOpp.deadline === 'string' ? topOpp.deadline : undefined,
+            value: undefined,
+            description: undefined,
+            rawData: topOpp,
+          },
+          buildPursuitMarketSignals(noticeSummary, topOpp)
+        );
+        if (!brief) {
+          throw new Error('Shared pursuit generator returned null');
+        }
         brief.processingTimeMs = Date.now() - profileStartTime;
         brief.sourceNoticeId = topOpp.noticeId;
 
@@ -301,76 +386,4 @@ function getSupabase() {
       elapsed: Date.now() - startTime,
     }, { status: 500 });
   }
-}
-
-async function generatePursuitBrief(
-  opportunity: Record<string, unknown>,
-  userProfile: { naics: string[]; agencies: string[] }
-): Promise<PursuitBrief> {
-  const prompt = `You are a senior GovCon capture manager. Generate a 1-page Pursuit Brief.
-
-USER PROFILE:
-- NAICS Codes: ${userProfile.naics.join(', ') || 'General services'}
-- Target Agencies: ${userProfile.agencies.join(', ') || 'All federal agencies'}
-
-OPPORTUNITY DATA:
-${JSON.stringify(opportunity, null, 2)}
-
-Generate JSON with:
-1. "contractName" - descriptive name
-2. "agency" - Department / Sub-agency
-3. "value" - formatted value (e.g., "$5M", "$500K", "TBD")
-4. "opportunityScore" - 0-100 based on fit and winability
-5. "whyWorthPursuing" - 2-3 sentence strategic rationale
-6. "workingHypothesis" - Theory of the case for winning
-7. "priorityIntel" - 5 must-answer questions
-8. "outreachTargets" - 4 people to contact. Each: priority (1-4), name, role, company, approach
-9. "actionPlan" - 5-day plan. Each: day (1-5), action, owner
-10. "risks" - 4 risks. Each: risk, likelihood, impact, mitigation
-11. "immediateNextMove" - Single most important action: action, owner, deadline
-
-SCORING GUIDE:
-- 90-100: Must pursue - perfect fit
-- 75-89: Strong pursuit
-- 60-74: Conditional pursuit
-- 45-59: Selective pursuit
-- Below 45: No-bid likely
-
-Return ONLY valid JSON.`;
-
-  const { text } = await generateBriefingJson(
-    'pursuit',
-    'You are a senior GovCon capture manager.',
-    prompt,
-    3000
-  );
-
-  const data = extractAndParseJSON<{
-    contractName?: string;
-    agency?: string;
-    value?: string;
-    opportunityScore?: number;
-    whyWorthPursuing?: string;
-    workingHypothesis?: string;
-    priorityIntel?: string[];
-    outreachTargets?: { priority: number; name: string; role: string; company?: string; approach: string }[];
-    actionPlan?: { day: number; action: string; owner: string }[];
-    risks?: { risk: string; likelihood: string; impact: string; mitigation: string }[];
-    immediateNextMove?: { action: string; owner: string; deadline: string };
-  }>(text);
-
-  return {
-    contractName: data.contractName || String(opportunity.title || 'Unknown Opportunity'),
-    agency: data.agency || String(opportunity.agency || 'Unknown Agency'),
-    value: data.value || 'TBD',
-    opportunityScore: data.opportunityScore || 50,
-    whyWorthPursuing: data.whyWorthPursuing || '',
-    workingHypothesis: data.workingHypothesis || '',
-    priorityIntel: data.priorityIntel || [],
-    outreachTargets: data.outreachTargets || [],
-    actionPlan: data.actionPlan || [],
-    risks: data.risks || [],
-    immediateNextMove: data.immediateNextMove || { action: 'Review opportunity', owner: 'Capture Lead', deadline: 'Tomorrow' },
-    processingTimeMs: 0,
-  };
 }

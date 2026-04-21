@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface ProviderStatus {
   status: string;
@@ -75,21 +75,29 @@ interface DashboardData {
   dailyMetrics: unknown[];
 }
 
-const ADMIN_PASSWORD = 'galata-assassin-2026';
-
 export default function ToolHealthDashboard() {
+  const [password, setPassword] = useState('');
+  const [authenticated, setAuthenticated] = useState(false);
   const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkingProviders, setCheckingProviders] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!password) return;
+    setLoading(true);
     try {
-      const res = await fetch(`/api/admin/tool-health?password=${ADMIN_PASSWORD}`);
+      const res = await fetch(`/api/admin/tool-health?password=${encodeURIComponent(password)}`);
+      if (res.status === 401) {
+        setAuthenticated(false);
+        setError('Invalid password');
+        return;
+      }
       const json = await res.json();
       if (json.success) {
         setData(json);
         setError(null);
+        setAuthenticated(true);
       } else {
         setError(json.error || 'Failed to fetch data');
       }
@@ -98,12 +106,12 @@ export default function ToolHealthDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [password]);
 
   const checkProviders = async () => {
     setCheckingProviders(true);
     try {
-      await fetch(`/api/admin/tool-health?password=${ADMIN_PASSWORD}`, {
+      await fetch(`/api/admin/tool-health?password=${encodeURIComponent(password)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'check_providers' }),
@@ -118,7 +126,7 @@ export default function ToolHealthDashboard() {
 
   const resolveError = async (errorId: string) => {
     try {
-      await fetch(`/api/admin/tool-health?password=${ADMIN_PASSWORD}`, {
+      await fetch(`/api/admin/tool-health?password=${encodeURIComponent(password)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'resolve', errorId }),
@@ -129,24 +137,51 @@ export default function ToolHealthDashboard() {
     }
   };
 
-  useEffect(() => {
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Refresh every 30s
-    return () => clearInterval(interval);
-  }, []);
+  };
 
-  if (loading) {
+  useEffect(() => {
+    // Auto-refresh every 30 seconds if authenticated
+    if (authenticated && password) {
+      const interval = setInterval(fetchData, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [authenticated, password, fetchData]);
+
+  // Login form if not authenticated
+  if (!authenticated) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <div className="text-xl">Loading dashboard...</div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-gray-800 rounded-lg p-8 max-w-md w-full">
+          <h1 className="text-2xl font-bold text-white mb-6">Tool Health Dashboard</h1>
+          <form onSubmit={handleLogin}>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter admin password"
+              className="w-full px-4 py-3 rounded bg-gray-700 text-white border border-gray-600 focus:border-purple-500 focus:outline-none mb-4"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded transition-colors"
+            >
+              {loading ? 'Loading...' : 'Login'}
+            </button>
+          </form>
+          {error && <p className="mt-4 text-red-400">{error}</p>}
+        </div>
       </div>
     );
   }
 
-  if (error) {
+  if (loading && !data) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <div className="text-red-400 text-xl">{error}</div>
+        <div className="text-xl">Loading dashboard...</div>
       </div>
     );
   }

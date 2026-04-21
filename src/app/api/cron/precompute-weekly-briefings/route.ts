@@ -15,7 +15,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
+import { fetchSamOpportunityNoticeSummaryFromCache } from '@/lib/briefings/pipelines/sam-gov';
+import { generateWeeklyDeepDiveFromContracts } from '@/lib/briefings/delivery/weekly-briefing-generator';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import crypto from 'crypto';
 
@@ -84,38 +85,6 @@ interface ContractForBriefing {
   description: string;
   numberOfBids?: number;
   competitionLevel?: string;
-}
-
-interface WeeklyOpportunity {
-  rank: number;
-  contractName: string;
-  agency: string;
-  incumbent: string;
-  value: number;
-  window: string;
-  displacementAngle: string;
-  keyDates: { label: string; date: string }[];
-  competitiveLandscape: string[];
-  recommendedApproach: string;
-}
-
-interface WeeklyTeamingPlay {
-  playNumber: number;
-  strategyName: string;
-  targetCompany: string;
-  whyTarget: string[];
-  whoToContact: string[];
-  suggestedOpener: string;
-  followUpMessage: string;
-}
-
-interface WeeklyBriefing {
-  weekOf: string;
-  opportunities: WeeklyOpportunity[];
-  teamingPlays: WeeklyTeamingPlay[];
-  marketSignals: { headline: string; source: string; implication: string; actionRequired: boolean }[];
-  calendar: { date: string; event: string; type: string; priority: string }[];
-  processingTimeMs: number;
 }
 
 function hashNaicsProfile(naicsCodes: string[]): string {
@@ -317,7 +286,13 @@ function getSupabase() {
         }
 
         // Generate AI analysis
-        const briefing = await generateWeeklyDeepDive(contracts);
+        const noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
+          naicsCodes: expandedNaics,
+          pscCodes: profile.aggregated_psc_codes.slice(0, 10),
+          keywords: profile.aggregated_keywords.slice(0, 20),
+        });
+
+        const briefing = await generateWeeklyDeepDiveFromContracts(contracts, noticeSummary);
         briefing.processingTimeMs = Date.now() - profileStartTime;
 
         // Store template
@@ -685,49 +660,4 @@ async function fetchContractsForNaics(naicsCodes: string[]): Promise<ContractFor
   }
 
   return allContracts.sort((a, b) => b.value - a.value).slice(0, 10);
-}
-
-async function generateWeeklyDeepDive(contracts: ContractForBriefing[]): Promise<WeeklyBriefing> {
-  // Use the same getWeekOfDate() calculation as the main function
-  // On Saturday: next Monday (weekOf = this Sunday's Monday)
-  // On Sunday: tomorrow (Monday)
-  const weekOfDate = getWeekOfDate();
-
-  const prompt = `You are a senior GovCon capture strategist. Generate a Weekly Deep Dive briefing with full analysis.
-
-CONTRACT DATA (REAL DATA FROM USASPENDING):
-${JSON.stringify(contracts, null, 2)}
-
-Generate JSON with:
-1. "opportunities" - Top 10 with FULL analysis. Each needs: rank, contractName, agency, incumbent, value (number), window, displacementAngle, keyDates (array of {label, date}), competitiveLandscape (array of 3-4 insights), recommendedApproach (string)
-2. "teamingPlays" - 3 DETAILED plays. Each: playNumber, strategyName, targetCompany, whyTarget (array), whoToContact (array), suggestedOpener, followUpMessage
-3. "marketSignals" - 4 news items. Each: headline, source, implication, actionRequired (boolean)
-4. "calendar" - 6 key dates. Each: date, event, type (deadline/industry_day/rfi_due/award_expected), priority (high/medium/low)
-
-Focus on contracts with low numberOfBids (1-2 bids = vulnerable incumbent) and near-term expiration.
-
-Return ONLY valid JSON.`;
-
-  const { text } = await generateBriefingJson(
-    'weekly',
-    'You are a senior GovCon capture strategist.',
-    prompt,
-    6000
-  );
-
-  const data = extractAndParseJSON<{
-    opportunities?: WeeklyOpportunity[];
-    teamingPlays?: WeeklyTeamingPlay[];
-    marketSignals?: { headline: string; source: string; implication: string; actionRequired: boolean }[];
-    calendar?: { date: string; event: string; type: string; priority: string }[];
-  }>(text);
-
-  return {
-    weekOf: weekOfDate,
-    opportunities: data.opportunities || [],
-    teamingPlays: data.teamingPlays || [],
-    marketSignals: data.marketSignals || [],
-    calendar: data.calendar || [],
-    processingTimeMs: 0,
-  };
 }

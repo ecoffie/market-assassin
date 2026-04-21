@@ -10,7 +10,7 @@
 6. **SAM.gov API does NOT support comma-separated NAICS codes.** Must make parallel requests for each NAICS code and merge results. See `src/lib/briefings/pipelines/sam-gov.ts`.
 7. **FPDS.gov retired Feb 24, 2026.** All federal contract data now flows through SAM.gov APIs. See `docs/sam-apis.md` for full reference.
 8. **Always run QA tests before deploying.** Use `npm run deploy` (runs tests first) or `npm run test:pre-deploy`.
-9. **Unified notification table:** All alert/briefing code uses `user_notification_settings` (not the old `user_alert_settings` or `user_briefing_profile` tables which were dropped).
+9. **Unified notification table:** All alert/briefing code uses `user_notification_settings` (not the old `user_alert_settings` or `user_briefing_profile` tables which were dropped). The `smart-profile` service (`src/lib/smart-profile/`) is **dead code** - its `user_briefing_profile` table was never deployed.
 10. **Daily briefings MUST use fast GREEN builder.** `send-briefings-fast` must use `buildSamGreenBriefing()` (instant, no AI), NOT `generateDailyBriefFromSam()` which calls Claude API (~4s/user, causes timeouts). Run `tests/test-briefing-architecture.sh` to verify.
 11. **Briefing log MUST include briefing_type in all queries.** The `briefing_log` table has a unique constraint on `(user_email, briefing_date, briefing_type)`. All INSERT/UPDATE/SELECT must filter by `briefing_type` ('daily', 'weekly', 'pursuit') to avoid collisions between briefing types.
 12. **Weekly-alerts uses batching.** `BATCH_SIZE=15` users per cron run to avoid Vercel 60s timeout. Deduplication checks `alert_log` for `alert_type='weekly'`.
@@ -410,12 +410,18 @@ Top 15 highest-scoring opportunities selected for each template.
 - `src/components/briefings/GrantsPanel.tsx` — Grants search UI
 - `src/components/briefings/SbirPanel.tsx` — SBIR/STTR search UI
 
-**Dashboard Features (April 9, 2026):**
+**Dashboard Features (April 21, 2026):**
 - **Search bar** — Find opportunities by title, agency, keywords with highlighting
-- **Filter buttons** — All, Urgent, Opportunities, Teaming with counts
+- **Advanced filters** — Search, Notice Type, Urgency, Set-Aside, NAICS, State, Agency
+- **Profile-based filtering** — Clicking from stats bar auto-filters by user's profile
 - **CSV export** — Download filtered briefing data as spreadsheet
 - **Print/PDF** — Browser print dialog for PDF export
 - **Email feedback** — Thumbs up/down buttons in emails track helpfulness
+
+**Forecasts Search Filters (April 21, 2026):**
+- NAICS Code, Agency, State (NEW), Set-Aside, Keyword
+- Auto-loads user profile when switching to FORECASTS tab
+- Database has `pop_state`, `program_office`, `contracting_office` fields
 
 **Feedback System:**
 - API: `/api/briefings/feedback` (GET for email links, POST for programmatic)
@@ -1000,4 +1006,4 @@ done
 
 ---
 
-*Last Updated: April 19, 2026 — Two-Stage Fetch & Score for Weekly Briefings, Agency Intelligence Expansion (307 agencies)*
+*Last Updated: April 21, 2026 — MI Dashboard Advanced Filters (NAICS, State, Agency), Forecasts State Filter*

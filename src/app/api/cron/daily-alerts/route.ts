@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchSamOpportunities, fetchSamOpportunitiesFromCache, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
+import {
+  fetchSamOpportunities,
+  fetchSamOpportunitiesFromCache,
+  fetchSamOpportunityNoticeSummaryFromCache,
+  scoreOpportunity,
+  SAMOpportunity,
+  SAMNoticeSummary,
+} from '@/lib/briefings/pipelines/sam-gov';
 import { searchGrantsByNAICS, scoreGrant, GrantOpportunity } from '@/lib/briefings/pipelines/grants-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
@@ -15,6 +22,7 @@ import {
 } from '@/lib/intelligence';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
+import { persistSentAlert } from '@/lib/alerts/delivery-log';
 
 // BATCH_SIZE: Process this many users per cron run
 // With 4 runs/day (11, 12, 14, 16 UTC), 100 users × 4 = 400 users/day
@@ -417,20 +425,21 @@ async function runDailyAlertJob(options?: {
 
       try {
         // DISABLED: Timezone filtering removed Apr 17, 2026
-        // All users now receive alerts in same batch (100% daily coverage)
-        // See: tasks/lessons.md - "Daily Alerts must send to ALL users daily"
+        // All daily-frequency users receive alerts in same batch (not staggered by timezone)
+        // Note: Only processes users with alert_frequency='daily' per query filter (line 327)
         // if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
         //   continue;
         // }
 
-        // BETA MODE: Send daily alerts to ALL users with NAICS (Apr 19, 2026)
-        // After beta ends (Apr 27, 2026), re-enable tier check to limit free users to weekly
-        // See: tasks/lessons.md - "Users need to receive emails to see value and upgrade"
+        // BETA MODE: Skip tier check for users with alert_frequency='daily' (Apr 19, 2026)
+        // Note: This route ONLY processes users where alert_frequency='daily' (line 327 query filter)
+        // Users with alert_frequency='weekly' go through weekly-alerts route instead
+        // After beta ends, re-enable tier check to limit free users to weekly-only
         const BETA_END_DATE = new Date('2026-05-28');
         const isBetaPeriod = new Date() < BETA_END_DATE;
 
         if (!isBetaPeriod) {
-          // Post-beta: Check tier - free tier users get weekly alerts, not daily
+          // Post-beta: Check tier - free tier users should use weekly alerts
           const tier = await getUserAlertTier(user.user_email);
           if (tier === 'free') {
             console.log(`[Daily Alerts] ${user.user_email} is free tier - will receive weekly alerts instead`);
@@ -439,7 +448,7 @@ async function runDailyAlertJob(options?: {
             continue;
           }
         }
-        // During beta: Everyone with NAICS gets daily alerts
+        // During beta: All daily-frequency users get alerts (tier check skipped)
 
         // Get NAICS codes - use defaults if user has none configured
         // Note: smart_user_profiles table was removed, using default NAICS as fallback
@@ -487,7 +496,15 @@ async function runDailyAlertJob(options?: {
         metrics.recordApiCall();
         let newOpportunities: SAMOpportunity[] = [];
         let allActiveOpportunities: SAMOpportunity[] = [];
+        let noticeSummary: SAMNoticeSummary | undefined;
         try {
+          noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
+            naicsCodes: expandedNaics,
+            keywords: userKeywords.length > 0 ? userKeywords : undefined,
+            setAsides,
+            states: userStates,
+          });
+
           const cacheResult = await fetchSamOpportunitiesFromCache({
             naicsCodes: expandedNaics,
             keywords: userKeywords.length > 0 ? userKeywords : undefined,
@@ -623,7 +640,15 @@ async function runDailyAlertJob(options?: {
         // Send email - now includes all active opportunities for deadline tracking and action tips
         try {
           metrics.recordEmailAttempted();
-          await sendDailyAlertEmail(user.user_email, scoredOpps, user, scoredGrants, allActiveOpportunities, actionTips);
+          await sendDailyAlertEmail(
+            user.user_email,
+            scoredOpps,
+            user,
+            scoredGrants,
+            allActiveOpportunities,
+            actionTips,
+            noticeSummary
+          );
 
           // Track successful send
           metrics.recordEmailSent();
@@ -639,13 +664,12 @@ async function runDailyAlertJob(options?: {
             itemIds: scoredOpps.slice(0, 20).map(o => o.noticeId),
           });
 
-          // Log the alert with opportunity IDs for deduplication
-          await getSupabase().from('alert_log').upsert({
-            user_email: user.user_email,
-            alert_date: new Date().toISOString().split('T')[0],
-            alert_type: 'daily',
-            opportunities_count: scoredOpps.length,
-            opportunities_data: scoredOpps.slice(0, 20).map(o => ({
+          await persistSentAlert({
+            supabase: getSupabase(),
+            email: user.user_email,
+            alertType: 'daily',
+            opportunitiesCount: scoredOpps.length,
+            opportunitiesData: scoredOpps.slice(0, 20).map(o => ({
               noticeId: o.noticeId,
               title: o.title,
               agency: o.department,
@@ -653,21 +677,8 @@ async function runDailyAlertJob(options?: {
               deadline: o.responseDeadline,
               score: o.score,
             })),
-            sent_at: new Date().toISOString(),
-            delivery_status: 'sent',
-            retry_count: 0,
-          }, {
-            onConflict: 'user_email,alert_date,alert_type',
+            currentTotalAlertsSent: (user as any).total_alerts_sent,
           });
-
-          // Update user stats (unified table)
-          await getSupabase()
-            .from('user_notification_settings')
-            .update({
-              last_alert_sent: new Date().toISOString(),
-              total_alerts_sent: (user as any).total_alerts_sent + 1 || 1,
-            })
-            .eq('user_email', user.user_email);
 
           console.log(`[Daily Alerts] ✅ Sent ${scoredOpps.length} opps to ${user.user_email}`);
           results.sent++;
@@ -884,8 +895,16 @@ function getDaysUntil(dateString: string): number {
 }
 
 // Count notice types for summary
-function countNoticeTypes(opps: SAMOpportunity[]): { rfp: number; rfq: number; sourcesSought: number; preSol: number; combined: number; other: number } {
-  const counts = { rfp: 0, rfq: 0, sourcesSought: 0, preSol: 0, combined: 0, other: 0 };
+function countNoticeTypes(opps: SAMOpportunity[]): SAMNoticeSummary {
+  const counts: SAMNoticeSummary = {
+    totalMatched: opps.length,
+    rfp: 0,
+    rfq: 0,
+    sourcesSought: 0,
+    preSol: 0,
+    combined: 0,
+    other: 0,
+  };
   for (const opp of opps) {
     const type = (opp.noticeType || '').toLowerCase();
     if (type.includes('solicitation') || type.includes('rfp')) counts.rfp++;
@@ -977,7 +996,8 @@ async function sendDailyAlertEmail(
   user: AlertUser,
   grants: (GrantOpportunity & { score: number })[] = [],
   allActiveOpportunities: SAMOpportunity[] = [],
-  actionTips: string[] = []
+  actionTips: string[] = [],
+  noticeSummary?: SAMNoticeSummary
 ) {
   const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
@@ -985,7 +1005,7 @@ async function sendDailyAlertEmail(
   const totalCount = opportunities.length + grants.length;
 
   // Count notice types for summary badges (from new opportunities)
-  const noticeCounts = countNoticeTypes(opportunities);
+  const noticeCounts = noticeSummary || countNoticeTypes(opportunities);
 
   // Get deadlines this week from ALL active opportunities (not just new ones)
   const oppsForDeadlines = allActiveOpportunities.length > 0 ? allActiveOpportunities : opportunities;
@@ -1102,7 +1122,7 @@ async function sendDailyAlertEmail(
   <!-- Notice Type Summary Section -->
   <div style="background: #f0fdf4; padding: 20px 24px; text-align: center; border-bottom: 2px solid #86efac;">
     <div style="font-size: 13px; font-weight: 700; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
-      📊 Notice Type Summary (${opportunities.length} Active)
+      📊 Notice Type Summary (${noticeCounts.totalMatched} matched active)
     </div>
     <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;">
       ${noticeCounts.rfp > 0 ? `<span class="notice-pill pill-rfp"><span class="notice-pill-count">${noticeCounts.rfp}</span> RFP/Solicitation</span>` : ''}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 interface NoticeTypeInfo {
@@ -90,7 +91,31 @@ const SET_ASIDE_LABELS: Record<string, string> = {
   'None': 'Full & Open',
 };
 
-export default function MIDashboard() {
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'DC', name: 'Washington DC' },
+  { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' }, { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' }, { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' },
+];
+
+function MIDashboardContent() {
+  const searchParams = useSearchParams();
+  const emailFromUrl = searchParams.get('email') || '';
+  const isProfileFiltered = !!emailFromUrl;
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -102,6 +127,9 @@ export default function MIDashboard() {
   const [noticeType, setNoticeType] = useState('');
   const [urgency, setUrgency] = useState('');
   const [setAside, setSetAside] = useState('');
+  const [naicsFilter, setNaicsFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [agencyFilter, setAgencyFilter] = useState('');
   const [page, setPage] = useState(1);
 
   // Expanded rows
@@ -109,7 +137,11 @@ export default function MIDashboard() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/mi-dashboard?mode=stats');
+      const params = new URLSearchParams();
+      params.set('mode', 'stats');
+      if (emailFromUrl) params.set('email', emailFromUrl);
+
+      const res = await fetch(`/api/mi-dashboard?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         setStats(data.stats);
@@ -117,7 +149,7 @@ export default function MIDashboard() {
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
-  }, []);
+  }, [emailFromUrl]);
 
   const fetchOpportunities = useCallback(async () => {
     setLoadingOpps(true);
@@ -125,10 +157,14 @@ export default function MIDashboard() {
       const params = new URLSearchParams();
       params.set('page', String(page));
       params.set('limit', '25');
+      if (emailFromUrl) params.set('email', emailFromUrl);
       if (search) params.set('search', search);
       if (noticeType) params.set('noticeType', noticeType);
       if (urgency) params.set('urgency', urgency);
       if (setAside) params.set('setAside', setAside);
+      if (naicsFilter) params.set('naics', naicsFilter);
+      if (stateFilter) params.set('state', stateFilter);
+      if (agencyFilter) params.set('agency', agencyFilter);
 
       const res = await fetch(`/api/mi-dashboard?${params.toString()}`);
       const data = await res.json();
@@ -141,7 +177,7 @@ export default function MIDashboard() {
     } finally {
       setLoadingOpps(false);
     }
-  }, [page, search, noticeType, urgency, setAside]);
+  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, emailFromUrl]);
 
   useEffect(() => {
     fetchStats().then(() => setLoading(false));
@@ -162,6 +198,9 @@ export default function MIDashboard() {
     setNoticeType('');
     setUrgency('');
     setSetAside('');
+    setNaicsFilter('');
+    setStateFilter('');
+    setAgencyFilter('');
     setPage(1);
   };
 
@@ -250,6 +289,11 @@ export default function MIDashboard() {
                 <span className="text-white font-bold text-sm">MI</span>
               </div>
               <span className="font-semibold">Market Intelligence Dashboard</span>
+              {isProfileFiltered && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  🎯 Your Profile
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -261,6 +305,14 @@ export default function MIDashboard() {
             </svg>
             Export CSV
           </button>
+          {isProfileFiltered && (
+            <Link
+              href="/briefings/dashboard"
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+            >
+              View All →
+            </Link>
+          )}
         </div>
       </header>
 
@@ -415,6 +467,37 @@ export default function MIDashboard() {
               <option value="WOSB">WOSB</option>
             </select>
 
+            {/* NAICS Code */}
+            <input
+              type="text"
+              value={naicsFilter}
+              onChange={(e) => setNaicsFilter(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="NAICS Code"
+              className="w-28 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
+              maxLength={6}
+            />
+
+            {/* State */}
+            <select
+              value={stateFilter}
+              onChange={(e) => { setStateFilter(e.target.value); setPage(1); }}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:border-purple-500 focus:outline-none"
+            >
+              <option value="">All States</option>
+              {US_STATES.map(state => (
+                <option key={state.code} value={state.code}>{state.code} - {state.name}</option>
+              ))}
+            </select>
+
+            {/* Agency */}
+            <input
+              type="text"
+              value={agencyFilter}
+              onChange={(e) => setAgencyFilter(e.target.value)}
+              placeholder="Agency"
+              className="w-32 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
+            />
+
             <button
               type="submit"
               className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
@@ -422,7 +505,7 @@ export default function MIDashboard() {
               Search
             </button>
 
-            {(search || noticeType || urgency || setAside) && (
+            {(search || noticeType || urgency || setAside || naicsFilter || stateFilter || agencyFilter) && (
               <button
                 type="button"
                 onClick={clearFilters}
@@ -439,7 +522,7 @@ export default function MIDashboard() {
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-400">
               Showing {opportunities.length} of {pagination.total.toLocaleString()} opportunities
-              {(search || noticeType || urgency || setAside) && ' (filtered)'}
+              {(search || noticeType || urgency || setAside || naicsFilter || stateFilter || agencyFilter) && ' (filtered)'}
             </p>
           </div>
         )}
@@ -590,5 +673,23 @@ export default function MIDashboard() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// Wrap in Suspense for useSearchParams
+export default function MIDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <span className="text-white font-bold text-xl">MI</span>
+          </div>
+          <p className="text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    }>
+      <MIDashboardContent />
+    </Suspense>
   );
 }

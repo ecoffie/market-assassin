@@ -158,18 +158,19 @@ export async function POST(request: NextRequest) {
     const customerName = session.customer_details?.name || undefined;
     const productName = lineItems.data[0]?.description || 'GovCon Product';
 
-    // AUTO-ENROLL ALL PURCHASERS in alert settings (free daily alerts during beta)
+    // AUTO-ENROLL ALL PURCHASERS in notification settings (free daily alerts during beta)
     // This ensures every paying customer gets daily opportunity alerts
+    // Note: Uses unified user_notification_settings table (not old user_alert_settings)
     if (supabase) {
       const { data: existingSettings } = await supabase
-        .from('user_alert_settings')
+        .from('user_notification_settings')
         .select('user_email')
         .eq('user_email', email.toLowerCase())
         .limit(1);
 
       if (!existingSettings || existingSettings.length === 0) {
-        // Create new alert settings for this purchaser
-        await supabase.from('user_alert_settings').insert({
+        // Create new notification settings for this purchaser
+        await supabase.from('user_notification_settings').insert({
           user_email: email.toLowerCase(),
           alerts_enabled: true,
           briefings_enabled: true,
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
       } else {
         // Ensure existing users have alerts enabled
         await supabase
-          .from('user_alert_settings')
+          .from('user_notification_settings')
           .update({
             alerts_enabled: true,
             briefings_enabled: true,
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
       // Alert Pro subscription - set user to daily frequency
       if (supabase) {
         await supabase
-          .from('user_alert_settings')
+          .from('user_notification_settings')
           .update({
             alert_frequency: 'daily',
             subscription_status: 'active',
@@ -250,7 +251,7 @@ export async function POST(request: NextRequest) {
       // Set alert frequency to daily for FHC members
       if (supabase) {
         await supabase
-          .from('user_alert_settings')
+          .from('user_notification_settings')
           .upsert({
             user_email: email.toLowerCase(),
             alert_frequency: 'daily',
@@ -381,7 +382,7 @@ export async function POST(request: NextRequest) {
           // Revert to weekly/free tier
           if (supabase) {
             await supabase
-              .from('user_alert_settings')
+              .from('user_notification_settings')
               .update({
                 alert_frequency: 'weekly',
                 subscription_status: 'canceled',
@@ -443,7 +444,7 @@ export async function POST(request: NextRequest) {
 
       // Revert alert frequency to weekly
       await supabase
-        .from('user_alert_settings')
+        .from('user_notification_settings')
         .update({
           alert_frequency: 'weekly',
           subscription_status: 'canceled',

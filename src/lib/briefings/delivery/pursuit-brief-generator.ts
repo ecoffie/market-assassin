@@ -34,6 +34,13 @@ export interface PursuitRisk {
   mitigation: string;
 }
 
+export interface PursuitMarketSignal {
+  headline: string;
+  source: string;
+  implication: string;
+  actionRequired: boolean;
+}
+
 export interface PursuitBrief {
   id: string;
   generatedAt: string;
@@ -58,9 +65,19 @@ export interface PursuitBrief {
     owner: string;
     deadline: string;
   };
+  relatedMarketSignals: PursuitMarketSignal[];
+  sourceNoticeId?: string;
 
   // Metadata
   processingTimeMs: number;
+}
+
+export interface PursuitProfileInput {
+  naics_codes: string[];
+  agencies: string[];
+  keywords: string[];
+  watched_companies: string[];
+  primary_industry?: string | null;
 }
 
 const SYSTEM_PROMPT = `You are a senior GovCon capture manager creating a 1-page pursuit brief for a specific opportunity. This brief enables a capture team to make a bid/no-bid decision and start positioning immediately.
@@ -195,71 +212,20 @@ export async function generatePursuitBrief(
       agencies: [],
       keywords: [],
       watched_companies: [],
+      primary_industry: null,
     };
-
-    const primaryIndustry = (profileData?.primary_industry as string) || null;
-
-    // Prioritize NAICS codes by primary industry
-    const prioritizedNaics = prioritizeNaicsByIndustry(profile.naics_codes, primaryIndustry);
-    console.log(`[PursuitBrief] Primary industry: ${primaryIndustry || 'none'}, prioritized NAICS: ${prioritizedNaics.slice(0, 5).join(', ')}...`);
-
-    // Update profile with prioritized codes for the AI prompt
-    profile.naics_codes = prioritizedNaics;
-
-    // Build user prompt with opportunity details
-    const userPrompt = buildUserPrompt(profile, opportunity);
-
-    console.log(`[PursuitBrief] Generating for ${opportunity.contractName || opportunity.contractNumber}...`);
-
-    const { text: responseText, provider, model } = await generateBriefingJson(
-      'pursuit',
-      SYSTEM_PROMPT,
-      userPrompt,
-      4000
+    const brief = await generatePursuitBriefFromProfileInput(
+      userEmail,
+      profile,
+      opportunity,
+      []
     );
-    const aiResponse = extractAndParseJSON<{
-      contractName?: string;
-      agency?: string;
-      value?: string;
-      opportunityScore?: number;
-      whyWorthPursuing?: string;
-      workingHypothesis?: string;
-      priorityIntel?: string[];
-      outreachTargets?: PursuitOutreachTarget[];
-      actionPlan?: PursuitActionItem[];
-      risks?: PursuitRisk[];
-      immediateNextMove?: { action: string; owner: string; deadline: string };
-    }>(responseText);
+    if (!brief) {
+      return null;
+    }
+    brief.processingTimeMs = Date.now() - startTime;
 
-    const brief: PursuitBrief = {
-      id: `pursuit-${userEmail}-${Date.now()}`,
-      generatedAt: new Date().toISOString(),
-      userId: userEmail,
-
-      contractName: aiResponse.contractName || opportunity.contractName || 'Unknown',
-      contractNumber: opportunity.contractNumber,
-      agency: aiResponse.agency || opportunity.agency || 'Unknown',
-      value: aiResponse.value || formatValue(opportunity.value),
-      opportunityScore: aiResponse.opportunityScore || 50,
-
-      whyWorthPursuing: aiResponse.whyWorthPursuing || '',
-      workingHypothesis: aiResponse.workingHypothesis || '',
-      priorityIntel: aiResponse.priorityIntel || [],
-      outreachTargets: aiResponse.outreachTargets || [],
-      actionPlan: aiResponse.actionPlan || [],
-      risks: aiResponse.risks || [],
-      immediateNextMove: aiResponse.immediateNextMove || {
-        action: 'Review opportunity details',
-        owner: 'Capture Lead',
-        deadline: 'Tomorrow',
-      },
-
-      processingTimeMs: Date.now() - startTime,
-    };
-
-    console.log(
-      `[PursuitBrief] Generated via ${provider}/${model}: Score ${brief.opportunityScore}/100 in ${brief.processingTimeMs}ms`
-    );
+    console.log(`[PursuitBrief] Generated shared brief: Score ${brief.opportunityScore}/100 in ${brief.processingTimeMs}ms`);
 
     return brief;
   } catch (error) {
@@ -268,14 +234,91 @@ export async function generatePursuitBrief(
   }
 }
 
-function buildUserPrompt(
-  profile: {
-    naics_codes: string[];
-    agencies: string[];
-    keywords: string[];
-    watched_companies: string[];
+export async function generatePursuitBriefFromProfileInput(
+  userId: string,
+  profile: PursuitProfileInput,
+  opportunity: {
+    contractNumber?: string;
+    contractName?: string;
+    agency?: string;
+    incumbent?: string;
+    value?: number;
+    naicsCode?: string;
+    description?: string;
+    deadline?: string;
+    rawData?: RecompeteContract | ContractAward | Record<string, unknown>;
   },
-  opportunity: Record<string, unknown>
+  relatedMarketSignals: PursuitMarketSignal[] = []
+): Promise<PursuitBrief | null> {
+  const startTime = Date.now();
+  const primaryIndustry = profile.primary_industry || null;
+  const prioritizedNaics = prioritizeNaicsByIndustry(profile.naics_codes, primaryIndustry);
+  console.log(`[PursuitBrief] Primary industry: ${primaryIndustry || 'none'}, prioritized NAICS: ${prioritizedNaics.slice(0, 5).join(', ')}...`);
+
+  const normalizedProfile: PursuitProfileInput = {
+    ...profile,
+    naics_codes: prioritizedNaics,
+  };
+
+  const userPrompt = buildUserPrompt(normalizedProfile, opportunity, relatedMarketSignals);
+
+  console.log(`[PursuitBrief] Generating for ${opportunity.contractName || opportunity.contractNumber}...`);
+
+  const { text: responseText, provider, model } = await generateBriefingJson(
+    'pursuit',
+    SYSTEM_PROMPT,
+    userPrompt,
+    4000
+  );
+  const aiResponse = extractAndParseJSON<{
+    contractName?: string;
+    agency?: string;
+    value?: string;
+    opportunityScore?: number;
+    whyWorthPursuing?: string;
+    workingHypothesis?: string;
+    priorityIntel?: string[];
+    outreachTargets?: PursuitOutreachTarget[];
+    actionPlan?: PursuitActionItem[];
+    risks?: PursuitRisk[];
+    immediateNextMove?: { action: string; owner: string; deadline: string };
+  }>(responseText);
+
+  const brief: PursuitBrief = {
+    id: `pursuit-${userId}-${Date.now()}`,
+    generatedAt: new Date().toISOString(),
+    userId,
+    contractName: aiResponse.contractName || opportunity.contractName || 'Unknown',
+    contractNumber: opportunity.contractNumber,
+    agency: aiResponse.agency || opportunity.agency || 'Unknown',
+    value: aiResponse.value || formatValue(opportunity.value),
+    opportunityScore: aiResponse.opportunityScore || 50,
+    whyWorthPursuing: aiResponse.whyWorthPursuing || '',
+    workingHypothesis: aiResponse.workingHypothesis || '',
+    priorityIntel: aiResponse.priorityIntel || [],
+    outreachTargets: aiResponse.outreachTargets || [],
+    actionPlan: aiResponse.actionPlan || [],
+    risks: aiResponse.risks || [],
+    immediateNextMove: aiResponse.immediateNextMove || {
+      action: 'Review opportunity details',
+      owner: 'Capture Lead',
+      deadline: 'Tomorrow',
+    },
+    relatedMarketSignals,
+    processingTimeMs: Date.now() - startTime,
+  };
+
+  console.log(
+    `[PursuitBrief] Generated via ${provider}/${model}: Score ${brief.opportunityScore}/100 in ${brief.processingTimeMs}ms`
+  );
+
+  return brief;
+}
+
+function buildUserPrompt(
+  profile: PursuitProfileInput,
+  opportunity: Record<string, unknown>,
+  relatedMarketSignals: PursuitMarketSignal[] = []
 ): string {
   return `Generate a 1-page pursuit brief for this opportunity:
 
@@ -287,6 +330,9 @@ USER PROFILE (the company considering this pursuit):
 
 OPPORTUNITY DETAILS:
 ${JSON.stringify(opportunity, null, 2)}
+
+RELATED MARKET SIGNALS:
+${JSON.stringify(relatedMarketSignals, null, 2)}
 
 Generate a complete pursuit brief with:
 1. Why Worth Pursuing (strategic rationale)
@@ -309,6 +355,7 @@ function buildProfile(profileData: Record<string, unknown>) {
     agencies: extractArray(aggregated?.agencies || profileData.agencies),
     keywords: extractArray(aggregated?.keywords || profileData.keywords),
     watched_companies: extractArray(aggregated?.watched_companies || profileData.watched_companies),
+    primary_industry: typeof profileData.primary_industry === 'string' ? profileData.primary_industry : null,
   };
 }
 

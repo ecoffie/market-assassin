@@ -598,7 +598,7 @@ export default function BriefingsDashboard() {
       />
 
       {/* Profile Stats Bar - Shows opportunity match stats */}
-      <ProfileStatsBar email={email} />
+      <ProfileStatsBar email={email} onTabChange={(tab) => setMainTab(tab as MainTab)} />
 
       {/* Settings Panel */}
       <SettingsPanel

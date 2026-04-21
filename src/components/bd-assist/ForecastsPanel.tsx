@@ -1,21 +1,39 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 
 interface Forecast {
   id: string;
-  source_agency: string;
   title: string;
   description?: string;
-  naics_code?: string;
-  naics_description?: string;
-  fiscal_year?: string;
-  anticipated_award_date?: string;
-  estimated_value_min?: number;
-  estimated_value_max?: number;
-  set_aside_type?: string;
-  contracting_office?: string;
-  pop_state?: string;
+  // API returns these field names (mapped from database)
+  agency?: string;
+  source_agency?: string; // fallback
+  department?: string;
+  office?: string;
+  naics?: string;
+  naics_code?: string; // fallback
+  naicsDescription?: string;
+  naics_description?: string; // fallback
+  psc?: string;
+  fiscalYear?: string;
+  fiscal_year?: string; // fallback
+  quarter?: string;
+  awardDate?: string;
+  anticipated_award_date?: string; // fallback
+  valueMin?: number;
+  valueMax?: number;
+  valueRange?: string;
+  estimated_value_min?: number; // fallback
+  estimated_value_max?: number; // fallback
+  estimated_value_range?: string; // fallback
+  setAside?: string;
+  set_aside_type?: string; // fallback
+  contractType?: string;
+  incumbent?: string;
+  state?: string;
+  pop_state?: string; // fallback
   status?: string;
 }
 
@@ -32,7 +50,28 @@ interface ForecastsStats {
 
 interface ForecastsPanelProps {
   email: string;
+  autoLoadProfile?: boolean; // Auto-load and filter by user's profile
 }
+
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'DC', name: 'Washington DC' },
+  { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' }, { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' }, { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' },
+];
 
 const AGENCY_COLORS: Record<string, { bg: string; text: string }> = {
   DOE: { bg: 'bg-amber-500/20', text: 'text-amber-400' },
@@ -69,19 +108,23 @@ function formatDate(dateStr: string | undefined): string {
   }
 }
 
-export default function ForecastsPanel({ email }: ForecastsPanelProps) {
+export default function ForecastsPanel({ email, autoLoadProfile = true }: ForecastsPanelProps) {
   const [summary, setSummary] = useState<ForecastsSummary | null>(null);
   const [stats, setStats] = useState<ForecastsStats | null>(null);
   const [forecasts, setForecasts] = useState<Forecast[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isProfileFiltered, setIsProfileFiltered] = useState(false);
+  const [userNaicsCodes, setUserNaicsCodes] = useState<string[]>([]);
+  const profileLoadedRef = useRef(false);
 
   // Search filters
   const [naicsFilter, setNaicsFilter] = useState('');
   const [agencyFilter, setAgencyFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [setAsideFilter, setSetAsideFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
 
   // Fetch summary and stats on mount
   useEffect(() => {
@@ -104,9 +147,55 @@ export default function ForecastsPanel({ email }: ForecastsPanelProps) {
     fetchSummary();
   }, []);
 
+  // Load user's NAICS profile and auto-search
+  useEffect(() => {
+    if (!autoLoadProfile || !email || profileLoadedRef.current) return;
+
+    async function loadProfileAndSearch() {
+      try {
+        const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`);
+        const data = await res.json();
+
+        if (data.success && data.data?.naicsCodes?.length > 0) {
+          const codes = data.data.naicsCodes;
+          setUserNaicsCodes(codes);
+          profileLoadedRef.current = true;
+
+          // Auto-search with first NAICS code (most specific)
+          // Use the first code for the search
+          setNaicsFilter(codes[0]);
+          setIsProfileFiltered(true);
+
+          // Trigger search with profile NAICS codes
+          setSearching(true);
+          const params = new URLSearchParams();
+          // Use OR logic for multiple NAICS - search each and combine
+          params.append('naics', codes[0]);
+          params.append('limit', '50');
+
+          const response = await fetch(`/api/forecasts?${params.toString()}`, {
+            headers: { 'X-User-Email': email },
+          });
+
+          if (response.ok) {
+            const searchData = await response.json();
+            if (searchData.success && searchData.forecasts) {
+              setForecasts(searchData.forecasts);
+            }
+          }
+          setSearching(false);
+        }
+      } catch (err) {
+        console.error('Failed to load profile for forecasts:', err);
+      }
+    }
+
+    loadProfileAndSearch();
+  }, [email, autoLoadProfile]);
+
   // Search forecasts
   const handleSearch = useCallback(async () => {
-    if (!naicsFilter && !agencyFilter && !searchQuery && !setAsideFilter) {
+    if (!naicsFilter && !agencyFilter && !searchQuery && !setAsideFilter && !stateFilter) {
       setForecasts([]);
       return;
     }
@@ -120,6 +209,7 @@ export default function ForecastsPanel({ email }: ForecastsPanelProps) {
       if (agencyFilter) params.append('agency', agencyFilter);
       if (searchQuery) params.append('search', searchQuery);
       if (setAsideFilter) params.append('setAside', setAsideFilter);
+      if (stateFilter) params.append('state', stateFilter);
       params.append('limit', '50');
 
       const response = await fetch(`/api/forecasts?${params.toString()}`, {
@@ -146,7 +236,7 @@ export default function ForecastsPanel({ email }: ForecastsPanelProps) {
     } finally {
       setSearching(false);
     }
-  }, [naicsFilter, agencyFilter, searchQuery, setAsideFilter, email]);
+  }, [naicsFilter, agencyFilter, searchQuery, setAsideFilter, stateFilter, email]);
 
   const getAgencyColors = (agency: string) => {
     return AGENCY_COLORS[agency] || { bg: 'bg-gray-500/20', text: 'text-gray-400' };
@@ -206,8 +296,23 @@ export default function ForecastsPanel({ email }: ForecastsPanelProps) {
 
       {/* Search Form */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Search Forecasts</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Search Forecasts</h3>
+          {userNaicsCodes.length > 0 && !isProfileFiltered && (
+            <button
+              onClick={() => {
+                setNaicsFilter(userNaicsCodes[0]);
+                setIsProfileFiltered(true);
+                // Trigger search
+                handleSearch();
+              }}
+              className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+            >
+              🎯 Use My Profile ({userNaicsCodes.length} NAICS)
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
           <div>
             <label className="block text-xs text-gray-500 mb-1">NAICS Code</label>
             <input
@@ -229,6 +334,21 @@ export default function ForecastsPanel({ email }: ForecastsPanelProps) {
               {stats?.byAgency.map((a) => (
                 <option key={a.agency} value={a.agency}>
                   {a.agency} ({a.count})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">State</label>
+            <select
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none"
+            >
+              <option value="">All States</option>
+              {US_STATES.map((s) => (
+                <option key={s.code} value={s.code}>
+                  {s.code} - {s.name}
                 </option>
               ))}
             </select>
@@ -261,7 +381,7 @@ export default function ForecastsPanel({ email }: ForecastsPanelProps) {
         </div>
         <button
           onClick={handleSearch}
-          disabled={searching || (!naicsFilter && !agencyFilter && !searchQuery && !setAsideFilter)}
+          disabled={searching || (!naicsFilter && !agencyFilter && !searchQuery && !setAsideFilter && !stateFilter)}
           className="px-6 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
         >
           {searching ? 'Searching...' : 'Search Forecasts'}
@@ -279,58 +399,141 @@ export default function ForecastsPanel({ email }: ForecastsPanelProps) {
       {forecasts.length > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-800 flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-              {forecasts.length} Forecasts Found
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                {forecasts.length} Forecasts Found
+              </h3>
+              {isProfileFiltered && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  🎯 Your Profile
+                </span>
+              )}
+            </div>
+            {isProfileFiltered && (
+              <button
+                onClick={() => {
+                  setIsProfileFiltered(false);
+                  setNaicsFilter('');
+                  setForecasts([]);
+                }}
+                className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+              >
+                Clear Filter
+              </button>
+            )}
           </div>
           <div className="divide-y divide-gray-800">
             {forecasts.map((forecast) => {
-              const colors = getAgencyColors(forecast.source_agency);
+              // Handle both API field names and fallback field names
+              const agencyCode = forecast.agency || forecast.source_agency || 'Unknown';
+              const naicsCode = forecast.naics || forecast.naics_code;
+              const naicsDesc = forecast.naicsDescription || forecast.naics_description;
+              const setAside = forecast.setAside || forecast.set_aside_type;
+              const valueMin = forecast.valueMin || forecast.estimated_value_min;
+              const valueMax = forecast.valueMax || forecast.estimated_value_max;
+              const valueRange = forecast.valueRange || forecast.estimated_value_range;
+              const awardDate = forecast.awardDate || forecast.anticipated_award_date;
+              const fiscalYear = forecast.fiscalYear || forecast.fiscal_year;
+              const state = forecast.state || forecast.pop_state;
+              const colors = getAgencyColors(agencyCode);
+
               return (
                 <div key={forecast.id} className="p-5 hover:bg-gray-800/50 transition-colors">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
+                      {/* Top badges row */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors.bg} ${colors.text}`}>
-                          {forecast.source_agency}
+                          {agencyCode}
                         </span>
-                        {forecast.set_aside_type && (
+                        {setAside && setAside !== 'No set aside used.' && (
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
-                            {forecast.set_aside_type}
+                            {setAside}
                           </span>
                         )}
-                        {forecast.naics_code && (
+                        {forecast.contractType && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400">
+                            {forecast.contractType}
+                          </span>
+                        )}
+                        {naicsCode && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-300" title={naicsDesc}>
+                            NAICS {naicsCode}
+                          </span>
+                        )}
+                        {forecast.psc && (
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-300">
-                            NAICS {forecast.naics_code}
+                            PSC {forecast.psc}
                           </span>
                         )}
                       </div>
+
+                      {/* Title */}
                       <h4 className="text-white font-medium mb-1 line-clamp-2">{forecast.title}</h4>
-                      {forecast.description && (
-                        <p className="text-gray-400 text-sm line-clamp-2 mb-2">{forecast.description}</p>
+
+                      {/* Department/Office */}
+                      {(forecast.department || forecast.office) && (
+                        <p className="text-gray-400 text-sm mb-1">
+                          {forecast.department}{forecast.office ? ` • ${forecast.office}` : ''}
+                        </p>
                       )}
-                      <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                        {forecast.fiscal_year && (
-                          <span>FY: {forecast.fiscal_year}</span>
+
+                      {/* Description */}
+                      {forecast.description && (
+                        <p className="text-gray-500 text-sm line-clamp-2 mb-2">{forecast.description}</p>
+                      )}
+
+                      {/* Incumbent info */}
+                      {forecast.incumbent && (
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <span className="text-xs text-amber-500">⚠️ Incumbent:</span>
+                          <span className="text-xs text-amber-400 font-medium">{forecast.incumbent}</span>
+                        </div>
+                      )}
+
+                      {/* Details row */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                        {fiscalYear && (
+                          <span className="flex items-center gap-1">
+                            <span>📅</span> FY: {fiscalYear}{forecast.quarter ? ` ${forecast.quarter}` : ''}
+                          </span>
                         )}
-                        {forecast.anticipated_award_date && (
-                          <span>Award: {formatDate(forecast.anticipated_award_date)}</span>
+                        {awardDate && (
+                          <span className="flex items-center gap-1">
+                            <span>🎯</span> Award: {formatDate(awardDate)}
+                          </span>
                         )}
-                        {forecast.contracting_office && (
-                          <span>Office: {forecast.contracting_office}</span>
+                        {state && (
+                          <span className="flex items-center gap-1">
+                            <span>📍</span> {state}
+                          </span>
                         )}
-                        {forecast.pop_state && (
-                          <span>Location: {forecast.pop_state}</span>
+                        {naicsDesc && !naicsCode && (
+                          <span className="flex items-center gap-1 text-gray-600">
+                            {naicsDesc}
+                          </span>
                         )}
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      {(forecast.estimated_value_min || forecast.estimated_value_max) && (
-                        <div className="text-lg font-bold text-white">
-                          {forecast.estimated_value_min === forecast.estimated_value_max
-                            ? formatCurrency(forecast.estimated_value_max)
-                            : `${formatCurrency(forecast.estimated_value_min)} - ${formatCurrency(forecast.estimated_value_max)}`}
-                        </div>
+
+                    {/* Value column */}
+                    <div className="text-right shrink-0 min-w-[100px]">
+                      {(valueMin || valueMax || valueRange) && (
+                        <>
+                          <div className="text-lg font-bold text-emerald-400">
+                            {valueRange ? valueRange : (
+                              valueMin === valueMax
+                                ? formatCurrency(valueMax)
+                                : `${formatCurrency(valueMin)} - ${formatCurrency(valueMax)}`
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">Est. Value</div>
+                        </>
+                      )}
+                      {forecast.status && forecast.status !== 'forecast' && (
+                        <span className="mt-2 inline-block px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
+                          {forecast.status}
+                        </span>
                       )}
                     </div>
                   </div>

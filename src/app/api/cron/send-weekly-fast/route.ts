@@ -454,6 +454,11 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
     .opener-box { background: white; border-radius: 6px; padding: 14px; margin: 12px 0; border: 1px dashed #10b981; }
     .opener-label { font-size: 11px; color: #047857; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
     .opener-text { font-size: 13px; color: #1f2937; line-height: 1.5; margin: 0; font-style: italic; }
+    .signal-item { background: #eff6ff; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #2563eb; }
+    .signal-headline { font-size: 15px; font-weight: 700; color: #1e3a8a; margin: 0 0 6px; }
+    .signal-meta { font-size: 11px; color: #1d4ed8; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
+    .signal-implication { font-size: 13px; color: #1e3a8a; margin: 0; line-height: 1.5; }
+    .signal-required { display: inline-block; margin-top: 10px; font-size: 11px; font-weight: 700; color: #92400e; background: #fef3c7; padding: 4px 8px; border-radius: 999px; }
     .calendar-item { display: flex; padding: 12px; background: #f9fafb; border-radius: 6px; margin-bottom: 8px; align-items: center; }
     .cal-date { font-size: 13px; font-weight: 700; color: ${BRAND_COLOR}; width: 100px; }
     .cal-event { font-size: 13px; color: #111827; flex: 1; }
@@ -520,6 +525,22 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
       `).join('')}
     </div>
 
+    ${briefing.marketSignals?.length > 0 ? `
+      <div class="section" style="background: #f8fafc;">
+        <div class="section-header">
+          <h2>📡 MARKET SIGNALS</h2>
+        </div>
+        ${briefing.marketSignals.map(signal => `
+          <div class="signal-item">
+            <h3 class="signal-headline">${escapeHtml(signal.headline)}</h3>
+            <div class="signal-meta">${escapeHtml(signal.source)}</div>
+            <p class="signal-implication">${escapeHtml(signal.implication)}</p>
+            ${signal.actionRequired ? '<span class="signal-required">ACTION REQUIRED</span>' : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
     ${briefing.calendar?.length > 0 ? `
       <div class="section" style="background: #faf5ff;">
         <div class="section-header">
@@ -555,6 +576,19 @@ function generateWeeklyEmailText(briefing: WeeklyBriefing): string {
     text += `   Incumbent: ${opp.incumbent}\n`;
     text += `   Value: $${formatValue(opp.value)}\n`;
     text += `   DISPLACEMENT: ${opp.displacementAngle}\n\n`;
+  }
+
+  if (briefing.marketSignals?.length > 0) {
+    text += `MARKET SIGNALS\n${'-'.repeat(20)}\n`;
+    for (const signal of briefing.marketSignals) {
+      text += `- ${signal.headline}\n`;
+      text += `  Source: ${signal.source}\n`;
+      text += `  ${signal.implication}\n`;
+      if (signal.actionRequired) {
+        text += `  ACTION REQUIRED\n`;
+      }
+      text += '\n';
+    }
   }
 
   return text;
