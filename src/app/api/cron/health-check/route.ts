@@ -46,6 +46,14 @@ function getTransporter() {
   });
 }
 
+function getNextMondayDate(): string {
+  const today = new Date();
+  const dayOfWeek = today.getUTCDay(); // 0 = Sunday, 1 = Monday
+  const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  today.setUTCDate(today.getUTCDate() + daysToMonday);
+  return today.toISOString().split('T')[0];
+}
+
 async function runTest(
   name: string,
   category: string,
@@ -389,10 +397,15 @@ const tests = [
     critical: false,
     fn: async () => {
       const today = new Date().toISOString().split('T')[0];
+      const dayOfWeek = new Date().getUTCDay();
+      const templateDate =
+        dayOfWeek === 0 || dayOfWeek === 1
+          ? getNextMondayDate()
+          : today;
       const { data, error } = await getSupabase()
         .from('briefing_templates')
         .select('id')
-        .eq('template_date', today)
+        .eq('template_date', templateDate)
         .limit(1);
 
       if (error) {
@@ -406,8 +419,8 @@ const tests = [
       return {
         passed: templatesExist,
         message: templatesExist
-          ? 'Briefing templates generated today'
-          : 'No briefing templates for today (precompute may not have run)',
+          ? `Briefing templates available for ${templateDate}`
+          : `No briefing templates for ${templateDate} (precompute may not have run)`,
       };
     },
   },

@@ -92,30 +92,91 @@ function extractNaicsPrefixes(naicsCodes: string[]): string[] {
   const prefixes = new Set<string>();
   for (const code of naicsCodes) {
     const clean = code.replace(/\D/g, '');
-    if (clean.length >= 3) {
+    if (clean.length >= 6) {
+      prefixes.add(clean.slice(0, 6));
+      prefixes.add(clean.slice(0, 5));
+      prefixes.add(clean.slice(0, 4));
       prefixes.add(clean.slice(0, 3));
+    } else if (clean.length >= 3) {
+      prefixes.add(clean);
     }
   }
   return Array.from(prefixes);
 }
 
 /**
- * Build a prefix-to-template map for fallback matching.
+ * Build a prefix-to-templates map for fallback matching.
  */
 function buildPrefixMap(templates: Array<{ naics_profile: string; naics_profile_hash: string; [key: string]: unknown }>) {
-  const prefixMap = new Map<string, typeof templates[0]>();
+  const prefixMap = new Map<string, Array<typeof templates[0]>>();
   for (const template of templates) {
     try {
       const naicsCodes = JSON.parse(template.naics_profile) as string[];
       const prefixes = extractNaicsPrefixes(naicsCodes);
       for (const prefix of prefixes) {
-        if (!prefixMap.has(prefix)) {
-          prefixMap.set(prefix, template);
-        }
+        const existing = prefixMap.get(prefix) || [];
+        existing.push(template);
+        prefixMap.set(prefix, existing);
       }
     } catch { /* skip */ }
   }
   return prefixMap;
+}
+
+function scoreTemplateOverlap(userNaics: string[], template: { naics_profile: string }): number {
+  try {
+    const templateNaics = JSON.parse(template.naics_profile) as string[];
+    const userPrefixes = new Set(extractNaicsPrefixes(userNaics));
+    const templatePrefixes = new Set(extractNaicsPrefixes(templateNaics));
+    let overlap = 0;
+    for (const prefix of userPrefixes) {
+      if (templatePrefixes.has(prefix)) {
+        overlap += prefix.length;
+      }
+    }
+    return overlap;
+  } catch {
+    return 0;
+  }
+}
+
+function findBestTemplateMatch(
+  userNaics: string[],
+  templateMap: Map<string, BriefingTemplate>,
+  prefixMap: Map<string, BriefingTemplate[]>
+): { template: BriefingTemplate | undefined; matchType: 'exact' | 'prefix' | 'none'; matchedPrefix?: string } {
+  const naicsHash = hashNaicsProfile(userNaics);
+  const exact = templateMap.get(naicsHash);
+  if (exact) {
+    return { template: exact, matchType: 'exact' };
+  }
+
+  const candidates = new Map<string, BriefingTemplate>();
+  let matchedPrefix: string | undefined;
+
+  for (const prefix of extractNaicsPrefixes(userNaics)) {
+    const templates = prefixMap.get(prefix) || [];
+    if (templates.length > 0 && !matchedPrefix) {
+      matchedPrefix = prefix;
+    }
+    for (const template of templates) {
+      candidates.set(template.naics_profile_hash, template);
+    }
+  }
+
+  if (candidates.size === 0) {
+    return { template: undefined, matchType: 'none' };
+  }
+
+  const ranked = Array.from(candidates.values())
+    .map(template => ({ template, score: scoreTemplateOverlap(userNaics, template) }))
+    .sort((a, b) => b.score - a.score);
+
+  return {
+    template: ranked[0]?.template,
+    matchType: 'prefix',
+    matchedPrefix,
+  };
 }
 
 function getWeekOfDate(): string {
@@ -284,23 +345,13 @@ function getSupabase() {
     for (const user of usersToProcess) {
       try {
         const userNaics = user.naics_codes || [];
-        const naicsHash = hashNaicsProfile(userNaics);
-        let template = templateMap.get(naicsHash);
-        let matchType = 'exact';
+        const match = findBestTemplateMatch(userNaics, templateMap, prefixMap);
+        const template = match.template;
+        const matchType = match.matchType;
 
-        // Prefix fallback: if no exact match, try matching on primary NAICS prefix
-        if (!template && userNaics.length > 0) {
-          const userPrefixes = extractNaicsPrefixes(userNaics);
-          for (const prefix of userPrefixes) {
-            const prefixTemplate = prefixMap.get(prefix);
-            if (prefixTemplate) {
-              template = prefixTemplate;
-              matchType = 'prefix';
-              prefixMatchCount++;
-              console.log(`[SendWeeklyFast] Prefix match for ${user.email}: ${prefix}`);
-              break;
-            }
-          }
+        if (matchType === 'prefix' && match.matchedPrefix) {
+          prefixMatchCount++;
+          console.log(`[SendWeeklyFast] Prefix match for ${user.email}: ${match.matchedPrefix}`);
         }
 
         if (!template) {

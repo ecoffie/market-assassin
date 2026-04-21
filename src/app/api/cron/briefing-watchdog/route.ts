@@ -155,12 +155,14 @@ export async function GET(request: NextRequest) {
 }
 
 async function checkBriefingHealth(briefingType: string, date: string): Promise<HealthMetrics> {
+  const templateDate = getTemplateDateForBriefingType(briefingType, date);
+
   // Get template count
   const { count: templatesAvailable } = await getSupabase()
     .from('briefing_templates')
     .select('*', { count: 'exact', head: true })
     .eq('briefing_type', briefingType)
-    .gte('generated_at', `${date}T00:00:00Z`);
+    .eq('template_date', templateDate);
 
   // Get unique NAICS profiles (expected templates)
   const { data: profiles } = await getSupabase()
@@ -185,6 +187,7 @@ async function checkBriefingHealth(briefingType: string, date: string): Promise<
     .from('briefing_log')
     .select('delivery_status, user_email')
     .eq('briefing_date', date)
+    .eq('briefing_type', briefingType)
     .gte('created_at', `${date}T00:00:00Z`);
 
   type LogRow = { delivery_status: string; user_email: string };
@@ -234,6 +237,17 @@ async function checkBriefingHealth(briefingType: string, date: string): Promise<
     isHealthy,
     alertLevel,
   };
+}
+
+function getTemplateDateForBriefingType(briefingType: string, date: string): string {
+  if (briefingType === 'daily') return date;
+
+  const base = new Date(`${date}T00:00:00Z`);
+  const dayOfWeek = base.getUTCDay();
+  const monday = new Date(base);
+  const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  monday.setUTCDate(monday.getUTCDate() + daysToMonday);
+  return monday.toISOString().split('T')[0];
 }
 
 async function logHealthMetrics(metrics: HealthMetrics, date: string): Promise<void> {
