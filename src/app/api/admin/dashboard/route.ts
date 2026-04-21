@@ -126,10 +126,10 @@ async function getEmailStats(today: string) {
     const todayMidnight = `${today}T00:00:00Z`;
     const tomorrowMidnight = new Date(new Date(today).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] + 'T00:00:00Z';
 
-    // Note: briefing_type column doesn't exist yet - only use tools_included for type detection
+    // Query briefings sent today - use briefing_type for accurate type detection
     const { data: briefingData, error: briefingError } = await getSupabase()
       .from('briefing_log')
-      .select('delivery_status, tools_included')
+      .select('delivery_status, briefing_type, tools_included')
       .gte('email_sent_at', todayMidnight)
       .lt('email_sent_at', tomorrowMidnight);
 
@@ -150,8 +150,16 @@ async function getEmailStats(today: string) {
       for (const row of briefingData) {
         if (row.delivery_status === 'sent') {
           stats.briefings.sent++;
-          // Count by type using tools_included array
-          if (row.tools_included) {
+          // Count by briefing_type (primary) or tools_included (fallback)
+          const briefingType = row.briefing_type;
+          if (briefingType === 'daily') {
+            stats.briefings.byType.daily++;
+          } else if (briefingType === 'weekly') {
+            stats.briefings.byType.weekly++;
+          } else if (briefingType === 'pursuit') {
+            stats.briefings.byType.pursuit++;
+          } else if (row.tools_included) {
+            // Fallback for legacy records without briefing_type
             if (row.tools_included.includes('daily_market_intel') || row.tools_included.includes('sam_cache_green')) {
               stats.briefings.byType.daily++;
             } else if (row.tools_included.includes('weekly_deep_dive')) {

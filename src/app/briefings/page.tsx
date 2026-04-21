@@ -11,6 +11,10 @@ import SbirPanel from '@/components/briefings/SbirPanel';
 import GrantsPanel from '@/components/briefings/GrantsPanel';
 import ShareButton from '@/components/briefings/ShareButton';
 
+// Client-specific types for briefing display
+// Note: These are intentionally separate from server-side types in @/lib/briefings/delivery/types.ts
+// because the server types have additional fields (userId, processingTimeMs) not needed for UI rendering
+
 interface QuickStat {
   label: string;
   value: string | number;
