@@ -36,10 +36,10 @@ export async function GET(request: NextRequest) {
   const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek];
 
   // Get today's briefing sends
-  // Note: briefing_log uses email_sent_at (not sent_at) and tools_included (not briefing_type)
+  // briefing_log uses email_sent_at and briefing_type ('daily', 'weekly', 'pursuit')
   const { data: todayBriefings, error: briefingError } = await supabase
     .from('briefing_log')
-    .select('user_email, email_sent_at, delivery_status, tools_included')
+    .select('user_email, email_sent_at, delivery_status, briefing_type, tools_included')
     .gte('email_sent_at', `${todayUTC}T00:00:00Z`)
     .order('email_sent_at', { ascending: false })
     .limit(100);
@@ -52,10 +52,9 @@ export async function GET(request: NextRequest) {
     .order('sent_at', { ascending: false })
     .limit(100);
 
-  // Get pursuit briefs sent today (they're in briefing_log with tools_included containing 'pursuit_brief')
-  // Note: pursuit_brief_log table doesn't exist - pursuit briefs are tracked in briefing_log
+  // Get pursuit briefs sent today (stored in briefing_log with briefing_type='pursuit')
   const todayPursuits = (todayBriefings || []).filter(b =>
-    b.tools_included?.includes('pursuit_brief')
+    b.briefing_type === 'pursuit' || b.tools_included?.includes('pursuit_brief')
   );
 
   // Analyze for anomalies

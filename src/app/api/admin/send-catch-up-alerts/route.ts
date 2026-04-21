@@ -184,8 +184,9 @@ export async function GET(request: NextRequest) {
         })),
         sent_at: new Date().toISOString(),
         delivery_status: 'sent',
+        alert_type: 'daily',
       }, {
-        onConflict: 'user_email,alert_date',
+        onConflict: 'user_email,alert_date,alert_type',
       });
 
       await getSupabase()

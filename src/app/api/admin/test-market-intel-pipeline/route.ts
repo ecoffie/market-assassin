@@ -229,12 +229,14 @@ async function checkPursuitStatus(supabase: ReturnType<typeof getSupabase>): Pro
     .eq('briefings_enabled', true);
 
   // Check recent pursuit briefs (weekly - last 7 days)
+  // Pursuit briefs are now stored in briefing_log with briefing_type='pursuit'
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
   const { count: recentCount } = await supabase
-    .from('pursuit_brief_log')
+    .from('briefing_log')
     .select('*', { count: 'exact', head: true })
+    .eq('briefing_type', 'pursuit')
     .gte('created_at', weekAgo.toISOString());
 
   return {

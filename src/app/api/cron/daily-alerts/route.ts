@@ -193,6 +193,7 @@ async function saveFailedAlert(
     .upsert({
       user_email: email,
       alert_date: new Date().toISOString().split('T')[0],
+      alert_type: 'daily',
       opportunities_count: opportunities.length,
       opportunities_data: opportunities.slice(0, 20).map(o => ({
         noticeId: o.noticeId,
@@ -205,7 +206,7 @@ async function saveFailedAlert(
       error_message: error,
       retry_count: 0,
     }, {
-      onConflict: 'user_email,alert_date',
+      onConflict: 'user_email,alert_date,alert_type',
     });
 }
 
