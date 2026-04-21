@@ -97,6 +97,8 @@ export interface PrecomputedWeeklyBriefing {
   marketSignals: WeeklyMarketSignal[];
   calendar: Array<{ date: string; event: string; type: string; priority: string }>;
   processingTimeMs: number;
+  llmProvider?: string;
+  llmModel?: string;
 }
 
 function getWeekOfDate(): string {
@@ -502,7 +504,7 @@ Focus on contracts with low numberOfBids (1-2 bids = vulnerable incumbent) and n
 
 Return ONLY valid JSON.`;
 
-  const { text } = await generateBriefingJson(
+  const { text, provider, model } = await generateBriefingJson(
     'weekly',
     'You are a senior GovCon capture strategist.',
     prompt,
@@ -526,6 +528,8 @@ Return ONLY valid JSON.`;
     ].slice(0, 6),
     calendar: data.calendar || [],
     processingTimeMs: 0,
+    llmProvider: provider,
+    llmModel: model,
   };
 }
 

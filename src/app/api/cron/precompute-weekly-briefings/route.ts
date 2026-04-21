@@ -305,8 +305,8 @@ function getSupabase() {
           opportunities_count: briefing.opportunities.length,
           teaming_plays_count: briefing.teamingPlays.length,
           processing_time_ms: briefing.processingTimeMs,
-          llm_provider: 'groq',
-          llm_model: 'llama-3.3-70b-versatile',
+          llm_provider: briefing.llmProvider || 'unknown',
+          llm_model: briefing.llmModel || 'unknown',
           generated_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
         }, { onConflict: 'naics_profile_hash,template_date,briefing_type' });

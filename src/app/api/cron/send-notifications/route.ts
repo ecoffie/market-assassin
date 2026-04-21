@@ -429,21 +429,24 @@ export async function GET(request: NextRequest) {
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
   if (isVercelCron || hasCronSecret) {
-    return runNotificationJob();
+    return NextResponse.json({
+      success: false,
+      retired: true,
+      message: 'Legacy send-notifications cron has been retired. Use /api/cron/daily-alerts as the single daily alert engine.',
+      replacement: '/api/cron/daily-alerts',
+    }, { status: 410 });
   }
 
   return NextResponse.json({
-    message: 'Unified Notifications Cron',
-    description: 'Sends daily alerts only. Briefings are handled by /api/cron/send-briefings.',
+    message: 'Legacy Notifications Cron (Retired)',
+    description: 'This route has been retired in favor of /api/cron/daily-alerts.',
     usage: {
       test: 'GET ?email=xxx&test=true',
-      manual: 'POST with Authorization: Bearer {CRON_SECRET}',
+      replacement: 'Use /api/cron/daily-alerts for production sends',
     },
     features: [
-      'Alerts: SAM.gov opportunities',
-      'Respects alerts_enabled preferences',
-      'Timezone-aware coverage via multiple cron runs',
-      'Deduplication for recent alerts',
+      'Manual legacy test path only',
+      'Production alert cron is /api/cron/daily-alerts',
     ],
   });
 }
@@ -458,6 +461,14 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
+  if (!body.testEmail) {
+    return NextResponse.json({
+      success: false,
+      retired: true,
+      message: 'Legacy send-notifications route is retired for production use. Provide testEmail for explicit one-user testing or use /api/cron/daily-alerts.',
+    }, { status: 410 });
+  }
+
   return runNotificationJob({
     testEmail: body.testEmail,
     skipTimezoneCheck: body.skipTimezoneCheck,

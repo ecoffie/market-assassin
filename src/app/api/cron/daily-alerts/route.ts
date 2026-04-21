@@ -218,6 +218,27 @@ async function saveFailedAlert(
     });
 }
 
+async function saveSkippedAlert(
+  email: string,
+  reason: string,
+  context?: Record<string, unknown>
+) {
+  await getSupabase()
+    .from('alert_log')
+    .upsert({
+      user_email: email,
+      alert_date: new Date().toISOString().split('T')[0],
+      alert_type: 'daily',
+      opportunities_count: 0,
+      opportunities_data: context ? [context] : [],
+      delivery_status: 'skipped',
+      error_message: reason,
+      retry_count: 0,
+    }, {
+      onConflict: 'user_email,alert_date,alert_type',
+    });
+}
+
 /**
  * Retry failed alerts from previous runs
  */
@@ -615,13 +636,47 @@ async function runDailyAlertJob(options?: {
           // Continue without grants - don't fail the whole alert
         }
 
+        // If dedupe eliminated everything, resurface a small set of active opportunities
+        // instead of sending nothing. This keeps daily alerts behaving like a daily pulse
+        // product rather than an exact-match-only trigger.
+        let usedRepeatFallback = false;
+        if (scoredOpps.length === 0 && allActiveOpportunities.length > 0) {
+          const resurfacedOpps = allActiveOpportunities
+            .map(opp => ({
+              ...opp,
+              score: scoreOpportunity(opp, {
+                naics_codes: userNaics,
+                agencies: user.agencies || [],
+                keywords: userKeywords,
+              }),
+            }))
+            .filter(opp => getDaysUntil(opp.responseDeadline) <= 14)
+            .sort((a, b) => {
+              if (b.score !== a.score) return b.score - a.score;
+              return getDaysUntil(a.responseDeadline) - getDaysUntil(b.responseDeadline);
+            })
+            .slice(0, 10);
+
+          if (resurfacedOpps.length > 0) {
+            scoredOpps = resurfacedOpps;
+            usedRepeatFallback = true;
+            console.log(`[Daily Alerts] ${user.user_email}: Resurfacing ${scoredOpps.length} active opportunities after dedupe`);
+          }
+        }
+
         // Even if no NEW opportunities, we still want to send if there are deadlines or active opportunities
         const hasNewOpps = scoredOpps.length > 0 || scoredGrants.length > 0;
         const hasActiveDeadlines = allActiveOpportunities.length > 0;
 
         if (!hasNewOpps && !hasActiveDeadlines) {
           console.log(`[Daily Alerts] No new or active opportunities for ${user.user_email}`);
+          await saveSkippedAlert(user.user_email, 'no_new_or_active_opportunities', {
+            naicsCodes: userNaics.slice(0, 5),
+            keywordCount: userKeywords.length,
+            deduplicatedCount: dedupCount,
+          });
           results.noOpps++;
+          results.skipped++;
           metrics.recordUserSkipped();
           continue;
         }
@@ -676,6 +731,7 @@ async function runDailyAlertJob(options?: {
               naics: o.naicsCode,
               deadline: o.responseDeadline,
               score: o.score,
+              repeatFallback: usedRepeatFallback || undefined,
             })),
             currentTotalAlertsSent: (user as any).total_alerts_sent,
           });

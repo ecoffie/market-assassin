@@ -14,22 +14,6 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/send-notifications",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/send-notifications",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/send-notifications",
-      "schedule": "0 17 * * *"
-    },
-    {
-      "path": "/api/cron/send-notifications",
-      "schedule": "0 19 * * *"
-    },
-    {
       "path": "/api/cron/weekly-alerts",
       "schedule": "0 23 * * 0"
     },

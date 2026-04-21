@@ -67,6 +67,8 @@ export interface PursuitBrief {
   };
   relatedMarketSignals: PursuitMarketSignal[];
   sourceNoticeId?: string;
+  llmProvider?: string;
+  llmModel?: string;
 
   // Metadata
   processingTimeMs: number;
@@ -306,6 +308,8 @@ export async function generatePursuitBriefFromProfileInput(
     },
     relatedMarketSignals,
     processingTimeMs: Date.now() - startTime,
+    llmProvider: provider,
+    llmModel: model,
   };
 
   console.log(

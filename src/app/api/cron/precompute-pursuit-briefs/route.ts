@@ -27,6 +27,9 @@ interface NaicsProfile {
   naics_profile_hash: string;
   user_count: number;
   naics_codes: string[];
+  aggregated_agencies: string[];
+  aggregated_keywords: string[];
+  primary_industry: string | null;
 }
 
 interface PursuitBrief {
@@ -171,7 +174,7 @@ function getSupabase() {
     // Step 1: Get all unique NAICS profiles
     const { data: users, error: usersError } = await getSupabase()
       .from('user_notification_settings')
-      .select('user_email, naics_codes')
+      .select('user_email, naics_codes, agencies, keywords, primary_industry')
       .eq('briefings_enabled', true);
 
     if (usersError) {
@@ -188,13 +191,30 @@ function getSupabase() {
       const key = JSON.stringify([...naicsCodes].sort());
 
       if (profileMap.has(hash)) {
-        profileMap.get(hash)!.user_count++;
+        const existing = profileMap.get(hash)!;
+        existing.user_count++;
+        for (const agency of user.agencies || []) {
+          if (!existing.aggregated_agencies.includes(agency)) {
+            existing.aggregated_agencies.push(agency);
+          }
+        }
+        for (const keyword of user.keywords || []) {
+          if (!existing.aggregated_keywords.includes(keyword)) {
+            existing.aggregated_keywords.push(keyword);
+          }
+        }
+        if (!existing.primary_industry && user.primary_industry) {
+          existing.primary_industry = user.primary_industry;
+        }
       } else {
         profileMap.set(hash, {
           naics_profile: key,
           naics_profile_hash: hash,
           user_count: 1,
           naics_codes: naicsCodes,
+          aggregated_agencies: [...(user.agencies || [])],
+          aggregated_keywords: [...(user.keywords || [])],
+          primary_industry: user.primary_industry || null,
         });
       }
     }
@@ -236,11 +256,37 @@ function getSupabase() {
         console.log(`[PrecomputePursuit] Generating template for ${profile.user_count} users...`);
 
         // Get recent alerts for users in this NAICS profile
-        type UserRow = { naics_codes: string[]; user_email: string };
+        type UserRow = {
+          naics_codes: string[];
+          user_email: string;
+          agencies?: string[] | null;
+          keywords?: string[] | null;
+          primary_industry?: string | null;
+        };
         const usersWithProfile = (users || []).filter((u: UserRow) => {
           const hash = hashNaicsProfile(u.naics_codes || []);
           return hash === profile.naics_profile_hash;
         });
+
+        const aggregatedAgencies = [...profile.aggregated_agencies];
+        const aggregatedKeywords = [...profile.aggregated_keywords];
+        let primaryIndustry = profile.primary_industry;
+
+        for (const userWithProfile of usersWithProfile) {
+          for (const agency of userWithProfile.agencies || []) {
+            if (!aggregatedAgencies.includes(agency)) {
+              aggregatedAgencies.push(agency);
+            }
+          }
+          for (const keyword of userWithProfile.keywords || []) {
+            if (!aggregatedKeywords.includes(keyword)) {
+              aggregatedKeywords.push(keyword);
+            }
+          }
+          if (!primaryIndustry && userWithProfile.primary_industry) {
+            primaryIndustry = userWithProfile.primary_industry;
+          }
+        }
 
         const userEmails = usersWithProfile.map((u: UserRow) => u.user_email).slice(0, 50);
 
@@ -303,10 +349,10 @@ function getSupabase() {
           profile.naics_profile_hash,
           {
             naics_codes: profile.naics_codes,
-            agencies: [],
-            keywords: [],
+            agencies: aggregatedAgencies.slice(0, 10),
+            keywords: aggregatedKeywords.slice(0, 10),
             watched_companies: [],
-            primary_industry: null,
+            primary_industry: primaryIndustry,
           },
           {
             contractNumber: typeof topOpp.noticeId === 'string' ? topOpp.noticeId : undefined,
@@ -336,8 +382,8 @@ function getSupabase() {
           opportunities_count: 1,
           teaming_plays_count: brief.outreachTargets.length,
           processing_time_ms: brief.processingTimeMs,
-          llm_provider: 'groq',
-          llm_model: 'llama-3.3-70b-versatile',
+          llm_provider: brief.llmProvider || 'unknown',
+          llm_model: brief.llmModel || 'unknown',
           generated_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         }, { onConflict: 'naics_profile_hash,template_date,briefing_type' });
