@@ -23,6 +23,7 @@ interface NotificationSettingsRow {
   psc_codes: string[] | null;
   keywords: string[] | null;
   agencies: string[] | null;
+  business_type?: string | null;
   timezone?: string | null;
   sms_enabled?: boolean | null;
   phone_number?: string | null;
@@ -53,6 +54,7 @@ export interface BriefingAudienceUser {
   psc_codes: string[];
   keywords: string[];
   agencies: string[];
+  business_type?: string;
   timezone?: string;
   sms_enabled?: boolean;
   phone_number?: string;
@@ -176,7 +178,7 @@ async function fetchNotificationSettings(supabase: SupabaseClient): Promise<Noti
     // Users can still get PSC codes via NAICS crosswalk (see psc-crosswalk.ts)
     const { data, error } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, keywords, agencies, timezone, sms_enabled, phone_number, aggregated_profile')
+      .select('user_email, naics_codes, keywords, agencies, business_type, timezone, sms_enabled, phone_number, aggregated_profile')
       .eq('is_active', true)
       .order('user_email')
       .range(from, to);
@@ -187,7 +189,7 @@ async function fetchNotificationSettings(supabase: SupabaseClient): Promise<Noti
         console.warn('[rollout] Column missing in user_notification_settings, using minimal query');
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('user_notification_settings')
-          .select('user_email, naics_codes, timezone, sms_enabled, phone_number')
+          .select('user_email, naics_codes, business_type, timezone, sms_enabled, phone_number')
           .eq('is_active', true)
           .order('user_email')
           .range(from, to);
@@ -266,6 +268,7 @@ function buildCandidate(
     timezone?: string;
     sms_enabled?: boolean;
     phone_number?: string;
+    business_type?: string;
     source: AudienceSource;
   }
 ): BriefingAudienceUser {
@@ -281,6 +284,7 @@ function buildCandidate(
     psc_codes: mergedPsc,
     keywords: mergedKeywords,
     agencies: mergedAgencies,
+    business_type: next.business_type || existing?.business_type,
     timezone: next.timezone || existing?.timezone,
     sms_enabled: next.sms_enabled ?? existing?.sms_enabled,
     phone_number: next.phone_number ?? existing?.phone_number,
@@ -313,6 +317,7 @@ export async function fetchBriefingAudienceCandidates(
       psc_codes: Array.from(new Set([...normalizeArray(row.psc_codes), ...aggregatedPsc])),
       keywords: Array.from(new Set([...normalizeArray(row.keywords), ...aggregatedKeywords])),
       agencies: Array.from(new Set([...normalizeArray(row.agencies), ...aggregatedAgencies])),
+      business_type: row.business_type || undefined,
       timezone: row.timezone || undefined,
       sms_enabled: Boolean(row.sms_enabled),
       phone_number: row.phone_number || undefined,

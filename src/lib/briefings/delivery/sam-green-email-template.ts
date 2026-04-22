@@ -60,6 +60,7 @@ export interface SamStrategicRankingContext {
   naicsCodes?: string[];
   agencies?: string[];
   keywords?: string[];
+  businessType?: string;
 }
 
 export interface NoticeSummary {
@@ -244,12 +245,66 @@ function scoreKeywordFit(opportunity: SAMOpportunity, keywords: string[]): { sco
   return { score: 0, label: 'No keyword overlap' };
 }
 
-function scoreSetAside(setAside: string | null | undefined): { score: number; label: string } {
+function normalizeBusinessTypePreference(businessType: string | null | undefined): string | null {
+  if (!businessType) return null;
+
+  const normalized = businessType.toLowerCase().trim();
+  if (!normalized) return null;
+
+  if (normalized === 'small business') return 'small-business';
+  if (normalized === 'sdvosb') return 'sdvosb';
+  if (normalized === 'vosb') return 'vosb';
+  if (normalized === '8a' || normalized === '8(a)') return '8a';
+  if (normalized === 'wosb') return 'wosb';
+  if (normalized === 'edwosb') return 'edwosb';
+  if (normalized === 'hubzone') return 'hubzone';
+
+  return normalized;
+}
+
+function scoreSetAside(
+  setAside: string | null | undefined,
+  preferredBusinessType?: string
+): { score: number; label: string } {
+  const preferred = normalizeBusinessTypePreference(preferredBusinessType);
+
   if (!setAside) {
+    if (preferred && preferred !== 'small-business') {
+      return { score: 5, label: 'Full and open opportunity stays in play' };
+    }
     return { score: 4, label: 'Full and open opportunity' };
   }
 
   const normalized = setAside.toLowerCase();
+
+  if (preferred) {
+    if (preferred === 'small-business') {
+      if (normalized.includes('small')) {
+        return { score: 14, label: `Matches your small-business preference: ${setAside}` };
+      }
+      return { score: 6, label: `Full and open / unrestricted lane: ${setAside}` };
+    }
+
+    const preferenceMatchers: Record<string, string[]> = {
+      sdvosb: ['sdvosb', 'service-disabled veteran'],
+      vosb: ['vosb', 'veteran-owned'],
+      '8a': ['8(a)', '8a'],
+      wosb: ['wosb', 'woman-owned'],
+      edwosb: ['edwosb', 'economically disadvantaged women-owned'],
+      hubzone: ['hubzone'],
+    };
+
+    const matchesPreference = (preferenceMatchers[preferred] || []).some(token => normalized.includes(token));
+    if (matchesPreference) {
+      return { score: 18, label: `Matches your ${preferredBusinessType} preference: ${setAside}` };
+    }
+
+    if (normalized.includes('small')) {
+      return { score: 10, label: `General small-business lane: ${setAside}` };
+    }
+
+    return { score: 6, label: `Alternate competition lane: ${setAside}` };
+  }
 
   if (normalized.includes('8') || normalized.includes('sdvosb') || normalized.includes('wosb') || normalized.includes('hub')) {
     return { score: 12, label: `Set-aside opportunity: ${setAside}` };
@@ -292,12 +347,13 @@ function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStra
   const naicsCodes = normalizeTextList(context?.naicsCodes);
   const agencies = normalizeTextList(context?.agencies);
   const keywords = normalizeTextList(context?.keywords);
+  const businessType = context?.businessType;
 
   const noticeTypeFactor = scoreNoticeType(opportunity.noticeType);
   const naicsFactor = scoreNaicsFit(opportunity.naicsCode, naicsCodes);
   const agencyFactor = scoreAgencyFit(opportunity.department || opportunity.subTier, agencies);
   const keywordFactor = scoreKeywordFit(opportunity, keywords);
-  const setAsideFactor = scoreSetAside(opportunity.setAsideDescription || opportunity.setAside);
+  const setAsideFactor = scoreSetAside(opportunity.setAsideDescription || opportunity.setAside, businessType);
   const timingFactor = scoreTiming(opportunity.responseDeadline);
 
   const totalScore =

@@ -194,6 +194,7 @@ export async function GET(request: NextRequest) {
           naicsCodes: userNaics,
           agencies: user.agencies || [],
           keywords: userKeywords,
+          businessType: user.business_type,
         }, noticeSummary);
 
         // Log briefing attempt
