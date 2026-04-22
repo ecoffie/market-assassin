@@ -343,21 +343,31 @@ async function getAlertTrend(sinceDate: string) {
       .gte('alert_date', sinceDate)
       .order('alert_date', { ascending: true });
 
-    if (data) {
-      const byDate: Record<string, { sent: number; failed: number; skipped: number }> = {};
+    const byDate: Record<string, { sent: number; failed: number; skipped: number }> = {};
 
+    if (data) {
       for (const row of data) {
         const date = row.alert_date;
+        if (!date) continue;
         if (!byDate[date]) byDate[date] = { sent: 0, failed: 0, skipped: 0 };
 
         if (row.delivery_status === 'sent') byDate[date].sent++;
         else if (row.delivery_status === 'failed') byDate[date].failed++;
         else if (row.delivery_status === 'skipped') byDate[date].skipped++;
       }
+    }
 
-      for (const [date, stats] of Object.entries(byDate)) {
-        trend.push({ date, ...stats });
-      }
+    // Always return the full rolling window, including zero days, so the trend keeps moving.
+    const start = new Date(`${sinceDate}T00:00:00Z`);
+    const end = new Date();
+    end.setUTCHours(0, 0, 0, 0);
+
+    for (let cursor = new Date(start); cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+      const date = cursor.toISOString().split('T')[0];
+      trend.push({
+        date,
+        ...(byDate[date] || { sent: 0, failed: 0, skipped: 0 }),
+      });
     }
   } catch (e) {
     console.error('Error fetching alert trend:', e);
