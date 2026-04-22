@@ -525,6 +525,7 @@ async function getRevenueMetrics() {
       amount: number;
       date: string;
       bundle?: string;
+      details?: string;
     }>,
   };
 
@@ -537,11 +538,129 @@ async function getRevenueMetrics() {
     // Use dynamic import for Stripe
     const Stripe = (await import('stripe')).default;
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const priceCache = new Map<string, { product: string; bundle?: string; details?: string }>();
+    const productCache = new Map<string, string>();
+
+    async function resolveProductName(productRef: string | { id?: string; name?: string } | null | undefined): Promise<string | null> {
+      if (!productRef) return null;
+      if (typeof productRef === 'object' && 'name' in productRef && productRef.name) {
+        return productRef.name;
+      }
+
+      const productId = typeof productRef === 'string' ? productRef : productRef.id;
+      if (!productId) return null;
+      if (productCache.has(productId)) {
+        return productCache.get(productId)!;
+      }
+
+      try {
+        const product = await stripe.products.retrieve(productId);
+        const name = product.name || null;
+        if (name) {
+          productCache.set(productId, name);
+        }
+        return name;
+      } catch {
+        return null;
+      }
+    }
+
+    async function resolvePriceSummary(
+      priceRef: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } | null | undefined
+    ): Promise<{ product: string; bundle?: string; details?: string }> {
+      if (!priceRef) {
+        return { product: 'Subscription' };
+      }
+
+      const priceId = typeof priceRef === 'string' ? priceRef : priceRef.id;
+      if (priceId && priceCache.has(priceId)) {
+        return priceCache.get(priceId)!;
+      }
+
+      let price = priceRef;
+      if (typeof priceRef === 'string') {
+        try {
+          price = await stripe.prices.retrieve(priceRef, { expand: ['product'] });
+        } catch {
+          return { product: 'Subscription' };
+        }
+      }
+
+      const nickname = (typeof price === 'object' && 'nickname' in price) ? price.nickname : null;
+      const recurring = (typeof price === 'object' && 'recurring' in price) ? price.recurring : null;
+      const metadata = (typeof price === 'object' && 'metadata' in price) ? price.metadata : undefined;
+      const productName = await resolveProductName(typeof price === 'object' && 'product' in price ? price.product : null);
+
+      const interval = recurring?.interval
+        ? `${recurring.interval_count && recurring.interval_count > 1 ? `${recurring.interval_count} ` : ''}${recurring.interval}`
+        : null;
+
+      const summary = {
+        product: nickname || metadata?.product_name || productName || 'Subscription',
+        bundle: metadata?.bundle || undefined,
+        details: interval ? `${interval}${priceId ? ` • ${priceId}` : ''}` : (priceId || undefined),
+      };
+
+      if (priceId) {
+        priceCache.set(priceId, summary);
+      }
+
+      return summary;
+    }
+
+    async function resolveChargePurchase(charge: {
+      id: string;
+      description: string | null;
+      amount: number;
+      created: number;
+      billing_details?: { email?: string | null };
+      receipt_email?: string | null;
+      metadata: Record<string, string>;
+      invoice?: string | { customer_email?: string | null; subscription?: string | { items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null } | null;
+      customer?: string | { email?: string | null };
+    }) {
+      let email =
+        charge.billing_details?.email ||
+        charge.receipt_email ||
+        (typeof charge.customer === 'object' ? charge.customer?.email : null) ||
+        null;
+
+      let product = charge.description || charge.metadata?.product_name || 'Subscription';
+      let bundle = charge.metadata?.bundle || undefined;
+      let details: string | undefined;
+
+      const invoice = typeof charge.invoice === 'object' ? charge.invoice : null;
+      if (invoice?.customer_email && !email) {
+        email = invoice.customer_email;
+      }
+
+      const subscription = invoice && typeof invoice.subscription === 'object'
+        ? invoice.subscription
+        : null;
+
+      const subscriptionPrice = subscription?.items?.data?.[0]?.price;
+      if (subscriptionPrice) {
+        const summary = await resolvePriceSummary(subscriptionPrice);
+        product = summary.product || product;
+        bundle = summary.bundle || bundle;
+        details = summary.details || details;
+      }
+
+      return {
+        email: email || 'N/A',
+        product,
+        amount: charge.amount / 100,
+        date: new Date(charge.created * 1000).toISOString(),
+        bundle,
+        details,
+      };
+    }
 
     // Get charges from the last 30 days
     const charges = await stripe.charges.list({
       created: { gte: thirtyDaysAgo },
       limit: 100,
+      expand: ['data.invoice', 'data.invoice.subscription', 'data.customer'],
     });
 
     for (const charge of charges.data) {
@@ -554,9 +673,22 @@ async function getRevenueMetrics() {
       metrics.thirtyDay.count++;
 
       // Group by product (use description or metadata)
-      const productName = charge.description ||
+      let productName = charge.description ||
         (charge.metadata?.product_name) ||
         'Subscription';
+
+      const expandedCharge = charge as typeof charge & {
+        invoice?: string | { subscription?: string | { items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null };
+      };
+      const invoice = typeof expandedCharge.invoice === 'object' ? expandedCharge.invoice : null;
+      const subscription = invoice && typeof invoice.subscription === 'object'
+        ? invoice.subscription
+        : null;
+      const subscriptionPrice = subscription?.items?.data?.[0]?.price;
+      if (subscriptionPrice) {
+        const summary = await resolvePriceSummary(subscriptionPrice);
+        productName = summary.product || productName;
+      }
 
       if (!metrics.thirtyDay.byProduct[productName]) {
         metrics.thirtyDay.byProduct[productName] = { count: 0, revenue: 0 };
@@ -576,16 +708,15 @@ async function getRevenueMetrics() {
       : 0;
 
     // Recent 10 purchases with emails
-    metrics.recentPurchases = charges.data
+    metrics.recentPurchases = await Promise.all(
+      charges.data
       .filter(c => c.status === 'succeeded')
       .slice(0, 10)
-      .map(c => ({
-        email: c.billing_details?.email || c.receipt_email || 'N/A',
-        product: c.description || 'Subscription',
-        amount: c.amount / 100,
-        date: new Date(c.created * 1000).toISOString(),
-        bundle: c.metadata?.bundle || undefined,
-      }));
+      .map(c => resolveChargePurchase(c as typeof c & {
+        invoice?: string | { customer_email?: string | null; subscription?: string | { items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null };
+        customer?: string | { email?: string | null };
+      }))
+    );
 
   } catch (e) {
     console.error('Error fetching Stripe revenue metrics:', e);

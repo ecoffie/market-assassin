@@ -63,6 +63,7 @@ interface DashboardData {
       amount: number;
       date: string;
       bundle?: string;
+      details?: string;
     }>;
   };
   systemAlerts: Array<{ level: 'critical' | 'warning' | 'info'; message: string }>;
@@ -577,6 +578,7 @@ export default function AdminDashboard() {
                         <th className="pb-2">Email</th>
                         <th className="pb-2">Product</th>
                         <th className="pb-2">Bundle</th>
+                        <th className="pb-2">Details</th>
                         <th className="pb-2 text-right">Amount</th>
                         <th className="pb-2 text-right">Date</th>
                       </tr>
@@ -592,6 +594,9 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-2 text-gray-400">
                             {p.bundle || '-'}
+                          </td>
+                          <td className="py-2 text-gray-400 truncate max-w-[180px]" title={p.details}>
+                            {p.details || '-'}
                           </td>
                           <td className="py-2 text-green-400 text-right font-mono">
                             ${p.amount.toLocaleString()}
