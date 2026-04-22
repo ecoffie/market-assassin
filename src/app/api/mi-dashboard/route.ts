@@ -180,10 +180,44 @@ export async function GET(request: NextRequest) {
       query = query.or(stateConditions.join(','));
     }
 
-    // Stats mode - return aggregations
+    // Stats mode - return aggregations (respects user profile filters)
     if (mode === 'stats') {
       const now = new Date().toISOString();
       const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      // Helper to build base query with user profile filters
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const buildBaseStatsQuery = () => {
+        let q = supabase
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .eq('active', true)
+          .gt('response_deadline', now);
+
+        // Apply NAICS filter
+        if (userNaicsCodes.length > 0) {
+          const conditions: string[] = [];
+          for (const code of userNaicsCodes) {
+            const trimmed = String(code).trim();
+            if (trimmed.length <= 4) {
+              conditions.push(`naics_code.like.${trimmed}%`);
+            } else {
+              conditions.push(`naics_code.eq.${trimmed}`);
+            }
+          }
+          if (conditions.length > 0) {
+            q = q.or(conditions.join(','));
+          }
+        }
+
+        // Apply state filter
+        if (userStates.length > 0) {
+          const stateConditions = userStates.map(s => `pop_state.eq.${s.toUpperCase()}`);
+          q = q.or(stateConditions.join(','));
+        }
+
+        return q;
+      };
 
       // Known notice types to count
       const noticeTypes = [
@@ -198,48 +232,117 @@ export async function GET(request: NextRequest) {
         'Justification',
       ];
 
-      // Count each notice type in parallel with proper COUNT queries
-      const noticeTypeCountPromises = noticeTypes.map(type =>
-        supabase
+      // Build notice type count queries with profile filters
+      const noticeTypeCountPromises = noticeTypes.map(type => {
+        let q = supabase
           .from('sam_opportunities')
           .select('id', { count: 'exact', head: true })
           .eq('active', true)
           .gt('response_deadline', now)
-          .eq('notice_type', type)
-          .then(({ count }: { count: number | null }) => ({ type, count: count || 0 }))
-      );
+          .eq('notice_type', type);
 
-      // Top agencies - use a different approach: get distinct then count
-      // For now, fetch top 1000 and note it's approximate for agencies
+        // Apply NAICS filter
+        if (userNaicsCodes.length > 0) {
+          const conditions: string[] = [];
+          for (const code of userNaicsCodes) {
+            const trimmed = String(code).trim();
+            if (trimmed.length <= 4) {
+              conditions.push(`naics_code.like.${trimmed}%`);
+            } else {
+              conditions.push(`naics_code.eq.${trimmed}`);
+            }
+          }
+          if (conditions.length > 0) {
+            q = q.or(conditions.join(','));
+          }
+        }
+
+        // Apply state filter
+        if (userStates.length > 0) {
+          const stateConditions = userStates.map(s => `pop_state.eq.${s.toUpperCase()}`);
+          q = q.or(stateConditions.join(','));
+        }
+
+        return q.then(({ count }: { count: number | null }) => ({ type, count: count || 0 }));
+      });
+
+      // Build urgent count query with profile filters
+      const buildUrgentQuery = () => {
+        let q = supabase
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .eq('active', true)
+          .lt('response_deadline', sevenDaysFromNow)
+          .gt('response_deadline', now);
+
+        if (userNaicsCodes.length > 0) {
+          const conditions: string[] = [];
+          for (const code of userNaicsCodes) {
+            const trimmed = String(code).trim();
+            if (trimmed.length <= 4) {
+              conditions.push(`naics_code.like.${trimmed}%`);
+            } else {
+              conditions.push(`naics_code.eq.${trimmed}`);
+            }
+          }
+          if (conditions.length > 0) {
+            q = q.or(conditions.join(','));
+          }
+        }
+
+        if (userStates.length > 0) {
+          const stateConditions = userStates.map(s => `pop_state.eq.${s.toUpperCase()}`);
+          q = q.or(stateConditions.join(','));
+        }
+
+        return q;
+      };
+
+      // Build agency sample query with profile filters
+      const buildAgencySampleQuery = () => {
+        let q = supabase
+          .from('sam_opportunities')
+          .select('department')
+          .eq('active', true)
+          .gt('response_deadline', now);
+
+        if (userNaicsCodes.length > 0) {
+          const conditions: string[] = [];
+          for (const code of userNaicsCodes) {
+            const trimmed = String(code).trim();
+            if (trimmed.length <= 4) {
+              conditions.push(`naics_code.like.${trimmed}%`);
+            } else {
+              conditions.push(`naics_code.eq.${trimmed}`);
+            }
+          }
+          if (conditions.length > 0) {
+            q = q.or(conditions.join(','));
+          }
+        }
+
+        if (userStates.length > 0) {
+          const stateConditions = userStates.map(s => `pop_state.eq.${s.toUpperCase()}`);
+          q = q.or(stateConditions.join(','));
+        }
+
+        return q.order('response_deadline', { ascending: true }).limit(1000);
+      };
+
       const [
         { count: totalActiveCount },
         { count: urgentTotalCount },
         noticeTypeCounts,
         { data: topAgencySample }
       ] = await Promise.all([
-        // Total active count
-        supabase
-          .from('sam_opportunities')
-          .select('id', { count: 'exact', head: true })
-          .eq('active', true)
-          .gt('response_deadline', now),
-        // Urgent count
-        supabase
-          .from('sam_opportunities')
-          .select('id', { count: 'exact', head: true })
-          .eq('active', true)
-          .lt('response_deadline', sevenDaysFromNow)
-          .gt('response_deadline', now),
-        // All notice type counts
+        // Total active count (with profile filters)
+        buildBaseStatsQuery(),
+        // Urgent count (with profile filters)
+        buildUrgentQuery(),
+        // All notice type counts (with profile filters)
         Promise.all(noticeTypeCountPromises),
-        // Top agencies (sample-based for now, accurate enough for top 10)
-        supabase
-          .from('sam_opportunities')
-          .select('department')
-          .eq('active', true)
-          .gt('response_deadline', now)
-          .order('response_deadline', { ascending: true })
-          .limit(1000)
+        // Top agencies sample (with profile filters)
+        buildAgencySampleQuery()
       ]);
 
       // Count agencies from sample (will be representative for top agencies)
@@ -255,16 +358,37 @@ export async function GET(request: NextRequest) {
         .slice(0, 10)
         .map(([dept]) => dept);
 
-      // Get accurate counts for top agencies
-      const topAgencyCountPromises = topAgenciesFromSample.map(dept =>
-        supabase
+      // Get accurate counts for top agencies (with profile filters)
+      const topAgencyCountPromises = topAgenciesFromSample.map(dept => {
+        let q = supabase
           .from('sam_opportunities')
           .select('id', { count: 'exact', head: true })
           .eq('active', true)
           .gt('response_deadline', now)
-          .eq('department', dept)
-          .then(({ count }: { count: number | null }) => ({ department: dept, count: count || 0 }))
-      );
+          .eq('department', dept);
+
+        if (userNaicsCodes.length > 0) {
+          const conditions: string[] = [];
+          for (const code of userNaicsCodes) {
+            const trimmed = String(code).trim();
+            if (trimmed.length <= 4) {
+              conditions.push(`naics_code.like.${trimmed}%`);
+            } else {
+              conditions.push(`naics_code.eq.${trimmed}`);
+            }
+          }
+          if (conditions.length > 0) {
+            q = q.or(conditions.join(','));
+          }
+        }
+
+        if (userStates.length > 0) {
+          const stateConditions = userStates.map(s => `pop_state.eq.${s.toUpperCase()}`);
+          q = q.or(stateConditions.join(','));
+        }
+
+        return q.then(({ count }: { count: number | null }) => ({ department: dept, count: count || 0 }));
+      });
       const topAgencies = await Promise.all(topAgencyCountPromises);
       topAgencies.sort((a, b) => b.count - a.count);
 
