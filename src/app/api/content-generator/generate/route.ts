@@ -685,6 +685,18 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       errorStack: error instanceof Error ? error.stack : undefined,
     });
 
+    // Check for rate limit error (429) and provide user-friendly message
+    const isRateLimit = errorMessage.includes('429') ||
+                        errorMessage.includes('exhausted') ||
+                        errorMessage.includes('rate limit');
+
+    if (isRateLimit) {
+      return NextResponse.json({
+        success: false,
+        error: 'Too many agencies selected. Please select 10-20 agencies at a time for best results. The AI service has temporary limits on how many posts can be generated at once.'
+      }, { status: 429, headers: corsHeaders });
+    }
+
     return NextResponse.json({
       success: false,
       error: errorMessage
