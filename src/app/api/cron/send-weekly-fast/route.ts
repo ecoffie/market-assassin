@@ -14,7 +14,7 @@ import {
   recordBriefingProgramDelivery,
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
-import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
+import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import crypto from 'crypto';
 
 const BATCH_SIZE = 200; // Increased for better coverage
@@ -378,6 +378,7 @@ function getSupabase() {
         });
 
         briefingsSent++;
+        await recordToolSuccess(ToolNames.BRIEFINGS);
 
         // Log to database (track match type for analytics)
         await getSupabase().from('briefing_log').upsert({

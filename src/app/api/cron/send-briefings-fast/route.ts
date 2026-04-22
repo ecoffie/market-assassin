@@ -26,7 +26,7 @@ import {
 } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
-import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
+import { logToolError, recordToolSuccess, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 
 // Process up to 200 users per cron run (~150ms each = 30 seconds total)
 // Increased from 100 to ensure all 958+ users are covered in 10 cron runs
@@ -221,6 +221,7 @@ export async function GET(request: NextRequest) {
         });
 
         briefingsSent++;
+        await recordToolSuccess(ToolNames.BRIEFINGS);
 
         // Update log with success (filter by briefing_type to avoid collision)
         await getSupabase().from('briefing_log').update({

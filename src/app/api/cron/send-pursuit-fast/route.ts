@@ -14,6 +14,7 @@ import {
   recordBriefingProgramDelivery,
   resolveBriefingAudience,
 } from '@/lib/briefings/delivery/rollout';
+import { recordToolSuccess, ToolNames } from '@/lib/tool-errors';
 import crypto from 'crypto';
 
 const BATCH_SIZE = 200; // Increased for better coverage
@@ -296,6 +297,7 @@ function getSupabase() {
         });
 
         briefingsSent++;
+        await recordToolSuccess(ToolNames.BRIEFINGS);
 
         // Log to briefing_log with briefing_type='pursuit'
         // UNIFIED: Use same table as daily/weekly for consistency
