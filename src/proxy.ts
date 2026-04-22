@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * MIDDLEWARE - ROUTE PROTECTION
- * =============================
+ * PROXY - ROUTE PROTECTION
+ * ========================
  *
  * Protected Routes:
  * 1. /database.html - Federal Contractor Database (requires db_access_email cookie)
@@ -16,7 +16,7 @@ import type { NextRequest } from 'next/server';
  * - Direct cookie set by admin
  */
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Protect Federal Contractor Database (HTML version)
