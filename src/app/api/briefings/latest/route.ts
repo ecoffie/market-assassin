@@ -40,10 +40,15 @@ function getSupabase() {
   return _supabase;
 }
 
+  // Filter out future-dated briefings (pursuit briefs are scheduled for next Monday)
+  // and show only briefings up to today
+  const today = new Date().toISOString().split('T')[0];
+
   const { data, error } = await getSupabase()
     .from('briefing_log')
     .select('briefing_date, briefing_content, items_count, created_at')
     .eq('user_email', email)
+    .lte('briefing_date', today)
     .order('briefing_date', { ascending: false })
     .limit(days);
 
