@@ -419,7 +419,7 @@ async function runDailyAlertJob(options?: {
 
     const samApiKey = process.env.SAM_API_KEY;
     if (!samApiKey) {
-      return NextResponse.json({ error: 'SAM API key not configured' }, { status: 500 });
+      console.warn('[Daily Alerts] SAM_API_KEY not configured - cache fallback to live SAM API is disabled');
     }
 
     const results = {
@@ -551,20 +551,24 @@ async function runDailyAlertJob(options?: {
           console.error(`[Daily Alerts] SAM cache error for ${user.user_email}:`, cacheError.message);
 
           // Fallback to live API if cache fails
-          try {
-            const newResult = await fetchSamOpportunities({
-              naicsCodes: expandedNaics,
-              keywords: userKeywords.length > 0 ? userKeywords : undefined,
-              setAsides,
-              states: userStates,
-              noticeTypes: ['p', 'r', 'k', 'o'],
-              postedFrom: getDateDaysAgo(1),
-              limit: 50,
-            }, samApiKey);
-            newOpportunities = newResult.opportunities;
-            console.log(`[Daily Alerts] ${user.user_email}: Fallback to API, found ${newOpportunities.length} new`);
-          } catch (apiError: any) {
-            console.error(`[Daily Alerts] API fallback also failed for ${user.user_email}:`, apiError.message);
+          if (samApiKey) {
+            try {
+              const newResult = await fetchSamOpportunities({
+                naicsCodes: expandedNaics,
+                keywords: userKeywords.length > 0 ? userKeywords : undefined,
+                setAsides,
+                states: userStates,
+                noticeTypes: ['p', 'r', 'k', 'o'],
+                postedFrom: getDateDaysAgo(1),
+                limit: 50,
+              }, samApiKey);
+              newOpportunities = newResult.opportunities;
+              console.log(`[Daily Alerts] ${user.user_email}: Fallback to API, found ${newOpportunities.length} new`);
+            } catch (apiError: any) {
+              console.error(`[Daily Alerts] API fallback also failed for ${user.user_email}:`, apiError.message);
+            }
+          } else {
+            console.warn(`[Daily Alerts] ${user.user_email}: Skipping live SAM fallback because SAM_API_KEY is not configured`);
           }
         }
 
