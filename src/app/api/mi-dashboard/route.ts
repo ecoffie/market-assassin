@@ -111,17 +111,21 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabase();
 
-    // If email provided, load user's NAICS profile for filtering
+    // If email provided, load user's profile for filtering (NAICS + location_states)
     let userNaicsCodes: string[] = [];
-    if (email && !naics) {
+    let userStates: string[] = [];
+    if (email) {
       const { data: profile } = await supabase
         .from('user_notification_settings')
-        .select('naics_codes')
+        .select('naics_codes, location_states')
         .ilike('user_email', email)
         .maybeSingle();
 
-      if (profile?.naics_codes?.length > 0) {
+      if (profile?.naics_codes?.length > 0 && !naics) {
         userNaicsCodes = profile.naics_codes;
+      }
+      if (profile?.location_states?.length > 0 && !state) {
+        userStates = profile.location_states;
       }
     }
 
@@ -168,7 +172,12 @@ export async function GET(request: NextRequest) {
       }
     }
     if (state) {
+      // Single state filter from URL takes precedence
       query = query.eq('pop_state', state.toUpperCase());
+    } else if (userStates.length > 0) {
+      // Apply user's profile states filter (OR across all states)
+      const stateConditions = userStates.map(s => `pop_state.eq.${s.toUpperCase()}`);
+      query = query.or(stateConditions.join(','));
     }
 
     // Stats mode - return aggregations
