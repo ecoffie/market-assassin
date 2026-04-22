@@ -6,6 +6,7 @@ import Link from 'next/link';
 interface ProfileStatsBarProps {
   email: string;
   onTabChange?: (tab: string) => void;
+  refreshKey?: number;
 }
 
 interface ProfileStats {
@@ -29,7 +30,7 @@ interface ProfileStatsResponse {
   };
 }
 
-export default function ProfileStatsBar({ email, onTabChange }: ProfileStatsBarProps) {
+export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0 }: ProfileStatsBarProps) {
   const [stats, setStats] = useState<ProfileStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,7 +50,7 @@ export default function ProfileStatsBar({ email, onTabChange }: ProfileStatsBarP
     if (email) {
       fetchStats();
     }
-  }, [email]);
+  }, [email, refreshKey]);
 
   if (loading) {
     return (

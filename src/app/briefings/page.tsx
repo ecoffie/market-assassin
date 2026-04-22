@@ -183,6 +183,7 @@ export default function BriefingsDashboard() {
   const [linkSending, setLinkSending] = useState(false);
   const [linkMessage, setLinkMessage] = useState('');
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [profileStatsRefreshKey, setProfileStatsRefreshKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [mainTab, setMainTab] = useState<MainTab>('briefings');
@@ -598,13 +599,18 @@ export default function BriefingsDashboard() {
       />
 
       {/* Profile Stats Bar - Shows opportunity match stats */}
-      <ProfileStatsBar email={email} onTabChange={(tab) => setMainTab(tab as MainTab)} />
+      <ProfileStatsBar
+        email={email}
+        refreshKey={profileStatsRefreshKey}
+        onTabChange={(tab) => setMainTab(tab as MainTab)}
+      />
 
       {/* Settings Panel */}
       <SettingsPanel
         isOpen={settingsPanelOpen}
         onClose={() => setSettingsPanelOpen(false)}
         email={email}
+        onSaved={() => setProfileStatsRefreshKey(prev => prev + 1)}
       />
 
       {/* Main Tab Navigation */}

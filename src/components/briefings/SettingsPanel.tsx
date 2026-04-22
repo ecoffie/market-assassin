@@ -67,6 +67,7 @@ interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   email: string;
+  onSaved?: () => void;
 }
 
 interface AlertSettings {
@@ -80,7 +81,7 @@ interface AlertSettings {
   alertsEnabled: boolean;
 }
 
-export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelProps) {
+export default function SettingsPanel({ isOpen, onClose, email, onSaved }: SettingsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -207,6 +208,7 @@ export default function SettingsPanel({ isOpen, onClose, email }: SettingsPanelP
 
       if (data.success) {
         setSuccess('Settings saved');
+        onSaved?.();
         setTimeout(() => setSuccess(''), 3000);
       } else {
         setError(data.error || 'Failed to save');
