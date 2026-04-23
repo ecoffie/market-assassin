@@ -23,6 +23,7 @@ interface NotificationSettingsRow {
   psc_codes: string[] | null;
   keywords: string[] | null;
   agencies: string[] | null;
+  location_states: string[] | null;
   business_type?: string | null;
   timezone?: string | null;
   sms_enabled?: boolean | null;
@@ -54,6 +55,7 @@ export interface BriefingAudienceUser {
   psc_codes: string[];
   keywords: string[];
   agencies: string[];
+  location_states: string[];
   business_type?: string;
   timezone?: string;
   sms_enabled?: boolean;
@@ -178,7 +180,7 @@ async function fetchNotificationSettings(supabase: SupabaseClient): Promise<Noti
     // Users can still get PSC codes via NAICS crosswalk (see psc-crosswalk.ts)
     const { data, error } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, keywords, agencies, business_type, timezone, sms_enabled, phone_number, aggregated_profile')
+      .select('user_email, naics_codes, keywords, agencies, location_states, business_type, timezone, sms_enabled, phone_number, aggregated_profile')
       .eq('is_active', true)
       .order('user_email')
       .range(from, to);
@@ -265,6 +267,7 @@ function buildCandidate(
     psc_codes: string[];
     keywords: string[];
     agencies: string[];
+    location_states: string[];
     timezone?: string;
     sms_enabled?: boolean;
     phone_number?: string;
@@ -276,6 +279,7 @@ function buildCandidate(
   const mergedPsc = Array.from(new Set([...(existing?.psc_codes || []), ...next.psc_codes]));
   const mergedKeywords = Array.from(new Set([...(existing?.keywords || []), ...next.keywords]));
   const mergedAgencies = Array.from(new Set([...(existing?.agencies || []), ...next.agencies]));
+  const mergedLocationStates = Array.from(new Set([...(existing?.location_states || []), ...next.location_states]));
   const hasProfileData = mergedNaics.length > 0 || mergedAgencies.length > 0 || mergedPsc.length > 0 || mergedKeywords.length > 0;
 
   return {
@@ -284,6 +288,7 @@ function buildCandidate(
     psc_codes: mergedPsc,
     keywords: mergedKeywords,
     agencies: mergedAgencies,
+    location_states: mergedLocationStates,
     business_type: next.business_type || existing?.business_type,
     timezone: next.timezone || existing?.timezone,
     sms_enabled: next.sms_enabled ?? existing?.sms_enabled,
@@ -317,6 +322,7 @@ export async function fetchBriefingAudienceCandidates(
       psc_codes: Array.from(new Set([...normalizeArray(row.psc_codes), ...aggregatedPsc])),
       keywords: Array.from(new Set([...normalizeArray(row.keywords), ...aggregatedKeywords])),
       agencies: Array.from(new Set([...normalizeArray(row.agencies), ...aggregatedAgencies])),
+      location_states: normalizeArray(row.location_states),
       business_type: row.business_type || undefined,
       timezone: row.timezone || undefined,
       sms_enabled: Boolean(row.sms_enabled),
@@ -338,6 +344,7 @@ export async function fetchBriefingAudienceCandidates(
         psc_codes: [], // Smart profiles don't have PSC codes yet
         keywords: [], // Smart profiles don't have keywords yet
         agencies: normalizeArray(row.agencies),
+        location_states: [], // Smart profiles don't have location_states yet
         timezone: row.timezone || undefined,
         source: 'smart_profile',
       });

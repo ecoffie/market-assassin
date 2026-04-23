@@ -147,13 +147,15 @@ export async function GET(request: NextRequest) {
         const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : DEFAULT_NAICS_CODES;
         const userPsc = user.psc_codes || [];
         const userKeywords = user.keywords || [];
+        const userStates = user.location_states || [];
 
         // Fetch SAM opportunities from cache using user's full profile
-        // Includes: NAICS codes, PSC codes (industry classification), and keywords
+        // Includes: NAICS codes, PSC codes (industry classification), keywords, and location_states
         const samResult = await fetchSamOpportunitiesFromCache({
           naicsCodes: userNaics.slice(0, 10), // Limit to 10 NAICS codes
           pscCodes: userPsc.slice(0, 10), // Limit to 10 PSC codes
           keywords: userKeywords.slice(0, 10), // Limit to 10 keywords
+          states: userStates.slice(0, 10), // Filter by user's location_states (Place of Performance)
           limit: BRIEFING_MARKET_FETCH_LIMIT, // Pull a broader matched market set for strategic ranking + notice summaries
         });
 
@@ -161,6 +163,7 @@ export async function GET(request: NextRequest) {
           naicsCodes: userNaics.slice(0, 10),
           pscCodes: userPsc.slice(0, 10),
           keywords: userKeywords.slice(0, 10),
+          states: userStates.slice(0, 10), // Filter by user's location_states
         });
 
         if (samResult.opportunities.length === 0) {
