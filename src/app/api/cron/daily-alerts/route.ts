@@ -330,10 +330,20 @@ async function runDailyAlertJob(options?: {
 
   // Check if circuit breaker is open (too many recent failures)
   if (await circuitBreaker.isOpen()) {
+    const breakerMessage = 'Circuit breaker is open due to recent failures. Will retry in 30 minutes.';
     console.error('[Daily Alerts] Circuit breaker is OPEN - skipping this run');
+    metrics.recordCircuitBreakerTripped();
+    metrics.recordGuardrailWarning();
+    await metrics.save();
+    await logToolError({
+      tool: ToolNames.ALERTS,
+      errorType: ErrorTypes.INTERNAL,
+      errorMessage: breakerMessage,
+      requestPath: '/api/cron/daily-alerts',
+    }).catch(() => {});
     return NextResponse.json({
       success: false,
-      error: 'Circuit breaker is open due to recent failures. Will retry in 30 minutes.',
+      error: breakerMessage,
       circuitBreakerOpen: true,
     }, { status: 503 });
   }
