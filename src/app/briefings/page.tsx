@@ -134,7 +134,23 @@ function isGeneratedBriefing(value: unknown): value is GeneratedBriefing {
 
 function isSamGreenBriefing(value: unknown): value is SamGreenBriefingPayload {
   if (!value || typeof value !== 'object') return false;
-  return 'opportunities' in value && Array.isArray((value as SamGreenBriefingPayload).opportunities);
+  // GREEN briefings have opportunities with 'title' and 'samLink' fields
+  // Legacy AI briefings have 'contractName' and 'displacementAngle' instead
+  if (!('opportunities' in value) || !Array.isArray((value as SamGreenBriefingPayload).opportunities)) {
+    return false;
+  }
+  const opportunities = (value as SamGreenBriefingPayload).opportunities || [];
+  // Check if first opportunity has GREEN-specific fields (samLink or noticeType)
+  // rather than legacy AI fields (contractName or displacementAngle)
+  if (opportunities.length > 0) {
+    const firstOpp = opportunities[0] as Record<string, unknown>;
+    // GREEN format has samLink or noticeType; legacy has contractName or displacementAngle
+    const hasGreenFields = 'samLink' in firstOpp || 'noticeType' in firstOpp;
+    const hasLegacyFields = 'contractName' in firstOpp || 'displacementAngle' in firstOpp;
+    return hasGreenFields && !hasLegacyFields;
+  }
+  // Empty opportunities array - check for other GREEN-specific fields
+  return 'noticeSummary' in value || 'deadlinesThisWeek' in value;
 }
 
 function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGeneratedAt: string): GeneratedBriefing {
@@ -153,8 +169,31 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
         opp.noticeType,
         opp.setAside || undefined,
         opp.naicsCode ? `NAICS ${opp.naicsCode}` : undefined,
-        opp.solicitationNumber ? `Solicitation ${opp.solicitationNumber}` : undefined,
+        opp.solicitationNumber ? `Sol# ${opp.solicitationNumber}` : undefined,
+        opp.postedDate ? `Posted ${opp.postedDate}` : undefined,
       ].filter(Boolean) as string[];
+
+      // Build a richer description for GREEN format
+      const descriptionParts: string[] = [];
+      if (opp.quickWinAssessment) {
+        descriptionParts.push(opp.quickWinAssessment);
+      }
+      if (opp.naicsCode) {
+        descriptionParts.push(`Industry: NAICS ${opp.naicsCode}`);
+      }
+      if (opp.setAside) {
+        descriptionParts.push(`Set-Aside: ${opp.setAside}`);
+      }
+      if (typeof opp.daysRemaining === 'number') {
+        if (opp.daysRemaining <= 3) {
+          descriptionParts.push(`⚠️ Only ${opp.daysRemaining} day${opp.daysRemaining === 1 ? '' : 's'} remaining to respond!`);
+        } else if (opp.daysRemaining <= 7) {
+          descriptionParts.push(`Response due in ${opp.daysRemaining} days.`);
+        }
+      }
+      const description = descriptionParts.length > 0
+        ? descriptionParts.join(' • ')
+        : 'Active opportunity matching your profile. Click to view full details on SAM.gov.';
 
       return {
         id: `sam-opportunity-${opp.rank || index + 1}`,
@@ -167,8 +206,9 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
           opp.setAside || null,
           opp.noticeType || null,
         ].filter(Boolean).join(' • '),
-        description: opp.quickWinAssessment || 'Opportunity identified from your latest daily briefing.',
+        description,
         urgencyBadge: typeof opp.daysRemaining === 'number' && opp.daysRemaining <= 7 ? 'HIGH' : undefined,
+        amount: opp.quickWinAssessment || undefined,
         deadline: opp.responseDeadline,
         actionUrl: opp.samLink || '/briefings',
         actionLabel: 'View on SAM.gov',
@@ -191,6 +231,9 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
         ? `Response due in ${deadline.daysRemaining} day${deadline.daysRemaining === 1 ? '' : 's'}.`
         : 'Upcoming response deadline.',
       urgencyBadge: typeof deadline.daysRemaining === 'number' && deadline.daysRemaining <= 7 ? 'URGENT' : undefined,
+      amount: typeof deadline.daysRemaining === 'number'
+        ? `Due in ${deadline.daysRemaining} day${deadline.daysRemaining === 1 ? '' : 's'}`
+        : 'Upcoming deadline',
       deadline: deadline.deadline,
       actionUrl: deadline.samLink || '/briefings',
       actionLabel: 'View on SAM.gov',
@@ -1139,6 +1182,7 @@ function ItemCard({
   email: string;
 }) {
   const isUrgent = item.urgencyBadge === 'URGENT' || item.urgencyBadge === 'HIGH';
+  const summaryText = item.amount || item.description;
 
   return (
     <div
@@ -1164,9 +1208,13 @@ function ItemCard({
             </div>
             <p className="text-xs text-gray-500 mt-0.5">{highlightText(item.subtitle, searchTerm)}</p>
           </div>
-          <div className="shrink-0 text-right">
-            {item.amount && <p className="text-sm font-semibold text-green-400">{item.amount}</p>}
-            {item.deadline && <p className="text-xs text-gray-500">{item.deadline}</p>}
+          <div className="shrink-0 text-right max-w-sm">
+            {summaryText && (
+              <p className="text-sm font-semibold text-green-400 leading-snug line-clamp-2">
+                {highlightText(summaryText, searchTerm)}
+              </p>
+            )}
+            {item.deadline && <p className="text-xs text-gray-500 mt-1">{item.deadline}</p>}
           </div>
         </div>
 
