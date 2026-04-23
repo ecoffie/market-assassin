@@ -87,14 +87,164 @@ interface LegacyAIBriefing {
   }>;
 }
 
+interface SamGreenBriefingPayload {
+  date?: string;
+  opportunities?: Array<{
+    rank?: number;
+    title?: string;
+    agency?: string;
+    naicsCode?: string;
+    setAside?: string | null;
+    responseDeadline?: string;
+    daysRemaining?: number;
+    noticeType?: string;
+    solicitationNumber?: string;
+    samLink?: string;
+    quickWinAssessment?: string;
+    postedDate?: string;
+  }>;
+  deadlinesThisWeek?: Array<{
+    title?: string;
+    fullTitle?: string;
+    deadline?: string;
+    daysRemaining?: number;
+    samLink?: string;
+    noticeType?: string;
+    noticeId?: string;
+    agency?: string;
+    naicsCode?: string;
+    setAside?: string;
+  }>;
+  actionTips?: string[];
+  noticeSummary?: {
+    totalMatched?: number;
+    rfp?: number;
+    rfq?: number;
+    sourcesSought?: number;
+    preSol?: number;
+    combined?: number;
+    other?: number;
+  };
+}
+
 function isGeneratedBriefing(value: unknown): value is GeneratedBriefing {
   if (!value || typeof value !== 'object') return false;
   return 'summary' in value && 'topItems' in value;
 }
 
+function isSamGreenBriefing(value: unknown): value is SamGreenBriefingPayload {
+  if (!value || typeof value !== 'object') return false;
+  return 'opportunities' in value && Array.isArray((value as SamGreenBriefingPayload).opportunities);
+}
+
 function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGeneratedAt: string): GeneratedBriefing {
   if (isGeneratedBriefing(raw)) {
     return raw;
+  }
+
+  if (isSamGreenBriefing(raw)) {
+    const briefing = raw;
+    const opportunities = briefing.opportunities || [];
+    const deadlinesThisWeek = briefing.deadlinesThisWeek || [];
+    const noticeSummary = briefing.noticeSummary;
+
+    const opportunityItems: BriefingItemFormatted[] = opportunities.map((opp, index) => {
+      const signals = [
+        opp.noticeType,
+        opp.setAside || undefined,
+        opp.naicsCode ? `NAICS ${opp.naicsCode}` : undefined,
+        opp.solicitationNumber ? `Solicitation ${opp.solicitationNumber}` : undefined,
+      ].filter(Boolean) as string[];
+
+      return {
+        id: `sam-opportunity-${opp.rank || index + 1}`,
+        rank: opp.rank || index + 1,
+        category: 'Opportunity',
+        categoryIcon: '📄',
+        title: opp.title || `Opportunity ${index + 1}`,
+        subtitle: [
+          opp.agency || 'Federal agency',
+          opp.setAside || null,
+          opp.noticeType || null,
+        ].filter(Boolean).join(' • '),
+        description: opp.quickWinAssessment || 'Opportunity identified from your latest daily briefing.',
+        urgencyBadge: typeof opp.daysRemaining === 'number' && opp.daysRemaining <= 7 ? 'HIGH' : undefined,
+        deadline: opp.responseDeadline,
+        actionUrl: opp.samLink || '/briefings',
+        actionLabel: 'View on SAM.gov',
+        signals,
+      };
+    });
+
+    const deadlineItems: BriefingItemFormatted[] = deadlinesThisWeek.map((deadline, index) => ({
+      id: `deadline-${deadline.noticeId || index + 1}`,
+      rank: index + 1,
+      category: 'Opportunity',
+      categoryIcon: '⏰',
+      title: deadline.fullTitle || deadline.title || `Deadline ${index + 1}`,
+      subtitle: [
+        deadline.agency || 'Federal agency',
+        deadline.setAside || null,
+        deadline.noticeType || null,
+      ].filter(Boolean).join(' • '),
+      description: typeof deadline.daysRemaining === 'number'
+        ? `Response due in ${deadline.daysRemaining} day${deadline.daysRemaining === 1 ? '' : 's'}.`
+        : 'Upcoming response deadline.',
+      urgencyBadge: typeof deadline.daysRemaining === 'number' && deadline.daysRemaining <= 7 ? 'URGENT' : undefined,
+      deadline: deadline.deadline,
+      actionUrl: deadline.samLink || '/briefings',
+      actionLabel: 'View on SAM.gov',
+      signals: [
+        deadline.noticeType,
+        deadline.setAside,
+        deadline.naicsCode ? `NAICS ${deadline.naicsCode}` : undefined,
+      ].filter(Boolean) as string[],
+    }));
+
+    const quickStats: QuickStat[] = [
+      { label: 'Opportunities', value: opportunities.length },
+      { label: 'Deadlines This Week', value: deadlinesThisWeek.length },
+      { label: 'Total Matched', value: noticeSummary?.totalMatched ?? opportunities.length },
+    ];
+
+    const sourceSummary = [
+      noticeSummary?.sourcesSought ? `${noticeSummary.sourcesSought} sources sought` : null,
+      noticeSummary?.rfp ? `${noticeSummary.rfp} RFPs` : null,
+      noticeSummary?.rfq ? `${noticeSummary.rfq} RFQs` : null,
+      noticeSummary?.preSol ? `${noticeSummary.preSol} pre-solicitations` : null,
+    ].filter(Boolean);
+
+    return {
+      id: `sam-green-${fallbackDate}`,
+      generatedAt: fallbackGeneratedAt,
+      briefingDate: fallbackDate,
+      summary: {
+        headline: opportunities.length > 0 ? `${opportunities.length} opportunities identified` : 'Market intelligence briefing',
+        subheadline: sourceSummary.length > 0
+          ? `${sourceSummary.join(' • ')} matched your profile.`
+          : 'Your latest market intelligence briefing is ready.',
+        quickStats,
+        urgentAlerts: deadlineItems.filter(item => item.urgencyBadge === 'URGENT' || item.urgencyBadge === 'HIGH').length,
+      },
+      topItems: [
+        {
+          title: 'Top Intelligence',
+          items: opportunityItems.slice(0, 5),
+        },
+      ],
+      categorizedItems: {
+        opportunities: {
+          title: 'All Opportunities',
+          items: opportunityItems,
+        },
+        deadlines: {
+          title: 'Deadlines This Week',
+          items: deadlineItems,
+        },
+      },
+      totalItems: opportunityItems.length + deadlineItems.length,
+      sourcesIncluded: ['SAM.gov', 'Briefing Log'],
+    };
   }
 
   const legacy = (raw || {}) as LegacyAIBriefing;
