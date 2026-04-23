@@ -885,10 +885,16 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
     filteredQuery = filteredQuery.or(setAsideFilters);
   }
 
-  const stateList = states || (state ? [state] : []);
+  const stateList = Array.from(
+    new Set((states || (state ? [state] : []))
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map(value => value.trim().toUpperCase()))
+  );
+
   if (stateList.length > 0) {
-    const stateFilters = stateList.map(s => `pop_state.eq.${s}`).join(',');
-    filteredQuery = filteredQuery.or(stateFilters);
+    // Location states should behave as a hard place-of-performance gate, not an optional OR signal.
+    filteredQuery = filteredQuery.in('pop_state', stateList);
+    console.log(`[SAM Cache] Using hard state filter: ${stateList.join(', ')}`);
   }
 
   return filteredQuery;
