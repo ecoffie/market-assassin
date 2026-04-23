@@ -29,6 +29,7 @@ interface BriefingItemFormatted {
   title: string;
   subtitle: string;
   description: string;
+  detailLine?: string;
   urgencyBadge?: string;
   amount?: string;
   deadline?: string;
@@ -189,9 +190,29 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
           descriptionParts.push(`Response due in ${opp.daysRemaining} days.`);
         }
       }
-      const description = descriptionParts.length > 0
+      const detailLine = descriptionParts.length > 0
         ? descriptionParts.join(' • ')
         : 'Active opportunity matching your profile. Click to view full details on SAM.gov.';
+
+      const expandedNarrativeParts = [
+        opp.quickWinAssessment || 'Active opportunity matching your profile.',
+        opp.noticeType
+          ? `${opp.noticeType} notice from ${opp.agency || 'a federal agency'}`
+          : opp.agency
+            ? `Opportunity from ${opp.agency}`
+            : null,
+        opp.naicsCode ? `aligned to NAICS ${opp.naicsCode}` : null,
+        opp.setAside ? `with ${opp.setAside} terms` : 'open for review under the current solicitation terms',
+        typeof opp.daysRemaining === 'number'
+          ? opp.daysRemaining <= 3
+            ? `Response is due in ${opp.daysRemaining} day${opp.daysRemaining === 1 ? '' : 's'}, so this is an immediate action item.`
+            : `Response is due in ${opp.daysRemaining} days, which still leaves time to review scope, teaming, and bid fit.`
+          : null,
+        opp.postedDate ? `Notice was posted ${opp.postedDate}.` : null,
+        opp.solicitationNumber ? `Solicitation reference: ${opp.solicitationNumber}.` : null,
+      ].filter(Boolean);
+
+      const description = expandedNarrativeParts.join(' ');
 
       return {
         id: `sam-opportunity-${opp.rank || index + 1}`,
@@ -205,6 +226,7 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
           opp.noticeType || null,
         ].filter(Boolean).join(' • '),
         description,
+        detailLine,
         urgencyBadge: typeof opp.daysRemaining === 'number' && opp.daysRemaining <= 7 ? 'HIGH' : undefined,
         amount: opp.quickWinAssessment || undefined,
         deadline: opp.responseDeadline,
@@ -1186,9 +1208,11 @@ function ItemCard({
 }) {
   const isUrgent = item.urgencyBadge === 'URGENT' || item.urgencyBadge === 'HIGH';
   const summaryText = item.amount || item.description;
-  const collapsedDetailText = item.amount && item.description && item.description !== item.amount
-    ? item.description
-    : '';
+  const collapsedDetailText = item.detailLine || (
+    item.amount && item.description && item.description !== item.amount
+      ? item.description
+      : ''
+  );
 
   return (
     <div
