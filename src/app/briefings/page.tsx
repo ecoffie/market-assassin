@@ -173,11 +173,9 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
         opp.postedDate ? `Posted ${opp.postedDate}` : undefined,
       ].filter(Boolean) as string[];
 
-      // Build a richer description for GREEN format
+      // Split the GREEN payload into a headline thesis and supporting detail so
+      // the collapsed MI cards can mirror the older richer layout.
       const descriptionParts: string[] = [];
-      if (opp.quickWinAssessment) {
-        descriptionParts.push(opp.quickWinAssessment);
-      }
       if (opp.naicsCode) {
         descriptionParts.push(`Industry: NAICS ${opp.naicsCode}`);
       }
@@ -227,9 +225,14 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
         deadline.setAside || null,
         deadline.noticeType || null,
       ].filter(Boolean).join(' • '),
-      description: typeof deadline.daysRemaining === 'number'
-        ? `Response due in ${deadline.daysRemaining} day${deadline.daysRemaining === 1 ? '' : 's'}.`
-        : 'Upcoming response deadline.',
+      description: [
+        deadline.agency || null,
+        deadline.noticeType || null,
+        deadline.setAside || null,
+        typeof deadline.daysRemaining === 'number'
+          ? `Response due in ${deadline.daysRemaining} day${deadline.daysRemaining === 1 ? '' : 's'}`
+          : 'Upcoming response deadline',
+      ].filter(Boolean).join(' • '),
       urgencyBadge: typeof deadline.daysRemaining === 'number' && deadline.daysRemaining <= 7 ? 'URGENT' : undefined,
       amount: typeof deadline.daysRemaining === 'number'
         ? `Due in ${deadline.daysRemaining} day${deadline.daysRemaining === 1 ? '' : 's'}`
@@ -1183,6 +1186,9 @@ function ItemCard({
 }) {
   const isUrgent = item.urgencyBadge === 'URGENT' || item.urgencyBadge === 'HIGH';
   const summaryText = item.amount || item.description;
+  const collapsedDetailText = item.amount && item.description && item.description !== item.amount
+    ? item.description
+    : '';
 
   return (
     <div
@@ -1207,6 +1213,11 @@ function ItemCard({
               )}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">{highlightText(item.subtitle, searchTerm)}</p>
+            {collapsedDetailText && (
+              <p className="text-xs text-gray-400 mt-1 leading-snug line-clamp-2">
+                {highlightText(collapsedDetailText, searchTerm)}
+              </p>
+            )}
           </div>
           <div className="shrink-0 text-right max-w-sm">
             {summaryText && (
