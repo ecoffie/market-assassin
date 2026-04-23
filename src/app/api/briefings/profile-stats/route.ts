@@ -15,6 +15,25 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+// State code to full name mapping for forecasts filtering
+// Forecasts use full state names, user profiles use codes
+const STATE_CODE_TO_NAME: Record<string, string> = {
+  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
+  'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
+  'DC': 'District of Columbia', 'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii',
+  'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+  'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine',
+  'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota',
+  'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska',
+  'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico',
+  'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+  'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island',
+  'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas',
+  'UT': 'Utah', 'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington',
+  'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+  'PR': 'Puerto Rico', 'VI': 'Virgin Islands', 'GU': 'Guam',
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email')?.toLowerCase().trim();
@@ -32,7 +51,7 @@ export async function GET(request: NextRequest) {
     // Get user's profile settings (case-insensitive email match)
     const { data: profile, error: profileError } = await supabase
       .from('user_notification_settings')
-      .select('naics_codes, keywords, agencies')
+      .select('naics_codes, keywords, agencies, location_states')
       .ilike('user_email', email)
       .maybeSingle();
 
@@ -47,6 +66,12 @@ export async function GET(request: NextRequest) {
 
     const naicsCodes = profile.naics_codes || [];
     const keywords = profile.keywords || [];
+    const locationStates = profile.location_states || [];
+
+    // Convert state codes to full names for forecasts filtering
+    const stateNames = locationStates
+      .map((code: string) => STATE_CODE_TO_NAME[code.toUpperCase()])
+      .filter(Boolean);
 
     if (naicsCodes.length === 0) {
       return NextResponse.json({
@@ -97,50 +122,76 @@ export async function GET(request: NextRequest) {
     const naicsFilter = buildNaicsFilter();
     const hasNaicsFilter = naicsFilter.length > 0;
 
-    // Query SAM opportunities matching user's NAICS codes (this week)
+    // Query SAM opportunities matching user's NAICS codes AND states (this week)
+    // Logic: (NAICS match) AND (state match if specified)
     let samThisWeekCount = 0;
     if (hasNaicsFilter) {
-      const { count } = await supabase
+      let query = supabase
         .from('sam_opportunities')
         .select('id', { count: 'exact', head: true })
         .or(naicsFilter)
         .gte('posted_date', weekAgoStr)
         .eq('active', true);
+      // State filter uses .in() for AND logic (not .or() which would be NAICS OR state)
+      if (locationStates.length > 0) {
+        query = query.in('pop_state', locationStates);
+      }
+      const { count } = await query;
       samThisWeekCount = count || 0;
     }
 
     // Last week (for comparison)
     let samLastWeekCount = 0;
     if (hasNaicsFilter) {
-      const { count } = await supabase
+      let query = supabase
         .from('sam_opportunities')
         .select('id', { count: 'exact', head: true })
         .or(naicsFilter)
         .gte('posted_date', twoWeeksAgoStr)
         .lt('posted_date', weekAgoStr)
         .eq('active', true);
+      if (locationStates.length > 0) {
+        query = query.in('pop_state', locationStates);
+      }
+      const { count } = await query;
       samLastWeekCount = count || 0;
     }
 
     // Today
     let samTodayCount = 0;
     if (hasNaicsFilter) {
-      const { count } = await supabase
+      let query = supabase
         .from('sam_opportunities')
         .select('id', { count: 'exact', head: true })
         .or(naicsFilter)
         .gte('posted_date', todayStr)
         .eq('active', true);
+      if (locationStates.length > 0) {
+        query = query.in('pop_state', locationStates);
+      }
+      const { count } = await query;
       samTodayCount = count || 0;
     }
 
-    // Query forecasts matching user's NAICS codes
+    // Query forecasts matching user's NAICS codes AND states
+    // Forecasts use full state names (NEW YORK, MASSACHUSETTS) in all caps
+    // Logic: (NAICS match) AND (state match if specified)
     let forecastCount = 0;
     if (hasNaicsFilter) {
-      const { count } = await supabase
+      // Build the query with NAICS filter first
+      let query = supabase
         .from('agency_forecasts')
         .select('id', { count: 'exact', head: true })
         .or(naicsFilter);
+
+      // Add state filter as IN clause (AND logic) if states specified
+      // Convert state names to uppercase since forecasts store as "NEW YORK" not "New York"
+      if (stateNames.length > 0) {
+        const upperStateNames = stateNames.map((s: string) => s.toUpperCase());
+        query = query.in('pop_state', upperStateNames);
+      }
+
+      const { count } = await query;
       forecastCount = count || 0;
     }
 
@@ -154,14 +205,20 @@ export async function GET(request: NextRequest) {
     const trend: 'up' | 'down' | 'neutral' = weeklyChange > 5 ? 'up' : weeklyChange < -5 ? 'down' : 'neutral';
 
     // Get total active opportunities matching profile (with future deadlines)
+    // Logic: (NAICS match) AND (state match if specified)
     let totalActiveMatching = 0;
     if (hasNaicsFilter) {
-      const { count } = await supabase
+      let query = supabase
         .from('sam_opportunities')
         .select('id', { count: 'exact', head: true })
         .or(naicsFilter)
         .eq('active', true)
         .gt('response_deadline', today.toISOString());
+      // State filter uses .in() for AND logic
+      if (locationStates.length > 0) {
+        query = query.in('pop_state', locationStates);
+      }
+      const { count } = await query;
       totalActiveMatching = count || 0;
     }
 
