@@ -16,6 +16,43 @@ interface PersistSentAlertParams {
   sentAt?: string;
 }
 
+function isMissingConflictConstraintError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('message' in error)) {
+    return false;
+  }
+
+  const message = String((error as { message: unknown }).message || '').toLowerCase();
+  return message.includes('no unique or exclusion constraint matching the on conflict specification');
+}
+
+export async function upsertAlertLog(
+  supabase: MinimalSupabaseClient,
+  payload: Record<string, unknown>
+): Promise<void> {
+  const preferredConflictTarget = 'user_email,alert_date,alert_type';
+  const legacyConflictTarget = 'user_email,alert_date';
+
+  const { error: preferredError } = await supabase
+    .from('alert_log')
+    .upsert(payload, { onConflict: preferredConflictTarget });
+
+  if (!preferredError) {
+    return;
+  }
+
+  if (!isMissingConflictConstraintError(preferredError)) {
+    throw new Error(`Failed to write alert_log: ${preferredError.message}`);
+  }
+
+  const { error: legacyError } = await supabase
+    .from('alert_log')
+    .upsert(payload, { onConflict: legacyConflictTarget });
+
+  if (legacyError) {
+    throw new Error(`Failed to write alert_log: ${legacyError.message}`);
+  }
+}
+
 export async function persistSentAlert({
   supabase,
   email,
@@ -42,13 +79,7 @@ export async function persistSentAlert({
     alertLogPayload.opportunities_data = opportunitiesData;
   }
 
-  const { error: logError } = await supabase
-    .from('alert_log')
-    .upsert(alertLogPayload, { onConflict: 'user_email,alert_date,alert_type' });
-
-  if (logError) {
-    throw new Error(`Failed to write alert_log: ${logError.message}`);
-  }
+  await upsertAlertLog(supabase, alertLogPayload);
 
   const { data: verifiedLog, error: verifyError } = await supabase
     .from('alert_log')

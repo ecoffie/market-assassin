@@ -22,12 +22,13 @@ import {
 } from '@/lib/intelligence';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
-import { persistSentAlert } from '@/lib/alerts/delivery-log';
+import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 
 // BATCH_SIZE: Process this many users per cron run
-// With 4 runs/day (11, 12, 14, 16 UTC), 100 users × 4 = 400 users/day
-// If more users, increase runs or batch size
-const BATCH_SIZE = 100;
+// Apr 23, 2026: Reduced from 100 to 35 to prevent Vercel 60s timeout
+// With 29 runs/day (11:00-15:40 UTC, every 10 min), 35 users × 29 = 1015 users/day
+// Each user requires ~2-3 Supabase queries, so 35 users ≈ 105 queries in 60s
+const BATCH_SIZE = 35;
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -196,26 +197,22 @@ async function saveFailedAlert(
   opportunities: (SAMOpportunity & { score: number })[],
   error: string
 ) {
-  await getSupabase()
-    .from('alert_log')
-    .upsert({
-      user_email: email,
-      alert_date: new Date().toISOString().split('T')[0],
-      alert_type: 'daily',
-      opportunities_count: opportunities.length,
-      opportunities_data: opportunities.slice(0, 20).map(o => ({
-        noticeId: o.noticeId,
-        title: o.title,
-        agency: o.department,
-        naics: o.naicsCode,
-        deadline: o.responseDeadline,
-      })),
-      delivery_status: 'failed',
-      error_message: error,
-      retry_count: 0,
-    }, {
-      onConflict: 'user_email,alert_date,alert_type',
-    });
+  await upsertAlertLog(getSupabase(), {
+    user_email: email,
+    alert_date: new Date().toISOString().split('T')[0],
+    alert_type: 'daily',
+    opportunities_count: opportunities.length,
+    opportunities_data: opportunities.slice(0, 20).map(o => ({
+      noticeId: o.noticeId,
+      title: o.title,
+      agency: o.department,
+      naics: o.naicsCode,
+      deadline: o.responseDeadline,
+    })),
+    delivery_status: 'failed',
+    error_message: error,
+    retry_count: 0,
+  });
 }
 
 async function saveSkippedAlert(
@@ -223,20 +220,16 @@ async function saveSkippedAlert(
   reason: string,
   context?: Record<string, unknown>
 ) {
-  await getSupabase()
-    .from('alert_log')
-    .upsert({
-      user_email: email,
-      alert_date: new Date().toISOString().split('T')[0],
-      alert_type: 'daily',
-      opportunities_count: 0,
-      opportunities_data: context ? [context] : [],
-      delivery_status: 'skipped',
-      error_message: reason,
-      retry_count: 0,
-    }, {
-      onConflict: 'user_email,alert_date,alert_type',
-    });
+  await upsertAlertLog(getSupabase(), {
+    user_email: email,
+    alert_date: new Date().toISOString().split('T')[0],
+    alert_type: 'daily',
+    opportunities_count: 0,
+    opportunities_data: context ? [context] : [],
+    delivery_status: 'skipped',
+    error_message: reason,
+    retry_count: 0,
+  });
 }
 
 /**
