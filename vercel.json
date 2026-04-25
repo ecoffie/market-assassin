@@ -250,8 +250,84 @@
       "schedule": "30 12 * * *"
     },
     {
-      "path": "/api/cron/health-check?email=true",
+      "path": "/api/cron/daily-alerts",
+      "schedule": "40 12 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "50 12 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "10 13 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "20 13 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "30 13 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "40 13 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "50 13 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "10 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "20 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "30 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "40 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "50 14 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "10 15 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "20 15 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "30 15 * * *"
+    },
+    {
+      "path": "/api/cron/daily-alerts",
+      "schedule": "40 15 * * *"
+    },
+    {
+      "path": "/api/cron/health-check?email=true",
+      "schedule": "0 16 * * *"
     },
     {
       "path": "/api/cron/refresh-contracts",

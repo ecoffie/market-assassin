@@ -73,6 +73,7 @@ export async function persistSentAlert({
     opportunities_count: opportunitiesCount,
     sent_at: sentAt,
     delivery_status: 'sent',
+    error_message: null,
   };
 
   if (opportunitiesData) {

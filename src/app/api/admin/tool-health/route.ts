@@ -5,6 +5,37 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const SUPABASE_PAGE_SIZE = 1000;
+
+async function fetchAllRows<T>(
+  buildQuery: (from: number, to: number) => any
+): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + SUPABASE_PAGE_SIZE - 1;
+    const { data, error } = await buildQuery(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    rows.push(...data);
+
+    if (data.length < SUPABASE_PAGE_SIZE) {
+      break;
+    }
+
+    from += SUPABASE_PAGE_SIZE;
+  }
+
+  return rows;
+}
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -44,6 +75,8 @@ export async function GET(request: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const startDateStr = startDate.toISOString().split('T')[0];
+
+    await resolveStaleOperationalErrors(supabase);
 
     // 1. Get daily metrics by tool
     let metricsQuery = supabase
@@ -141,6 +174,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Delivery logs are the operational source of truth for alert/briefing sends.
+    // tool_health_metrics only tracks request-level helper calls and can undercount
+    // batched cron work.
+    await mergeDeliveryLogStats(supabase, startDateStr, toolStats, toolFilter);
+
     // 5. Format provider status
     const providerStatus: Record<string, {
       status: string;
@@ -155,7 +193,7 @@ export async function GET(request: NextRequest) {
         providerStatus[p.provider] = {
           status: p.status,
           last_check: p.last_check_at,
-          last_error: p.last_error_message,
+          last_error: p.status === 'healthy' ? null : p.last_error_message,
           latency_ms: p.avg_latency_ms,
           rate_limit_remaining: p.rate_limit_remaining,
         };
@@ -305,6 +343,7 @@ export async function POST(request: NextRequest) {
             last_check_at: new Date().toISOString(),
             last_success_at: new Date().toISOString(),
             avg_latency_ms: latency,
+            last_error_message: null,
           }).eq('provider', 'groq');
         } else {
           results['groq'] = { status: 'down', error: `HTTP ${groqRes.status}` };
@@ -341,6 +380,7 @@ export async function POST(request: NextRequest) {
             last_check_at: new Date().toISOString(),
             last_success_at: new Date().toISOString(),
             avg_latency_ms: latency,
+            last_error_message: null,
           }).eq('provider', 'sam_gov');
         } else {
           const status = samRes.status === 429 ? 'degraded' : 'down';
@@ -386,6 +426,7 @@ export async function POST(request: NextRequest) {
             last_check_at: new Date().toISOString(),
             last_success_at: new Date().toISOString(),
             avg_latency_ms: latency,
+            last_error_message: null,
           }).eq('provider', 'usaspending');
         } else {
           results['usaspending'] = { status: 'down', error: `HTTP ${usaRes.status}` };
@@ -423,6 +464,7 @@ export async function POST(request: NextRequest) {
             last_check_at: new Date().toISOString(),
             last_success_at: new Date().toISOString(),
             avg_latency_ms: latency,
+            last_error_message: null,
           }).eq('provider', 'grants_gov');
         } else {
           results['grants_gov'] = { status: 'down', error: `HTTP ${grantsRes.status}` };
@@ -456,6 +498,148 @@ export async function POST(request: NextRequest) {
   }
 }
 
+async function mergeDeliveryLogStats(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  startDateStr: string,
+  toolStats: Record<string, {
+    requests_total: number;
+    requests_success: number;
+    requests_failed: number;
+    tokens_used: number;
+    success_rate: number;
+    errors_by_type: Record<string, number>;
+  }>,
+  toolFilter: string | null
+) {
+  const shouldIncludeAlerts = !toolFilter || toolFilter === 'daily_alerts';
+  const shouldIncludeBriefings = !toolFilter || toolFilter === 'briefings';
+
+  if (shouldIncludeAlerts) {
+    try {
+      const alerts = await fetchAllRows<{
+        delivery_status: string | null;
+      }>((from, to) =>
+        supabase
+          .from('alert_log')
+          .select('delivery_status')
+          .gte('alert_date', startDateStr)
+          .eq('alert_type', 'daily')
+          .range(from, to)
+      );
+
+      toolStats['daily_alerts'] = buildDeliveryStats(alerts);
+    } catch (error) {
+      console.error('[ToolHealth] Alert delivery stats error:', error);
+    }
+  }
+
+  if (shouldIncludeBriefings) {
+    try {
+      const startTimestamp = `${startDateStr}T00:00:00Z`;
+      const briefings = await fetchAllRows<{
+        delivery_status: string | null;
+      }>((from, to) =>
+        supabase
+          .from('briefing_log')
+          .select('delivery_status')
+          .or(`briefing_date.gte.${startDateStr},email_sent_at.gte.${startTimestamp}`)
+          .range(from, to)
+      );
+
+      toolStats['briefings'] = buildDeliveryStats(briefings);
+    } catch (error) {
+      console.error('[ToolHealth] Briefing delivery stats error:', error);
+    }
+  }
+}
+
+function buildDeliveryStats(rows: Array<{ delivery_status: string | null }>) {
+  const sent = rows.filter(row => row.delivery_status === 'sent').length;
+  const failed = rows.filter(row => row.delivery_status === 'failed').length;
+  const skipped = rows.filter(row => row.delivery_status === 'skipped').length;
+  const total = sent + failed + skipped;
+  const errorsByType: Record<string, number> = {};
+  if (failed > 0) {
+    errorsByType.email_failure = failed;
+  }
+
+  return {
+    requests_total: total,
+    requests_success: sent,
+    requests_failed: failed,
+    tokens_used: 0,
+    success_rate: total > 0 ? Math.round((sent / total) * 100 * 10) / 10 : 0,
+    errors_by_type: errorsByType,
+  };
+}
+
+async function resolveStaleOperationalErrors(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>
+) {
+  try {
+    const { data: errors, error } = await supabase
+      .from('tool_errors')
+      .select('id, tool_name, user_email, created_at')
+      .eq('is_resolved', false)
+      .in('tool_name', ['daily_alerts', 'briefings']);
+
+    if (error || !errors) {
+      if (error) console.error('[ToolHealth] Stale error query failed:', error);
+      return;
+    }
+
+    for (const row of errors) {
+      let recovered = false;
+
+      if (row.tool_name === 'daily_alerts') {
+        let query = supabase
+          .from('alert_log')
+          .select('id')
+          .eq('delivery_status', 'sent')
+          .gte('sent_at', row.created_at)
+          .limit(1);
+
+        if (row.user_email) {
+          query = query.eq('user_email', row.user_email);
+        }
+
+        const { data } = await query;
+        recovered = Boolean(data && data.length > 0);
+      }
+
+      if (row.tool_name === 'briefings') {
+        let query = supabase
+          .from('briefing_log')
+          .select('id')
+          .eq('delivery_status', 'sent')
+          .gte('email_sent_at', row.created_at)
+          .limit(1);
+
+        if (row.user_email) {
+          query = query.eq('user_email', row.user_email);
+        }
+
+        const { data } = await query;
+        recovered = Boolean(data && data.length > 0);
+      }
+
+      if (recovered) {
+        await supabase
+          .from('tool_errors')
+          .update({
+            is_resolved: true,
+            resolved_at: new Date().toISOString(),
+            resolved_by: 'tool-health-auto',
+            resolution_notes: 'Auto-resolved after a newer successful delivery was logged.',
+          })
+          .eq('id', row.id);
+      }
+    }
+  } catch (error) {
+    console.error('[ToolHealth] Failed to auto-resolve stale errors:', error);
+  }
+}
+
 function determineOverallHealth(
   tools: Record<string, { success_rate: number; requests_failed: number }>,
   providers: Record<string, { status: string }>,
@@ -466,7 +650,8 @@ function determineOverallHealth(
   if (queryErrors.length > 0) return 'critical';
 
   // Critical if any required provider is down (not_configured is OK)
-  for (const p of Object.values(providers)) {
+  for (const [name, p] of Object.entries(providers)) {
+    if (name === 'openai') continue;
     if (p.status === 'down') return 'critical';
   }
 
@@ -479,7 +664,8 @@ function determineOverallHealth(
   }
 
   // Warning if any provider is degraded
-  for (const p of Object.values(providers)) {
+  for (const [name, p] of Object.entries(providers)) {
+    if (name === 'openai') continue;
     if (p.status === 'degraded') return 'warning';
   }
 
@@ -504,6 +690,7 @@ function generateAlerts(
 
   // Provider alerts
   for (const [name, p] of Object.entries(providers)) {
+    if (name === 'openai') continue;
     if (p.status === 'down') {
       alerts.push(`${name.toUpperCase()} is DOWN: ${p.last_error || 'Unknown error'}`);
     } else if (p.status === 'degraded') {

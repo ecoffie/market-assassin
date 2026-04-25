@@ -8,6 +8,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 const EMAIL_OPERATIONS_COMPLETE_HOUR_UTC = 13; // After briefings (08:30 UTC) and daily alerts (12:30 UTC) are done
 const PAID_TIER_ACCESS_FLAGS = [
@@ -42,6 +45,38 @@ function getSupabase() {
     );
   }
   return _supabase;
+}
+
+const SUPABASE_PAGE_SIZE = 1000;
+
+async function fetchAllRows<T>(
+  buildQuery: (from: number, to: number) => any
+): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + SUPABASE_PAGE_SIZE - 1;
+    const { data, error } = await buildQuery(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    rows.push(...data);
+
+    if (data.length < SUPABASE_PAGE_SIZE) {
+      break;
+    }
+
+    from += SUPABASE_PAGE_SIZE;
+  }
+
+  return rows;
 }
 
 export async function GET(request: NextRequest) {
@@ -123,10 +158,13 @@ async function getEmailStats(today: string) {
 
   try {
     // Alert stats for today
-    const { data: alertData } = await getSupabase()
-      .from('alert_log')
-      .select('delivery_status')
-      .eq('alert_date', today);
+    const alertData = await fetchAllRows<{ delivery_status: string }>((from, to) =>
+      getSupabase()
+        .from('alert_log')
+        .select('delivery_status')
+        .eq('alert_date', today)
+        .range(from, to)
+    );
 
     if (alertData) {
       for (const row of alertData) {
@@ -151,11 +189,29 @@ async function getEmailStats(today: string) {
     const tomorrowMidnight = new Date(new Date(today).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] + 'T00:00:00Z';
 
     // Query briefings sent today - use briefing_type for accurate type detection
-    const { data: briefingData, error: briefingError } = await getSupabase()
-      .from('briefing_log')
-      .select('delivery_status, briefing_type, tools_included')
-      .gte('email_sent_at', todayMidnight)
-      .lt('email_sent_at', tomorrowMidnight);
+    let briefingError: { message?: string } | null = null;
+    let briefingData: Array<{
+      delivery_status: string;
+      briefing_type?: string | null;
+      tools_included?: string[] | null;
+    }> = [];
+
+    try {
+      briefingData = await fetchAllRows<{
+        delivery_status: string;
+        briefing_type?: string | null;
+        tools_included?: string[] | null;
+      }>((from, to) =>
+        getSupabase()
+          .from('briefing_log')
+          .select('delivery_status, briefing_type, tools_included')
+          .gte('email_sent_at', todayMidnight)
+          .lt('email_sent_at', tomorrowMidnight)
+          .range(from, to)
+      );
+    } catch (error) {
+      briefingError = error as { message?: string };
+    }
 
     // Log any query errors for debugging
     if (briefingError) {
@@ -163,11 +219,14 @@ async function getEmailStats(today: string) {
     }
 
     // Also get pending/failed/skipped for today by briefing_date (they don't have email_sent_at)
-    const { data: pendingData } = await getSupabase()
-      .from('briefing_log')
-      .select('delivery_status')
-      .eq('briefing_date', today)
-      .in('delivery_status', ['pending', 'failed', 'skipped']);
+    const pendingData = await fetchAllRows<{ delivery_status: string }>((from, to) =>
+      getSupabase()
+        .from('briefing_log')
+        .select('delivery_status')
+        .eq('briefing_date', today)
+        .in('delivery_status', ['pending', 'failed', 'skipped'])
+        .range(from, to)
+    );
 
     // Count sent briefings (by email_sent_at)
     if (briefingData) {
@@ -337,11 +396,14 @@ async function getAlertTrend(sinceDate: string) {
   const trend: Array<{ date: string; sent: number; failed: number; skipped: number }> = [];
 
   try {
-    const { data } = await getSupabase()
-      .from('alert_log')
-      .select('alert_date, delivery_status')
-      .gte('alert_date', sinceDate)
-      .order('alert_date', { ascending: true });
+    const data = await fetchAllRows<{ alert_date: string; delivery_status: string }>((from, to) =>
+      getSupabase()
+        .from('alert_log')
+        .select('alert_date, delivery_status')
+        .gte('alert_date', sinceDate)
+        .order('alert_date', { ascending: true })
+        .range(from, to)
+    );
 
     const byDate: Record<string, { sent: number; failed: number; skipped: number }> = {};
 
@@ -380,11 +442,18 @@ async function getBriefingTrend(sinceDate: string) {
   const trend: Array<{ date: string; sent: number; failed: number; skipped: number }> = [];
 
   try {
-    const { data } = await getSupabase()
-      .from('briefing_log')
-      .select('briefing_date, email_sent_at, delivery_status')
-      .or(`briefing_date.gte.${sinceDate},email_sent_at.gte.${sinceDate}T00:00:00Z`)
-      .order('briefing_date', { ascending: true });
+    const data = await fetchAllRows<{
+      briefing_date: string;
+      email_sent_at?: string | null;
+      delivery_status: string;
+    }>((from, to) =>
+      getSupabase()
+        .from('briefing_log')
+        .select('briefing_date, email_sent_at, delivery_status')
+        .or(`briefing_date.gte.${sinceDate},email_sent_at.gte.${sinceDate}T00:00:00Z`)
+        .order('briefing_date', { ascending: true })
+        .range(from, to)
+    );
 
     const byDate: Record<string, { sent: number; failed: number; skipped: number }> = {};
 

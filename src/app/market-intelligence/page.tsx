@@ -2,7 +2,9 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { PRODUCTS } from '@/lib/products';
+
+const CHECKOUT_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z';
+const CHECKOUT_ANNUAL = 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A';
 
 export default function MarketIntelligencePage() {
   const emailRef = useRef<HTMLInputElement>(null);
@@ -11,11 +13,6 @@ export default function MarketIntelligencePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [redirecting, setRedirecting] = useState(false);
-  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
-
-  const monthlyTier = PRODUCTS.DAILY_BRIEFINGS.tiers.briefings;
-  const annualTier = PRODUCTS.DAILY_BRIEFINGS.tiers.briefings_annual;
-  const annualSavings = monthlyTier.price * 12 - annualTier.price;
 
   const handleVerifyAccess = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -47,7 +44,7 @@ export default function MarketIntelligencePage() {
         return;
       }
 
-      setError('No access found for this email. Choose a plan below.');
+      setError('No access found for this email. Choose a plan below to get started.');
     } catch {
       setError('Failed to verify access. Please try again.');
     } finally {
@@ -88,50 +85,43 @@ export default function MarketIntelligencePage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-5">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 max-w-5xl w-full shadow-2xl">
-        <div className="text-center mb-8">
-          <div className="mb-4 flex items-center justify-center gap-2">
-            <span className="text-2xl font-bold text-blue-400">GovCon</span>
-            <span className="text-2xl font-bold text-amber-400">Giants</span>
+    <div className="min-h-screen bg-slate-950">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-3 mb-6">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
+              <span className="text-white font-bold text-2xl">MI</span>
+            </div>
           </div>
-          <h1 className="text-slate-100 mb-3 text-3xl font-bold">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Market Intelligence
           </h1>
-          <p className="text-slate-400 text-base leading-relaxed max-w-2xl mx-auto">
-            Access daily briefs, weekly deep dives, and pursuit briefs personalized to your NAICS,
-            target agencies, and capture priorities.
+          <p className="text-xl text-purple-200 mb-2">
+            Know what matters before your competitors do.
+          </p>
+          <p className="text-slate-400 max-w-2xl mx-auto">
+            Daily briefs that prioritize your opportunities. Weekly deep dives on market movement.
+            Pursuit briefs that turn targets into capture plans.
           </p>
         </div>
+      </div>
 
-        {/* Video Demo */}
-        <div className="mb-8 rounded-xl overflow-hidden border border-slate-700 bg-slate-900/50">
-          <div className="aspect-video">
-            <iframe
-              src="https://player.vimeo.com/video/1181569155?badge=0&autopause=0&player_id=0&app_id=58479&title=0&byline=0&portrait=0"
-              className="w-full h-full"
-              allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media"
-              title="Market Intelligence Brief Settings"
-            />
-          </div>
-          <div className="p-3 text-center border-t border-slate-700">
-            <p className="text-sm text-slate-400">See how to configure your personalized briefings in under a minute</p>
-          </div>
-        </div>
-
-        <div className="border border-slate-700 rounded-xl p-4 mb-8 bg-slate-900/50">
-          <p className="text-slate-400 text-sm mb-3 text-center">Already purchased? Enter your email to access:</p>
-          <form onSubmit={handleVerifyAccess} className="flex gap-2">
+      {/* Access Check Section */}
+      <div className="max-w-4xl mx-auto px-4 -mt-8">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+          <p className="text-slate-300 text-center mb-4">Already have access? Enter your email:</p>
+          <form onSubmit={handleVerifyAccess} className="flex gap-2 max-w-xl mx-auto">
             <input
               ref={emailRef}
               type="email"
               placeholder="Enter your purchase email"
-              className="flex-1 px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              className="flex-1 px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-slate-950 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold disabled:opacity-50 transition-all"
             >
               {loading ? '...' : 'Access'}
             </button>
@@ -141,112 +131,183 @@ export default function MarketIntelligencePage() {
               type="button"
               onClick={handleSendSecureLink}
               disabled={sendingLink}
-              className="text-sm text-cyan-300 hover:text-cyan-200 disabled:opacity-50"
+              className="text-sm text-purple-400 hover:text-purple-300 disabled:opacity-50"
             >
               {sendingLink ? 'Sending secure link...' : 'Email me a secure access link'}
             </button>
           </div>
-          {error ? <p className="text-red-400 text-sm mt-3 text-center">{error}</p> : null}
-          {success ? <p className="text-green-400 text-sm mt-3 text-center">{success}</p> : null}
-          {redirecting ? <p className="text-green-400 text-sm mt-3 text-center">Access verified! Redirecting...</p> : null}
+          {error && <p className="text-red-400 text-sm mt-3 text-center">{error}</p>}
+          {success && <p className="text-green-400 text-sm mt-3 text-center">{success}</p>}
+          {redirecting && <p className="text-green-400 text-sm mt-3 text-center">Access verified! Redirecting...</p>}
         </div>
+      </div>
 
-        <div className="mb-8 rounded-2xl border border-amber-400/35 bg-gradient-to-r from-amber-500/15 to-orange-500/10 p-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Ultimate Shortcut</p>
-              <p className="mt-1 text-lg font-semibold text-white">
-                Ultimate Bundle includes lifetime Market Intelligence access
-              </p>
-              <p className="mt-1 text-sm text-slate-300">
-                Planning to buy Ultimate? Skip this subscription and get Market Intelligence included for life.
-              </p>
+      {/* What's Included */}
+      <div className="max-w-4xl mx-auto px-4 py-16">
+        <h2 className="text-2xl font-bold text-white text-center mb-10">What&apos;s Included</h2>
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4">
+              <span className="text-2xl">📋</span>
             </div>
-            <div className="shrink-0">
-              <Link
-                href="/bundles/ultimate"
-                className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:from-amber-400 hover:to-orange-400"
-              >
-                Compare with Ultimate →
-              </Link>
+            <h3 className="text-lg font-bold text-white mb-2">Daily Brief</h3>
+            <p className="text-slate-400 text-sm">
+              Ranked opportunities with urgency indicators, agency signals, and recommended next actions.
+              Delivered every morning by email.
+            </p>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4">
+              <span className="text-2xl">📊</span>
             </div>
+            <h3 className="text-lg font-bold text-white mb-2">Weekly Deep Dive</h3>
+            <p className="text-slate-400 text-sm">
+              Strategic analysis of market movement, teaming opportunities, and emerging agency priorities.
+              Delivered every Sunday.
+            </p>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4">
+              <span className="text-2xl">🎯</span>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Pursuit Brief</h3>
+            <p className="text-slate-400 text-sm">
+              Capture-focused guidance for your top targets. Incumbent analysis, win themes, and next-step actions.
+              Delivered every Monday.
+            </p>
           </div>
         </div>
 
-        <div className="max-w-sm mx-auto mb-6 inline-flex w-full justify-center rounded-full border border-slate-700 bg-slate-900/70 p-1 text-sm">
-          <button
-            type="button"
-            onClick={() => setBilling('monthly')}
-            className={`rounded-full px-4 py-2 transition ${billing === 'monthly' ? 'bg-white text-slate-950' : 'text-slate-300 hover:text-white'}`}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setBilling('annual')}
-            className={`rounded-full px-4 py-2 transition ${billing === 'annual' ? 'bg-white text-slate-950' : 'text-slate-300 hover:text-white'}`}
-          >
-            Annual
-          </button>
+        {/* Additional Features */}
+        <div className="mt-10 grid md:grid-cols-2 gap-4">
+          <div className="flex items-start gap-3 text-slate-300">
+            <span className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm flex-shrink-0 mt-0.5">✓</span>
+            <span>Personalized by your NAICS codes, agencies, and geography</span>
+          </div>
+          <div className="flex items-start gap-3 text-slate-300">
+            <span className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm flex-shrink-0 mt-0.5">✓</span>
+            <span>Dashboard access with search, filters, and CSV export</span>
+          </div>
+          <div className="flex items-start gap-3 text-slate-300">
+            <span className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm flex-shrink-0 mt-0.5">✓</span>
+            <span>Access to Forecasts, SBIR, and Grants tabs</span>
+          </div>
+          <div className="flex items-start gap-3 text-slate-300">
+            <span className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm flex-shrink-0 mt-0.5">✓</span>
+            <span>30-day briefing history with full archive</span>
+          </div>
         </div>
+      </div>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <div className={`border rounded-xl p-6 card-hover ${billing === 'monthly' ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-slate-700 bg-slate-900/50'}`}>
-            <div className="text-center mb-4">
-              <span className="px-3 py-1 bg-cyan-500/20 text-cyan-300 text-sm font-bold rounded-full border border-cyan-500/30">Monthly</span>
-              <div className="mt-3">
-                <span className="text-4xl font-bold text-slate-100">${monthlyTier.price}</span>
-                <span className="text-slate-400 ml-2">/ month</span>
+      {/* Pricing Section */}
+      <div className="max-w-4xl mx-auto px-4 pb-16">
+        <h2 className="text-2xl font-bold text-white text-center mb-10">Choose Your Plan</h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Monthly */}
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 hover:border-purple-500/50 transition-colors">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold text-white mb-2">Monthly</h3>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-4xl font-bold text-white">$49</span>
+                <span className="text-slate-400">/mo</span>
               </div>
+              <p className="text-slate-500 text-sm mt-1 line-through">$199/mo value</p>
             </div>
-            <ul className="space-y-2 text-sm text-slate-300 mb-6">
-              <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Daily opportunity brief</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Weekly deep dive analysis</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Weekly pursuit briefs</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Personalized by NAICS, agencies, and geography</li>
+            <ul className="space-y-3 mb-8">
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Daily market intelligence brief
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Weekly deep dive analysis
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Pursuit briefs with capture guidance
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Full dashboard access
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Cancel anytime
+              </li>
             </ul>
             <a
-              href={monthlyTier.stripeUrl}
-              className="block w-full text-center bg-cyan-500 hover:bg-cyan-600 text-slate-950 py-3 px-6 rounded-lg font-bold transition-all"
+              href={CHECKOUT_MONTHLY}
+              className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl text-center transition-colors"
             >
-              Start Monthly
+              Start Monthly →
             </a>
           </div>
 
-          <div className={`border rounded-xl p-6 relative card-hover ${billing === 'annual' ? 'border-amber-500/60 bg-gradient-to-br from-amber-500/10 to-orange-500/10' : 'border-slate-700 bg-slate-900/50'}`}>
+          {/* Annual */}
+          <div className="bg-gradient-to-br from-purple-900/50 to-slate-800 border-2 border-purple-500 rounded-2xl p-8 relative">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full">
-                BEST VALUE
-              </span>
+              <span className="bg-purple-500 text-white text-xs font-bold px-4 py-1 rounded-full">BEST VALUE</span>
             </div>
-            <div className="text-center mb-4 mt-1">
-              <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold rounded-full">Annual</span>
-              <div className="mt-3">
-                <span className="text-4xl font-bold text-slate-100">${annualTier.price}</span>
-                <span className="text-slate-400 ml-2">/ year</span>
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold text-white mb-2">Annual</h3>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-4xl font-bold text-white">$497</span>
+                <span className="text-slate-400">/yr</span>
               </div>
-              <p className="mt-2 text-sm text-emerald-300">Save ${annualSavings} vs monthly</p>
+              <p className="text-green-400 text-sm mt-1 font-medium">Save $91 vs monthly</p>
             </div>
-            <ul className="space-y-2 text-sm text-slate-300 mb-6">
-              <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Everything in monthly access</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Lower annual effective rate</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Ideal for capture teams using the full program</li>
-              <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Direct access after Stripe purchase</li>
+            <ul className="space-y-3 mb-8">
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Everything in Monthly
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> 2 months free
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Priority support
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Locked-in pricing
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> Best for serious capture teams
+              </li>
             </ul>
             <a
-              href={annualTier.stripeUrl}
-              className="block w-full text-center bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 py-3 px-6 rounded-lg font-bold transition-all"
+              href={CHECKOUT_ANNUAL}
+              className="block w-full py-3 bg-white hover:bg-slate-100 text-purple-700 font-semibold rounded-xl text-center transition-colors"
             >
-              Start Annual
+              Start Annual →
             </a>
           </div>
         </div>
 
-        <p className="text-slate-500 text-xs mt-6 text-center">
-          <Link href="/" className="text-blue-400 hover:text-blue-300">
-            ← Back to Tools
-          </Link>
-        </p>
+        {/* Ultimate Bundle Callout */}
+        <div className="mt-8 bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-center">
+          <p className="text-slate-400 text-sm mb-2">Planning to go all-in?</p>
+          <p className="text-white font-medium mb-3">
+            The <span className="text-purple-400">Ultimate Bundle ($1,497)</span> includes lifetime Market Intelligence access.
+          </p>
+          <a
+            href="https://shop.govcongiants.org/bundles/ultimate"
+            className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+          >
+            Compare with Ultimate →
+          </a>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-slate-800 py-8">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <p className="text-slate-500 text-sm">
+            <Link href="/" className="text-slate-400 hover:text-white">
+              ← Back to Tools
+            </Link>
+            <span className="mx-4">•</span>
+            <Link href="/briefings" className="text-slate-400 hover:text-white">
+              View Dashboard
+            </Link>
+          </p>
+          <p className="text-slate-600 text-xs mt-4">
+            © {new Date().getFullYear()} GovCon Giants • tools.govcongiants.org
+          </p>
+        </div>
       </div>
     </div>
   );

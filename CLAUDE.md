@@ -493,6 +493,38 @@ The `fetchSamOpportunitiesFromCache` function accepts all three and uses OR logi
 **Admin Endpoint:**
 `/api/admin/apply-business-intel-migration?password=xxx` — Check migration status
 
+**OH → Market Intelligence Funnel (April 25, 2026):**
+
+Complete conversion funnel from free Opportunity Hunter to paid Market Intelligence:
+
+```
+1. OH Search Results → MI upsell card (full-width purple banner)
+   "$199/mo value → $49/mo" with direct checkout CTA
+
+2. Daily Alert Emails → MI upsell box (purple gradient)
+   "Want the Daily Briefing?" with link to /market-intelligence
+
+3. /market-intelligence → Unified checkout page
+   - Access verification (existing users → /briefings)
+   - What's Included section (Daily Brief, Weekly, Pursuit)
+   - Direct Stripe checkout: Monthly $49/mo, Annual $497/yr
+   - Ultimate Bundle callout ($1,497 lifetime)
+
+4. /briefings (denied state) → Links to /market-intelligence
+```
+
+**Key Files:**
+| File | Purpose |
+|------|---------|
+| `src/app/opportunity-hunter/page.tsx` | MI upsell card in results (lines 1205-1230) |
+| `src/app/api/cron/daily-alerts/route.ts` | MI upsell in email (lines 1254-1267) |
+| `src/app/market-intelligence/page.tsx` | Unified checkout/landing page |
+| `src/app/briefings/page.tsx` | Dashboard with denied state → MI link |
+
+**Stripe Checkout URLs:**
+- Monthly: `https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z`
+- Annual: `https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A`
+
 **Cron Schedule (ET):**
 | Job | Times (ET) | Purpose |
 |-----|------------|---------|

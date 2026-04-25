@@ -1203,6 +1203,41 @@ export default function OpportunityHunterPage() {
               </div>
             )}
 
+            {/* Market Intelligence Upsell - Full Width */}
+            {!isPro && emailGatePassed && results.agencies.length > 0 && (
+              <div className="mt-6 bg-gradient-to-r from-purple-600 to-indigo-700 rounded-xl p-6 text-white">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                        <span className="text-xl">🧠</span>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-lg">Market Intelligence</h3>
+                        <p className="text-purple-200 text-sm">Know what matters before your competitors do</p>
+                      </div>
+                    </div>
+                    <p className="text-purple-100 text-sm mt-3 leading-relaxed">
+                      Turn these {results.agencies.length} agencies into a daily action plan. Get ranked opportunities,
+                      weekly deep dives on market movement, and pursuit briefs with capture guidance — all personalized to your NAICS codes.
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center md:items-end gap-2">
+                    <div className="text-center md:text-right">
+                      <span className="text-purple-200 text-sm line-through">$199/mo value</span>
+                      <div className="text-2xl font-bold">$49/mo</div>
+                    </div>
+                    <a
+                      href="/market-intelligence"
+                      className="inline-block bg-white text-purple-700 px-6 py-2.5 rounded-lg font-semibold hover:bg-purple-50 transition text-sm"
+                    >
+                      Get Daily Briefings →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 

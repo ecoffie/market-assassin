@@ -184,7 +184,7 @@ async function getUnsubscribePage(status: 'success' | 'error', message: string):
     <div class="icon">${isSuccess ? '✅' : '❌'}</div>
     <h1>${isSuccess ? 'Unsubscribed' : 'Error'}</h1>
     ${isSuccess ? `
-      <p>You've been unsubscribed from weekly opportunity alerts.</p>
+      <p>You've been unsubscribed from daily opportunity alerts.</p>
       <p class="email">${message}</p>
       <p style="margin-top: 24px; font-size: 14px;">
         Changed your mind? <a href="${resubscribeUrl}">Resubscribe</a>

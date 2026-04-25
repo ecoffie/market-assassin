@@ -91,7 +91,9 @@ export default function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/dashboard?password=${password}`);
+      const res = await fetch(`/api/admin/dashboard?password=${password}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) {
         if (res.status === 401) {
           setAuthenticated(false);

@@ -94,7 +94,7 @@ export default function AlertSignupPage() {
             </div>
             <h1 className="text-3xl font-bold text-white mb-4">You&apos;re Signed Up!</h1>
             <p className="text-slate-400 text-lg mb-8">
-              You&apos;ll receive weekly SAM.gov opportunity alerts at <span className="text-white font-medium">{email}</span>.
+              Your Daily Alerts profile is saved for <span className="text-white font-medium">{email}</span>. During beta, matching SAM.gov opportunities are delivered free.
             </p>
 
             {/* Alert Pro Upsell */}
@@ -103,57 +103,57 @@ export default function AlertSignupPage() {
                 <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Free Tier: 5 Opportunities/Week
+                Beta Access: Daily Alerts
               </h3>
               <p className="text-slate-400 mb-4">
-                You&apos;re on the free tier. Upgrade to <strong className="text-emerald-400">Alert Pro</strong> for daily alerts and unlimited opportunities.
+                You&apos;re set up for daily opportunity monitoring. After beta, keep it active with <strong className="text-emerald-400">Alert Pro</strong> for $19/mo.
               </p>
               <ul className="text-slate-400 text-sm space-y-1 mb-4">
                 <li className="flex items-center gap-2">
                   <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <strong className="text-white">Daily</strong> alerts (not weekly)
+                  <strong className="text-white">Daily</strong> alert delivery
                 </li>
                 <li className="flex items-center gap-2">
                   <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <strong className="text-white">Unlimited</strong> opportunities (no 5 cap)
+                  <strong className="text-white">Unlimited</strong> matched opportunities
                 </li>
               </ul>
               <Link
                 href="https://buy.stripe.com/8x24gA1oifvAcFv3OEfnO0y"
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm"
               >
-                Upgrade to Alert Pro - $19/mo
+                Keep Daily Alerts - $19/mo
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Link>
             </div>
 
-            {/* Market Assassin Upsell */}
-            <div className="bg-gradient-to-br from-slate-900 to-red-950/30 border border-red-500/30 rounded-xl p-6 mb-8 text-left">
+            {/* Daily Briefings Upsell */}
+            <div className="bg-gradient-to-br from-slate-900 to-purple-950/30 border border-purple-500/30 rounded-xl p-6 mb-8 text-left">
               <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
-                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z" />
                 </svg>
-                Go Beyond Alerts
+                Want Prioritization?
               </h3>
               <p className="text-slate-400 text-sm mb-4">
-                <strong className="text-white">Federal Market Assassin</strong> gives you complete agency intelligence: pain points, contract history, competitor analysis, and strategic reports.
+                <strong className="text-white">Daily Briefings</strong> turn your matches into ranked priorities, weekly market analysis, and pursuit guidance so you know what to chase next.
               </p>
               <Link
-                href="/market-assassin"
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm"
+                href="https://shop.govcongiants.org/market-intelligence"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-700 hover:from-purple-500 hover:to-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm"
               >
-                Explore Market Assassin
+                Upgrade to Daily Briefings
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Link>
-              <p className="text-slate-500 text-sm mt-2">Starting at $297</p>
+              <p className="text-slate-500 text-sm mt-2">$49/mo or $497/yr</p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -208,14 +208,14 @@ export default function AlertSignupPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Free Weekly Alerts
+            Daily Alerts
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
             Get SAM.gov Opportunities <br className="hidden sm:block" />
             Delivered to Your Inbox
           </h1>
           <p className="text-slate-400 text-lg">
-            Never miss a contracting opportunity. Get 5 matched opportunities every week.
+            Set your NAICS and business type once. During beta, get matching opportunities delivered daily.
           </p>
         </div>
 
@@ -245,8 +245,8 @@ export default function AlertSignupPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 className="text-white font-medium mb-1">Weekly Email</h3>
-            <p className="text-slate-500 text-sm">Direct to your inbox</p>
+            <h3 className="text-white font-medium mb-1">Daily Email</h3>
+            <p className="text-slate-500 text-sm">Fresh matches in your inbox</p>
           </div>
         </div>
 
@@ -336,11 +336,11 @@ export default function AlertSignupPage() {
                   </svg>
                   Signing up...
                 </span>
-              ) : 'Get Free Weekly Alerts'}
+              ) : 'Set Up Daily Alerts'}
             </button>
 
             <p className="text-slate-500 text-xs text-center">
-              By signing up, you agree to receive weekly emails. You can unsubscribe anytime.
+              By signing up, you agree to receive daily alert emails. You can unsubscribe anytime.
             </p>
           </form>
         </div>
@@ -376,7 +376,7 @@ export default function AlertSignupPage() {
                     <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <strong className="text-white">Daily alerts</strong> (not weekly)
+                    <strong className="text-white">Daily alerts</strong>
                   </li>
                   <li className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -410,62 +410,62 @@ export default function AlertSignupPage() {
             </div>
           </div>
 
-          {/* Market Assassin */}
-          <div className="bg-gradient-to-br from-slate-900 to-red-950/30 border border-red-500/30 rounded-xl p-6 hover:border-red-500/50 transition-colors relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-              POPULAR
+          {/* Daily Briefings */}
+          <div className="bg-gradient-to-br from-slate-900 to-purple-950/30 border border-purple-500/30 rounded-xl p-6 hover:border-purple-500/50 transition-colors relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-purple-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
+              NEXT STEP
             </div>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-white font-semibold text-lg">Federal Market Assassin</h3>
-                  <span className="text-red-400 font-bold">$297+</span>
+                  <h3 className="text-white font-semibold text-lg">Daily Briefings</h3>
+                  <span className="text-purple-400 font-bold">$49/mo</span>
                 </div>
                 <p className="text-slate-400 text-sm mb-3">
-                  Complete agency intelligence platform. Know exactly which agencies buy your services and how to win.
+                  Daily Alerts tell you what matched. Daily Briefings tell you what to pursue, why it matters, and how to move.
                 </p>
                 <ul className="text-slate-400 text-sm space-y-1 mb-4">
                   <li className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Agency pain points & strategic reports
+                    Ranked daily opportunity priorities
                   </li>
                   <li className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Contract history & spending analysis
+                    Weekly market and teaming analysis
                   </li>
                   <li className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Competitor intelligence & positioning
+                    Pursuit-specific action briefs
                   </li>
                   <li className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    PDF reports you can use for proposals
+                    Market Intelligence dashboard access
                   </li>
                 </ul>
                 <div className="flex items-center gap-3">
                   <Link
-                    href="/market-assassin"
-                    className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm"
+                    href="https://shop.govcongiants.org/market-intelligence"
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-700 hover:from-purple-500 hover:to-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm"
                   >
-                    See Market Assassin
+                    See Daily Briefings
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
                   </Link>
-                  <span className="text-slate-500 text-xs">Standard $297 | Premium $497</span>
+                  <span className="text-slate-500 text-xs">$49/mo | $497/yr</span>
                 </div>
               </div>
             </div>

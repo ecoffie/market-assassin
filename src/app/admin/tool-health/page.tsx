@@ -87,7 +87,9 @@ export default function ToolHealthDashboard() {
     if (!password) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/tool-health?password=${encodeURIComponent(password)}`);
+      const res = await fetch(`/api/admin/tool-health?password=${encodeURIComponent(password)}`, {
+        cache: 'no-store',
+      });
       if (res.status === 401) {
         setAuthenticated(false);
         setError('Invalid password');
@@ -223,6 +225,7 @@ export default function ToolHealthDashboard() {
     sample_opportunities: 'Sample Opportunities',
     opportunity_hunter: 'Opportunity Hunter',
     reports: 'Market Reports',
+    daily_alerts: 'Daily Alerts',
   };
 
   return (

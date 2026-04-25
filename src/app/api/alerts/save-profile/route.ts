@@ -25,8 +25,7 @@ interface AlertProfileRequest {
 
 /**
  * POST /api/alerts/save-profile
- * Save or update alert profile for MA Premium user
- * Called after MA report generation
+ * Save or update a daily alert profile.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -128,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Alert profile saved. You will receive weekly opportunity alerts.',
+      message: 'Alert profile saved. You will receive daily opportunity alerts.',
       data: {
         email: data.user_email,
         naicsCodes: data.naics_codes,

@@ -3,7 +3,8 @@ import { Resend } from 'resend';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
 // Primary: Resend (more reliable)
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const resendApiKey = process.env.RESEND_API_KEY?.replace(/\\n$/, '').trim();
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 // Fallback: Office365 SMTP
 const transporter = nodemailer.createTransport({
@@ -37,12 +38,13 @@ export async function sendEmail({
   // Use alerts@govcongiants.com (verified in Resend)
   const fromEmail = process.env.EMAIL_FROM || 'alerts@govcongiants.com';
   const fromName = 'GovCon Giants AI';
+  const fromAddress = from || `${fromName} <${fromEmail}>`;
 
   // Try Resend first (primary)
   if (resend) {
     try {
       const { error } = await resend.emails.send({
-        from: `${fromName} <${fromEmail}>`,
+        from: fromAddress,
         to: [to],
         subject,
         html,
@@ -63,8 +65,6 @@ export async function sendEmail({
 
   // Fallback to Office365 SMTP
   try {
-    const fromAddress = from || `"${fromName}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`;
-
     await transporter.sendMail({
       from: fromAddress,
       to,

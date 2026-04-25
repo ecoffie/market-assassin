@@ -23,6 +23,7 @@ import {
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
+import { sendEmail } from '@/lib/send-email';
 
 // BATCH_SIZE: Process this many users per cron run
 // Apr 23, 2026: Reduced from 100 to 35 to prevent Vercel 60s timeout
@@ -315,6 +316,7 @@ async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number
 async function runDailyAlertJob(options?: {
   skipTimezoneCheck?: boolean;
   testEmail?: string;
+  forceResend?: boolean;
 }): Promise<NextResponse> {
   // Initialize metrics and guardrails
   const metrics = new IntelligenceMetrics('daily_alerts');
@@ -396,6 +398,9 @@ async function runDailyAlertJob(options?: {
       .eq('delivery_status', 'sent');
 
     const alreadySentEmails = new Set((alreadySentToday || []).map((s: { user_email: string }) => s.user_email));
+    if (options?.forceResend && options.testEmail) {
+      alreadySentEmails.delete(options.testEmail);
+    }
     const alreadySentCount = alreadySentEmails.size;
 
     // Filter out already-sent users and apply BATCH_SIZE limit
@@ -867,6 +872,7 @@ export async function POST(request: NextRequest) {
   return runDailyAlertJob({
     skipTimezoneCheck: body.skipTimezoneCheck,
     testEmail: body.testEmail,
+    forceResend: body.forceResend,
   });
 }
 
@@ -880,6 +886,7 @@ export async function GET(request: NextRequest) {
   const test = request.nextUrl.searchParams.get('test') === 'true';
   const password = request.nextUrl.searchParams.get('password');
   const skipTimezone = request.nextUrl.searchParams.get('skipTimezone') === 'true';
+  const forceResend = request.nextUrl.searchParams.get('forceResend') === 'true';
   const limit = parseInt(request.nextUrl.searchParams.get('limit') || '0');
 
   // Admin override - allows manual triggering with timezone skip
@@ -888,6 +895,7 @@ export async function GET(request: NextRequest) {
     return runDailyAlertJob({
       skipTimezoneCheck: skipTimezone,
       testEmail: email || undefined,
+      forceResend: forceResend && Boolean(email),
     });
   }
 
@@ -1052,7 +1060,7 @@ Return ONLY a JSON array of strings, each tip under 100 characters:
   return defaultTips;
 }
 
-// Send daily alert email - NEW "Active Solicitations" format
+// Send daily alert email - alert product format (distinct from Market Intelligence briefings)
 async function sendDailyAlertEmail(
   email: string,
   opportunities: (SAMOpportunity & { score: number })[],
@@ -1064,91 +1072,60 @@ async function sendDailyAlertEmail(
 ) {
   const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const maUrl = 'https://tools.govcongiants.org/market-assassin';
+  const dailyBriefingsUrl = 'https://shop.govcongiants.org/market-intelligence';
   const totalCount = opportunities.length + grants.length;
 
-  // Count notice types for summary badges (from new opportunities)
-  const noticeCounts = noticeSummary || countNoticeTypes(opportunities);
-
-  // Get deadlines this week from ALL active opportunities (not just new ones)
-  const oppsForDeadlines = allActiveOpportunities.length > 0 ? allActiveOpportunities : opportunities;
-  const deadlinesThisWeek = oppsForDeadlines
-    .filter(opp => {
-      const days = getDaysUntil(opp.responseDeadline);
-      return days >= 0 && days <= 7;
-    })
-    .sort((a, b) => getDaysUntil(a.responseDeadline) - getDaysUntil(b.responseDeadline))
-    .slice(0, 5);
-
-  // Default action tips if none provided
-  const finalActionTips = actionTips.length > 0 ? actionTips : [
-    'Review solicitation documents within 48 hours of receiving this brief',
-    'Identify teaming partners for larger opportunities',
-    'Check SAM.gov for amendments and Q&A updates',
-  ];
-
-  // Format today's date
-  const todayFormatted = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-
-  // Build opportunity cards HTML (top 10)
-  const opportunitiesHtml = opportunities.slice(0, 10).map((opp, i) => {
+  const opportunitiesHtml = opportunities.slice(0, 20).map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
-    const urgencyColor = getUrgencyColor(daysUntil);
+    const urgencyColor = daysUntil <= 7 ? '#dc2626' : daysUntil <= 14 ? '#d97706' : '#16a34a';
+    const urgencyBadge = daysUntil <= 3
+      ? `<span style="background: #dc2626; color: white; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 4px;">🔥 ${daysUntil <= 0 ? 'DUE NOW' : `${daysUntil} DAYS LEFT`}</span>`
+      : daysUntil <= 7
+        ? `<span style="background: #f97316; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">⚡ ${daysUntil} days</span>`
+        : daysUntil <= 14
+          ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">📅 2 weeks</span>`
+          : '';
 
-    // Notice type badge styling
-    const getNoticeStyle = (type: string): { bg: string; text: string } => {
-      const t = (type || '').toLowerCase();
-      if (t.includes('solicitation') || t.includes('rfp')) return { bg: '#dbeafe', text: '#1e40af' };
-      if (t.includes('rfq')) return { bg: '#fef3c7', text: '#92400e' };
-      if (t.includes('sources sought') || t.includes('rfi')) return { bg: '#d1fae5', text: '#065f46' };
-      if (t.includes('presol')) return { bg: '#f3e8ff', text: '#6b21a8' };
-      if (t.includes('combined')) return { bg: '#fce7f3', text: '#9d174d' };
-      return { bg: '#f3f4f6', text: '#374151' };
+    const noticeTypeColors: Record<string, { bg: string; text: string }> = {
+      'Solicitation': { bg: '#dcfce7', text: '#166534' },
+      'RFP': { bg: '#dcfce7', text: '#166534' },
+      'RFQ': { bg: '#dbeafe', text: '#1e40af' },
+      'Sources Sought': { bg: '#f3e8ff', text: '#7c3aed' },
+      'Presolicitation': { bg: '#ffedd5', text: '#c2410c' },
+      'Combined Synopsis/Solicitation': { bg: '#ccfbf1', text: '#0f766e' },
     };
-    const noticeStyle = getNoticeStyle(opp.noticeType || '');
+    const noticeColors = noticeTypeColors[opp.noticeType || ''] || { bg: '#f1f5f9', text: '#475569' };
+    const scoreColor = opp.score >= 75 ? '#16a34a' : opp.score >= 50 ? '#84cc16' : opp.score >= 30 ? '#eab308' : '#f97316';
+    const scoreBadge = `<span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${opp.score}%</span>`;
 
     return `
-      <div style="background: #f9fafb; border-radius: 10px; padding: 18px; margin-bottom: 14px; border-left: 4px solid #10b981;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: #10b981; color: white; border-radius: 50%; font-size: 12px; font-weight: 700;">${i + 1}</span>
-            <span style="background: ${noticeStyle.bg}; color: ${noticeStyle.text}; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;">${opp.noticeType || 'Solicitation'}</span>
-            ${opp.setAside ? `<span style="background: #e0e7ff; color: #3730a3; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;">${opp.setAside}</span>` : ''}
+      <tr>
+        <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;${daysUntil <= 3 ? ' background: #fef2f2;' : ''}">
+          <div style="margin-bottom: 6px;">
+            <span style="background: ${noticeColors.bg}; color: ${noticeColors.text}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+              ${opp.noticeType || 'Solicitation'}
+            </span>
+            ${opp.setAside ? `<span style="background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${opp.setAside}</span>` : ''}
+            ${urgencyBadge}
+            ${scoreBadge}
           </div>
-          <span style="background: ${urgencyColor}; color: white; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; white-space: nowrap;">${getUrgencyLabel(daysUntil)}</span>
-        </div>
-        <a href="${opp.uiLink}" style="color: #111827; font-weight: 700; text-decoration: none; font-size: 15px; line-height: 1.4; display: block; margin-bottom: 10px;">
-          ${opp.title.slice(0, 100)}${opp.title.length > 100 ? '...' : ''}
-        </a>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 12px;">
-          <div>
-            <span style="color: #6b7280; text-transform: uppercase; font-size: 10px;">Agency</span><br>
-            <span style="color: #111827; font-weight: 600;">${opp.department || 'Federal'}${opp.subTier ? ` › ${opp.subTier}` : ''}</span>
+          <a href="${opp.uiLink}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+            ${i + 1}. ${opp.title.slice(0, 90)}${opp.title.length > 90 ? '...' : ''}
+          </a>
+          <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
+            ${opp.department || 'Federal'}${opp.subTier ? ` › ${opp.subTier}` : ''} &nbsp;•&nbsp;
+            NAICS ${opp.naicsCode || 'N/A'}
           </div>
-          <div>
-            <span style="color: #6b7280; text-transform: uppercase; font-size: 10px;">NAICS</span><br>
-            <span style="color: #111827; font-weight: 600;">${opp.naicsCode || 'N/A'}</span>
+          <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
+            📅 Posted ${formatDate(opp.postedDate)} &nbsp;•&nbsp;
+            <span style="color: ${urgencyColor}; font-weight: 600;">Due ${formatDate(opp.responseDeadline)}</span>
           </div>
-          <div>
-            <span style="color: #6b7280; text-transform: uppercase; font-size: 10px;">Posted</span><br>
-            <span style="color: #111827; font-weight: 600;">${formatDate(opp.postedDate)}</span>
-          </div>
-          <div>
-            <span style="color: #6b7280; text-transform: uppercase; font-size: 10px;">Response Due</span><br>
-            <span style="color: ${urgencyColor}; font-weight: 700;">${formatDate(opp.responseDeadline)}</span>
-          </div>
-        </div>
-        <a href="${opp.uiLink}" style="display: inline-block; background: #10b981; color: white; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; margin-top: 12px;">View on SAM.gov →</a>
-      </div>
+        </td>
+      </tr>
     `;
   }).join('');
 
-  const moreCount = opportunities.length > 10 ? opportunities.length - 10 : 0;
+  const moreCount = opportunities.length > 20 ? opportunities.length - 20 : 0;
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -1156,98 +1133,48 @@ async function sendDailyAlertEmail(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    .notice-pill { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin: 4px; }
-    .pill-rfp { background: #dbeafe; color: #1e40af; }
-    .pill-rfq { background: #fef3c7; color: #92400e; }
-    .pill-sources { background: #d1fae5; color: #065f46; }
-    .pill-presol { background: #f3e8ff; color: #6b21a8; }
-    .pill-combined { background: #fce7f3; color: #9d174d; }
-    .pill-other { background: #f3f4f6; color: #374151; }
-    .notice-pill-count { font-weight: 800; margin-right: 4px; }
-  </style>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 680px; margin: 0 auto; padding: 0; background: #f3f4f6;">
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 620px; margin: 0 auto; padding: 20px; background: #f8fafc;">
 
-  <!-- Header - Green Active Solicitations -->
-  <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 32px 24px; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 26px; font-weight: 700;">
-      📋 Active Solicitations
-    </h1>
-    <p style="color: rgba(255,255,255,0.95); margin: 12px 0 0 0; font-size: 15px;">
-      ${todayFormatted}
+  <!-- FREE PREVIEW Banner -->
+  <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+    <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
+      🎁 FREE PREVIEW • You're testing our daily alerts — no charge during beta!
     </p>
-    <div style="display: inline-block; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; margin-top: 12px; color: white;">
-      ✅ VERIFIED FROM SAM.gov
-    </div>
   </div>
 
-  <!-- Notice Type Summary Section -->
-  <div style="background: #f0fdf4; padding: 20px 24px; text-align: center; border-bottom: 2px solid #86efac;">
-    <div style="font-size: 13px; font-weight: 700; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
-      📊 Notice Type Summary (${noticeCounts.totalMatched} matched active)
-    </div>
-    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;">
-      ${noticeCounts.rfp > 0 ? `<span class="notice-pill pill-rfp"><span class="notice-pill-count">${noticeCounts.rfp}</span> RFP/Solicitation</span>` : ''}
-      ${noticeCounts.rfq > 0 ? `<span class="notice-pill pill-rfq"><span class="notice-pill-count">${noticeCounts.rfq}</span> RFQ</span>` : ''}
-      ${noticeCounts.sourcesSought > 0 ? `<span class="notice-pill pill-sources"><span class="notice-pill-count">${noticeCounts.sourcesSought}</span> Sources Sought</span>` : ''}
-      ${noticeCounts.preSol > 0 ? `<span class="notice-pill pill-presol"><span class="notice-pill-count">${noticeCounts.preSol}</span> Pre-Sol</span>` : ''}
-      ${noticeCounts.combined > 0 ? `<span class="notice-pill pill-combined"><span class="notice-pill-count">${noticeCounts.combined}</span> Combined</span>` : ''}
-      ${noticeCounts.other > 0 ? `<span class="notice-pill pill-other"><span class="notice-pill-count">${noticeCounts.other}</span> Other</span>` : ''}
-    </div>
+  <!-- Header -->
+  <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">
+      🎯 Saved Search Alert
+    </h1>
+    <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 14px;">
+      ${formatDate(new Date().toISOString())} • ${totalCount} matches found
+    </p>
+    <p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 440px;">
+      New matches from your saved filters. Daily Briefings prioritize the best opportunities and show the full market view.
+    </p>
   </div>
 
-  <!-- Filter Summary Bar -->
-  <div style="background: #ffffff; padding: 14px 24px; border-bottom: 1px solid #e5e7eb;">
-    <p style="color: #4b5563; font-size: 13px; margin: 0;">
-      <strong style="color: #059669;">Your Filters:</strong>
+  <!-- Filter summary -->
+  <div style="background: #1e293b; padding: 12px 20px; border-bottom: 1px solid #334155;">
+    <p style="color: #cbd5e1; font-size: 12px; margin: 0;">
+      <strong style="color: #f8fafc;">Filters:</strong>
       NAICS ${user.naics_codes?.slice(0, 3).join(', ') || 'Any'}${user.naics_codes?.length > 3 ? ` +${user.naics_codes.length - 3}` : ''}
       ${user.business_type ? ` • ${user.business_type}` : ''}
       ${user.location_state ? ` • ${user.location_state}` : ''}
     </p>
   </div>
 
-  ${deadlinesThisWeek.length > 0 ? `
-  <!-- Deadlines This Week Section -->
-  <div style="background: #fef2f2; padding: 20px 24px; border-bottom: 2px solid #fecaca;">
-    <div style="font-size: 13px; font-weight: 700; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
-      ⏰ DEADLINES THIS WEEK (${deadlinesThisWeek.length})
-    </div>
-    <div style="display: flex; flex-direction: column; gap: 8px;">
-      ${deadlinesThisWeek.map(opp => {
-        const days = getDaysUntil(opp.responseDeadline);
-        const urgColor = days <= 3 ? '#dc2626' : '#f97316';
-        return `
-        <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 14px; border-radius: 6px; border-left: 4px solid ${urgColor};">
-          <div style="flex: 1; min-width: 0;">
-            <a href="${opp.uiLink}" style="color: #111827; font-weight: 600; text-decoration: none; font-size: 13px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${opp.title.slice(0, 60)}${opp.title.length > 60 ? '...' : ''}
-            </a>
-            <span style="color: #6b7280; font-size: 11px;">${opp.department || 'Federal'}</span>
-          </div>
-          <span style="background: ${urgColor}; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; white-space: nowrap; margin-left: 8px;">
-            ${getUrgencyLabel(days)}
-          </span>
-        </div>`;
-      }).join('')}
-    </div>
-  </div>
-  ` : ''}
-
   ${opportunities.length > 0 ? `
-  <!-- Section Header -->
-  <div style="background: #ffffff; padding: 20px 24px 12px 24px; border-bottom: 2px solid #e5e7eb;">
-    <h2 style="margin: 0; font-size: 16px; color: #059669; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-      🎯 TOP ${Math.min(opportunities.length, 10)} NEW OPPORTUNITIES TO BID
-    </h2>
-  </div>
-
   <!-- Opportunities list -->
-  <div style="background: #ffffff; padding: 0 24px;">
-    ${opportunitiesHtml}
+  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-top: none;">
+    <table style="width: 100%; border-collapse: collapse;">
+      ${opportunitiesHtml}
+    </table>
     ${moreCount > 0 ? `
-    <div style="padding: 16px; background: #f0fdf4; text-align: center; border-radius: 8px; margin: 16px 0;">
-      <span style="color: #059669; font-size: 14px; font-weight: 600;">+ ${moreCount} more opportunities matching your profile</span>
+    <div style="padding: 14px 16px; background: #f8fafc; text-align: center; border-top: 1px solid #e5e7eb;">
+      <span style="color: #64748b; font-size: 13px;">+ ${moreCount} more opportunities matching your profile</span>
     </div>
     ` : ''}
   </div>
@@ -1258,8 +1185,7 @@ async function sendDailyAlertEmail(
       <div style="font-size: 36px; margin-bottom: 12px;">📭</div>
       <h3 style="color: #0369a1; margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">No New Opportunities Today</h3>
       <p style="color: #0c4a6e; margin: 0; font-size: 14px; line-height: 1.5;">
-        No new opportunities matching your NAICS codes were posted in the last 24 hours.
-        ${deadlinesThisWeek.length > 0 ? '<br><strong>But check the deadlines above!</strong>' : ''}
+        No new opportunities matching your alert filters were available today.
       </p>
     </div>
   </div>
@@ -1310,16 +1236,6 @@ async function sendDailyAlertEmail(
   </div>
   ` : ''}
 
-  <!-- Action Tips Section -->
-  <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 20px 24px; margin: 20px 0;">
-    <div style="font-size: 14px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;">
-      💡 ACTION TIPS
-    </div>
-    <ul style="margin: 0; padding: 0 0 0 20px; color: #78350f;">
-      ${finalActionTips.map(tip => `<li style="margin-bottom: 8px; font-size: 14px; line-height: 1.5;">${tip}</li>`).join('')}
-    </ul>
-  </div>
-
   <!-- Feedback Section -->
   <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 16px 20px; margin-top: 20px; text-align: center;">
     <p style="color: #166534; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
@@ -1335,18 +1251,18 @@ async function sendDailyAlertEmail(
     </div>
   </div>
 
-  <div style="background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
+  <div style="background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
     <h3 style="color: white; margin: 0 0 8px 0; font-size: 17px; font-weight: 700;">
-      🎯 Ready to Win These Contracts?
+      Want the Daily Briefing?
     </h3>
-    <p style="color: #fecaca; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
-      Finding opportunities is step one. <strong>Market Assassin</strong> shows you agency pain points, competitor intel, and exactly how to position your proposal.
+    <p style="color: #ddd6fe; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
+      Alerts tell you what matched. <strong>Daily Briefings</strong> rank your top priorities, explain why they matter, and link you to the full opportunity dashboard.
     </p>
-    <a href="${maUrl}" style="background: white; color: #991b1b; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
-      Get Market Assassin →
+    <a href="${dailyBriefingsUrl}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
+      Upgrade to Daily Briefings →
     </a>
-    <p style="color: #fca5a5; font-size: 11px; margin: 10px 0 0 0;">
-      Starting at $297 • Agency intelligence + strategic reports
+    <p style="color: #c4b5fd; font-size: 11px; margin: 10px 0 0 0;">
+      Top priorities in your inbox + browse all matching opportunities
     </p>
   </div>
 
@@ -1365,22 +1281,10 @@ async function sendDailyAlertEmail(
 </html>
 `;
 
-  const urgentCount = deadlinesThisWeek.length;
-
-  // Build subject line based on content
-  let subject: string;
-  if (totalCount > 0) {
-    subject = `📋 ${totalCount} Active Solicitations${urgentCount > 0 ? ` (${urgentCount} due soon!)` : ''} - ${formatDate(new Date().toISOString())}`;
-  } else if (urgentCount > 0) {
-    subject = `⏰ ${urgentCount} Deadline${urgentCount > 1 ? 's' : ''} Coming Up - ${formatDate(new Date().toISOString())}`;
-  } else {
-    subject = `📊 Your Daily GovCon Intel - ${formatDate(new Date().toISOString())}`;
-  }
-
-  await getTransporter().sendMail({
-    from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+  await sendEmail({
+    from: `"Alerts" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
-    subject,
+    subject: `🎯 ${totalCount} New Opportunities${grants.length > 0 ? ' + Grants' : ''} - ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
   });
 }
