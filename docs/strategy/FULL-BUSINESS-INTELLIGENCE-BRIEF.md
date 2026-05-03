@@ -385,6 +385,14 @@ Traffic → Free Tools → MI SaaS ($149/mo) → Enterprise expansion
 
 ## Competitive Intelligence
 
+### The Big Three in GovCon Intelligence
+
+| Company | Product | Target Market | Price Range |
+|---------|---------|---------------|-------------|
+| **Deltek** | GovWin IQ | Mid-Large contractors ($10M-$500M+) | $13K-$119K/year |
+| **Unanet** | GovIntel + CRM | Small-Mid contractors ($2M-$100M) | $2,500-$50K+/year |
+| **GovCon Giants** | MI (Market Intelligence) | Small contractors (<$10M) | $1,788-$30K/year |
+
 ### Deltek GovWin Analysis
 
 | Metric | Deltek GovWin | GovCon Giants MI |
@@ -396,6 +404,28 @@ Traffic → Free Tools → MI SaaS ($149/mo) → Enterprise expansion
 | **Technology** | Legacy database | AI-powered |
 | **Setup** | Weeks | Minutes |
 | **UX** | "Cumbersome" (reviews) | Modern, simple |
+
+### Unanet Analysis
+
+| Metric | Unanet | GovCon Giants MI |
+|--------|--------|------------------|
+| **Entry Price** | $2,500/year | $1,788/year (29% less) |
+| **Full Suite** | $10K-$50K/year | $5,988/year (40-88% less) |
+| **Team (5 users)** | $25K+/year | $5,988/year (76% less) |
+| **Strengths** | CRM + ERP + ProposalAI | Daily briefings + AI agents |
+| **Weakness** | Complex setup, no daily intel | No ERP integration |
+
+**Unanet Product Suite:**
+- **GovIntel** — Market intelligence, opportunity tracking (~$2,500/year entry)
+- **CRM for GovCon** — Pipeline, capture, proposals (custom quote)
+- **ERP GovCon** — Accounting, compliance, DCAA ($4,000+/year)
+- **ProposalAI** — AI-generated proposal content (included with CRM)
+- **GovChannel** — Partner/teaming network (included with GovIntel)
+
+**What Unanet Users Complain About:**
+- Initial setup/migration "incredibly difficult, time consuming, expensive"
+- Interface not as polished as modern SaaS
+- Less deep historical data than Deltek
 
 ### What Deltek Users Complain About (Our Opportunity)
 
@@ -418,6 +448,28 @@ Traffic → Free Tools → MI SaaS ($149/mo) → Enterprise expansion
 | **AI Content Generation** | LinkedIn posts from GovCon intel |
 | **Action Planner** | 5-phase guided workflow |
 | **Market Scanner (6 Questions)** | Who's buying? How? Who has it? What's available? Events? Who to talk to? |
+
+### Three-Way Competitive Comparison
+
+| Feature | Deltek | Unanet | MI |
+|---------|--------|--------|-----|
+| **Daily AI briefings** | ❌ | ❌ | ✅ |
+| **Weekly deep dives** | ❌ | ❌ | ✅ |
+| **Pursuit-level analysis** | ✅ | ✅ | ✅ |
+| **Recompete tracking** | ✅ | ✅ | ✅ |
+| **Forecast intelligence** | ✅ | ✅ | ✅ |
+| **Contractor database** | ✅ | ✅ | ✅ |
+| **Market research (6Q)** | ❌ | ❌ | ✅ |
+| **CRM/Pipeline** | ✅ | ✅ | ✅ |
+| **Proposal AI** | ✅ | ✅ | ✅ (OpenGovIQ) |
+| **Private AI agents** | ❌ | ❌ | ✅ (OpenGovIQ) |
+| **ERP integration** | ✅ | ✅ | ❌ |
+| **BD coaching** | ❌ | ❌ | ✅ |
+| **Small business focus** | ❌ | ⚠️ | ✅ |
+| **Entry price** | $13,000/yr | $2,500/yr | $1,788/yr |
+
+**Our positioning:**
+> "Deltek is for contractors who can afford $30K/year. Unanet is for contractors who need ERP integration. MI is for contractors who just need to know what to pursue this week—at 80% less cost."
 
 ---
 
