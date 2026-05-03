@@ -225,7 +225,211 @@ Supabase DB (Unified)
 
 ---
 
-## Migration Plan
+## Migration Plan (Elon Musk 5-Step Algorithm)
+
+> **The Algorithm:**
+> 1. **Question the requirements** - Make them less dumb. Every requirement needs a name attached.
+> 2. **Delete** - Delete the part/process. If you're not adding back 10%, you're not deleting enough.
+> 3. **Simplify** - Only AFTER deleting. Don't optimize what shouldn't exist.
+> 4. **Accelerate** - Speed up cycle time. Only AFTER simplifying.
+> 5. **Automate** - Only AFTER steps 1-4. Never automate a broken process.
+
+---
+
+### Step 1: QUESTION THE REQUIREMENTS
+
+**Why are we migrating OpenGovIQ at all?**
+
+| Requirement | Who Asked? | Is It Real? | Challenge |
+|-------------|------------|-------------|-----------|
+| "Need CRM/Pipeline" | Eric | ✅ Yes | But BD Assist already has pipeline. Do we need OpenGovIQ's? |
+| "Need Proposal Manager" | Eric | ⚠️ Maybe | Do users actually use it? How many proposals generated? |
+| "Need AI Workbench" | APEX quote | ⚠️ Maybe | Did APEX buy? Are 4 current users using it? |
+| "Need Team Seats" | Laurie | ✅ Yes | She explicitly asked for team access |
+| "Need Automations" | Base44 | ❌ Questionable | How many automations exist? Are they running? |
+| "Need Email Integration" | Base44 | ❌ Questionable | How many email accounts connected? |
+| "Need Activity Logs" | -- | ❌ Nobody asked | Delete unless users request it |
+
+**ACTION:** Before migrating ANYTHING, answer:
+1. How many OpenGovIQ users are active? (4 customers - verify usage)
+2. Which features do they actually use? (Check Base44 analytics)
+3. What breaks if we just turn it off? (Probably nothing)
+
+---
+
+### Step 2: DELETE
+
+**What can we DELETE entirely?**
+
+| Entity | Records | Last Used | Decision |
+|--------|---------|-----------|----------|
+| ActivityLog | ~10,000 | ? | ❌ DELETE - Nobody reads audit logs |
+| ApplicationSetting | ~50 | ? | ❌ DELETE - Base44 system stuff |
+| ApplicationMessageTemplate | ~20 | ? | ❌ DELETE - Email templates we won't use |
+| AvailableLanguage | ~5 | Never | ❌ DELETE - We're English only |
+| CalendarEvent | ~100 | ? | ❌ DELETE - Use Google Calendar |
+| Comment | ~500 | ? | ⚠️ REVIEW - Are these valuable? |
+| DataSource | ~10 | ? | ❌ DELETE - Base44 system stuff |
+| ForecastRequest | ~100 | ? | ❌ DELETE - We have Forecast Intelligence |
+| ContractVehicleAnalysisTask | ~30 | ? | ⚠️ REVIEW - Is anyone using this? |
+| ContractVehicleSummary | ~100 | ? | ⚠️ REVIEW - Is anyone using this? |
+
+**What can we DELETE from the migration plan?**
+
+| Phase | Original | Delete? | Why |
+|-------|----------|---------|-----|
+| Email Integration | Build email sync | ✅ DELETE | Just use existing email. Link to Gmail/Outlook. |
+| Automation Engine | Build cron system | ✅ DELETE | We already have crons. Don't rebuild. |
+| AI Workbench | Build custom agents | ⚠️ DEFER | Build only if someone pays for it |
+| Activity Logs | Build audit trail | ✅ DELETE | Nobody asked for this |
+
+**MINIMUM VIABLE MIGRATION:**
+1. Contacts → Keep (CRM is real need)
+2. Pipeline → Enhance BD Assist (don't rebuild)
+3. Conversations → Keep (attached to contacts)
+4. Everything else → DELETE or DEFER
+
+---
+
+### Step 3: SIMPLIFY
+
+**After deleting, what's left?**
+
+| Component | Complex Version | Simple Version |
+|-----------|-----------------|----------------|
+| CRM | Full contact management with custom fields | Just a table: name, email, company, notes, last_contacted |
+| Pipeline | Kanban with drag-drop, automations, scoring | Add "Save to Pipeline" button on opportunities. That's it. |
+| Proposals | AI generation, templates, versioning | PDF export of opportunity + capability statement. Done. |
+| Team | Admin dashboard, roles, permissions | Shared login with same NAICS preferences. Start there. |
+
+**Simplified Architecture:**
+
+```
+BEFORE (Complex):
+├── /execution/contacts      (full CRM)
+├── /execution/pipeline      (rebuild BD Assist)
+├── /execution/proposals     (AI + templates + export)
+├── /execution/workbench     (custom agents)
+├── /execution/automations   (workflow engine)
+
+AFTER (Simple):
+├── /pipeline               (existing BD Assist + "save opp" button)
+├── /contacts               (simple table, link to pipeline)
+└── /proposals              (PDF export only)
+```
+
+**Simplified Database:**
+
+```sql
+-- That's it. Three tables.
+
+CREATE TABLE contacts (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),
+  name TEXT,
+  email TEXT,
+  company TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE pipeline_items (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),
+  opportunity_id TEXT,  -- SAM.gov notice ID
+  title TEXT,
+  stage TEXT DEFAULT 'tracking',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE conversations (
+  id UUID PRIMARY KEY,
+  contact_id UUID REFERENCES contacts(id),
+  content TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+### Step 4: ACCELERATE
+
+**How do we do this in 2 weeks instead of 9?**
+
+| Original Timeline | Accelerated | How |
+|-------------------|-------------|-----|
+| Week 1-2: Export schemas | Day 1-2 | Just export contacts + pipeline. Ignore rest. |
+| Week 2-3: Build Supabase schema | Day 2-3 | 3 simple tables (above). Copy-paste SQL. |
+| Week 3-6: UI Migration | Day 4-7 | Enhance BD Assist with contact sidebar. No new pages. |
+| Week 6-7: Unified Nav | Day 8-10 | Add sidebar to existing pages. Don't rebuild. |
+| Week 7-8: Data Migration | Day 11-12 | Export CSV from Base44. Import to Supabase. |
+| Week 8-9: Launch | Day 13-14 | Email 4 customers. Done. |
+
+**Accelerated Timeline:**
+
+| Day | Task | Deliverable |
+|-----|------|-------------|
+| **Day 1** | Export Base44 contacts + pipeline as CSV | CSV files |
+| **Day 2** | Create 3 Supabase tables | SQL migration |
+| **Day 3** | Import data to Supabase | Data live |
+| **Day 4** | Add "Save to Pipeline" on opportunity cards | Button works |
+| **Day 5** | Add contact sidebar to BD Assist | Contacts visible |
+| **Day 6** | Add unified sidebar to all pages | Navigation works |
+| **Day 7** | Test with 1 customer | Feedback |
+| **Day 8-10** | Fix issues | Stable |
+| **Day 11-14** | Roll out to all 4 OpenGovIQ customers | Migrated |
+
+**Total: 2 weeks, not 9 weeks.**
+
+---
+
+### Step 5: AUTOMATE
+
+**Only automate AFTER the simple version works:**
+
+| Feature | Automate When? | Trigger |
+|---------|----------------|---------|
+| "Save to Pipeline" | Day 30+ | If users save 100+ opps/week |
+| Contact import | Day 60+ | If users request bulk import |
+| Team seats | Day 90+ | If 3+ customers pay for Team tier |
+| Proposal AI | Never | Build only if Laurie or APEX pays |
+| Email sync | Never | Just link to Gmail/Outlook |
+
+---
+
+### The REAL Migration Plan (Post-Algorithm)
+
+**Week 1: Minimum Viable Migration**
+
+| Day | Task | Owner | Done? |
+|-----|------|-------|-------|
+| Mon | Export contacts + pipeline from Base44 | Eric | ⬜ |
+| Mon | Create 3 Supabase tables | Claude | ⬜ |
+| Tue | Import CSV to Supabase | Claude | ⬜ |
+| Wed | Add "Save to Pipeline" button | Claude | ⬜ |
+| Thu | Add contact sidebar to BD Assist | Claude | ⬜ |
+| Fri | Test with 1 OpenGovIQ customer | Eric | ⬜ |
+
+**Week 2: Polish & Migrate**
+
+| Day | Task | Owner | Done? |
+|-----|------|-------|-------|
+| Mon | Fix bugs from customer feedback | Claude | ⬜ |
+| Tue | Add unified sidebar | Claude | ⬜ |
+| Wed | Migrate remaining 3 customers | Eric | ⬜ |
+| Thu | Send "Base44 shutting down" notice | Eric | ⬜ |
+| Fri | Turn off Base44 | Eric | ⬜ |
+
+**What we're NOT building:**
+- ❌ AI Workbench (nobody's paying for it)
+- ❌ Automation engine (we have crons)
+- ❌ Email integration (use Gmail)
+- ❌ Activity logs (nobody asked)
+- ❌ Complex proposal manager (PDF export only)
+- ❌ Role-based permissions (shared login first)
+
+---
 
 ### Phase 1: OpenGovIQ Export & Discovery (Week 1-2)
 **Goal:** Get all Base44 data and schemas out, understand what we're migrating
