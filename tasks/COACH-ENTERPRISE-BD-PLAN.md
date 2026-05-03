@@ -322,29 +322,27 @@ A: See COACH-PARTNERSHIP-CALL-SCRIPT.md (to be created)
 
 ## FHC Transition Plan
 
-### FHC Pro ($99/mo) = Retention Tool
-- **Keep it** — but it's for retention, not acquisition
-- Existing buyers get community access + occasional live events
-- No coach-led weekly trainings
-- Eric/Sikander host occasional Q&As (not coaches)
-- **Purpose:** Keep paying customers engaged, reduce churn
+### FHC Pro → Rolls into MI Pro ($149/mo)
+- **Not a separate product** — becomes part of MI Pro value stack
+- Community access, recorded trainings, occasional Q&As = MI Pro perks
+- One product, one price: $149/mo for everything
+- Pending validation week research to confirm
 
 ### FHC Starter ($9/mo) = Sunset
 - Stop selling new memberships
 - Grandfather existing for 90 days → migrate to MI Free
 - No more weekly coach trainings for this tier
-- **ROI:** Free up 16-24 coach hours/month for partnership BD
 
 ### Weekly Trainings = Cut Entirely
-- Record best sessions once → put in member library
+- Record best sessions once → put in MI Pro member library
 - No more live weekly events led by coaches
-- Coaches focus 100% on APEX/SBDC/Chamber partnerships
+- Eric/Sikander host occasional Q&As (not coaches)
 
 **Bottom Line:**
-- FHC Pro stays (retention)
-- FHC Starter goes (not worth it)
-- Weekly coach trainings go (misallocation)
-- Coaches do enterprise BD (100K user goal)
+- FHC Pro rolls into MI Pro $149/mo (consolidation)
+- FHC Starter sunsets
+- Weekly coach trainings cut
+- Coaches focus 100% on enterprise BD (100K user goal)
 
 ---
 
