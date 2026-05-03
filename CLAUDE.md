@@ -15,6 +15,89 @@
 11. **Briefing log MUST include briefing_type in all queries.** The `briefing_log` table has a unique constraint on `(user_email, briefing_date, briefing_type)`. All INSERT/UPDATE/SELECT must filter by `briefing_type` ('daily', 'weekly', 'pursuit') to avoid collisions between briefing types.
 12. **Weekly-alerts uses cache-backed batching.** `BATCH_SIZE=75` users per cron run across the Sunday/Monday batch window. It uses the local `sam_opportunities` cache in the hot path, writes `sent`/`skipped`/`failed` rows to `alert_log`, and dedupes by the Sunday cycle `alert_date` plus `alert_type='weekly'`.
 13. **Alert and briefing email sends use shared `sendEmail()`.** Resend is primary. Office 365 is fallback only. Do not add route-local Office365-only `nodemailer` transports for weekly alerts, daily alerts, weekly deep dives, or pursuit briefs.
+14. **Unified MI Platform Architecture.** All tools live inside `/briefings` as panels switched by sidebar, NOT separate routes. This follows the Atlassian navigation pattern. See "Unified MI Platform Architecture" section below.
+
+---
+
+## Unified MI Platform Architecture (May 2026)
+
+**Decision:** All Market Intelligence tools are panels within `/briefings`, NOT separate routes.
+
+**Pattern:** Atlassian sidebar navigation — sidebar switches content panels, not routes.
+- Reference: https://www.atlassian.com/blog/design/designing-atlassians-new-navigation
+
+**Why Sidebar (Not Tabs):**
+- Industry standard (Slack, Google, Microsoft, Notion)
+- Vertical space for 10+ items
+- Bird's-eye view of all tools
+- Familiar pattern for SaaS users
+
+### MIPanel Type
+
+```typescript
+// src/components/UnifiedSidebar.tsx
+export type MIPanel =
+  | 'dashboard'      // Daily briefings & intel
+  | 'research'       // Market Research (Federal Market Assassin)
+  | 'forecasts'      // 7,700+ upcoming procurements
+  | 'recompetes'     // Expiring contracts
+  | 'contractors'    // 3,500+ with contacts
+  | 'pipeline'       // Track pursuits
+  | 'contacts'       // CRM & relationships
+  | 'content'        // Content Reaper
+  | 'planner'        // Action Planner
+  | 'sbir'           // SBIR/STTR
+  | 'grants';        // Federal grants
+```
+
+### Navigation Sections
+
+| Section | Panels |
+|---------|--------|
+| **Intelligence** | Dashboard, Market Research, Forecasts, Recompetes, Contractors |
+| **Execution** | Pipeline, Contacts |
+| **Tools** | Content Reaper, Action Planner |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/components/UnifiedSidebar.tsx` | Sidebar component with MIPanel type |
+| `src/app/briefings/page.tsx` | Main dashboard with panel conditional rendering |
+| `src/components/bd-assist/PipelineBoard.tsx` | Pipeline panel component |
+| `src/components/bd-assist/ContactsPanel.tsx` | Contacts panel component |
+| `src/components/bd-assist/ForecastsPanel.tsx` | Forecasts panel component |
+| `src/components/briefings/SbirPanel.tsx` | SBIR/STTR panel component |
+| `src/components/briefings/GrantsPanel.tsx` | Grants panel component |
+
+### Implementation Pattern
+
+```tsx
+// In /briefings/page.tsx
+const [activePanel, setActivePanel] = useState<MIPanel>('dashboard');
+
+return (
+  <div className="flex">
+    <UnifiedSidebar activePanel={activePanel} onPanelChange={setActivePanel} />
+    <main>
+      {activePanel === 'dashboard' && <DashboardContent />}
+      {activePanel === 'pipeline' && <PipelineBoard email={email} />}
+      {activePanel === 'contacts' && <ContactsPanel email={email} />}
+      {/* ... other panels */}
+    </main>
+  </div>
+);
+```
+
+### DO NOT
+
+- Create separate routes for tools (e.g., `/pipeline`, `/contacts`)
+- Use href links in sidebar — use onClick with panel state
+- Add tools outside `/briefings` — all tools are panels within MI
+
+### Pricing
+
+**One platform, one price:** $149/mo for all Market Intelligence tools
 
 ---
 

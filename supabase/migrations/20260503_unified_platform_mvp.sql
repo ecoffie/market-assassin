@@ -94,12 +94,14 @@ ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 
 -- For now, allow service role full access (we authenticate at API level)
-CREATE POLICY IF NOT EXISTS "Service role has full access to contacts"
+DROP POLICY IF EXISTS "Service role has full access to contacts" ON contacts;
+CREATE POLICY "Service role has full access to contacts"
   ON contacts FOR ALL
   USING (true)
   WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "Service role has full access to conversations"
+DROP POLICY IF EXISTS "Service role has full access to conversations" ON conversations;
+CREATE POLICY "Service role has full access to conversations"
   ON conversations FOR ALL
   USING (true)
   WITH CHECK (true);

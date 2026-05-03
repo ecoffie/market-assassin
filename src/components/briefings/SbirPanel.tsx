@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 
 interface SbirOpportunity {
   id: string;
@@ -354,16 +355,29 @@ export default function SbirPanel({ email }: SbirPanelProps) {
                           {formatCurrency(opp.amount)}
                         </div>
                       )}
-                      {opp.url && (
-                        <a
-                          href={opp.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block px-3 py-1.5 bg-blue-600/20 text-blue-400 text-xs font-medium rounded hover:bg-blue-600/30 transition-colors"
-                        >
-                          View Details →
-                        </a>
-                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        {opp.url && (
+                          <a
+                            href={opp.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block px-3 py-1.5 bg-blue-600/20 text-blue-400 text-xs font-medium rounded hover:bg-blue-600/30 transition-colors"
+                          >
+                            View Details →
+                          </a>
+                        )}
+                        <SaveToPipelineButton
+                          opportunity={{
+                            title: opp.title,
+                            noticeId: opp.id,
+                            agency: opp.agency,
+                            deadline: opp.endDate,
+                            samLink: opp.url,
+                          }}
+                          email={email}
+                          variant="small"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

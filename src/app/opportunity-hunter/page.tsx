@@ -32,6 +32,7 @@
 
 import React, { useState, FormEvent, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+// UnifiedSidebar removed - Opportunity Hunter is a standalone free product, not part of MI platform
 
 const OPPORTUNITY_HUNTER_PRO_PRODUCT_ID = 'opportunity-hunter-pro';
 
@@ -603,8 +604,10 @@ export default function OpportunityHunterPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        {/* Header */}
+      {/* Main Content */}
+      <div className="w-full">
+        <div className="container mx-auto px-4 py-8 max-w-5xl">
+          {/* Header */}
         <div className="text-center mb-8">
           <div className="mb-4">
             <span className="text-3xl font-bold text-blue-400">GovCon</span>
@@ -1671,6 +1674,7 @@ export default function OpportunityHunterPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

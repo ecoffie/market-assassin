@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 
 interface Forecast {
   id: string;
@@ -516,8 +517,8 @@ export default function ForecastsPanel({ email, autoLoadProfile = true }: Foreca
                       </div>
                     </div>
 
-                    {/* Value column */}
-                    <div className="text-right shrink-0 min-w-[100px]">
+                    {/* Value column + Track button */}
+                    <div className="text-right shrink-0 min-w-[100px] flex flex-col items-end gap-2">
                       {(valueMin || valueMax || valueRange) && (
                         <>
                           <div className="text-lg font-bold text-emerald-400">
@@ -531,10 +532,22 @@ export default function ForecastsPanel({ email, autoLoadProfile = true }: Foreca
                         </>
                       )}
                       {forecast.status && forecast.status !== 'forecast' && (
-                        <span className="mt-2 inline-block px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
                           {forecast.status}
                         </span>
                       )}
+                      {/* Save to Pipeline button */}
+                      <SaveToPipelineButton
+                        opportunity={{
+                          title: forecast.title,
+                          agency: agencyCode,
+                          naicsCode: naicsCode || undefined,
+                          setAside: setAside || undefined,
+                          deadline: awardDate || undefined,
+                        }}
+                        email={email}
+                        variant="small"
+                      />
                     </div>
                   </div>
                 </div>

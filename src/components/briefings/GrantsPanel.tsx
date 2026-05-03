@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 
 interface Grant {
   id: string;
@@ -334,14 +335,27 @@ export default function GrantsPanel({ email }: GrantsPanelProps) {
                             : formatCurrency(grant.awardCeiling || grant.estimatedFunding)}
                         </div>
                       )}
-                      <a
-                        href={grant.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block px-3 py-1.5 bg-emerald-600/20 text-emerald-400 text-xs font-medium rounded hover:bg-emerald-600/30 transition-colors"
-                      >
-                        View on Grants.gov →
-                      </a>
+                      <div className="flex items-center gap-2 mt-2">
+                        <a
+                          href={grant.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block px-3 py-1.5 bg-emerald-600/20 text-emerald-400 text-xs font-medium rounded hover:bg-emerald-600/30 transition-colors"
+                        >
+                          View on Grants.gov →
+                        </a>
+                        <SaveToPipelineButton
+                          opportunity={{
+                            title: grant.title,
+                            noticeId: grant.oppNumber,
+                            agency: grant.agency,
+                            deadline: grant.closeDate,
+                            samLink: grant.url,
+                          }}
+                          email={email}
+                          variant="small"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

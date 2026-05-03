@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import UnifiedSidebar, { type MIPanel } from '@/components/UnifiedSidebar';
 import MarketIntelligenceHeader from '@/components/briefings/MarketIntelligenceHeader';
 import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
 import OnboardingWizard from '@/components/briefings/OnboardingWizard';
@@ -11,6 +12,9 @@ import ForecastsPanel from '@/components/bd-assist/ForecastsPanel';
 import SbirPanel from '@/components/briefings/SbirPanel';
 import GrantsPanel from '@/components/briefings/GrantsPanel';
 import ShareButton from '@/components/briefings/ShareButton';
+import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
+import PipelineBoard from '@/components/bd-assist/PipelineBoard';
+import ContactsPanel from '@/components/bd-assist/ContactsPanel';
 
 // Client-specific types for briefing display
 // Note: These are intentionally separate from server-side types in @/lib/briefings/delivery/types.ts
@@ -37,6 +41,12 @@ interface BriefingItemFormatted {
   actionUrl: string;
   actionLabel: string;
   signals: string[];
+  // Pipeline-related fields
+  noticeId?: string;
+  solicitationNumber?: string;
+  agency?: string;
+  naicsCode?: string;
+  setAside?: string;
 }
 
 interface BriefingSection {
@@ -234,6 +244,11 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
         actionUrl: opp.samLink || '/briefings',
         actionLabel: 'View on SAM.gov',
         signals,
+        // Pipeline fields (convert null to undefined for type safety)
+        solicitationNumber: opp.solicitationNumber || undefined,
+        agency: opp.agency || undefined,
+        naicsCode: opp.naicsCode || undefined,
+        setAside: opp.setAside || undefined,
       };
     });
 
@@ -268,6 +283,11 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
         deadline.setAside,
         deadline.naicsCode ? `NAICS ${deadline.naicsCode}` : undefined,
       ].filter(Boolean) as string[],
+      // Pipeline fields (convert null to undefined for type safety)
+      noticeId: deadline.noticeId || undefined,
+      agency: deadline.agency || undefined,
+      naicsCode: deadline.naicsCode || undefined,
+      setAside: deadline.setAside || undefined,
     }));
 
     const quickStats: QuickStat[] = [
@@ -389,6 +409,7 @@ type PageStatus = 'loading' | 'gate' | 'verifying' | 'onboarding' | 'denied' | '
 
 type FilterType = 'all' | 'urgent' | 'opportunity' | 'teaming';
 
+// MainTab is deprecated - using MIPanel from sidebar instead
 type MainTab = 'briefings' | 'forecasts' | 'sbir' | 'grants';
 
 interface ProfileSetupState {
@@ -419,6 +440,9 @@ function BriefingsDashboardContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [mainTab, setMainTab] = useState<MainTab>('briefings');
+
+  // Unified MI panel state - controls which panel is shown
+  const [activePanel, setActivePanel] = useState<MIPanel>('dashboard');
 
   const selectedBriefing = briefings.find(b => b.briefing_date === selectedDate)?.content ?? null;
 
@@ -871,113 +895,225 @@ function BriefingsDashboardContent() {
 
   // --- Dashboard ---
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header with Market Intelligence branding */}
-      <MarketIntelligenceHeader
-        email={email}
-        onSettingsClick={() => setSettingsPanelOpen(true)}
-        onSwitchAccount={handleSwitchAccount}
-      />
+    <div className="flex min-h-screen bg-gray-950 text-white">
+      {/* Unified Sidebar - switches content panels, not routes */}
+      <UnifiedSidebar activePanel={activePanel} onPanelChange={setActivePanel} />
 
-      {/* Profile Stats Bar - Shows opportunity match stats */}
-      <ProfileStatsBar
-        email={email}
-        refreshKey={profileStatsRefreshKey}
-        onTabChange={(tab) => setMainTab(tab as MainTab)}
-      />
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0">
+        {/* Header with Market Intelligence branding */}
+        <MarketIntelligenceHeader
+          email={email}
+          onSettingsClick={() => setSettingsPanelOpen(true)}
+          onSwitchAccount={handleSwitchAccount}
+        />
 
-      {/* Settings Panel */}
-      <SettingsPanel
-        isOpen={settingsPanelOpen}
-        onClose={() => setSettingsPanelOpen(false)}
-        email={email}
-        onSaved={() => setProfileStatsRefreshKey(prev => prev + 1)}
-      />
+        {/* Settings Panel */}
+        <SettingsPanel
+          isOpen={settingsPanelOpen}
+          onClose={() => setSettingsPanelOpen(false)}
+          email={email}
+          onSaved={() => setProfileStatsRefreshKey(prev => prev + 1)}
+        />
 
-      {/* Main Tab Navigation */}
-      <div className="border-b border-gray-800 bg-gray-900/50">
-        <div className="max-w-7xl mx-auto px-4">
-          <nav className="flex gap-1">
-            <button
-              onClick={() => setMainTab('briefings')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                mainTab === 'briefings'
-                  ? 'border-purple-500 text-purple-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              📋 BRIEFINGS
-            </button>
-            <button
-              onClick={() => setMainTab('forecasts')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                mainTab === 'forecasts'
-                  ? 'border-purple-500 text-purple-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              🔮 FORECASTS
-            </button>
-            <button
-              onClick={() => setMainTab('sbir')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                mainTab === 'sbir'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              🔬 SBIR
-            </button>
-            <button
-              onClick={() => setMainTab('grants')}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                mainTab === 'grants'
-                  ? 'border-emerald-500 text-emerald-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              💰 GRANTS
-            </button>
-          </nav>
-        </div>
-      </div>
+        {/* Panel Content - Rendered based on activePanel */}
 
-      {/* Forecasts Tab */}
-      {mainTab === 'forecasts' && (
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">Procurement Forecasts</h2>
-            <p className="text-gray-400">Early-warning intel on upcoming opportunities 6-18 months before solicitation.</p>
+        {/* Pipeline Panel */}
+        {activePanel === 'pipeline' && (
+          <div className="p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Pipeline</h2>
+              <p className="text-gray-400">Track your pursuit opportunities through each stage.</p>
+            </div>
+            <PipelineBoard email={email} />
           </div>
-          <ForecastsPanel email={email} />
-        </div>
-      )}
+        )}
 
-      {/* SBIR Tab */}
-      {mainTab === 'sbir' && (
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">SBIR/STTR Opportunities</h2>
-            <p className="text-gray-400">Small business R&D funding from NIH, NSF, DOD, and other federal agencies.</p>
+        {/* Contacts Panel */}
+        {activePanel === 'contacts' && (
+          <div className="p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Contacts</h2>
+              <p className="text-gray-400">Manage your relationships and teaming partners.</p>
+            </div>
+            <ContactsPanel email={email} />
           </div>
-          <SbirPanel email={email} />
-        </div>
-      )}
+        )}
 
-      {/* Grants Tab */}
-      {mainTab === 'grants' && (
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">Federal Grants</h2>
-            <p className="text-gray-400">Access $700B+ in annual federal grant funding from Grants.gov.</p>
+        {/* Forecasts Panel */}
+        {activePanel === 'forecasts' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Procurement Forecasts</h2>
+              <p className="text-gray-400">Early-warning intel on upcoming opportunities 6-18 months before solicitation.</p>
+            </div>
+            <ForecastsPanel email={email} />
           </div>
-          <GrantsPanel email={email} />
-        </div>
-      )}
+        )}
 
-      {/* Briefings Tab */}
-      {mainTab === 'briefings' && (
-        <>
+        {/* SBIR Panel */}
+        {activePanel === 'sbir' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">SBIR/STTR Opportunities</h2>
+              <p className="text-gray-400">Small business R&D funding from NIH, NSF, DOD, and other federal agencies.</p>
+            </div>
+            <SbirPanel email={email} />
+          </div>
+        )}
+
+        {/* Grants Panel */}
+        {activePanel === 'grants' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Federal Grants</h2>
+              <p className="text-gray-400">Access $700B+ in annual federal grant funding from Grants.gov.</p>
+            </div>
+            <GrantsPanel email={email} />
+          </div>
+        )}
+
+        {/* Research Panel - placeholder for Federal Market Assassin */}
+        {activePanel === 'research' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Market Research</h2>
+              <p className="text-gray-400">Deep market intelligence with 8 strategic reports.</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🔍</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Federal Market Assassin</h3>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Enter 5 inputs, select target agencies, and get 8 comprehensive market research reports instantly.
+              </p>
+              <a
+                href="/federal-market-assassin"
+                className="inline-block px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Launch Market Research Tool
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Recompetes Panel - placeholder */}
+        {activePanel === 'recompetes' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Recompete Tracker</h2>
+              <p className="text-gray-400">Track expiring contracts and recompete opportunities.</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">⏰</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Expiring Contracts</h3>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Find contracts approaching expiration and position for recompete.
+              </p>
+              <a
+                href="/recompete"
+                className="inline-block px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                View Recompete Tracker
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Contractors Panel - placeholder */}
+        {activePanel === 'contractors' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Contractor Database</h2>
+              <p className="text-gray-400">3,500+ federal contractors with SBLO contacts.</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🏢</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Federal Contractors</h3>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Search contractors by NAICS, agency, and certifications. Export contacts for teaming outreach.
+              </p>
+              <a
+                href="/contractor-database"
+                className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Search Contractors
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Content Reaper Panel - placeholder */}
+        {activePanel === 'content' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Content Reaper</h2>
+              <p className="text-gray-400">AI-powered content generator for GovCon.</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">✍️</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">AI Content Generator</h3>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Generate LinkedIn posts, capability statements, and marketing content tailored to federal agencies.
+              </p>
+              <a
+                href="/content-generator"
+                className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Launch Content Reaper
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Action Planner Panel - placeholder */}
+        {activePanel === 'planner' && (
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Action Planner</h2>
+              <p className="text-gray-400">36-task roadmap to federal contracting success.</p>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">📋</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Guided Action Plan</h3>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Step-by-step tasks organized in 5 phases to build your federal contracting business.
+              </p>
+              <a
+                href="/planner"
+                className="inline-block px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg transition-colors"
+              >
+                Open Action Planner
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Dashboard Panel - Default briefings view */}
+        {activePanel === 'dashboard' && (
+          <>
+            {/* Profile Stats Bar - Shows opportunity match stats */}
+            <ProfileStatsBar
+              email={email}
+              refreshKey={profileStatsRefreshKey}
+              onTabChange={(tab) => {
+                // Map old tabs to new panels
+                if (tab === 'forecasts') setActivePanel('forecasts');
+                else if (tab === 'sbir') setActivePanel('sbir');
+                else if (tab === 'grants') setActivePanel('grants');
+              }}
+            />
+
+          {/* Briefings Content */}
           {briefings.length === 0 ? (
             /* Empty state */
             <div className="flex items-center justify-center py-32 px-4">
@@ -1240,6 +1376,7 @@ function BriefingsDashboardContent() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -1342,6 +1479,25 @@ function ItemCard({
             >
               {item.actionLabel} &rarr;
             </a>
+            {/* Save to Pipeline button - only for opportunities */}
+            {item.category === 'Opportunity' && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <SaveToPipelineButton
+                  opportunity={{
+                    title: item.title,
+                    noticeId: item.noticeId,
+                    solicitationNumber: item.solicitationNumber,
+                    agency: item.agency,
+                    naicsCode: item.naicsCode,
+                    setAside: item.setAside,
+                    deadline: item.deadline,
+                    samLink: item.actionUrl,
+                  }}
+                  email={email}
+                  variant="small"
+                />
+              </div>
+            )}
             <div onClick={(e) => e.stopPropagation()}>
               <ShareButton
                 opportunity={{
