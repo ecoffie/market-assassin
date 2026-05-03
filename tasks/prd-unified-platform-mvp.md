@@ -171,7 +171,111 @@ CREATE TABLE conversations (
 
 ---
 
-## 8. Go-to-Market
+## 8. Testing & QA
+
+> **Reference:** See `docs/PRD-testing-evaluation-guardrails.md` and `tasks/evaluation-criteria.md` for full methodology.
+
+### Pre-Deploy Checklist (Every Feature)
+
+```bash
+# Run before any deploy
+npm run test:pre-deploy
+```
+
+### Feature-Specific Tests
+
+#### A. Database Tables (Day 1)
+| Test | Method | Pass Criteria |
+|------|--------|---------------|
+| Tables created | `SELECT * FROM contacts LIMIT 1` | No error |
+| Indexes exist | Check `pg_indexes` | All FK columns indexed |
+| RLS policies | Test unauthorized access | Blocked |
+
+```sql
+-- Verify schema
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name IN ('contacts', 'pipeline_items', 'conversations');
+```
+
+#### B. Data Migration (Day 2)
+| Test | Method | Pass Criteria |
+|------|--------|---------------|
+| Row counts match | Compare Base44 export to Supabase | 100% match |
+| No data loss | Spot check 10 random records | All fields present |
+| Foreign keys valid | Check contact_id in conversations | No orphans |
+
+```bash
+# Verify migration
+curl -s "https://tools.govcongiants.org/api/admin/migration-status?password=galata-assassin-2026" | jq .
+```
+
+#### C. Save to Pipeline Button (Day 3)
+| Test | Method | Pass Criteria |
+|------|--------|---------------|
+| Button renders | Visual check on OH results | Present on all cards |
+| Click saves | Click button, check DB | Row created |
+| Duplicate prevention | Click twice | Only 1 row |
+| Mobile works | Test at 375px | Tap target >44px |
+
+```bash
+# Test API
+curl -X POST "https://tools.govcongiants.org/api/pipeline" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","opportunityId":"test-123","title":"Test Opp"}'
+```
+
+#### D. Unified Sidebar (Day 4)
+| Test | Method | Pass Criteria |
+|------|--------|---------------|
+| Renders on all pages | Visit /briefings, /bd-assist, /forecasts | Sidebar present |
+| Active state | Current page highlighted | Correct highlight |
+| Mobile collapse | Test at 375px | Hamburger menu works |
+| Links work | Click each nav item | Correct destination |
+
+#### E. Contacts Panel (Day 6)
+| Test | Method | Pass Criteria |
+|------|--------|---------------|
+| List renders | Open BD Assist | Contacts visible |
+| Add contact | Fill form, submit | Row created |
+| Edit contact | Click edit, save | Row updated |
+| Search works | Type in search box | Filters correctly |
+
+### Guardrails
+
+```typescript
+// Pre-save validation
+const GUARDRAILS = {
+  maxContactsPerUser: 1000,      // Prevent abuse
+  maxPipelineItemsPerUser: 500,  // Keep it manageable
+  maxNotesLength: 5000,          // Prevent blob storage
+};
+```
+
+### Weekly QA Checklist (During 2-Week Build)
+
+**Week 1 Checkpoint (Friday):**
+- [ ] All 3 tables created and tested
+- [ ] Data migration script working
+- [ ] Save to Pipeline button functional
+- [ ] 1 OpenGovIQ customer tested and approved
+
+**Week 2 Checkpoint (Friday):**
+- [ ] Unified sidebar on all pages
+- [ ] Contacts panel working
+- [ ] All 4 OpenGovIQ customers migrated
+- [ ] Zero critical bugs
+- [ ] Laurie demo ready
+
+### Rollback Plan
+
+If migration fails:
+1. Keep Base44 running (don't turn off until verified)
+2. Restore from CSV backup
+3. Notify affected customers
+
+---
+
+## 9. Go-to-Market
 
 **Pricing impact:**
 - [x] Included in existing MI Pro ($149/mo)
@@ -188,7 +292,7 @@ CREATE TABLE conversations (
 
 ---
 
-## 9. Approval
+## 10. Approval
 
 **Status:** Ready for Review
 
@@ -199,3 +303,4 @@ CREATE TABLE conversations (
 ---
 
 *Created: May 3, 2026*
+*Updated: May 3, 2026 — Added Testing & QA section*
