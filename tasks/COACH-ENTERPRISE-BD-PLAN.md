@@ -1,11 +1,31 @@
 # Coach Enterprise BD Plan: 100K Users in 6 Months
 
 > **Elon Musk Algorithm Applied:**
-> 1. Question: Why are coaches teaching bootcamps to tire kickers?
-> 2. Delete: Free public bootcamp teaching
+> 1. Question: Why are coaches doing weekly trainings for $9/mo and $27/mo users?
+> 2. Delete: Weekly FHC trainings (generates $300/mo for hours of work)
 > 3. Simplify: One job — onboard users through decision makers
 > 4. Accelerate: Partner with APEX/SBDC/Chambers NOW
 > 5. Automate: Self-serve signup → Daily alerts → Paid conversion
+
+---
+
+## The Problem: Low-Value Coaching Time
+
+Looking at Federal Help Center events (from screenshots):
+- "Kill 90% of Bad Bids in 48 Hours" — 10 attendees
+- "BD vs Capture Management" — 5 attendees
+- "$50M Agency Buying Pattern Exposed" — 4 attendees
+- "Build a Proposal Dream Team" — 12 attendees
+- "Leveraging Government Small Business Programs" — low attendance
+
+**The Math:**
+- FHC Starter: $9/mo × ~30 members = **$270/mo**
+- FHC Pro: $27/mo × ~10 members = **$270/mo**
+- **Total FHC revenue: ~$540/mo**
+- Coach hours: 4-6 events/week × 1-2 hours = **16-24 hours/month**
+- **Effective hourly rate: $22-34/hour** (for experienced coaches!)
+
+This is a **massive misallocation of talent**.
 
 ---
 
@@ -13,11 +33,13 @@
 
 | OLD MODEL | NEW MODEL |
 |-----------|-----------|
-| Teach free bootcamps | Partner BD with organizations |
-| 50 tire kickers per event | 5,000 members per org |
-| Hope they buy | Auto-enroll in free daily alerts |
-| Coaches do sales | Coaches do partnerships |
-| Revenue: $500/bootcamp maybe | Revenue: 100K emails → 1-5% convert → $49-149/mo |
+| Weekly FHC trainings (5-12 attendees) | Partner BD with organizations |
+| $540/mo total revenue | 5,000 members per org |
+| Coaches doing $22/hr work | Auto-enroll in free daily alerts |
+| Live teaching to low-tier users | Coaches do high-value partnerships |
+| Revenue: $540/mo | Revenue: 100K emails → 1-5% convert → $49-149/mo |
+
+**Note:** Free bootcamps CONTINUE as sales tools (Eric/Sikander handle). Only weekly FHC trainings get cut.
 
 **Math:**
 - 100K free alert users
@@ -228,10 +250,14 @@ https://tools.govcongiants.org/briefings?partner=chamber-houston
 
 ## What Coaches STOP Doing
 
-- [ ] Free public bootcamp teaching (Sikander + Annelle handle)
+- [ ] **Weekly FHC trainings** — Kill 90% of Bad Bids, BD vs Capture, Agency Buying Patterns, etc.
+  - These generate $540/mo total for 16-24 hours of coach time
+  - Replace with: recorded courses, AI-generated content, or sunset the membership
 - [ ] 1-on-1 sales calls with $297 buyers (funnel handles)
 - [ ] Content creation for social (use AI reaper)
 - [ ] Customer support (use help desk)
+
+**What stays:** Free bootcamps as sales tools (Eric/Sikander run these, not coaches)
 
 ## What Coaches START Doing
 
@@ -294,6 +320,31 @@ A: See COACH-PARTNERSHIP-CALL-SCRIPT.md (to be created)
 
 ---
 
+## FHC Transition Plan
+
+### Option 1: Sunset FHC Memberships (Recommended)
+- Stop selling $9/mo and $27/mo memberships
+- Grandfather existing members for 90 days
+- Migrate interested users to MI Free → MI Pro funnel
+- **ROI:** Free up 16-24 coach hours/month for partnership BD
+
+### Option 2: Automate FHC Content
+- Record all existing training topics once
+- Put recordings in member portal (self-serve)
+- Monthly live Q&A only (1 hour/month total)
+- **ROI:** 90% reduction in coach time, same revenue
+
+### Option 3: Raise Prices + Cut Volume
+- Raise to $49/mo (matches MI pricing)
+- Cut to 2 events/month (not weekly)
+- Focus on high-value topics only
+- **ROI:** Higher revenue per hour, smaller audience
+
+**Recommendation:** Option 1 — the $540/mo isn't worth preserving. Focus coaches on $250K MRR opportunity.
+
+---
+
 *Created: May 3, 2026*
+*Updated: May 3, 2026 — Clarified FHC trainings are the problem, not free bootcamps*
 *Timeline: May - October 2026*
 *Goal: 100K free users → $250K MRR*
