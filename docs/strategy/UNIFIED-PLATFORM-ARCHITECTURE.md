@@ -227,74 +227,372 @@ Supabase DB (Unified)
 
 ## Migration Plan
 
-### Phase 1: OpenGovIQ Export (Week 1-2)
-**Goal:** Get all Base44 data and schemas out
+### Phase 1: OpenGovIQ Export & Discovery (Week 1-2)
+**Goal:** Get all Base44 data and schemas out, understand what we're migrating
 
-1. Export Base44 entity schemas as JSON
-2. Document all automations/workflows
-3. Export all data via Base44 API or CSV
-4. Map entities to Supabase tables
+#### Week 1: Schema Export
+| Task | Owner | Deliverable | Status |
+|------|-------|-------------|--------|
+| Login to Base44 admin panel | Eric | Access confirmed | ⬜ |
+| Export all entity schemas as JSON | Eric | `base44-schemas.json` | ⬜ |
+| Screenshot all entity relationships | Eric | `base44-erd.png` | ⬜ |
+| Document field types per entity | Claude | `base44-field-mapping.md` | ⬜ |
+| Count records per entity | Eric | Record counts table | ⬜ |
 
-**Entities to migrate (from screenshot):**
-- ActivityLog
-- ApplicationMessageTemplate
-- ApplicationSetting
-- Automation
-- AvailableLanguage
-- CalendarEvent
-- Comment
-- Contact
-- ContractVehicleAnalysisTask
-- ContractVehicleSummary
-- Conversation
-- DataSource
-- EmailAccount
-- EmailMessage
-- Feedback
-- ForecastRequest
-- (and more...)
+#### Week 2: Automation & Workflow Audit
+| Task | Owner | Deliverable | Status |
+|------|-------|-------------|--------|
+| List all automations/triggers | Eric | `base44-automations.md` | ⬜ |
+| Document automation logic (when/then) | Claude | Automation specs | ⬜ |
+| Identify email templates | Eric | Template list | ⬜ |
+| Map to Next.js equivalents (cron, API routes) | Claude | Migration mapping | ⬜ |
+| Export sample data (10 records per entity) | Eric | `base44-sample-data/` | ⬜ |
 
-### Phase 2: Supabase Schema (Week 2-3)
-**Goal:** Create unified database
+**Entities to migrate (from Base44 screenshot):**
 
-1. Create Supabase tables matching Base44 entities
-2. Set up relationships (foreign keys)
-3. Create indexes for performance
-4. Set up Row Level Security (RLS)
+| Entity | Priority | Records (est.) | Supabase Table |
+|--------|----------|----------------|----------------|
+| Contact | P0 | ~500 | `contacts` |
+| Pipeline (Opportunity) | P0 | ~200 | `pipeline_items` |
+| Conversation | P0 | ~1,000 | `conversations` |
+| EmailAccount | P1 | ~10 | `email_accounts` |
+| EmailMessage | P1 | ~5,000 | `email_messages` |
+| Automation | P1 | ~20 | `automations` |
+| ActivityLog | P1 | ~10,000 | `activity_logs` |
+| CalendarEvent | P2 | ~100 | `calendar_events` |
+| Comment | P2 | ~500 | `comments` |
+| Feedback | P2 | ~50 | `feedback` |
+| ContractVehicleAnalysisTask | P2 | ~30 | `cv_analysis_tasks` |
+| ContractVehicleSummary | P2 | ~100 | `cv_summaries` |
+| DataSource | P3 | ~10 | `data_sources` |
+| ApplicationSetting | P3 | ~50 | `app_settings` |
+| ApplicationMessageTemplate | P3 | ~20 | `message_templates` |
+| ForecastRequest | P3 | ~100 | `forecast_requests` |
+
+---
+
+### Phase 2: Supabase Schema Design (Week 2-3)
+**Goal:** Create unified database with proper relationships
+
+#### Core Tables (P0)
+```sql
+-- contacts: CRM contacts from OpenGovIQ
+CREATE TABLE contacts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  email TEXT,
+  name TEXT,
+  company TEXT,
+  title TEXT,
+  phone TEXT,
+  linkedin_url TEXT,
+  contact_type TEXT, -- 'prime', 'sub', 'agency', 'osdbu'
+  tags TEXT[],
+  notes TEXT,
+  last_contacted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- pipeline_items: Opportunity tracking
+CREATE TABLE pipeline_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  opportunity_id TEXT, -- SAM.gov notice ID
+  title TEXT NOT NULL,
+  agency TEXT,
+  value NUMERIC,
+  stage TEXT DEFAULT 'tracking', -- tracking, pursuing, bidding, submitted, won, lost
+  stage_changed_at TIMESTAMPTZ,
+  due_date TIMESTAMPTZ,
+  win_probability INTEGER,
+  notes TEXT,
+  contacts UUID[], -- linked contact IDs
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- conversations: Communication history
+CREATE TABLE conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  contact_id UUID REFERENCES contacts(id),
+  pipeline_item_id UUID REFERENCES pipeline_items(id),
+  channel TEXT, -- 'email', 'call', 'meeting', 'linkedin'
+  subject TEXT,
+  content TEXT,
+  direction TEXT, -- 'inbound', 'outbound'
+  conversation_date TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### Execution Tables (P1)
+```sql
+-- email_accounts: Connected email accounts
+CREATE TABLE email_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  provider TEXT, -- 'google', 'microsoft', 'smtp'
+  email TEXT NOT NULL,
+  credentials JSONB, -- encrypted
+  is_active BOOLEAN DEFAULT true,
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- automations: Workflow definitions
+CREATE TABLE automations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  name TEXT NOT NULL,
+  trigger_type TEXT, -- 'stage_change', 'deadline', 'new_opp', 'schedule'
+  trigger_config JSONB,
+  action_type TEXT, -- 'email', 'task', 'notification', 'webhook'
+  action_config JSONB,
+  is_active BOOLEAN DEFAULT true,
+  last_run_at TIMESTAMPTZ,
+  run_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- activity_logs: Audit trail
+CREATE TABLE activity_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id),
+  entity_type TEXT, -- 'contact', 'pipeline', 'proposal'
+  entity_id UUID,
+  action TEXT, -- 'created', 'updated', 'deleted', 'stage_changed'
+  old_value JSONB,
+  new_value JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### RLS Policies
+```sql
+-- Users can only see their own data
+ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users see own contacts" ON contacts
+  FOR ALL USING (auth.uid() = user_id);
+
+-- Team members can see team data (for Team tier)
+CREATE POLICY "Team members see team data" ON contacts
+  FOR SELECT USING (
+    user_id IN (
+      SELECT member_id FROM team_members
+      WHERE team_id = (SELECT team_id FROM team_members WHERE member_id = auth.uid())
+    )
+  );
+```
+
+---
 
 ### Phase 3: UI Migration (Week 3-6)
 **Goal:** Rebuild OpenGovIQ screens in Next.js
 
-1. Map Base44 UI components to existing MI components
-2. Build Pipeline/CRM views
-3. Build Proposal Manager
-4. Build AI Workbench (integrate with existing AI)
-5. Build Automation engine
+#### Week 3-4: Core CRM/Pipeline
+| Component | Base44 Source | Next.js Location | Effort |
+|-----------|---------------|------------------|--------|
+| Contact List | Contacts entity | `/execution/contacts/page.tsx` | 2 days |
+| Contact Detail | Contact view | `/execution/contacts/[id]/page.tsx` | 1 day |
+| Pipeline Board | Pipeline entity | Enhance `/bd-assist` | 2 days |
+| Pipeline Detail | Opportunity view | `/execution/pipeline/[id]/page.tsx` | 1 day |
+| Activity Timeline | ActivityLog | `<ActivityFeed />` component | 2 days |
+
+#### Week 5: Proposal Manager
+| Component | Base44 Source | Next.js Location | Effort |
+|-----------|---------------|------------------|--------|
+| Proposal List | Proposals entity | `/execution/proposals/page.tsx` | 1 day |
+| Proposal Editor | AI generation | `/execution/proposals/[id]/page.tsx` | 3 days |
+| Template Library | Templates | `/execution/proposals/templates/page.tsx` | 1 day |
+| Export (PDF/DOCX) | Export feature | API route + jsPDF | 2 days |
+
+#### Week 6: AI Workbench
+| Component | Base44 Source | Next.js Location | Effort |
+|-----------|---------------|------------------|--------|
+| Agent List | AI Workbench | `/execution/workbench/page.tsx` | 1 day |
+| Agent Builder | Custom agents | `/execution/workbench/new/page.tsx` | 3 days |
+| Document Upload | Knowledge base | `/execution/workbench/documents/page.tsx` | 2 days |
+| Chat Interface | Agent chat | `<AgentChat />` component | 2 days |
+
+---
 
 ### Phase 4: Unified Navigation (Week 6-7)
 **Goal:** Single entry point, tab-based navigation
 
-1. Create `/dashboard` home page
-2. Build unified sidebar (Intelligence | Execution | Team | Settings)
-3. Implement deep linking between tools
-4. Add "Add to Pipeline" from any opportunity
+#### Navigation Structure
+```
+/dashboard                    ← Home (daily briefings, metrics, quick actions)
+│
+├── /intelligence             ← Intelligence layer (MI Pro)
+│   ├── /briefings           ← Daily/Weekly/Pursuit
+│   ├── /opportunities       ← Opportunity Hunter (search)
+│   ├── /recompetes          ← Recompete Tracker
+│   ├── /forecasts           ← Forecast Intelligence
+│   ├── /market              ← Market Assassin (deep research)
+│   └── /contractors         ← Contractor Database
+│
+├── /execution               ← Execution layer (MI + Execution tier)
+│   ├── /pipeline            ← BD Assist Pipeline
+│   ├── /contacts            ← CRM (from OpenGovIQ)
+│   ├── /proposals           ← Proposal Manager (from OpenGovIQ)
+│   ├── /workbench           ← AI Agents (from OpenGovIQ)
+│   └── /automations         ← Workflows (from OpenGovIQ)
+│
+├── /team                    ← Team management (Team tier+)
+│   ├── /members             ← Add/remove team members
+│   ├── /activity            ← Team activity feed
+│   └── /settings            ← Team preferences
+│
+└── /settings                ← User settings
+    ├── /profile             ← NAICS, preferences
+    ├── /billing             ← Subscription, invoices
+    └── /integrations        ← Email, calendar connections
+```
+
+#### Sidebar Component
+```tsx
+// src/components/layout/UnifiedSidebar.tsx
+const navigation = [
+  {
+    name: 'Dashboard',
+    href: '/dashboard',
+    icon: HomeIcon,
+    tier: 'free'
+  },
+  {
+    name: 'Intelligence',
+    icon: LightBulbIcon,
+    tier: 'pro',
+    children: [
+      { name: 'Briefings', href: '/intelligence/briefings' },
+      { name: 'Opportunities', href: '/intelligence/opportunities' },
+      { name: 'Recompetes', href: '/intelligence/recompetes' },
+      { name: 'Forecasts', href: '/intelligence/forecasts' },
+      { name: 'Market Research', href: '/intelligence/market' },
+      { name: 'Contractors', href: '/intelligence/contractors' },
+    ]
+  },
+  {
+    name: 'Execution',
+    icon: RocketIcon,
+    tier: 'execution', // MI + Execution tier
+    children: [
+      { name: 'Pipeline', href: '/execution/pipeline' },
+      { name: 'Contacts', href: '/execution/contacts' },
+      { name: 'Proposals', href: '/execution/proposals' },
+      { name: 'AI Workbench', href: '/execution/workbench' },
+      { name: 'Automations', href: '/execution/automations' },
+    ]
+  },
+  {
+    name: 'Team',
+    icon: UsersIcon,
+    tier: 'team', // Team tier+
+    children: [
+      { name: 'Members', href: '/team/members' },
+      { name: 'Activity', href: '/team/activity' },
+    ]
+  },
+];
+```
+
+#### Dashboard Home Page
+| Section | Content | Data Source |
+|---------|---------|-------------|
+| Today's Briefing | Top 3-5 opportunities | `briefing_templates` |
+| Pipeline Summary | Stage counts, total value | `pipeline_items` |
+| Upcoming Deadlines | Next 7 days | `pipeline_items.due_date` |
+| Recent Activity | Last 10 actions | `activity_logs` |
+| Quick Actions | Add opp, search, new contact | UI buttons |
+
+---
 
 ### Phase 5: Data Migration (Week 7-8)
 **Goal:** Move live data from Base44 to Supabase
 
-1. Export all Base44 records
-2. Transform to Supabase format
-3. Import to production Supabase
-4. Verify data integrity
-5. Switch DNS / update auth
+#### Migration Script Structure
+```javascript
+// scripts/migrate-base44-to-supabase.js
+
+const migration = {
+  // Step 1: Export from Base44
+  async exportFromBase44() {
+    // Use Base44 API or CSV export
+    // Save to /migrations/base44-export-YYYY-MM-DD/
+  },
+
+  // Step 2: Transform data
+  async transformData() {
+    // Map Base44 fields → Supabase fields
+    // Handle foreign key relationships
+    // Generate UUIDs for new records
+  },
+
+  // Step 3: Import to Supabase
+  async importToSupabase() {
+    // Insert in dependency order:
+    // 1. contacts (no dependencies)
+    // 2. pipeline_items (references contacts)
+    // 3. conversations (references both)
+    // 4. activity_logs (references all)
+  },
+
+  // Step 4: Verify
+  async verifyMigration() {
+    // Count records match
+    // Spot check 10 random records
+    // Verify relationships intact
+  }
+};
+```
+
+#### Migration Checklist
+| Step | Task | Verification | Status |
+|------|------|--------------|--------|
+| 1 | Export Base44 contacts | Count matches | ⬜ |
+| 2 | Export Base44 pipeline | Count matches | ⬜ |
+| 3 | Export Base44 conversations | Count matches | ⬜ |
+| 4 | Export Base44 activity logs | Count matches | ⬜ |
+| 5 | Run transformation script | No errors | ⬜ |
+| 6 | Import to Supabase staging | Counts match | ⬜ |
+| 7 | Test UI with staging data | All pages load | ⬜ |
+| 8 | Import to Supabase prod | Counts match | ⬜ |
+| 9 | Verify prod UI | All pages load | ⬜ |
+| 10 | Update DNS/auth | Login works | ⬜ |
+
+---
 
 ### Phase 6: Launch (Week 8-9)
 **Goal:** Unified platform live
 
-1. Beta with existing OpenGovIQ users (4 customers)
-2. Fix any issues
-3. Announce unified platform
-4. Deprecate Base44 instance
+#### Beta Launch (4 existing OpenGovIQ customers)
+| Customer | Contact | Status | Feedback |
+|----------|---------|--------|----------|
+| Customer 1 | TBD | ⬜ Invited | |
+| Customer 2 | TBD | ⬜ Invited | |
+| Customer 3 | TBD | ⬜ Invited | |
+| Customer 4 | TBD | ⬜ Invited | |
+
+#### Launch Checklist
+| Task | Owner | Deadline | Status |
+|------|-------|----------|--------|
+| Beta invites sent | Eric | Week 8 Day 1 | ⬜ |
+| Beta feedback collected | Eric | Week 8 Day 5 | ⬜ |
+| Critical bugs fixed | Dev | Week 9 Day 1 | ⬜ |
+| Pricing page updated | Eric | Week 9 Day 2 | ⬜ |
+| Announcement email drafted | Eric | Week 9 Day 3 | ⬜ |
+| Base44 deprecation notice | Eric | Week 9 Day 4 | ⬜ |
+| Public launch | Eric | Week 9 Day 5 | ⬜ |
+
+#### Post-Launch Monitoring
+| Metric | Target | Alert Threshold |
+|--------|--------|-----------------|
+| Page load time | <2s | >5s |
+| Error rate | <1% | >5% |
+| Daily active users | Growing | -20% WoW |
+| Support tickets | <5/day | >20/day |
 
 ---
 
