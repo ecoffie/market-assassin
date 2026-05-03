@@ -61,6 +61,7 @@ export interface SamStrategicRankingContext {
   agencies?: string[];
   keywords?: string[];
   businessType?: string;
+  businessDescription?: string;
 }
 
 export interface NoticeSummary {
@@ -245,6 +246,44 @@ function scoreKeywordFit(opportunity: SAMOpportunity, keywords: string[]): { sco
   return { score: 0, label: 'No keyword overlap' };
 }
 
+const BUSINESS_DESCRIPTION_STOP_WORDS = new Set([
+  'about', 'after', 'also', 'and', 'are', 'business', 'company', 'does', 'for',
+  'from', 'government', 'help', 'into', 'our', 'provide', 'provides', 'providing',
+  'services', 'support', 'that', 'the', 'their', 'this', 'through', 'with', 'your',
+]);
+
+function extractBusinessDescriptionTerms(description?: string): string[] {
+  if (!description) return [];
+
+  return Array.from(new Set(
+    description
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .map(term => term.trim())
+      .filter(term => term.length >= 4 && !BUSINESS_DESCRIPTION_STOP_WORDS.has(term))
+  )).slice(0, 20);
+}
+
+function scoreBusinessDescriptionFit(opportunity: SAMOpportunity, descriptionTerms: string[]): { score: number; label: string } {
+  if (descriptionTerms.length === 0) {
+    return { score: 0, label: 'No business description configured' };
+  }
+
+  const searchableText = `${opportunity.title} ${opportunity.description || ''}`.toLowerCase();
+  const matches = descriptionTerms.filter(term => searchableText.includes(term));
+
+  if (matches.length >= 3) {
+    return { score: 12, label: `Business description match: ${matches.slice(0, 3).join(', ')}` };
+  }
+
+  if (matches.length >= 1) {
+    return { score: 6, label: `Business description signal: ${matches.slice(0, 2).join(', ')}` };
+  }
+
+  return { score: 0, label: 'No business description overlap' };
+}
+
 function normalizeBusinessTypePreference(businessType: string | null | undefined): string | null {
   if (!businessType) return null;
 
@@ -347,12 +386,14 @@ function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStra
   const naicsCodes = normalizeTextList(context?.naicsCodes);
   const agencies = normalizeTextList(context?.agencies);
   const keywords = normalizeTextList(context?.keywords);
+  const descriptionTerms = extractBusinessDescriptionTerms(context?.businessDescription);
   const businessType = context?.businessType;
 
   const noticeTypeFactor = scoreNoticeType(opportunity.noticeType);
   const naicsFactor = scoreNaicsFit(opportunity.naicsCode, naicsCodes);
   const agencyFactor = scoreAgencyFit(opportunity.department || opportunity.subTier, agencies);
   const keywordFactor = scoreKeywordFit(opportunity, keywords);
+  const descriptionFactor = scoreBusinessDescriptionFit(opportunity, descriptionTerms);
   const setAsideFactor = scoreSetAside(opportunity.setAsideDescription || opportunity.setAside, businessType);
   const timingFactor = scoreTiming(opportunity.responseDeadline);
 
@@ -361,6 +402,7 @@ function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStra
     naicsFactor.score +
     agencyFactor.score +
     keywordFactor.score +
+    descriptionFactor.score +
     setAsideFactor.score +
     timingFactor.score;
 
@@ -369,6 +411,7 @@ function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStra
     naicsFactor,
     agencyFactor,
     keywordFactor,
+    descriptionFactor,
     setAsideFactor,
     timingFactor,
   ]

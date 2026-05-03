@@ -13,7 +13,8 @@
 9. **Unified notification table:** All alert/briefing code uses `user_notification_settings` (not the old `user_alert_settings` or `user_briefing_profile` tables which were dropped). The `smart-profile` service (`src/lib/smart-profile/`) is **dead code** - its `user_briefing_profile` table was never deployed.
 10. **Daily briefings MUST use fast GREEN builder.** `send-briefings-fast` must use `buildSamGreenBriefing()` (instant, no AI), NOT `generateDailyBriefFromSam()` which calls Claude API (~4s/user, causes timeouts). Run `tests/test-briefing-architecture.sh` to verify.
 11. **Briefing log MUST include briefing_type in all queries.** The `briefing_log` table has a unique constraint on `(user_email, briefing_date, briefing_type)`. All INSERT/UPDATE/SELECT must filter by `briefing_type` ('daily', 'weekly', 'pursuit') to avoid collisions between briefing types.
-12. **Weekly-alerts uses batching.** `BATCH_SIZE=15` users per cron run to avoid Vercel 60s timeout. Deduplication checks `alert_log` for `alert_type='weekly'`.
+12. **Weekly-alerts uses cache-backed batching.** `BATCH_SIZE=75` users per cron run across the Sunday/Monday batch window. It uses the local `sam_opportunities` cache in the hot path, writes `sent`/`skipped`/`failed` rows to `alert_log`, and dedupes by the Sunday cycle `alert_date` plus `alert_type='weekly'`.
+13. **Alert and briefing email sends use shared `sendEmail()`.** Resend is primary. Office 365 is fallback only. Do not add route-local Office365-only `nodemailer` transports for weekly alerts, daily alerts, weekly deep dives, or pursuit briefs.
 
 ---
 
@@ -245,18 +246,31 @@ Instead of generating 928 individual briefings per type, we pre-compute 49 templ
 | Briefing | Pre-compute Cron | Send Cron | Schedule |
 |----------|------------------|-----------|----------|
 | Daily Brief | `precompute-briefings` | `send-briefings-fast` | Daily 2-4 AM → 7-8:30 AM |
-| Weekly Deep Dive | `precompute-weekly-briefings` | `send-weekly-fast` | Sat 8-10 PM → Sun 7-8:30 AM |
-| Pursuit Brief | `precompute-pursuit-briefs` | `send-pursuit-fast` | Sun 8-10 PM → Mon 7-8:30 AM |
+| Weekly Deep Dive | `precompute-weekly-briefings` | `send-weekly-fast` | Thu 8-10 PM → Fri 7-8:30 AM |
+| Pursuit Brief | `precompute-pursuit-briefs` | `send-pursuit-fast` | Fri 8-10 PM → Sat 7-8:30 AM |
+
+**Email delivery rule (April 25, 2026):**
+All production alert/briefing send paths should call `src/lib/send-email.ts` via `sendEmail()`.
+This makes Resend the primary provider and keeps Office 365 as fallback only.
+Verified paths include `weekly-alerts`, `send-briefings-fast`, `send-weekly-fast`, `send-pursuit-fast`, legacy `weekly-deep-dive`, legacy `pursuit-brief`, and admin `send-all-briefings`.
+
+**Weekly deep dive catch-up rule (April 25, 2026):**
+`send-weekly-fast` supports `catchup=true` / `force=true` across the Friday cron batch window.
+This exists because weekly templates can be generated after the primary Friday 7-8:30 AM UTC send window.
+If no weekly templates exist at send time, the route logs a `tool_errors` record.
+
+**Weekly/pursuit precompute resumability (April 25, 2026):**
+`precompute-weekly-briefings` and `precompute-pursuit-briefs` skip target-date templates that already exist, cap each run with a soft timeout budget, and return `templatesRemaining` so later cron invocations continue coverage instead of being killed by the platform timeout.
 
 **Day-of-Week Guards (April 16, 2026):**
 All cron endpoints have **explicit day guards** that prevent sending on wrong days:
 
 | Endpoint | Allowed Day | UTC Day # | Guard Response |
 |----------|-------------|-----------|----------------|
-| `precompute-weekly-briefings` | Saturday | 6 | `{"skipped": true, "dayOfWeek": X}` |
-| `send-weekly-fast` | Sunday | 0 | `{"skipped": true, "dayOfWeek": X}` |
-| `precompute-pursuit-briefs` | Sunday | 0 | `{"skipped": true, "dayOfWeek": X}` |
-| `send-pursuit-fast` | Monday | 1 | `{"skipped": true, "dayOfWeek": X}` |
+| `precompute-weekly-briefings` | Thursday | 4 | `{"skipped": true, "dayOfWeek": X}` |
+| `send-weekly-fast` | Friday | 5 | `{"skipped": true, "dayOfWeek": X}` |
+| `precompute-pursuit-briefs` | Friday | 5 | `{"skipped": true, "dayOfWeek": X}` |
+| `send-pursuit-fast` | Saturday | 6 | `{"skipped": true, "dayOfWeek": X}` |
 
 Test mode (`?test=true&email=...`) bypasses day guards for manual testing.
 
@@ -276,10 +290,10 @@ Users with custom NAICS profiles (via preferences page) get briefings immediatel
 **Key Files:**
 - `api/cron/precompute-briefings/route.ts` — Daily templates (2-4 AM)
 - `api/cron/send-briefings-fast/route.ts` — Send daily briefings (7-8:30 AM)
-- `api/cron/precompute-weekly-briefings/route.ts` — Weekly templates (Sat 8-10 PM)
-- `api/cron/send-weekly-fast/route.ts` — Send weekly briefings (Sun 7-8:30 AM)
-- `api/cron/precompute-pursuit-briefs/route.ts` — Pursuit templates (Sun 8-10 PM)
-- `api/cron/send-pursuit-fast/route.ts` — Send pursuit briefs (Mon 7-8:30 AM)
+- `api/cron/precompute-weekly-briefings/route.ts` — Weekly templates (Thu 8-10 PM)
+- `api/cron/send-weekly-fast/route.ts` — Send weekly briefings (Fri 7-8:30 AM)
+- `api/cron/precompute-pursuit-briefs/route.ts` — Pursuit templates (Fri 8-10 PM)
+- `api/cron/send-pursuit-fast/route.ts` — Send pursuit briefs (Sat 7-8:30 AM)
 - `src/lib/briefings/delivery/ai-briefing-generator.ts` — Supports `naicsOverride` for profile-based generation
 
 **Email Products (April 16, 2026):**
@@ -531,11 +545,18 @@ Complete conversion funnel from free Opportunity Hunter to paid Market Intellige
 | daily-alerts | 7 AM, 8 AM, 10 AM, 12 PM | Timezone coverage (1 email/user/day, deduped) |
 | precompute-briefings | 10:00-11:30 PM (prev night) | Daily templates by NAICS profile |
 | send-briefings-fast | 3:00-4:30 AM (every 10 min) | Send daily briefings |
-| precompute-weekly-briefings | Sat 4:00-6:00 PM | Weekly templates by NAICS profile |
-| send-weekly-fast | Sun 3:00-4:30 AM (every 10 min) | Send weekly briefings |
-| precompute-pursuit-briefs | Sun 4:00-6:00 PM | Pursuit templates by NAICS profile |
-| send-pursuit-fast | Mon 3:00-4:30 AM (every 10 min) | Send pursuit briefs |
-| weekly-alerts | 7 PM Sunday | Weekly digest |
+| precompute-weekly-briefings | Thu 4:00-6:00 PM | Weekly templates by NAICS profile |
+| send-weekly-fast | Fri 3:00-4:30 AM (every 10 min) | Send weekly briefings |
+| precompute-pursuit-briefs | Fri 4:00-6:00 PM | Pursuit templates by NAICS profile |
+| send-pursuit-fast | Sat 3:00-4:30 AM (every 10 min) | Send pursuit briefs |
+| weekly-alerts | Sun 7:00-7:50 PM + Mon 8:00-8:30 PM UTC-equivalent catch-up window | Free/weekly saved-search digest |
+
+**Weekly alerts (April 25, 2026):**
+- Scheduled as a 10-invocation batch window in `vercel.json`
+- Uses `?catchup=true` so Monday catch-up invocations are allowed
+- Uses the Sunday cycle date for all rows in that weekly run
+- Writes `opportunities_data[0].alertSource` as `free_weekly_fallback` or `explicit_weekly`
+- Operations dashboard tracks eligible, processed, sent, skipped, failed, remaining, processed free, and processed explicit counts
 
 **Briefing rollout model:**
 - `beta_all` = full eligible briefing audience

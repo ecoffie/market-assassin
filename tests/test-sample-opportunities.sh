@@ -103,6 +103,24 @@ NAICS_COUNT=$(echo "$ALL_NAICS" | jq 'length')
 test_result "Returns samples from multiple NAICS codes" "$([ "$NAICS_COUNT" -gt 3 ] && echo true || echo false)"
 
 echo ""
+echo "--- Test 7: Roofer onboarding infers and ranks NAICS 238160 ---"
+RESULT=$(curl -s -X POST "$BASE_URL/api/sample-opportunities" \
+  -H "Content-Type: application/json" \
+  -d '{"description": "roofer in south florida"}')
+
+SUCCESS=$(echo "$RESULT" | jq -r '.success')
+INFERRED_ROOFING=$(echo "$RESULT" | jq '(.inferredNaicsCodes // []) | index("238160") != null')
+INFERRED_FL=$(echo "$RESULT" | jq '(.inferredStates // []) | index("FL") != null')
+FIRST_NAICS=$(echo "$RESULT" | jq -r '.opportunities[0].naics_code')
+TOP_FIVE_HAS_ROOFING=$(echo "$RESULT" | jq '[.opportunities[0:5][].naics_code] | index("238160") != null')
+
+test_result "Roofer query returns success=true" "$([ "$SUCCESS" = "true" ] && echo true || echo false)"
+test_result "Roofer query infers NAICS 238160" "$INFERRED_ROOFING"
+test_result "Roofer query infers Florida" "$INFERRED_FL"
+test_result "Roofer query ranks NAICS 238160 first" "$([ "$FIRST_NAICS" = "238160" ] && echo true || echo false)"
+test_result "Roofer query keeps NAICS 238160 in top 5" "$TOP_FIVE_HAS_ROOFING"
+
+echo ""
 echo "==========================================="
 echo "TEST RESULTS: $PASSED passed, $FAILED failed"
 echo "==========================================="

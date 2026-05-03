@@ -40,7 +40,7 @@ function getSupabase() {
   return _supabase;
 }
 
-  // Filter out future-dated briefings (pursuit briefs are scheduled for next Monday)
+  // Filter out future-dated briefings (pursuit briefs are scheduled for Saturday)
   // and show only briefings up to today
   const today = new Date().toISOString().split('T')[0];
 

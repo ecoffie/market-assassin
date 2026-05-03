@@ -213,6 +213,7 @@ export async function generatePursuitBrief(
       naics_codes: FALLBACK_NAICS,
       agencies: [],
       keywords: [],
+      business_description: null,
       watched_companies: [],
       primary_industry: null,
     };
@@ -358,6 +359,7 @@ function buildProfile(profileData: Record<string, unknown>) {
     naics_codes: extractArray(aggregated?.naics_codes || profileData.naics_codes),
     agencies: extractArray(aggregated?.agencies || profileData.agencies),
     keywords: extractArray(aggregated?.keywords || profileData.keywords),
+    business_description: typeof profileData.business_description === 'string' ? profileData.business_description : null,
     watched_companies: extractArray(aggregated?.watched_companies || profileData.watched_companies),
     primary_industry: typeof profileData.primary_industry === 'string' ? profileData.primary_industry : null,
   };

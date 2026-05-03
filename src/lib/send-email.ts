@@ -1,10 +1,23 @@
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
 // Primary: Resend (more reliable)
 const resendApiKey = process.env.RESEND_API_KEY?.replace(/\\n$/, '').trim();
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: SupabaseClient<any> | null = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 // Fallback: Office365 SMTP
 const transporter = nodemailer.createTransport({
@@ -26,6 +39,67 @@ interface SendEmailParams {
   html: string;
   text?: string;
   from?: string;
+  emailType?: string;
+  eventSource?: string;
+  tags?: Record<string, string | number | boolean | null | undefined>;
+  metadata?: Record<string, unknown>;
+}
+
+function sanitizeResendTagValue(value: unknown): string {
+  return String(value ?? 'unknown')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 256) || 'unknown';
+}
+
+function toResendTags(tags?: SendEmailParams['tags']) {
+  return Object.entries(tags || {})
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([name, value]) => ({
+      name: sanitizeResendTagValue(name),
+      value: sanitizeResendTagValue(value),
+    }));
+}
+
+async function recordProviderSend({
+  provider,
+  providerMessageId,
+  to,
+  subject,
+  emailType,
+  eventSource,
+  tags,
+  metadata,
+  status,
+}: {
+  provider: 'resend' | 'office365';
+  providerMessageId?: string | null;
+  to: string;
+  subject: string;
+  emailType?: string;
+  eventSource?: string;
+  tags?: SendEmailParams['tags'];
+  metadata?: Record<string, unknown>;
+  status: string;
+}) {
+  try {
+    await getSupabase()
+      .from('email_provider_sends')
+      .upsert({
+        provider,
+        provider_message_id: providerMessageId || null,
+        user_email: to.toLowerCase().trim(),
+        subject,
+        email_type: emailType || null,
+        event_source: eventSource || null,
+        tags: tags || {},
+        metadata: metadata || {},
+        status,
+        sent_at: new Date().toISOString(),
+      }, providerMessageId ? { onConflict: 'provider,provider_message_id' } : undefined);
+  } catch (error) {
+    console.error('[SendEmail] Failed to record provider send:', error);
+  }
 }
 
 export async function sendEmail({
@@ -34,6 +108,10 @@ export async function sendEmail({
   html,
   text,
   from,
+  emailType,
+  eventSource,
+  tags,
+  metadata,
 }: SendEmailParams): Promise<boolean> {
   // Use alerts@govcongiants.com (verified in Resend)
   const fromEmail = process.env.EMAIL_FROM || 'alerts@govcongiants.com';
@@ -43,12 +121,18 @@ export async function sendEmail({
   // Try Resend first (primary)
   if (resend) {
     try {
-      const { error } = await resend.emails.send({
+      const resendTags = toResendTags(tags);
+      const { data, error } = await resend.emails.send({
         from: fromAddress,
         to: [to],
         subject,
         html,
         text: text || html.replace(/<[^>]*>/g, ''),
+        tags: resendTags.length > 0 ? resendTags : undefined,
+        headers: {
+          'X-GCG-Email-Type': sanitizeResendTagValue(emailType || 'general'),
+          'X-GCG-Event-Source': sanitizeResendTagValue(eventSource || 'general'),
+        },
       });
 
       if (error) {
@@ -56,10 +140,23 @@ export async function sendEmail({
         throw new Error(error.message);
       }
 
+      await recordProviderSend({
+        provider: 'resend',
+        providerMessageId: data?.id,
+        to,
+        subject,
+        emailType,
+        eventSource,
+        tags,
+        metadata,
+        status: 'sent',
+      });
+
       console.log(`[SendEmail] ✅ Sent via Resend to ${to}: ${subject}`);
       return true;
-    } catch (resendError: any) {
-      console.error(`[SendEmail] Resend failed, trying Office365 fallback:`, resendError.message);
+    } catch (resendError: unknown) {
+      const message = resendError instanceof Error ? resendError.message : String(resendError);
+      console.error(`[SendEmail] Resend failed, trying Office365 fallback:`, message);
     }
   }
 
@@ -71,6 +168,17 @@ export async function sendEmail({
       subject,
       html,
       text: text || html.replace(/<[^>]*>/g, ''),
+    });
+
+    await recordProviderSend({
+      provider: 'office365',
+      to,
+      subject,
+      emailType,
+      eventSource,
+      tags,
+      metadata,
+      status: 'sent',
     });
 
     console.log(`[SendEmail] ✅ Sent via Office365 to ${to}: ${subject}`);

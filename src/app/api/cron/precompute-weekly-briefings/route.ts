@@ -4,7 +4,7 @@
  * ENTERPRISE ARCHITECTURE: Generate 49 weekly templates instead of 928 individual briefings.
  * Same pattern as daily briefings pre-computation.
  *
- * Schedule: Saturday 8 PM UTC (before Sunday 7 AM send)
+ * Schedule: Thursday 8 PM UTC (before Friday 7 AM send)
  *
  * Process:
  * 1. Find all unique NAICS profiles among enabled users
@@ -20,7 +20,8 @@ import { generateWeeklyDeepDiveFromContracts } from '@/lib/briefings/delivery/we
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import crypto from 'crypto';
 
-const PROFILES_PER_RUN = 50; // 250-profile weekly coverage across 5 cron windows
+const PROFILES_PER_RUN = 25; // Upper bound; soft time budget stops safely before platform timeout.
+const MAX_RUN_MS = 210_000;
 const DELAY_BETWEEN_PROFILES_MS = 1000;
 
 // NAICS prefix expansion for 3-digit codes (comprehensive version)
@@ -94,27 +95,23 @@ function hashNaicsProfile(naicsCodes: string[]): string {
 
 function getWeekOfDate(): string {
   const now = new Date();
-  const dayOfWeek = now.getUTCDay(); // 0=Sunday, 6=Saturday
-
-  // Calculate Monday of the target week
-  // If running Saturday (6), we need NEXT Monday (tomorrow is Sunday, +2 to Monday)
-  // If running Sunday (0), we need TODAY's Monday (+1)
-  // If running any other day, use current week's Monday
-  let daysToAdd: number;
-  if (dayOfWeek === 6) {
-    // Saturday: next Monday is in 2 days
-    daysToAdd = 2;
-  } else if (dayOfWeek === 0) {
-    // Sunday: today's Monday is tomorrow
-    daysToAdd = 1;
-  } else {
-    // Weekday: current week's Monday
-    daysToAdd = 1 - dayOfWeek;
-  }
-
+  const dayOfWeek = now.getUTCDay(); // 0=Sunday, 1=Monday, etc.
+  const daysToAdd = dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
   const monday = new Date(now);
   monday.setUTCDate(monday.getUTCDate() + daysToAdd);
   return monday.toISOString().split('T')[0];
+}
+
+function getProfilesPerRun(request: NextRequest): number {
+  const limitParam = Number(request.nextUrl.searchParams.get('limit'));
+  if (!Number.isFinite(limitParam) || limitParam <= 0) {
+    return PROFILES_PER_RUN;
+  }
+  return Math.min(Math.floor(limitParam), PROFILES_PER_RUN);
+}
+
+function shouldStopForTimeBudget(startTime: number): boolean {
+  return Date.now() - startTime >= MAX_RUN_MS;
 }
 
 export async function GET(request: NextRequest) {
@@ -128,21 +125,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         message: 'Pre-compute Weekly Deep Dive Templates',
         description: 'Generates weekly templates by NAICS profile (enterprise architecture)',
-        schedule: 'Saturday 8 PM UTC',
+        schedule: 'Thursday 8 PM UTC',
         benefit: '95% reduction in LLM calls (928 users → 49 templates)',
       });
     }
   }
 
-  // DAY-OF-WEEK GUARD: Weekly precompute only runs on Saturday (UTC)
+  // DAY-OF-WEEK GUARD: Weekly precompute only runs on Thursday (UTC)
   const today = new Date();
-  const dayOfWeek = today.getUTCDay(); // 6 = Saturday
+  const dayOfWeek = today.getUTCDay(); // 4 = Thursday
 
-  if (dayOfWeek !== 6 && !isTest) {
-    console.log(`[PrecomputeWeekly] Skipped - not Saturday (day ${dayOfWeek})`);
+  if (dayOfWeek !== 4 && !isTest) {
+    console.log(`[PrecomputeWeekly] Skipped - not Thursday (day ${dayOfWeek})`);
     return NextResponse.json({
       success: true,
-      message: `Weekly precompute only runs on Saturday. Today is day ${dayOfWeek}.`,
+      message: `Weekly precompute only runs on Thursday. Today is day ${dayOfWeek}.`,
       skipped: true,
       dayOfWeek,
     });
@@ -162,8 +159,11 @@ function getSupabase() {
 
   const startTime = Date.now();
   const weekOf = getWeekOfDate();
+  const maxProfilesThisRun = getProfilesPerRun(request);
   let templatesGenerated = 0;
   let templatesFailed = 0;
+  let profilesAttempted = 0;
+  let stoppedForTimeBudget = false;
   const errors: string[] = [];
 
   console.log('[PrecomputeWeekly] Starting weekly template generation...');
@@ -250,9 +250,9 @@ function getSupabase() {
     const profilesToProcess = allProfiles
       .filter(p => !existingHashes.has(p.naics_profile_hash))
       .sort((a, b) => b.user_count - a.user_count)
-      .slice(0, PROFILES_PER_RUN);
+      .slice(0, maxProfilesThisRun);
 
-    console.log(`[PrecomputeWeekly] Processing ${profilesToProcess.length} profiles (${existingHashes.size} already done)`);
+    console.log(`[PrecomputeWeekly] Processing up to ${profilesToProcess.length} profiles (${existingHashes.size} already done)`);
 
     if (profilesToProcess.length === 0) {
       return NextResponse.json({
@@ -266,6 +266,13 @@ function getSupabase() {
 
     // Step 3: Generate template for each profile
     for (const profile of profilesToProcess) {
+      if (shouldStopForTimeBudget(startTime)) {
+        stoppedForTimeBudget = true;
+        console.log(`[PrecomputeWeekly] Stopping early to avoid timeout after ${Date.now() - startTime}ms`);
+        break;
+      }
+
+      profilesAttempted++;
       const profileStartTime = Date.now();
 
       try {
@@ -329,7 +336,8 @@ function getSupabase() {
     }
 
     const elapsed = Date.now() - startTime;
-    const remaining = allProfiles.length - existingHashes.size - templatesGenerated;
+    const templatesExistingAfterRun = existingHashes.size + templatesGenerated;
+    const remaining = Math.max(0, allProfiles.length - templatesExistingAfterRun);
 
     console.log(`[PrecomputeWeekly] Complete: ${templatesGenerated} generated, ${templatesFailed} failed, ${remaining} remaining`);
 
@@ -337,8 +345,11 @@ function getSupabase() {
       success: true,
       templatesGenerated,
       templatesFailed,
+      profilesAttempted,
+      stoppedForTimeBudget,
+      maxProfilesThisRun,
       totalProfiles: allProfiles.length,
-      templatesExisting: existingHashes.size,
+      templatesExisting: templatesExistingAfterRun,
       templatesRemaining: remaining,
       totalUsers: users?.length,
       errors: errors.length > 0 ? errors : undefined,

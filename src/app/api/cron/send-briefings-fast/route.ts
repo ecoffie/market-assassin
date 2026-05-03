@@ -198,6 +198,7 @@ export async function GET(request: NextRequest) {
           agencies: user.agencies || [],
           keywords: userKeywords,
           businessType: user.business_type,
+          businessDescription: user.business_description,
         }, noticeSummary);
 
         // Log briefing attempt

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface SampleOpportunity {
   notice_id: string;
@@ -23,23 +23,28 @@ interface ExtractedProfile {
 
 interface SampleOpportunitiesPickerProps {
   email: string; // User's email for storing business intelligence
+  initialDescription?: string;
+  autoFetch?: boolean;
   onProfileExtracted: (profile: ExtractedProfile) => void;
   onClose: () => void;
 }
 
 export default function SampleOpportunitiesPicker({
   email,
+  initialDescription = '',
+  autoFetch = false,
   onProfileExtracted,
   onClose,
 }: SampleOpportunitiesPickerProps) {
   const [step, setStep] = useState<'describe' | 'select' | 'results'>('describe');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(initialDescription);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [opportunities, setOpportunities] = useState<SampleOpportunity[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [extractedProfile, setExtractedProfile] = useState<ExtractedProfile | null>(null);
   const [recommendation, setRecommendation] = useState('');
+  const didAutoFetch = useRef(false);
 
   // Fetch sample opportunities
   const handleFetchSamples = async () => {
@@ -123,6 +128,13 @@ export default function SampleOpportunitiesPicker({
     }
   };
 
+  useEffect(() => {
+    if (!autoFetch || didAutoFetch.current || initialDescription.trim().length < 10) return;
+    didAutoFetch.current = true;
+    handleFetchSamples();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFetch, initialDescription]);
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-gray-900 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -162,7 +174,7 @@ export default function SampleOpportunitiesPicker({
           <div className="p-6 flex-1">
             <div className="bg-gray-800/50 rounded-xl p-6">
               <p className="text-gray-300 mb-4">
-                Describe what your company does in a few sentences. We'll use this to find relevant sample opportunities.
+                Describe what your company does in a few sentences. We&apos;ll use this to find relevant sample opportunities.
               </p>
               <textarea
                 value={description}

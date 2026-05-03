@@ -72,6 +72,25 @@ interface SAMSearchParams {
   states?: string[]; // Multiple state codes for expanded search
 }
 
+const DESCRIPTION_STOP_WORDS = new Set([
+  'about', 'after', 'also', 'and', 'are', 'business', 'company', 'does', 'for',
+  'from', 'government', 'help', 'into', 'our', 'provide', 'provides', 'providing',
+  'services', 'support', 'that', 'the', 'their', 'this', 'through', 'with', 'your',
+]);
+
+function extractDescriptionTerms(description?: string | null): string[] {
+  if (!description) return [];
+
+  return Array.from(new Set(
+    description
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .map(term => term.trim())
+      .filter(term => term.length >= 4 && !DESCRIPTION_STOP_WORDS.has(term))
+  )).slice(0, 20);
+}
+
 interface SAMSearchResult {
   opportunities: SAMOpportunity[];
   totalRecords: number;
@@ -494,6 +513,7 @@ export function scoreOpportunity(
     naics_codes: string[];
     agencies: string[];
     keywords: string[];
+    business_description?: string | null;
   }
 ): number {
   let score = 0;
@@ -519,6 +539,14 @@ export function scoreOpportunity(
     oppText.includes(k.toLowerCase())
   ).length;
   score += keywordMatches * 10;
+
+  // Business description semantic-lite ranking.
+  // Structured filters still decide inclusion; this only nudges ordering.
+  const descriptionTerms = extractDescriptionTerms(userProfile.business_description);
+  if (descriptionTerms.length > 0) {
+    const descriptionMatches = descriptionTerms.filter(term => oppText.includes(term)).length;
+    score += Math.min(descriptionMatches * 3, 15);
+  }
 
   // Deadline urgency (closer = higher score)
   if (opportunity.responseDeadline) {
@@ -629,11 +657,11 @@ export async function searchRelatedOpportunities(
   params: RelatedOpportunitySearch,
   apiKey: string
 ): Promise<RelatedOpportunityResult> {
-  const { naicsCode, agency, incumbentName, keywords = [], lookbackDays = 180 } = params;
+  const { naicsCode, agency, keywords = [], lookbackDays = 180 } = params;
 
   const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2';
 
-  // Build search keywords from agency and incumbent
+  // Build search keywords from agency and custom terms
   const searchTerms: string[] = [];
 
   // Add agency keywords (extract key words from agency name)
@@ -751,10 +779,7 @@ export async function fetchSamOpportunitiesFromCache(
   const {
     naicsCodes = [],
     pscCodes = [],
-    setAsides = [],
     keywords = [],
-    state,
-    states,
     limit = 100,
   } = params;
 
@@ -771,7 +796,7 @@ export async function fetchSamOpportunitiesFromCache(
   console.log(`[SAM Cache] Querying database for ${searchCriteria.join(' | ') || 'all opportunities'}`);
 
   try {
-    let query = applySamCacheFilters(
+    const query = applySamCacheFilters(
       supabase
         .from('sam_opportunities')
         .select('*')
@@ -780,7 +805,7 @@ export async function fetchSamOpportunitiesFromCache(
       params
     );
 
-    const { data, error, count } = await query;
+    const { data, error } = await query;
 
     if (error) {
       console.error('[SAM Cache] Query error:', error);
@@ -848,6 +873,9 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
     setAsides = [],
     state,
     states,
+    postedFrom,
+    postedTo,
+    noticeTypes = [],
   } = params;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -855,6 +883,14 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
 
   filteredQuery = filteredQuery.eq('active', true);
   filteredQuery = filteredQuery.gte('response_deadline', new Date().toISOString());
+
+  if (postedFrom) {
+    filteredQuery = filteredQuery.gte('posted_date', postedFrom);
+  }
+
+  if (postedTo) {
+    filteredQuery = filteredQuery.lte('posted_date', postedTo);
+  }
 
   if (naicsCodes.length > 0) {
     const prefixes = new Set<string>();
@@ -883,6 +919,21 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   if (setAsides.length > 0) {
     const setAsideFilters = setAsides.map(s => `set_aside_code.eq.${s}`).join(',');
     filteredQuery = filteredQuery.or(setAsideFilters);
+  }
+
+  if (noticeTypes.length > 0) {
+    const noticeTypeFilters = new Set<string>();
+    for (const type of noticeTypes.map(t => t.toLowerCase())) {
+      noticeTypeFilters.add(`notice_type.eq.${type}`);
+      if (type === 'p') noticeTypeFilters.add('notice_type.ilike.*presol*');
+      if (type === 'r') {
+        noticeTypeFilters.add('notice_type.ilike.*source*');
+        noticeTypeFilters.add('notice_type.ilike.*rfi*');
+      }
+      if (type === 'k') noticeTypeFilters.add('notice_type.ilike.*combined*');
+      if (type === 'o') noticeTypeFilters.add('notice_type.ilike.*solicitation*');
+    }
+    filteredQuery = filteredQuery.or(Array.from(noticeTypeFilters).join(','));
   }
 
   const stateList = Array.from(
@@ -933,7 +984,7 @@ export async function fetchSamOpportunityNoticeSummaryFromCache(
 
   try {
     for (let from = 0; ; from += pageSize) {
-      let query = applySamCacheFilters(
+      const query = applySamCacheFilters(
         supabase
           .from('sam_opportunities')
           .select('notice_type,title,description')

@@ -12,7 +12,9 @@
     "test:local": "bash tests/test-pre-deploy.sh --local",
     "test:schema": "node tests/test-schema-sync.js",
     "predeploy": "npm run test:schema && npm run test:pre-deploy",
-    "deploy": "npm run predeploy && vercel --prod"
+    "deploy": "npm run predeploy && vercel --prod",
+    "experiment:dry-run": "DRY_RUN=true npx tsx scripts/assign-experiment-cohorts.ts",
+    "experiment:execute": "DRY_RUN=false npx tsx scripts/assign-experiment-cohorts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

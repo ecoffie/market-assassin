@@ -71,14 +71,6 @@ async function storeBusinessIntelligence(
       .from('user_business_profiles')
       .upsert(updates, { onConflict: 'user_email' });
 
-    // Also update business_description in user_notification_settings if it exists
-    if (data.businessDescription) {
-      await supabase
-        .from('user_notification_settings')
-        .update({ business_description: data.businessDescription })
-        .eq('user_email', email.toLowerCase().trim());
-    }
-
     console.log(`[sample-opportunities] Stored business intel for ${email}`);
   } catch (err) {
     // Don't fail the main flow if storage fails
@@ -89,6 +81,7 @@ async function storeBusinessIntelligence(
 interface SampleOpportunity {
   notice_id: string;
   title: string;
+  description?: string | null;
   department: string;
   naics_code: string;
   psc_code: string;
@@ -96,6 +89,7 @@ interface SampleOpportunity {
   notice_type: string;
   response_deadline: string | null;
   ui_link: string;
+  pop_state?: string | null;
 }
 
 interface ExtractedProfile {
@@ -132,6 +126,7 @@ const NAICS_NAMES: Record<string, string> = {
   '237310': 'Highway, Street, and Bridge Construction',
   '238210': 'Electrical Contractors',
   '238220': 'Plumbing, Heating, and AC Contractors',
+  '238160': 'Roofing Contractors',
   '238910': 'Site Preparation Contractors',
   '541511': 'Custom Computer Programming Services',
   '541512': 'Computer Systems Design Services',
@@ -198,9 +193,175 @@ const NAICS_NAMES: Record<string, string> = {
   '336414': 'Guided Missile and Space Vehicle Manufacturing',
 };
 
+const SAMPLE_SELECT_FIELDS = 'notice_id, title, description, department, naics_code, psc_code, set_aside_description, notice_type, response_deadline, ui_link, pop_state';
+
+const INDUSTRY_HINTS: Array<{
+  codes: string[];
+  prefixes?: string[];
+  patterns: RegExp[];
+  terms: string[];
+}> = [
+  {
+    codes: ['238160'],
+    prefixes: ['238'],
+    patterns: [/\broof(?:er|ers|ing)?\b/i, /\bshingle(?:s)?\b/i, /\bwaterproofing\b/i, /\bgutter(?:s)?\b/i],
+    terms: ['roof', 'roofing', 'roofer', 'shingle', 'waterproofing', 'gutter'],
+  },
+  {
+    codes: ['236220'],
+    prefixes: ['236', '237', '238'],
+    patterns: [/\bconstruction\b/i, /\bcontractor(?:s)?\b/i, /\brenovation\b/i, /\bbuilding\b/i],
+    terms: ['construction', 'contractor', 'renovation', 'building'],
+  },
+  {
+    codes: ['541512', '541511', '541519', '518210'],
+    patterns: [/\bcyber(?:security)?\b/i, /\bsoftware\b/i, /\bcloud\b/i, /\bit\b/i, /\binformation technology\b/i],
+    terms: ['cyber', 'cybersecurity', 'software', 'cloud', 'technology'],
+  },
+  {
+    codes: ['561720', '561210', '561730', '561790'],
+    patterns: [/\bjanitorial\b/i, /\bfacilit(?:y|ies)\b/i, /\bmaintenance\b/i, /\blandscap(?:e|ing)\b/i],
+    terms: ['janitorial', 'facility', 'facilities', 'maintenance', 'landscaping'],
+  },
+];
+
+const STATE_HINTS: Record<string, string> = {
+  alabama: 'AL',
+  alaska: 'AK',
+  arizona: 'AZ',
+  arkansas: 'AR',
+  california: 'CA',
+  colorado: 'CO',
+  connecticut: 'CT',
+  delaware: 'DE',
+  florida: 'FL',
+  georgia: 'GA',
+  hawaii: 'HI',
+  idaho: 'ID',
+  illinois: 'IL',
+  indiana: 'IN',
+  iowa: 'IA',
+  kansas: 'KS',
+  kentucky: 'KY',
+  louisiana: 'LA',
+  maine: 'ME',
+  maryland: 'MD',
+  massachusetts: 'MA',
+  michigan: 'MI',
+  minnesota: 'MN',
+  mississippi: 'MS',
+  missouri: 'MO',
+  montana: 'MT',
+  nebraska: 'NE',
+  nevada: 'NV',
+  'new hampshire': 'NH',
+  'new jersey': 'NJ',
+  'new mexico': 'NM',
+  'new york': 'NY',
+  'north carolina': 'NC',
+  'north dakota': 'ND',
+  ohio: 'OH',
+  oklahoma: 'OK',
+  oregon: 'OR',
+  pennsylvania: 'PA',
+  rhode: 'RI',
+  'rhode island': 'RI',
+  'south carolina': 'SC',
+  'south dakota': 'SD',
+  tennessee: 'TN',
+  texas: 'TX',
+  utah: 'UT',
+  vermont: 'VT',
+  virginia: 'VA',
+  washington: 'WA',
+  wisconsin: 'WI',
+  wyoming: 'WY',
+  'washington dc': 'DC',
+  dc: 'DC',
+};
+
+function inferSearchProfile(description: string) {
+  const normalized = description.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+  const exactCodes = new Set<string>();
+  const prefixes = new Set<string>();
+  const terms = new Set<string>();
+
+  const explicitCodes = normalized.match(/\b\d{3,6}\b/g) || [];
+  for (const code of explicitCodes) {
+    exactCodes.add(code);
+  }
+
+  for (const hint of INDUSTRY_HINTS) {
+    if (hint.patterns.some(pattern => pattern.test(normalized))) {
+      hint.codes.forEach(code => exactCodes.add(code));
+      hint.prefixes?.forEach(prefix => prefixes.add(prefix));
+      hint.terms.forEach(term => terms.add(term));
+    }
+  }
+
+  const keywords = normalized
+    .split(/\s+/)
+    .map(word => {
+      if (word === 'roofer' || word === 'roofers' || word === 'roofing') return 'roof';
+      return word;
+    })
+    .filter(word => word.length > 3 && !STOP_WORDS.has(word));
+
+  keywords.slice(0, 6).forEach(word => terms.add(word));
+
+  const states = new Set<string>();
+  for (const [name, code] of Object.entries(STATE_HINTS)) {
+    if (new RegExp(`\\b${name}\\b`, 'i').test(normalized)) {
+      states.add(code);
+    }
+  }
+
+  return {
+    exactCodes: Array.from(exactCodes),
+    prefixes: Array.from(prefixes),
+    terms: Array.from(terms).slice(0, 8),
+    states: Array.from(states),
+  };
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = await request.json();
   const email = body.email || '';
+
+  // Save-only request from onboarding/settings flows.
+  // This keeps the free-text business description in the same runtime field used
+  // by alerts and briefings matching, without requiring the sample picker flow.
+  if (body.action === 'save_profile') {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database not configured',
+      }, { status: 500 });
+    }
+
+    if (!email) {
+      return NextResponse.json({
+        success: false,
+        error: 'Email is required',
+      }, { status: 400 });
+    }
+
+    const businessDescription = String(body.businessDescription || '').trim();
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    await storeBusinessIntelligence(supabase, email, {
+      businessDescription,
+      opportunitiesShown: 0,
+      opportunitiesSelected: 0,
+    });
+
+    return NextResponse.json({
+      success: true,
+      businessDescriptionSaved: Boolean(businessDescription),
+    });
+  }
 
   // Check if this is an extraction request
   if (body.action === 'extract') {
@@ -233,166 +394,204 @@ async function handleSampleSearch(description: string, email?: string): Promise<
   }
 
   try {
-    // Extract potential keywords from description
-    const keywords = description
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(word => word.length > 3 && !STOP_WORDS.has(word))
-      .slice(0, 5);
-
-    // Strategy: Get diverse samples from different angles
+    const searchProfile = inferSearchProfile(description);
     const samples: SampleOpportunity[] = [];
     const seenIds = new Set<string>();
 
-    // 1. If user provided description, search by keywords in title
-    if (keywords.length > 0) {
-      for (const keyword of keywords.slice(0, 3)) {
-        const { data } = await supabase
+    const addSamples = (items: SampleOpportunity[] | null) => {
+      if (!items) return;
+      for (const opp of items) {
+        if (!seenIds.has(opp.notice_id)) {
+          seenIds.add(opp.notice_id);
+          samples.push(opp);
+        }
+      }
+    };
+
+    // 1. Pull exact inferred NAICS matches first. For "roofer", this means 238160.
+    if (searchProfile.exactCodes.length > 0) {
+      let exactQuery = supabase
+        .from('sam_opportunities')
+        .select(SAMPLE_SELECT_FIELDS)
+        .in('naics_code', searchProfile.exactCodes)
+        .eq('active', true)
+        .order('posted_date', { ascending: false })
+        .limit(30);
+
+      if (searchProfile.states.length > 0) {
+        exactQuery = exactQuery.in('pop_state', searchProfile.states);
+      }
+
+      const { data: exactStateMatches } = await exactQuery;
+      addSamples(exactStateMatches as SampleOpportunity[] | null);
+
+      if (samples.length < 12 && searchProfile.states.length > 0) {
+        const { data: exactNationwideMatches } = await supabase
           .from('sam_opportunities')
-          .select('notice_id, title, department, naics_code, psc_code, set_aside_description, notice_type, response_deadline, ui_link')
-          .ilike('title', `%${keyword}%`)
+          .select(SAMPLE_SELECT_FIELDS)
+          .in('naics_code', searchProfile.exactCodes)
           .eq('active', true)
           .order('posted_date', { ascending: false })
-          .limit(10);
+          .limit(30);
+        addSamples(exactNationwideMatches as SampleOpportunity[] | null);
+      }
+    }
 
-        if (data) {
-          for (const opp of data) {
-            if (!seenIds.has(opp.notice_id)) {
-              seenIds.add(opp.notice_id);
-              samples.push(opp);
-            }
-          }
+    // 2. Search title/description terms so mislabeled SAM records can still surface.
+    if (searchProfile.terms.length > 0) {
+      for (const term of searchProfile.terms.slice(0, 5)) {
+        const { data } = await supabase
+          .from('sam_opportunities')
+          .select(SAMPLE_SELECT_FIELDS)
+          .or(`title.ilike.%${term}%,description.ilike.%${term}%`)
+          .eq('active', true)
+          .order('posted_date', { ascending: false })
+          .limit(12);
+
+        addSamples(data as SampleOpportunity[] | null);
+      }
+    }
+
+    // 3. Use inferred NAICS prefixes as the next fallback before unrelated industries.
+    if (samples.length < 24 && searchProfile.prefixes.length > 0) {
+      for (const prefix of searchProfile.prefixes.slice(0, 3)) {
+        let prefixQuery = supabase
+          .from('sam_opportunities')
+          .select(SAMPLE_SELECT_FIELDS)
+          .like('naics_code', `${prefix}%`)
+          .eq('active', true)
+          .order('posted_date', { ascending: false })
+          .limit(20);
+
+        if (searchProfile.states.length > 0) {
+          prefixQuery = prefixQuery.in('pop_state', searchProfile.states);
+        }
+
+        const { data: prefixStateMatches } = await prefixQuery;
+        addSamples(prefixStateMatches as SampleOpportunity[] | null);
+
+        if (samples.length >= 24) {
+          break;
         }
       }
     }
 
-    // 2. Get recent active opportunities across different industries
-    // IT/Tech
-    const { data: techOpps } = await supabase
-      .from('sam_opportunities')
-      .select('notice_id, title, department, naics_code, psc_code, set_aside_description, notice_type, response_deadline, ui_link')
-      .in('naics_code', ['541512', '541511', '541519', '518210'])
-      .eq('active', true)
-      .order('posted_date', { ascending: false })
-      .limit(8);
+    // 4. If the user gave no useful clues, provide a balanced starter set.
+    if (samples.length < 12 && searchProfile.exactCodes.length === 0 && searchProfile.terms.length === 0) {
+      const starterQueries = [
+        { codes: ['541512', '541511', '541519', '518210'], limit: 6 },
+        { prefix: '23', limit: 6 },
+        { codes: ['541611', '541612', '541618', '541690'], limit: 6 },
+        { codes: ['561720', '561210', '561730'], limit: 6 },
+      ];
 
-    if (techOpps) {
-      for (const opp of techOpps) {
-        if (!seenIds.has(opp.notice_id)) {
-          seenIds.add(opp.notice_id);
-          samples.push(opp);
+      for (const starter of starterQueries) {
+        let query = supabase
+          .from('sam_opportunities')
+          .select(SAMPLE_SELECT_FIELDS)
+          .eq('active', true)
+          .order('posted_date', { ascending: false })
+          .limit(starter.limit);
+
+        if (starter.codes) {
+          query = query.in('naics_code', starter.codes);
+        } else if (starter.prefix) {
+          query = query.like('naics_code', `${starter.prefix}%`);
         }
+
+        const { data } = await query;
+        addSamples(data as SampleOpportunity[] | null);
       }
     }
 
-    // Construction
-    const { data: constOpps } = await supabase
-      .from('sam_opportunities')
-      .select('notice_id, title, department, naics_code, psc_code, set_aside_description, notice_type, response_deadline, ui_link')
-      .like('naics_code', '23%')
-      .eq('active', true)
-      .order('posted_date', { ascending: false })
-      .limit(8);
-
-    if (constOpps) {
-      for (const opp of constOpps) {
-        if (!seenIds.has(opp.notice_id)) {
-          seenIds.add(opp.notice_id);
-          samples.push(opp);
-        }
-      }
-    }
-
-    // Professional Services
-    const { data: profOpps } = await supabase
-      .from('sam_opportunities')
-      .select('notice_id, title, department, naics_code, psc_code, set_aside_description, notice_type, response_deadline, ui_link')
-      .in('naics_code', ['541611', '541612', '541618', '541690'])
-      .eq('active', true)
-      .order('posted_date', { ascending: false })
-      .limit(8);
-
-    if (profOpps) {
-      for (const opp of profOpps) {
-        if (!seenIds.has(opp.notice_id)) {
-          seenIds.add(opp.notice_id);
-          samples.push(opp);
-        }
-      }
-    }
-
-    // Engineering
-    const { data: engOpps } = await supabase
-      .from('sam_opportunities')
-      .select('notice_id, title, department, naics_code, psc_code, set_aside_description, notice_type, response_deadline, ui_link')
-      .in('naics_code', ['541330', '541310', '541712'])
-      .eq('active', true)
-      .order('posted_date', { ascending: false })
-      .limit(8);
-
-    if (engOpps) {
-      for (const opp of engOpps) {
-        if (!seenIds.has(opp.notice_id)) {
-          seenIds.add(opp.notice_id);
-          samples.push(opp);
-        }
-      }
-    }
-
-    // Facilities/Maintenance
-    const { data: facOpps } = await supabase
-      .from('sam_opportunities')
-      .select('notice_id, title, department, naics_code, psc_code, set_aside_description, notice_type, response_deadline, ui_link')
-      .in('naics_code', ['561720', '561210', '561730'])
-      .eq('active', true)
-      .order('posted_date', { ascending: false })
-      .limit(8);
-
-    if (facOpps) {
-      for (const opp of facOpps) {
-        if (!seenIds.has(opp.notice_id)) {
-          seenIds.add(opp.notice_id);
-          samples.push(opp);
-        }
-      }
-    }
-
-    // 3. If we still need more, get random recent ones
+    // 5. Fill remaining space with recent records only after ranked matches.
     if (samples.length < 30) {
       const { data: recentOpps } = await supabase
         .from('sam_opportunities')
-        .select('notice_id, title, department, naics_code, psc_code, set_aside_description, notice_type, response_deadline, ui_link')
+        .select(SAMPLE_SELECT_FIELDS)
         .eq('active', true)
         .order('posted_date', { ascending: false })
         .limit(50);
 
-      if (recentOpps) {
-        // Shuffle and take what we need
-        const shuffled = recentOpps.sort(() => Math.random() - 0.5);
-        for (const opp of shuffled) {
-          if (!seenIds.has(opp.notice_id) && samples.length < 30) {
-            seenIds.add(opp.notice_id);
-            samples.push(opp);
-          }
-        }
-      }
+      addSamples(recentOpps as SampleOpportunity[] | null);
     }
 
-    // Shuffle final results for variety
-    const shuffledSamples = samples.sort(() => Math.random() - 0.5).slice(0, 30);
+    const scoreOpportunity = (opp: SampleOpportunity): number => {
+      const text = `${opp.title || ''} ${opp.description || ''}`.toLowerCase();
+      let score = 0;
+
+      if (opp.naics_code && searchProfile.exactCodes.includes(opp.naics_code)) {
+        score += 100;
+      }
+
+      if (opp.naics_code && searchProfile.prefixes.some(prefix => opp.naics_code.startsWith(prefix))) {
+        score += 35;
+      }
+
+      for (const term of searchProfile.terms) {
+        if (text.includes(term)) {
+          score += 12;
+        }
+      }
+
+      if (opp.pop_state && searchProfile.states.includes(opp.pop_state)) {
+        score += 10;
+      }
+
+      if (opp.response_deadline && new Date(opp.response_deadline).getTime() > Date.now()) {
+        score += 2;
+      }
+
+      return score;
+    };
+
+    const rankedSamples = samples
+      .sort((a, b) => {
+        const scoreDiff = scoreOpportunity(b) - scoreOpportunity(a);
+        if (scoreDiff !== 0) return scoreDiff;
+        const aDate = a.response_deadline ? new Date(a.response_deadline).getTime() : 0;
+        const bDate = b.response_deadline ? new Date(b.response_deadline).getTime() : 0;
+        return bDate - aDate;
+      })
+      .slice(0, 30);
+
+    if (
+      searchProfile.exactCodes.length > 0 &&
+      !rankedSamples.some(opp => searchProfile.exactCodes.includes(opp.naics_code))
+    ) {
+      const code = searchProfile.exactCodes[0];
+      rankedSamples.unshift({
+        notice_id: `naics-reference-${code}`,
+        title: `${NAICS_NAMES[code] || 'Recommended NAICS'} profile match`,
+        description: 'No active SAM examples in the local cache matched this exact NAICS today, but this is the best classification for your description.',
+        department: 'PROFILE MATCH',
+        naics_code: code,
+        psc_code: '',
+        set_aside_description: null,
+        notice_type: 'NAICS reference',
+        response_deadline: null,
+        ui_link: `https://sam.gov/search/?index=opp&naics=${code}`,
+        pop_state: searchProfile.states[0] || null,
+      });
+      if (rankedSamples.length > 30) {
+        rankedSamples.pop();
+      }
+    }
 
     // Store opportunities shown count
     if (email) {
       await storeBusinessIntelligence(supabase, email, {
-        opportunitiesShown: shuffledSamples.length,
+        opportunitiesShown: rankedSamples.length,
       });
     }
 
     return NextResponse.json({
       success: true,
-      count: shuffledSamples.length,
+      count: rankedSamples.length,
       message: 'Select the opportunities that look relevant to your business. We\'ll use your selections to calibrate your profile.',
-      opportunities: shuffledSamples,
+      inferredNaicsCodes: searchProfile.exactCodes,
+      inferredStates: searchProfile.states,
+      opportunities: rankedSamples,
     });
 
   } catch (error) {
@@ -444,6 +643,14 @@ async function handleExtraction(selectedIds: string[], email: string): Promise<N
     const pscCount: Record<string, number> = {};
     const agencyCount: Record<string, number> = {};
     const allTitles: string[] = [];
+
+    for (const selectedId of selectedIds) {
+      const referenceMatch = selectedId.match(/^naics-reference-(\d{3,6})$/);
+      if (referenceMatch) {
+        const code = referenceMatch[1];
+        naicsCount[code] = (naicsCount[code] || 0) + 1;
+      }
+    }
 
     for (const opp of selectedOpps) {
       // Count NAICS codes

@@ -4,7 +4,7 @@
  * ENTERPRISE ARCHITECTURE: Instead of generating pursuit briefs per-user,
  * we pre-compute briefs for TOP opportunities per NAICS profile.
  *
- * Schedule: Sunday 8 PM UTC (before Monday 7 AM send)
+ * Schedule: Friday 8 PM UTC (before Saturday 7 AM send)
  *
  * Process:
  * 1. Find all unique NAICS profiles
@@ -19,7 +19,8 @@ import { fetchSamOpportunityNoticeSummaryFromCache, SAMNoticeSummary } from '@/l
 import { generatePursuitBriefFromProfileInput } from '@/lib/briefings/delivery/pursuit-brief-generator';
 import crypto from 'crypto';
 
-const PROFILES_PER_RUN = 25; // Increased from 10 to ensure 125 profiles covered across 5 cron windows
+const PROFILES_PER_RUN = 25; // Upper bound; soft time budget stops safely before platform timeout.
+const MAX_RUN_MS = 210_000;
 const DELAY_BETWEEN_PROFILES_MS = 1000;
 
 interface NaicsProfile {
@@ -70,7 +71,7 @@ function buildPursuitMarketSignals(
   const signals: Array<{ headline: string; source: string; implication: string; actionRequired: boolean }> = [
     {
       headline: `${summary.totalMatched} matched active SAM notices around ${targetLabel}`,
-      source: 'SAM.gov Cache',
+      source: 'SAM.gov',
       implication: 'This pursuit sits inside a broader active market. Calibrate your bid/no-bid against nearby demand and timing.',
       actionRequired: false,
     },
@@ -79,7 +80,7 @@ function buildPursuitMarketSignals(
   if (summary.sourcesSought > 0) {
     signals.push({
       headline: `${summary.sourcesSought} related Sources Sought / RFI notices remain open`,
-      source: 'SAM.gov Cache',
+      source: 'SAM.gov',
       implication: 'There may still be a requirements-shaping window nearby. Capture should check for response or briefing opportunities immediately.',
       actionRequired: true,
     });
@@ -88,7 +89,7 @@ function buildPursuitMarketSignals(
   if (summary.preSol > 0) {
     signals.push({
       headline: `${summary.preSol} presolicitation notices suggest follow-on activity`,
-      source: 'SAM.gov Cache',
+      source: 'SAM.gov',
       implication: 'Use presol activity to map likely follow-ons, teaming posture, and agency buying sequence before final solicitation.',
       actionRequired: true,
     });
@@ -97,7 +98,7 @@ function buildPursuitMarketSignals(
   if (summary.rfp + summary.rfq + summary.combined > 0) {
     signals.push({
       headline: `${summary.rfp + summary.rfq + summary.combined} adjacent solicitation-stage notices are already active`,
-      source: 'SAM.gov Cache',
+      source: 'SAM.gov',
       implication: 'Competitors may already be mobilized in this market. Positioning speed and outreach urgency matter more now.',
       actionRequired: summary.rfp + summary.rfq + summary.combined >= 3,
     });
@@ -111,12 +112,24 @@ function hashNaicsProfile(naicsCodes: string[]): string {
   return crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex');
 }
 
-function getMondayDate(): string {
-  const monday = new Date();
-  const day = monday.getDay();
-  const diff = day === 0 ? 1 : (8 - day);
-  monday.setDate(monday.getDate() + diff);
-  return monday.toISOString().split('T')[0];
+function getPursuitDate(): string {
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // 0=Sunday, 6=Saturday
+  const daysToAdd = dayOfWeek === 6 ? 0 : (6 - dayOfWeek + 7) % 7;
+  now.setUTCDate(now.getUTCDate() + daysToAdd);
+  return now.toISOString().split('T')[0];
+}
+
+function getProfilesPerRun(request: NextRequest): number {
+  const limitParam = Number(request.nextUrl.searchParams.get('limit'));
+  if (!Number.isFinite(limitParam) || limitParam <= 0) {
+    return PROFILES_PER_RUN;
+  }
+  return Math.min(Math.floor(limitParam), PROFILES_PER_RUN);
+}
+
+function shouldStopForTimeBudget(startTime: number): boolean {
+  return Date.now() - startTime >= MAX_RUN_MS;
 }
 
 export async function GET(request: NextRequest) {
@@ -130,21 +143,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         message: 'Pre-compute Pursuit Briefs',
         description: 'Generates pursuit templates by NAICS profile (enterprise architecture)',
-        schedule: 'Sunday 8 PM UTC',
+        schedule: 'Friday 8 PM UTC',
         benefit: '95% reduction in LLM calls (928 users → 49 templates)',
       });
     }
   }
 
-  // DAY-OF-WEEK GUARD: Pursuit precompute only runs on Sunday (UTC)
+  // DAY-OF-WEEK GUARD: Pursuit precompute only runs on Friday (UTC)
   const today = new Date();
-  const dayOfWeek = today.getUTCDay(); // 0 = Sunday
+  const dayOfWeek = today.getUTCDay(); // 5 = Friday
 
-  if (dayOfWeek !== 0 && !isTest) {
-    console.log(`[PrecomputePursuit] Skipped - not Sunday (day ${dayOfWeek})`);
+  if (dayOfWeek !== 5 && !isTest) {
+    console.log(`[PrecomputePursuit] Skipped - not Friday (day ${dayOfWeek})`);
     return NextResponse.json({
       success: true,
-      message: `Pursuit precompute only runs on Sunday. Today is day ${dayOfWeek}.`,
+      message: `Pursuit precompute only runs on Friday. Today is day ${dayOfWeek}.`,
       skipped: true,
       dayOfWeek,
     });
@@ -163,9 +176,12 @@ function getSupabase() {
 }
 
   const startTime = Date.now();
-  const mondayDate = getMondayDate();
+  const pursuitDate = getPursuitDate();
+  const maxProfilesThisRun = getProfilesPerRun(request);
   let templatesGenerated = 0;
   let templatesFailed = 0;
+  let profilesAttempted = 0;
+  let stoppedForTimeBudget = false;
   const errors: string[] = [];
 
   console.log('[PrecomputePursuit] Starting pursuit brief template generation...');
@@ -226,7 +242,7 @@ function getSupabase() {
     const { data: existingTemplates } = await getSupabase()
       .from('briefing_templates')
       .select('naics_profile_hash')
-      .eq('template_date', mondayDate)
+      .eq('template_date', pursuitDate)
       .eq('briefing_type', 'pursuit');
 
     const existingHashes = new Set((existingTemplates || []).map((t: { naics_profile_hash: string }) => t.naics_profile_hash));
@@ -234,9 +250,9 @@ function getSupabase() {
     const profilesToProcess = allProfiles
       .filter(p => !existingHashes.has(p.naics_profile_hash))
       .sort((a, b) => b.user_count - a.user_count)
-      .slice(0, PROFILES_PER_RUN);
+      .slice(0, maxProfilesThisRun);
 
-    console.log(`[PrecomputePursuit] Processing ${profilesToProcess.length} profiles (${existingHashes.size} already done)`);
+    console.log(`[PrecomputePursuit] Processing up to ${profilesToProcess.length} profiles (${existingHashes.size} already done)`);
 
     if (profilesToProcess.length === 0) {
       return NextResponse.json({
@@ -250,6 +266,13 @@ function getSupabase() {
 
     // Step 3: For each profile, find top opportunity and generate pursuit brief
     for (const profile of profilesToProcess) {
+      if (shouldStopForTimeBudget(startTime)) {
+        stoppedForTimeBudget = true;
+        console.log(`[PrecomputePursuit] Stopping early to avoid timeout after ${Date.now() - startTime}ms`);
+        break;
+      }
+
+      profilesAttempted++;
       const profileStartTime = Date.now();
 
       try {
@@ -376,7 +399,7 @@ function getSupabase() {
         const { error: insertError } = await getSupabase().from('briefing_templates').upsert({
           naics_profile: profile.naics_profile,
           naics_profile_hash: profile.naics_profile_hash,
-          template_date: mondayDate,
+          template_date: pursuitDate,
           briefing_type: 'pursuit',
           briefing_content: brief,
           opportunities_count: 1,
@@ -406,7 +429,8 @@ function getSupabase() {
     }
 
     const elapsed = Date.now() - startTime;
-    const remaining = allProfiles.length - existingHashes.size - templatesGenerated;
+    const templatesExistingAfterRun = existingHashes.size + templatesGenerated;
+    const remaining = Math.max(0, allProfiles.length - templatesExistingAfterRun);
 
     console.log(`[PrecomputePursuit] Complete: ${templatesGenerated} generated, ${templatesFailed} failed, ${remaining} remaining`);
 
@@ -414,8 +438,11 @@ function getSupabase() {
       success: true,
       templatesGenerated,
       templatesFailed,
+      profilesAttempted,
+      stoppedForTimeBudget,
+      maxProfilesThisRun,
       totalProfiles: allProfiles.length,
-      templatesExisting: existingHashes.size,
+      templatesExisting: templatesExistingAfterRun,
       templatesRemaining: remaining,
       totalUsers: users?.length,
       errors: errors.length > 0 ? errors : undefined,

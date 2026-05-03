@@ -126,7 +126,7 @@ function buildWeeklyNoticeSignals(summary?: SAMNoticeSummary): WeeklyMarketSigna
   const signals: WeeklyMarketSignal[] = [
     {
       headline: `${summary.totalMatched} matched active SAM notices in this market`,
-      source: 'SAM.gov Cache',
+      source: 'SAM.gov',
       implication: 'The weekly deep dive is grounded in an active federal market, not just expiring-contract data.',
       actionRequired: false,
     },
@@ -135,7 +135,7 @@ function buildWeeklyNoticeSignals(summary?: SAMNoticeSummary): WeeklyMarketSigna
   if (summary.sourcesSought > 0) {
     signals.push({
       headline: `${summary.sourcesSought} Sources Sought / RFI notices are open`,
-      source: 'SAM.gov Cache',
+      source: 'SAM.gov',
       implication: 'Market research windows are open now. Shape requirements early and request capability conversations before solicitation.',
       actionRequired: true,
     });
@@ -144,7 +144,7 @@ function buildWeeklyNoticeSignals(summary?: SAMNoticeSummary): WeeklyMarketSigna
   if (summary.preSol > 0) {
     signals.push({
       headline: `${summary.preSol} presolicitation notices signal upcoming bids`,
-      source: 'SAM.gov Cache',
+      source: 'SAM.gov',
       implication: 'This is the positioning phase for teaming, agency outreach, and forecast monitoring before the RFP lands.',
       actionRequired: true,
     });
@@ -153,7 +153,7 @@ function buildWeeklyNoticeSignals(summary?: SAMNoticeSummary): WeeklyMarketSigna
   if (summary.rfp + summary.rfq + summary.combined > 0) {
     signals.push({
       headline: `${summary.rfp + summary.rfq + summary.combined} active solicitation-stage notices are already live`,
-      source: 'SAM.gov Cache',
+      source: 'SAM.gov',
       implication: 'Balance long-range positioning with nearer-term bids already in motion.',
       actionRequired: summary.rfp + summary.rfq + summary.combined >= 5,
     });
@@ -309,6 +309,7 @@ export async function generateWeeklyBriefing(
       naics_codes: FALLBACK_NAICS,
       agencies: [],
       keywords: [],
+      business_description: null,
       aggregated_profile: null,
       primary_industry: null,
     };
@@ -539,6 +540,7 @@ function buildProfile(profileData: Record<string, unknown>) {
     naics_codes: extractArray(aggregated?.naics_codes || profileData.naics_codes),
     agencies: extractArray(aggregated?.agencies || profileData.agencies),
     keywords: extractArray(aggregated?.keywords || profileData.keywords),
+    business_description: typeof profileData.business_description === 'string' ? profileData.business_description : null,
     watched_companies: extractArray(aggregated?.watched_companies || profileData.watched_companies),
   };
 }

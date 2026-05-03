@@ -73,6 +73,7 @@ interface SettingsPanelProps {
 interface AlertSettings {
   naicsCodes: string[];
   keywords: string[];
+  businessDescription?: string | null;
   businessType: string;
   targetAgencies: string[];
   locationStates: string[];
@@ -102,6 +103,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
   // AI Code Suggestion state
   const [showCodeAssistant, setShowCodeAssistant] = useState(false);
   const [businessDescription, setBusinessDescription] = useState('');
+  const [showDescriptionPrompt, setShowDescriptionPrompt] = useState(false);
   const [suggestingCodes, setSuggestingCodes] = useState(false);
   const [naicsSuggestions, setNaicsSuggestions] = useState<CodeSuggestion[]>([]);
   const [pscSuggestions, setPscSuggestions] = useState<CodeSuggestion[]>([]);
@@ -126,6 +128,10 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
 
         // Load keywords
         setKeywordsInput((settings.keywords || []).join(', '));
+
+        const description = settings.businessDescription || '';
+        setBusinessDescription(description);
+        setShowDescriptionPrompt(!description);
 
         // Load business type
         setBusinessType(settings.businessType || '');
@@ -193,6 +199,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
           email,
           naicsCodes,
           keywords,
+          businessDescription: businessDescription.trim() || null,
           businessType: businessType || null,
           targetAgencies: getAllAgencies(),
           locationStates: selectedStates,
@@ -402,13 +409,51 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
             )}
 
             {/* Smart Profile Setup */}
+            {!businessDescription.trim() && (
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <h3 className="text-emerald-100 font-medium text-sm">Add a business description</h3>
+                    <p className="text-xs text-emerald-200/80 mt-1">
+                      A short description helps rank the opportunities that already match your structured filters.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowDescriptionPrompt(true)}
+                      className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      Add description
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(showDescriptionPrompt || businessDescription.trim()) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Business Description
+                </label>
+                <textarea
+                  value={businessDescription}
+                  onChange={e => setBusinessDescription(e.target.value)}
+                  rows={4}
+                  placeholder="Describe what your company does in 1-2 sentences."
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Optional. Used as a ranking signal after NAICS, agency, and geography filters.
+                </p>
+              </div>
+            )}
+
             <div className="p-4 bg-gradient-to-r from-purple-600/10 to-blue-600/10 border border-purple-500/20 rounded-xl">
               <div className="flex items-start gap-3">
                 <div className="text-2xl">🎯</div>
                 <div className="flex-1">
                   <h3 className="text-white font-medium text-sm">Not sure which codes to pick?</h3>
                   <p className="text-xs text-gray-400 mt-1">
-                    Browse real opportunities and pick ones that fit. We'll auto-calibrate your profile.
+                    Browse real opportunities and pick ones that fit. We&apos;ll auto-calibrate your profile.
                   </p>
                   <button
                     type="button"
@@ -503,13 +548,13 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
                 className="mt-3 text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1"
               >
                 <span className="text-lg">✨</span>
-                <span>{showCodeAssistant ? 'Hide' : "Need help finding codes?"}</span>
+                <span>{showCodeAssistant ? 'Hide' : 'Need help finding codes?'}</span>
               </button>
 
               {showCodeAssistant && (
                 <div className="mt-3 p-4 bg-gray-800/70 border border-purple-500/20 rounded-lg">
                   <p className="text-sm text-gray-300 mb-3">
-                    Describe what your company does, and we'll suggest the best NAICS and PSC codes:
+                    Describe what your company does, and we&apos;ll suggest the best NAICS and PSC codes:
                   </p>
                   <textarea
                     value={businessDescription}
@@ -623,7 +668,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
                 Keywords <span className="text-gray-500 font-normal">(optional)</span>
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                Catch mislabeled opportunities. We'll search titles and descriptions for these terms.
+                Catch mislabeled opportunities. We&apos;ll search titles and descriptions for these terms.
               </p>
               <textarea
                 value={keywordsInput}

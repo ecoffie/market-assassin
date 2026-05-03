@@ -24,7 +24,9 @@ interface NotificationSettingsRow {
   keywords: string[] | null;
   agencies: string[] | null;
   location_states: string[] | null;
+  briefings_enabled?: boolean | null;
   business_type?: string | null;
+  business_description?: string | null;
   timezone?: string | null;
   sms_enabled?: boolean | null;
   phone_number?: string | null;
@@ -45,8 +47,9 @@ interface SmartProfileRow {
 
 interface BriefingEntitlementRow {
   email: string | null;
-  access_briefings: boolean | null;
-  briefings_expires_at?: string | null;
+  briefings_access?: string | null;
+  briefings_expiry?: string | null;
+  classification_version?: number | null;
 }
 
 export interface BriefingAudienceUser {
@@ -57,6 +60,7 @@ export interface BriefingAudienceUser {
   agencies: string[];
   location_states: string[];
   business_type?: string;
+  business_description?: string;
   timezone?: string;
   sms_enabled?: boolean;
   phone_number?: string;
@@ -180,8 +184,9 @@ async function fetchNotificationSettings(supabase: SupabaseClient): Promise<Noti
     // Users can still get PSC codes via NAICS crosswalk (see psc-crosswalk.ts)
     const { data, error } = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, keywords, agencies, location_states, business_type, timezone, sms_enabled, phone_number, aggregated_profile')
+      .select('user_email, naics_codes, keywords, agencies, location_states, business_type, timezone, sms_enabled, phone_number, aggregated_profile, briefings_enabled')
       .eq('is_active', true)
+      .eq('briefings_enabled', true)
       .order('user_email')
       .range(from, to);
 
@@ -191,8 +196,9 @@ async function fetchNotificationSettings(supabase: SupabaseClient): Promise<Noti
         console.warn('[rollout] Column missing in user_notification_settings, using minimal query');
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('user_notification_settings')
-          .select('user_email, naics_codes, business_type, timezone, sms_enabled, phone_number')
+          .select('user_email, naics_codes, business_type, timezone, sms_enabled, phone_number, briefings_enabled')
           .eq('is_active', true)
+          .eq('briefings_enabled', true)
           .order('user_email')
           .range(from, to);
         if (fallbackError) throw fallbackError;
@@ -228,9 +234,8 @@ async function fetchSmartProfiles(supabase: SupabaseClient): Promise<SmartProfil
 async function fetchBriefingEntitlements(supabase: SupabaseClient): Promise<Set<string>> {
   const rows = await fetchAllRows(async (from, to) => {
     const { data, error } = await supabase
-      .from('user_profiles')
-      .select('email, access_briefings, briefings_expires_at')
-      .eq('access_briefings', true)
+      .from('customer_classifications')
+      .select('email, briefings_access, briefings_expiry, classification_version')
       .order('email')
       .range(from, to);
 
@@ -246,11 +251,18 @@ async function fetchBriefingEntitlements(supabase: SupabaseClient): Promise<Set<
 
   const entitled = new Set<string>();
   const now = Date.now();
+  const latestVersion = rows.reduce(
+    (max, row) => Math.max(max, Number(row.classification_version || 0)),
+    0
+  );
+  const entitledAccess = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
 
   for (const row of rows) {
     const email = row.email?.toLowerCase().trim();
-    if (!email || !row.access_briefings) continue;
-    if (row.briefings_expires_at && new Date(row.briefings_expires_at).getTime() < now) {
+    if (!email) continue;
+    if (Number(row.classification_version || 0) !== latestVersion) continue;
+    if (!entitledAccess.has(row.briefings_access || '')) continue;
+    if (row.briefings_expiry && new Date(row.briefings_expiry).getTime() <= now) {
       continue;
     }
     entitled.add(email);
@@ -272,6 +284,7 @@ function buildCandidate(
     sms_enabled?: boolean;
     phone_number?: string;
     business_type?: string;
+    business_description?: string;
     source: AudienceSource;
   }
 ): BriefingAudienceUser {
@@ -290,6 +303,7 @@ function buildCandidate(
     agencies: mergedAgencies,
     location_states: mergedLocationStates,
     business_type: next.business_type || existing?.business_type,
+    business_description: next.business_description || existing?.business_description,
     timezone: next.timezone || existing?.timezone,
     sms_enabled: next.sms_enabled ?? existing?.sms_enabled,
     phone_number: next.phone_number ?? existing?.phone_number,
@@ -324,6 +338,7 @@ export async function fetchBriefingAudienceCandidates(
       agencies: Array.from(new Set([...normalizeArray(row.agencies), ...aggregatedAgencies])),
       location_states: normalizeArray(row.location_states),
       business_type: row.business_type || undefined,
+      business_description: row.business_description || undefined,
       timezone: row.timezone || undefined,
       sms_enabled: Boolean(row.sms_enabled),
       phone_number: row.phone_number || undefined,
@@ -353,9 +368,10 @@ export async function fetchBriefingAudienceCandidates(
   }
 
   return Array.from(usersByEmail.values())
+    .filter(user => entitledEmails.has(user.email))
     .map(user => ({
       ...user,
-      hasPaidBriefingAccess: entitledEmails.has(user.email),
+      hasPaidBriefingAccess: true,
     }))
     .sort((a, b) => a.email.localeCompare(b.email));
 }

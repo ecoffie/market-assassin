@@ -49,8 +49,16 @@ function getTransporter() {
 function getNextMondayDate(): string {
   const today = new Date();
   const dayOfWeek = today.getUTCDay(); // 0 = Sunday, 1 = Monday
-  const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  const daysToMonday = dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
   today.setUTCDate(today.getUTCDate() + daysToMonday);
+  return today.toISOString().split('T')[0];
+}
+
+function getNextSaturdayDate(): string {
+  const today = new Date();
+  const dayOfWeek = today.getUTCDay(); // 0 = Sunday, 6 = Saturday
+  const daysToSaturday = dayOfWeek === 6 ? 0 : (6 - dayOfWeek + 7) % 7;
+  today.setUTCDate(today.getUTCDate() + daysToSaturday);
   return today.toISOString().split('T')[0];
 }
 
@@ -399,8 +407,10 @@ const tests = [
       const today = new Date().toISOString().split('T')[0];
       const dayOfWeek = new Date().getUTCDay();
       const templateDate =
-        dayOfWeek === 0 || dayOfWeek === 1
+        dayOfWeek === 4 || dayOfWeek === 5
           ? getNextMondayDate()
+          : dayOfWeek === 6
+            ? getNextSaturdayDate()
           : today;
       const { data, error } = await getSupabase()
         .from('briefing_templates')

@@ -24,6 +24,7 @@ import { createSecureAccessUrl } from '@/lib/access-links';
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
+import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 
 // BATCH_SIZE: Process this many users per cron run
 // Apr 23, 2026: Reduced from 100 to 35 to prevent Vercel 60s timeout
@@ -80,6 +81,7 @@ interface AlertUser {
   naics_codes: string[];
   keywords: string[] | null;
   business_type: string | null;
+  business_description?: string | null;
   agencies: string[];  // renamed from target_agencies
   location_state: string | null;
   location_states: string[] | null; // Multi-state support
@@ -609,6 +611,7 @@ async function runDailyAlertJob(options?: {
             naics_codes: userNaics, // Original codes, not expanded
             agencies: user.agencies || [],
             keywords: userKeywords,
+            business_description: user.business_description || null,
           }),
         })).sort((a, b) => b.score - a.score);
 
@@ -634,6 +637,7 @@ async function runDailyAlertJob(options?: {
                 naics_codes: userNaics,
                 keywords: userKeywords,
                 agencies: user.agencies || [],
+                business_description: user.business_description || null,
               }),
             }))
             .filter(g => g.score >= 20) // Only include relevant grants
@@ -660,6 +664,7 @@ async function runDailyAlertJob(options?: {
                 naics_codes: userNaics,
                 agencies: user.agencies || [],
                 keywords: userKeywords,
+                business_description: user.business_description || null,
               }),
             }))
             .filter(opp => getDaysUntil(opp.responseDeadline) <= 14)
@@ -1070,6 +1075,17 @@ async function sendDailyAlertEmail(
   actionTips: string[] = [],
   noticeSummary?: SAMNoticeSummary
 ) {
+  const emailDate = new Date().toISOString().split('T')[0];
+  const tokenResult = await createEmailTrackingToken(email, 'daily_alert', emailDate);
+  const trackingToken = tokenResult?.token;
+  const trackedUrl = (url: string, label: string, content = label) => {
+    const urlWithUtm = appendEmailUtm(url, {
+      campaign: 'daily_alert',
+      content,
+    });
+    return trackingToken ? generateTrackedLink(trackingToken, urlWithUtm, label) : urlWithUtm;
+  };
+
   const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const dailyBriefingsUrl = 'https://shop.govcongiants.org/market-intelligence';
@@ -1109,7 +1125,7 @@ async function sendDailyAlertEmail(
             ${urgencyBadge}
             ${scoreBadge}
           </div>
-          <a href="${opp.uiLink}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+          <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `opportunity_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
             ${i + 1}. ${opp.title.slice(0, 90)}${opp.title.length > 90 ? '...' : ''}
           </a>
           <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
@@ -1220,7 +1236,7 @@ async function sendDailyAlertEmail(
                   ${fundingText ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${fundingText}</span>` : ''}
                   <span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${grant.score}%</span>
                 </div>
-                <a href="${grant.link}" style="color: #065f46; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+                <a href="${trackedUrl(grant.link, 'grants_gov_opportunity', `grant_${grant.oppNumber || i + 1}`)}" style="color: #065f46; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
                   ${i + 1}. ${grant.title.slice(0, 90)}${grant.title.length > 90 ? '...' : ''}
                 </a>
                 <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
@@ -1242,10 +1258,10 @@ async function sendDailyAlertEmail(
       Was this alert helpful?
     </p>
     <div style="display: inline-block;">
-      <a href="https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+      <a href="${trackedUrl(`https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
         👍 Yes
       </a>
-      <a href="https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+      <a href="${trackedUrl(`https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
         👎 No
       </a>
     </div>
@@ -1258,7 +1274,7 @@ async function sendDailyAlertEmail(
     <p style="color: #ddd6fe; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
       Alerts tell you what matched. <strong>Daily Briefings</strong> rank your top priorities, explain why they matter, and link you to the full opportunity dashboard.
     </p>
-    <a href="${dailyBriefingsUrl}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
+    <a href="${trackedUrl(dailyBriefingsUrl, 'upgrade_market_intelligence')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
       Upgrade to Daily Briefings →
     </a>
     <p style="color: #c4b5fd; font-size: 11px; margin: 10px 0 0 0;">
@@ -1269,14 +1285,15 @@ async function sendDailyAlertEmail(
   <!-- Footer -->
   <div style="background: #f1f5f9; padding: 18px 20px; border-radius: 0 0 12px 12px; text-align: center; margin-top: 1px;">
     <p style="color: #64748b; font-size: 12px; margin: 0;">
-      <a href="${preferencesUrl}" style="color: #475569; text-decoration: none;">Manage Preferences</a>
+      <a href="${trackedUrl(preferencesUrl, 'manage_preferences')}" style="color: #475569; text-decoration: none;">Manage Preferences</a>
       &nbsp;•&nbsp;
-      <a href="${unsubscribeUrl}" style="color: #475569; text-decoration: none;">Unsubscribe</a>
+      <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #475569; text-decoration: none;">Unsubscribe</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
       © ${new Date().getFullYear()} GovCon Giants • tools.govcongiants.org
     </p>
   </div>
+  ${trackingToken ? generateTrackingPixel(trackingToken) : ''}
 </body>
 </html>
 `;
@@ -1286,5 +1303,24 @@ async function sendDailyAlertEmail(
     to: email,
     subject: `🎯 ${totalCount} New Opportunities${grants.length > 0 ? ' + Grants' : ''} - ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
+    emailType: 'daily_alert',
+    eventSource: 'daily_alert',
+    tags: {
+      email_type: 'daily_alert',
+      alert_type: 'daily',
+      match_count: totalCount,
+      sam_match_count: opportunities.length,
+      grant_match_count: grants.length,
+      naics_primary: user.naics_codes?.[0] || 'none',
+      user_segment: user.business_type || 'uncertified',
+      state: user.location_state || 'none',
+    },
+    metadata: {
+      tracking_token: trackingToken || null,
+      naics_codes: user.naics_codes || [],
+      business_type: user.business_type || null,
+      location_state: user.location_state || null,
+      opportunity_ids: opportunities.slice(0, 20).map(opp => opp.noticeId).filter(Boolean),
+    },
   });
 }

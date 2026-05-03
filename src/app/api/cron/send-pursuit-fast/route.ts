@@ -4,7 +4,7 @@
  * ENTERPRISE ARCHITECTURE: Matches users to pre-computed pursuit templates.
  * Processing time per user: ~100ms (vs 52+ seconds with generation)
  *
- * Schedule: Monday 7 AM UTC (after precompute-pursuit-briefs completes)
+ * Schedule: Saturday 7 AM UTC (after precompute-pursuit-briefs completes)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -103,21 +103,22 @@ function buildPrefixMap(templates: Array<{ naics_profile: string; naics_profile_
   return prefixMap;
 }
 
-function getMondayDate(): string {
-  const today = new Date();
-  const day = today.getDay();
-  // If it's Monday, use today. Otherwise use next Monday
-  if (day === 1) {
-    return today.toISOString().split('T')[0];
-  }
-  const diff = day === 0 ? 1 : (8 - day);
-  today.setDate(today.getDate() + diff);
-  return today.toISOString().split('T')[0];
+function getPursuitDate(): string {
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // 0=Sunday, 6=Saturday
+  const daysToAdd = dayOfWeek === 6 ? 0 : (6 - dayOfWeek + 7) % 7;
+  now.setUTCDate(now.getUTCDate() + daysToAdd);
+  return now.toISOString().split('T')[0];
 }
 
 function escapeHtml(text: string): string {
   if (!text) return '';
   return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function displaySource(source: string | undefined): string {
+  if (!source) return 'SAM.gov';
+  return source.replace(/SAM\.gov Cache/gi, 'SAM.gov');
 }
 
 export async function GET(request: NextRequest) {
@@ -133,7 +134,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         message: 'Send Pursuit Brief (Fast) - Uses Pre-computed Templates',
         description: 'Matches users to templates, sends in ~100ms per user',
-        schedule: 'Monday 7 AM UTC',
+        schedule: 'Saturday 7 AM UTC',
         capacity: '500+ users per run',
       });
     }
@@ -151,31 +152,32 @@ function getSupabase() {
   return _supabase;
 }
 
-  // DAY-OF-WEEK GUARD: Pursuit Brief only sends on Monday (UTC)
+  // DAY-OF-WEEK GUARD: Pursuit Brief only sends on Saturday (UTC)
   // Can be bypassed with: ?password=xxx&skipDayCheck=true (admin override)
   const today = new Date();
-  const dayOfWeek = today.getUTCDay(); // 1 = Monday
+  const dayOfWeek = today.getUTCDay(); // 6 = Saturday
   const isTestMode = testEmail && isTest;
   const skipDayCheck = request.nextUrl.searchParams.get('skipDayCheck') === 'true';
+  const isCatchup = request.nextUrl.searchParams.get('catchup') === 'true' || request.nextUrl.searchParams.get('force') === 'true';
   const adminPassword = request.nextUrl.searchParams.get('password');
   const isAdminOverride = skipDayCheck && adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
 
-  if (dayOfWeek !== 1 && !isTestMode && !isAdminOverride) {
-    console.log(`[SendPursuitFast] Skipped - not Monday (day ${dayOfWeek})`);
+  if (dayOfWeek !== 6 && !isTestMode && !isAdminOverride && !isCatchup) {
+    console.log(`[SendPursuitFast] Skipped - not Saturday (day ${dayOfWeek})`);
     return NextResponse.json({
       success: true,
-      message: `Pursuit Brief only sends on Monday. Today is day ${dayOfWeek}.`,
+      message: `Pursuit Brief only sends on Saturday unless catchup=true or force=true. Today is day ${dayOfWeek}.`,
       skipped: true,
       dayOfWeek,
     });
   }
 
-  if (isAdminOverride) {
-    console.log(`[SendPursuitFast] Admin override - bypassing Monday check (day ${dayOfWeek})`);
+  if (isAdminOverride || isCatchup) {
+    console.log(`[SendPursuitFast] Bypassing Saturday check (day ${dayOfWeek}) via ${isAdminOverride ? 'admin override' : 'catchup'}`);
   }
 
   const startTime = Date.now();
-  const mondayDate = getMondayDate();
+  const pursuitDate = getPursuitDate();
   let briefingsSent = 0;
   let briefingsSkipped = 0;
   let briefingsFailed = 0;
@@ -190,7 +192,7 @@ function getSupabase() {
     const { data: templates, error: templatesError } = await getSupabase()
       .from('briefing_templates')
       .select('*')
-      .eq('template_date', mondayDate)
+      .eq('template_date', pursuitDate)
       .eq('briefing_type', 'pursuit');
 
     if (templatesError) {
@@ -201,7 +203,7 @@ function getSupabase() {
       return NextResponse.json({
         success: false,
         error: 'No pursuit templates found. Run precompute-pursuit-briefs first.',
-        mondayDate,
+        pursuitDate,
         elapsed: Date.now() - startTime,
       });
     }
@@ -231,12 +233,12 @@ function getSupabase() {
 
     // Check for already sent this week - use briefing_log with briefing_type='pursuit'
     // CRITICAL: Use unified briefing_log table (pursuit_brief_log does not exist)
-    // Note: mondayDate is already defined above at function start
+    // Note: pursuitDate is already defined above at function start
 
     const { data: sentThisWeek } = await getSupabase()
       .from('briefing_log')
       .select('user_email')
-      .eq('briefing_date', mondayDate)
+      .eq('briefing_date', pursuitDate)
       .eq('briefing_type', 'pursuit')
       .in('delivery_status', ['sent', 'skipped']);
 
@@ -274,7 +276,7 @@ function getSupabase() {
 
         if (!template) {
           noTemplateCount++;
-          await queueForRetry(getSupabase(), user.email, userNaics, 'No matching template (exact or prefix)', getMondayDate());
+          await queueForRetry(getSupabase(), user.email, userNaics, 'No matching template (exact or prefix)', pursuitDate);
           continue;
         }
 
@@ -303,7 +305,7 @@ function getSupabase() {
         // UNIFIED: Use same table as daily/weekly for consistency
         await getSupabase().from('briefing_log').upsert({
           user_email: user.email,
-          briefing_date: mondayDate,
+          briefing_date: pursuitDate,
           briefing_type: 'pursuit',
           briefing_content: brief,
           items_count: 1,
@@ -326,7 +328,7 @@ function getSupabase() {
 
         // Queue for automatic retry
         const userNaics = user.naics_codes || [];
-        await queueForRetry(getSupabase(), user.email, userNaics, errorMsg, getMondayDate());
+        await queueForRetry(getSupabase(), user.email, userNaics, errorMsg, pursuitDate);
       }
     }
 
@@ -467,7 +469,7 @@ function generatePursuitEmailHtml(brief: PursuitBrief): string {
         ${brief.relatedMarketSignals.map(signal => `
           <div class="signal-card">
             <h4 class="signal-headline">${escapeHtml(signal.headline)}</h4>
-            <div class="signal-meta">${escapeHtml(signal.source)}</div>
+            <div class="signal-meta">${escapeHtml(displaySource(signal.source))}</div>
             <p class="signal-text">${escapeHtml(signal.implication)}</p>
             ${signal.actionRequired ? '<span class="signal-required">ACTION REQUIRED</span>' : ''}
           </div>
@@ -565,7 +567,7 @@ ${'='.repeat(40)}
 RELATED MARKET SIGNALS
 ${'='.repeat(40)}
 ${brief.relatedMarketSignals.map(signal =>
-  `- ${signal.headline}\n  Source: ${signal.source}\n  ${signal.implication}${signal.actionRequired ? '\n  ACTION REQUIRED' : ''}`
+  `- ${signal.headline}\n  Source: ${displaySource(signal.source)}\n  ${signal.implication}${signal.actionRequired ? '\n  ACTION REQUIRED' : ''}`
 ).join('\n\n')}
 ` : ''}
 

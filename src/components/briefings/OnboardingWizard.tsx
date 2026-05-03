@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-// Industry presets from preferences page
+// Industry presets as fallback/quick-select options
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], description: 'Building, heavy civil, specialty trades', icon: '🏗️' },
   { label: 'IT Services', codes: ['541511', '541512', '541513', '541519'], description: 'Software, systems design, data processing', icon: '💻' },
@@ -45,37 +45,72 @@ const REGION_PRESETS = {
   'Northeast': ['NY', 'MA', 'CT', 'RI', 'NH', 'VT', 'ME'],
 };
 
+interface NaicsSuggestion {
+  code: string;
+  name: string;
+  confidence: number;
+  reason: string;
+}
+
 interface OnboardingWizardProps {
   email: string;
   onComplete: () => void;
+  initialBusinessDescription?: string;
+  skipDescriptionStep?: boolean;
 }
 
-export default function OnboardingWizard({ email, onComplete }: OnboardingWizardProps) {
-  const [step, setStep] = useState(1);
+export default function OnboardingWizard({
+  email,
+  onComplete,
+  initialBusinessDescription = '',
+  skipDescriptionStep = false,
+}: OnboardingWizardProps) {
+  const firstStep = skipDescriptionStep ? 2 : 1;
+  const [step, setStep] = useState(firstStep);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Form state
+  // Step 1: Business Description (Primary Path)
+  const [businessDescription, setBusinessDescription] = useState(initialBusinessDescription);
+  const [suggestingCodes, setSuggestingCodes] = useState(false);
+  const [suggestions, setSuggestions] = useState<NaicsSuggestion[]>([]);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
+  const [showManualEntry, setShowManualEntry] = useState(false);
+
+  // Manual/fallback NAICS entry
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [customNaics, setCustomNaics] = useState('');
+
+  // Step 2: Agencies
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
   const [customAgencies, setCustomAgencies] = useState('');
+
+  // Step 3: Geography
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
+
+  // Step 4: Delivery
   const [frequency, setFrequency] = useState<'daily' | 'weekly'>('daily');
 
   const totalSteps = 4;
 
-  // Get all NAICS codes from selected industries + custom
+  // Get NAICS codes from AI suggestions + manual selections
   const getAllNaicsCodes = (): string[] => {
+    // From AI suggestions
+    const fromSuggestions = Array.from(selectedSuggestions);
+
+    // From industry presets
     const fromIndustries = selectedIndustries.flatMap(industry => {
       const preset = INDUSTRY_PRESETS.find(p => p.label === industry);
       return preset?.codes || [];
     });
+
+    // From manual entry
     const custom = customNaics
       .split(/[,\s]+/)
       .map(c => c.trim())
       .filter(c => /^\d+$/.test(c));
-    return [...new Set([...fromIndustries, ...custom])];
+
+    return [...new Set([...fromSuggestions, ...fromIndustries, ...custom])];
   };
 
   // Get all agencies from selected + custom
@@ -85,6 +120,61 @@ export default function OnboardingWizard({ email, onComplete }: OnboardingWizard
       .map(a => a.trim())
       .filter(a => a.length > 0);
     return [...new Set([...selectedAgencies, ...custom])];
+  };
+
+  // Call AI to suggest NAICS codes from business description
+  const suggestCodes = async () => {
+    if (!businessDescription.trim() || businessDescription.trim().length < 20) {
+      setError('Please describe your business in at least a few sentences');
+      return;
+    }
+
+    setSuggestingCodes(true);
+    setError('');
+    setSuggestions([]);
+
+    try {
+      const res = await fetch('/api/suggest-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: businessDescription,
+          maxResults: 8,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.naicsSuggestions || data.naicsSuggestions.length === 0) {
+        setError('Could not generate suggestions. Please try describing your business differently, or use manual entry below.');
+        return;
+      }
+
+      setSuggestions(data.naicsSuggestions);
+      // Auto-select all high-confidence suggestions (>70%)
+      const autoSelected = new Set<string>(
+        data.naicsSuggestions
+          .filter((s: NaicsSuggestion) => s.confidence >= 70)
+          .map((s: NaicsSuggestion) => s.code)
+      );
+      setSelectedSuggestions(autoSelected);
+    } catch {
+      setError('Failed to generate suggestions. Please try again or use manual entry.');
+    } finally {
+      setSuggestingCodes(false);
+    }
+  };
+
+  const toggleSuggestion = (code: string) => {
+    setSelectedSuggestions(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return next;
+    });
   };
 
   const saveStepToAPI = async (stepData: Record<string, unknown>) => {
@@ -112,33 +202,57 @@ export default function OnboardingWizard({ email, onComplete }: OnboardingWizard
     }
   };
 
+  // Also save business description to user_business_profiles
+  const saveBusinessProfile = async () => {
+    if (!businessDescription.trim()) return;
+
+    try {
+      await fetch('/api/sample-opportunities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_profile',
+          email,
+          businessDescription: businessDescription.trim(),
+          extractedNaicsCodes: getAllNaicsCodes(),
+        }),
+      });
+    } catch {
+      // Non-blocking - just log
+      console.error('Failed to save business profile');
+    }
+  };
+
   const handleNext = async () => {
     if (step === 1) {
-      // Validate: at least one industry or NAICS code
-      if (getAllNaicsCodes().length === 0) {
-        setError('Please select at least one industry or enter NAICS codes');
+      // Validate: at least one NAICS code (from suggestions or manual)
+      const codes = getAllNaicsCodes();
+      if (codes.length === 0) {
+        setError('Please select at least one NAICS code');
         return;
       }
+
+      // Save business description to profile
+      await saveBusinessProfile();
+
       const success = await saveStepToAPI({
-        naicsCodes: getAllNaicsCodes(),
+        naicsCodes: codes,
         primaryIndustry: selectedIndustries[0] || null,
+        businessDescription: businessDescription.trim() || null,
       });
       if (success) setStep(2);
     } else if (step === 2) {
-      // Agencies are optional but recommended
       const success = await saveStepToAPI({
         targetAgencies: getAllAgencies(),
       });
       if (success) setStep(3);
     } else if (step === 3) {
-      // Geography is optional (nationwide if empty)
       const success = await saveStepToAPI({
         locationStates: selectedStates,
         locationState: selectedStates[0] || null,
       });
       if (success) setStep(4);
     } else if (step === 4) {
-      // Final step - save frequency and complete
       const success = await saveStepToAPI({
         frequency,
         alertsEnabled: true,
@@ -150,7 +264,7 @@ export default function OnboardingWizard({ email, onComplete }: OnboardingWizard
   };
 
   const handleBack = () => {
-    if (step > 1) setStep(step - 1);
+    if (step > firstStep) setStep(step - 1);
   };
 
   const toggleIndustry = (industry: string) => {
@@ -197,7 +311,7 @@ export default function OnboardingWizard({ email, onComplete }: OnboardingWizard
             </div>
           </div>
           <p className="text-gray-400 max-w-md mx-auto">
-            Configure your profile so we can deliver personalized GovCon intelligence.
+            Tell us about your business so we can deliver personalized GovCon intelligence.
           </p>
         </div>
 
@@ -226,7 +340,7 @@ export default function OnboardingWizard({ email, onComplete }: OnboardingWizard
             />
           </div>
           <div className="flex justify-between mt-2 text-xs text-gray-500">
-            <span>Industries</span>
+            <span>Your Business</span>
             <span>Agencies</span>
             <span>Geography</span>
             <span>Delivery</span>
@@ -241,51 +355,170 @@ export default function OnboardingWizard({ email, onComplete }: OnboardingWizard
             </div>
           )}
 
-          {/* Step 1: Industries/NAICS */}
+          {/* Step 1: Business Description (Primary Path) */}
           {step === 1 && (
             <div>
-              <h2 className="text-xl font-semibold text-white mb-2">What industries do you serve?</h2>
+              <h2 className="text-xl font-semibold text-white mb-2">Tell us about your business</h2>
               <p className="text-gray-400 text-sm mb-6">
-                Select your primary industries. This determines which opportunities appear in your briefings.
+                Describe what your company does in plain language. We&apos;ll suggest the right NAICS codes.
               </p>
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                {INDUSTRY_PRESETS.map(preset => (
+              {/* Primary: Business description textarea */}
+              {!suggestions.length && (
+                <div className="mb-6">
+                  <textarea
+                    value={businessDescription}
+                    onChange={e => setBusinessDescription(e.target.value)}
+                    placeholder="Example: We provide cybersecurity consulting services for federal agencies. We specialize in cloud security assessments, vulnerability testing, and compliance audits for FedRAMP and FISMA requirements..."
+                    rows={5}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none text-sm resize-none"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Be specific about your services, capabilities, and target markets.
+                  </p>
+
                   <button
-                    key={preset.label}
                     type="button"
-                    onClick={() => toggleIndustry(preset.label)}
-                    className={`text-left p-4 rounded-xl border transition-all ${
-                      selectedIndustries.includes(preset.label)
-                        ? 'bg-purple-600/20 border-purple-500/50 ring-2 ring-purple-500/30'
-                        : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
-                    }`}
+                    onClick={suggestCodes}
+                    disabled={suggestingCodes || !businessDescription.trim()}
+                    className="w-full mt-4 py-3 px-6 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{preset.icon}</span>
-                      <span className="font-medium text-white text-sm">{preset.label}</span>
-                    </div>
-                    <p className="text-xs text-gray-500">{preset.description}</p>
+                    {suggestingCodes ? (
+                      <>
+                        <span className="animate-spin">⏳</span> Analyzing your business...
+                      </>
+                    ) : (
+                      <>
+                        <span>✨</span> Suggest NAICS Codes
+                      </>
+                    )}
                   </button>
-                ))}
+                </div>
+              )}
+
+              {/* Show AI suggestions */}
+              {suggestions.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-purple-400">Suggested NAICS codes:</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSuggestions([]);
+                        setSelectedSuggestions(new Set());
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-400"
+                    >
+                      ← Describe again
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {suggestions.map(suggestion => (
+                      <button
+                        key={suggestion.code}
+                        type="button"
+                        onClick={() => toggleSuggestion(suggestion.code)}
+                        className={`w-full text-left p-3 rounded-xl border transition-all ${
+                          selectedSuggestions.has(suggestion.code)
+                            ? 'bg-purple-600/20 border-purple-500/50 ring-2 ring-purple-500/30'
+                            : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${
+                            selectedSuggestions.has(suggestion.code) ? 'border-purple-500 bg-purple-500' : 'border-gray-600'
+                          }`}>
+                            {selectedSuggestions.has(suggestion.code) && (
+                              <span className="text-white text-xs">✓</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-purple-400 text-sm">{suggestion.code}</span>
+                              <span className="text-white text-sm font-medium truncate">{suggestion.name}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                suggestion.confidence >= 80 ? 'bg-green-500/20 text-green-400' :
+                                suggestion.confidence >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
+                                'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {suggestion.confidence}%
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{suggestion.reason}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedSuggestions.size > 0 && (
+                    <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                      <p className="text-xs text-purple-400 font-medium">
+                        {selectedSuggestions.size} code{selectedSuggestions.size !== 1 ? 's' : ''} selected
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Divider with manual entry toggle */}
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-800"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowManualEntry(!showManualEntry)}
+                    className="px-4 py-1.5 bg-gray-900 text-xs text-gray-500 hover:text-gray-400 transition-colors"
+                  >
+                    {showManualEntry ? '▼ Hide manual entry' : '▶ I already know my NAICS codes'}
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Additional NAICS codes (optional)
-                </label>
-                <input
-                  type="text"
-                  value={customNaics}
-                  onChange={e => setCustomNaics(e.target.value)}
-                  placeholder="541512, 236220"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none font-mono text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Use short codes like &quot;236&quot; to match all codes starting with 236.
-                </p>
-              </div>
+              {/* Manual entry (collapsed by default) */}
+              {showManualEntry && (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-500">Quick-select common industries or enter codes directly:</p>
 
+                  <div className="grid grid-cols-2 gap-2">
+                    {INDUSTRY_PRESETS.map(preset => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => toggleIndustry(preset.label)}
+                        className={`text-left p-3 rounded-xl border transition-all ${
+                          selectedIndustries.includes(preset.label)
+                            ? 'bg-purple-600/20 border-purple-500/50'
+                            : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{preset.icon}</span>
+                          <span className="font-medium text-white text-xs">{preset.label}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Custom NAICS codes
+                    </label>
+                    <input
+                      type="text"
+                      value={customNaics}
+                      onChange={e => setCustomNaics(e.target.value)}
+                      placeholder="541512, 236220"
+                      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none font-mono text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Show combined selection */}
               {getAllNaicsCodes().length > 0 && (
                 <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
                   <p className="text-xs text-purple-400 font-medium mb-1">Selected NAICS codes:</p>
@@ -493,7 +726,7 @@ export default function OnboardingWizard({ email, onComplete }: OnboardingWizard
             <button
               type="button"
               onClick={handleBack}
-              disabled={step === 1}
+              disabled={step === firstStep}
               className="px-6 py-2.5 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               Back
@@ -501,7 +734,7 @@ export default function OnboardingWizard({ email, onComplete }: OnboardingWizard
             <button
               type="button"
               onClick={handleNext}
-              disabled={saving}
+              disabled={saving || (step === 1 && getAllNaicsCodes().length === 0)}
               className="px-8 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
             >
               {saving ? 'Saving...' : step === totalSteps ? 'Complete Setup' : 'Continue'}

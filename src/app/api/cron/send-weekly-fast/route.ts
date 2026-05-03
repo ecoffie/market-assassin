@@ -4,7 +4,7 @@
  * ENTERPRISE ARCHITECTURE: Matches users to pre-computed weekly templates.
  * Processing time per user: ~100ms (vs 52+ seconds with generation)
  *
- * Schedule: Sunday 7 AM UTC (after precompute-weekly-briefings completes)
+ * Schedule: Friday 7 AM UTC (after precompute-weekly-briefings completes)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -181,24 +181,8 @@ function findBestTemplateMatch(
 
 function getWeekOfDate(): string {
   const now = new Date();
-  const dayOfWeek = now.getUTCDay(); // 0=Sunday, 6=Saturday
-
-  // Calculate Monday of the target week
-  // If running Saturday (6), we need NEXT Monday (tomorrow is Sunday, +2 to Monday)
-  // If running Sunday (0), we need TODAY's Monday (+1)
-  // If running any other day, use current week's Monday
-  let daysToAdd: number;
-  if (dayOfWeek === 6) {
-    // Saturday: next Monday is in 2 days
-    daysToAdd = 2;
-  } else if (dayOfWeek === 0) {
-    // Sunday: today's Monday is tomorrow
-    daysToAdd = 1;
-  } else {
-    // Weekday: current week's Monday
-    daysToAdd = 1 - dayOfWeek;
-  }
-
+  const dayOfWeek = now.getUTCDay(); // 0=Sunday, 1=Monday, etc.
+  const daysToAdd = dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
   const monday = new Date(now);
   monday.setUTCDate(monday.getUTCDate() + daysToAdd);
   return monday.toISOString().split('T')[0];
@@ -215,6 +199,11 @@ function escapeHtml(text: string): string {
   return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function displaySource(source: string | undefined): string {
+  if (!source) return 'SAM.gov';
+  return source.replace(/SAM\.gov Cache/gi, 'SAM.gov');
+}
+
 export async function GET(request: NextRequest) {
   const testEmail = request.nextUrl.searchParams.get('email');
   const isTest = request.nextUrl.searchParams.get('test') === 'true';
@@ -228,7 +217,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         message: 'Send Weekly Deep Dive (Fast) - Uses Pre-computed Templates',
         description: 'Matches users to templates, sends in ~100ms per user',
-        schedule: 'Sunday 7 AM UTC',
+        schedule: 'Friday 7 AM UTC',
         capacity: '500+ users per run',
       });
     }
@@ -246,27 +235,28 @@ function getSupabase() {
   return _supabase;
 }
 
-  // DAY-OF-WEEK GUARD: Weekly Deep Dive only sends on Sunday (UTC)
+  // DAY-OF-WEEK GUARD: Weekly Deep Dive only sends on Friday (UTC)
   // Can be bypassed with: ?password=xxx&skipDayCheck=true (admin override)
   const today = new Date();
-  const dayOfWeek = today.getUTCDay(); // 0 = Sunday
+  const dayOfWeek = today.getUTCDay(); // 5 = Friday
   const isTestMode = testEmail && isTest;
   const skipDayCheck = request.nextUrl.searchParams.get('skipDayCheck') === 'true';
+  const isCatchup = request.nextUrl.searchParams.get('catchup') === 'true' || request.nextUrl.searchParams.get('force') === 'true';
   const adminPassword = request.nextUrl.searchParams.get('password');
   const isAdminOverride = skipDayCheck && adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
 
-  if (dayOfWeek !== 0 && !isTestMode && !isAdminOverride) {
-    console.log(`[SendWeeklyFast] Skipped - not Sunday (day ${dayOfWeek})`);
+  if (dayOfWeek !== 5 && !isTestMode && !isAdminOverride && !isCatchup) {
+    console.log(`[SendWeeklyFast] Skipped - not Friday (day ${dayOfWeek})`);
     return NextResponse.json({
       success: true,
-      message: `Weekly Deep Dive only sends on Sunday. Today is day ${dayOfWeek}.`,
+      message: `Weekly Deep Dive only sends on Friday unless catchup=true or force=true. Today is day ${dayOfWeek}.`,
       skipped: true,
       dayOfWeek,
     });
   }
 
-  if (isAdminOverride) {
-    console.log(`[SendWeeklyFast] Admin override - bypassing Sunday check (day ${dayOfWeek})`);
+  if (isAdminOverride || isCatchup) {
+    console.log(`[SendWeeklyFast] Bypassing Friday check (day ${dayOfWeek}) via ${isAdminOverride ? 'admin override' : 'catchup'}`);
   }
 
   const startTime = Date.now();
@@ -293,9 +283,18 @@ function getSupabase() {
     }
 
     if (!templates || templates.length === 0) {
+      await logToolError({
+        tool: ToolNames.BRIEFINGS,
+        errorType: ErrorTypes.VALIDATION,
+        errorMessage: `No weekly templates found for ${weekOf}. Run precompute-weekly-briefings first.`,
+        requestPath: '/api/cron/send-weekly-fast',
+        requestParams: { weekOf, briefingType: 'weekly', catchup: isCatchup },
+      }).catch(() => {});
+
       return NextResponse.json({
         success: false,
         error: 'No weekly templates found. Run precompute-weekly-briefings first.',
+        weekOf,
         elapsed: Date.now() - startTime,
       });
     }
@@ -585,7 +584,7 @@ function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
         ${briefing.marketSignals.map(signal => `
           <div class="signal-item">
             <h3 class="signal-headline">${escapeHtml(signal.headline)}</h3>
-            <div class="signal-meta">${escapeHtml(signal.source)}</div>
+            <div class="signal-meta">${escapeHtml(displaySource(signal.source))}</div>
             <p class="signal-implication">${escapeHtml(signal.implication)}</p>
             ${signal.actionRequired ? '<span class="signal-required">ACTION REQUIRED</span>' : ''}
           </div>
@@ -634,7 +633,7 @@ function generateWeeklyEmailText(briefing: WeeklyBriefing): string {
     text += `MARKET SIGNALS\n${'-'.repeat(20)}\n`;
     for (const signal of briefing.marketSignals) {
       text += `- ${signal.headline}\n`;
-      text += `  Source: ${signal.source}\n`;
+      text += `  Source: ${displaySource(signal.source)}\n`;
       text += `  ${signal.implication}\n`;
       if (signal.actionRequired) {
         text += `  ACTION REQUIRED\n`;

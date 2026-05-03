@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Schedule constants: daily = every day, weekly = Sunday (0), pursuit = Monday (1)
+// Schedule constants: daily = every day, weekly = Friday (5), pursuit = Saturday (6)
 
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
@@ -66,13 +66,13 @@ export async function GET(request: NextRequest) {
 
   // Analyze for anomalies
   const anomalies: string[] = [];
-  if (weeklyCount > 0 && dayOfWeek !== 0) {
-    anomalies.push(`⚠️ ${weeklyCount} Weekly Deep Dive emails sent on ${dayName} (should be Sunday only)`);
+  if (weeklyCount > 0 && dayOfWeek !== 5) {
+    anomalies.push(`⚠️ ${weeklyCount} Weekly Deep Dive emails sent on ${dayName} (should be Friday only)`);
   }
 
   // Check if pursuit briefs sent on wrong day
-  if (pursuitCount > 0 && dayOfWeek !== 1) {
-    anomalies.push(`⚠️ ${pursuitCount} Pursuit Briefs sent on ${dayName} (should be Monday only)`);
+  if (pursuitCount > 0 && dayOfWeek !== 6) {
+    anomalies.push(`⚠️ ${pursuitCount} Pursuit Briefs sent on ${dayName} (should be Saturday only)`);
   }
 
   // Summary counts - use briefing_type as primary discriminator
@@ -88,8 +88,8 @@ export async function GET(request: NextRequest) {
     },
     expectedToday: {
       daily: true,
-      weekly: dayOfWeek === 0,
-      pursuit: dayOfWeek === 1,
+      weekly: dayOfWeek === 5,
+      pursuit: dayOfWeek === 6,
     },
     anomalies,
     health: anomalies.length === 0 ? '✅ HEALTHY' : '⚠️ CHECK ANOMALIES',

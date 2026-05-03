@@ -1,13 +1,65 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
+
+// Feedback reasons with labels
+const FEEDBACK_REASONS = [
+  { value: 'wrong_industry', label: 'Wrong industry/NAICS codes', icon: '🏭' },
+  { value: 'wrong_location', label: 'Wrong state/region', icon: '📍' },
+  { value: 'too_broad', label: 'Too many irrelevant opportunities', icon: '📊' },
+  { value: 'too_narrow', label: 'Not enough opportunities', icon: '🔍' },
+  { value: 'irrelevant_agencies', label: 'Wrong agencies', icon: '🏛️' },
+  { value: 'already_saw', label: 'Already saw these elsewhere', icon: '👀' },
+  { value: 'other', label: 'Other reason', icon: '💬' },
+];
 
 function ThanksContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const rating = searchParams.get('rating');
+  const email = searchParams.get('email');
+  const date = searchParams.get('date');
+  const type = searchParams.get('type') || 'daily';
   const isHelpful = rating === 'helpful';
+
+  // State for reason selection
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [otherComment, setOtherComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [reasonSubmitted, setReasonSubmitted] = useState(false);
+
+  // Check if we need to collect a reason (not_helpful without a reason already set)
+  const needsReason = !isHelpful && email && date && !reasonSubmitted;
+
+  const handleSubmitReason = async () => {
+    if (!selectedReason || !email || !date) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch('/api/briefings/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          date,
+          type,
+          rating: 'not_helpful',
+          reason: selectedReason,
+          comment: selectedReason === 'other' ? otherComment : null,
+        }),
+      });
+
+      if (response.ok) {
+        setReasonSubmitted(true);
+      }
+    } catch (error) {
+      console.error('Failed to submit reason:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
@@ -16,16 +68,65 @@ function ThanksContent() {
           <span className="text-3xl">{isHelpful ? '👍' : '👎'}</span>
         </div>
         <h1 className="text-2xl font-bold text-white mb-3">
-          Thanks for your feedback!
+          {reasonSubmitted ? 'Got it!' : 'Thanks for your feedback!'}
         </h1>
         <p className="text-gray-400 mb-6">
           {isHelpful
             ? "We're glad the briefing was helpful. We'll keep delivering quality intel."
-            : "We appreciate your honesty. Let's make your briefings more relevant."}
+            : reasonSubmitted
+              ? "We'll use this to improve your future briefings."
+              : "Help us understand what went wrong so we can fix it."}
         </p>
 
-        {/* Profile Refinement CTA for Not Helpful */}
-        {!isHelpful && (
+        {/* Reason Selection for Not Helpful */}
+        {needsReason && (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6 text-left">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <span className="text-xl">❓</span> What was the main issue?
+            </h3>
+            <div className="space-y-2 mb-4">
+              {FEEDBACK_REASONS.map((reason) => (
+                <button
+                  key={reason.value}
+                  onClick={() => setSelectedReason(reason.value)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
+                    selectedReason === reason.value
+                      ? 'border-purple-500 bg-purple-500/10 text-white'
+                      : 'border-gray-700 bg-gray-800/50 text-gray-300 hover:border-gray-600'
+                  }`}
+                >
+                  <span className="text-lg">{reason.icon}</span>
+                  <span className="text-sm">{reason.label}</span>
+                  {selectedReason === reason.value && (
+                    <span className="ml-auto text-purple-400">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Other comment field */}
+            {selectedReason === 'other' && (
+              <textarea
+                value={otherComment}
+                onChange={(e) => setOtherComment(e.target.value)}
+                placeholder="Tell us what we could improve..."
+                className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 text-sm focus:border-purple-500 focus:outline-none resize-none"
+                rows={3}
+              />
+            )}
+
+            <button
+              onClick={handleSubmitReason}
+              disabled={!selectedReason || submitting}
+              className="w-full py-3 px-6 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all"
+            >
+              {submitting ? 'Saving...' : 'Submit Feedback'}
+            </button>
+          </div>
+        )}
+
+        {/* Profile Refinement CTA - show after reason is submitted or for general not_helpful */}
+        {!isHelpful && (reasonSubmitted || !needsReason) && (
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6 text-left">
             <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
               <span className="text-xl">🎯</span> Refine Your Profile
@@ -40,7 +141,7 @@ function ThanksContent() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-purple-400 mt-0.5">2.</span>
-                <span><strong className="text-white">Keywords</strong> - Add specific terms like "cybersecurity" or "cloud"</span>
+                <span><strong className="text-white">Keywords</strong> - Add specific terms like &quot;cybersecurity&quot; or &quot;cloud&quot;</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-purple-400 mt-0.5">3.</span>
@@ -67,14 +168,14 @@ function ThanksContent() {
           >
             View Your Briefings
           </Link>
-        ) : (
+        ) : (reasonSubmitted || !needsReason) ? (
           <Link
             href="/briefings"
             className="inline-block py-2 px-4 text-gray-400 hover:text-white text-sm transition-colors"
           >
             Skip for now
           </Link>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ interface PreferencesResponse {
   error?: string;
   data?: {
     email: string;
+    businessDescription?: string | null;
     naicsCodes?: string[];
     businessType?: string | null;
     targetAgencies?: string[];
@@ -53,6 +54,8 @@ function AlertPreferencesContent() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [emailInput, setEmailInput] = useState('');
+  const [businessDescription, setBusinessDescription] = useState('');
+  const [showDescriptionPrompt, setShowDescriptionPrompt] = useState(false);
   const [naicsInput, setNaicsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [agenciesInput, setAgenciesInput] = useState('');
@@ -87,6 +90,9 @@ function AlertPreferencesContent() {
       localStorage.setItem('preferences_access_email', normalizedEmail);
 
       if (data.data) {
+        const description = data.data.businessDescription || '';
+        setBusinessDescription(description);
+        setShowDescriptionPrompt(!description);
         setNaicsInput((data.data.naicsCodes || []).join(', '));
         setBusinessType(data.data.businessType || '');
         setAgenciesInput((data.data.targetAgencies || []).join(', '));
@@ -140,6 +146,7 @@ function AlertPreferencesContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
+          businessDescription: businessDescription.trim() || null,
           naicsCodes,
           businessType: businessType || null,
           targetAgencies: parseList(agenciesInput),
@@ -232,7 +239,46 @@ function AlertPreferencesContent() {
                 </div>
               ) : null}
 
+              {!businessDescription.trim() ? (
+                <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="font-semibold text-emerald-100">Improve your matches</h2>
+                      <p className="mt-1 text-sm text-emerald-200/80">
+                        Add a short business description so we can rank alerts more accurately.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowDescriptionPrompt(true)}
+                      className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+                    >
+                      Add description
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="space-y-6">
+                {(showDescriptionPrompt || businessDescription.trim()) && (
+                  <div>
+                    <label htmlFor="businessDescription" className="mb-2 block text-sm font-medium text-slate-300">
+                      Business Description
+                    </label>
+                    <textarea
+                      id="businessDescription"
+                      value={businessDescription}
+                      onChange={event => setBusinessDescription(event.target.value)}
+                      rows={4}
+                      placeholder="Describe what your company does in 1-2 sentences."
+                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                    />
+                    <p className="mt-2 text-xs text-slate-500">
+                      Optional. Used as a ranking signal after NAICS, agency, and geography filters.
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <label htmlFor="naics" className="mb-2 block text-sm font-medium text-slate-300">
                     NAICS Codes

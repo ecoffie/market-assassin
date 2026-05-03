@@ -243,7 +243,34 @@ export function generateTrackingPixel(token: string): string {
 export function generateTrackedLink(token: string, url: string, linkText?: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://tools.govcongiants.org';
   const encodedUrl = encodeURIComponent(url);
-  return `${baseUrl}/api/track?t=${token}&a=click&url=${encodedUrl}`;
+  const label = linkText ? `&l=${encodeURIComponent(linkText)}` : '';
+  return `${baseUrl}/api/track?t=${token}&a=click&url=${encodedUrl}${label}`;
+}
+
+export function appendEmailUtm(
+  url: string,
+  {
+    campaign,
+    content,
+    source = 'resend',
+    medium = 'email',
+  }: {
+    campaign: string;
+    content: string;
+    source?: string;
+    medium?: string;
+  }
+): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set('utm_source', source);
+    parsed.searchParams.set('utm_medium', medium);
+    parsed.searchParams.set('utm_campaign', campaign);
+    parsed.searchParams.set('utm_content', content);
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }
 
 // ============================================================

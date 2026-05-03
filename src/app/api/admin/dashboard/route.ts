@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { kv } from '@vercel/kv';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -34,6 +35,7 @@ const PRO_TIER_PRODUCTS = [
   'starter-govcon-bundle',
   'pro-giant-bundle',
 ];
+const PROFILE_REMINDER_LAST_RUN_KEY = 'admin:profile-reminder:last-run';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -50,7 +52,7 @@ function getSupabase() {
 const SUPABASE_PAGE_SIZE = 1000;
 
 async function fetchAllRows<T>(
-  buildQuery: (from: number, to: number) => any
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>
 ): Promise<T[]> {
   const rows: T[] = [];
   let from = 0;
@@ -99,21 +101,31 @@ export async function GET(request: NextRequest) {
   const [
     emailStats,
     userHealth,
+    weeklyAlertHealth,
+    betaHealth,
+    providerEmailHealth,
+    matchingQuality,
     alertTrend,
     briefingTrend,
     deadLetterStats,
     forecastStats,
     revenueMetrics,
-    alerts
+    alerts,
+    profileReminderLastRun
   ] = await Promise.all([
     getEmailStats(reportDate),
     getUserHealth(),
+    getWeeklyAlertHealth(),
+    getBetaHealth(),
+    getProviderEmailHealth(),
+    getMatchingQuality(),
     getAlertTrend(sevenDaysAgo),
     getBriefingTrend(sevenDaysAgo),
     getDeadLetterStats(),
     getForecastStats(),
     getRevenueMetrics(),
-    getSystemAlerts(reportDate)
+    getSystemAlerts(reportDate),
+    kv.get(PROFILE_REMINDER_LAST_RUN_KEY)
   ]);
 
   return NextResponse.json({
@@ -125,6 +137,18 @@ export async function GET(request: NextRequest) {
 
     // Section 2: User Health
     userHealth,
+
+    // Section 2b: Free weekly alert cron health
+    weeklyAlerts: weeklyAlertHealth,
+
+    // Section 2c: Beta monetization / engagement health
+    betaHealth,
+
+    // Section 2d: Resend/provider delivery health
+    providerEmailHealth,
+
+    // Section 2e: Matching quality
+    matchingQuality,
 
     // Section 3: 7-Day Trends (both alerts AND briefings)
     trends: {
@@ -142,7 +166,10 @@ export async function GET(request: NextRequest) {
     revenue: revenueMetrics,
 
     // Section 7: System Alerts & Warnings
-    systemAlerts: alerts
+    systemAlerts: alerts,
+
+    // Section 8: Action agent state
+    profileReminderLastRun
   });
 }
 
@@ -287,35 +314,104 @@ async function getUserHealth() {
     weeklyFrequencyConfigured: 0,
     postBetaPaidDailyEligible: 0,
     postBetaFreeWeeklyFallback: 0,
+    briefingsProfileIncomplete: 0,
+    briefingsProfileIncompleteEmails: [] as string[],
     briefingsEnabled: 0,
+    briefingsEntitled: 0,
+    briefingsCronEligible: 0,
+    briefingsExpired: 0,
+    internalExcluded: 0,
     unconfiguredEmails: [] as string[]
   };
 
   try {
     const supabase = getSupabase();
-    const [settingsResult, profilesResult, proBuyerEmails] = await Promise.all([
-      supabase
-        .from('user_notification_settings')
-        .select('user_email, naics_codes, business_type, alerts_enabled, alert_frequency, briefings_enabled, is_active'),
-      supabase
-        .from('user_profiles')
-        .select('email, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_briefings'),
+    const [settingsData, profilesData, classificationRows, proBuyerEmails] = await Promise.all([
+      fetchAllRows<{
+        user_email: string;
+        naics_codes: string[] | null;
+        business_type: string | null;
+        alerts_enabled: boolean | null;
+        alert_frequency: string | null;
+        keywords?: string[] | null;
+        agencies?: string[] | null;
+        briefings_enabled: boolean | null;
+        is_active: boolean | null;
+      }>((from, to) =>
+        supabase
+          .from('user_notification_settings')
+          .select('user_email, naics_codes, business_type, keywords, agencies, alerts_enabled, alert_frequency, briefings_enabled, is_active')
+          .range(from, to)
+      ),
+      fetchAllRows<Record<string, unknown> & { email: string }>((from, to) =>
+        supabase
+          .from('user_profiles')
+          .select('email, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_briefings')
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        email: string;
+        briefings_access?: string | null;
+        briefings_expiry?: string | null;
+        classification_version?: number | null;
+      }>((from, to) =>
+        supabase
+          .from('customer_classifications')
+          .select('email, briefings_access, briefings_expiry, classification_version')
+          .range(from, to)
+      ),
       fetchWeeklyAlertBuyerEmails(),
     ]);
 
-    const { data } = settingsResult;
+    const latestClassificationVersion = classificationRows.reduce(
+      (max: number, row: { classification_version?: number | null }) =>
+        Math.max(max, Number(row.classification_version || 0)),
+      0
+    );
+    const entitledAccess = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
+    const now = Date.now();
+    const classificationsByEmail = new Map(
+      classificationRows
+        .filter((row: { classification_version?: number | null }) =>
+          Number(row.classification_version || 0) === latestClassificationVersion
+        )
+        .map((row: { email: string }) => [row.email.toLowerCase(), row])
+    );
+    const entitledEmails = new Set<string>();
+    const currentEntitledEmails = new Set<string>();
+    for (const row of classificationsByEmail.values() as Iterable<{
+      email: string;
+      briefings_access?: string | null;
+      briefings_expiry?: string | null;
+    }>) {
+      const email = row.email.toLowerCase();
+      if (row.briefings_access === 'excluded') {
+        health.internalExcluded++;
+      }
+      if (!entitledAccess.has(row.briefings_access || '')) {
+        continue;
+      }
+      entitledEmails.add(email);
+      if (row.briefings_expiry && new Date(row.briefings_expiry).getTime() <= now) {
+        health.briefingsExpired++;
+        continue;
+      }
+      currentEntitledEmails.add(email);
+    }
+    health.briefingsEntitled = entitledEmails.size;
+
     const paidDailyEmails = new Set(
-      (profilesResult.data || [])
+      profilesData
         .filter((profile: Record<string, unknown>) =>
           PAID_TIER_ACCESS_FLAGS.some(flag => profile[flag] === true)
         )
         .map((profile: { email: string }) => profile.email.toLowerCase())
     );
 
-    if (data) {
-      health.totalUsers = data.length;
+    if (settingsData) {
+      health.totalUsers = settingsData.length;
 
-      for (const user of data) {
+      for (const user of settingsData) {
         const hasNaics = user.naics_codes && user.naics_codes.length > 0;
         const hasBusinessType = user.business_type && user.business_type.trim() !== '';
         const normalizedEmail = user.user_email.toLowerCase();
@@ -324,6 +420,8 @@ async function getUserHealth() {
         else health.unconfiguredEmails.push(user.user_email);
 
         if (hasBusinessType) health.businessTypeSet++;
+        const isCurrentBriefingsEntitled = currentEntitledEmails.has(normalizedEmail);
+
         if (user.alerts_enabled) {
           health.alertsEnabledTotal++;
 
@@ -345,7 +443,20 @@ async function getUserHealth() {
             }
           }
         }
-        if (user.briefings_enabled) health.briefingsEnabled++;
+        if (user.briefings_enabled) {
+          health.briefingsEnabled++;
+          const hasAnyBriefingProfileSignal =
+            (user.naics_codes || []).length > 0 ||
+            (user.keywords || []).length > 0 ||
+            (user.agencies || []).length > 0;
+          if (user.is_active && !hasAnyBriefingProfileSignal) {
+            health.briefingsProfileIncomplete++;
+            health.briefingsProfileIncompleteEmails.push(user.user_email);
+          }
+          if (user.is_active && isCurrentBriefingsEntitled) {
+            health.briefingsCronEligible++;
+          }
+        }
       }
 
       health.naicsPercent = `${Math.round((health.naicsConfigured / health.totalUsers) * 100)}%`;
@@ -353,12 +464,422 @@ async function getUserHealth() {
 
       // Only include first 10 unconfigured emails
       health.unconfiguredEmails = health.unconfiguredEmails.slice(0, 10);
+      health.briefingsProfileIncompleteEmails = health.briefingsProfileIncompleteEmails.slice(0, 10);
     }
   } catch (e) {
     console.error('Error fetching user health:', e);
   }
 
   return health;
+}
+
+function getWeeklyCycleDates() {
+  const now = new Date();
+  const currentCycle = new Date(now);
+  currentCycle.setUTCHours(0, 0, 0, 0);
+  currentCycle.setUTCDate(currentCycle.getUTCDate() - currentCycle.getUTCDay());
+
+  const nextScheduled = new Date(currentCycle);
+  nextScheduled.setUTCHours(23, 0, 0, 0);
+
+  if (now >= nextScheduled) {
+    nextScheduled.setUTCDate(nextScheduled.getUTCDate() + 7);
+  }
+
+  return {
+    cycleDate: currentCycle.toISOString().split('T')[0],
+    scheduledAtUtc: `${currentCycle.toISOString().split('T')[0]}T23:00:00Z`,
+    nextScheduledAtUtc: nextScheduled.toISOString(),
+  };
+}
+
+async function getWeeklyAlertHealth() {
+  const cycle = getWeeklyCycleDates();
+  const health = {
+    cycleDate: cycle.cycleDate,
+    scheduledAtUtc: cycle.scheduledAtUtc,
+    nextScheduledAtUtc: cycle.nextScheduledAtUtc,
+    eligibleTotal: 0,
+    eligibleWithNaics: 0,
+    explicitWeeklyUsers: 0,
+    freeFallbackUsers: 0,
+    processedFreeFallback: 0,
+    processedExplicitWeekly: 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    processed: 0,
+    remaining: 0,
+    successRate: 'N/A',
+    lastSentAt: null as string | null,
+  };
+
+  try {
+    const supabase = getSupabase();
+    const [settings, proBuyerEmails, weeklyLogs] = await Promise.all([
+      fetchAllRows<{
+        user_email: string;
+        naics_codes?: string[] | null;
+        alerts_enabled: boolean;
+        alert_frequency: string | null;
+        is_active: boolean;
+      }>((from, to) =>
+        supabase
+          .from('user_notification_settings')
+          .select('user_email, naics_codes, alerts_enabled, alert_frequency, is_active')
+          .eq('is_active', true)
+          .eq('alerts_enabled', true)
+          .range(from, to)
+      ),
+      fetchWeeklyAlertBuyerEmails(),
+      fetchAllRows<{
+        user_email: string | null;
+        delivery_status: string | null;
+        sent_at: string | null;
+        opportunities_data?: Array<{ alertSource?: string }> | null;
+      }>((from, to) =>
+        supabase
+          .from('alert_log')
+          .select('user_email, delivery_status, sent_at, opportunities_data')
+          .eq('alert_type', 'weekly')
+          .eq('alert_date', cycle.cycleDate)
+          .range(from, to)
+      ),
+    ]);
+
+    const eligibleEmails = new Set<string>();
+
+    for (const user of settings || []) {
+      const email = user.user_email.toLowerCase();
+      const isExplicitWeekly = user.alert_frequency === 'weekly';
+      const isFreeFallback = !proBuyerEmails.has(email);
+
+      if (!isExplicitWeekly && !isFreeFallback) {
+        continue;
+      }
+
+      eligibleEmails.add(email);
+      if ((user.naics_codes || []).length > 0) {
+        health.eligibleWithNaics++;
+      }
+      if (isExplicitWeekly) {
+        health.explicitWeeklyUsers++;
+      }
+      if (isFreeFallback) {
+        health.freeFallbackUsers++;
+      }
+    }
+
+    health.eligibleTotal = eligibleEmails.size;
+    const processedEligibleEmails = new Set<string>();
+
+    for (const row of weeklyLogs || []) {
+      if (row.delivery_status === 'sent') health.sent++;
+      else if (row.delivery_status === 'failed') health.failed++;
+      else if (row.delivery_status === 'skipped') health.skipped++;
+
+      const email = row.user_email?.toLowerCase();
+      if (email && eligibleEmails.has(email)) {
+        processedEligibleEmails.add(email);
+      }
+
+      const alertSource = Array.isArray(row.opportunities_data)
+        ? row.opportunities_data[0]?.alertSource
+        : null;
+      if (alertSource === 'free_weekly_fallback') {
+        health.processedFreeFallback++;
+      } else if (alertSource === 'explicit_weekly') {
+        health.processedExplicitWeekly++;
+      }
+
+      if (row.sent_at && (!health.lastSentAt || row.sent_at > health.lastSentAt)) {
+        health.lastSentAt = row.sent_at;
+      }
+    }
+
+    health.processed = processedEligibleEmails.size;
+    health.remaining = Math.max(health.eligibleTotal - health.processed, 0);
+
+    const attempted = health.sent + health.failed;
+    health.successRate = attempted > 0
+      ? `${Math.round((health.sent / attempted) * 100)}%`
+      : 'N/A';
+  } catch (e) {
+    console.error('Error fetching weekly alert health:', e);
+  }
+
+  return health;
+}
+
+function percent(numerator: number, denominator: number): string {
+  return denominator > 0 ? `${Math.round((numerator / denominator) * 100)}%` : 'N/A';
+}
+
+async function getBetaHealth() {
+  const now = new Date();
+  const sevenDaysAgoIso = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const todayIso = now.toISOString().split('T')[0];
+
+  const health = {
+    weeklyActiveUsers: 0,
+    dailyActiveUsers: 0,
+    dauWauRatio: 'N/A',
+    activeBetaUsers: 0,
+    queueSize: 0,
+    activationRate7d: 'N/A',
+    profileCompletionRate: '0%',
+    firstClickUsers7d: 0,
+  };
+
+  try {
+    const supabase = getSupabase();
+    const [settings, queueResult, engagement7d, engagementToday] = await Promise.all([
+      fetchAllRows<{
+        user_email: string;
+        naics_codes?: string[] | null;
+        alerts_enabled?: boolean | null;
+        is_active?: boolean | null;
+      }>((from, to) =>
+        supabase
+          .from('user_notification_settings')
+          .select('user_email, naics_codes, alerts_enabled, is_active')
+          .range(from, to)
+      ),
+      supabase
+        .from('waitlist_queue')
+        .select('id', { count: 'exact', head: true }),
+      fetchAllRows<{
+        user_email: string | null;
+        event_type: string;
+      }>((from, to) =>
+        supabase
+          .from('user_engagement')
+          .select('user_email, event_type')
+          .in('event_type', ['email_open', 'link_click'])
+          .gte('created_at', sevenDaysAgoIso)
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        user_email: string | null;
+        event_type: string;
+      }>((from, to) =>
+        supabase
+          .from('user_engagement')
+          .select('user_email, event_type')
+          .in('event_type', ['email_open', 'link_click'])
+          .gte('created_at', `${todayIso}T00:00:00Z`)
+          .range(from, to)
+      ),
+    ]);
+
+    const activeSettings = settings.filter(user => user.is_active !== false && user.alerts_enabled !== false);
+    const completedProfiles = activeSettings.filter(user => (user.naics_codes || []).length > 0);
+    const weeklyActiveEmails = new Set(engagement7d.map(row => row.user_email).filter(Boolean) as string[]);
+    const dailyActiveEmails = new Set(engagementToday.map(row => row.user_email).filter(Boolean) as string[]);
+    const firstClickEmails = new Set(
+      engagement7d
+        .filter(row => row.event_type === 'link_click')
+        .map(row => row.user_email)
+        .filter(Boolean) as string[]
+    );
+
+    health.activeBetaUsers = activeSettings.length;
+    health.profileCompletionRate = percent(completedProfiles.length, activeSettings.length);
+    health.weeklyActiveUsers = weeklyActiveEmails.size;
+    health.dailyActiveUsers = dailyActiveEmails.size;
+    health.dauWauRatio = percent(dailyActiveEmails.size, weeklyActiveEmails.size);
+    health.firstClickUsers7d = firstClickEmails.size;
+    health.queueSize = queueResult.error ? 0 : queueResult.count || 0;
+    health.activationRate7d = percent(weeklyActiveEmails.size, activeSettings.length);
+  } catch (error) {
+    console.error('Error fetching beta health:', error);
+  }
+
+  return health;
+}
+
+async function getProviderEmailHealth() {
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const health = {
+    sends7d: 0,
+    delivered7d: 0,
+    opened7d: 0,
+    clicked7d: 0,
+    bounced7d: 0,
+    complained7d: 0,
+    failed7d: 0,
+    deliveryRate: 'N/A',
+    clickRate: 'N/A',
+    complaintRate: 'N/A',
+    topLinks: [] as Array<{ label: string; count: number }>,
+  };
+
+  try {
+    const supabase = getSupabase();
+    const [sends, events] = await Promise.all([
+      fetchAllRows<{ provider_message_id: string | null }>((from, to) =>
+        supabase
+          .from('email_provider_sends')
+          .select('provider_message_id')
+          .gte('sent_at', sevenDaysAgoIso)
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        event_type: string;
+        metadata?: { resend?: { click?: { link?: string } } } | null;
+      }>((from, to) =>
+        supabase
+          .from('email_provider_events')
+          .select('event_type, metadata')
+          .gte('occurred_at', sevenDaysAgoIso)
+          .range(from, to)
+      ),
+    ]);
+
+    const topLinks: Record<string, number> = {};
+    health.sends7d = sends.length;
+
+    for (const event of events) {
+      if (event.event_type === 'email.delivered') health.delivered7d++;
+      else if (event.event_type === 'email.opened') health.opened7d++;
+      else if (event.event_type === 'email.clicked') {
+        health.clicked7d++;
+        const link = event.metadata?.resend?.click?.link || 'unknown';
+        const label = link.includes('sam.gov')
+          ? 'SAM.gov'
+          : link.includes('market-intelligence')
+            ? 'Market Intelligence'
+            : link.includes('feedback')
+              ? 'Feedback'
+              : link;
+        topLinks[label] = (topLinks[label] || 0) + 1;
+      } else if (event.event_type === 'email.bounced') health.bounced7d++;
+      else if (event.event_type === 'email.complained') health.complained7d++;
+      else if (event.event_type === 'email.failed') health.failed7d++;
+    }
+
+    health.deliveryRate = percent(health.delivered7d, health.sends7d);
+    health.clickRate = percent(health.clicked7d, health.delivered7d || health.sends7d);
+    health.complaintRate = percent(health.complained7d, health.delivered7d || health.sends7d);
+    health.topLinks = Object.entries(topLinks)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, count]) => ({ label, count }));
+  } catch (error) {
+    console.error('Error fetching provider email health:', error);
+  }
+
+  return health;
+}
+
+async function getMatchingQuality() {
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysAgoDate = sevenDaysAgoIso.split('T')[0];
+  const quality = {
+    totalFeedback: 0,
+    helpful: 0,
+    notHelpful: 0,
+    helpfulRate: 'N/A',
+    last7Days: { total: 0, helpful: 0, notHelpful: 0, helpfulRate: 'N/A' },
+    byType: {
+      daily: { helpful: 0, notHelpful: 0, helpfulRate: 'N/A' },
+      weekly: { helpful: 0, notHelpful: 0, helpfulRate: 'N/A' },
+      pursuit: { helpful: 0, notHelpful: 0, helpfulRate: 'N/A' },
+    },
+    usersNeedingAttention: 0,
+    repeatNegative: [] as Array<{ email: string; count: number }>,
+    zeroAlertUsers7d: 0,
+    highVolumeUsers7d: 0,
+  };
+
+  try {
+    const supabase = getSupabase();
+    const [feedback, settings, alertLogs] = await Promise.all([
+      fetchAllRows<{
+        user_email: string;
+        rating: string;
+        briefing_type: 'daily' | 'weekly' | 'pursuit' | string | null;
+        created_at: string;
+      }>((from, to) =>
+        supabase
+          .from('briefing_feedback')
+          .select('user_email, rating, briefing_type, created_at')
+          .neq('rating', 'outreach_sent')
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        user_email: string;
+        alerts_enabled?: boolean | null;
+        is_active?: boolean | null;
+        naics_codes?: string[] | null;
+      }>((from, to) =>
+        supabase
+          .from('user_notification_settings')
+          .select('user_email, alerts_enabled, is_active, naics_codes')
+          .eq('alerts_enabled', true)
+          .eq('is_active', true)
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        user_email: string;
+        opportunities_count?: number | null;
+      }>((from, to) =>
+        supabase
+          .from('alert_log')
+          .select('user_email, opportunities_count')
+          .gte('alert_date', sevenDaysAgoDate)
+          .eq('delivery_status', 'sent')
+          .range(from, to)
+      ),
+    ]);
+
+    const negativeByUser: Record<string, number> = {};
+    for (const row of feedback) {
+      const rating = row.rating;
+      const type = row.briefing_type;
+      const isLast7 = row.created_at >= sevenDaysAgoIso;
+
+      if (rating === 'helpful') {
+        quality.helpful++;
+        if (isLast7) quality.last7Days.helpful++;
+        if (type && type in quality.byType) quality.byType[type as keyof typeof quality.byType].helpful++;
+      } else if (rating === 'not_helpful') {
+        quality.notHelpful++;
+        negativeByUser[row.user_email] = (negativeByUser[row.user_email] || 0) + 1;
+        if (isLast7) quality.last7Days.notHelpful++;
+        if (type && type in quality.byType) quality.byType[type as keyof typeof quality.byType].notHelpful++;
+      }
+      if (isLast7) quality.last7Days.total++;
+    }
+
+    quality.totalFeedback = quality.helpful + quality.notHelpful;
+    quality.helpfulRate = percent(quality.helpful, quality.totalFeedback);
+    quality.last7Days.helpfulRate = percent(quality.last7Days.helpful, quality.last7Days.total);
+    for (const type of Object.keys(quality.byType) as Array<keyof typeof quality.byType>) {
+      const item = quality.byType[type];
+      item.helpfulRate = percent(item.helpful, item.helpful + item.notHelpful);
+    }
+
+    quality.repeatNegative = Object.entries(negativeByUser)
+      .filter(([, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([email, count]) => ({ email, count }));
+    quality.usersNeedingAttention = quality.repeatNegative.length;
+
+    const alertCountsByUser: Record<string, number> = {};
+    for (const row of alertLogs) {
+      alertCountsByUser[row.user_email.toLowerCase()] = (alertCountsByUser[row.user_email.toLowerCase()] || 0) + (row.opportunities_count || 0);
+    }
+
+    const activeWithNaics = settings.filter(user => (user.naics_codes || []).length > 0);
+    quality.zeroAlertUsers7d = activeWithNaics.filter(user => !alertCountsByUser[user.user_email.toLowerCase()]).length;
+    quality.highVolumeUsers7d = Object.values(alertCountsByUser).filter(count => count >= 30).length;
+  } catch (error) {
+    console.error('Error fetching matching quality:', error);
+  }
+
+  return quality;
 }
 
 async function fetchWeeklyAlertBuyerEmails(): Promise<Set<string>> {
@@ -746,7 +1267,6 @@ async function getRevenueMetrics() {
       if (charge.status !== 'succeeded') continue;
 
       const amount = charge.amount / 100; // Convert cents to dollars
-      const chargeDate = new Date(charge.created * 1000);
 
       metrics.thirtyDay.total += amount;
       metrics.thirtyDay.count++;
@@ -814,7 +1334,16 @@ async function getSystemAlerts(today: string) {
   // Check for issues
   const emailStats = await getEmailStats(today);
   const userHealth = await getUserHealth();
+  const weeklyAlertHealth = await getWeeklyAlertHealth();
   const deadLetter = await getDeadLetterStats();
+  const profileReminderLastRun = await kv.get<{
+    summary?: {
+      eligibleToSend?: number;
+      cursorSkipped?: number;
+      processed?: number;
+      remaining?: number;
+    };
+  }>(PROFILE_REMINDER_LAST_RUN_KEY);
 
   // Critical: No sends yesterday (shown after 8 AM today)
   // Note: Dashboard shows yesterday's data since today isn't complete yet
@@ -846,9 +1375,29 @@ async function getSystemAlerts(today: string) {
     });
   }
 
+  const weeklyCycleDue = new Date() > new Date(weeklyAlertHealth.scheduledAtUtc);
+  if (weeklyCycleDue && weeklyAlertHealth.eligibleTotal > 0 && weeklyAlertHealth.processed === 0) {
+    alerts.push({
+      level: 'critical',
+      message: `Weekly alert fallback has no processed records for ${weeklyAlertHealth.cycleDate}`
+    });
+  } else if (weeklyCycleDue && weeklyAlertHealth.remaining > 0) {
+    alerts.push({
+      level: 'warning',
+      message: `Weekly alert fallback still has ${weeklyAlertHealth.remaining} eligible users remaining for ${weeklyAlertHealth.cycleDate}`
+    });
+  }
+
   // Warning: Many unconfigured users
   const unconfiguredPercent = 100 - parseInt(userHealth.naicsPercent);
-  if (unconfiguredPercent > 30) {
+  const profileReminderSummary = profileReminderLastRun?.summary;
+  const profileReminderQueueComplete = profileReminderSummary
+    ? (profileReminderSummary.remaining || 0) === 0 &&
+      (profileReminderSummary.eligibleToSend || 0) <=
+        (profileReminderSummary.cursorSkipped || 0) + (profileReminderSummary.processed || 0)
+    : false;
+
+  if (unconfiguredPercent > 30 && !profileReminderQueueComplete) {
     alerts.push({
       level: 'warning',
       message: `${unconfiguredPercent}% of users (${userHealth.totalUsers - userHealth.naicsConfigured}) have no NAICS configured`
@@ -908,6 +1457,15 @@ export async function POST(request: NextRequest) {
         const dlResult = await dlResponse.json();
         return NextResponse.json({ success: true, action: 'process-dead-letter', result: dlResult });
 
+      case 'process-weekly-fallback':
+        // Process the next weekly alert fallback batch. The cron endpoint owns its batch size.
+        const weeklyFallbackResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tools.govcongiants.org'}/api/cron/weekly-alerts?password=${ADMIN_PASSWORD}&catchup=true`,
+          { method: 'GET' }
+        );
+        const weeklyFallbackResult = await weeklyFallbackResponse.json();
+        return NextResponse.json({ success: true, action: 'process-weekly-fallback', result: weeklyFallbackResult });
+
       case 'send-naics-reminder':
         // Send NAICS reminder to unconfigured users
         const reminderResponse = await fetch(
@@ -916,6 +1474,25 @@ export async function POST(request: NextRequest) {
         );
         const reminderResult = await reminderResponse.json();
         return NextResponse.json({ success: true, action: 'send-naics-reminder', result: reminderResult });
+
+      case 'preview-profile-reminders':
+        const profilePreviewLimit = Number(body.limit || 50);
+        const profilePreviewResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tools.govcongiants.org'}/api/admin/send-profile-reminders?password=${ADMIN_PASSWORD}&mode=preview&limit=${profilePreviewLimit}`,
+          { method: 'POST' }
+        );
+        const profilePreviewResult = await profilePreviewResponse.json();
+        return NextResponse.json({ success: true, action: 'preview-profile-reminders', result: profilePreviewResult });
+
+      case 'send-profile-reminders':
+        const profileSendLimit = Number(body.limit || 25);
+        const profileSendBatchSize = Number(body.batchSize || 10);
+        const profileSendResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tools.govcongiants.org'}/api/admin/send-profile-reminders?password=${ADMIN_PASSWORD}&mode=execute&limit=${profileSendLimit}&batchSize=${profileSendBatchSize}`,
+          { method: 'POST' }
+        );
+        const profileSendResult = await profileSendResponse.json();
+        return NextResponse.json({ success: true, action: 'send-profile-reminders', result: profileSendResult });
 
       case 'preview-naics-reminder':
         // Preview who would receive NAICS reminders

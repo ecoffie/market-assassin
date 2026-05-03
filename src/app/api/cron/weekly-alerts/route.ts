@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
-import nodemailer from 'nodemailer';
+import { fetchSamOpportunitiesFromCache, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { createSecureAccessUrl } from '@/lib/access-links';
-import { persistSentAlert } from '@/lib/alerts/delivery-log';
+import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
+import { sendEmail } from '@/lib/send-email';
+import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -16,16 +17,6 @@ function getSupabase() {
   }
   return _supabase;
 }
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.office365.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
 
 // Map business type to SAM.gov set-aside code
 const businessTypeToSetAside: Record<string, string> = {
@@ -46,9 +37,9 @@ const ALERT_LIMITS = {
   pro: 15,      // Any paid product: 15 opps/week
 };
 
-// Batch size to avoid Vercel timeout (60s limit)
-// Each user takes ~2-3s for SAM.gov fetch + email send
-const BATCH_SIZE = 15;
+// Uses local SAM cache instead of per-user SAM.gov API calls, so the Sunday batch
+// window can cover the free weekly audience without external API rate limits.
+const BATCH_SIZE = 75;
 
 // Products that grant Pro tier (15 opps)
 const PRO_TIER_PRODUCTS = [
@@ -117,12 +108,78 @@ interface AlertUser {
   user_email: string;
   naics_codes: string[];
   business_type: string | null;
+  business_description?: string | null;
   agencies: string[];
   location_state: string | null;
   alert_frequency: string;
   alerts_enabled: boolean;
   is_active: boolean;
   total_alerts_sent?: number | null;
+}
+
+type WeeklyAlertSource = 'explicit_weekly' | 'free_weekly_fallback';
+
+interface WeeklyAlertJobOptions {
+  force?: boolean;
+  email?: string | null;
+}
+
+function getWeeklyCycleDate(referenceDate = new Date()): string {
+  const cycle = new Date(referenceDate);
+  cycle.setUTCHours(0, 0, 0, 0);
+  cycle.setUTCDate(cycle.getUTCDate() - cycle.getUTCDay());
+  return cycle.toISOString().split('T')[0];
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown error';
+}
+
+function getAlertSource(user: AlertUser, tier: 'free' | 'pro'): WeeklyAlertSource | null {
+  if (user.alert_frequency === 'weekly') {
+    return 'explicit_weekly';
+  }
+  if (tier === 'free') {
+    return 'free_weekly_fallback';
+  }
+  return null;
+}
+
+async function persistProcessedWeeklyAlert({
+  user,
+  alertDate,
+  status,
+  source,
+  tier,
+  opportunitiesCount,
+  opportunitiesData,
+  errorMessage,
+}: {
+  user: AlertUser;
+  alertDate: string;
+  status: 'skipped' | 'failed';
+  source: WeeklyAlertSource;
+  tier: 'free' | 'pro';
+  opportunitiesCount: number;
+  opportunitiesData?: Record<string, unknown>[];
+  errorMessage?: string;
+}) {
+  const processedAt = new Date().toISOString();
+
+  await upsertAlertLog(getSupabase(), {
+    user_email: user.user_email,
+    alert_date: alertDate,
+    alert_type: 'weekly',
+    opportunities_count: opportunitiesCount,
+    opportunities_data: opportunitiesData || [{
+      alertSource: source,
+      tier,
+      reason: errorMessage || status,
+    }],
+    sent_at: processedAt,
+    delivery_status: status,
+    error_message: errorMessage || null,
+  });
 }
 
 /**
@@ -132,9 +189,10 @@ interface AlertUser {
  * 1. Users with alert_frequency='weekly' (explicitly chose weekly)
  * 2. Free tier users with alert_frequency='daily' (skipped by daily-alerts cron)
  */
-async function runWeeklyAlertJob(): Promise<NextResponse> {
+async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<NextResponse> {
   try {
     console.log('[Weekly Alerts] Starting weekly alert job...');
+    const alertDate = getWeeklyCycleDate();
 
     // Get all active alert users who want alerts (weekly OR daily)
     // Daily-alerts cron skips free tier users, so we include them here
@@ -161,7 +219,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
     // Filter to:
     // 1. Users who chose weekly
     // 2. Free tier users (no product purchase) regardless of preference
-    const users: AlertUser[] = [];
+    let users: AlertUser[] = [];
     for (const user of allUsers) {
       const { tier } = await getAlertLimit(user.user_email);
 
@@ -171,23 +229,20 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
       }
     }
 
+    if (options.email) {
+      users = users.filter(user => user.user_email.toLowerCase() === options.email?.toLowerCase());
+    }
+
     if (users.length === 0) {
       console.log('[Weekly Alerts] No users to process after tier filtering');
       return NextResponse.json({ success: true, message: 'No users to process', sent: 0 });
     }
 
     // Check for already processed this week (deduplication)
-    const today = new Date();
-    const startOfWeek = new Date(today);
-    const dayOfWeek = startOfWeek.getUTCDay();
-    const daysToSubtract = dayOfWeek === 0 ? 0 : dayOfWeek; // Go back to Sunday
-    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - daysToSubtract);
-    startOfWeek.setUTCHours(0, 0, 0, 0);
-
     const { data: processedThisWeek } = await getSupabase()
       .from('alert_log')
       .select('user_email')
-      .gte('sent_at', startOfWeek.toISOString())
+      .eq('alert_date', alertDate)
       .eq('alert_type', 'weekly');
 
     const processedEmails = new Set((processedThisWeek || []).map((r: { user_email: string }) => r.user_email.toLowerCase()));
@@ -208,16 +263,12 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
       });
     }
 
-    const samApiKey = process.env.SAM_API_KEY;
-    if (!samApiKey) {
-      console.error('[Weekly Alerts] SAM_API_KEY not configured');
-      return NextResponse.json({ error: 'SAM API key not configured' }, { status: 500 });
-    }
-
     const results = {
       sent: 0,
       skipped: 0,
       failed: 0,
+      noNaics: 0,
+      noMatches: 0,
       errors: [] as string[],
     };
 
@@ -229,14 +280,35 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
       try {
         // Determine user's alert tier based on purchase history
         const { limit: alertLimit, tier } = await getAlertLimit(user.user_email);
+        const alertSource = getAlertSource(user, tier);
+
+        if (!alertSource) {
+          continue;
+        }
+
+        if (!user.naics_codes || user.naics_codes.length === 0) {
+          await persistProcessedWeeklyAlert({
+            user,
+            alertDate,
+            status: 'skipped',
+            source: alertSource,
+            tier,
+            opportunitiesCount: 0,
+            errorMessage: 'No NAICS configured',
+          });
+          results.skipped++;
+          results.noNaics++;
+          continue;
+        }
 
         // Build search params from user profile
         const setAsides = user.business_type
           ? [businessTypeToSetAside[user.business_type] || user.business_type]
           : [];
 
-        // Fetch opportunities from SAM.gov
-        const searchResult = await fetchSamOpportunities({
+        // Fetch opportunities from the local SAM cache. The cache is synced by cron
+        // and avoids per-user SAM.gov API calls in the weekly send hot path.
+        const searchResult = await fetchSamOpportunitiesFromCache({
           naicsCodes: user.naics_codes || [],
           setAsides,
           state: user.location_state || undefined,
@@ -244,7 +316,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
           noticeTypes: ['p', 'r', 'k', 'o'], // presolicitation, sources sought, combined, solicitation
           postedFrom: getDateDaysAgo(7), // Last 7 days
           limit: 50,
-        }, samApiKey);
+        });
 
         const opportunities = searchResult.opportunities;
 
@@ -255,6 +327,7 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
             naics_codes: user.naics_codes || [],
             agencies: user.agencies || [],
             keywords: [],
+            business_description: user.business_description || null,
           }),
         })).sort((a, b) => b.score - a.score);
 
@@ -264,7 +337,17 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
 
         if (topOpps.length === 0) {
           console.log(`[Weekly Alerts] No opportunities found for ${user.user_email}`);
+          await persistProcessedWeeklyAlert({
+            user,
+            alertDate,
+            status: 'skipped',
+            source: alertSource,
+            tier,
+            opportunitiesCount: 0,
+            errorMessage: 'No matching opportunities found',
+          });
           results.skipped++;
+          results.noMatches++;
           continue;
         }
 
@@ -275,8 +358,12 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
           supabase: getSupabase(),
           email: user.user_email,
           alertType: 'weekly',
+          alertDate,
           opportunitiesCount: topOpps.length,
-          opportunitiesData: topOpps.slice(0, 5).map(o => ({
+          opportunitiesData: topOpps.slice(0, 5).map((o, i) => ({
+            alertSource,
+            tier,
+            rank: i + 1,
             title: o.title,
             agency: o.department,
             naics: o.naicsCode,
@@ -291,8 +378,22 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
 
       } catch (userError: unknown) {
         console.error(`[Weekly Alerts] Error processing ${user.user_email}:`, userError);
+        const { tier } = await getAlertLimit(user.user_email);
+        const alertSource = getAlertSource(user, tier) || 'free_weekly_fallback';
+        const errorMessage = getErrorMessage(userError);
+        await persistProcessedWeeklyAlert({
+          user,
+          alertDate,
+          status: 'failed',
+          source: alertSource,
+          tier,
+          opportunitiesCount: 0,
+          errorMessage,
+        }).catch(logError => {
+          console.error(`[Weekly Alerts] Failed to persist failure for ${user.user_email}:`, logError);
+        });
         results.failed++;
-        results.errors.push(`${user.user_email}: ${userError instanceof Error ? userError.message : 'Unknown error'}`);
+        results.errors.push(`${user.user_email}: ${errorMessage}`);
       }
     }
 
@@ -307,6 +408,8 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
         alreadyProcessed: processedEmails.size,
         remaining: remainingUsers,
         totalEligible: users.length,
+        batchSize: BATCH_SIZE,
+        alertDate,
       },
     });
   } catch (error: unknown) {
@@ -325,13 +428,19 @@ async function runWeeklyAlertJob(): Promise<NextResponse> {
 export async function POST(request: NextRequest) {
   // Verify cron secret
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const adminPassword = request.nextUrl.searchParams.get('password');
+  const hasAdminPassword = adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !hasAdminPassword) {
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }
 
-  return runWeeklyAlertJob();
+  const { searchParams } = request.nextUrl;
+  return runWeeklyAlertJob({
+    force: searchParams.get('force') === 'true' || searchParams.get('catchup') === 'true',
+    email: searchParams.get('email'),
+  });
 }
 
 /**
@@ -340,37 +449,43 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
+  const isTest = request.nextUrl.searchParams.get('test') === 'true';
+  const isCatchup = request.nextUrl.searchParams.get('catchup') === 'true';
+  const force = request.nextUrl.searchParams.get('force') === 'true' || isCatchup;
 
   // Check if this is a Vercel cron request
   const isVercelCron = request.headers.get('x-vercel-cron') === '1';
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const adminPassword = request.nextUrl.searchParams.get('password');
+  const hasAdminPassword = adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
 
   // Run the job if triggered by Vercel cron or has CRON_SECRET
-  if (isVercelCron || hasCronSecret) {
+  if (isVercelCron || hasCronSecret || hasAdminPassword) {
     // DAY-OF-WEEK GUARD: Weekly alerts only send on Sunday (UTC)
     const today = new Date();
     const dayOfWeek = today.getUTCDay(); // 0 = Sunday
 
-    if (dayOfWeek !== 0) {
+    if (dayOfWeek !== 0 && !force) {
       console.log(`[Weekly Alerts] Skipped - not Sunday (day ${dayOfWeek})`);
       return NextResponse.json({
         success: true,
-        message: `Weekly alerts only send on Sunday. Today is day ${dayOfWeek}.`,
+        message: `Weekly alerts only send on Sunday unless catchup=true or force=true. Today is day ${dayOfWeek}.`,
         skipped: true,
         dayOfWeek,
       });
     }
 
-    return runWeeklyAlertJob();
+    return runWeeklyAlertJob({ force, email: isTest ? email : null });
   }
 
   // If checking specific user (not cron trigger)
   if (!email) {
     return NextResponse.json({
       message: 'Weekly Alerts Cron Job',
-      usage: 'GET ?email=xxx to test for specific user',
-      schedule: 'Every Sunday at 6 PM ET (23:00 UTC)',
+      usage: 'GET ?email=xxx to inspect a user. Use authorized GET/POST with ?catchup=true for manual catch-up.',
+      schedule: 'Sunday batch window from 23:00 UTC into Monday 00:30 UTC',
+      batchSize: BATCH_SIZE,
     });
   }
 
@@ -436,6 +551,17 @@ async function sendAlertEmail(
   tier: 'free' | 'pro' = 'free',
   totalAvailable: number = 0
 ) {
+  const emailDate = new Date().toISOString().split('T')[0];
+  const tokenResult = await createEmailTrackingToken(email, 'weekly_alert', emailDate);
+  const trackingToken = tokenResult?.token;
+  const trackedUrl = (url: string, label: string, content = label) => {
+    const urlWithUtm = appendEmailUtm(url, {
+      campaign: 'weekly_alert',
+      content,
+    });
+    return trackingToken ? generateTrackedLink(trackingToken, urlWithUtm, label) : urlWithUtm;
+  };
+
   const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const briefingsUpgradeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org'}/market-intelligence`;
@@ -458,7 +584,7 @@ async function sendAlertEmail(
             ${opp.setAside ? `<span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${opp.setAside}</span>` : ''}
             ${urgencyText ? `<span style="background: ${urgencyColor}20; color: ${urgencyColor}; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${urgencyText}</span>` : ''}
           </div>
-          <a href="${opp.uiLink}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
+          <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `opportunity_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
             ${i + 1}. ${opp.title.slice(0, 100)}${opp.title.length > 100 ? '...' : ''}
           </a>
           <div style="color: #6b7280; font-size: 13px; margin-top: 6px;">
@@ -509,7 +635,7 @@ async function sendAlertEmail(
         Free tier shows 5 opps/week. We found <strong>${totalAvailable}</strong> matches for your profile.<br>
         Upgrade to Pro for <strong>15 opps/week</strong> + priority ranking.
       </p>
-      <a href="${ohProUpgradeUrl}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+      <a href="${trackedUrl(ohProUpgradeUrl, 'upgrade_opportunity_hunter_pro')}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
         Upgrade to OH Pro - $49 one-time
       </a>
     </div>
@@ -522,7 +648,7 @@ async function sendAlertEmail(
         Daily Briefings gives you AI-ranked opportunities with win probability,<br>
         competitor intel, and specific action steps. Every morning.
       </p>
-      <a href="${briefingsUpgradeUrl}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+      <a href="${trackedUrl(briefingsUpgradeUrl, 'upgrade_market_intelligence')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
         Upgrade to Market Intelligence - $49/mo
       </a>
     </div>
@@ -533,10 +659,10 @@ async function sendAlertEmail(
         Was this weekly digest helpful?
       </p>
       <div>
-        <a href="https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=weekly_digest" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+        <a href="${trackedUrl(`https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=weekly_digest`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
           👍 Yes
         </a>
-        <a href="https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=weekly_digest" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+        <a href="${trackedUrl(`https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=weekly_digest`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
           👎 No
         </a>
       </div>
@@ -545,21 +671,42 @@ async function sendAlertEmail(
 
   <div style="background: #f8fafc; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; text-align: center;">
     <p style="color: #6b7280; font-size: 12px; margin: 0;">
-      <a href="${preferencesUrl}" style="color: #6b7280;">Manage Preferences</a> &nbsp;|&nbsp;
-      <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
+      <a href="${trackedUrl(preferencesUrl, 'manage_preferences')}" style="color: #6b7280;">Manage Preferences</a> &nbsp;|&nbsp;
+      <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
       &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.org
     </p>
   </div>
+  ${trackingToken ? generateTrackingPixel(trackingToken) : ''}
 </body>
 </html>
 `;
 
-  await transporter.sendMail({
-    from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+  await sendEmail({
+    from: `"GovCon Giants" <${process.env.EMAIL_FROM || 'alerts@govcongiants.com'}>`,
     to: email,
     subject: `${opportunities.length} New Opportunities Match Your Profile - Week of ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
+    text: `${opportunities.length} new opportunities matched your profile this week. Manage preferences: ${preferencesUrl}`,
+    emailType: 'weekly_alert',
+    eventSource: 'weekly_alert',
+    tags: {
+      email_type: 'weekly_alert',
+      alert_type: 'weekly',
+      match_count: opportunities.length,
+      total_available: totalAvailable,
+      tier,
+      naics_primary: user.naics_codes?.[0] || 'none',
+      user_segment: user.business_type || 'uncertified',
+      state: user.location_state || 'none',
+    },
+    metadata: {
+      tracking_token: trackingToken || null,
+      naics_codes: user.naics_codes || [],
+      business_type: user.business_type || null,
+      location_state: user.location_state || null,
+      opportunity_ids: opportunities.map(opp => opp.noticeId).filter(Boolean),
+    },
   });
 }

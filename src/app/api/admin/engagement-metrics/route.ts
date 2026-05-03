@@ -44,19 +44,27 @@ export async function GET(request: NextRequest) {
 
     // Get overall metrics
     const [
-      emailsSent,
+      briefingsSent,
+      alertsSent,
       emailsOpened,
       linksClicked,
       topLinks,
       dailyTrends,
       topEngagedUsers,
     ] = await Promise.all([
-      // Total emails sent (briefing_log entries with sent status)
+      // Total briefings sent
       supabase
         .from('briefing_log')
         .select('*', { count: 'exact', head: true })
         .eq('delivery_status', 'sent')
         .gte('email_sent_at', startDateStr),
+
+      // Total alerts sent
+      supabase
+        .from('alert_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('delivery_status', 'sent')
+        .gte('sent_at', startDateStr),
 
       // Unique email opens
       supabase
@@ -72,13 +80,12 @@ export async function GET(request: NextRequest) {
         .eq('event_type', 'link_click')
         .gte('created_at', startDateStr),
 
-      // Top clicked links (by link_text label)
+      // Top clicked links (by metadata.link_text label)
       supabase
         .from('user_engagement')
-        .select('link_text')
+        .select('metadata')
         .eq('event_type', 'link_click')
-        .gte('created_at', startDateStr)
-        .not('link_text', 'is', null),
+        .gte('created_at', startDateStr),
 
       // Daily engagement trends
       supabase
@@ -96,7 +103,9 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Calculate metrics
-    const totalSent = emailsSent.count || 0;
+    const totalBriefingsSent = briefingsSent.count || 0;
+    const totalAlertsSent = alertsSent.count || 0;
+    const totalSent = totalBriefingsSent + totalAlertsSent;
     const totalOpens = emailsOpened.count || 0;
     const totalClicks = linksClicked.count || 0;
 
@@ -107,7 +116,10 @@ export async function GET(request: NextRequest) {
     // Aggregate top links
     const linkCounts: Record<string, number> = {};
     for (const row of topLinks.data || []) {
-      const label = row.link_text || 'unknown';
+      const metadata = (row.metadata || {}) as Record<string, unknown>;
+      const label = typeof metadata.link_text === 'string' && metadata.link_text
+        ? metadata.link_text
+        : 'unknown';
       linkCounts[label] = (linkCounts[label] || 0) + 1;
     }
     const sortedLinks = Object.entries(linkCounts)
@@ -164,6 +176,8 @@ export async function GET(request: NextRequest) {
       },
       summary: {
         emailsSent: totalSent,
+        briefingsSent: totalBriefingsSent,
+        alertsSent: totalAlertsSent,
         emailsOpened: totalOpens,
         linksClicked: totalClicks,
         openRate: `${openRate}%`,
@@ -216,7 +230,7 @@ async function getUserMetrics(
     // Recent activity (last 20 events)
     supabase
       .from('user_engagement')
-      .select('event_type, link_text, page_url, created_at')
+      .select('event_type, event_source, metadata, created_at')
       .eq('user_email', userEmail.toLowerCase())
       .order('created_at', { ascending: false })
       .limit(20),

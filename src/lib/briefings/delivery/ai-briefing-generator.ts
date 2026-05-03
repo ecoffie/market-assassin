@@ -497,6 +497,7 @@ function buildProfile(profileData: Record<string, unknown>): {
   naics_codes: string[];
   agencies: string[];
   keywords: string[];
+  business_description: string | null;
   watched_companies: string[];
 } {
   const aggregated = profileData.aggregated_profile as Record<string, unknown> | null;
@@ -505,6 +506,7 @@ function buildProfile(profileData: Record<string, unknown>): {
     naics_codes: extractArray(aggregated?.naics_codes || profileData.naics_codes),
     agencies: extractArray(aggregated?.agencies || profileData.agencies),
     keywords: extractArray(aggregated?.keywords || profileData.keywords),
+    business_description: typeof profileData.business_description === 'string' ? profileData.business_description : null,
     watched_companies: extractArray(aggregated?.watched_companies || profileData.watched_companies),
   };
 }

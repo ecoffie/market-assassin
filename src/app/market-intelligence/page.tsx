@@ -1,18 +1,82 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 const CHECKOUT_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z';
 const CHECKOUT_ANNUAL = 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A';
 
-export default function MarketIntelligencePage() {
+function MarketIntelligenceContent() {
+  const searchParams = useSearchParams();
   const emailRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [redirecting, setRedirecting] = useState(false);
+  const [verifyingInvite, setVerifyingInvite] = useState(false);
+
+  // Handle invite token on mount
+  useEffect(() => {
+    const inviteToken = searchParams.get('invite');
+    if (!inviteToken) return;
+
+    const verifyInviteToken = async () => {
+      setVerifyingInvite(true);
+      setError('');
+
+      try {
+        // Verify the invite token
+        const res = await fetch(`/api/invitations/verify?token=${encodeURIComponent(inviteToken)}`);
+        const data = await res.json();
+
+        if (!data.valid) {
+          setError('This invitation link is invalid or has expired. Please contact support.');
+          setVerifyingInvite(false);
+          return;
+        }
+
+        // Token is valid - grant briefings access and redirect
+        const email = data.email?.toLowerCase().trim();
+        if (email) {
+          // Save profile with briefings access
+          await fetch('/api/alerts/save-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              naicsCodes: [], // Will be set up in onboarding
+              alertsEnabled: true,
+              briefingsEnabled: true,
+              source: 'paid_existing',
+              stripeCustomerId: data.customerId || undefined,
+              isActive: true,
+            }),
+          });
+
+          // Mark invite as used
+          await fetch('/api/invitations/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: inviteToken }),
+          });
+
+          // Store email for briefings dashboard
+          localStorage.setItem('briefings_access_email', email);
+
+          // Redirect to briefings with setup flag
+          setRedirecting(true);
+          window.location.href = '/briefings?setup=true';
+        }
+      } catch {
+        setError('Failed to verify invitation. Please try again or contact support.');
+        setVerifyingInvite(false);
+      }
+    };
+
+    verifyInviteToken();
+  }, [searchParams]);
 
   const handleVerifyAccess = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -83,6 +147,30 @@ export default function MarketIntelligencePage() {
       setSendingLink(false);
     }
   };
+
+  // Show loading state when verifying invite token
+  if (verifyingInvite || (searchParams.get('invite') && !error)) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
+            <span className="text-white font-bold text-2xl">MI</span>
+          </div>
+          <h2 className="text-xl font-semibold text-white mb-2">
+            {redirecting ? 'Access Granted!' : 'Verifying Your Invitation...'}
+          </h2>
+          <p className="text-slate-400">
+            {redirecting ? 'Redirecting to your dashboard...' : 'Just a moment while we verify your access.'}
+          </p>
+          {!redirecting && (
+            <div className="mt-4 flex justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent"></div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -310,5 +398,17 @@ export default function MarketIntelligencePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MarketIntelligencePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950 flex items-center justify-center">
+        <div className="text-slate-400">Loading...</div>
+      </div>
+    }>
+      <MarketIntelligenceContent />
+    </Suspense>
   );
 }

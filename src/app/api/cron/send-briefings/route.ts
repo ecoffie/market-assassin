@@ -277,6 +277,21 @@ function getSupabase() {
               subject: emailTemplate.subject,
               html: emailTemplate.htmlBody,
               text: emailTemplate.textBody,
+              emailType: 'weekly_deep_dive',
+              eventSource: 'weekly_briefing',
+              tags: {
+                email_type: 'weekly_deep_dive',
+                briefing_type: 'weekly',
+                match_count: totalItems,
+                naics_primary: user.naics_codes?.[0] || 'none',
+                user_segment: 'unknown',
+              },
+              metadata: {
+                tracking_token: trackingToken || null,
+                briefing_date: briefing.briefingDate,
+                naics_codes: user.naics_codes || [],
+                total_items: totalItems,
+              },
             });
 
             // Email sent successfully
@@ -452,6 +467,18 @@ async function retryFailedBriefings(supabase: any): Promise<{ retried: number; s
         subject: emailTemplate.subject,
         html: emailTemplate.htmlBody,
         text: emailTemplate.textBody,
+        emailType: 'weekly_deep_dive_retry',
+        eventSource: 'weekly_briefing',
+        tags: {
+          email_type: 'weekly_deep_dive_retry',
+          briefing_type: 'weekly',
+          match_count: (briefingContent.opportunities?.length || 0) + (briefingContent.teamingPlays?.length || 0),
+        },
+        metadata: {
+          tracking_token: trackingToken || null,
+          briefing_date: briefingContent.briefingDate,
+          retry: true,
+        },
       });
 
       // Email sent successfully

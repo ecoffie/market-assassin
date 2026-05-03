@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
 import { getNAICSForPSC } from '@/lib/utils/psc-crosswalk';
+import { grantBriefingsAccess } from '@/lib/briefings/access';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -19,8 +20,13 @@ interface AlertProfileRequest {
   businessType: string;
   targetAgencies?: string[];
   locationState?: string;
+  locationStates?: string[];
   locationZip?: string;
-  source?: string;            // e.g., "opportunity-hunter-free" for free tier
+  alertFrequency?: 'daily' | 'weekly';
+  source?: string;            // e.g., "opportunity-hunter-free", "free-signup", "paid_existing"
+  inviteToken?: string;       // Magic link token for paid subscriber activation
+  stripeCustomerId?: string;  // Stripe customer ID from invitation verification
+  businessDescription?: string | null;
 }
 
 /**
@@ -30,7 +36,22 @@ interface AlertProfileRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: AlertProfileRequest = await request.json();
-    const { email, naicsCodes, naicsInput, pscCode, businessType, targetAgencies, locationState, locationZip, source } = body;
+    const {
+      email,
+      naicsCodes,
+      naicsInput,
+      pscCode,
+      businessType,
+      targetAgencies,
+      locationState,
+      locationStates,
+      locationZip,
+      alertFrequency,
+      source,
+      inviteToken,
+      stripeCustomerId,
+      businessDescription,
+    } = body;
 
     if (!email) {
       return NextResponse.json(
@@ -40,10 +61,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Free tier sources don't require MA Premium access
-    const isFreeSource = source === 'opportunity-hunter-free' || source === 'free-signup';
+    // paid_existing = subscriber activated via magic link invitation
+    const isFreeSource = source === 'opportunity-hunter-free' || source === 'free-signup' || source === 'paid_existing';
 
     // Collect all NAICS codes from various inputs
-    let allNaicsCodes: string[] = [];
+    const allNaicsCodes: string[] = [];
 
     // 1. Direct array of NAICS codes
     if (naicsCodes && naicsCodes.length > 0) {
@@ -95,21 +117,59 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Build upsert payload
+    const upsertPayload: Record<string, unknown> = {
+      user_email: email.toLowerCase(),
+      naics_codes: expandedNaics.length > 0 ? expandedNaics : [],
+      business_type: businessType || null,
+      agencies: targetAgencies || [],
+      location_state: locationState || null,
+      location_states: Array.isArray(locationStates) ? locationStates : [],
+      location_zip: locationZip || null,
+      is_active: true,
+      alerts_enabled: true,
+      alert_frequency: alertFrequency === 'weekly' ? 'weekly' : 'daily',
+      updated_at: new Date().toISOString(),
+    };
+
+    const cleanBusinessDescription = typeof businessDescription === 'string'
+      ? businessDescription.trim()
+      : '';
+
+    // Production does not have user_notification_settings.business_description yet.
+    // Store the description in user_business_profiles below until the migration is applied.
+
+    // paid_existing = subscriber activated via magic link invitation
+    // They get FULL Daily Briefings access ($49/mo value), not just Daily Alerts
+    if (source === 'paid_existing') {
+      // Enable Daily Briefings (includes Daily Market Intel + Weekly Deep Dive + Pursuit Brief)
+      upsertPayload.briefings_enabled = true;
+
+      // Track invitation cohort for 90-day analysis
+      if (inviteToken) {
+        upsertPayload.invitation_sent_at = new Date().toISOString();
+        upsertPayload.invitation_source = 'invitation_campaign';
+      }
+      if (stripeCustomerId) {
+        upsertPayload.stripe_customer_id = stripeCustomerId;
+      }
+
+      // Grant KV access for briefings (gates actual tool access)
+      try {
+        await grantBriefingsAccess(email);
+        console.log(`[Alerts] Granted briefings access to paid subscriber: ${email}`);
+      } catch (kvError) {
+        console.warn(`[Alerts] KV error granting briefings to ${email}:`, kvError);
+        // Continue anyway - database flag will work as fallback
+      }
+
+      console.log(`[Alerts] Paid subscriber activated: ${email} (Stripe: ${stripeCustomerId || 'unknown'}) - Daily Briefings enabled`);
+    }
+
     // Upsert notification settings (unified table)
     const { data, error } = await getSupabase()
       .from('user_notification_settings')
-      .upsert({
-        user_email: email.toLowerCase(),
-        naics_codes: expandedNaics.length > 0 ? expandedNaics : [],
-        business_type: businessType || null,
-        agencies: targetAgencies || [],
-        location_state: locationState || null,
-        location_zip: locationZip || null,
-        is_active: true,
-        alerts_enabled: true,
-        alert_frequency: 'daily',
-        updated_at: new Date().toISOString(),
-      }, {
+      .upsert(upsertPayload, {
         onConflict: 'user_email',
       })
       .select()
@@ -117,13 +177,29 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[Alerts] Error saving profile:', error);
+      const errorMessage = error.message || 'Failed to save alert profile';
       return NextResponse.json(
-        { success: false, error: 'Failed to save alert profile' },
+        { success: false, error: errorMessage },
         { status: 500 }
       );
     }
 
     console.log(`[Alerts] Saved alert profile for ${email}: ${expandedNaics.length} NAICS codes, ${targetAgencies?.length || 0} agencies`);
+
+    if (businessDescription !== undefined) {
+      try {
+        await getSupabase()
+          .from('user_business_profiles')
+          .upsert({
+            user_email: email.toLowerCase().trim(),
+            business_description: cleanBusinessDescription || null,
+            business_description_updated_at: cleanBusinessDescription ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_email' });
+      } catch (businessProfileError) {
+        console.warn('[Alerts] Could not mirror business description:', businessProfileError);
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -134,6 +210,8 @@ export async function POST(request: NextRequest) {
         naicsCount: data.naics_codes?.length || 0,
         inputCodes: allNaicsCodes.length,
         expandedCodes: expandedNaics.length,
+        businessDescription: data.business_description || null,
+        businessDescriptionStored: cleanBusinessDescription || null,
         businessType: data.business_type,
         targetAgencies: data.agencies,
         frequency: data.alert_frequency,

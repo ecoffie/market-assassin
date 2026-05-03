@@ -2,7 +2,7 @@
  * Email Tracking API
  *
  * GET /api/track/open?t={token} - Track email open (returns 1x1 transparent GIF)
- * GET /api/track/click?t={token}&url={encodedUrl} - Track link click (redirects to URL)
+ * GET /api/track?t={token}&a=click&url={encodedUrl}&l={linkLabel} - Track link click (redirects to URL)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get('t');
   const action = searchParams.get('a') || 'open'; // 'open' or 'click'
   const url = searchParams.get('url');
+  const linkText = searchParams.get('l') || undefined;
 
   if (!token) {
     // Return transparent pixel anyway to avoid broken images
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
       const decodedUrl = decodeURIComponent(url);
 
       // Record the click (fire and forget)
-      recordLinkClick(token, decodedUrl).catch(() => {});
+      recordLinkClick(token, decodedUrl, linkText).catch(() => {});
 
       // Redirect to the actual URL
       return NextResponse.redirect(decodedUrl, { status: 302 });

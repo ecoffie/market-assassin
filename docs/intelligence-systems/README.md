@@ -13,6 +13,7 @@
 | [Tools](./tools.md) | MCP tools and API endpoints |
 | [Budget Intel](./budget-intel.md) | Budget intelligence system |
 | [Forecast Intel](./forecasts.md) | Procurement forecasts (Phase 1-4) |
+| [Operations Automation](../automation/README.md) | Internal skills, tools, agents, and build plan |
 
 ---
 

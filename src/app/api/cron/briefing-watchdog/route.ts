@@ -13,7 +13,7 @@ import { sendEmail } from '@/lib/send-email';
  * 5. Alert on critical failures
  *
  * Schedule: 9 AM, 9:30 AM daily (after send windows)
- *           Plus 9 AM Sunday (after weekly), 9 AM Monday (after pursuit)
+ *           Plus Friday checks after weekly and Saturday checks after pursuit
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
 
     // Determine which briefing types to check based on day
     const briefingTypes: string[] = ['daily'];
-    if (dayOfWeek === 0) briefingTypes.push('weekly');  // Sunday
-    if (dayOfWeek === 1) briefingTypes.push('pursuit'); // Monday
+    if (dayOfWeek === 5) briefingTypes.push('weekly');  // Friday
+    if (dayOfWeek === 6) briefingTypes.push('pursuit'); // Saturday
 
     // 1. Health Check for each briefing type
     for (const briefingType of briefingTypes) {
@@ -244,8 +244,16 @@ function getTemplateDateForBriefingType(briefingType: string, date: string): str
 
   const base = new Date(`${date}T00:00:00Z`);
   const dayOfWeek = base.getUTCDay();
+
+  if (briefingType === 'pursuit') {
+    const saturday = new Date(base);
+    const daysToSaturday = dayOfWeek === 6 ? 0 : (6 - dayOfWeek + 7) % 7;
+    saturday.setUTCDate(saturday.getUTCDate() + daysToSaturday);
+    return saturday.toISOString().split('T')[0];
+  }
+
   const monday = new Date(base);
-  const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  const daysToMonday = dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
   monday.setUTCDate(monday.getUTCDate() + daysToMonday);
   return monday.toISOString().split('T')[0];
 }

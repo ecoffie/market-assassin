@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import MarketIntelligenceHeader from '@/components/briefings/MarketIntelligenceHeader';
 import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
@@ -390,7 +391,14 @@ type FilterType = 'all' | 'urgent' | 'opportunity' | 'teaming';
 
 type MainTab = 'briefings' | 'forecasts' | 'sbir' | 'grants';
 
-export default function BriefingsDashboard() {
+interface ProfileSetupState {
+  hasNaics: boolean;
+  hasBusinessDescription: boolean;
+  businessDescription: string;
+}
+
+function BriefingsDashboardContent() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [inputEmail, setInputEmail] = useState('');
   const [status, setStatus] = useState<PageStatus>('gate');
@@ -401,7 +409,13 @@ export default function BriefingsDashboard() {
   const [linkSending, setLinkSending] = useState(false);
   const [linkMessage, setLinkMessage] = useState('');
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [pendingSetupOpen, setPendingSetupOpen] = useState(false); // Track if we should open settings after auth/onboarding
   const [profileStatsRefreshKey, setProfileStatsRefreshKey] = useState(0);
+  const [profileSetupState, setProfileSetupState] = useState<ProfileSetupState>({
+    hasNaics: false,
+    hasBusinessDescription: false,
+    businessDescription: '',
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [mainTab, setMainTab] = useState<MainTab>('briefings');
@@ -506,18 +520,23 @@ export default function BriefingsDashboard() {
     window.print();
   }, []);
 
-  // Check if user has completed their profile (has NAICS codes)
-  const checkProfileComplete = useCallback(async (userEmail: string): Promise<boolean> => {
+  // Check profile setup state for smart-skip onboarding.
+  const checkProfileSetupState = useCallback(async (userEmail: string): Promise<ProfileSetupState> => {
     try {
       const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`);
       const data = await res.json();
       if (data.success && data.data) {
         const naicsCodes = data.data.naicsCodes || [];
-        return naicsCodes.length > 0;
+        const businessDescription = String(data.data.businessDescription || '').trim();
+        return {
+          hasNaics: naicsCodes.length > 0,
+          hasBusinessDescription: businessDescription.length > 0,
+          businessDescription,
+        };
       }
-      return false;
+      return { hasNaics: false, hasBusinessDescription: false, businessDescription: '' };
     } catch {
-      return false;
+      return { hasNaics: false, hasBusinessDescription: false, businessDescription: '' };
     }
   }, []);
 
@@ -580,10 +599,10 @@ export default function BriefingsDashboard() {
         return;
       }
 
-      // Check if profile is complete
-      const profileComplete = await checkProfileComplete(userEmail);
+      const profileSetup = await checkProfileSetupState(userEmail);
+      setProfileSetupState(profileSetup);
 
-      if (!profileComplete) {
+      if (!profileSetup.hasNaics) {
         setEmail(userEmail);
         localStorage.setItem('briefings_access_email', userEmail);
         setStatus('onboarding');
@@ -595,16 +614,53 @@ export default function BriefingsDashboard() {
     } catch {
       setStatus('gate');
     }
-  }, [checkProfileComplete, fetchBriefings]);
+  }, [checkProfileSetupState, fetchBriefings]);
+
+  // Campaign activation links include the entitled billing email.
+  useEffect(() => {
+    const emailParam = searchParams.get('email')?.toLowerCase().trim();
+    if (!emailParam) {
+      return;
+    }
+
+    setInputEmail(emailParam);
+    setEmail(emailParam);
+    localStorage.setItem('briefings_access_email', emailParam);
+    void verifyAndLoadUser(emailParam);
+  }, [searchParams, verifyAndLoadUser]);
 
   // On mount, check localStorage
   useEffect(() => {
+    if (searchParams.get('email')) {
+      return;
+    }
+
     const saved = localStorage.getItem('briefings_access_email');
     if (!saved) {
       return;
     }
     void verifyAndLoadUser(saved);
-  }, [verifyAndLoadUser]);
+  }, [searchParams, verifyAndLoadUser]);
+
+  // Capture ?setup=true intent early and clean up URL
+  useEffect(() => {
+    const setupParam = searchParams.get('setup');
+    if (setupParam === 'true') {
+      setPendingSetupOpen(true);
+      // Clean up URL immediately to avoid re-triggering
+      const url = new URL(window.location.href);
+      url.searchParams.delete('setup');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [searchParams]);
+
+  // Open settings panel when status becomes ready AND we have a pending setup intent
+  useEffect(() => {
+    if (status === 'ready' && pendingSetupOpen) {
+      setSettingsPanelOpen(true);
+      setPendingSetupOpen(false);
+    }
+  }, [status, pendingSetupOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -773,7 +829,14 @@ export default function BriefingsDashboard() {
 
   // --- Onboarding Wizard ---
   if (status === 'onboarding') {
-    return <OnboardingWizard email={email} onComplete={handleOnboardingComplete} />;
+    return (
+      <OnboardingWizard
+        email={email}
+        onComplete={handleOnboardingComplete}
+        initialBusinessDescription={profileSetupState.businessDescription}
+        skipDescriptionStep={profileSetupState.hasNaics && profileSetupState.hasBusinessDescription}
+      />
+    );
   }
 
   // --- Access Denied ---
@@ -1297,5 +1360,17 @@ function ItemCard({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BriefingsDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-gray-400">Loading Market Intelligence...</div>
+      </div>
+    }>
+      <BriefingsDashboardContent />
+    </Suspense>
   );
 }

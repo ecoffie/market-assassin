@@ -62,11 +62,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const { data: businessProfile } = await getSupabase()
+      .from('user_business_profiles')
+      .select('business_description')
+      .eq('user_email', email.toLowerCase())
+      .maybeSingle();
+
+    const businessDescription =
+      typeof data.business_description === 'string' && data.business_description.trim()
+        ? data.business_description
+        : businessProfile?.business_description || null;
+
     return NextResponse.json({
       success: true,
       data: {
         email: data.user_email,
         // Search criteria
+        businessDescription,
         primaryIndustry: data.primary_industry || null,
         naicsCodes: data.naics_codes || [],
         keywords: data.keywords || [],
@@ -132,6 +144,7 @@ export async function POST(request: NextRequest) {
       // Search criteria
       naicsCodes,
       keywords,
+      businessDescription,
       businessType,
       targetAgencies,
       locationState,
@@ -237,6 +250,9 @@ export async function POST(request: NextRequest) {
       record.keywords = Array.isArray(keywords) ? keywords : [];
     }
 
+    // Production does not have user_notification_settings.business_description yet.
+    // Mirror businessDescription to user_business_profiles after the main settings save.
+
     if (businessType !== undefined) {
       record.business_type = businessType || null;
     }
@@ -295,6 +311,25 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Failed to save preferences' },
         { status: 500 }
       );
+    }
+
+    if (businessDescription !== undefined) {
+      const cleanDescription = typeof businessDescription === 'string'
+        ? businessDescription.trim()
+        : '';
+
+      try {
+        await getSupabase()
+          .from('user_business_profiles')
+          .upsert({
+            user_email: normalizedEmail,
+            business_description: cleanDescription || null,
+            business_description_updated_at: cleanDescription ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_email' });
+      } catch (businessProfileError) {
+        console.warn('[Notification Preferences] Could not mirror business description:', businessProfileError);
+      }
     }
 
     return NextResponse.json({

@@ -188,6 +188,7 @@ export function scoreGrant(
     naics_codes: string[];
     keywords: string[];
     agencies: string[];
+    business_description?: string | null;
   }
 ): number {
   let score = 0;
@@ -200,6 +201,12 @@ export function scoreGrant(
     grantText.includes(k.toLowerCase())
   ).length;
   score += keywordMatches * 15;
+
+  const descriptionTerms = extractDescriptionTerms(userProfile.business_description);
+  if (descriptionTerms.length > 0) {
+    const descriptionMatches = descriptionTerms.filter(term => grantText.includes(term)).length;
+    score += Math.min(descriptionMatches * 3, 15);
+  }
 
   // Check NAICS-derived keywords
   for (const naics of userProfile.naics_codes.slice(0, 5)) {
@@ -234,6 +241,25 @@ export function scoreGrant(
 }
 
 // Helper functions
+const DESCRIPTION_STOP_WORDS = new Set([
+  'about', 'after', 'also', 'and', 'are', 'business', 'company', 'does', 'for',
+  'from', 'government', 'help', 'into', 'our', 'provide', 'provides', 'providing',
+  'services', 'support', 'that', 'the', 'their', 'this', 'through', 'with', 'your',
+]);
+
+function extractDescriptionTerms(description?: string | null): string[] {
+  if (!description) return [];
+
+  return Array.from(new Set(
+    description
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .map(term => term.trim())
+      .filter(term => term.length >= 4 && !DESCRIPTION_STOP_WORDS.has(term))
+  )).slice(0, 20);
+}
+
 function parseNumber(value: any): number | null {
   if (value === null || value === undefined) return null;
   const num = typeof value === 'string' ? parseFloat(value.replace(/[,$]/g, '')) : value;

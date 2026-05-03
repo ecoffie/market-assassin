@@ -14,6 +14,7 @@ interface PersistSentAlertParams {
   lastAlertCount?: number;
   profileTable?: ProfileTable;
   sentAt?: string;
+  alertDate?: string;
 }
 
 function isMissingConflictConstraintError(error: unknown): boolean {
@@ -23,6 +24,18 @@ function isMissingConflictConstraintError(error: unknown): boolean {
 
   const message = String((error as { message: unknown }).message || '').toLowerCase();
   return message.includes('no unique or exclusion constraint matching the on conflict specification');
+}
+
+function isMissingProfileStatsColumnError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('message' in error)) {
+    return false;
+  }
+
+  const message = String((error as { message: unknown }).message || '').toLowerCase();
+  return (
+    message.includes("could not find the 'last_alert_count' column") ||
+    message.includes("could not find the 'total_alerts_sent' column")
+  );
 }
 
 export async function upsertAlertLog(
@@ -63,8 +76,9 @@ export async function persistSentAlert({
   lastAlertCount,
   profileTable = 'user_notification_settings',
   sentAt = new Date().toISOString(),
+  alertDate: explicitAlertDate,
 }: PersistSentAlertParams): Promise<{ alertDate: string; sentAt: string }> {
-  const alertDate = sentAt.split('T')[0];
+  const alertDate = explicitAlertDate || sentAt.split('T')[0];
 
   const alertLogPayload: Record<string, unknown> = {
     user_email: email,
@@ -113,6 +127,17 @@ export async function persistSentAlert({
     .eq('user_email', email);
 
   if (profileError) {
+    if (isMissingProfileStatsColumnError(profileError)) {
+      const { error: minimalProfileError } = await supabase
+        .from(profileTable)
+        .update({ last_alert_sent: sentAt })
+        .eq('user_email', email);
+
+      if (!minimalProfileError) {
+        return { alertDate, sentAt };
+      }
+    }
+
     throw new Error(`Failed to update ${profileTable}: ${profileError.message}`);
   }
 
