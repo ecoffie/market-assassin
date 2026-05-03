@@ -32,6 +32,37 @@
 - Bird's-eye view of all tools
 - Familiar pattern for SaaS users
 
+### Tier Structure (May 2026)
+
+| Tier | Price | Includes |
+|------|-------|----------|
+| **MI Free** | $0 | Limited opportunity search only |
+| **MI Pro** | $149/mo | Full intelligence stack (Dashboard, Research, Forecasts, Recompetes, Contractors, SBIR, Grants) |
+| **MI + Execution** | $316/mo | Intelligence + Pipeline + Contacts + Proposals + AI Workbench |
+| **MI Team** | $1,000/mo | 5 seats, shared pipeline, team collaboration |
+| **MI Enterprise** | $2,500+/mo | 15+ seats, API access, white-label options |
+| **White Glove** | $5,000+/mo | Done-for-you BD services (add-on) |
+
+### MITier Type
+
+```typescript
+// src/components/UnifiedSidebar.tsx
+export type MITier = 'free' | 'pro' | 'execution' | 'team' | 'enterprise';
+
+const tierInfo: Record<MITier, { name: string; price: string; color: string }> = {
+  free: { name: 'MI Free', price: '$0', color: 'gray' },
+  pro: { name: 'MI Pro', price: '$149/mo', color: 'emerald' },
+  execution: { name: 'MI + Execution', price: '$316/mo', color: 'purple' },
+  team: { name: 'MI Team', price: '$1,000/mo', color: 'blue' },
+  enterprise: { name: 'MI Enterprise', price: '$2,500+/mo', color: 'amber' },
+};
+
+function hasAccess(userTier: MITier, requiredTier: MITier): boolean {
+  const tierOrder: MITier[] = ['free', 'pro', 'execution', 'team', 'enterprise'];
+  return tierOrder.indexOf(userTier) >= tierOrder.indexOf(requiredTier);
+}
+```
+
 ### MIPanel Type
 
 ```typescript
@@ -42,27 +73,29 @@ export type MIPanel =
   | 'forecasts'      // 7,700+ upcoming procurements
   | 'recompetes'     // Expiring contracts
   | 'contractors'    // 3,500+ with contacts
-  | 'pipeline'       // Track pursuits
-  | 'contacts'       // CRM & relationships
+  | 'pipeline'       // Track pursuits (Execution tier)
+  | 'contacts'       // CRM & relationships (Execution tier)
   | 'content'        // Content Reaper
   | 'planner'        // Action Planner
   | 'sbir'           // SBIR/STTR
-  | 'grants';        // Federal grants
+  | 'grants'         // Federal grants
+  | 'proposals'      // Proposal Manager (Execution tier)
+  | 'workbench';     // AI Workbench (Execution tier)
 ```
 
-### Navigation Sections
+### Navigation Sections by Tier
 
-| Section | Panels |
-|---------|--------|
-| **Intelligence** | Dashboard, Market Research, Forecasts, Recompetes, Contractors |
-| **Execution** | Pipeline, Contacts |
-| **Tools** | Content Reaper, Action Planner |
+| Section | Tier Required | Panels |
+|---------|---------------|--------|
+| **Intelligence** | Pro ($149/mo) | Dashboard, Market Research, Forecasts, Recompetes, Contractors, SBIR/STTR, Grants |
+| **Execution** | Execution ($316/mo) | Pipeline, Contacts, Proposals (NEW), AI Workbench (NEW) |
+| **Tools** | Pro ($149/mo) | Content Reaper, Action Planner |
 
 ### Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/components/UnifiedSidebar.tsx` | Sidebar component with MIPanel type |
+| `src/components/UnifiedSidebar.tsx` | Sidebar with tier-based access control |
 | `src/app/briefings/page.tsx` | Main dashboard with panel conditional rendering |
 | `src/components/bd-assist/PipelineBoard.tsx` | Pipeline panel component |
 | `src/components/bd-assist/ContactsPanel.tsx` | Contacts panel component |
@@ -78,7 +111,11 @@ const [activePanel, setActivePanel] = useState<MIPanel>('dashboard');
 
 return (
   <div className="flex">
-    <UnifiedSidebar activePanel={activePanel} onPanelChange={setActivePanel} />
+    <UnifiedSidebar
+      activePanel={activePanel}
+      onPanelChange={setActivePanel}
+      userTier="pro" // Determines feature access
+    />
     <main>
       {activePanel === 'dashboard' && <DashboardContent />}
       {activePanel === 'pipeline' && <PipelineBoard email={email} />}
@@ -94,10 +131,7 @@ return (
 - Create separate routes for tools (e.g., `/pipeline`, `/contacts`)
 - Use href links in sidebar — use onClick with panel state
 - Add tools outside `/briefings` — all tools are panels within MI
-
-### Pricing
-
-**One platform, one price:** $149/mo for all Market Intelligence tools
+- Allow access to tier-restricted features without proper userTier check
 
 ---
 
