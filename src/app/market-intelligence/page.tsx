@@ -421,9 +421,9 @@ function MarketIntelligenceContent() {
                 <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
                 <td className="py-3 px-4 text-center text-emerald-400">✓</td>
               </tr>
-              {/* SBIR/STTR */}
+              {/* Full SAM.gov Dashboard */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">SBIR/STTR R&D Opportunities</td>
+                <td className="py-3 px-4 text-slate-300">Full SAM.gov Dashboard (24K+ Opps)</td>
                 <td className="py-3 px-4 text-center text-slate-600">—</td>
                 <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
                 <td className="py-3 px-4 text-center text-emerald-400">✓</td>
