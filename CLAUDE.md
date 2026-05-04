@@ -852,6 +852,22 @@ node scripts/import-forecasts.js --source=DOE
 | Pro Giant ($997) | $1,388 value | Contractor DB, Recompete, MA Standard, Content Gen, 1 Year Briefings |
 | Ultimate ($1,497) | $1,788 value | Content Full Fix, Contractor DB, Recompete, MA Premium, Lifetime Briefings |
 
+### Comp/Testimonial Accounts (Exclude from Campaigns)
+
+These accounts received free product access for testing and testimonial purposes. They are **not paying customers** and should be excluded from:
+- Paid customer counts
+- Revenue reporting
+- Upgrade campaigns
+- Billing queries
+
+| Email | Purpose |
+|-------|---------|
+| `aj@cypherintel.com` | Testimonial |
+| `pa.joof@pjaygroup.com` | Testimonial |
+| `dare2dreaminc615@gmail.com` | Testimonial |
+| `olga@olaexecutiveconsulting.com` | Testimonial |
+| `tavinalford@gmail.com` | Testimonial |
+
 ### Memberships
 | Membership | Price | Includes |
 |------------|-------|----------|
