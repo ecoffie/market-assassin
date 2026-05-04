@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     // Free tier sources don't require MA Premium access
     // paid_existing = subscriber activated via magic link invitation
-    // free_signup = MI Free signup from /briefings?setup=free
+    // free_signup / free-signup = MI Free signup from /alerts/signup
     const isFreeSource = source === 'opportunity-hunter-free' || source === 'free-signup' || source === 'free_signup' || source === 'paid_existing';
 
     // Collect all NAICS codes from various inputs

@@ -679,12 +679,10 @@ function BriefingsDashboardContent() {
       url.searchParams.delete('setup');
       window.history.replaceState({}, '', url.toString());
     } else if (setupParam === 'free') {
-      // Free signup flow - show signup form without requiring existing access
-      setStatus('free_signup');
-      // Clean up URL immediately
-      const url = new URL(window.location.href);
-      url.searchParams.delete('setup');
-      window.history.replaceState({}, '', url.toString());
+      // MI Free signup - redirect to the alerts signup which works correctly
+      // The alerts signup handles free users properly (alerts only, no briefings)
+      window.location.href = '/alerts/signup';
+      return;
     }
   }, [searchParams]);
 

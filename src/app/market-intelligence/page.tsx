@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 const CHECKOUT_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z';
 const CHECKOUT_ANNUAL = 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A';
-const FREE_SIGNUP_URL = '/briefings?setup=free'; // Free tier setup flow
+const FREE_SIGNUP_URL = '/alerts/signup'; // MI Free tier setup flow (alerts only)
 
 function MarketIntelligenceContent() {
   const searchParams = useSearchParams();

@@ -57,6 +57,7 @@ interface OnboardingWizardProps {
   onComplete: () => void;
   initialBusinessDescription?: string;
   skipDescriptionStep?: boolean;
+  isFreeUser?: boolean; // MI Free tier = alerts only, no briefings
 }
 
 export default function OnboardingWizard({
@@ -64,6 +65,7 @@ export default function OnboardingWizard({
   onComplete,
   initialBusinessDescription = '',
   skipDescriptionStep = false,
+  isFreeUser = false,
 }: OnboardingWizardProps) {
   const firstStep = skipDescriptionStep ? 2 : 1;
   const [step, setStep] = useState(firstStep);
