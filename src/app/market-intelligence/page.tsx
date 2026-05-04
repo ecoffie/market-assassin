@@ -6,6 +6,7 @@ import Link from 'next/link';
 
 const CHECKOUT_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z';
 const CHECKOUT_ANNUAL = 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A';
+const FREE_SIGNUP_URL = '/briefings?setup=free'; // Free tier setup flow
 
 function MarketIntelligenceContent() {
   const searchParams = useSearchParams();
@@ -192,6 +193,20 @@ function MarketIntelligenceContent() {
             Daily briefs that prioritize your opportunities. Weekly deep dives on market movement.
             Pursuit briefs that turn targets into capture plans.
           </p>
+
+          {/* Free Tier CTA */}
+          <div className="mt-8 inline-flex items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-xl px-6 py-4">
+            <div className="text-left">
+              <p className="text-white font-semibold">Start Free — No Credit Card Required</p>
+              <p className="text-slate-400 text-sm">Get daily opportunity alerts + market research tools</p>
+            </div>
+            <a
+              href={FREE_SIGNUP_URL}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold whitespace-nowrap transition-colors"
+            >
+              Start Free →
+            </a>
+          </div>
         </div>
       </div>
 
@@ -287,6 +302,173 @@ function MarketIntelligenceContent() {
         </div>
       </div>
 
+      {/* Tier Comparison Table */}
+      <div className="max-w-5xl mx-auto px-4 pb-16">
+        <h2 className="text-2xl font-bold text-white text-center mb-4">Compare Plans</h2>
+        <p className="text-slate-400 text-center mb-10 max-w-2xl mx-auto">
+          Start free and upgrade when you need AI-powered intelligence. Save $700+/month vs. Deltek GovWin.
+        </p>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left py-4 px-4 text-slate-400 font-medium border-b border-slate-700">Feature</th>
+                <th className="py-4 px-4 text-center border-b border-slate-700">
+                  <div className="text-white font-bold">MI Free</div>
+                  <div className="text-emerald-400 text-sm font-semibold">$0/mo</div>
+                </th>
+                <th className="py-4 px-4 text-center border-b border-slate-700 bg-purple-900/20">
+                  <div className="text-white font-bold">MI Pro</div>
+                  <div className="text-purple-400 text-sm font-semibold">$149/mo</div>
+                </th>
+                <th className="py-4 px-4 text-center border-b border-slate-700">
+                  <div className="text-white font-bold">MI Team</div>
+                  <div className="text-blue-400 text-sm font-semibold">$499/mo</div>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="text-sm">
+              {/* Daily Alerts */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Daily Opportunity Alerts</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* Opportunity Hunter */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Opportunity Hunter (Market Research)</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* Alert Type */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Alert Type</td>
+                <td className="py-3 px-4 text-center text-slate-400">Simple list</td>
+                <td className="py-3 px-4 text-center text-purple-400 bg-purple-900/10 font-medium">AI-ranked with win probability</td>
+                <td className="py-3 px-4 text-center text-purple-400 font-medium">AI-ranked with win probability</td>
+              </tr>
+              {/* Daily Brief */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Daily AI Brief (Prioritized + Analysis)</td>
+                <td className="py-3 px-4 text-center text-slate-600">—</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* Weekly Deep Dive */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Weekly Deep Dive (Market Movement)</td>
+                <td className="py-3 px-4 text-center text-slate-600">—</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* Pursuit Brief */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Pursuit Brief (Capture Guidance)</td>
+                <td className="py-3 px-4 text-center text-slate-600">—</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* Dashboard */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Full Dashboard (Search, Export, Archive)</td>
+                <td className="py-3 px-4 text-center text-slate-600">—</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* Forecasts */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Forecasts (7,700+ Upcoming)</td>
+                <td className="py-3 px-4 text-center text-slate-600">—</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* SBIR/STTR */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">SBIR/STTR R&D Opportunities</td>
+                <td className="py-3 px-4 text-center text-slate-600">—</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* Grants */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Grants.gov Integration ($700B+)</td>
+                <td className="py-3 px-4 text-center text-slate-600">—</td>
+                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+              {/* Team Seats */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Team Seats</td>
+                <td className="py-3 px-4 text-center text-slate-400">1</td>
+                <td className="py-3 px-4 text-center text-slate-400 bg-purple-900/10">1</td>
+                <td className="py-3 px-4 text-center text-blue-400 font-medium">5 seats</td>
+              </tr>
+              {/* Shared Pipeline */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-3 px-4 text-slate-300">Shared Pipeline & CRM</td>
+                <td className="py-3 px-4 text-center text-slate-600">—</td>
+                <td className="py-3 px-4 text-center text-slate-600 bg-purple-900/10">—</td>
+                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="py-6 px-4"></td>
+                <td className="py-6 px-4 text-center">
+                  <a
+                    href={FREE_SIGNUP_URL}
+                    className="inline-block px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
+                  >
+                    Start Free
+                  </a>
+                </td>
+                <td className="py-6 px-4 text-center bg-purple-900/10">
+                  <a
+                    href={CHECKOUT_MONTHLY}
+                    className="inline-block px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors"
+                  >
+                    Get Pro →
+                  </a>
+                </td>
+                <td className="py-6 px-4 text-center">
+                  <a
+                    href="mailto:service@govcongiants.com?subject=MI%20Team%20Plan"
+                    className="inline-block px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors"
+                  >
+                    Contact Sales
+                  </a>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Competitor Comparison */}
+        <div className="mt-10 bg-slate-800/30 border border-slate-700 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">💡</span>
+            <h3 className="text-lg font-bold text-white">Why MI Pro vs. Deltek GovWin?</h3>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6 text-sm">
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">MI Pro: $149/mo</p>
+              <p className="text-slate-400">AI-powered briefings, personalized by your NAICS + geography. Daily, weekly, and pursuit briefs with win probability scoring.</p>
+            </div>
+            <div>
+              <p className="text-slate-500 font-semibold mb-1">Deltek GovWin: $800-1,200/mo</p>
+              <p className="text-slate-500">Enterprise platform with extensive data. Overkill for small businesses. Requires training.</p>
+            </div>
+            <div>
+              <p className="text-emerald-400 font-semibold mb-1">Your Savings: $700+/mo</p>
+              <p className="text-slate-400">Get the intelligence you need at a fraction of the cost. Built for small GovCon firms, not enterprise.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Pricing Section */}
       <div className="max-w-4xl mx-auto px-4 pb-16">
         <h2 className="text-2xl font-bold text-white text-center mb-10">Choose Your Plan</h2>
@@ -372,7 +554,7 @@ function MarketIntelligenceContent() {
             The <span className="text-purple-400">Ultimate Bundle ($1,497)</span> includes lifetime Market Intelligence access.
           </p>
           <a
-            href="https://shop.govcongiants.org/bundles/ultimate"
+            href="/pricing"
             className="text-purple-400 hover:text-purple-300 text-sm font-medium"
           >
             Compare with Ultimate →
@@ -391,9 +573,13 @@ function MarketIntelligenceContent() {
             <Link href="/briefings" className="text-slate-400 hover:text-white">
               View Dashboard
             </Link>
+            <span className="mx-4">•</span>
+            <a href="mailto:service@govcongiants.com" className="text-slate-400 hover:text-white">
+              Support
+            </a>
           </p>
           <p className="text-slate-600 text-xs mt-4">
-            © {new Date().getFullYear()} GovCon Giants • tools.govcongiants.org
+            © {new Date().getFullYear()} GovCon Giants • mi.govcongiants.com
           </p>
         </div>
       </div>
