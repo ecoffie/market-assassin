@@ -62,7 +62,8 @@ export async function POST(request: NextRequest) {
 
     // Free tier sources don't require MA Premium access
     // paid_existing = subscriber activated via magic link invitation
-    const isFreeSource = source === 'opportunity-hunter-free' || source === 'free-signup' || source === 'paid_existing';
+    // free_signup = MI Free signup from /briefings?setup=free
+    const isFreeSource = source === 'opportunity-hunter-free' || source === 'free-signup' || source === 'free_signup' || source === 'paid_existing';
 
     // Collect all NAICS codes from various inputs
     const allNaicsCodes: string[] = [];
@@ -138,6 +139,13 @@ export async function POST(request: NextRequest) {
 
     // Production does not have user_notification_settings.business_description yet.
     // Store the description in user_business_profiles below until the migration is applied.
+
+    // free_signup = MI Free tier signup (alerts only, no AI briefings)
+    if (source === 'free_signup') {
+      upsertPayload.briefings_enabled = false;
+      upsertPayload.treatment_type = 'alerts';
+      console.log(`[Alerts] MI Free signup: ${email} - Daily Alerts only, no briefings`);
+    }
 
     // paid_existing = subscriber activated via magic link invitation
     // They get FULL Daily Briefings access ($49/mo value), not just Daily Alerts

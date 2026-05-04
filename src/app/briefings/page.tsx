@@ -405,7 +405,7 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
   };
 }
 
-type PageStatus = 'loading' | 'gate' | 'verifying' | 'onboarding' | 'denied' | 'ready';
+type PageStatus = 'loading' | 'gate' | 'verifying' | 'onboarding' | 'denied' | 'ready' | 'free_signup';
 
 type FilterType = 'all' | 'urgent' | 'opportunity' | 'teaming';
 
@@ -666,12 +666,19 @@ function BriefingsDashboardContent() {
     void verifyAndLoadUser(saved);
   }, [searchParams, verifyAndLoadUser]);
 
-  // Capture ?setup=true intent early and clean up URL
+  // Capture ?setup=true or ?setup=free intent early and clean up URL
   useEffect(() => {
     const setupParam = searchParams.get('setup');
     if (setupParam === 'true') {
       setPendingSetupOpen(true);
       // Clean up URL immediately to avoid re-triggering
+      const url = new URL(window.location.href);
+      url.searchParams.delete('setup');
+      window.history.replaceState({}, '', url.toString());
+    } else if (setupParam === 'free') {
+      // Free signup flow - show signup form without requiring existing access
+      setStatus('free_signup');
+      // Clean up URL immediately
       const url = new URL(window.location.href);
       url.searchParams.delete('setup');
       window.history.replaceState({}, '', url.toString());
@@ -729,6 +736,50 @@ function BriefingsDashboardContent() {
   const handleOnboardingComplete = async () => {
     // After onboarding, fetch briefings
     await fetchBriefings(email);
+  };
+
+  // Handle free signup - creates user with alerts-only access (MI Free tier)
+  const handleFreeSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = inputEmail.toLowerCase().trim();
+    if (!trimmed) {
+      setError('Please enter your email');
+      return;
+    }
+
+    setStatus('verifying');
+    setError('');
+
+    try {
+      // Create user with free tier (alerts only, not briefings)
+      const response = await fetch('/api/alerts/save-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: trimmed,
+          naicsCodes: [], // Will be set in onboarding
+          alertsEnabled: true,
+          briefingsEnabled: false, // Free tier = alerts only
+          source: 'free_signup',
+          isActive: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        setError(data.error || 'Could not create account. Please try again.');
+        setStatus('free_signup');
+        return;
+      }
+
+      // Set email and go to onboarding
+      setEmail(trimmed);
+      localStorage.setItem('briefings_access_email', trimmed);
+      setStatus('onboarding');
+    } catch {
+      setError('Could not create account. Please try again.');
+      setStatus('free_signup');
+    }
   };
 
   const handleSwitchAccount = () => {
@@ -888,6 +939,90 @@ function BriefingsDashboardContent() {
           >
             Try a different email
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MI Free Signup ---
+  if (status === 'free_signup') {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+        <div className="max-w-md w-full">
+          {/* Header branding */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-3 mb-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <span className="text-white font-bold text-2xl">MI</span>
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">MI Free</h1>
+            <p className="text-emerald-400">Start your GovCon intelligence journey</p>
+          </div>
+
+          {/* What's included */}
+          <div className="mb-8 space-y-3">
+            <div className="flex items-center gap-3 text-gray-300">
+              <span className="w-6 h-6 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm">✓</span>
+              <span>Daily Opportunity Alerts — never miss a posting</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-300">
+              <span className="w-6 h-6 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm">✓</span>
+              <span>Opportunity Hunter — find government buyers</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-300">
+              <span className="w-6 h-6 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm">✓</span>
+              <span>Personalized by your NAICS codes</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-500">
+              <span className="w-6 h-6 rounded-full bg-gray-800 flex items-center justify-center text-gray-600 text-sm">—</span>
+              <span>AI Briefings, Forecasts, SBIR/STTR <span className="text-purple-400">(Pro)</span></span>
+            </div>
+          </div>
+
+          {/* Free signup form */}
+          <div className="p-6 bg-gray-900 border border-gray-800 rounded-2xl">
+            <form onSubmit={handleFreeSignup}>
+              <label htmlFor="free-email" className="block text-sm font-medium text-gray-300 mb-2">
+                Enter your email to get started — it&apos;s free
+              </label>
+              <input
+                type="email"
+                id="free-email"
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
+                required
+                className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-emerald-500 focus:outline-none"
+                placeholder="you@example.com"
+              />
+              {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+              <button
+                type="submit"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-colors"
+              >
+                Start Free — No Credit Card
+              </button>
+            </form>
+          </div>
+
+          {/* Already have access link */}
+          <p className="text-gray-500 text-sm mt-6 text-center">
+            Already have access?{' '}
+            <button
+              onClick={() => setStatus('gate')}
+              className="text-purple-400 hover:underline"
+            >
+              Sign in
+            </button>
+          </p>
+
+          {/* Upgrade link */}
+          <p className="text-gray-500 text-sm mt-2 text-center">
+            Want AI briefings?{' '}
+            <Link href="/market-intelligence" className="text-purple-400 hover:underline">
+              See MI Pro — $149/mo
+            </Link>
+          </p>
         </div>
       </div>
     );
