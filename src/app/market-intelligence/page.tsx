@@ -296,10 +296,10 @@ function MarketIntelligenceContent() {
             <div className="text-center mb-6">
               <h3 className="text-xl font-bold text-white mb-2">Monthly</h3>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-white">$49</span>
+                <span className="text-4xl font-bold text-white">$149</span>
                 <span className="text-slate-400">/mo</span>
               </div>
-              <p className="text-slate-500 text-sm mt-1 line-through">$199/mo value</p>
+              <p className="text-slate-500 text-sm mt-1 line-through">$299/mo value</p>
             </div>
             <ul className="space-y-3 mb-8">
               <li className="flex items-center gap-2 text-slate-300 text-sm">
@@ -334,10 +334,10 @@ function MarketIntelligenceContent() {
             <div className="text-center mb-6">
               <h3 className="text-xl font-bold text-white mb-2">Annual</h3>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-white">$497</span>
+                <span className="text-4xl font-bold text-white">$1,490</span>
                 <span className="text-slate-400">/yr</span>
               </div>
-              <p className="text-green-400 text-sm mt-1 font-medium">Save $91 vs monthly</p>
+              <p className="text-green-400 text-sm mt-1 font-medium">Save $298 vs monthly (2 months free)</p>
             </div>
             <ul className="space-y-3 mb-8">
               <li className="flex items-center gap-2 text-slate-300 text-sm">

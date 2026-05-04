@@ -636,7 +636,7 @@ async function sendAlertEmail(
         Upgrade to Pro for <strong>15 opps/week</strong> + priority ranking.
       </p>
       <a href="${trackedUrl(ohProUpgradeUrl, 'upgrade_opportunity_hunter_pro')}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        Upgrade to OH Pro - $49 one-time
+        Upgrade to OH Pro - $99 one-time
       </a>
     </div>
     ` : ''}
@@ -649,7 +649,7 @@ async function sendAlertEmail(
         competitor intel, and specific action steps. Every morning.
       </p>
       <a href="${trackedUrl(briefingsUpgradeUrl, 'upgrade_market_intelligence')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        Upgrade to Market Intelligence - $49/mo
+        Upgrade to Market Intelligence - $149/mo
       </a>
     </div>
 

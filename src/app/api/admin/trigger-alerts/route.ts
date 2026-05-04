@@ -328,7 +328,7 @@ async function sendAlertEmail(
         Upgrade to Pro for <strong>15 opps/week</strong> instead of 5.
       </p>
       <a href="${ohProUpgradeUrl}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        Upgrade to Pro - $49
+        Upgrade to Pro - $99
       </a>
     </div>
   ` : '';

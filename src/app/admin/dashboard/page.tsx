@@ -1058,7 +1058,7 @@ export default function AdminDashboard() {
 
           {/* 7-Day Briefing Trend */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">7-Day Briefing Trend ($49/mo)</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">7-Day Briefing Trend ($149/mo)</h2>
             {data.trends.briefings.length > 0 ? (
               <div className="space-y-2">
                 {data.trends.briefings.map((day) => (

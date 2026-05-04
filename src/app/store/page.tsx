@@ -165,7 +165,7 @@ export default function Home() {
                 </ul>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                   <div>
-                    <div className="text-sm text-gray-400">$49/mo or $497/yr</div>
+                    <div className="text-sm text-gray-400">$149/mo or $1,490/yr</div>
                     <div className="text-2xl font-bold text-blue-800">Subscription</div>
                     <div className="text-xs text-gray-500">Ultimate bundle includes lifetime access</div>
                   </div>

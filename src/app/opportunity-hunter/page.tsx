@@ -1110,7 +1110,7 @@ export default function OpportunityHunterPage() {
                             href="https://buy.stripe.com/7sIaGqevYeIcdri147"
                             className="block text-center bg-white text-slate-700 px-4 py-2 rounded-lg font-semibold hover:bg-slate-50 transition-colors text-sm"
                           >
-                            One-Time - $49
+                            One-Time - $99
                           </a>
                         </div>
                       </div>
@@ -1227,8 +1227,8 @@ export default function OpportunityHunterPage() {
                   </div>
                   <div className="flex flex-col items-center md:items-end gap-2">
                     <div className="text-center md:text-right">
-                      <span className="text-purple-200 text-sm line-through">$199/mo value</span>
-                      <div className="text-2xl font-bold">$49/mo</div>
+                      <span className="text-purple-200 text-sm line-through">$299/mo value</span>
+                      <div className="text-2xl font-bold">$149/mo</div>
                     </div>
                     <a
                       href="/market-intelligence"
