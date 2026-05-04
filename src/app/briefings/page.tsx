@@ -405,7 +405,7 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
   };
 }
 
-type PageStatus = 'loading' | 'gate' | 'verifying' | 'onboarding' | 'denied' | 'ready' | 'free_signup';
+type PageStatus = 'loading' | 'gate' | 'verifying' | 'onboarding' | 'denied' | 'ready' | 'free_signup' | 'free_ready';
 
 type FilterType = 'all' | 'urgent' | 'opportunity' | 'teaming';
 
@@ -443,6 +443,9 @@ function BriefingsDashboardContent() {
 
   // Unified MI panel state - controls which panel is shown
   const [activePanel, setActivePanel] = useState<MIPanel>('dashboard');
+
+  // Track if user is on free tier (alerts only, no briefings access)
+  const [isFreeUser, setIsFreeUser] = useState(false);
 
   const selectedBriefing = briefings.find(b => b.briefing_date === selectedDate)?.content ?? null;
 
@@ -734,8 +737,32 @@ function BriefingsDashboardContent() {
   };
 
   const handleOnboardingComplete = async () => {
-    // After onboarding, fetch briefings
-    await fetchBriefings(email);
+    // Check if user has briefings access (MI Pro) or just alerts (MI Free)
+    try {
+      const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const hasBriefingsAccess = data.data.briefingsEnabled === true;
+
+        if (hasBriefingsAccess) {
+          // MI Pro user - fetch and show briefings
+          await fetchBriefings(email);
+        } else {
+          // MI Free user - show free tier dashboard (alerts only)
+          setIsFreeUser(true);
+          setStatus('free_ready');
+        }
+      } else {
+        // Fallback: assume free tier
+        setIsFreeUser(true);
+        setStatus('free_ready');
+      }
+    } catch {
+      // On error, fallback to free tier dashboard
+      setIsFreeUser(true);
+      setStatus('free_ready');
+    }
   };
 
   // Handle free signup - creates user with alerts-only access (MI Free tier)
@@ -1023,6 +1050,85 @@ function BriefingsDashboardContent() {
               See MI Pro — $149/mo
             </Link>
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MI Free Ready (completed onboarding, alerts-only tier) ---
+  if (status === 'free_ready') {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+        <div className="max-w-lg w-full">
+          {/* Success header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-600/20 mb-4">
+              <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">You&apos;re All Set!</h1>
+            <p className="text-gray-400">
+              Your MI Free account is ready. You&apos;ll start receiving daily opportunity alerts at <span className="text-emerald-400">{email}</span>
+            </p>
+          </div>
+
+          {/* What's included */}
+          <div className="p-6 bg-gray-900 border border-gray-800 rounded-2xl mb-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Your MI Free Benefits</h2>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-gray-300">
+                <span className="w-6 h-6 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm">✓</span>
+                <span>Daily Opportunity Alerts — sent to your inbox</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-300">
+                <span className="w-6 h-6 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm">✓</span>
+                <span>Matched to your NAICS codes</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-300">
+                <span className="w-6 h-6 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm">✓</span>
+                <span>Opportunity Hunter search access</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <Link
+              href="/opportunity-hunter"
+              className="block w-full py-3 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-colors text-center"
+            >
+              Search Opportunities Now →
+            </Link>
+            <button
+              onClick={() => setSettingsPanelOpen(true)}
+              className="block w-full py-3 px-6 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition-colors text-center"
+            >
+              Update My Profile
+            </button>
+          </div>
+
+          {/* Upgrade CTA */}
+          <div className="mt-8 p-6 bg-gradient-to-r from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl">
+            <h3 className="text-lg font-semibold text-white mb-2">Want More Intelligence?</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Upgrade to MI Pro for AI-powered daily briefings, forecasts, SBIR/STTR intel, and pipeline tracking.
+            </p>
+            <Link
+              href="/market-intelligence"
+              className="inline-block py-2 px-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg transition-colors"
+            >
+              See MI Pro — $149/mo
+            </Link>
+          </div>
+
+          {/* Settings panel for profile updates */}
+          <SettingsPanel
+            isOpen={settingsPanelOpen}
+            onClose={() => setSettingsPanelOpen(false)}
+            email={email}
+            onSaved={() => {}}
+          />
         </div>
       </div>
     );
