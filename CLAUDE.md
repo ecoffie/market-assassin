@@ -36,18 +36,24 @@
 
 | Tier | Price | Includes |
 |------|-------|----------|
-| **MI Free** | $0 | Limited opportunity search only |
-| **MI Pro** | $149/mo | Full intelligence stack (Dashboard, Research, Forecasts, Recompetes, Contractors, SBIR, Grants) |
+| **MI Free** | $0 | Opportunity Hunter + Daily Alerts (simple list, no AI) |
+| **MI Pro** | $149/mo | Full intelligence stack with AI briefings |
+| **MI Pro (grandfathered)** | $49/mo | Existing $49 subscribers honored |
 | **MI + Execution** | $316/mo | Intelligence + Pipeline + Contacts + Proposals + AI Workbench |
-| **MI Team** | $1,000/mo | 5 seats, shared pipeline, team collaboration |
-| **MI Enterprise** | $2,500+/mo | 15+ seats, API access, white-label options |
-| **White Glove** | $5,000+/mo | Done-for-you BD services (add-on) |
+| **MI Team** | $499/mo | 5 seats, shared pipeline |
+| **MI Enterprise** | $2,500+/mo | 15+ seats, API, white-label |
 
-**$49/mo Briefings-Only Tier (DEPRECATED):**
-- ❌ NOT available for new customers
-- ✅ Grandfathered for existing $49 subscribers
-- ✅ Available for trial/beta users who convert
-- **Retention play:** Federal Help Center ($99/mo) replaces $49 as ongoing support option
+**Legacy Product Handling:**
+- Alert Pro ($19/mo) → Cancel subscriptions, users get MI Free
+- Briefings ($49/mo) → Grandfather at $49, get MI Pro features
+- Tool bundles → Lifetime MI Pro access
+- Shop → KILLED, redirect to /pricing
+
+**Domain Structure (May 2026):**
+- `govcongiants.com` → Marketing/SEO (govcon-funnels)
+- `mi.govcongiants.com` → SaaS app (market-assassin)
+- `shop.govcongiants.com` → KILLED (redirect to /pricing)
+- See `docs/strategy/DOMAIN-BRAND-CONSOLIDATION.md` for full plan
 
 ### MITier Type
 
