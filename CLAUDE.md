@@ -43,6 +43,12 @@
 | **MI Enterprise** | $2,500+/mo | 15+ seats, API access, white-label options |
 | **White Glove** | $5,000+/mo | Done-for-you BD services (add-on) |
 
+**$49/mo Briefings-Only Tier (DEPRECATED):**
+- ❌ NOT available for new customers
+- ✅ Grandfathered for existing $49 subscribers
+- ✅ Available for trial/beta users who convert
+- **Retention play:** Federal Help Center ($99/mo) replaces $49 as ongoing support option
+
 ### MITier Type
 
 ```typescript
