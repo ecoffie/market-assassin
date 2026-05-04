@@ -245,59 +245,95 @@ function MarketIntelligenceContent() {
         </div>
       </div>
 
-      {/* What's Included */}
-      <div className="max-w-4xl mx-auto px-4 py-16">
-        <h2 className="text-2xl font-bold text-white text-center mb-10">What&apos;s Included</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-            <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-2xl">📋</span>
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Daily Brief</h3>
-            <p className="text-slate-400 text-sm">
-              Ranked opportunities with urgency indicators, agency signals, and recommended next actions.
-              Delivered every morning by email.
-            </p>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-            <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-2xl">📊</span>
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Weekly Deep Dive</h3>
-            <p className="text-slate-400 text-sm">
-              Strategic analysis of market movement, teaming opportunities, and emerging agency priorities.
-              Delivered every Sunday.
-            </p>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-            <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-2xl">🎯</span>
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Pursuit Brief</h3>
-            <p className="text-slate-400 text-sm">
-              Capture-focused guidance for your top targets. Incumbent analysis, win themes, and next-step actions.
-              Delivered every Monday.
-            </p>
-          </div>
-        </div>
+      {/* What's Included - Two Tier Cards */}
+      <div className="max-w-5xl mx-auto px-4 py-16">
+        <h2 className="text-2xl font-bold text-white text-center mb-4">Choose Your Plan</h2>
+        <p className="text-slate-400 text-center mb-10">Start free, upgrade when you need AI-powered intelligence</p>
 
-        {/* Additional Features */}
-        <div className="mt-10 grid md:grid-cols-2 gap-4">
-          <div className="flex items-start gap-3 text-slate-300">
-            <span className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm flex-shrink-0 mt-0.5">✓</span>
-            <span>Personalized by your NAICS codes, agencies, and geography</span>
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* MI Free Card */}
+          <div className="bg-slate-800/50 border-2 border-emerald-500/50 rounded-2xl p-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">🆓</span>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">MI Free</h3>
+                <p className="text-emerald-400 font-semibold">$0/month</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex items-start gap-3 text-slate-300">
+                <span className="w-5 h-5 rounded-full bg-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs flex-shrink-0 mt-0.5">✓</span>
+                <span><strong>Daily Opportunity Alerts</strong> — simple list of new opportunities</span>
+              </div>
+              <div className="flex items-start gap-3 text-slate-300">
+                <span className="w-5 h-5 rounded-full bg-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs flex-shrink-0 mt-0.5">✓</span>
+                <span><strong>Opportunity Hunter</strong> — market research tool</span>
+              </div>
+              <div className="flex items-start gap-3 text-slate-300">
+                <span className="w-5 h-5 rounded-full bg-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs flex-shrink-0 mt-0.5">✓</span>
+                <span>Personalized by your NAICS codes</span>
+              </div>
+              <div className="flex items-start gap-3 text-slate-500">
+                <span className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center text-slate-500 text-xs flex-shrink-0 mt-0.5">—</span>
+                <span>No AI briefings or analysis</span>
+              </div>
+            </div>
+
+            <a
+              href={FREE_SIGNUP_URL}
+              className="block w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-center rounded-xl font-semibold transition-colors"
+            >
+              Start Free →
+            </a>
           </div>
-          <div className="flex items-start gap-3 text-slate-300">
-            <span className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm flex-shrink-0 mt-0.5">✓</span>
-            <span>Dashboard access with search, filters, and CSV export</span>
-          </div>
-          <div className="flex items-start gap-3 text-slate-300">
-            <span className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm flex-shrink-0 mt-0.5">✓</span>
-            <span>Access to Forecasts, SBIR, and Grants tabs</span>
-          </div>
-          <div className="flex items-start gap-3 text-slate-300">
-            <span className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-sm flex-shrink-0 mt-0.5">✓</span>
-            <span>30-day briefing history with full archive</span>
+
+          {/* MI Pro Card */}
+          <div className="bg-slate-800/50 border-2 border-purple-500/50 rounded-2xl p-8 relative">
+            <div className="absolute -top-3 right-6 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+              RECOMMENDED
+            </div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">🚀</span>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">MI Pro</h3>
+                <p className="text-purple-400 font-semibold">$149/month</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex items-start gap-3 text-slate-300">
+                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
+                <span><strong>Daily AI Brief</strong> — ranked with win probability</span>
+              </div>
+              <div className="flex items-start gap-3 text-slate-300">
+                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
+                <span><strong>Weekly Deep Dive</strong> — strategic market analysis</span>
+              </div>
+              <div className="flex items-start gap-3 text-slate-300">
+                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
+                <span><strong>Pursuit Brief</strong> — capture guidance for top targets</span>
+              </div>
+              <div className="flex items-start gap-3 text-slate-300">
+                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
+                <span>Forecasts, SBIR, Grants + full dashboard</span>
+              </div>
+              <div className="flex items-start gap-3 text-slate-300">
+                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
+                <span>Everything in Free tier included</span>
+              </div>
+            </div>
+
+            <a
+              href={CHECKOUT_MONTHLY}
+              className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white text-center rounded-xl font-semibold transition-colors"
+            >
+              Get Pro — $149/mo
+            </a>
           </div>
         </div>
       </div>
