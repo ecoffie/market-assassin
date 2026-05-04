@@ -88,15 +88,34 @@ tools.govcongiants.org/mi
 
 ---
 
-## Unified MI SaaS Tiers (Revised)
+## Unified MI SaaS Tiers (Revised May 2026)
+
+### MI Free - $0
+**Entry tier with habit-forming daily touchpoint**
+
+| Feature | Current Status |
+|---------|----------------|
+| Opportunity Hunter (market research) | ✅ BUILT |
+| Daily Alerts (simple opp list, no AI) | ✅ BUILT |
+| Weekly digest email | ✅ BUILT |
+| NAICS profile setup | ✅ BUILT |
+| Dashboard preview (limited view) | ✅ BUILT |
+
+**Why Daily Alerts in Free:**
+- **Habit-forming hook** — Daily email creates touchpoint
+- **Same onboarding** — NAICS profile for both OH and Alerts
+- **Natural upgrade path** — "Want AI analysis?" → MI Pro
+- **Matches SaaS best practices** — Gate value amplifiers, not core value
 
 ### MI Pro - $149/mo
 **One user, full intelligence stack**
 
 | Feature | Current Status |
 |---------|----------------|
-| Daily Bid Targets (briefings) | ✅ BUILT |
+| Everything in Free, unlimited | ✅ |
+| Daily Briefings (AI-powered, win probability) | ✅ BUILT |
 | Weekly Deep Dives | ✅ BUILT |
+| Pursuit Briefs | ✅ BUILT |
 | Full Opportunity Dashboard | ✅ BUILT |
 | Market Assassin (strategy) | ✅ BUILT |
 | Recompete Tracker | ✅ BUILT |
@@ -104,9 +123,21 @@ tools.govcongiants.org/mi
 | Contractor Database | ✅ BUILT |
 | Market Scanner (6Q) | ✅ BUILT |
 | BD Pipeline (lite) | ✅ BUILT |
-| Pursuit Briefs | ✅ BUILT |
+| Saved searches & export | ✅ BUILT |
 | Feedback loop (rate matches) | ❌ NEEDS BUILD |
-| Unified navigation | ❌ NEEDS BUILD |
+| Unified navigation | ✅ BUILT |
+
+### Key Difference: Daily Alerts vs Daily Briefings
+
+| Feature | Daily Alerts (Free) | Daily Briefings (Pro) |
+|---------|---------------------|----------------------|
+| Delivery | Email | Email + Dashboard |
+| Content | Simple opportunity list | AI-curated top 3-5 matches |
+| Analysis | None | Win probability score |
+| Strategy | None | Strategic recommendations |
+| "Why this?" | None | Match reasoning |
+| Next steps | None | Action items |
+| Price | $0 | $149/mo |
 
 ### MI Team - $499/mo
 **5 seats, shared intelligence**
@@ -504,16 +535,21 @@ This is 59% less than Deltek and includes features they don't have (daily briefi
 
 ---
 
-## The Bundle That Sells Itself
+## The Funnel That Sells Itself
 
-**MI Pro + Market Assassin (one-time) = $149/mo + $297 = Complete intelligence stack**
+**MI Free → MI Pro conversion funnel:**
 
-Or...
+1. **User signs up for MI Free** (OH + Daily Alerts)
+2. **Daily email creates habit** — opens every morning
+3. **Sees value but wants more** — "Why did this match me?"
+4. **Upgrades to MI Pro** ($149/mo) for AI analysis
+5. **MI Pro Annual** ($1,788/year) includes Market Assassin free
 
-**MI Pro Annual ($1,788/year) includes Market Assassin free**
-- Locks in recurring revenue
-- Gives them the strategy map + daily radar
-- No fragmented upsells
+**Why this works:**
+- Daily Alerts is the habit-forming hook
+- Same onboarding (NAICS profile) for all users
+- Clear value gap: simple list → AI intelligence
+- 2026 SaaS best practice: hybrid freemium model
 
 ---
 
@@ -529,4 +565,4 @@ Or...
 
 ---
 
-*Last Updated: May 3, 2026*
+*Last Updated: May 3, 2026 — MI Free includes OH + Daily Alerts (habit-forming hook)*

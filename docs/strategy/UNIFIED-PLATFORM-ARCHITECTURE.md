@@ -29,29 +29,48 @@
 
 ---
 
-## Key Decision: OH + MA Consolidation
+## Key Decision: OH + Daily Alerts + MA Consolidation
 
-**Opportunity Hunter** and **Market Assassin** are the same product at different depths.
+**Opportunity Hunter**, **Daily Alerts**, and **Market Assassin** are now unified into one product with tiers.
 
-| Aspect | Opportunity Hunter | Market Assassin |
-|--------|-------------------|-----------------|
-| Job | Find opportunities | Understand your market |
-| Data | SAM + Grants | Same + agency intel + spending |
-| Price | Free | Paid |
-| Role | Lead generation | Conversion |
+| Aspect | Opportunity Hunter | Daily Alerts | Market Assassin |
+|--------|-------------------|--------------|-----------------|
+| Job | Find who buys what you sell | Notify of new opportunities | Deep market strategy |
+| Data | USASpending (historical awards) | SAM.gov (active solicitations) | Full intel stack |
+| Price | Free | Free | Paid |
+| Role | Market research hook | Habit-forming daily touchpoint | Full intelligence |
 
-**Decision:** Merge them into one product with tiers.
+**Decision:** Merge ALL into one product with tiers.
 
 | Old Name | New Name | Access |
 |----------|----------|--------|
-| Opportunity Hunter | **MI Free** | Search, limited results, lead capture |
-| Market Assassin | **MI Pro** | Full search + briefings + intel |
+| Opportunity Hunter | **MI Free** | Market research (limited to 10 agencies) |
+| Daily Alerts | **MI Free** | Daily email notifications (simple list, no AI analysis) |
+| Market Assassin + Daily Briefings | **MI Pro** | Full intelligence stack with AI analysis |
+
+**MI Free ($0) includes:**
+- Opportunity Hunter (market research: "who buys what you sell")
+- Daily Alerts (simple opportunity list email - no AI)
+- Weekly digest email
+- NAICS profile setup
+- Dashboard preview (limited view)
+
+**MI Pro ($149/mo) includes:**
+- Everything in Free, unlimited
+- Daily Briefings (AI-powered intelligence, win probability)
+- Weekly Deep Dive + Pursuit Brief
+- Full Dashboard access
+- Forecasts, Recompetes, Contractors, SBIR, Grants
+- Market Assassin (deep research)
+- Export, saved searches
 
 **Benefits:**
-- One product name to market
+- One product name to market ("Market Intelligence")
 - Clear upgrade path (Free → Pro)
 - No confusion about "which tool"
-- OH continues to drive leads, just under MI Free branding
+- Daily email touchpoint drives habit formation and upgrades
+- Same onboarding for all users (NAICS profile)
+- OH + Daily Alerts combined = powerful free tier hook for social/Apex
 
 ---
 
