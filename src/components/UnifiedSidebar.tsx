@@ -10,22 +10,19 @@ export type MIPanel =
   | 'forecasts'      // 7,700+ upcoming procurements
   | 'recompetes'     // Expiring contracts
   | 'contractors'    // 3,500+ with contacts
-  | 'pipeline'       // Track pursuits
-  | 'contacts'       // CRM & relationships
+  | 'pipeline'       // Track pursuits (Pro tier)
+  | 'contacts'       // CRM & relationships (Pro tier)
   | 'content'        // Content Reaper
   | 'planner'        // Action Planner
   | 'sbir'           // SBIR/STTR
-  | 'grants'         // Federal grants
-  | 'proposals'      // Proposal Manager (Execution tier)
-  | 'workbench';     // AI Workbench (Execution tier)
+  | 'grants';        // Federal grants
 
 // Tier definitions for access control
-// Free: MI Free ($0) - Limited search
-// Tier 1: MI Pro ($149/mo) - Full intelligence
-// Tier 2: MI + Execution ($316/mo) - Intelligence + CRM + AI proposals
-// Tier 3: MI Team ($1,000/mo) - 5 seats, shared pipeline
-// Tier 4: MI Enterprise ($2,500+/mo) - 15+ seats, API, white-label
-export type MITier = 'free' | 'pro' | 'execution' | 'team' | 'enterprise';
+// Free: MI Free ($0) - OH + Daily Alerts
+// Tier 1: MI Pro ($149/mo) - Full intelligence + Pipeline
+// Tier 2: MI Team ($499/mo) - 5 seats, shared pipeline
+// Tier 3: MI Enterprise (Contact Sales) - 15+ seats, API, white-label
+export type MITier = 'free' | 'pro' | 'team' | 'enterprise';
 
 interface NavItem {
   name: string;
@@ -47,11 +44,10 @@ interface NavSection {
 // Reference: https://www.atlassian.com/blog/design/designing-atlassians-new-navigation
 //
 // TIER STRUCTURE:
-// - MI Free ($0): Limited opportunity search only
-// - MI Pro ($149/mo): Full intelligence stack
-// - MI + Execution ($316/mo): Intelligence + CRM + Proposals + AI Workbench
-// - MI Team ($1,000/mo): 5 seats, shared pipeline
-// - MI Enterprise ($2,500+/mo): 15+ seats, API, white-label
+// - MI Free ($0): OH + Daily Alerts
+// - MI Pro ($149/mo): Full intelligence + Pipeline
+// - MI Team ($499/mo): 5 seats, shared pipeline
+// - MI Enterprise (Contact Sales): 15+ seats, API, white-label
 const navigation: NavSection[] = [
   {
     title: 'Intelligence',
@@ -109,38 +105,22 @@ const navigation: NavSection[] = [
     ],
   },
   {
-    title: 'Execution',
-    tier: 'execution',
+    title: 'Pipeline',
+    tier: 'pro',
     items: [
       {
         name: 'Pipeline',
         panel: 'pipeline',
         icon: '🎯',
         description: 'Track pursuits',
-        tier: 'execution',
+        tier: 'pro',
       },
       {
         name: 'Contacts',
         panel: 'contacts',
         icon: '👥',
         description: 'CRM & relationships',
-        tier: 'execution',
-      },
-      {
-        name: 'Proposals',
-        panel: 'proposals',
-        icon: '📝',
-        description: 'AI-generated proposals',
-        tier: 'execution',
-        badge: 'NEW',
-      },
-      {
-        name: 'AI Workbench',
-        panel: 'workbench',
-        icon: '🤖',
-        description: 'Private AI agents',
-        tier: 'execution',
-        badge: 'NEW',
+        tier: 'pro',
       },
     ],
   },
@@ -170,14 +150,13 @@ const navigation: NavSection[] = [
 const tierInfo: Record<MITier, { name: string; price: string; color: string }> = {
   free: { name: 'MI Free', price: '$0', color: 'gray' },
   pro: { name: 'MI Pro', price: '$149/mo', color: 'emerald' },
-  execution: { name: 'MI + Execution', price: '$316/mo', color: 'purple' },
-  team: { name: 'MI Team', price: '$1,000/mo', color: 'blue' },
-  enterprise: { name: 'MI Enterprise', price: '$2,500+/mo', color: 'amber' },
+  team: { name: 'MI Team', price: '$499/mo', color: 'blue' },
+  enterprise: { name: 'MI Enterprise', price: 'Contact Sales', color: 'amber' },
 };
 
 // Check if user has access to a feature based on their tier
 function hasAccess(userTier: MITier, requiredTier: MITier): boolean {
-  const tierOrder: MITier[] = ['free', 'pro', 'execution', 'team', 'enterprise'];
+  const tierOrder: MITier[] = ['free', 'pro', 'team', 'enterprise'];
   return tierOrder.indexOf(userTier) >= tierOrder.indexOf(requiredTier);
 }
 

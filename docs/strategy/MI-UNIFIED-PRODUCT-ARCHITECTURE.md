@@ -151,21 +151,21 @@ tools.govcongiants.org/mi
 | Shared pipeline views | ⚠️ PARTIAL |
 | Team activity log | ❌ NEEDS BUILD |
 
-### MI Enterprise - $2,500/mo
-**Unlimited seats, white-label, API**
+### MI Enterprise - Contact Sales
+**15+ seats, white-label, API**
 
 | Feature | Current Status |
 |---------|----------------|
 | Everything in MI Team | - |
-| Unlimited seats | ❌ NEEDS BUILD |
+| 15+ seats | ❌ NEEDS BUILD |
 | API access | ❌ NEEDS BUILD |
 | White-label reports | ❌ NEEDS BUILD |
 | Custom briefing templates | ⚠️ PARTIAL |
 | SSO/SAML | ❌ NEEDS BUILD |
 | Dedicated support | Process only |
 
-### MI Enterprise Plus - $5,000+/mo
-**White Glove + Software**
+### White Glove - $5,000+/mo
+**Done-for-you BD + Software**
 
 | Feature | Current Status |
 |---------|----------------|
@@ -565,4 +565,4 @@ This is 59% less than Deltek and includes features they don't have (daily briefi
 
 ---
 
-*Last Updated: May 3, 2026 — MI Free includes OH + Daily Alerts (habit-forming hook)*
+*Last Updated: May 4, 2026 — Simplified to 4 tiers: Free, Pro ($149), Team ($499), Enterprise (Contact Sales)*

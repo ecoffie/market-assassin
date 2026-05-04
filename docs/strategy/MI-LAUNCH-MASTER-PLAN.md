@@ -1,6 +1,6 @@
 # MI Launch Master Plan
 
-**Date:** May 3, 2026
+**Date:** May 4, 2026
 **Purpose:** Complete buildout plan, rollout strategy, pricing, and bootcamp redesign
 
 ---
@@ -154,12 +154,11 @@ APEX Accelerators counsel 30,000+ small businesses annually across 90+ locations
 
 | Tier | Monthly | Annual | What's Included |
 |------|---------|--------|-----------------|
-| **MI Free** | $0 | $0 | Search opps (limited results), lead capture |
+| **MI Free** | $0 | $0 | OH + Daily Alerts, lead capture |
 | **MI Beta** | $49 | $588 | Full access, expires [DATE] |
-| **MI Pro** | $149 | $1,788 | Full intelligence + briefings (1 seat) |
-| **MI + Execution** | $316 | $3,792 | Intelligence + CRM + Proposals (1 seat) |
+| **MI Pro** | $149 | $1,788 | Full intelligence + Pipeline + CRM (1 seat) |
 | **MI Team** | $499 | $5,988 | 5 seats, shared pipeline, admin |
-| **MI Enterprise** | $2,500 | $30,000 | 15+ seats, API, white-label |
+| **MI Enterprise** | Contact Sales | Contact Sales | 15+ seats, API, white-label |
 | **White Glove** | $5,000+ | $60,000+ | Done-for-you BD + coaching |
 
 ### Beta → Core Transition
@@ -197,12 +196,12 @@ APEX Accelerators counsel 30,000+ small businesses annually across 90+ locations
 
 ### Comparison Pricing
 
-| Competitor | Entry | Average | Enterprise |
-|------------|-------|---------|------------|
-| **Deltek GovWin** | $13K/year | $29K/year | $119K/year |
-| **Unanet GovIntel** | $2.5K/year | $10K/year | $50K+/year |
-| **MI (Us)** | **$1,788/year** | **$5,988/year** | **$30K/year** |
-| **Savings vs Deltek** | 86% | 79% | 75% |
+| Competitor | Entry | Team (5 seats) | Enterprise |
+|------------|-------|----------------|------------|
+| **Deltek GovWin** | $13K/year | $60K/year | $119K/year |
+| **Unanet GovIntel** | $2.5K/year | $30K/year | $50K+/year |
+| **MI (Us)** | **$1,788/year** | **$5,988/year** | **Contact Sales** |
+| **Savings vs Deltek** | 86% | 90% | — |
 
 ---
 

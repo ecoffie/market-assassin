@@ -112,9 +112,9 @@
 ## Product Tiers (Unified)
 
 ### Tier 1: MI Pro - $149/mo
-**"Know what to pursue"**
+**"Know what to pursue AND execute on it"**
 
-All intelligence tools:
+All intelligence + execution tools:
 - Daily AI Briefings (personalized bid targets)
 - Weekly Deep Dives (market trends)
 - Pursuit Briefs (opportunity analysis)
@@ -124,26 +124,15 @@ All intelligence tools:
 - Forecast Intelligence (upcoming procurements)
 - Contractor Database (competitors/partners)
 - Market Scanner (6-question framework)
-
-**Single user, full intelligence stack**
-
-### Tier 2: MI + Execution - $316/mo ($149 + $167)
-**"Know what to pursue AND execute on it"**
-
-Everything in MI Pro, plus:
 - Pipeline/CRM Management
-- Proposal Manager (AI-generated)
-- AI Workbench (private agents)
-- Email/Calendar Integration
-- Deadline Tracking
-- Activity Logs
+- Contacts CRM
 
 **Single user, full stack**
 
-### Tier 3: Team - $1,000/mo (5 seats)
+### Tier 2: MI Team - $499/mo (5 seats)
 **"BD team intelligence + execution"**
 
-Everything in Tier 2, plus:
+Everything in MI Pro, plus:
 - 5 user seats
 - Team admin dashboard
 - Shared pipeline views
@@ -151,9 +140,9 @@ Everything in Tier 2, plus:
 - Team activity feed
 - Role-based access
 
-**$200/seat/mo = $2,400/seat/year**
+**$100/seat/mo = $1,200/seat/year**
 
-### Tier 4: Enterprise - $2,500+/mo
+### Tier 3: MI Enterprise - Contact Sales
 **"Organization-wide deployment"**
 
 Everything in Team, plus:
@@ -165,7 +154,7 @@ Everything in Team, plus:
 - White-label reports
 - Dedicated support
 
-### Tier 5: White Glove - $5,000+/mo
+### Tier 4: White Glove - $5,000+/mo
 **"Done-for-you BD"**
 
 Everything in Enterprise, plus:
@@ -726,15 +715,12 @@ const navigation = [
     ]
   },
   {
-    name: 'Execution',
+    name: 'Pipeline',
     icon: RocketIcon,
-    tier: 'execution', // MI + Execution tier
+    tier: 'pro', // MI Pro tier
     children: [
-      { name: 'Pipeline', href: '/execution/pipeline' },
-      { name: 'Contacts', href: '/execution/contacts' },
-      { name: 'Proposals', href: '/execution/proposals' },
-      { name: 'AI Workbench', href: '/execution/workbench' },
-      { name: 'Automations', href: '/execution/automations' },
+      { name: 'Pipeline', href: '/pipeline' },
+      { name: 'Contacts', href: '/contacts' },
     ]
   },
   {
@@ -892,9 +878,8 @@ const migration = {
 | Tier | GovCon Giants | Deltek | Unanet |
 |------|---------------|--------|--------|
 | Entry (1 seat) | **$149/mo** | $1,083/mo | $208/mo |
-| Full Stack (1 seat) | **$316/mo** | $2,500/mo | $500/mo |
-| Team (5 seats) | **$1,000/mo** | $5,000/mo | $2,500/mo |
-| Enterprise (15 seats) | **$4,167/mo** | $10,000/mo | $8,333/mo |
+| Team (5 seats) | **$499/mo** | $5,000/mo | $2,500/mo |
+| Enterprise (15+ seats) | **Contact Sales** | $10,000/mo | $8,333/mo |
 
 **Positioning:**
 > "Enterprise GovCon intelligence at small business prices.
@@ -965,11 +950,10 @@ const migration = {
 
 | Tier | What You Get | Price |
 |------|--------------|-------|
-| **MI Free** | Search opportunities (limited) | $0 |
-| **MI Pro** | Full intelligence + daily briefings | $149/mo |
-| **MI + Execution** | Intelligence + CRM + AI proposals | $316/mo |
-| **MI Team** | 5 seats, shared pipeline | $1,000/mo |
-| **MI Enterprise** | 15+ seats, API, white-label | $2,500+/mo |
+| **MI Free** | Search opportunities + Daily Alerts | $0 |
+| **MI Pro** | Full intelligence + Pipeline + CRM | $149/mo |
+| **MI Team** | 5 seats, shared pipeline | $499/mo |
+| **MI Enterprise** | 15+ seats, API, white-label | Contact Sales |
 | **White Glove** | Done-for-you BD + coaching | $5,000+/mo |
 
 ### The Comparison
@@ -983,4 +967,4 @@ const migration = {
 
 ---
 
-*Last Updated: May 3, 2026*
+*Last Updated: May 4, 2026 — Simplified to 4 tiers: Free, Pro ($149), Team ($499), Enterprise (Contact Sales)*

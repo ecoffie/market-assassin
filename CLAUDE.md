@@ -37,11 +37,10 @@
 | Tier | Price | Includes |
 |------|-------|----------|
 | **MI Free** | $0 | Opportunity Hunter + Daily Alerts (simple list, no AI) |
-| **MI Pro** | $149/mo | Full intelligence stack with AI briefings |
+| **MI Pro** | $149/mo | Full intelligence stack with AI briefings + Pipeline |
 | **MI Pro (grandfathered)** | $49/mo | Existing $49 subscribers honored |
-| **MI + Execution** | $316/mo | Intelligence + Pipeline + Contacts + Proposals + AI Workbench |
 | **MI Team** | $499/mo | 5 seats, shared pipeline |
-| **MI Enterprise** | $2,500+/mo | 15+ seats, API, white-label |
+| **MI Enterprise** | Contact Sales | 15+ seats, API, white-label |
 
 **Legacy Product Handling:**
 - Alert Pro ($19/mo) → Cancel subscriptions, users get MI Free
@@ -59,18 +58,17 @@
 
 ```typescript
 // src/components/UnifiedSidebar.tsx
-export type MITier = 'free' | 'pro' | 'execution' | 'team' | 'enterprise';
+export type MITier = 'free' | 'pro' | 'team' | 'enterprise';
 
 const tierInfo: Record<MITier, { name: string; price: string; color: string }> = {
   free: { name: 'MI Free', price: '$0', color: 'gray' },
   pro: { name: 'MI Pro', price: '$149/mo', color: 'emerald' },
-  execution: { name: 'MI + Execution', price: '$316/mo', color: 'purple' },
-  team: { name: 'MI Team', price: '$1,000/mo', color: 'blue' },
-  enterprise: { name: 'MI Enterprise', price: '$2,500+/mo', color: 'amber' },
+  team: { name: 'MI Team', price: '$499/mo', color: 'blue' },
+  enterprise: { name: 'MI Enterprise', price: 'Contact Sales', color: 'amber' },
 };
 
 function hasAccess(userTier: MITier, requiredTier: MITier): boolean {
-  const tierOrder: MITier[] = ['free', 'pro', 'execution', 'team', 'enterprise'];
+  const tierOrder: MITier[] = ['free', 'pro', 'team', 'enterprise'];
   return tierOrder.indexOf(userTier) >= tierOrder.indexOf(requiredTier);
 }
 ```
@@ -85,14 +83,12 @@ export type MIPanel =
   | 'forecasts'      // 7,700+ upcoming procurements
   | 'recompetes'     // Expiring contracts
   | 'contractors'    // 3,500+ with contacts
-  | 'pipeline'       // Track pursuits (Execution tier)
-  | 'contacts'       // CRM & relationships (Execution tier)
+  | 'pipeline'       // Track pursuits (Pro tier)
+  | 'contacts'       // CRM & relationships (Pro tier)
   | 'content'        // Content Reaper
   | 'planner'        // Action Planner
   | 'sbir'           // SBIR/STTR
-  | 'grants'         // Federal grants
-  | 'proposals'      // Proposal Manager (Execution tier)
-  | 'workbench';     // AI Workbench (Execution tier)
+  | 'grants';        // Federal grants
 ```
 
 ### Navigation Sections by Tier
@@ -100,7 +96,7 @@ export type MIPanel =
 | Section | Tier Required | Panels |
 |---------|---------------|--------|
 | **Intelligence** | Pro ($149/mo) | Dashboard, Market Research, Forecasts, Recompetes, Contractors, SBIR/STTR, Grants |
-| **Execution** | Execution ($316/mo) | Pipeline, Contacts, Proposals (NEW), AI Workbench (NEW) |
+| **Pipeline** | Pro ($149/mo) | Pipeline, Contacts |
 | **Tools** | Pro ($149/mo) | Content Reaper, Action Planner |
 
 ### Key Files
