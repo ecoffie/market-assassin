@@ -82,7 +82,7 @@ const navigation: NavSection[] = [
         name: 'Recompetes',
         panel: 'recompetes',
         icon: '⏰',
-        description: 'Expiring contracts',
+        description: '12,000+ expiring contracts',
         tier: 'pro',
       },
       {
