@@ -19,17 +19,29 @@ import type {
   PipelineHistoryEntry,
 } from './types';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Lazy-initialize Supabase client to avoid build-time errors
+// Using 'any' type to bypass strict type checking on table schemas
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+
+function getSupabase() {
+  if (!_supabase) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase environment variables not configured');
+    }
+    _supabase = createClient(supabaseUrl, supabaseKey);
+  }
+  return _supabase;
+}
 
 // =============================================
 // CONTACTS
 // =============================================
 
 export async function getContacts(userEmail: string): Promise<Contact[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('contacts')
     .select('*')
     .eq('user_email', userEmail)
@@ -40,7 +52,7 @@ export async function getContacts(userEmail: string): Promise<Contact[]> {
 }
 
 export async function getContact(id: string, userEmail: string): Promise<Contact | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('contacts')
     .select('*')
     .eq('id', id)
@@ -54,6 +66,7 @@ export async function getContact(id: string, userEmail: string): Promise<Contact
 }
 
 export async function createContact(input: CreateContactInput): Promise<Contact> {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('contacts')
     .insert({
@@ -72,6 +85,7 @@ export async function updateContact(
   userEmail: string,
   input: UpdateContactInput
 ): Promise<Contact> {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('contacts')
     .update(input)
@@ -85,7 +99,7 @@ export async function updateContact(
 }
 
 export async function deleteContact(id: string, userEmail: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('contacts')
     .delete()
     .eq('id', id)
@@ -98,7 +112,7 @@ export async function searchContacts(
   userEmail: string,
   query: string
 ): Promise<Contact[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('contacts')
     .select('*')
     .eq('user_email', userEmail)
@@ -115,7 +129,7 @@ export async function searchContacts(
 // =============================================
 
 export async function getPipelineItems(userEmail: string): Promise<PipelineItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('user_pipeline')
     .select('*')
     .eq('user_email', userEmail.toLowerCase())
@@ -129,7 +143,7 @@ export async function getPipelineItem(
   id: string,
   userEmail: string
 ): Promise<PipelineItem | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('user_pipeline')
     .select('*')
     .eq('id', id)
@@ -145,6 +159,8 @@ export async function getPipelineItem(
 export async function createPipelineItem(
   input: CreatePipelineItemInput
 ): Promise<PipelineItem> {
+  const supabase = getSupabase();
+
   // Check for duplicate (same user + notice_id)
   if (input.notice_id) {
     const { data: existing } = await supabase
@@ -180,6 +196,7 @@ export async function updatePipelineItem(
   userEmail: string,
   input: UpdatePipelineItemInput
 ): Promise<PipelineItem> {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('user_pipeline')
     .update(input)
@@ -193,7 +210,7 @@ export async function updatePipelineItem(
 }
 
 export async function deletePipelineItem(id: string, userEmail: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('user_pipeline')
     .delete()
     .eq('id', id)
@@ -203,7 +220,7 @@ export async function deletePipelineItem(id: string, userEmail: string): Promise
 }
 
 export async function getPipelineStats(userEmail: string): Promise<PipelineStats> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('user_pipeline')
     .select('stage')
     .eq('user_email', userEmail.toLowerCase());
@@ -233,7 +250,7 @@ export async function getPipelineStats(userEmail: string): Promise<PipelineStats
 export async function getPipelineHistory(
   pipelineId: string
 ): Promise<PipelineHistoryEntry[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('pipeline_history')
     .select('*')
     .eq('pipeline_id', pipelineId)
@@ -248,7 +265,7 @@ export async function getPipelineHistory(
 // =============================================
 
 export async function getConversations(contactId: string): Promise<Conversation[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('conversations')
     .select('*')
     .eq('contact_id', contactId)
@@ -261,6 +278,7 @@ export async function getConversations(contactId: string): Promise<Conversation[
 export async function createConversation(
   input: CreateConversationInput
 ): Promise<Conversation> {
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('conversations')
     .insert({
@@ -278,7 +296,7 @@ export async function deleteConversation(
   id: string,
   userEmail: string
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('conversations')
     .delete()
     .eq('id', id)
@@ -294,6 +312,7 @@ export async function deleteConversation(
 export async function bulkImportContacts(
   contacts: CreateContactInput[]
 ): Promise<{ imported: number; errors: string[] }> {
+  const supabase = getSupabase();
   const errors: string[] = [];
   let imported = 0;
 
@@ -313,7 +332,7 @@ export async function bulkImportContacts(
     if (error) {
       errors.push(`Batch ${Math.floor(i / batchSize)}: ${error.message}`);
     } else {
-      imported += data?.length || 0;
+      imported += (data)?.length || 0;
     }
   }
 
@@ -323,6 +342,7 @@ export async function bulkImportContacts(
 export async function bulkImportPipelineItems(
   items: CreatePipelineItemInput[]
 ): Promise<{ imported: number; errors: string[] }> {
+  const supabase = getSupabase();
   const errors: string[] = [];
   let imported = 0;
 
@@ -344,7 +364,7 @@ export async function bulkImportPipelineItems(
     if (error) {
       errors.push(`Batch ${Math.floor(i / batchSize)}: ${error.message}`);
     } else {
-      imported += data?.length || 0;
+      imported += (data)?.length || 0;
     }
   }
 
