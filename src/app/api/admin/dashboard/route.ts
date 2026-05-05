@@ -1391,7 +1391,8 @@ async function getRevenueMetrics() {
             if (lineItem) {
               // Get product name from line item description or price product
               const lineDescription = lineItem.description;
-              const linePrice = lineItem.price;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const linePrice = (lineItem as any).price;
 
               if (linePrice && typeof linePrice === 'object') {
                 const summary = await resolvePriceSummary(linePrice);
