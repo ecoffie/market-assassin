@@ -1316,7 +1316,7 @@ async function getRevenueMetrics() {
       billing_details?: { email?: string | null };
       receipt_email?: string | null;
       metadata: Record<string, string>;
-      invoice?: string | { customer_email?: string | null; subscription?: string | { items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null } | null;
+      invoice?: string | { customer_email?: string | null; subscription?: string | { id?: string; items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null } | null;
       customer?: string | { email?: string | null };
     }) {
       let email =
@@ -1325,7 +1325,14 @@ async function getRevenueMetrics() {
         (typeof charge.customer === 'object' ? charge.customer?.email : null) ||
         null;
 
-      let product = charge.description || charge.metadata?.product_name || 'Subscription';
+      // Don't use generic Stripe descriptions like "Subscription creation"
+      const isGenericDescription = !charge.description ||
+        charge.description.toLowerCase().includes('subscription creation') ||
+        charge.description.toLowerCase().includes('subscription update');
+
+      let product = isGenericDescription
+        ? (charge.metadata?.product_name || 'Subscription')
+        : (charge.description || 'Subscription');
       let bundle = charge.metadata?.bundle || undefined;
       let details: string | undefined;
 
@@ -1334,11 +1341,29 @@ async function getRevenueMetrics() {
         email = invoice.customer_email;
       }
 
-      const subscription = invoice && typeof invoice.subscription === 'object'
-        ? invoice.subscription
-        : null;
+      // Get subscription reference - could be object or string ID
+      const subscriptionRef = invoice?.subscription;
+      let subscriptionPrice = null;
 
-      const subscriptionPrice = subscription?.items?.data?.[0]?.price;
+      // If subscription is an object with items, use them
+      if (subscriptionRef && typeof subscriptionRef === 'object' && subscriptionRef.items?.data?.[0]?.price) {
+        subscriptionPrice = subscriptionRef.items.data[0].price;
+      }
+      // If subscription is a string ID, fetch it to get actual product name
+      else if (subscriptionRef) {
+        const subscriptionId = typeof subscriptionRef === 'string' ? subscriptionRef : subscriptionRef.id;
+        if (subscriptionId) {
+          try {
+            const fullSubscription = await stripe.subscriptions.retrieve(subscriptionId, {
+              expand: ['items.data.price.product']
+            });
+            subscriptionPrice = fullSubscription.items?.data?.[0]?.price;
+          } catch {
+            // Subscription may have been deleted, continue with fallback
+          }
+        }
+      }
+
       if (subscriptionPrice) {
         const summary = await resolvePriceSummary(subscriptionPrice);
         product = summary.product || product;
