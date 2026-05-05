@@ -1316,7 +1316,7 @@ async function getRevenueMetrics() {
       billing_details?: { email?: string | null };
       receipt_email?: string | null;
       metadata: Record<string, string>;
-      invoice?: string | { customer_email?: string | null; subscription?: string | { id?: string; items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null } | null;
+      invoice?: string | { id?: string; customer_email?: string | null; subscription?: string | { id?: string; items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null } | null;
       customer?: string | { email?: string | null };
     }) {
       let email =
@@ -1331,8 +1331,8 @@ async function getRevenueMetrics() {
         charge.description.toLowerCase().includes('subscription update');
 
       let product = isGenericDescription
-        ? (charge.metadata?.product_name || 'Subscription')
-        : (charge.description || 'Subscription');
+        ? (charge.metadata?.product_name || 'Purchase')
+        : (charge.description || 'Purchase');
       let bundle = charge.metadata?.bundle || undefined;
       let details: string | undefined;
 
@@ -1343,32 +1343,76 @@ async function getRevenueMetrics() {
 
       // Get subscription reference - could be object or string ID
       const subscriptionRef = invoice?.subscription;
-      let subscriptionPrice = null;
+      let foundProductName = false;
 
-      // If subscription is an object with items, use them
+      // Try 1: If subscription is an object with items, use them
       if (subscriptionRef && typeof subscriptionRef === 'object' && subscriptionRef.items?.data?.[0]?.price) {
-        subscriptionPrice = subscriptionRef.items.data[0].price;
+        const summary = await resolvePriceSummary(subscriptionRef.items.data[0].price);
+        if (summary.product && summary.product !== 'Subscription') {
+          product = summary.product;
+          bundle = summary.bundle || bundle;
+          details = summary.details || details;
+          foundProductName = true;
+        }
       }
-      // If subscription is a string ID, fetch it to get actual product name
-      else if (subscriptionRef) {
+      // Try 2: If subscription is a string ID, fetch it
+      else if (subscriptionRef && !foundProductName) {
         const subscriptionId = typeof subscriptionRef === 'string' ? subscriptionRef : subscriptionRef.id;
         if (subscriptionId) {
           try {
             const fullSubscription = await stripe.subscriptions.retrieve(subscriptionId, {
               expand: ['items.data.price.product']
             });
-            subscriptionPrice = fullSubscription.items?.data?.[0]?.price;
+            const subscriptionPrice = fullSubscription.items?.data?.[0]?.price;
+            if (subscriptionPrice) {
+              const summary = await resolvePriceSummary(subscriptionPrice);
+              if (summary.product && summary.product !== 'Subscription') {
+                product = summary.product;
+                bundle = summary.bundle || bundle;
+                details = summary.details || details;
+                foundProductName = true;
+              }
+            }
           } catch {
             // Subscription may have been deleted, continue with fallback
           }
         }
       }
 
-      if (subscriptionPrice) {
-        const summary = await resolvePriceSummary(subscriptionPrice);
-        product = summary.product || product;
-        bundle = summary.bundle || bundle;
-        details = summary.details || details;
+      // Try 3: For one-time purchases, fetch invoice line items
+      if (!foundProductName && invoice) {
+        const invoiceId = typeof invoice === 'object' ? invoice.id : invoice;
+        if (invoiceId) {
+          try {
+            const fullInvoice = await stripe.invoices.retrieve(invoiceId, {
+              expand: ['lines.data.price.product']
+            });
+            const lineItem = fullInvoice.lines?.data?.[0];
+            if (lineItem) {
+              // Get product name from line item description or price product
+              const lineDescription = lineItem.description;
+              const linePrice = lineItem.price;
+
+              if (linePrice && typeof linePrice === 'object') {
+                const summary = await resolvePriceSummary(linePrice);
+                if (summary.product && summary.product !== 'Subscription') {
+                  product = summary.product;
+                  bundle = summary.bundle || bundle;
+                  details = summary.details || details;
+                  foundProductName = true;
+                }
+              }
+
+              // Fall back to line item description if still no product name
+              if (!foundProductName && lineDescription && !lineDescription.toLowerCase().includes('subscription')) {
+                product = lineDescription;
+                foundProductName = true;
+              }
+            }
+          } catch {
+            // Invoice fetch failed, continue with fallback
+          }
+        }
       }
 
       return {
