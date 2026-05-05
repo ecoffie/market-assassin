@@ -44,6 +44,9 @@ interface DashboardData {
     explicitWeeklyUsers: number;
     freeFallbackUsers: number;
     processedFreeFallback: number;
+    eligibleWithCustomNaics: number;
+    eligibleWithDefaultNaicsOnly: number;
+    eligibleNoNaics: number;
     processedExplicitWeekly: number;
     sent: number;
     failed: number;
@@ -1056,14 +1059,18 @@ export default function AdminDashboard() {
               </div>
               <div className="pl-4 space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">With NAICS</span>
-                  <span className="text-gray-400 font-mono">{data.weeklyAlerts.eligibleWithNaics}</span>
+                  <span className="text-green-500">Custom NAICS</span>
+                  <span className="text-green-400 font-mono">{data.weeklyAlerts.eligibleWithCustomNaics}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Weekly digest users</span>
-                  <span className="text-gray-400 font-mono">{data.weeklyAlerts.freeFallbackUsers}</span>
+                  <span className="text-amber-500">Default NAICS only</span>
+                  <span className="text-amber-400 font-mono">{data.weeklyAlerts.eligibleWithDefaultNaicsOnly}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-red-500">No NAICS</span>
+                  <span className="text-red-400 font-mono">{data.weeklyAlerts.eligibleNoNaics}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-gray-700">
                   <span className="text-gray-500">User-selected weekly</span>
                   <span className="text-gray-400 font-mono">{data.weeklyAlerts.explicitWeeklyUsers}</span>
                 </div>

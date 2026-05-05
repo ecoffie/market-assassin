@@ -588,6 +588,9 @@ async function getWeeklyAlertHealth() {
     nextScheduledAtUtc: cycle.nextScheduledAtUtc,
     eligibleTotal: 0,
     eligibleWithNaics: 0,
+    eligibleWithCustomNaics: 0,
+    eligibleWithDefaultNaicsOnly: 0,
+    eligibleNoNaics: 0,
     explicitWeeklyUsers: 0,
     freeFallbackUsers: 0,
     processedFreeFallback: 0,
@@ -646,8 +649,18 @@ async function getWeeklyAlertHealth() {
       }
 
       eligibleEmails.add(email);
-      if ((user.naics_codes || []).length > 0) {
+      const naicsCodes = user.naics_codes || [];
+      const hasNaics = naicsCodes.length > 0;
+      if (hasNaics) {
         health.eligibleWithNaics++;
+        const hasOnlyDefaults = naicsCodes.every((code: string) => DEFAULT_NAICS_SET.has(code));
+        if (hasOnlyDefaults) {
+          health.eligibleWithDefaultNaicsOnly++;
+        } else {
+          health.eligibleWithCustomNaics++;
+        }
+      } else {
+        health.eligibleNoNaics++;
       }
       if (isExplicitWeekly) {
         health.explicitWeeklyUsers++;
