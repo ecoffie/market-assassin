@@ -6,15 +6,16 @@ export const PRODUCTS = {
     name: 'Market Intelligence',
     tiers: {
       briefings: {
-        price: 49,
+        price: 149, // $149/mo - MI Pro
         billing: 'monthly',
-        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_CHECKOUT_URL || 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_CHECKOUT_URL || 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C',
       },
       briefings_annual: {
-        price: 497,
+        price: 1490, // $1,490/yr - MI Pro Annual (2 months free)
         billing: 'annual',
-        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_ANNUAL_CHECKOUT_URL || 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_ANNUAL_CHECKOUT_URL || 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D',
       },
+      // Note: $49/mo grandfathered users keep their price (price_1TJVGCK5zyiZ50PBQUPA4f4e)
     },
   },
   AI_CONTENT_GENERATOR: {

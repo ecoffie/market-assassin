@@ -15,8 +15,10 @@ interface DashboardData {
   };
   userHealth: {
     totalUsers: number;
-    naicsConfigured: number;
+    naicsConfigured: number;      // Custom NAICS (not defaults)
     naicsPercent: string;
+    defaultNaicsOnly?: number;    // Has NAICS but only defaults
+    noNaics?: number;             // No NAICS at all
     businessTypeSet: number;
     businessTypePercent: string;
     alertsEnabledTotal: number;
@@ -128,6 +130,16 @@ interface DashboardData {
       details?: string;
     }>;
   };
+  bootcampRollout?: {
+    totalBootcampUsers: number;
+    invitationsSent: number;
+    invitationsRemaining: number;
+    profilesCompleted: number;
+    profileCompletionRate: string;
+    readyForAlerts: number;
+    conversionRate: string;
+    lastInvitationSent: string | null;
+  };
   systemAlerts: Array<{ level: 'critical' | 'warning' | 'info'; message: string }>;
   profileReminderLastRun?: ProfileReminderRun | null;
 }
@@ -180,10 +192,10 @@ function getSystemAlertAction(alert: DashboardData['systemAlerts'][number]) {
     };
   }
 
-  if (message.includes('weekly alert fallback')) {
+  if (message.includes('Weekly digest')) {
     return {
-      href: '#weekly-alert-fallback',
-      label: 'Review fallback',
+      href: '#weekly-digest',
+      label: 'Review digest',
       note: 'Check remaining users, sent count, failures, and the next scheduled run.',
     };
   }
@@ -419,11 +431,11 @@ export default function AdminDashboard() {
       href: '#briefings-delivery',
     },
     {
-      label: 'Weekly fallback',
+      label: 'Weekly digest',
       value: `${data.weeklyAlerts.remaining} remaining`,
       detail: `Cycle ${data.weeklyAlerts.cycleDate}`,
       ok: data.weeklyAlerts.remaining === 0,
-      href: '#weekly-alert-fallback',
+      href: '#weekly-digest',
     },
     {
       label: 'Dead letter',
@@ -845,6 +857,57 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Bootcamp Rollout */}
+          {data.bootcampRollout && (
+            <div id="bootcamp-rollout" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-lg font-semibold text-white">Bootcamp Rollout</h2>
+                <span className="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">
+                  8,804 Users
+                </span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Total Enrolled</span>
+                  <span className="text-white font-mono">{data.bootcampRollout.totalBootcampUsers.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Invitations Sent</span>
+                  <span className="text-green-400 font-mono">{data.bootcampRollout.invitationsSent.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Invitations Remaining</span>
+                  <span className="text-yellow-400 font-mono">{data.bootcampRollout.invitationsRemaining.toLocaleString()}</span>
+                </div>
+                <div className="pt-2 border-t border-gray-700 flex justify-between items-center">
+                  <span className="text-gray-400">Profiles Completed</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-mono">{data.bootcampRollout.profilesCompleted}</span>
+                    <span className="text-gray-500 text-sm">({data.bootcampRollout.profileCompletionRate})</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Ready for Alerts</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-400 font-mono">{data.bootcampRollout.readyForAlerts}</span>
+                    <span className="text-gray-500 text-sm">({data.bootcampRollout.conversionRate})</span>
+                  </div>
+                </div>
+                {data.bootcampRollout.lastInvitationSent && (
+                  <div className="pt-2 border-t border-gray-700 flex justify-between">
+                    <span className="text-gray-400">Last Email Sent</span>
+                    <span className="text-gray-300 text-sm">
+                      {new Date(data.bootcampRollout.lastInvitationSent).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
+                  Drip campaign: 2K emails/day via Office365 SMTP. Users complete profile → get Daily Alerts.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* User Health */}
           <div id="user-health" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-white mb-4">User Health</h2>
@@ -853,16 +916,41 @@ export default function AdminDashboard() {
                 <span className="text-gray-400">Total Users</span>
                 <span className="text-white font-mono">{data.userHealth.totalUsers}</span>
               </div>
+              {/* NAICS Breakdown */}
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">NAICS Configured</span>
+                <span className="text-gray-400">Custom NAICS</span>
                 <div className="flex items-center gap-2">
                   <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-green-500"
-                      style={{ width: data.userHealth.naicsPercent }}
+                      style={{ width: `${Math.round((data.userHealth.naicsConfigured / data.userHealth.totalUsers) * 100)}%` }}
                     />
                   </div>
-                  <span className="text-white font-mono text-sm">{data.userHealth.naicsPercent}</span>
+                  <span className="text-green-400 font-mono text-sm">{data.userHealth.naicsConfigured}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Default NAICS Only</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500"
+                      style={{ width: `${Math.round(((data.userHealth.defaultNaicsOnly || 0) / data.userHealth.totalUsers) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-amber-400 font-mono text-sm">{data.userHealth.defaultNaicsOnly || 0}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">No NAICS</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-red-500"
+                      style={{ width: `${Math.round(((data.userHealth.noNaics || 0) / data.userHealth.totalUsers) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-red-400 font-mono text-sm">{data.userHealth.noNaics || 0}</span>
                 </div>
               </div>
               <div className="flex justify-between items-center">
@@ -920,13 +1008,13 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Weekly Alert Fallback */}
-          <div id="weekly-alert-fallback" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
+          {/* Weekly Digest */}
+          <div id="weekly-digest" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
             <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white">Weekly Alert Fallback</h2>
+                <h2 className="text-lg font-semibold text-white">Weekly Digest</h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  Processes free fallback and user-selected weekly alerts for the active weekly cycle.
+                  Weekly opportunity digest for users who prefer less frequent emails.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -937,7 +1025,7 @@ export default function AdminDashboard() {
                   <button
                     onClick={() => {
                       const confirmed = window.confirm(
-                        'Process the next weekly fallback batch now? This can send real weekly alert emails.'
+                        'Process the next weekly digest batch now? This will send real weekly alert emails.'
                       );
                       if (confirmed) {
                         handleAction('process-weekly-fallback');
@@ -972,7 +1060,7 @@ export default function AdminDashboard() {
                   <span className="text-gray-400 font-mono">{data.weeklyAlerts.eligibleWithNaics}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Fallback users</span>
+                  <span className="text-gray-500">Weekly digest users</span>
                   <span className="text-gray-400 font-mono">{data.weeklyAlerts.freeFallbackUsers}</span>
                 </div>
                 <div className="flex justify-between">
@@ -986,7 +1074,7 @@ export default function AdminDashboard() {
               </div>
               <div className="pl-4 space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Processed fallback</span>
+                  <span className="text-gray-500">Processed digest</span>
                   <span className="text-gray-400 font-mono">{data.weeklyAlerts.processedFreeFallback}</span>
                 </div>
                 <div className="flex justify-between">

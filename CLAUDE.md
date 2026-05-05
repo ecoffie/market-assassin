@@ -37,14 +37,19 @@
 | Tier | Price | Includes |
 |------|-------|----------|
 | **MI Free** | $0 | Opportunity Hunter + Daily Alerts (simple list, no AI) |
-| **MI Pro** | $149/mo | Full intelligence stack with AI briefings + Pipeline |
-| **MI Pro (grandfathered)** | $49/mo | Existing $49 subscribers honored |
+| **MI Pro** | $149/mo | Full intelligence stack + AI briefings + Pipeline + FHC training |
+| **MI Pro (loyalty)** | $49/mo | Private offer for past customers only (NOT public) |
 | **MI Team** | $499/mo | 5 seats, shared pipeline |
 | **MI Enterprise** | Contact Sales | 15+ seats, API, white-label |
 
+**Pricing Notes (May 4, 2026):**
+- Public page shows $149/mo only (anchor price)
+- $49/mo is private loyalty link for past customers via email campaign
+- $149/mo includes FHC training/coaching access (replaces $99/mo FHC)
+
 **Legacy Product Handling:**
 - Alert Pro ($19/mo) → Cancel subscriptions, users get MI Free
-- Briefings ($49/mo) → Grandfather at $49, get MI Pro features
+- Briefings ($49/mo) → Grandfather at $49, get MI Pro features (no training)
 - Tool bundles → Lifetime MI Pro access
 - Shop → KILLED, redirect to /pricing
 
@@ -824,9 +829,8 @@ node scripts/import-forecasts.js --source=DOE
 
 | Product | Price | KV Key | Stripe Metadata |
 |---------|-------|--------|-----------------|
-| Opportunity Hunter Pro | $19/mo | `ospro:{email}` | `tier: hunter_pro` |
-| Daily Alerts | $19/mo | `alertpro:{email}` | `tier: alert_pro` |
-| Daily Briefings | $49/mo | `briefings:{email}` | `tier: briefings` |
+| **MI Pro** | $149/mo | `briefings:{email}` | `tier: briefings` |
+| **MI Pro (loyalty)** | $49/mo | `briefings:{email}` | `tier: briefings` |
 | Content Reaper | $197 | `contentgen:{email}` | `tier: content_standard` |
 | Market Assassin Standard | $297 | `ma:{email}` | `tier: assassin_standard` |
 | Content Reaper Full Fix | $397 | `contentgen:{email}` | `tier: content_full_fix` |
@@ -834,18 +838,20 @@ node scripts/import-forecasts.js --source=DOE
 | Federal Contractor Database | $497 | `dbaccess:{email}` | `tier: contractor_db` |
 | Market Assassin Premium | $497 | `ma:{email}` | `tier: assassin_premium` |
 
-### Market Intelligence Pricing (Post-Beta: April 27, 2026)
+### Market Intelligence Access (May 2026)
 
-| User Type | Daily Alerts ($19/mo) | Daily Briefings ($49/mo) |
-|-----------|----------------------|--------------------------|
-| OH Free users (no purchase) | ❌ Pay $19/mo | ❌ Pay $49/mo |
-| OH Pro ($19/mo) subscribers | ✅ Included | ❌ Pay $49/mo |
-| Any product buyer (excl OH free) | ✅ Free | ❌ Pay $49/mo |
-| Pro Giant ($997) | ✅ Free | ✅ 1 year free |
-| Ultimate ($1,497) | ✅ Free | ✅ Lifetime free |
-| Beta users (no purchase) | 30 days free → $19/mo | 30 days free → $49/mo |
+| User Type | MI Free ($0) | MI Pro ($149/mo) |
+|-----------|--------------|------------------|
+| New users | ✅ Free signup | Pay $149/mo |
+| Past customers (loyalty) | ✅ Free | Offered $49/mo via email |
+| Pro Giant ($997) | ✅ Free | ✅ Included |
+| Ultimate ($1,497) | ✅ Free | ✅ Lifetime |
+| Pro Member ($52/mo) | ✅ Free | ✅ Included |
 
-**Beta End Date:** April 27, 2026
+**Notes:**
+- $49/mo loyalty pricing is private (email campaign only, not on public page)
+- $149/mo includes FHC training access (replaces $99/mo FHC product)
+- MI Free = Daily Alerts + OH search (no AI briefings)
 
 ### Bundles
 | Bundle | Price | Includes |

@@ -412,8 +412,13 @@ type FilterType = 'all' | 'urgent' | 'opportunity' | 'teaming';
 // MainTab is deprecated - using MIPanel from sidebar instead
 type MainTab = 'briefings' | 'forecasts' | 'sbir' | 'grants';
 
+// Default NAICS codes assigned during bootcamp batch enrollment
+// Users with ONLY these codes should still go through onboarding
+const DEFAULT_NAICS_SET = new Set(['541512', '541611', '541330', '541990', '561210']);
+
 interface ProfileSetupState {
   hasNaics: boolean;
+  hasCustomNaics: boolean; // true if user has NAICS beyond just defaults
   hasBusinessDescription: boolean;
   businessDescription: string;
 }
@@ -434,6 +439,7 @@ function BriefingsDashboardContent() {
   const [profileStatsRefreshKey, setProfileStatsRefreshKey] = useState(0);
   const [profileSetupState, setProfileSetupState] = useState<ProfileSetupState>({
     hasNaics: false,
+    hasCustomNaics: false,
     hasBusinessDescription: false,
     businessDescription: '',
   });
@@ -548,22 +554,28 @@ function BriefingsDashboardContent() {
   }, []);
 
   // Check profile setup state for smart-skip onboarding.
+  // Users with only default NAICS codes (from batch enrollment) should still go through onboarding.
   const checkProfileSetupState = useCallback(async (userEmail: string): Promise<ProfileSetupState> => {
     try {
       const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`);
       const data = await res.json();
       if (data.success && data.data) {
-        const naicsCodes = data.data.naicsCodes || [];
+        const naicsCodes: string[] = data.data.naicsCodes || [];
         const businessDescription = String(data.data.businessDescription || '').trim();
+        const hasNaics = naicsCodes.length > 0;
+        // Check if user has customized NAICS (has codes beyond just defaults)
+        const hasOnlyDefaults = hasNaics && naicsCodes.every((code: string) => DEFAULT_NAICS_SET.has(code));
+        const hasCustomNaics = hasNaics && !hasOnlyDefaults;
         return {
-          hasNaics: naicsCodes.length > 0,
+          hasNaics,
+          hasCustomNaics,
           hasBusinessDescription: businessDescription.length > 0,
           businessDescription,
         };
       }
-      return { hasNaics: false, hasBusinessDescription: false, businessDescription: '' };
+      return { hasNaics: false, hasCustomNaics: false, hasBusinessDescription: false, businessDescription: '' };
     } catch {
-      return { hasNaics: false, hasBusinessDescription: false, businessDescription: '' };
+      return { hasNaics: false, hasCustomNaics: false, hasBusinessDescription: false, businessDescription: '' };
     }
   }, []);
 
@@ -629,7 +641,8 @@ function BriefingsDashboardContent() {
       const profileSetup = await checkProfileSetupState(userEmail);
       setProfileSetupState(profileSetup);
 
-      if (!profileSetup.hasNaics) {
+      // Show onboarding if user has no NAICS or only default NAICS (from batch enrollment)
+      if (!profileSetup.hasCustomNaics) {
         setEmail(userEmail);
         localStorage.setItem('briefings_access_email', userEmail);
         setStatus('onboarding');

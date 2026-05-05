@@ -4,8 +4,14 @@ import { useRef, useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-const CHECKOUT_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z';
-const CHECKOUT_ANNUAL = 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A';
+// Public pricing (anchor price)
+const CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
+const CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';  // $1,490/yr
+
+// Private loyalty pricing (for email campaigns to past customers only - NOT shown on public page)
+// const CHECKOUT_LOYALTY_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z'; // $49/mo
+// const CHECKOUT_LOYALTY_ANNUAL = 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A';  // $497/yr
+
 const FREE_SIGNUP_URL = '/alerts/signup'; // MI Free tier setup flow (alerts only)
 
 function MarketIntelligenceContent() {
@@ -292,8 +298,8 @@ function MarketIntelligenceContent() {
 
           {/* MI Pro Card */}
           <div className="bg-slate-800/50 border-2 border-purple-500/50 rounded-2xl p-8 relative">
-            <div className="absolute -top-3 right-6 bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-              RECOMMENDED
+            <div className="absolute -top-3 right-6 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+              FULL INTELLIGENCE
             </div>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
@@ -301,8 +307,17 @@ function MarketIntelligenceContent() {
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">MI Pro</h3>
-                <p className="text-purple-400 font-semibold">$149/month</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-purple-400 font-semibold text-2xl">$149/mo</p>
+                </div>
               </div>
+            </div>
+
+            {/* Value Banner */}
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-4 py-2 mb-4 text-center">
+              <p className="text-purple-400 text-sm font-medium">
+                Includes FHC training & coaching access
+              </p>
             </div>
 
             <div className="space-y-3 mb-6">
@@ -330,10 +345,13 @@ function MarketIntelligenceContent() {
 
             <a
               href={CHECKOUT_MONTHLY}
-              className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white text-center rounded-xl font-semibold transition-colors"
+              className="block w-full py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-center rounded-xl font-semibold transition-all shadow-lg shadow-purple-500/25"
             >
-              Get Pro — $149/mo
+              Get MI Pro — $149/mo
             </a>
+            <p className="text-center text-slate-500 text-xs mt-2">
+              Cancel anytime • Includes FHC training access
+            </p>
           </div>
         </div>
       </div>
@@ -357,6 +375,7 @@ function MarketIntelligenceContent() {
                 <th className="py-4 px-4 text-center border-b border-slate-700 bg-purple-900/20">
                   <div className="text-white font-bold">MI Pro</div>
                   <div className="text-purple-400 text-sm font-semibold">$149/mo</div>
+                  <div className="text-slate-500 text-xs">+ FHC Training</div>
                 </th>
                 <th className="py-4 px-4 text-center border-b border-slate-700">
                   <div className="text-white font-bold">MI Team</div>
@@ -464,9 +483,9 @@ function MarketIntelligenceContent() {
                 <td className="py-6 px-4 text-center bg-purple-900/10">
                   <a
                     href={CHECKOUT_MONTHLY}
-                    className="inline-block px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors"
+                    className="inline-block px-6 py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white rounded-lg font-semibold transition-all"
                   >
-                    Get Pro →
+                    Get Pro — $149/mo →
                   </a>
                 </td>
                 <td className="py-6 px-4 text-center">
@@ -491,14 +510,14 @@ function MarketIntelligenceContent() {
           <div className="grid md:grid-cols-3 gap-6 text-sm">
             <div>
               <p className="text-purple-400 font-semibold mb-1">MI Pro: $149/mo</p>
-              <p className="text-slate-400">AI-powered briefings, personalized by your NAICS + geography. Daily, weekly, and pursuit briefs with win probability scoring.</p>
+              <p className="text-slate-400">AI-powered briefings, personalized by your NAICS + geography. Daily, weekly, and pursuit briefs with win probability scoring. Includes FHC training access.</p>
             </div>
             <div>
               <p className="text-slate-500 font-semibold mb-1">Deltek GovWin: $800-1,200/mo</p>
               <p className="text-slate-500">Enterprise platform with extensive data. Overkill for small businesses. Requires training.</p>
             </div>
             <div>
-              <p className="text-emerald-400 font-semibold mb-1">Your Savings: $700+/mo</p>
+              <p className="text-emerald-400 font-semibold mb-1">Your Savings: 85%+</p>
               <p className="text-slate-400">Get the intelligence you need at a fraction of the cost. Built for small GovCon firms, not enterprise.</p>
             </div>
           </div>
@@ -517,7 +536,7 @@ function MarketIntelligenceContent() {
                 <span className="text-4xl font-bold text-white">$149</span>
                 <span className="text-slate-400">/mo</span>
               </div>
-              <p className="text-slate-500 text-sm mt-1 line-through">$299/mo value</p>
+              <p className="text-slate-500 text-sm mt-1">Includes FHC training access</p>
             </div>
             <ul className="space-y-3 mb-8">
               <li className="flex items-center gap-2 text-slate-300 text-sm">
@@ -531,6 +550,9 @@ function MarketIntelligenceContent() {
               </li>
               <li className="flex items-center gap-2 text-slate-300 text-sm">
                 <span className="text-green-500">✓</span> Full dashboard access
+              </li>
+              <li className="flex items-center gap-2 text-slate-300 text-sm">
+                <span className="text-green-500">✓</span> FHC live training sessions
               </li>
               <li className="flex items-center gap-2 text-slate-300 text-sm">
                 <span className="text-green-500">✓</span> Cancel anytime

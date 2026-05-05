@@ -169,8 +169,77 @@ export async function GET(request: NextRequest) {
     systemAlerts: alerts,
 
     // Section 8: Action agent state
-    profileReminderLastRun
+    profileReminderLastRun,
+
+    // Section 9: Bootcamp Rollout Progress
+    bootcampRollout: await getBootcampRollout()
   });
+}
+
+async function getBootcampRollout() {
+  const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
+
+  const rollout = {
+    totalBootcampUsers: 0,
+    invitationsSent: 0,
+    invitationsRemaining: 0,
+    profilesCompleted: 0,
+    profileCompletionRate: '0%',
+    readyForAlerts: 0,
+    conversionRate: '0%',
+    lastInvitationSent: null as string | null
+  };
+
+  try {
+    const supabase = getSupabase();
+
+    // Get all bootcamp users (needs_setup or bootcamp-batch-enroll source)
+    const { data: bootcampUsers } = await supabase
+      .from('user_notification_settings')
+      .select('user_email, naics_codes, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
+      .or('treatment_type.eq.needs_setup,invitation_source.eq.bootcamp-batch-enroll');
+
+    if (bootcampUsers) {
+      rollout.totalBootcampUsers = bootcampUsers.length;
+
+      for (const user of bootcampUsers) {
+        // Count invitations sent
+        if (user.invitation_sent_at) {
+          rollout.invitationsSent++;
+          // Track most recent
+          if (!rollout.lastInvitationSent || user.invitation_sent_at > rollout.lastInvitationSent) {
+            rollout.lastInvitationSent = user.invitation_sent_at;
+          }
+        }
+
+        // Check if profile is completed (custom NAICS, not default)
+        const naics = user.naics_codes || [];
+        const hasCustomNaics = naics.length > 0 &&
+          !(naics.length === DEFAULT_NAICS.length && naics.every((n: string) => DEFAULT_NAICS.includes(n)));
+
+        if (hasCustomNaics) {
+          rollout.profilesCompleted++;
+        }
+
+        // Ready for alerts (has custom NAICS and alerts enabled)
+        if (hasCustomNaics && user.alerts_enabled && user.treatment_type === 'alerts') {
+          rollout.readyForAlerts++;
+        }
+      }
+
+      rollout.invitationsRemaining = rollout.totalBootcampUsers - rollout.invitationsSent;
+      rollout.profileCompletionRate = rollout.invitationsSent > 0
+        ? `${Math.round((rollout.profilesCompleted / rollout.invitationsSent) * 100)}%`
+        : '0%';
+      rollout.conversionRate = rollout.totalBootcampUsers > 0
+        ? `${Math.round((rollout.readyForAlerts / rollout.totalBootcampUsers) * 100)}%`
+        : '0%';
+    }
+  } catch (error) {
+    console.error('getBootcampRollout error:', error);
+  }
+
+  return rollout;
 }
 
 async function getEmailStats(today: string) {
@@ -302,11 +371,16 @@ async function getEmailStats(today: string) {
   return stats;
 }
 
+// Default NAICS assigned during bootcamp batch enrollment
+const DEFAULT_NAICS_SET = new Set(['541512', '541611', '541330', '541990', '561210']);
+
 async function getUserHealth() {
   const health = {
     totalUsers: 0,
-    naicsConfigured: 0,
+    naicsConfigured: 0,      // Custom NAICS (not defaults)
     naicsPercent: '0%',
+    defaultNaicsOnly: 0,     // Has NAICS but only defaults
+    noNaics: 0,              // No NAICS at all
     businessTypeSet: 0,
     businessTypePercent: '0%',
     alertsEnabledTotal: 0,
@@ -412,12 +486,25 @@ async function getUserHealth() {
       health.totalUsers = settingsData.length;
 
       for (const user of settingsData) {
-        const hasNaics = user.naics_codes && user.naics_codes.length > 0;
+        const naicsCodes = user.naics_codes || [];
+        const hasNaics = naicsCodes.length > 0;
         const hasBusinessType = user.business_type && user.business_type.trim() !== '';
         const normalizedEmail = user.user_email.toLowerCase();
 
-        if (hasNaics) health.naicsConfigured++;
-        else health.unconfiguredEmails.push(user.user_email);
+        // Check if user has CUSTOM NAICS (not just defaults)
+        const hasOnlyDefaults = hasNaics &&
+          naicsCodes.every((code: string) => DEFAULT_NAICS_SET.has(code));
+        const hasCustomNaics = hasNaics && !hasOnlyDefaults;
+
+        if (hasCustomNaics) {
+          health.naicsConfigured++;
+        } else if (hasOnlyDefaults) {
+          health.defaultNaicsOnly++;
+          health.unconfiguredEmails.push(user.user_email); // Still needs setup
+        } else {
+          health.noNaics++;
+          health.unconfiguredEmails.push(user.user_email);
+        }
 
         if (hasBusinessType) health.businessTypeSet++;
         const isCurrentBriefingsEntitled = currentEntitledEmails.has(normalizedEmail);
@@ -1379,12 +1466,12 @@ async function getSystemAlerts(today: string) {
   if (weeklyCycleDue && weeklyAlertHealth.eligibleTotal > 0 && weeklyAlertHealth.processed === 0) {
     alerts.push({
       level: 'critical',
-      message: `Weekly alert fallback has no processed records for ${weeklyAlertHealth.cycleDate}`
+      message: `Weekly digest has no processed records for ${weeklyAlertHealth.cycleDate}`
     });
   } else if (weeklyCycleDue && weeklyAlertHealth.remaining > 0) {
     alerts.push({
       level: 'warning',
-      message: `Weekly alert fallback still has ${weeklyAlertHealth.remaining} eligible users remaining for ${weeklyAlertHealth.cycleDate}`
+      message: `Weekly digest still has ${weeklyAlertHealth.remaining} eligible users remaining for ${weeklyAlertHealth.cycleDate}`
     });
   }
 
