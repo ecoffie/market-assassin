@@ -1427,12 +1427,19 @@ async function getRevenueMetrics() {
               expand: ['data.items.data.price.product']
             });
             const sub = subscriptions.data[0];
-            if (sub?.items?.data?.[0]?.price) {
-              const summary = await resolvePriceSummary(sub.items.data[0].price);
-              if (summary.product && summary.product !== 'Subscription') {
-                product = summary.product;
-                bundle = summary.bundle || bundle;
-                details = summary.details || details;
+            const subItem = sub?.items?.data?.[0];
+            if (subItem) {
+              // Try to get product name directly from expanded price.product
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const priceObj = subItem.price as any;
+              const productObj = priceObj?.product;
+              const productName = typeof productObj === 'object' ? productObj?.name : null;
+
+              if (productName) {
+                product = productName;
+                foundProductName = true;
+              } else if (priceObj?.nickname) {
+                product = priceObj.nickname;
                 foundProductName = true;
               }
             }
