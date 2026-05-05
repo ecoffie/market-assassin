@@ -1509,16 +1509,41 @@ async function getRevenueMetrics() {
       ? Math.round(metrics.thirtyDay.total / metrics.thirtyDay.count)
       : 0;
 
-    // Recent 10 purchases with emails
-    metrics.recentPurchases = await Promise.all(
-      charges.data
-      .filter(c => c.status === 'succeeded')
-      .slice(0, 10)
-      .map(c => resolveChargePurchase(c as typeof c & {
-        invoice?: string | { customer_email?: string | null; subscription?: string | { items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null };
-        customer?: string | { id?: string; email?: string | null };
-      }))
-    );
+    // Recent 10 purchases - use Supabase purchases table as source of truth
+    // (Stripe charges have generic descriptions like "Subscription creation")
+    try {
+      const { data: recentPurchasesData } = await getSupabase()
+        .from('purchases')
+        .select('user_email, product_name, amount_paid, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (recentPurchasesData && recentPurchasesData.length > 0) {
+        metrics.recentPurchases = recentPurchasesData.map((p: {
+          user_email: string;
+          product_name: string;
+          amount_paid: number;
+          created_at: string;
+        }) => ({
+          email: p.user_email || 'N/A',
+          product: p.product_name || 'Purchase',
+          amount: (p.amount_paid || 0) / 100,
+          date: p.created_at,
+        }));
+      }
+    } catch (purchaseError) {
+      console.error('Error fetching recent purchases from Supabase:', purchaseError);
+      // Fall back to Stripe charges
+      metrics.recentPurchases = await Promise.all(
+        charges.data
+        .filter(c => c.status === 'succeeded')
+        .slice(0, 10)
+        .map(c => resolveChargePurchase(c as typeof c & {
+          invoice?: string | { customer_email?: string | null; subscription?: string | { items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null };
+          customer?: string | { id?: string; email?: string | null };
+        }))
+      );
+    }
 
   } catch (e) {
     console.error('Error fetching Stripe revenue metrics:', e);
