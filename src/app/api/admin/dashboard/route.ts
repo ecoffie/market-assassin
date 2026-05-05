@@ -1317,7 +1317,7 @@ async function getRevenueMetrics() {
       receipt_email?: string | null;
       metadata: Record<string, string>;
       invoice?: string | { id?: string; customer_email?: string | null; subscription?: string | { id?: string; items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null } | null;
-      customer?: string | { email?: string | null };
+      customer?: string | { id?: string; email?: string | null };
     }) {
       let email =
         charge.billing_details?.email ||
@@ -1415,6 +1415,32 @@ async function getRevenueMetrics() {
         }
       }
 
+      // Try 4: Last resort - look up customer's subscriptions directly
+      if (!foundProductName && charge.customer) {
+        const customerId = typeof charge.customer === 'string' ? charge.customer : charge.customer.id;
+        if (customerId) {
+          try {
+            const subscriptions = await stripe.subscriptions.list({
+              customer: customerId,
+              limit: 1,
+              expand: ['data.items.data.price.product']
+            });
+            const sub = subscriptions.data[0];
+            if (sub?.items?.data?.[0]?.price) {
+              const summary = await resolvePriceSummary(sub.items.data[0].price);
+              if (summary.product && summary.product !== 'Subscription') {
+                product = summary.product;
+                bundle = summary.bundle || bundle;
+                details = summary.details || details;
+                foundProductName = true;
+              }
+            }
+          } catch {
+            // Subscription lookup failed, continue with fallback
+          }
+        }
+      }
+
       return {
         email: email || 'N/A',
         product,
@@ -1482,7 +1508,7 @@ async function getRevenueMetrics() {
       .slice(0, 10)
       .map(c => resolveChargePurchase(c as typeof c & {
         invoice?: string | { customer_email?: string | null; subscription?: string | { items?: { data?: Array<{ price?: string | { id?: string; nickname?: string | null; product?: string | { id?: string; name?: string }; recurring?: { interval?: string; interval_count?: number } | null; metadata?: Record<string, string> } }> } } | null };
-        customer?: string | { email?: string | null };
+        customer?: string | { id?: string; email?: string | null };
       }))
     );
 
