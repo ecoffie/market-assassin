@@ -5,29 +5,23 @@ import { useState } from 'react';
 // Panel types for the unified MI dashboard
 // All navigation happens within /briefings - no separate routes
 export type MIPanel =
-  | 'dashboard'       // AI Briefings - Daily/Weekly/Pursuit (Pro only)
-  | 'alerts'          // Daily Alerts - simple list (Free), AI analysis (Pro)
-  | 'research'        // Market Research - 4 reports free, 10 Pro (Federal Market Assassin)
-  | 'forecasts'       // 7,700+ upcoming procurements
-  | 'recompetes'      // Expiring contracts
-  | 'contractors'     // 3,500+ with contacts
-  | 'pipeline'        // Track pursuits (Pro tier)
-  | 'contacts'        // CRM & relationships (Pro tier)
-  | 'proposals'       // AI Proposal Assist (Pro tier)
-  | 'grants';         // Federal grants
+  | 'dashboard'      // Daily briefings & intel
+  | 'research'       // Market Research (Federal Market Assassin)
+  | 'forecasts'      // 7,700+ upcoming procurements
+  | 'recompetes'     // Expiring contracts
+  | 'contractors'    // 3,500+ with contacts
+  | 'pipeline'       // Track pursuits (Pro tier)
+  | 'contacts'       // CRM & relationships (Pro tier)
+  | 'content'        // Content Reaper
+  | 'planner'        // Action Planner
+  | 'sbir'           // SBIR/STTR
+  | 'grants';        // Federal grants
 
-// Note: SBIR/STTR removed from MI dashboard - it serves a different customer profile (R&D companies)
-// than our target (service contractors). Deltek/HigherGov/GovTribe don't include it either.
-// If there's demand, it can live as a standalone tool at /sbir
-
-// Note: Action Planner removed from MI dashboard - it's an onboarding/education tool
-// Lives at /planner as standalone, linked from OnboardingWizard and Settings
-
-// Tier definitions for access control (May 2026)
-// Free: MI Free ($0) - Market Research (4 reports, 5/mo) + Daily Alerts (simple list)
-// Pro: MI Pro ($149/mo) - Everything: Full tools + AI Briefings + FHC Training
-// Team: MI Team ($299/mo) - Pro + 5 seats + shared pipeline/CRM + team admin
-// Enterprise: Custom - Unlimited seats + SSO + custom integrations
+// Tier definitions for access control
+// Free: MI Free ($0) - OH + Daily Alerts
+// Tier 1: MI Pro ($149/mo) - Full intelligence + Pipeline
+// Tier 2: MI Team ($499/mo) - 5 seats, shared pipeline
+// Tier 3: MI Enterprise (Contact Sales) - 15+ seats, API, white-label
 export type MITier = 'free' | 'pro' | 'team' | 'enterprise';
 
 interface NavItem {
@@ -49,43 +43,29 @@ interface NavSection {
 // Based on Atlassian pattern: Sidebar switches content panels, not routes
 // Reference: https://www.atlassian.com/blog/design/designing-atlassians-new-navigation
 //
-// TIER STRUCTURE (Simplified May 2026):
-// - MI Free ($0): Agency Search (10 agencies) + Daily Alerts (simple list)
-// - MI Pro ($149/mo): Everything - All tools + AI Briefings + FHC Training
+// TIER STRUCTURE:
+// - MI Free ($0): OH + Daily Alerts
+// - MI Pro ($149/mo): Full intelligence + Pipeline
+// - MI Team ($499/mo): 5 seats, shared pipeline
+// - MI Enterprise (Contact Sales): 15+ seats, API, white-label
 const navigation: NavSection[] = [
-  // Free tier section - always visible
-  {
-    title: 'Free Tools',
-    tier: 'free',
-    items: [
-      {
-        name: 'Market Research',
-        panel: 'research',
-        icon: '🔍',
-        description: '4 reports • 5/mo',
-        tier: 'free',
-      },
-      {
-        name: 'Daily Alerts',
-        panel: 'alerts',
-        icon: '🔔',
-        description: 'Opportunity notifications',
-        tier: 'free',
-      },
-    ],
-  },
-  // Pro tier sections - locked for free users
   {
     title: 'Intelligence',
     tier: 'pro',
     items: [
       {
-        name: 'AI Briefings',
+        name: 'Dashboard',
         panel: 'dashboard',
         icon: '📊',
-        description: 'Daily + Weekly + Pursuit',
+        description: 'Daily briefings & intel',
         tier: 'pro',
-        badge: 'PRO',
+      },
+      {
+        name: 'Market Research',
+        panel: 'research',
+        icon: '🔍',
+        description: 'Deep market intelligence',
+        tier: 'pro',
       },
       {
         name: 'Forecasts',
@@ -109,6 +89,13 @@ const navigation: NavSection[] = [
         tier: 'pro',
       },
       {
+        name: 'SBIR/STTR',
+        panel: 'sbir',
+        icon: '🔬',
+        description: 'R&D funding opportunities',
+        tier: 'pro',
+      },
+      {
         name: 'Grants',
         panel: 'grants',
         icon: '💰',
@@ -129,14 +116,6 @@ const navigation: NavSection[] = [
         tier: 'pro',
       },
       {
-        name: 'Proposals',
-        panel: 'proposals',
-        icon: '📝',
-        description: 'AI proposal assist',
-        tier: 'pro',
-        badge: 'NEW',
-      },
-      {
         name: 'Contacts',
         panel: 'contacts',
         icon: '👥',
@@ -145,30 +124,40 @@ const navigation: NavSection[] = [
       },
     ],
   },
+  {
+    title: 'Tools',
+    tier: 'pro',
+    items: [
+      {
+        name: 'Content Reaper',
+        panel: 'content',
+        icon: '✍️',
+        description: 'AI content generator',
+        tier: 'pro',
+      },
+      {
+        name: 'Action Planner',
+        panel: 'planner',
+        icon: '📋',
+        description: '36-task roadmap',
+        tier: 'pro',
+      },
+    ],
+  },
 ];
 
-// Tier display info (4 tiers for mid-size and enterprise)
+// Tier display info
 const tierInfo: Record<MITier, { name: string; price: string; color: string }> = {
   free: { name: 'MI Free', price: '$0', color: 'gray' },
-  pro: { name: 'MI Pro', price: '$149/mo', color: 'purple' },
+  pro: { name: 'MI Pro', price: '$149/mo', color: 'emerald' },
   team: { name: 'MI Team', price: '$499/mo', color: 'blue' },
-  enterprise: { name: 'MI Enterprise', price: 'Custom', color: 'amber' },
+  enterprise: { name: 'MI Enterprise', price: 'Contact Sales', color: 'amber' },
 };
 
 // Check if user has access to a feature based on their tier
 function hasAccess(userTier: MITier, requiredTier: MITier): boolean {
   const tierOrder: MITier[] = ['free', 'pro', 'team', 'enterprise'];
   return tierOrder.indexOf(userTier) >= tierOrder.indexOf(requiredTier);
-}
-
-// Get gradient colors for tier badge
-function getTierGradient(tier: MITier): string {
-  switch (tier) {
-    case 'free': return 'from-gray-500 to-gray-700';
-    case 'pro': return 'from-purple-500 to-purple-700';
-    case 'team': return 'from-blue-500 to-blue-700';
-    case 'enterprise': return 'from-amber-500 to-amber-700';
-  }
 }
 
 interface UnifiedSidebarProps {
@@ -235,10 +224,10 @@ export default function UnifiedSidebar({
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-800">
           {!isMinimized && (
             <button
-              onClick={() => handlePanelClick(userTier === 'free' ? 'research' : 'dashboard', 'free')}
+              onClick={() => handlePanelClick('dashboard', 'pro')}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
-              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getTierGradient(userTier)} flex items-center justify-center`}>
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br from-${currentTierInfo.color}-500 to-${currentTierInfo.color}-700 flex items-center justify-center`}>
                 <span className="text-white font-bold text-sm">MI</span>
               </div>
               <div className="text-left">
@@ -249,10 +238,10 @@ export default function UnifiedSidebar({
           )}
           {isMinimized && (
             <button
-              onClick={() => handlePanelClick(userTier === 'free' ? 'research' : 'dashboard', 'free')}
+              onClick={() => handlePanelClick('dashboard', 'pro')}
               className="mx-auto hover:opacity-80 transition-opacity"
             >
-              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${getTierGradient(userTier)} flex items-center justify-center`}>
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br from-${currentTierInfo.color}-500 to-${currentTierInfo.color}-700 flex items-center justify-center`}>
                 <span className="text-white font-bold text-sm">MI</span>
               </div>
             </button>
@@ -355,16 +344,16 @@ export default function UnifiedSidebar({
           })}
         </nav>
 
-        {/* Upgrade CTA for free users */}
-        {!isMinimized && userTier === 'free' && (
+        {/* Upgrade CTA for non-enterprise users */}
+        {!isMinimized && userTier !== 'enterprise' && (
           <div className="p-4 border-t border-gray-800">
             <a
-              href="/market-intelligence"
+              href="/pricing"
               className="block px-3 py-2 bg-gradient-to-r from-purple-600/20 to-purple-500/10 border border-purple-500/30 rounded-lg hover:border-purple-500/50 transition-colors"
             >
-              <p className="text-xs text-purple-400 font-medium">Upgrade to MI Pro</p>
+              <p className="text-xs text-purple-400 font-medium">Upgrade Plan</p>
               <p className="text-[10px] text-gray-500 mt-0.5">
-                Unlock AI Briefings + All Tools →
+                {userTier === 'pro' ? 'Add Execution tools →' : 'Unlock more features →'}
               </p>
             </a>
           </div>

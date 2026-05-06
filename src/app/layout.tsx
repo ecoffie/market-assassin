@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { QueryProvider } from "@/providers/QueryProvider";
-import { MIProvider } from "@/context/MIContext";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -17,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Market Intelligence | GovCon Giants",
-  description: "AI-powered market intelligence for federal contractors. Daily briefings, opportunity alerts, market research, and pipeline tracking.",
+  title: "Free Federal Contracting Tools | GovCon Giants",
+  description: "Free government contracting tools: opportunity search, contractor database, recompete tracker, market intelligence. Find and win federal contracts.",
 };
 
 export default function RootLayout({
@@ -31,11 +29,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-slate-950 text-slate-100`}
       >
-        <QueryProvider>
-          <MIProvider>
-            {children}
-          </MIProvider>
-        </QueryProvider>
+        {children}
       </body>
     </html>
   );
