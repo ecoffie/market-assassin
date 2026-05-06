@@ -8,6 +8,19 @@ interface MarketResearchPanelProps {
   tier: MIBetaTier;
 }
 
+type BusinessType = 'Women Owned' | 'HUBZone' | '8(a) Certified' | 'Small Business' | 'Native American/Tribal' | '';
+type VeteranStatus = 'Not Applicable' | 'Veteran Owned' | 'Service Disabled Veteran';
+
+interface FormData {
+  businessType: BusinessType;
+  naicsCode: string;
+  pscCode: string;
+  zipCode: string;
+  veteranStatus: VeteranStatus;
+  companyName: string;
+  excludeDOD: boolean;
+}
+
 interface Report {
   id: string;
   title: string;
@@ -128,12 +141,64 @@ const REPORTS: Report[] = [
   { id: 'forecast', title: 'Market Forecast', description: 'Future opportunity pipeline', icon: '🔮', tier: 'pro', reportKey: 'forecastList' },
 ];
 
+// PSC Category options
+const PSC_CATEGORIES = [
+  { value: '', label: 'Select PSC Category...' },
+  { value: 'D', label: 'D - IT & Telecom Services' },
+  { value: 'R', label: 'R - Professional Services' },
+  { value: 'J', label: 'J - Maintenance & Repair' },
+  { value: 'S', label: 'S - Utilities & Housekeeping' },
+  { value: 'Y', label: 'Y - Construction of Structures' },
+  { value: 'Z', label: 'Z - Maintenance of Real Property' },
+  { value: 'B', label: 'B - Special Studies & Analysis' },
+  { value: 'C', label: 'C - Architect & Engineering' },
+  { value: 'F', label: 'F - Natural Resources Management' },
+  { value: 'G', label: 'G - Social Services' },
+  { value: 'H', label: 'H - Quality Control & Testing' },
+  { value: 'K', label: 'K - Modification of Equipment' },
+  { value: 'L', label: 'L - Technical Representative' },
+  { value: 'M', label: 'M - Operation of Facilities' },
+  { value: 'N', label: 'N - Installation of Equipment' },
+  { value: 'P', label: 'P - Salvage Services' },
+  { value: 'Q', label: 'Q - Medical Services' },
+  { value: 'T', label: 'T - Photo, Map, Print, Publishing' },
+  { value: 'U', label: 'U - Education & Training' },
+  { value: 'V', label: 'V - Transportation & Travel' },
+  { value: 'W', label: 'W - Lease/Rental of Equipment' },
+  { value: 'X', label: 'X - Lease/Rental of Facilities' },
+  { value: 'A', label: 'A - R&D Services' },
+  { value: '70', label: '70 - IT Equipment & Software' },
+  { value: '58', label: '58 - Communication Equipment' },
+  { value: '65', label: '65 - Medical & Dental Equipment' },
+  { value: '66', label: '66 - Instruments & Lab Equipment' },
+  { value: '75', label: '75 - Office Supplies' },
+  { value: '71', label: '71 - Furniture' },
+  { value: '23', label: '23 - Motor Vehicles' },
+  { value: '25', label: '25 - Vehicular Equipment' },
+  { value: '15', label: '15 - Aircraft & Airframe Components' },
+  { value: '59', label: '59 - Electrical Equipment' },
+  { value: '36', label: '36 - Special Industry Machinery' },
+  { value: '89', label: '89 - Subsistence (Food)' },
+  { value: '84', label: '84 - Clothing & Textiles' },
+];
+
+const BUSINESS_TYPES: BusinessType[] = ['Women Owned', 'HUBZone', '8(a) Certified', 'Small Business', 'Native American/Tribal'];
+const VETERAN_STATUSES: VeteranStatus[] = ['Not Applicable', 'Veteran Owned', 'Service Disabled Veteran'];
+
 export default function MarketResearchPanel({ email, tier }: MarketResearchPanelProps) {
-  const [selectedNaics, setSelectedNaics] = useState('541512');
+  const [formData, setFormData] = useState<FormData>({
+    businessType: '',
+    naicsCode: '',
+    pscCode: '',
+    zipCode: '',
+    veteranStatus: 'Not Applicable',
+    companyName: '',
+    excludeDOD: false,
+  });
   const [selectedAgency, setSelectedAgency] = useState('');
-  const [businessType, setBusinessType] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const [generatedReports, setGeneratedReports] = useState<Set<string>>(new Set());
@@ -143,8 +208,28 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
     return tier !== 'free';
   };
 
+  const validateForm = (): boolean => {
+    setValidationError(null);
+
+    if (!formData.businessType) {
+      setValidationError('Please select a business type');
+      return false;
+    }
+
+    const hasNaics = formData.naicsCode && formData.naicsCode.trim();
+    const hasPsc = formData.pscCode && formData.pscCode.trim();
+
+    if (!hasNaics && !hasPsc) {
+      setValidationError('Please enter either a NAICS code or select a PSC code/category');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleGenerateAll = useCallback(async () => {
-    if (!email || !selectedNaics) return;
+    if (!email) return;
+    if (!validateForm()) return;
 
     setIsGenerating(true);
     setError(null);
@@ -155,8 +240,13 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inputs: {
-            naicsCode: selectedNaics,
-            businessType: businessType || 'small_business',
+            naicsCode: formData.naicsCode,
+            pscCode: formData.pscCode,
+            businessType: formData.businessType || 'Small Business',
+            veteranStatus: formData.veteranStatus,
+            zipCode: formData.zipCode,
+            companyName: formData.companyName,
+            excludeDOD: formData.excludeDOD,
             goodsOrServices: 'services',
           },
           selectedAgencies: selectedAgency ? [selectedAgency] : ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration'],
@@ -185,7 +275,7 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
     } finally {
       setIsGenerating(false);
     }
-  }, [email, selectedNaics, selectedAgency, businessType, tier]);
+  }, [email, formData, selectedAgency, tier]);
 
   const handleReportClick = (report: Report) => {
     if (!canAccessReport(report.tier)) return;
@@ -222,10 +312,25 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
         </div>
         <button
           onClick={handleGenerateAll}
-          disabled={isGenerating || !selectedNaics}
-          className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+          disabled={isGenerating}
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
         >
-          {isGenerating ? 'Generating...' : 'Generate All Reports'}
+          {isGenerating ? (
+            <>
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Finding Target Agencies...
+            </>
+          ) : (
+            <>
+              Find Target Agencies
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </>
+          )}
         </button>
       </div>
 
@@ -237,44 +342,162 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
         </div>
       )}
 
-      {/* Input Form */}
+      {/* Input Form - Full Federal Market Assassin */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <h3 className="font-semibold text-white mb-4">Research Parameters</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="mb-4">
+          <h3 className="font-semibold text-white">Enter Your 5 Core Inputs</h3>
+          <p className="text-sm text-slate-500 mt-1">Provide your business information to discover matching government agencies</p>
+        </div>
+
+        {/* Validation Error */}
+        {validationError && (
+          <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm flex items-start">
+            <span className="mr-2">⚠️</span>
+            {validationError}
+          </div>
+        )}
+
+        {/* Business Type - Required */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            1. Business Type <span className="text-red-400">*</span>
+          </label>
+          <select
+            value={formData.businessType}
+            onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
+            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+          >
+            <option value="">Select your business type...</option>
+            {BUSINESS_TYPES.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* NAICS Code and PSC Code - Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-2">NAICS Code *</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              2. NAICS Code(s) <span className="text-slate-500 text-xs">(or use PSC)</span>
+            </label>
             <input
               type="text"
-              value={selectedNaics}
-              onChange={(e) => setSelectedNaics(e.target.value)}
-              placeholder="e.g., 541512"
+              value={formData.naicsCode}
+              onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
+              placeholder="e.g., 236, 238320, 541511"
+              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Multiple codes OK: <span className="text-blue-400">236, 238</span> = all construction
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              PSC Code <span className="text-slate-500 text-xs">(or use NAICS)</span>
+            </label>
+            <input
+              type="text"
+              value={formData.pscCode}
+              onChange={(e) => setFormData({ ...formData, pscCode: e.target.value.toUpperCase() })}
+              placeholder="e.g., D310, 7030"
+              maxLength={4}
+              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            />
+            <p className="mt-1 text-xs text-slate-500">Product/Service Code (4-char)</p>
+          </div>
+        </div>
+
+        {/* Zip Code and Veteran Status - Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              3. Zip Code <span className="text-slate-500 text-xs">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              value={formData.zipCode}
+              onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+              placeholder="e.g., 20001"
+              maxLength={5}
               className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-2">Target Agency (optional)</label>
-            <input
-              type="text"
-              value={selectedAgency}
-              onChange={(e) => setSelectedAgency(e.target.value)}
-              placeholder="e.g., Department of Defense"
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-2">Business Type</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              4. Veteran Status <span className="text-slate-500 text-xs">(Optional)</span>
+            </label>
             <select
-              value={businessType}
-              onChange={(e) => setBusinessType(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-emerald-500 outline-none"
+              value={formData.veteranStatus}
+              onChange={(e) => setFormData({ ...formData, veteranStatus: e.target.value as VeteranStatus })}
+              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
             >
-              <option value="">Small Business (default)</option>
-              <option value="8a">8(a)</option>
-              <option value="wosb">WOSB</option>
-              <option value="sdvosb">SDVOSB</option>
-              <option value="hubzone">HUBZone</option>
+              {VETERAN_STATUSES.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
             </select>
           </div>
+        </div>
+
+        {/* PSC Category and Company Name - Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              5. PSC Category <span className="text-slate-500 text-xs">(Optional)</span>
+            </label>
+            <select
+              value={formData.pscCode}
+              onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
+              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            >
+              {PSC_CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Company Name <span className="text-slate-500 text-xs">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              value={formData.companyName}
+              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+              placeholder="Your company name"
+              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Civilian Agencies Only Checkbox */}
+        <div className="mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+          <label className="flex items-start cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.excludeDOD}
+              onChange={(e) => setFormData({ ...formData, excludeDOD: e.target.checked })}
+              className="mt-0.5 h-4 w-4 text-amber-500 bg-slate-800 border-slate-600 rounded focus:ring-amber-500"
+            />
+            <div className="ml-3">
+              <span className="text-sm font-semibold text-amber-400">Civilian Agencies Only</span>
+              <p className="text-xs text-amber-300/70 mt-0.5">
+                Exclude Department of Defense (DOD) agencies. Civilian agencies are often more accessible for startups and small businesses.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        {/* Target Agency (optional override) */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Target Agency <span className="text-slate-500 text-xs">(Optional - focuses reports on specific agency)</span>
+          </label>
+          <input
+            type="text"
+            value={selectedAgency}
+            onChange={(e) => setSelectedAgency(e.target.value)}
+            placeholder="e.g., Department of Defense, VA, GSA"
+            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+          />
         </div>
       </div>
 
