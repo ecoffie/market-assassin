@@ -10,10 +10,14 @@ import { ComprehensiveReport, CoreInputs, Agency, SimplifiedAcquisitionReport, S
 import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget-authority';
 import { fetchPricingIntel } from '@/lib/utils/calc-rates';
 import { checkReportRateLimit, checkUnauthenticatedIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
-import { getEmailFromRequest, verifyMAAccess } from '@/lib/api-auth';
+import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/api-auth';
 import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
 import { getMarketAssassinTier } from '@/lib/access-codes';
+
+// Free reports available to all users (4 reports)
+const FREE_REPORT_KEYS = ['simplifiedAcquisition', 'budgetCheckup', 'governmentBuyers'];
+// Note: 'osbp' uses same key as governmentBuyers but different view
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,14 +45,17 @@ export async function POST(request: NextRequest) {
       if (!rl.allowed) return rateLimitResponse(rl);
     }
 
-    // Server-side access verification
-    const auth = await verifyMAAccess(email);
-    if (!auth.authenticated) {
+    // Server-side access verification - MI tiers (free/pro/none)
+    const auth = await verifyMIAccess(email);
+    if (auth.tier === 'none') {
       return NextResponse.json(
-        { success: false, error: auth.error },
+        { success: false, error: auth.error || 'Email required for access' },
         { status: 403 }
       );
     }
+
+    // Track the access tier for filtering reports later
+    const accessTier: MIAccessTier = auth.tier;
 
     // Check if user is blocked for abuse
     if (email && await isUserBlocked(email)) {
@@ -851,9 +858,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Filter reports based on access tier
+    // Free tier only gets: governmentBuyers, budgetCheckup, simplifiedAcquisition
+    const filteredReport = accessTier === 'free' ? {
+      governmentBuyers: report.governmentBuyers,
+      budgetCheckup: report.budgetCheckup,
+      simplifiedAcquisition: report.simplifiedAcquisition,
+      metadata: report.metadata,
+    } : report;
+
     return NextResponse.json({
       success: true,
-      report,
+      report: filteredReport,
+      accessTier, // Let client know what tier they have
     });
   } catch (error) {
     console.error('Error generating reports:', error);
