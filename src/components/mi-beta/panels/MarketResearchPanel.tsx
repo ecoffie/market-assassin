@@ -305,33 +305,9 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Market Research</h1>
-          <p className="text-slate-400 mt-1">Generate strategic intelligence reports</p>
-        </div>
-        <button
-          onClick={handleGenerateAll}
-          disabled={isGenerating}
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
-        >
-          {isGenerating ? (
-            <>
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Finding Target Agencies...
-            </>
-          ) : (
-            <>
-              Find Target Agencies
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </>
-          )}
-        </button>
+      <div>
+        <h1 className="text-2xl font-bold text-white">Market Research</h1>
+        <p className="text-slate-400 mt-1">Generate strategic intelligence reports</p>
       </div>
 
       {/* Error */}
@@ -487,7 +463,7 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
         </div>
 
         {/* Target Agency (optional override) */}
-        <div className="mb-4">
+        <div className="mb-6">
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Target Agency <span className="text-slate-500 text-xs">(Optional - focuses reports on specific agency)</span>
           </label>
@@ -499,6 +475,30 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
             className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
           />
         </div>
+
+        {/* Generate Button - At Bottom of Form */}
+        <button
+          onClick={handleGenerateAll}
+          disabled={isGenerating}
+          className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+        >
+          {isGenerating ? (
+            <>
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Finding Target Agencies...
+            </>
+          ) : (
+            <>
+              Find Target Agencies
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Reports Grid */}
