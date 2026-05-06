@@ -204,7 +204,7 @@ function MarketIntelligenceContent() {
           <div className="mt-8 inline-flex items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-xl px-6 py-4">
             <div className="text-left">
               <p className="text-white font-semibold">Start Free — No Credit Card Required</p>
-              <p className="text-slate-400 text-sm">Get daily opportunity alerts + market research tools</p>
+              <p className="text-slate-400 text-sm">Market Research (4 reports, 5/mo) + Daily Alerts</p>
             </div>
             <a
               href={FREE_SIGNUP_URL}
@@ -251,247 +251,336 @@ function MarketIntelligenceContent() {
         </div>
       </div>
 
-      {/* What's Included - Two Tier Cards */}
-      <div className="max-w-5xl mx-auto px-4 py-16">
+      {/* What's Included - Three Tier Cards */}
+      <div className="max-w-6xl mx-auto px-4 py-16">
         <h2 className="text-2xl font-bold text-white text-center mb-4">Choose Your Plan</h2>
         <p className="text-slate-400 text-center mb-10">Start free, upgrade when you need AI-powered intelligence</p>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid md:grid-cols-3 gap-6">
           {/* MI Free Card */}
-          <div className="bg-slate-800/50 border-2 border-emerald-500/50 rounded-2xl p-8">
+          <div className="bg-slate-800/50 border-2 border-slate-600/50 rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">🆓</span>
+              <div className="w-10 h-10 bg-slate-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-xl">🆓</span>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">MI Free</h3>
-                <p className="text-emerald-400 font-semibold">$0/month</p>
+                <h3 className="text-lg font-bold text-white">MI Free</h3>
+                <p className="text-slate-400 font-semibold">$0/month</p>
               </div>
             </div>
 
-            <div className="space-y-3 mb-6">
-              <div className="flex items-start gap-3 text-slate-300">
-                <span className="w-5 h-5 rounded-full bg-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs flex-shrink-0 mt-0.5">✓</span>
-                <span><strong>Daily Opportunity Alerts</strong> — simple list of new opportunities</span>
+            <div className="space-y-2 mb-6 text-sm">
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span><strong>4 Market Research</strong> reports</span>
               </div>
-              <div className="flex items-start gap-3 text-slate-300">
-                <span className="w-5 h-5 rounded-full bg-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs flex-shrink-0 mt-0.5">✓</span>
-                <span><strong>Opportunity Hunter</strong> — market research tool</span>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span><strong>Daily Alerts</strong> — simple list</span>
               </div>
-              <div className="flex items-start gap-3 text-slate-300">
-                <span className="w-5 h-5 rounded-full bg-emerald-600/30 flex items-center justify-center text-emerald-400 text-xs flex-shrink-0 mt-0.5">✓</span>
-                <span>Personalized by your NAICS codes</span>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span>5 reports/month limit</span>
               </div>
-              <div className="flex items-start gap-3 text-slate-500">
-                <span className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center text-slate-500 text-xs flex-shrink-0 mt-0.5">—</span>
-                <span>No AI briefings or analysis</span>
+              <div className="flex items-start gap-2 text-slate-500">
+                <span className="mt-0.5">—</span>
+                <span>No AI briefings</span>
               </div>
             </div>
 
             <a
               href={FREE_SIGNUP_URL}
-              className="block w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-center rounded-xl font-semibold transition-colors"
+              className="block w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-center rounded-lg font-semibold transition-colors text-sm"
             >
               Start Free →
             </a>
           </div>
 
-          {/* MI Pro Card */}
-          <div className="bg-slate-800/50 border-2 border-purple-500/50 rounded-2xl p-8 relative">
-            <div className="absolute -top-3 right-6 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-              FULL INTELLIGENCE
+          {/* MI Pro Card - Most Popular */}
+          <div className="bg-slate-800/50 border-2 border-purple-500 rounded-2xl p-6 relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+              MOST POPULAR
             </div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">🚀</span>
+              <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-xl">🚀</span>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">MI Pro</h3>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-purple-400 font-semibold text-2xl">$149/mo</p>
-                </div>
+                <h3 className="text-lg font-bold text-white">MI Pro</h3>
+                <p className="text-purple-400 font-semibold text-xl">$149/mo</p>
               </div>
             </div>
 
-            {/* Value Banner */}
-            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-4 py-2 mb-4 text-center">
-              <p className="text-purple-400 text-sm font-medium">
-                Includes FHC training & coaching access
-              </p>
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-3 py-1.5 mb-4 text-center">
+              <p className="text-purple-400 text-xs font-medium">+ FHC training included</p>
             </div>
 
-            <div className="space-y-3 mb-6">
-              <div className="flex items-start gap-3 text-slate-300">
-                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
-                <span><strong>Daily AI Brief</strong> — ranked with win probability</span>
+            <div className="space-y-2 mb-6 text-sm">
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span><strong>All 10 reports</strong> unlimited</span>
               </div>
-              <div className="flex items-start gap-3 text-slate-300">
-                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
-                <span><strong>Weekly Deep Dive</strong> — strategic market analysis</span>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span><strong>AI Briefings</strong> — Daily + Weekly + Pursuit</span>
               </div>
-              <div className="flex items-start gap-3 text-slate-300">
-                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
-                <span><strong>Pursuit Brief</strong> — capture guidance for top targets</span>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span>Forecasts, SBIR, Grants</span>
               </div>
-              <div className="flex items-start gap-3 text-slate-300">
-                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
-                <span>Forecasts, SBIR, Grants + full dashboard</span>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span>Pipeline + CRM + Content</span>
               </div>
-              <div className="flex items-start gap-3 text-slate-300">
-                <span className="w-5 h-5 rounded-full bg-purple-600/30 flex items-center justify-center text-purple-400 text-xs flex-shrink-0 mt-0.5">✓</span>
-                <span>Everything in Free tier included</span>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span>1 user seat</span>
               </div>
             </div>
 
             <a
               href={CHECKOUT_MONTHLY}
-              className="block w-full py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-center rounded-xl font-semibold transition-all shadow-lg shadow-purple-500/25"
+              className="block w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-center rounded-lg font-semibold transition-all shadow-lg shadow-purple-500/25 text-sm"
             >
-              Get MI Pro — $149/mo
+              Get Pro — $149/mo
             </a>
-            <p className="text-center text-slate-500 text-xs mt-2">
-              Cancel anytime • Includes FHC training access
-            </p>
+          </div>
+
+          {/* MI Team Card */}
+          <div className="bg-slate-800/50 border-2 border-blue-500/50 rounded-2xl p-6 relative">
+            <div className="absolute -top-3 right-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+              MID-SIZE FIRMS
+            </div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-xl">👥</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">MI Team</h3>
+                <p className="text-blue-400 font-semibold text-xl">$499/mo</p>
+              </div>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-1.5 mb-4 text-center">
+              <p className="text-blue-400 text-xs font-medium">5 team members included</p>
+            </div>
+
+            <div className="space-y-2 mb-6 text-sm">
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span><strong>Everything in Pro</strong></span>
+              </div>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span><strong>5 user seats</strong></span>
+              </div>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span>Shared pipeline & CRM</span>
+              </div>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span>Team admin dashboard</span>
+              </div>
+              <div className="flex items-start gap-2 text-slate-300">
+                <span className="text-emerald-400 mt-0.5">✓</span>
+                <span>Priority support</span>
+              </div>
+            </div>
+
+            <a
+              href="mailto:service@govcongiants.com?subject=MI%20Team%20Inquiry"
+              className="block w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-center rounded-lg font-semibold transition-colors text-sm"
+            >
+              Contact Sales →
+            </a>
+          </div>
+        </div>
+
+        {/* Enterprise Callout */}
+        <div className="mt-8 bg-gradient-to-r from-amber-900/30 to-amber-800/20 border border-amber-500/30 rounded-xl p-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">🏢</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">MI Enterprise</h3>
+                <p className="text-amber-400 text-sm">Custom solutions for large contractors</p>
+              </div>
+            </div>
+            <div className="text-center md:text-right">
+              <p className="text-slate-400 text-sm mb-2">Unlimited seats • SSO • Dedicated support • Custom integrations</p>
+              <a
+                href="mailto:service@govcongiants.com?subject=MI%20Enterprise%20Inquiry"
+                className="inline-block px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold transition-colors text-sm"
+              >
+                Talk to Sales →
+              </a>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Tier Comparison Table */}
-      <div className="max-w-5xl mx-auto px-4 pb-16">
+      <div className="max-w-6xl mx-auto px-4 pb-16">
         <h2 className="text-2xl font-bold text-white text-center mb-4">Compare Plans</h2>
         <p className="text-slate-400 text-center mb-10 max-w-2xl mx-auto">
           Start free and upgrade when you need AI-powered intelligence. Save $700+/month vs. Deltek GovWin.
         </p>
 
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="text-left py-4 px-4 text-slate-400 font-medium border-b border-slate-700">Feature</th>
-                <th className="py-4 px-4 text-center border-b border-slate-700">
-                  <div className="text-white font-bold">MI Free</div>
-                  <div className="text-emerald-400 text-sm font-semibold">$0/mo</div>
+                <th className="text-left py-3 px-3 text-slate-400 font-medium border-b border-slate-700">Feature</th>
+                <th className="py-3 px-3 text-center border-b border-slate-700">
+                  <div className="text-white font-bold">Free</div>
+                  <div className="text-slate-400 text-xs">$0/mo</div>
                 </th>
-                <th className="py-4 px-4 text-center border-b border-slate-700 bg-purple-900/20">
-                  <div className="text-white font-bold">MI Pro</div>
-                  <div className="text-purple-400 text-sm font-semibold">$149/mo</div>
-                  <div className="text-slate-500 text-xs">+ FHC Training</div>
+                <th className="py-3 px-3 text-center border-b border-slate-700 bg-purple-900/20">
+                  <div className="text-white font-bold">Pro</div>
+                  <div className="text-purple-400 text-xs">$149/mo</div>
                 </th>
-                <th className="py-4 px-4 text-center border-b border-slate-700">
-                  <div className="text-white font-bold">MI Team</div>
-                  <div className="text-blue-400 text-sm font-semibold">$499/mo</div>
+                <th className="py-3 px-3 text-center border-b border-slate-700 bg-blue-900/20">
+                  <div className="text-white font-bold">Team</div>
+                  <div className="text-blue-400 text-xs">$499/mo</div>
+                </th>
+                <th className="py-3 px-3 text-center border-b border-slate-700 bg-amber-900/20">
+                  <div className="text-white font-bold">Enterprise</div>
+                  <div className="text-amber-400 text-xs">Custom</div>
                 </th>
               </tr>
             </thead>
-            <tbody className="text-sm">
+            <tbody className="text-xs">
+              {/* User Seats */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-2.5 px-3 text-slate-300">User Seats</td>
+                <td className="py-2.5 px-3 text-center text-slate-400">1</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">1</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">5</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">Unlimited</td>
+              </tr>
+              {/* Market Research */}
+              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
+                <td className="py-2.5 px-3 text-slate-300">Market Research Reports</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400">4 • 5/mo</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">10 • Unlimited</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">10 • Unlimited</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">10 • Unlimited</td>
+              </tr>
               {/* Daily Alerts */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Daily Opportunity Alerts</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">Daily Alerts</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400">✓ Basic</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓ + AI</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ + AI</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ + AI</td>
               </tr>
-              {/* Opportunity Hunter */}
+              {/* AI Briefings */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Opportunity Hunter (Market Research)</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">AI Briefings</td>
+                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
               </tr>
-              {/* Alert Type */}
+              {/* Forecasts + SBIR + Grants */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Alert Type</td>
-                <td className="py-3 px-4 text-center text-slate-400">Simple list</td>
-                <td className="py-3 px-4 text-center text-purple-400 bg-purple-900/10 font-medium">AI-ranked with win probability</td>
-                <td className="py-3 px-4 text-center text-purple-400 font-medium">AI-ranked with win probability</td>
+                <td className="py-2.5 px-3 text-slate-300">Forecasts, SBIR, Grants</td>
+                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
               </tr>
-              {/* Daily Brief */}
+              {/* Pipeline & CRM */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Daily AI Brief (Prioritized + Analysis)</td>
-                <td className="py-3 px-4 text-center text-slate-600">—</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">Pipeline + CRM</td>
+                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ Shared</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ Shared</td>
               </tr>
-              {/* Weekly Deep Dive */}
+              {/* Content Reaper */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Weekly Deep Dive (Market Movement)</td>
-                <td className="py-3 px-4 text-center text-slate-600">—</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">Content Reaper</td>
+                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
               </tr>
-              {/* Pursuit Brief */}
+              {/* FHC Training */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Pursuit Brief (Capture Guidance)</td>
-                <td className="py-3 px-4 text-center text-slate-600">—</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">FHC Training</td>
+                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ All seats</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ All seats</td>
               </tr>
-              {/* Dashboard */}
+              {/* Team Admin */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Full Dashboard (Search, Export, Archive)</td>
-                <td className="py-3 px-4 text-center text-slate-600">—</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">Team Admin Dashboard</td>
+                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
+                <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
               </tr>
-              {/* Forecasts */}
+              {/* SSO */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Forecasts (7,700+ Upcoming)</td>
-                <td className="py-3 px-4 text-center text-slate-600">—</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">SSO / SAML</td>
+                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
+                <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
+                <td className="py-2.5 px-3 text-center text-slate-600 bg-blue-900/10">—</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
               </tr>
-              {/* Full SAM.gov Dashboard */}
+              {/* Custom Integrations */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Full SAM.gov Dashboard (24K+ Opps)</td>
-                <td className="py-3 px-4 text-center text-slate-600">—</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">Custom Integrations</td>
+                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
+                <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
+                <td className="py-2.5 px-3 text-center text-slate-600 bg-blue-900/10">—</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
               </tr>
-              {/* Grants */}
+              {/* Support */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Grants.gov Integration ($700B+)</td>
-                <td className="py-3 px-4 text-center text-slate-600">—</td>
-                <td className="py-3 px-4 text-center text-emerald-400 bg-purple-900/10">✓</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
-              </tr>
-              {/* Team Seats */}
-              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Team Seats</td>
-                <td className="py-3 px-4 text-center text-slate-400">1</td>
-                <td className="py-3 px-4 text-center text-slate-400 bg-purple-900/10">1</td>
-                <td className="py-3 px-4 text-center text-blue-400 font-medium">5 seats</td>
-              </tr>
-              {/* Shared Pipeline */}
-              <tr className="border-b border-slate-800 hover:bg-slate-800/30">
-                <td className="py-3 px-4 text-slate-300">Shared Pipeline & CRM</td>
-                <td className="py-3 px-4 text-center text-slate-600">—</td>
-                <td className="py-3 px-4 text-center text-slate-600 bg-purple-900/10">—</td>
-                <td className="py-3 px-4 text-center text-emerald-400">✓</td>
+                <td className="py-2.5 px-3 text-slate-300">Support</td>
+                <td className="py-2.5 px-3 text-center text-slate-400">Email</td>
+                <td className="py-2.5 px-3 text-center text-slate-300 bg-purple-900/10">Email</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">Priority</td>
+                <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">Dedicated</td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
-                <td className="py-6 px-4"></td>
-                <td className="py-6 px-4 text-center">
+                <td className="py-4 px-3"></td>
+                <td className="py-4 px-3 text-center">
                   <a
                     href={FREE_SIGNUP_URL}
-                    className="inline-block px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
+                    className="inline-block px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Start Free
                   </a>
                 </td>
-                <td className="py-6 px-4 text-center bg-purple-900/10">
+                <td className="py-4 px-3 text-center bg-purple-900/10">
                   <a
                     href={CHECKOUT_MONTHLY}
-                    className="inline-block px-6 py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white rounded-lg font-semibold transition-all"
+                    className="inline-block px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors text-xs"
                   >
-                    Get Pro — $149/mo →
+                    Get Pro →
                   </a>
                 </td>
-                <td className="py-6 px-4 text-center">
+                <td className="py-4 px-3 text-center bg-blue-900/10">
                   <a
-                    href="mailto:service@govcongiants.com?subject=MI%20Team%20Plan"
-                    className="inline-block px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors"
+                    href="mailto:service@govcongiants.com?subject=MI%20Team%20Inquiry"
+                    className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors text-xs"
+                  >
+                    Contact Sales
+                  </a>
+                </td>
+                <td className="py-4 px-3 text-center bg-amber-900/10">
+                  <a
+                    href="mailto:service@govcongiants.com?subject=MI%20Enterprise%20Inquiry"
+                    className="inline-block px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Contact Sales
                   </a>

@@ -1,6 +1,34 @@
 // Product Configuration with Stripe Checkout URLs
 
 export const PRODUCTS = {
+  // MI Pro ($149/mo) - The main product: All tools + AI Briefings + FHC Training
+  MI_PRO: {
+    id: 'mi-pro',
+    name: 'MI Pro',
+    tiers: {
+      monthly: {
+        price: 149,
+        billing: 'monthly',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_CHECKOUT_URL || 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C',
+      },
+      annual: {
+        price: 1490, // 2 months free
+        billing: 'annual',
+        stripeUrl: process.env.NEXT_PUBLIC_BRIEFINGS_ANNUAL_CHECKOUT_URL || 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D',
+      },
+    },
+    features: ['agency-search-full', 'daily-alerts', 'ai-briefings', 'market-research', 'forecasts', 'pipeline', 'crm', 'content-reaper', 'fhc-training'],
+  },
+  // Legacy: $49/mo briefings (for grandfathered users, NOT promoted)
+  LEGACY_BRIEFINGS: {
+    id: 'legacy-briefings',
+    name: 'Market Intelligence (Legacy)',
+    price: 49,
+    billing: 'monthly',
+    stripeUrl: 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z',
+    features: ['ai-briefings'],  // AI briefings only, not full tools
+  },
+  // Legacy: Keep for backwards compatibility
   DAILY_BRIEFINGS: {
     id: 'briefings',
     name: 'Market Intelligence',

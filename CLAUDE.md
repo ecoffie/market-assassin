@@ -32,26 +32,41 @@
 - Bird's-eye view of all tools
 - Familiar pattern for SaaS users
 
-### Tier Structure (May 2026)
+### Tier Structure (May 2026) - SIMPLIFIED
 
 | Tier | Price | Includes |
 |------|-------|----------|
-| **MI Free** | $0 | Opportunity Hunter + Daily Alerts (simple list, no AI) |
-| **MI Pro** | $149/mo | Full intelligence stack + AI briefings + Pipeline + FHC training |
-| **MI Pro (loyalty)** | $49/mo | Private offer for past customers only (NOT public) |
-| **MI Team** | $499/mo | 5 seats, shared pipeline |
-| **MI Enterprise** | Contact Sales | 15+ seats, API, white-label |
+| **MI Free** | $0 | Market Research (4 reports, 5/mo) + Daily Alerts (simple list) |
+| **MI Pro** | $149/mo | **Everything:** Market Research (10 reports, unlimited) + AI Briefings + Forecasts + Pipeline + CRM + FHC Training |
 
-**Pricing Notes (May 4, 2026):**
-- Public page shows $149/mo only (anchor price)
-- $49/mo is private loyalty link for past customers via email campaign
-- $149/mo includes FHC training/coaching access (replaces $99/mo FHC)
+**Public-facing = 2 tiers only: Free → Pro**
 
-**Legacy Product Handling:**
-- Alert Pro ($19/mo) → Cancel subscriptions, users get MI Free
-- Briefings ($49/mo) → Grandfather at $49, get MI Pro features (no training)
-- Tool bundles → Lifetime MI Pro access
-- Shop → KILLED, redirect to /pricing
+No decision fatigue. Clear upgrade path.
+
+**MI Free Features:**
+- Market Research (4 Standard reports: Analytics, Budget Authority, Gov Buyers, OSBP Contacts)
+- 5 reports per month cap
+- Daily Alerts (simple opportunity list, no AI analysis)
+- Profile setup + NAICS preferences
+
+**MI Pro Features ($149/mo):**
+- Market Research (all 10 reports, unlimited usage)
+- AI Briefings (Daily + Weekly + Pursuit)
+- 7,700+ Forecasts
+- Pipeline Tracker + Teaming CRM
+- Content Reaper (AI LinkedIn posts)
+- FHC Training access
+
+**Grandfathered Users (internal tracking only):**
+- OH Pro ($49 one-time) → Keep OH Pro features forever
+- Briefings ($49/mo) → Keep at $49/mo, get AI briefings (no full tools)
+- Alert Pro ($19/mo) → Cancel, migrate to MI Free
+- Tool bundles (Starter/Pro Giant/Ultimate) → Lifetime MI Pro access
+
+**Pricing Notes (May 5, 2026):**
+- Public page shows **Free vs $149/mo Pro only**
+- $49/mo exists but NOT promoted (loyalty/grandfather only)
+- $149/mo includes FHC training (replaces separate $99/mo product)
 
 **Domain Structure (May 2026):**
 - `govcongiants.com` → Marketing/SEO (govcon-funnels)
@@ -63,28 +78,31 @@
 
 ```typescript
 // src/components/UnifiedSidebar.tsx
-export type MITier = 'free' | 'pro' | 'team' | 'enterprise';
+export type MITier = 'free' | 'pro';  // Simplified: only 2 public tiers
 
 const tierInfo: Record<MITier, { name: string; price: string; color: string }> = {
   free: { name: 'MI Free', price: '$0', color: 'gray' },
   pro: { name: 'MI Pro', price: '$149/mo', color: 'emerald' },
-  team: { name: 'MI Team', price: '$499/mo', color: 'blue' },
-  enterprise: { name: 'MI Enterprise', price: 'Contact Sales', color: 'amber' },
 };
 
-function hasAccess(userTier: MITier, requiredTier: MITier): boolean {
-  const tierOrder: MITier[] = ['free', 'pro', 'team', 'enterprise'];
-  return tierOrder.indexOf(userTier) >= tierOrder.indexOf(requiredTier);
+function hasProAccess(userTier: MITier): boolean {
+  return userTier === 'pro';
 }
 ```
+
+**Internal tracking** (for grandfathered users, not in UI):
+- `legacy_briefings` = $49/mo briefings subscribers (AI briefings only)
+- `legacy_oh_pro` = $49 one-time OH Pro buyers (agency search only)
+- `legacy_bundle` = Tool bundle buyers (full MI Pro)
 
 ### MIPanel Type
 
 ```typescript
 // src/components/UnifiedSidebar.tsx
 export type MIPanel =
-  | 'dashboard'      // Daily briefings & intel
-  | 'research'       // Market Research (Federal Market Assassin)
+  | 'dashboard'      // AI Briefings - Daily/Weekly/Pursuit (Pro only)
+  | 'alerts'         // Daily Alerts - simple list (Free), AI analysis (Pro)
+  | 'research'       // Market Research - 4 reports free, 10 Pro (Federal Market Assassin)
   | 'forecasts'      // 7,700+ upcoming procurements
   | 'recompetes'     // Expiring contracts
   | 'contractors'    // 3,500+ with contacts
@@ -98,11 +116,18 @@ export type MIPanel =
 
 ### Navigation Sections by Tier
 
-| Section | Tier Required | Panels |
-|---------|---------------|--------|
-| **Intelligence** | Pro ($149/mo) | Dashboard, Market Research, Forecasts, Recompetes, Contractors, SBIR/STTR, Grants |
-| **Pipeline** | Pro ($149/mo) | Pipeline, Contacts |
-| **Tools** | Pro ($149/mo) | Content Reaper, Action Planner |
+| Section | MI Free ($0) | MI Pro ($149/mo) |
+|---------|--------------|------------------|
+| **Market Research** | 4 reports, 5/mo cap | All 10 reports, unlimited |
+| **Daily Alerts** | Simple list (no AI) | ✅ |
+| **AI Briefings** | ❌ | Daily + Weekly + Pursuit |
+| **Forecasts** | ❌ | 7,700+ |
+| **SBIR/STTR** | ❌ | ✅ |
+| **Grants** | ❌ | ✅ |
+| **Pipeline** | ❌ | ✅ |
+| **CRM/Contacts** | ❌ | ✅ |
+| **Content Reaper** | ❌ | ✅ |
+| **FHC Training** | ❌ | ✅ |
 
 ### Key Files
 
