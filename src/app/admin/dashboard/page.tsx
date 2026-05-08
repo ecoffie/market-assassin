@@ -303,6 +303,59 @@ function formatNextAction(action: string) {
     .join(' ');
 }
 
+const loadingMessages = [
+  'Checking email delivery health',
+  'Reading MI engagement signals',
+  'Calculating profile and alert gaps',
+  'Pulling customer outcome metrics',
+  'Preparing action levers',
+];
+
+function DashboardLoadingVisual({ messageIndex = 0 }: { messageIndex?: number }) {
+  return (
+    <div className="mt-5 rounded-lg border border-purple-500/30 bg-gray-900/70 p-4">
+      <style>{`
+        @keyframes admin-loading-slide {
+          0% { transform: translateX(-110%); }
+          55% { transform: translateX(35%); }
+          100% { transform: translateX(210%); }
+        }
+        @keyframes admin-loading-dot {
+          0%, 80%, 100% { opacity: 0.35; transform: translateY(0); }
+          40% { opacity: 1; transform: translateY(-3px); }
+        }
+      `}</style>
+
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <p className="text-sm font-semibold text-white">Loading dashboard data</p>
+        <div className="flex gap-1" aria-hidden="true">
+          {[0, 1, 2].map((dot) => (
+            <span
+              key={dot}
+              className="h-2 w-2 rounded-full bg-purple-300"
+              style={{
+                animation: 'admin-loading-dot 1s infinite ease-in-out',
+                animationDelay: `${dot * 140}ms`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="relative h-2 overflow-hidden rounded-full bg-gray-700">
+        <div
+          className="absolute inset-y-0 w-1/2 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-300 to-emerald-300"
+          style={{ animation: 'admin-loading-slide 1.45s infinite ease-in-out' }}
+        />
+      </div>
+
+      <p className="mt-3 text-xs text-gray-400">
+        {loadingMessages[messageIndex % loadingMessages.length]}
+      </p>
+    </div>
+  );
+}
+
 function getSystemAlertAction(alert: DashboardData['systemAlerts'][number]) {
   const message = alert.message.toLowerCase();
 
@@ -381,6 +434,7 @@ export default function AdminDashboard() {
   const [toolAccessSummary, setToolAccessSummary] = useState<ToolAccessSummary | null>(null);
   const [testEmail, setTestEmail] = useState('eric@govcongiants.com');
   const [profileReminderLimit, setProfileReminderLimit] = useState(25);
+  const [loadingStep, setLoadingStep] = useState(0);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -448,6 +502,19 @@ export default function AdminDashboard() {
     }
   }, [authenticated, fetchDashboard]);
 
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStep(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setLoadingStep((step) => step + 1);
+    }, 1400);
+
+    return () => clearInterval(interval);
+  }, [loading]);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     fetchDashboard();
@@ -503,6 +570,7 @@ export default function AdminDashboard() {
               {loading ? 'Loading...' : 'Login'}
             </button>
           </form>
+          {loading && <DashboardLoadingVisual messageIndex={loadingStep} />}
           {error && <p className="mt-4 text-red-400">{error}</p>}
         </div>
       </div>
@@ -512,7 +580,13 @@ export default function AdminDashboard() {
   if (!data) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">Loading dashboard...</div>
+        <div className="w-full max-w-lg rounded-lg bg-gray-800 p-8 shadow-xl">
+          <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+          <p className="mt-2 text-sm text-gray-400">
+            The admin view is gathering live delivery, engagement, and customer result metrics.
+          </p>
+          <DashboardLoadingVisual messageIndex={loadingStep} />
+        </div>
       </div>
     );
   }
