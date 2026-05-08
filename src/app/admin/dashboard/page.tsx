@@ -922,10 +922,10 @@ export default function AdminDashboard() {
                 </p>
               </div>
               <div className="bg-gray-900/60 rounded-lg p-4">
-                <p className="text-gray-400 text-sm">Profiles Completed</p>
+                <p className="text-gray-400 text-sm">Profile Activity</p>
                 <p className="text-3xl font-bold text-green-400">{data.miGrowth.acquisition.profilesCompletedOrUpdated.current.toLocaleString()}</p>
                 <p className={`text-xs mt-1 ${trendClass(data.miGrowth.acquisition.profilesCompletedOrUpdated)}`}>
-                  {formatSignedDelta(data.miGrowth.acquisition.profilesCompletedOrUpdated.delta)} vs prior {data.miGrowth.periodDays}d
+                  completed/updated, {formatSignedDelta(data.miGrowth.acquisition.profilesCompletedOrUpdated.delta)} vs prior {data.miGrowth.periodDays}d
                 </p>
               </div>
               <div className="bg-gray-900/60 rounded-lg p-4">
