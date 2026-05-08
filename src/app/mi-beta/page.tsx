@@ -38,8 +38,9 @@ function MIBetaDashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [authStep, setAuthStep] = useState<'email' | 'code'>('email');
+  const [authStep, setAuthStep] = useState<'credentials' | 'code'>('credentials');
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -176,9 +177,12 @@ function MIBetaDashboard() {
     trackEngagement('page_view', { panel: nextPanel, tier });
   }, [flushPanelTime, tier, trackEngagement]);
 
-  const requestTwoFactorCode = useCallback(async (userEmail: string) => {
+  const requestTwoFactorCode = useCallback(async (userEmail: string, password: string) => {
     const normalizedEmail = userEmail.toLowerCase().trim();
-    if (!normalizedEmail) return;
+    if (!normalizedEmail || !password) {
+      setAuthError('Enter your email and password');
+      return;
+    }
 
     setAuthLoading(true);
     setAuthError(null);
@@ -188,7 +192,7 @@ function MIBetaDashboard() {
       const res = await fetch('/api/auth/two-factor/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
       const data = await res.json();
 
@@ -333,16 +337,17 @@ function MIBetaDashboard() {
           {/* Email Entry */}
           <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-8 max-w-md mx-auto">
             <h2 className="text-lg font-semibold text-white mb-4 text-center">
-              {authStep === 'email' ? 'Sign in with two-factor verification' : 'Enter verification code'}
+              {authStep === 'credentials' ? 'Sign in to Market Intelligence' : 'Enter verification code'}
             </h2>
 
-            {authStep === 'email' ? (
+            {authStep === 'credentials' ? (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   const formData = new FormData(e.currentTarget);
                   const emailValue = formData.get('email') as string;
-                  requestTwoFactorCode(emailValue);
+                  const passwordValue = formData.get('password') as string;
+                  requestTwoFactorCode(emailValue, passwordValue);
                 }}
                 className="space-y-4"
               >
@@ -353,14 +358,25 @@ function MIBetaDashboard() {
                   onChange={(e) => setPendingEmail(e.target.value)}
                   placeholder="your@email.com"
                   required
+                  autoComplete="email"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+                <input
+                  type="password"
+                  name="password"
+                  value={signInPassword}
+                  onChange={(e) => setSignInPassword(e.target.value)}
+                  placeholder="Password"
+                  required
+                  autoComplete="current-password"
                   className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                 />
                 <button
                   type="submit"
-                  disabled={authLoading}
+                  disabled={authLoading || !pendingEmail.trim() || !signInPassword}
                   className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
                 >
-                  {authLoading ? 'Sending Code...' : 'Send Verification Code'}
+                  {authLoading ? 'Checking...' : 'Continue to 2FA'}
                 </button>
               </form>
             ) : (
@@ -395,7 +411,7 @@ function MIBetaDashboard() {
                   <button
                     type="button"
                     onClick={() => {
-                      setAuthStep('email');
+                      setAuthStep('credentials');
                       setVerificationCode('');
                       setAuthError(null);
                       setAuthMessage(null);
@@ -406,8 +422,8 @@ function MIBetaDashboard() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => requestTwoFactorCode(pendingEmail)}
-                    disabled={authLoading}
+                    onClick={() => requestTwoFactorCode(pendingEmail, signInPassword)}
+                    disabled={authLoading || !signInPassword}
                     className="text-emerald-400 hover:text-emerald-300 disabled:text-gray-600 transition-colors"
                   >
                     Resend code
@@ -521,8 +537,9 @@ function MIBetaDashboard() {
                   localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
                   setEmail(null);
                   setPendingEmail('');
+                  setSignInPassword('');
                   setVerificationCode('');
-                  setAuthStep('email');
+                  setAuthStep('credentials');
                 }}
                 className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
               >

@@ -5,6 +5,11 @@ import { sendEmail } from '@/lib/send-email';
 
 const CODE_TTL_MINUTES = 10;
 const RESEND_WINDOW_SECONDS = 60;
+const MI_SIGN_IN_PASSWORD =
+  process.env.MI_BETA_ACCESS_PASSWORD ||
+  process.env.MARKET_INTELLIGENCE_PASSWORD ||
+  process.env.MA_ACCESS_PASSWORD ||
+  'gcg-assassin-2024';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -75,9 +80,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const email = normalizeEmail(String(body.email || ''));
+    const password = String(body.password || '');
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({ success: false, error: 'Valid email is required' }, { status: 400 });
+    }
+
+    if (!password) {
+      return NextResponse.json({ success: false, error: 'Password is required' }, { status: 400 });
+    }
+
+    if (password !== MI_SIGN_IN_PASSWORD) {
+      return NextResponse.json({ success: false, error: 'Invalid email or password' }, { status: 401 });
     }
 
     const table = await ensureTwoFactorTable();
