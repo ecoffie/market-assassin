@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 
 interface DashboardPanelProps {
@@ -30,22 +30,54 @@ interface BriefingStats {
   pursuit: { date: string; targetCount: number } | null;
 }
 
+interface WorkspaceSummary {
+  members: Array<{ id: string; user_email: string; role: string; status: string }>;
+  settings?: {
+    onboarding_completed?: boolean;
+    company_name?: string;
+    display_name?: string;
+    naics_codes?: string[];
+    target_agencies?: string[];
+  } | null;
+  activity: Array<{ id: string; summary: string; actor_email: string; created_at: string }>;
+  reminders: Array<{
+    id: string;
+    title: string;
+    next_action?: string;
+    next_action_date?: string;
+    owner_email?: string;
+    isOverdue: boolean;
+    daysUntilDue: number;
+  }>;
+}
+
 export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const [briefings, setBriefings] = useState<Briefing[]>([]);
   const [stats, setStats] = useState<BriefingStats>({ daily: null, weekly: null, pursuit: null });
+  const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedBriefing, setSelectedBriefing] = useState<Briefing | null>(null);
 
-  useEffect(() => {
-    if (email && tier !== 'free') {
-      loadBriefings();
-    } else {
-      setIsLoading(false);
+  const loadWorkspace = useCallback(async () => {
+    if (!email) return;
+    try {
+      const res = await fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+      if (data.success) {
+        setWorkspace({
+          members: data.members || [],
+          settings: data.settings,
+          activity: data.activity || [],
+          reminders: data.reminders || [],
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load workspace summary:', err);
     }
-  }, [email, tier]);
+  }, [email]);
 
-  const loadBriefings = async () => {
+  const loadBriefings = useCallback(async () => {
     if (!email) return;
 
     setIsLoading(true);
@@ -106,7 +138,17 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [email]);
+
+  useEffect(() => {
+    if (email && tier !== 'free') {
+      loadBriefings();
+      loadWorkspace();
+    } else {
+      if (email) loadWorkspace();
+      setIsLoading(false);
+    }
+  }, [email, tier, loadBriefings, loadWorkspace]);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -171,6 +213,56 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           🔄 Refresh
         </button>
       </div>
+
+      {workspace && (
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="font-semibold text-white">Unified Workspace</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Team, profile, security, ownership, and reminders are now connected.
+                </p>
+              </div>
+              <span className={`px-2 py-1 rounded text-xs ${workspace.settings?.onboarding_completed ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
+                {workspace.settings?.onboarding_completed ? 'Ready' : 'Onboarding'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <DashboardStat label="Seats" value={workspace.members.length} />
+              <DashboardStat label="Due Soon" value={workspace.reminders.length} />
+              <DashboardStat label="NAICS" value={workspace.settings?.naics_codes?.length || 0} />
+              <DashboardStat label="Agencies" value={workspace.settings?.target_agencies?.length || 0} />
+            </div>
+
+            {!workspace.settings?.onboarding_completed && (
+              <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4">
+                <div className="font-medium text-amber-200">Finish onboarding</div>
+                <p className="text-sm text-amber-100/80 mt-1">
+                  Add company profile, NAICS, target agencies, and confirm 2FA in Unified Settings.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="font-semibold text-white mb-4">Next Actions</h2>
+            <div className="space-y-3">
+              {workspace.reminders.slice(0, 4).map(reminder => (
+                <div key={reminder.id} className="rounded-lg bg-slate-800/60 p-3">
+                  <div className="text-sm text-white line-clamp-2">{reminder.next_action || reminder.title}</div>
+                  <div className={`text-xs mt-1 ${reminder.isOverdue ? 'text-red-300' : 'text-amber-300'}`}>
+                    {reminder.isOverdue ? 'Overdue' : `Due in ${reminder.daysUntilDue} days`}
+                    {reminder.owner_email ? ` • ${reminder.owner_email}` : ''}
+                  </div>
+                </div>
+              ))}
+              {workspace.reminders.length === 0 && <p className="text-sm text-slate-500">No pursuit reminders due this week.</p>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error State */}
       {error && (
@@ -320,6 +412,15 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function DashboardStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg bg-slate-800/60 p-3">
+      <div className="text-xl font-bold text-white">{value}</div>
+      <div className="text-xs text-slate-500 mt-1">{label}</div>
     </div>
   );
 }

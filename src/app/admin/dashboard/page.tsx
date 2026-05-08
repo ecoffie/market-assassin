@@ -79,6 +79,85 @@ interface DashboardData {
     complaintRate: string;
     topLinks: Array<{ label: string; count: number }>;
   };
+  miGrowth?: {
+    periodDays: number;
+    acquisition: {
+      signups: TrendMetric;
+      profilesCompletedOrUpdated: TrendMetric;
+    };
+    audience: {
+      totalUsers: number;
+      activeAlerts: number;
+      dailyAlerts: number;
+      weeklyAlerts: number;
+      customProfiles: number;
+      defaultProfilesOnly: number;
+      noProfile: number;
+      profileCompletionRate: string;
+      briefingsEntitled: number;
+      briefingsEligible: number;
+      briefingsProfileIncomplete: number;
+    };
+    email: {
+      sent7d: number;
+      delivered7d: number;
+      opened7d: number;
+      clicked7d: number;
+      openRate: string;
+      clickRate: string;
+      topLinks: Array<{ label: string; count: number }>;
+    };
+    app: {
+      activeUsers: TrendMetric;
+      activeToday: number;
+      totalEvents7d: number;
+      totalMinutes7d: number;
+      avgMinutesPerActiveUser: number;
+      topAreas: Array<{ area: string; minutes: number; events: number; users: number }>;
+      trackingNote: string;
+    };
+    levers: Array<{ priority: 'high' | 'medium' | 'low'; label: string; detail: string }>;
+    definitions: string[];
+  };
+  outcomeMetrics?: {
+    periodDays: number;
+    findContracts: {
+      opportunityClicks: number;
+      uniqueClickers: number;
+      savedOpportunities: number;
+      savers: number;
+      pursuitBriefsRequested: number;
+      pursuitBriefsSent: number;
+      topClicked: Array<{ label: string; count: number }>;
+      topAgenciesSaved: Array<{ agency: string; count: number }>;
+    };
+    winContracts: {
+      pipelineItemsCreated: number;
+      pipelineUsers: number;
+      pursuing: number;
+      bidding: number;
+      submitted: number;
+      won: number;
+      lost: number;
+      dueSoon: number;
+      totalPipelineValue: number;
+      whiteGloveHelpRequests: number;
+      nextActionBreakdown: Array<{ action: string; count: number }>;
+      stageBreakdown: Array<{ stage: string; count: number }>;
+    };
+    experience: {
+      helpfulRate: string;
+      helpful: number;
+      notHelpful: number;
+      zeroAlertUsers7d: number;
+      highVolumeUsers7d: number;
+    };
+    verdicts: {
+      findContracts: string;
+      winContracts: string;
+    };
+    levers: Array<{ priority: 'high' | 'medium' | 'low'; label: string; detail: string }>;
+  };
   matchingQuality: {
     totalFeedback: number;
     helpful: number;
@@ -134,6 +213,7 @@ interface DashboardData {
     }>;
   };
   bootcampRollout?: {
+    totalAttendees?: number;
     totalBootcampUsers: number;
     invitationsSent: number;
     invitationsRemaining: number;
@@ -145,6 +225,13 @@ interface DashboardData {
   };
   systemAlerts: Array<{ level: 'critical' | 'warning' | 'info'; message: string }>;
   profileReminderLastRun?: ProfileReminderRun | null;
+}
+
+interface TrendMetric {
+  current: number;
+  previous: number;
+  delta: number;
+  direction: 'up' | 'down' | 'flat' | string;
 }
 
 interface ProfileReminderRun {
@@ -182,6 +269,38 @@ type PreviewRecipient = string | { email: string; createdAt?: string | null; upd
 
 function getPreviewEmail(user: PreviewRecipient): string {
   return typeof user === 'string' ? user : user.email;
+}
+
+function formatSignedDelta(value: number) {
+  if (value > 0) return `+${value}`;
+  return `${value}`;
+}
+
+function trendClass(metric: TrendMetric) {
+  if (metric.direction === 'up') return 'text-green-400';
+  if (metric.direction === 'down') return 'text-red-400';
+  return 'text-gray-400';
+}
+
+function percentNumber(numerator: number, denominator: number) {
+  return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
+}
+
+function formatCurrencyCompact(value: number) {
+  if (!value) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+    notation: value >= 1000000 ? 'compact' : 'standard',
+  }).format(value);
+}
+
+function formatNextAction(action: string) {
+  return action
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 function getSystemAlertAction(alert: DashboardData['systemAlerts'][number]) {
@@ -417,6 +536,16 @@ export default function AdminDashboard() {
   const samCacheAgeHours = data.dataHealth.samCacheLastUpdate
     ? Math.round((Date.now() - new Date(data.dataHealth.samCacheLastUpdate).getTime()) / (1000 * 60 * 60))
     : null;
+  const alertAttempts = data.emailOperations.alerts.sent + data.emailOperations.alerts.failed;
+  const alertProcessed = alertAttempts + data.emailOperations.alerts.skipped;
+  const alertAudience = data.miGrowth?.audience.activeAlerts || data.userHealth.alertsEnabledTotal;
+  const briefingAttempts = data.emailOperations.briefings.sent + data.emailOperations.briefings.failed;
+  const briefingProcessed = briefingAttempts + data.emailOperations.briefings.skipped + data.emailOperations.briefings.pending;
+  const briefingAudience = data.miGrowth?.audience.briefingsEligible || data.userHealth.briefingsCronEligible;
+  const bootcampAudience = data.bootcampRollout?.totalAttendees || data.bootcampRollout?.totalBootcampUsers || 0;
+  const bootcampSentRate = data.bootcampRollout
+    ? percentNumber(data.bootcampRollout.invitationsSent, bootcampAudience)
+    : 0;
   const profileReminderRemaining = profileReminderRun?.summary?.remaining;
   const opsChecks = [
     {
@@ -462,6 +591,22 @@ export default function AdminDashboard() {
       href: '#data-health',
     },
   ];
+  const commandLevers = [
+    ...(data.miGrowth?.levers || []),
+    ...(data.outcomeMetrics?.levers || []),
+  ].slice(0, 4);
+  const activationProfileGap = data.miGrowth
+    ? data.miGrowth.audience.defaultProfilesOnly + data.miGrowth.audience.noProfile
+    : (data.userHealth.defaultNaicsOnly || 0) + (data.userHealth.noNaics || 0);
+  const profileCompletionRate = data.miGrowth?.audience.profileCompletionRate || data.userHealth.naicsPercent;
+  const profilesCompletedCurrent = data.miGrowth?.acquisition.profilesCompletedOrUpdated.current || 0;
+  const appActiveUsers = data.miGrowth?.app.activeUsers.current || data.betaHealth.weeklyActiveUsers;
+  const appMinutes = data.miGrowth?.app.totalMinutes7d || 0;
+  const emailClickRate = data.miGrowth?.email.clickRate || data.providerEmailHealth.clickRate;
+  const opportunitiesClicked = data.outcomeMetrics?.findContracts.opportunityClicks || 0;
+  const opportunitiesSaved = data.outcomeMetrics?.findContracts.savedOpportunities || 0;
+  const pipelineAdds = data.outcomeMetrics?.winContracts.pipelineItemsCreated || 0;
+  const whiteGloveSignals = data.outcomeMetrics?.winContracts.whiteGloveHelpRequests || 0;
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -551,13 +696,174 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* MI Command Center */}
+        <div className="bg-gray-800 rounded-lg p-6 mb-8 border border-purple-900/40">
+          <div className="flex flex-col gap-3 mb-5 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-purple-300">Market Intelligence Command Center</p>
+              <h2 className="mt-1 text-2xl font-bold text-white">Are customers moving toward federal contract wins?</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                Business-health readout first: activation, engagement, and movement from discovery into pursuit.
+              </p>
+            </div>
+            <span className="shrink-0 rounded bg-gray-700 px-3 py-2 text-xs text-gray-300">
+              Last {data.miGrowth?.periodDays || data.outcomeMetrics?.periodDays || 7} days
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="rounded-lg border border-emerald-800/40 bg-emerald-950/15 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">1. Activation</h3>
+                  <p className="mt-1 text-sm text-emerald-100/70">Are new users getting configured?</p>
+                </div>
+                <span className="rounded bg-emerald-900/60 px-2 py-1 text-xs font-semibold text-emerald-100">
+                  Setup
+                </span>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded bg-gray-900/60 p-3">
+                  <p className="text-xs text-gray-500">New/imported</p>
+                  <p className="text-2xl font-bold text-white">{(data.miGrowth?.acquisition.signups.current || 0).toLocaleString()}</p>
+                  {data.miGrowth && (
+                    <p className={`mt-1 text-xs ${trendClass(data.miGrowth.acquisition.signups)}`}>
+                      {formatSignedDelta(data.miGrowth.acquisition.signups.delta)}
+                    </p>
+                  )}
+                </div>
+                <div className="rounded bg-gray-900/60 p-3">
+                  <p className="text-xs text-gray-500">Profiles done</p>
+                  <p className="text-2xl font-bold text-emerald-300">{profilesCompletedCurrent.toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-gray-500">{profileCompletionRate} total</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Active alert audience</span>
+                  <span className="font-mono text-white">{alertAudience.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Need custom profile</span>
+                  <span className="font-mono text-yellow-300">{activationProfileGap.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Briefings eligible</span>
+                  <span className="font-mono text-white">{briefingAudience.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-purple-800/40 bg-purple-950/15 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">2. Engagement</h3>
+                  <p className="mt-1 text-sm text-purple-100/70">Are they spending time in MI?</p>
+                </div>
+                <span className="rounded bg-purple-900/60 px-2 py-1 text-xs font-semibold text-purple-100">
+                  Usage
+                </span>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded bg-gray-900/60 p-3">
+                  <p className="text-xs text-gray-500">App active users</p>
+                  <p className="text-2xl font-bold text-purple-300">{appActiveUsers.toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-gray-500">{data.miGrowth?.app.activeToday || data.betaHealth.dailyActiveUsers} active today</p>
+                </div>
+                <div className="rounded bg-gray-900/60 p-3">
+                  <p className="text-xs text-gray-500">Time in MI</p>
+                  <p className="text-2xl font-bold text-white">{appMinutes.toLocaleString()}m</p>
+                  <p className="mt-1 text-xs text-gray-500">{data.miGrowth?.app.avgMinutesPerActiveUser || 0}m/user</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Email click rate</span>
+                  <span className="font-mono text-blue-300">{emailClickRate}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Email opened/clicked</span>
+                  <span className="font-mono text-white">{data.betaHealth.weeklyActiveUsers.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Top panel</span>
+                  <span className="max-w-[9rem] truncate text-right font-mono text-white">
+                    {data.miGrowth?.app.topAreas[0]?.area || 'Not tracked yet'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-blue-800/40 bg-blue-950/15 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">3. Outcomes</h3>
+                  <p className="mt-1 text-sm text-blue-100/70">Are they moving from find to pursue?</p>
+                </div>
+                <span className="rounded bg-blue-900/60 px-2 py-1 text-xs font-semibold text-blue-100">
+                  Results
+                </span>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded bg-gray-900/60 p-3">
+                  <p className="text-xs text-gray-500">Opp clicks</p>
+                  <p className="text-2xl font-bold text-white">{opportunitiesClicked.toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-gray-500">{opportunitiesSaved.toLocaleString()} saved</p>
+                </div>
+                <div className="rounded bg-gray-900/60 p-3">
+                  <p className="text-xs text-gray-500">Pipeline adds</p>
+                  <p className="text-2xl font-bold text-blue-300">{pipelineAdds.toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-yellow-300">{whiteGloveSignals.toLocaleString()} GCG help</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Pursuit briefs</span>
+                  <span className="font-mono text-purple-300">{(data.outcomeMetrics?.findContracts.pursuitBriefsSent || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Submitted/Won</span>
+                  <span className="font-mono text-emerald-300">
+                    {((data.outcomeMetrics?.winContracts.submitted || 0) + (data.outcomeMetrics?.winContracts.won || 0)).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300">Current read</span>
+                  <span className="max-w-[10rem] truncate text-right text-white">
+                    {data.outcomeMetrics?.verdicts.winContracts || 'Needs data'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {commandLevers.length > 0 && (
+            <div className="mt-5 rounded-lg border border-slate-700 bg-slate-950/40 p-4">
+              <h3 className="text-sm font-semibold text-white mb-3">What To Do Next</h3>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+                {commandLevers.map((lever) => (
+                  <div key={`${lever.priority}-${lever.label}`} className="rounded bg-gray-900/70 p-3">
+                    <span className={`text-xs font-semibold uppercase ${
+                      lever.priority === 'high' ? 'text-red-300' : lever.priority === 'medium' ? 'text-yellow-300' : 'text-gray-400'
+                    }`}>
+                      {lever.priority}
+                    </span>
+                    <p className="mt-1 text-sm font-semibold text-white">{lever.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-gray-400">{lever.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Daily Ops Checklist */}
         <div id="ops-checklist" className="scroll-mt-6 bg-gray-800 rounded-lg p-6 mb-8">
           <div className="flex flex-col gap-2 mb-5 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-white">Today&apos;s Ops Checklist</h2>
+              <h2 className="text-xl font-semibold text-white">System Health Checklist</h2>
               <p className="text-sm text-gray-400">
-                Morning readout for delivery, queues, profile setup, and data freshness.
+                Delivery, queues, reminders, and data freshness. Important, but separate from customer progress.
               </p>
             </div>
             <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
@@ -592,12 +898,299 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* North Star / Launch Health */}
+        {/* MI Growth & Engagement */}
+        {data.miGrowth && (
+          <div className="bg-gray-800 rounded-lg p-6 mb-8">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h2 className="text-xl font-semibold text-white">MI Growth & Engagement</h2>
+                <p className="text-sm text-gray-400">
+                  Separates audience inventory, onboarding progress, email engagement, and time spent in MI.
+                </p>
+              </div>
+              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
+                Last {data.miGrowth.periodDays} days
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+              <div className="bg-gray-900/60 rounded-lg p-4">
+                <p className="text-gray-400 text-sm">New / Imported Users</p>
+                <p className="text-3xl font-bold text-white">{data.miGrowth.acquisition.signups.current.toLocaleString()}</p>
+                <p className={`text-xs mt-1 ${trendClass(data.miGrowth.acquisition.signups)}`}>
+                  {formatSignedDelta(data.miGrowth.acquisition.signups.delta)} vs prior {data.miGrowth.periodDays}d
+                </p>
+              </div>
+              <div className="bg-gray-900/60 rounded-lg p-4">
+                <p className="text-gray-400 text-sm">Profiles Completed</p>
+                <p className="text-3xl font-bold text-green-400">{data.miGrowth.acquisition.profilesCompletedOrUpdated.current.toLocaleString()}</p>
+                <p className={`text-xs mt-1 ${trendClass(data.miGrowth.acquisition.profilesCompletedOrUpdated)}`}>
+                  {formatSignedDelta(data.miGrowth.acquisition.profilesCompletedOrUpdated.delta)} vs prior {data.miGrowth.periodDays}d
+                </p>
+              </div>
+              <div className="bg-gray-900/60 rounded-lg p-4">
+                <p className="text-gray-400 text-sm">App Active Users</p>
+                <p className="text-3xl font-bold text-purple-300">{data.miGrowth.app.activeUsers.current.toLocaleString()}</p>
+                <p className={`text-xs mt-1 ${trendClass(data.miGrowth.app.activeUsers)}`}>
+                  {data.miGrowth.app.activeToday.toLocaleString()} active today
+                </p>
+              </div>
+              <div className="bg-gray-900/60 rounded-lg p-4">
+                <p className="text-gray-400 text-sm">Time In MI</p>
+                <p className="text-3xl font-bold text-white">{data.miGrowth.app.totalMinutes7d.toLocaleString()}m</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {data.miGrowth.app.avgMinutesPerActiveUser}m per active user
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="bg-gray-900/60 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-white mb-3">Audience Funnel</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-400">Total users</span><span className="font-mono text-white">{data.miGrowth.audience.totalUsers.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Active alert audience</span><span className="font-mono text-white">{data.miGrowth.audience.activeAlerts.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Custom profiles</span><span className="font-mono text-green-400">{data.miGrowth.audience.customProfiles.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Default/no profile</span><span className="font-mono text-yellow-300">{(data.miGrowth.audience.defaultProfilesOnly + data.miGrowth.audience.noProfile).toLocaleString()}</span></div>
+                  <div className="flex justify-between pt-2 border-t border-gray-700"><span className="text-gray-400">Briefings eligible</span><span className="font-mono text-white">{data.miGrowth.audience.briefingsEligible.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Briefings need profile</span><span className="font-mono text-orange-300">{data.miGrowth.audience.briefingsProfileIncomplete.toLocaleString()}</span></div>
+                </div>
+              </div>
+
+              <div className="bg-gray-900/60 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-white mb-3">Email Engagement</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><p className="text-gray-500">Sent</p><p className="font-mono text-white">{data.miGrowth.email.sent7d.toLocaleString()}</p></div>
+                  <div><p className="text-gray-500">Delivered</p><p className="font-mono text-green-400">{data.miGrowth.email.delivered7d.toLocaleString()}</p></div>
+                  <div><p className="text-gray-500">Open Rate</p><p className="font-mono text-white">{data.miGrowth.email.openRate}</p></div>
+                  <div><p className="text-gray-500">Click Rate</p><p className="font-mono text-blue-300">{data.miGrowth.email.clickRate}</p></div>
+                </div>
+                {data.miGrowth.email.topLinks.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-700">
+                    <p className="text-xs text-gray-500 mb-2">Top clicked links</p>
+                    <div className="flex flex-wrap gap-2">
+                      {data.miGrowth.email.topLinks.slice(0, 4).map(link => (
+                        <span key={link.label} className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-200">
+                          {link.label}: {link.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-gray-900/60 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-white mb-3">Where Time Goes</h3>
+                {data.miGrowth.app.topAreas.length > 0 ? (
+                  <div className="space-y-2">
+                    {data.miGrowth.app.topAreas.map(area => (
+                      <div key={area.area} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate text-gray-300">{area.area}</span>
+                        <span className="shrink-0 font-mono text-white">{area.minutes}m</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">{data.miGrowth.app.trackingNote}</p>
+                )}
+              </div>
+            </div>
+
+            {data.miGrowth.levers.length > 0 && (
+              <div className="mt-5 rounded-lg border border-slate-700 bg-slate-950/40 p-4">
+                <h3 className="text-sm font-semibold text-white mb-3">Levers To Pull</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                  {data.miGrowth.levers.slice(0, 3).map((lever) => (
+                    <div key={lever.label} className="rounded bg-gray-900/70 p-3">
+                      <span className={`text-xs font-semibold uppercase ${
+                        lever.priority === 'high' ? 'text-red-300' : lever.priority === 'medium' ? 'text-yellow-300' : 'text-gray-400'
+                      }`}>
+                        {lever.priority}
+                      </span>
+                      <p className="mt-1 text-sm font-semibold text-white">{lever.label}</p>
+                      <p className="mt-1 text-xs text-gray-400">{lever.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Customer Results */}
+        {data.outcomeMetrics && (
+          <div className="bg-gray-800 rounded-lg p-6 mb-8">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Customer Results Funnel</h2>
+                <p className="text-sm text-gray-400">
+                  Answers whether MI helps users find contracts and move toward winning them.
+                </p>
+              </div>
+              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
+                Last {data.outcomeMetrics.periodDays} days
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-5">
+              <div className="rounded-lg border border-emerald-800/40 bg-emerald-950/15 p-4">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Find Federal Contracts</h3>
+                    <p className="mt-1 text-sm text-emerald-200/70">{data.outcomeMetrics.verdicts.findContracts}</p>
+                  </div>
+                  <span className="rounded bg-emerald-900/60 px-2 py-1 text-xs font-semibold text-emerald-100">Discovery</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="rounded bg-gray-900/60 p-3">
+                    <p className="text-xs text-gray-500">Opp Clicks</p>
+                    <p className="text-2xl font-bold text-white">{data.outcomeMetrics.findContracts.opportunityClicks.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded bg-gray-900/60 p-3">
+                    <p className="text-xs text-gray-500">Clickers</p>
+                    <p className="text-2xl font-bold text-white">{data.outcomeMetrics.findContracts.uniqueClickers.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded bg-gray-900/60 p-3">
+                    <p className="text-xs text-gray-500">Saved Opps</p>
+                    <p className="text-2xl font-bold text-emerald-300">{data.outcomeMetrics.findContracts.savedOpportunities.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded bg-gray-900/60 p-3">
+                    <p className="text-xs text-gray-500">Pursuit Briefs</p>
+                    <p className="text-2xl font-bold text-purple-300">{data.outcomeMetrics.findContracts.pursuitBriefsSent.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Top clicks</p>
+                    {data.outcomeMetrics.findContracts.topClicked.length > 0 ? (
+                      <div className="space-y-1">
+                        {data.outcomeMetrics.findContracts.topClicked.slice(0, 4).map(item => (
+                          <div key={item.label} className="flex justify-between gap-3">
+                            <span className="truncate text-gray-300">{item.label}</span>
+                            <span className="font-mono text-white">{item.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No opportunity clicks tracked yet.</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Saved by agency</p>
+                    {data.outcomeMetrics.findContracts.topAgenciesSaved.length > 0 ? (
+                      <div className="space-y-1">
+                        {data.outcomeMetrics.findContracts.topAgenciesSaved.slice(0, 4).map(item => (
+                          <div key={item.agency} className="flex justify-between gap-3">
+                            <span className="truncate text-gray-300">{item.agency}</span>
+                            <span className="font-mono text-white">{item.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No saved opportunities yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-blue-800/40 bg-blue-950/15 p-4">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Win Federal Contracts</h3>
+                    <p className="mt-1 text-sm text-blue-200/70">{data.outcomeMetrics.verdicts.winContracts}</p>
+                  </div>
+                  <span className="rounded bg-blue-900/60 px-2 py-1 text-xs font-semibold text-blue-100">Pipeline</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="rounded bg-gray-900/60 p-3">
+                    <p className="text-xs text-gray-500">Pipeline Adds</p>
+                    <p className="text-2xl font-bold text-white">{data.outcomeMetrics.winContracts.pipelineItemsCreated.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded bg-gray-900/60 p-3">
+                    <p className="text-xs text-gray-500">Active Stages</p>
+                    <p className="text-2xl font-bold text-blue-300">
+                      {(data.outcomeMetrics.winContracts.pursuing + data.outcomeMetrics.winContracts.bidding + data.outcomeMetrics.winContracts.submitted).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded bg-gray-900/60 p-3">
+                    <p className="text-xs text-gray-500">Submitted/Won</p>
+                    <p className="text-2xl font-bold text-emerald-300">
+                      {(data.outcomeMetrics.winContracts.submitted + data.outcomeMetrics.winContracts.won).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded bg-gray-900/60 p-3">
+                    <p className="text-xs text-gray-500">GCG Help</p>
+                    <p className="text-2xl font-bold text-yellow-300">{data.outcomeMetrics.winContracts.whiteGloveHelpRequests.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Pipeline stage</p>
+                    {data.outcomeMetrics.winContracts.stageBreakdown.length > 0 ? (
+                      <div className="space-y-1">
+                        {data.outcomeMetrics.winContracts.stageBreakdown.map(item => (
+                          <div key={item.stage} className="flex justify-between gap-3">
+                            <span className="capitalize text-gray-300">{item.stage}</span>
+                            <span className="font-mono text-white">{item.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No pipeline movement tracked yet.</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Next actions</p>
+                    {data.outcomeMetrics.winContracts.nextActionBreakdown.length > 0 ? (
+                      <div className="space-y-1">
+                        {data.outcomeMetrics.winContracts.nextActionBreakdown.slice(0, 5).map(item => (
+                          <div key={item.action} className="flex justify-between gap-3">
+                            <span className="text-gray-300">{formatNextAction(item.action)}</span>
+                            <span className="font-mono text-white">{item.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No next-action choices tracked yet.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-800 pt-3 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-300">Due soon</span><span className="font-mono text-yellow-300">{data.outcomeMetrics.winContracts.dueSoon}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-300">Pipeline value</span><span className="font-mono text-white">{formatCurrencyCompact(data.outcomeMetrics.winContracts.totalPipelineValue)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-300">Helpful rate</span><span className="font-mono text-white">{data.outcomeMetrics.experience.helpfulRate}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-300">Zero-alert users</span><span className="font-mono text-yellow-300">{data.outcomeMetrics.experience.zeroAlertUsers7d}</span></div>
+                </div>
+              </div>
+            </div>
+
+            {data.outcomeMetrics.levers.length > 0 && (
+              <div className="rounded-lg border border-slate-700 bg-slate-950/40 p-4">
+                <h3 className="text-sm font-semibold text-white mb-3">Outcome Levers</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                  {data.outcomeMetrics.levers.slice(0, 3).map(lever => (
+                    <div key={lever.label} className="rounded bg-gray-900/70 p-3">
+                      <span className={`text-xs font-semibold uppercase ${
+                        lever.priority === 'high' ? 'text-red-300' : lever.priority === 'medium' ? 'text-yellow-300' : 'text-gray-400'
+                      }`}>
+                        {lever.priority}
+                      </span>
+                      <p className="mt-1 text-sm font-semibold text-white">{lever.label}</p>
+                      <p className="mt-1 text-xs text-gray-400">{lever.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Legacy email launch health */}
         <div className="bg-gray-800 rounded-lg p-6 mb-8">
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
-              <h2 className="text-xl font-semibold text-white">Briefings Launch Command Center</h2>
-              <p className="text-sm text-gray-400">Activation, entitlement, delivery, and matching quality for the paid briefings rollout.</p>
+              <h2 className="text-xl font-semibold text-white">Email Launch Snapshot</h2>
+              <p className="text-sm text-gray-400">Email opens/clicks and alert audience inventory. This is not app time.</p>
             </div>
             <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">Last 7 days</span>
           </div>
@@ -611,7 +1204,7 @@ export default function AdminDashboard() {
             <div className="bg-gray-900/60 rounded-lg p-4">
               <p className="text-gray-400 text-sm">DAU / WAU</p>
               <p className="text-3xl font-bold text-purple-300">{data.betaHealth.dauWauRatio}</p>
-              <p className="text-xs text-gray-500 mt-1">{data.betaHealth.dailyActiveUsers} active today</p>
+              <p className="text-xs text-gray-500 mt-1">{data.betaHealth.dailyActiveUsers} email-active today</p>
             </div>
             <div className="bg-gray-900/60 rounded-lg p-4">
               <p className="text-gray-400 text-sm">Alerts Audience</p>
@@ -784,46 +1377,63 @@ export default function AdminDashboard() {
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* Yesterday's Alerts (most recent completed day) */}
+          {/* Completed alert delivery day */}
           <div id="daily-alerts-delivery" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-lg font-semibold text-white">Daily Alerts Delivery</h2>
-              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
+            <div className="flex justify-between items-start gap-4 mb-5">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Daily Alerts</h2>
+                <p className="mt-1 text-xs text-gray-500">Completed send window, not today-in-progress.</p>
+              </div>
+              <span className="shrink-0 text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
                 {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Yesterday'}
               </span>
             </div>
+            <div className="mb-5">
+              <p className="text-5xl font-bold text-green-400">{data.emailOperations.alerts.sent.toLocaleString()}</p>
+              <p className="mt-1 text-sm text-gray-400">emails sent to {alertAudience.toLocaleString()} active alert users</p>
+            </div>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-400">Sent</span>
-                <span className="text-green-400 font-mono">{data.emailOperations.alerts.sent}</span>
+                <span className="text-gray-400">Processed</span>
+                <span className="text-white font-mono">{alertProcessed.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Failed</span>
-                <span className="text-red-400 font-mono">{data.emailOperations.alerts.failed}</span>
+                <span className="text-gray-400">Skipped by rules</span>
+                <span className="text-yellow-400 font-mono">{data.emailOperations.alerts.skipped.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Skipped</span>
-                <span className="text-yellow-400 font-mono">{data.emailOperations.alerts.skipped}</span>
+                <span className="text-gray-400">Failures</span>
+                <span className="text-red-400 font-mono">{data.emailOperations.alerts.failed.toLocaleString()}</span>
               </div>
               <div className="pt-2 border-t border-gray-700 flex justify-between">
-                <span className="text-gray-400">Success Rate</span>
+                <span className="text-gray-400">Delivery health</span>
                 <span className="text-white font-semibold">{data.emailOperations.alerts.successRate}</span>
               </div>
+              <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
+                Lever: profile completion and NAICS quality increase useful matches; failed sends are the reliability risk.
+              </p>
             </div>
           </div>
 
-          {/* Yesterday's Briefings */}
+          {/* Completed briefing delivery day */}
           <div id="briefings-delivery" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-lg font-semibold text-white">Briefings Delivery</h2>
-              <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
+            <div className="flex justify-between items-start gap-4 mb-5">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Briefings</h2>
+                <p className="mt-1 text-xs text-gray-500">Paid briefing sends after entitlement, matching, and dedupe.</p>
+              </div>
+              <span className="shrink-0 text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
                 {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Yesterday'}
               </span>
             </div>
+            <div className="mb-5">
+              <p className="text-5xl font-bold text-purple-300">{data.emailOperations.briefings.sent.toLocaleString()}</p>
+              <p className="mt-1 text-sm text-gray-400">sent from {briefingAudience.toLocaleString()} currently eligible users</p>
+            </div>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-400">Sent (Total)</span>
-                <span className="text-green-400 font-mono">{data.emailOperations.briefings.sent}</span>
+                <span className="text-gray-400">Processed</span>
+                <span className="text-white font-mono">{briefingProcessed.toLocaleString()}</span>
               </div>
               {/* Breakdown by type */}
               {data.emailOperations.briefings.byType && (
@@ -843,19 +1453,19 @@ export default function AdminDashboard() {
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-gray-400">Failed</span>
-                <span className="text-red-400 font-mono">{data.emailOperations.briefings.failed}</span>
+                <span className="text-gray-400">Failures</span>
+                <span className="text-red-400 font-mono">{data.emailOperations.briefings.failed.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Pending</span>
-                <span className="text-blue-400 font-mono">{data.emailOperations.briefings.pending}</span>
+                <span className="text-blue-400 font-mono">{data.emailOperations.briefings.pending.toLocaleString()}</span>
               </div>
               <div className="pt-2 border-t border-gray-700 flex justify-between">
-                <span className="text-gray-400">Success Rate</span>
+                <span className="text-gray-400">Delivery health</span>
                 <span className="text-white font-semibold">{data.emailOperations.briefings.successRate}</span>
               </div>
               <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
-                Tomorrow&apos;s send is governed by Briefings Cron Eligible in User Health.
+                Lever: reduce the profile-incomplete group so more entitled users receive relevant briefings.
               </p>
             </div>
           </div>
@@ -863,27 +1473,30 @@ export default function AdminDashboard() {
           {/* Bootcamp Rollout */}
           {data.bootcampRollout && (
             <div id="bootcamp-rollout" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="text-lg font-semibold text-white">Bootcamp Rollout</h2>
-                <span className="text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">
-                  8,804 Users
+              <div className="flex justify-between items-start gap-4 mb-5">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Bootcamp Onboarding</h2>
+                  <p className="mt-1 text-xs text-gray-500">Invitation rollout and profile conversion.</p>
+                </div>
+                <span className="shrink-0 text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">
+                  {bootcampAudience.toLocaleString()} audience
                 </span>
+              </div>
+              <div className="mb-5">
+                <p className="text-5xl font-bold text-emerald-400">{data.bootcampRollout.invitationsSent.toLocaleString()}</p>
+                <p className="mt-1 text-sm text-gray-400">invites sent, {bootcampSentRate}% of rollout audience</p>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Total Enrolled</span>
+                  <span className="text-gray-400">Enrolled in settings</span>
                   <span className="text-white font-mono">{data.bootcampRollout.totalBootcampUsers.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Invitations Sent</span>
-                  <span className="text-green-400 font-mono">{data.bootcampRollout.invitationsSent.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Invitations Remaining</span>
+                  <span className="text-gray-400">Remaining to invite</span>
                   <span className="text-yellow-400 font-mono">{data.bootcampRollout.invitationsRemaining.toLocaleString()}</span>
                 </div>
                 <div className="pt-2 border-t border-gray-700 flex justify-between items-center">
-                  <span className="text-gray-400">Profiles Completed</span>
+                  <span className="text-gray-400">Profiles completed</span>
                   <div className="flex items-center gap-2">
                     <span className="text-white font-mono">{data.bootcampRollout.profilesCompleted}</span>
                     <span className="text-gray-500 text-sm">({data.bootcampRollout.profileCompletionRate})</span>
@@ -905,7 +1518,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
-                  Drip campaign: 2K emails/day via Office365 SMTP. Users complete profile → get Daily Alerts.
+                  Lever: the next win is profile setup, not more dashboard counting. Completed profiles turn into alert-ready users.
                 </p>
               </div>
             </div>

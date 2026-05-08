@@ -12,6 +12,7 @@ import {
   sendBundleEmail,
   sendFHCWelcomeEmail,
   sendAlertProWelcomeEmail,
+  sendMarketIntelligenceWelcomeEmail,
 } from '@/lib/send-email';
 import { getOrCreateProfile, updateAccessFlags } from '@/lib/supabase/user-profiles';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
@@ -46,28 +47,41 @@ export async function POST(request: NextRequest) {
   console.log('Live secret configured:', !!liveWebhookSecret, liveWebhookSecret ? `(starts with ${liveWebhookSecret.substring(0, 10)}...)` : '(empty)');
   console.log('Test secret configured:', !!testWebhookSecret, testWebhookSecret ? `(starts with ${testWebhookSecret.substring(0, 10)}...)` : '(empty)');
 
-  if (!signature) {
-    return NextResponse.json({ error: 'No signature' }, { status: 400 });
-  }
-
   let event: Stripe.Event;
   let isTestMode = false;
 
   // Verify signature
   try {
+    if (!signature) throw new Error('No Stripe signature header');
     const stripe = getStripe(false);
     event = stripe.webhooks.constructEvent(rawBody, signature, liveWebhookSecret);
     console.log('Live signature verified successfully');
   } catch (liveError) {
     console.log('Live signature failed:', liveError instanceof Error ? liveError.message : 'unknown error');
     try {
+      if (!signature) throw new Error('No Stripe signature header');
       const stripeTest = getStripe(true);
       event = stripeTest.webhooks.constructEvent(rawBody, signature, testWebhookSecret);
       isTestMode = true;
       console.log('Test signature verified successfully');
     } catch (testError) {
       console.log('Test signature also failed:', testError instanceof Error ? testError.message : 'unknown error');
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      try {
+        const parsed = JSON.parse(rawBody) as { id?: string; livemode?: boolean };
+        if (!parsed.id?.startsWith('evt_')) {
+          return NextResponse.json({ error: 'Invalid Stripe event' }, { status: 400 });
+        }
+
+        // Stripe uses a different signing secret per webhook endpoint. This
+        // legacy endpoint may receive valid events signed with an old endpoint
+        // secret, so verify authenticity by retrieving the event from Stripe.
+        isTestMode = parsed.livemode === false;
+        event = await getStripe(isTestMode).events.retrieve(parsed.id);
+        console.log(`Recovered Stripe event ${event.id} via Events API`);
+      } catch (retrieveError) {
+        console.log('Unable to recover Stripe event:', retrieveError instanceof Error ? retrieveError.message : 'unknown error');
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      }
     }
   }
 
@@ -291,6 +305,13 @@ export async function POST(request: NextRequest) {
     } else if (tier === 'recompete') {
       // Recompete Tracker
       await sendRecompeteEmail({ to: email, customerName });
+    } else if (
+      tier === 'briefings' ||
+      tier === 'briefings_monthly' ||
+      tier === 'briefings_annual' ||
+      tier === 'briefings_lifetime'
+    ) {
+      await sendMarketIntelligenceWelcomeEmail({ to: email, customerName });
     } else if (profile?.license_key) {
       // Fallback to generic license key email
       await sendLicenseKeyEmail({

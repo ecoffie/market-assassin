@@ -23,6 +23,18 @@
 
 ## Executive Summary
 
+### Strategic Transition Context
+
+Read first: **GOVCON-GIANTS-STRATEGIC-TRANSITION-MEMO.md**
+
+This brief should be read as the business case for a company transition, not only a product launch. GovCon Giants is moving from a training-first business to a platform-and-services company:
+
+- **Tier 1: Free audience** — alerts, YouTube, livestreams, books, and free tools identify engaged users.
+- **Tier 2: Market Intelligence customers** — paid self-serve users use briefings, alerts, pipeline, teaming, and market research.
+- **Tier 3: White-glove clients** — committed customers get done-with-you or done-for-you BD, capture, proposals, and advisor-supported execution.
+
+The core question is no longer, "Will people consume more training?" It is: **Does Market Intelligence help small businesses find and win federal contracts they would not have found on their own?**
+
 ### The Big Picture
 
 | Metric | Current State | What It Means |

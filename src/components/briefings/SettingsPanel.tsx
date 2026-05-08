@@ -68,6 +68,7 @@ interface SettingsPanelProps {
   onClose: () => void;
   email: string;
   onSaved?: () => void;
+  mode?: 'briefings' | 'alerts';
 }
 
 interface AlertSettings {
@@ -82,7 +83,7 @@ interface AlertSettings {
   alertsEnabled: boolean;
 }
 
-export default function SettingsPanel({ isOpen, onClose, email, onSaved }: SettingsPanelProps) {
+export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 'briefings' }: SettingsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -147,20 +148,23 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
         setSelectedStates(settings.locationStates || []);
 
         // Load frequency
-        if (!settings.alertsEnabled || !settings.briefingsEnabled) {
+        if (mode === 'alerts') {
+          setFrequency(settings.alertsEnabled === false ? 'paused' : settings.frequency === 'weekly' ? 'weekly' : 'daily');
+          setBriefingsEnabled(false);
+        } else if (!settings.alertsEnabled || !settings.briefingsEnabled) {
           setFrequency('paused');
+          setBriefingsEnabled(settings.briefingsEnabled ?? true);
         } else {
           setFrequency(settings.frequency === 'weekly' ? 'weekly' : 'daily');
+          setBriefingsEnabled(settings.briefingsEnabled ?? true);
         }
-
-        setBriefingsEnabled(settings.briefingsEnabled ?? true);
       }
     } catch {
       setError('Failed to load settings');
     } finally {
       setLoading(false);
     }
-  }, [email]);
+  }, [email, mode]);
 
   useEffect(() => {
     if (isOpen) {
@@ -206,7 +210,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
           locationState: selectedStates[0] || null,
           frequency,
           alertsEnabled: frequency !== 'paused',
-          briefingsEnabled,
+          briefingsEnabled: mode === 'alerts' ? false : briefingsEnabled,
           isActive: frequency !== 'paused',
         }),
       });
@@ -378,7 +382,9 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
         <div className="sticky top-0 bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-white">Settings</h2>
-            <p className="text-xs text-gray-500">Market Intelligence preferences</p>
+            <p className="text-xs text-gray-500">
+              {mode === 'alerts' ? 'Daily Alerts preferences' : 'Market Intelligence preferences'}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -856,24 +862,26 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved }: Setti
             </div>
 
             {/* Briefings Toggle */}
-            <div className="p-4 bg-gray-800/50 rounded-lg">
-              <label className="flex items-center justify-between cursor-pointer">
-                <div>
-                  <span className="text-white font-medium">Market Intelligence Briefings</span>
-                  <p className="text-xs text-gray-500">Daily, weekly, and pursuit briefs</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={briefingsEnabled}
-                    onChange={e => setBriefingsEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:bg-purple-600 transition-colors"></div>
-                  <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
-                </div>
-              </label>
-            </div>
+            {mode === 'briefings' && (
+              <div className="p-4 bg-gray-800/50 rounded-lg">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <span className="text-white font-medium">Market Intelligence Briefings</span>
+                    <p className="text-xs text-gray-500">Daily, weekly, and pursuit briefs</p>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={briefingsEnabled}
+                      onChange={e => setBriefingsEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:bg-purple-600 transition-colors"></div>
+                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+                  </div>
+                </label>
+              </div>
+            )}
 
             {/* Save Button */}
             <button

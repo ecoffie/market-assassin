@@ -11,6 +11,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireTwoFactorSession } from '@/lib/two-factor-session';
+import { ensureWorkspaceMember, recordMIBetaActivity } from '@/lib/mi-beta/workspace';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -42,6 +44,10 @@ export interface TeamingPartner {
   last_contact?: string;
   notes?: string;
   source?: string;
+  workspace_id?: string;
+  owner_email?: string;
+  created_by?: string;
+  updated_by?: string;
 }
 
 // GET - List saved partners
@@ -57,11 +63,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const twoFactor = requireTwoFactorSession(request, email);
+  if (!twoFactor.ok) return twoFactor.response;
+  const { workspaceId } = await ensureWorkspaceMember(email);
+
   try {
     let query = getSupabase()
       .from('user_teaming_partners')
       .select('*')
-      .eq('user_email', email.toLowerCase())
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${email.toLowerCase()}`)
       .order('partner_name', { ascending: true });
 
     if (status) {
@@ -136,9 +146,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const twoFactor = requireTwoFactorSession(request, body.user_email);
+    if (!twoFactor.ok) return twoFactor.response;
+
     body.user_email = body.user_email.toLowerCase();
+    const { workspaceId } = await ensureWorkspaceMember(body.user_email);
     body.outreach_status = body.outreach_status || 'none';
     body.source = body.source || 'manual';
+    body.workspace_id = workspaceId;
+    body.owner_email = body.owner_email || body.user_email;
+    body.created_by = body.user_email;
+    body.updated_by = body.user_email;
 
     const { data, error } = await getSupabase()
       .from('user_teaming_partners')
@@ -155,6 +173,17 @@ export async function POST(request: NextRequest) {
       }
       throw error;
     }
+
+    await recordMIBetaActivity({
+      workspaceId,
+      userEmail: body.user_email,
+      actorEmail: body.user_email,
+      entityType: 'partner',
+      entityId: data.id,
+      action: 'created',
+      summary: `Added teaming partner ${data.partner_name}`,
+      metadata: { partnerType: data.partner_type, status: data.outreach_status },
+    });
 
     return NextResponse.json({
       success: true,
@@ -183,6 +212,12 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const twoFactor = requireTwoFactorSession(request, user_email);
+    if (!twoFactor.ok) return twoFactor.response;
+    const { workspaceId } = await ensureWorkspaceMember(user_email);
+    updates.updated_by = user_email.toLowerCase();
+    updates.workspace_id = updates.workspace_id || workspaceId;
+
     // Update last_contact if outreach_status changes
     if (updates.outreach_status && updates.outreach_status !== 'none') {
       updates.last_contact = new Date().toISOString().split('T')[0];
@@ -192,11 +227,22 @@ export async function PATCH(request: NextRequest) {
       .from('user_teaming_partners')
       .update(updates)
       .eq('id', id)
-      .eq('user_email', user_email.toLowerCase())
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
       .select()
       .single();
 
     if (error) throw error;
+
+    await recordMIBetaActivity({
+      workspaceId,
+      userEmail: user_email,
+      actorEmail: user_email,
+      entityType: 'partner',
+      entityId: id,
+      action: 'updated',
+      summary: `Updated teaming partner ${data.partner_name}`,
+      metadata: { status: data.outreach_status },
+    });
 
     return NextResponse.json({
       success: true,
@@ -224,11 +270,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const twoFactor = requireTwoFactorSession(request, user_email);
+    if (!twoFactor.ok) return twoFactor.response;
+    const { workspaceId } = await ensureWorkspaceMember(user_email);
+
     const { error } = await getSupabase()
       .from('user_teaming_partners')
       .delete()
       .eq('id', id)
-      .eq('user_email', user_email.toLowerCase());
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`);
 
     if (error) throw error;
 

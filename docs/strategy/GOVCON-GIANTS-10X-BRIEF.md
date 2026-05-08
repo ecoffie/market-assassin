@@ -3,12 +3,17 @@
 > Applying the Wealth GENIUS "Do LESS to 10x" Framework
 > Analysis Date: May 3, 2026
 > **REVISED v5:** MI SaaS-First Model — Competing with Deltek, Not Trainers
+> Strategic transition memo: `GOVCON-GIANTS-STRATEGIC-TRANSITION-MEMO.md`
 
 ---
 
 ## Executive Summary
 
 **The Strategic Pivot:** Stop competing with GovCon trainers. Start competing with Deltek GovWin.
+
+**The Bigger Transition:** GovCon Giants is moving from training-first to platform-and-services. Training supports onboarding, retention, and customer success. Market Intelligence is the core platform. White-glove is the premium execution layer.
+
+**One thing:** We help small businesses win federal contracts they would not have found on their own.
 
 **Customer Validation (Laurie Sayles, CEO of CivilityMS):**
 > "Congratulations on producing something that ideally will be LESS than Deltek!!!"

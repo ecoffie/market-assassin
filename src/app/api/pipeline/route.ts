@@ -11,6 +11,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireTwoFactorSession } from '@/lib/two-factor-session';
+import { ensureWorkspaceMember, recordMIBetaActivity } from '@/lib/mi-beta/workspace';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -48,6 +50,10 @@ export interface PipelineOpportunity {
   outcome_notes?: string;
   award_amount?: string;
   winner?: string;
+  workspace_id?: string;
+  owner_email?: string;
+  created_by?: string;
+  updated_by?: string;
 }
 
 // GET - List pipeline opportunities
@@ -64,11 +70,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const twoFactor = requireTwoFactorSession(request, email);
+  if (!twoFactor.ok) return twoFactor.response;
+  const { workspaceId } = await ensureWorkspaceMember(email);
+
   try {
     let query = getSupabase()
       .from('user_pipeline')
       .select('*')
-      .eq('user_email', email.toLowerCase())
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${email.toLowerCase()}`)
       .order('response_deadline', { ascending: true, nullsFirst: false });
 
     if (stage) {
@@ -126,14 +136,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const twoFactor = requireTwoFactorSession(request, body.user_email);
+    if (!twoFactor.ok) return twoFactor.response;
+
     // Normalize email
     body.user_email = body.user_email.toLowerCase();
+    const { workspaceId } = await ensureWorkspaceMember(body.user_email);
 
     // Set defaults
     body.stage = body.stage || 'tracking';
     body.priority = body.priority || 'medium';
     body.source = body.source || 'manual';
     body.is_prime = body.is_prime ?? true;
+    body.workspace_id = workspaceId;
+    body.owner_email = body.owner_email || body.user_email;
+    body.created_by = body.user_email;
+    body.updated_by = body.user_email;
 
     const { data, error } = await getSupabase()
       .from('user_pipeline')
@@ -151,6 +169,17 @@ export async function POST(request: NextRequest) {
       }
       throw error;
     }
+
+    await recordMIBetaActivity({
+      workspaceId,
+      userEmail: body.user_email,
+      actorEmail: body.user_email,
+      entityType: 'pipeline',
+      entityId: data.id,
+      action: 'created',
+      summary: `Added ${data.title} to pipeline`,
+      metadata: { stage: data.stage, priority: data.priority },
+    });
 
     return NextResponse.json({
       success: true,
@@ -179,12 +208,18 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const twoFactor = requireTwoFactorSession(request, user_email);
+    if (!twoFactor.ok) return twoFactor.response;
+    const { workspaceId } = await ensureWorkspaceMember(user_email);
+    updates.updated_by = user_email.toLowerCase();
+    updates.workspace_id = updates.workspace_id || workspaceId;
+
     // Verify ownership
     const { data: existing } = await getSupabase()
       .from('user_pipeline')
       .select('id, stage')
       .eq('id', id)
-      .eq('user_email', user_email.toLowerCase())
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
       .single();
 
     if (!existing) {
@@ -202,7 +237,7 @@ export async function PATCH(request: NextRequest) {
       .from('user_pipeline')
       .update(updates)
       .eq('id', id)
-      .eq('user_email', user_email.toLowerCase())
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
       .select()
       .single();
 
@@ -212,6 +247,19 @@ export async function PATCH(request: NextRequest) {
     if (newStage && oldStage !== newStage) {
       console.log(`Pipeline stage change: ${oldStage} → ${newStage} for ${id}`);
     }
+
+    await recordMIBetaActivity({
+      workspaceId,
+      userEmail: user_email,
+      actorEmail: user_email,
+      entityType: 'pipeline',
+      entityId: id,
+      action: newStage && oldStage !== newStage ? 'stage_changed' : 'updated',
+      summary: newStage && oldStage !== newStage
+        ? `Moved ${data.title} from ${oldStage} to ${newStage}`
+        : `Updated ${data.title}`,
+      metadata: { oldStage, newStage },
+    });
 
     return NextResponse.json({
       success: true,
@@ -240,11 +288,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const twoFactor = requireTwoFactorSession(request, user_email);
+    if (!twoFactor.ok) return twoFactor.response;
+    const { workspaceId } = await ensureWorkspaceMember(user_email);
+
     const { error } = await getSupabase()
       .from('user_pipeline')
       .delete()
       .eq('id', id)
-      .eq('user_email', user_email.toLowerCase());
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`);
 
     if (error) throw error;
 

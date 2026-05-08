@@ -210,3 +210,66 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// PATCH endpoint for lightweight next-action updates from the MI save prompt.
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      email,
+      pipelineId,
+      nextAction,
+      stage,
+      notes,
+    } = body;
+
+    if (!email || !pipelineId || !nextAction) {
+      return NextResponse.json(
+        { success: false, error: 'email, pipelineId, and nextAction are required' },
+        { status: 400 }
+      );
+    }
+
+    const updates: Record<string, string> = {
+      next_action: nextAction,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (stage) {
+      updates.stage = stage;
+    }
+
+    if (notes) {
+      updates.notes = notes;
+    }
+
+    const { data, error } = await getSupabase()
+      .from('user_pipeline')
+      .update(updates)
+      .eq('id', pipelineId)
+      .eq('user_email', email.toLowerCase())
+      .select('id, title, stage, next_action')
+      .single();
+
+    if (error) {
+      console.error('Pipeline next-action update error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      pipeline: data,
+      message: 'Next action saved',
+    });
+
+  } catch (err) {
+    console.error('Pipeline next-action error:', err);
+    return NextResponse.json(
+      { success: false, error: 'Internal error' },
+      { status: 500 }
+    );
+  }
+}

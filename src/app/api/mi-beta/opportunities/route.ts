@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireTwoFactorSession } from '@/lib/two-factor-session';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -52,6 +53,9 @@ export async function GET(request: NextRequest) {
   const naicsParam = searchParams.get('naics');
   const limit = parseInt(searchParams.get('limit') || '25', 10);
   const noticeType = searchParams.get('noticeType');
+
+  const twoFactor = requireTwoFactorSession(request, email);
+  if (!twoFactor.ok) return twoFactor.response;
 
   // Get user's NAICS codes from their profile
   let naicsCodes: string[] = [];

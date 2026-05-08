@@ -11,6 +11,12 @@ const DEFAULT_MAX_FALLBACK_PERCENT = 15;
 const CONFIG_KEY = 'briefings:rollout:config';
 const ACTIVE_COHORT_KEY = 'briefings:rollout:active-cohort';
 
+const INTERNAL_BRIEFING_EMAILS = new Set([
+  'evankoffdev@gmail.com',
+  'kashif6331@gmail.com',
+  'usamashraf2@gmail.com',
+]);
+
 export type BriefingProgramType = 'daily_brief' | 'weekly_deep_dive' | 'pursuit_brief';
 
 export type BriefingRolloutMode = 'beta_all' | 'rollout';
@@ -158,6 +164,13 @@ function normalizeArray(values: string[] | null | undefined): string[] {
     : [];
 }
 
+function isInternalBriefingRecipient(email: string): boolean {
+  const domain = email.split('@')[1] || '';
+  return domain === 'govcongiants.com'
+    || domain === 'govcongiants.org'
+    || INTERNAL_BRIEFING_EMAILS.has(email);
+}
+
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -261,6 +274,10 @@ async function fetchBriefingEntitlements(supabase: SupabaseClient): Promise<Set<
     const email = row.email?.toLowerCase().trim();
     if (!email) continue;
     if (Number(row.classification_version || 0) !== latestVersion) continue;
+    if (row.briefings_access === 'excluded' && isInternalBriefingRecipient(email)) {
+      entitled.add(email);
+      continue;
+    }
     if (!entitledAccess.has(row.briefings_access || '')) continue;
     if (row.briefings_expiry && new Date(row.briefings_expiry).getTime() <= now) {
       continue;

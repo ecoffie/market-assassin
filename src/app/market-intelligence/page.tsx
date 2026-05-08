@@ -700,12 +700,12 @@ function MarketIntelligenceContent() {
           <p className="text-white font-medium mb-3">
             The <span className="text-purple-400">Ultimate Bundle ($1,497)</span> includes lifetime Market Intelligence access.
           </p>
-          <a
-            href="/pricing"
+          <Link
+            href="/bundles/ultimate"
             className="text-purple-400 hover:text-purple-300 text-sm font-medium"
           >
             Compare with Ultimate →
-          </a>
+          </Link>
         </div>
       </div>
 

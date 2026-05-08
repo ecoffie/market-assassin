@@ -3,6 +3,8 @@
 **Date:** May 4, 2026
 **Purpose:** Complete buildout plan, rollout strategy, pricing, and bootcamp redesign
 
+**Strategic context:** See `GOVCON-GIANTS-STRATEGIC-TRANSITION-MEMO.md`
+
 ---
 
 ## Table of Contents
@@ -355,46 +357,52 @@ APEX Accelerators counsel 30,000+ small businesses annually across 90+ locations
 Generic GovCon training — "How to Win Government Contracts"
 
 ### New Bootcamp Focus
-**MI Platform Launch** — "The End of 11 Platforms"
+**Platform Demo + Pathway to Execution** — "Win contracts you would not have found on your own"
+
+This bootcamp is not another training event. It is the public transition from training-first GovCon Giants to a platform-and-services company.
+
+**Bootcamp goals:**
+- Show the Market Intelligence platform producing real federal-contract intelligence.
+- Help attendees configure enough profile data for the platform to work.
+- Surface serious operators for MI subscription, Ultimate Bundle, team accounts, and white-glove.
+- Use proof stories and customer behavior instead of more generic instruction.
 
 ### Proposed Agenda
 
 | Time | Session | Content |
 |------|---------|---------|
-| **9:00 AM** | **The Problem** | Why 11 platforms is killing your BD |
-| **9:30 AM** | **The Solution** | Live MI platform walkthrough |
-| **10:00 AM** | **Demo: Daily Briefings** | See AI-powered intelligence in action |
+| **9:00 AM** | **The New GovCon Giants** | From training company to platform-and-services company |
+| **9:30 AM** | **The Problem** | Why 11 disconnected platforms make small businesses miss winnable contracts |
+| **10:00 AM** | **Live Demo: Daily Briefings** | Real opportunities, why they match, and what to do next |
 | **10:30 AM** | **Break** | |
-| **10:45 AM** | **Demo: Market Research** | From NAICS to contract in 10 minutes |
-| **11:15 AM** | **Demo: Proposal AI** | Generate capability statement live |
-| **11:45 AM** | **Workshop: Set Up Your Profile** | NAICS, agencies, preferences |
+| **10:45 AM** | **Live Demo: Market Research** | From NAICS to agency, incumbent, spend, and recompete path |
+| **11:15 AM** | **Customer Proof** | Stories from users/operators who found or won work through better intelligence |
+| **11:45 AM** | **Activation Block** | Set NAICS, agencies, certifications, alerts, and briefing preferences |
 | **12:30 PM** | **Lunch** | |
-| **1:30 PM** | **Workshop: Build Your Pipeline** | Add first 5 opportunities |
-| **2:30 PM** | **Workshop: Generate Briefing** | See your first daily briefing |
+| **1:30 PM** | **Deal Flow / Pipeline Demo** | Turn matched opportunities into a pursuit board |
+| **2:30 PM** | **Teaming + White-Glove Path** | When to self-serve, when to team, when to ask for done-for-you help |
 | **3:30 PM** | **Break** | |
-| **3:45 PM** | **Advanced: Team Features** | Admin dashboard, team management |
-| **4:30 PM** | **Q&A + Launch Offer** | $49/mo founding member pricing |
+| **3:45 PM** | **Team Features** | Admin access, team seats, shared pipeline, and future Deal Flow Board |
+| **4:30 PM** | **Choose Your Path** | MI self-serve, Ultimate Bundle, team account, or white-glove application |
 | **5:00 PM** | **Close** | |
 
 ### Bootcamp Offer
 
 **During bootcamp:**
-> "Everyone here today gets founding member pricing: **$49/mo** (vs $149/mo at launch).
+> "Market Intelligence is now your primary access path to GovCon Giants. If you want to self-serve, join MI. If you want us closer to the execution, apply for team or white-glove support.
 >
-> This expires at midnight tonight.
->
-> If you need team access, **MI Team is $499/mo** for 5 seats."
+> Today we are giving you a path based on your level of commitment: MI self-serve, Ultimate Bundle, MI Team, or white-glove."
 
 ### Bootcamp Positioning
 
 **Old:** "Learn how to win government contracts"
-**New:** "See the platform that replaces 11 tools — and set it up live"
+**New:** "See the platform and service path that helps you find and win contracts you would not have found on your own"
 
 **Why this works:**
 - They leave with a working account (not just knowledge)
 - They see the value before buying
-- The "founding member" urgency is real
-- Team tier pitch is natural ("need more seats?")
+- The offer maps to commitment level instead of forcing everyone into the same training product
+- Team and white-glove conversations become natural for serious operators
 
 ---
 

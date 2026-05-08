@@ -9,6 +9,8 @@
 
 We have **17 advisory board members** across three specialized boards:
 
+**Important sequencing:** advisory boards are not the first launch audience. The first audience is customers and users who have demonstrated behavior: purchases, profile completion, livestream attendance, email engagement, tool usage, replies, and calls booked. Advisors come second to support proof, credibility, white-glove delivery, and enterprise positioning after customer signal is clear.
+
 | Board | Focus | Members | Enterprise Value |
 |-------|-------|---------|------------------|
 | **Infrastructure Security** | Cybersecurity, Critical Infrastructure | 6 | DoD, DHS, IC contracts |

@@ -3,13 +3,17 @@
 **Date:** May 3, 2026
 **Purpose:** Clear instructions for email outreach and phone interviews
 
+**Strategic context:** See `GOVCON-GIANTS-STRATEGIC-TRANSITION-MEMO.md`
+
 ---
 
-## Focus: Current Customers Only
+## Focus: Current Customers First
 
 | Focus | Owner | Goal |
 |-------|-------|------|
 | **Customer Validation** | Annelle (emails) + Sikander (calls) | 8-10 customer interviews |
+
+**Strategic rule:** Human time follows customer behavior. Prioritize people who bought, configured profiles, attended, opened, clicked, replied, or otherwise demonstrated commitment.
 
 **Target audience:**
 - FHC (Federal Help Center) members

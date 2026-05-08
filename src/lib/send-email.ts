@@ -1104,6 +1104,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Standard', link: 'https://tools.govcongiants.org/market-assassin', description: 'Strategic market intelligence reports' },
         { name: 'Content Reaper', link: 'https://tools.govcongiants.org/content-generator', description: 'AI-powered LinkedIn content generator' },
+        { name: 'Market Intelligence - 1 Year Access', link: 'https://tools.govcongiants.org/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'pro-giant-bundle': {
@@ -1113,6 +1114,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Standard', link: 'https://tools.govcongiants.org/market-assassin', description: 'Strategic market intelligence reports' },
         { name: 'Content Reaper', link: 'https://tools.govcongiants.org/content-generator', description: 'AI-powered LinkedIn content generator' },
+        { name: 'Market Intelligence - 1 Year Access', link: 'https://tools.govcongiants.org/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'ultimate': {
@@ -1123,6 +1125,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: 'https://tools.govcongiants.org/market-assassin', description: 'All 8 strategic intelligence reports' },
         { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Market Intelligence - Lifetime Access', link: 'https://tools.govcongiants.org/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
     'ultimate-govcon-bundle': {
@@ -1133,6 +1136,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: 'https://tools.govcongiants.org/market-assassin', description: 'All 8 strategic intelligence reports' },
         { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Market Intelligence - Lifetime Access', link: 'https://tools.govcongiants.org/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
   };
@@ -1256,6 +1260,61 @@ Questions? Reply to this email for support.
     console.error('❌ Failed to send bundle email:', error);
     return false;
   }
+}
+
+export async function sendMarketIntelligenceWelcomeEmail({
+  to,
+  customerName,
+}: {
+  to: string;
+  customerName?: string;
+}): Promise<boolean> {
+  const setupLink = await createSecureAccessUrl(to, 'preferences');
+
+  return sendEmail({
+    to,
+    subject: 'Your Market Intelligence Access is Ready | GovCon Giants',
+    emailType: 'market_intelligence_welcome',
+    eventSource: 'stripe_purchase',
+    tags: {
+      type: 'market_intelligence_welcome',
+      product: 'market_intelligence',
+    },
+    metadata: {
+      source: 'stripe_purchase',
+    },
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 620px; margin: 0 auto; padding: 24px;">
+        <h1 style="color: #1e3a8a; margin-bottom: 8px;">Your Market Intelligence access is ready</h1>
+        <p>Hi${customerName ? ` ${customerName}` : ''},</p>
+        <p>Your GovCon Giants Market Intelligence purchase is active. Use your purchase email, <strong>${to}</strong>, to access your dashboard and briefings.</p>
+        <p style="margin: 28px 0;">
+          <a href="https://tools.govcongiants.org/market-intelligence" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Market Intelligence</a>
+        </p>
+        <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 18px; margin: 24px 0;">
+          <strong>Set up your briefing preferences</strong>
+          <p style="margin: 8px 0 14px;">Add your NAICS codes, agencies, keywords, and timezone so the briefings match your business.</p>
+          <a href="${setupLink}" style="color: #166534; font-weight: 700;">Set up preferences</a>
+        </div>
+        <p style="color: #6b7280; font-size: 13px;">Questions? Reply to this email for support.</p>
+      </div>
+    `,
+    text: `Your Market Intelligence access is ready.
+
+Hi${customerName ? ` ${customerName}` : ''},
+
+Your GovCon Giants Market Intelligence purchase is active.
+
+Access Market Intelligence:
+https://tools.govcongiants.org/market-intelligence
+
+Set up briefing preferences:
+${setupLink}
+
+Use this email to access your account: ${to}
+
+Questions? Reply to this email for support.`,
+  });
 }
 
 // Email for Federal Help Center membership

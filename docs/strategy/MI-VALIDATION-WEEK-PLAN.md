@@ -5,6 +5,21 @@
 
 ---
 
+## Strategic Frame
+
+Read first: `GOVCON-GIANTS-STRATEGIC-TRANSITION-MEMO.md`
+
+This is not a training validation sprint. We are validating the transition to a platform-and-services company:
+
+- Free audience identifies who is engaged.
+- Market Intelligence serves active paying customers.
+- White-glove serves committed clients who want outcomes.
+- Training becomes onboarding, retention, and customer success.
+
+**Primary success question:** Does this help small businesses find and win federal contracts they would not have found on their own?
+
+**Execution rule:** Talk to users first. Advisory comes second. Use `ANNELLE-SIKANDER-QUALIFIED-CUSTOMER-OUTREACH.csv` for direct customer outreach.
+
 ## Three Channels
 
 | Channel | Owner | Audience | Data Points | Questions |

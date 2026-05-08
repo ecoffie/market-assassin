@@ -281,6 +281,25 @@ Early-warning intel on upcoming procurement opportunities 6-18 months before sol
 **Current:** Development complete (April 9, 2026)
 **Purpose:** Unified BD workflow — opportunity pipeline tracking, teaming partner suggestions, market intelligence
 
+### Buyer-Validated Next Feature: Deal Flow Board
+
+**Priority:** HIGH
+**Signal:** Top 10 buyer conversations identified shared deal flow as the most valuable future team feature.
+**PRD:** [`docs/PRD-deal-flow-board.md`](./docs/PRD-deal-flow-board.md)
+
+**Purpose:** Move MI from individual alerts/pipeline into shared team execution: saved opportunities, owners, collaborators, next actions, teaming partners, proposal status, and win/loss outcomes in one board.
+
+**Outcome metrics to prove value:**
+- Alert/opportunity clicks -> saved opportunities
+- Saved opportunities -> Deal Flow cards
+- Deal Flow cards -> capture/proposal/submitted
+- Submitted -> won/lost/no-bid
+- Team activity, stuck pursuits, and time in board
+
+**MVP columns:** Inbox -> Qualify -> Capture -> Proposal -> Submitted -> Won/Lost/No-Bid
+
+**Pricing fit:** MI Team and Enterprise. MI Pro keeps individual pipeline; MI Team gets shared board and team accountability.
+
 ### ✅ Completed Features (April 9, 2026)
 
 | Feature | Status | Notes |

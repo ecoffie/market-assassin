@@ -13,6 +13,8 @@ export type MIBetaPanel =
   | 'contractors'    // 3,500+ with contacts
   | 'pipeline'       // Track pursuits
   | 'contacts'       // CRM & relationships
+  | 'team'           // Team access and seats
+  | 'settings'       // Unified account settings
   | 'proposals'      // AI Proposal Assist
   | 'grants';        // Federal grants
 
@@ -105,6 +107,14 @@ const NAV_SECTIONS: NavSection[] = [
         tier: ['pro', 'team', 'enterprise'],
       },
       {
+        id: 'team',
+        label: 'Team Access',
+        icon: '👥',
+        description: 'Seats + roles',
+        tier: ['pro', 'team', 'enterprise'],
+        badge: 'New',
+      },
+      {
         id: 'proposals',
         label: 'Proposal Assist',
         icon: '📝',
@@ -123,6 +133,18 @@ const NAV_SECTIONS: NavSection[] = [
         icon: '💰',
         description: '$700B+ in grants',
         tier: ['pro', 'team', 'enterprise'],
+      },
+    ],
+  },
+  {
+    title: 'Account',
+    items: [
+      {
+        id: 'settings',
+        label: 'Unified Settings',
+        icon: '⚙️',
+        description: 'Profile, NAICS, security',
+        tier: ['free', 'pro', 'team', 'enterprise'],
       },
     ],
   },

@@ -10,12 +10,24 @@
 ## READ BEFORE CALL
 
 Please review these two documents before the meeting:
-1. **FULL-BUSINESS-INTELLIGENCE-BRIEF.md** — Complete data analysis
-2. **GOVCON-GIANTS-10X-BRIEF.md** — Strategic direction
+1. **GOVCON-GIANTS-STRATEGIC-TRANSITION-MEMO.md** — The company pivot we are aligning around
+2. **FULL-BUSINESS-INTELLIGENCE-BRIEF.md** — Complete data analysis
+3. **GOVCON-GIANTS-10X-BRIEF.md** — Strategic direction
 
 ---
 
 ## TLDR (2-Minute Summary)
+
+### The Bigger Headline
+
+This is not just a briefings launch. It is the shift from **training-first GovCon Giants** to a **platform-and-services company**.
+
+**Operating rules for the team:**
+- Market Intelligence is the core product.
+- Training supports onboarding, retention, and customer success; it is no longer the main product.
+- Human time follows customer behavior: buyers, profile completers, attendees, clickers, responders, and active users get priority.
+- The free/9K audience is a filter. We observe who engages instead of spending team time persuading the disengaged.
+- Customers and users come first. Advisors come second and support proof, credibility, and white-glove delivery after customer signal.
 
 ### The Shift
 **Stop competing with GovCon trainers. Start competing with Deltek.**
@@ -174,18 +186,19 @@ These are the ONLY two questions. Simple. Direct. Get real answers.
 ### 5. 5/30 Bootcamp Redesign (5 min) — Eric
 
 **Old format:** 8-hour training "How to Win Government Contracts"
-**New format:** MI Platform Launch "The End of 11 Platforms"
+**New format:** Platform demo + pathway to execution: "Win contracts you would not have found on your own"
 
 | Time | Session |
 |------|---------|
-| **Morning** | The Problem (11 platforms) → The Solution (MI demo) |
-| **Midday** | Workshops: Set up profile, build pipeline, generate briefing |
-| **Afternoon** | Advanced features → Q&A → Launch offer |
+| **Morning** | The New GovCon Giants → MI platform demo with real opportunities |
+| **Midday** | Activation: set profile, alerts, briefing preferences, and pipeline |
+| **Afternoon** | Deal flow, team features, proof stories, and choose-your-path offer |
 
 **Bootcamp becomes:**
-- Product launch event (not just training)
+- Strategic transition event (not just training)
 - Attendees leave with working MI account
-- Founding member pricing ($49/mo) expires at midnight
+- Serious operators choose MI self-serve, Ultimate Bundle, team account, or white-glove
+- The team watches behavior: who configures, asks serious questions, and wants execution help
 
 ### 6. Rollout Strategy Preview (3 min) — Eric
 

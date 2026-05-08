@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import UnifiedSidebar, { type MIPanel } from '@/components/UnifiedSidebar';
@@ -409,9 +409,6 @@ type PageStatus = 'loading' | 'gate' | 'verifying' | 'onboarding' | 'denied' | '
 
 type FilterType = 'all' | 'urgent' | 'opportunity' | 'teaming';
 
-// MainTab is deprecated - using MIPanel from sidebar instead
-type MainTab = 'briefings' | 'forecasts' | 'sbir' | 'grants';
-
 // Default NAICS codes assigned during bootcamp batch enrollment
 // Users with ONLY these codes should still go through onboarding
 const DEFAULT_NAICS_SET = new Set(['541512', '541611', '541330', '541990', '561210']);
@@ -445,15 +442,64 @@ function BriefingsDashboardContent() {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [mainTab, setMainTab] = useState<MainTab>('briefings');
 
   // Unified MI panel state - controls which panel is shown
   const [activePanel, setActivePanel] = useState<MIPanel>('dashboard');
+  const panelStartedAtRef = useRef<number>(Date.now());
+  const lastTrackedPanelRef = useRef<MIPanel>('dashboard');
 
   // Track if user is on free tier (alerts only, no briefings access)
   const [isFreeUser, setIsFreeUser] = useState(false);
 
   const selectedBriefing = briefings.find(b => b.briefing_date === selectedDate)?.content ?? null;
+
+  const trackEngagement = useCallback((
+    eventType: 'page_view' | 'tool_use' | 'login' | 'profile_update' | 'onboarding_step' | 'export',
+    metadata: Record<string, unknown> = {},
+    eventSource = 'market_intelligence'
+  ) => {
+    const trackedEmail = email || inputEmail;
+    if (!trackedEmail || !trackedEmail.includes('@')) return;
+
+    const payload = JSON.stringify({
+      email: trackedEmail.toLowerCase().trim(),
+      eventType,
+      eventSource,
+      metadata,
+    });
+
+    if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
+      const blob = new Blob([payload], { type: 'application/json' });
+      navigator.sendBeacon('/api/mi-beta/engagement', blob);
+      return;
+    }
+
+    fetch('/api/mi-beta/engagement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
+  }, [email, inputEmail]);
+
+  const flushPanelTime = useCallback((reason: string, panelOverride?: MIPanel) => {
+    const panel = panelOverride || lastTrackedPanelRef.current;
+    const now = Date.now();
+    const durationMs = now - panelStartedAtRef.current;
+
+    // Ignore tiny transitions and cap one event so a suspended tab cannot distort time-in-app.
+    if (durationMs >= 5000) {
+      trackEngagement('tool_use', {
+        panel,
+        area: panel,
+        duration_ms: Math.min(durationMs, 30 * 60 * 1000),
+        reason,
+        status,
+      }, 'market_intelligence');
+    }
+
+    panelStartedAtRef.current = now;
+  }, [status, trackEngagement]);
 
   // Filter items based on search term and active filter
   const filterItems = useCallback((items: BriefingItemFormatted[]): BriefingItemFormatted[] => {
@@ -547,11 +593,22 @@ function BriefingsDashboardContent() {
     link.download = `briefing-${selectedBriefing.briefingDate}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [selectedBriefing, filterItems]);
+    trackEngagement('export', {
+      panel: activePanel,
+      area: activePanel,
+      briefingDate: selectedBriefing.briefingDate,
+      format: 'csv',
+    }, 'market_intelligence');
+  }, [selectedBriefing, filterItems, trackEngagement, activePanel]);
 
   const exportToPrint = useCallback(() => {
     window.print();
-  }, []);
+    trackEngagement('export', {
+      panel: activePanel,
+      area: activePanel,
+      format: 'print',
+    }, 'market_intelligence');
+  }, [trackEngagement, activePanel]);
 
   // Check profile setup state for smart-skip onboarding.
   // Users with only default NAICS codes (from batch enrollment) should still go through onboarding.
@@ -707,6 +764,61 @@ function BriefingsDashboardContent() {
     }
   }, [status, pendingSetupOpen]);
 
+  useEffect(() => {
+    if (status !== 'ready' && status !== 'free_ready') return;
+
+    trackEngagement('page_view', {
+      panel: activePanel,
+      area: activePanel,
+      status,
+      isFreeUser,
+    }, 'market_intelligence');
+  }, [status, activePanel, isFreeUser, trackEngagement]);
+
+  useEffect(() => {
+    if (status !== 'ready' && status !== 'free_ready') {
+      panelStartedAtRef.current = Date.now();
+      lastTrackedPanelRef.current = activePanel;
+      return;
+    }
+
+    const previousPanel = lastTrackedPanelRef.current;
+    if (previousPanel !== activePanel) {
+      flushPanelTime('panel_change', previousPanel);
+      lastTrackedPanelRef.current = activePanel;
+      trackEngagement('tool_use', {
+        panel: activePanel,
+        area: activePanel,
+        action: 'panel_open',
+        status,
+      }, 'market_intelligence');
+    }
+  }, [activePanel, flushPanelTime, status, trackEngagement]);
+
+  useEffect(() => {
+    if (status !== 'ready' && status !== 'free_ready') return;
+
+    const handlePageHide = () => {
+      flushPanelTime('page_hide');
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPanelTime('visibility_hidden');
+      } else {
+        panelStartedAtRef.current = Date.now();
+      }
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      flushPanelTime('component_unmount');
+    };
+  }, [flushPanelTime, status]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = inputEmail.toLowerCase().trim();
@@ -748,6 +860,11 @@ function BriefingsDashboardContent() {
   };
 
   const handleOnboardingComplete = async () => {
+    trackEngagement('profile_update', {
+      step: 'onboarding_complete',
+      source: 'briefings_page',
+    }, 'onboarding');
+
     // Check if user has briefings access (MI Pro) or just alerts (MI Free)
     try {
       const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`);
@@ -813,6 +930,10 @@ function BriefingsDashboardContent() {
       // Set email and go to onboarding
       setEmail(trimmed);
       localStorage.setItem('briefings_access_email', trimmed);
+      trackEngagement('onboarding_step', {
+        step: 'free_signup_created',
+        source: 'briefings_page',
+      }, 'onboarding');
       setStatus('onboarding');
     } catch {
       setError('Could not create account. Please try again.');

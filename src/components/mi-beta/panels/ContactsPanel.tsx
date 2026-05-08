@@ -34,6 +34,16 @@ interface TeamingStats {
   byType: Record<string, number>;
 }
 
+interface PipelineOpportunity {
+  id: string;
+  title: string;
+  agency?: string;
+  stage?: 'tracking' | 'pursuing' | 'bidding' | 'submitted' | 'won' | 'lost' | 'archived';
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  response_deadline?: string;
+  teaming_partners?: string[];
+}
+
 const PARTNER_TYPES = [
   { id: 'prime', label: 'Prime', color: 'bg-blue-500' },
   { id: 'sub', label: 'Subcontractor', color: 'bg-emerald-500' },
@@ -51,13 +61,39 @@ const OUTREACH_STATUSES = [
 
 export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
   const [partners, setPartners] = useState<TeamingPartner[]>([]);
+  const [pipeline, setPipeline] = useState<PipelineOpportunity[]>([]);
   const [stats, setStats] = useState<TeamingStats>({ total: 0, byStatus: {}, byType: {} });
   const [loading, setLoading] = useState(true);
+  const [pipelineLoading, setPipelineLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<TeamingPartner | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
+  const tierLabel = tier === 'free' ? 'Free CRM' : tier === 'pro' ? 'Pro CRM' : 'Full CRM';
+
+  const loadPipeline = useCallback(async () => {
+    if (!email) return;
+
+    setPipelineLoading(true);
+
+    try {
+      const res = await fetch(`/api/pipeline?email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setPipeline(data.opportunities || []);
+      }
+    } catch (err) {
+      console.error('Failed to load pipeline:', err);
+      setError('Failed to load pipeline pursuits');
+    } finally {
+      setPipelineLoading(false);
+    }
+  }, [email]);
 
   const loadPartners = useCallback(async () => {
     if (!email) {
@@ -98,6 +134,10 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
   useEffect(() => {
     loadPartners();
   }, [loadPartners]);
+
+  useEffect(() => {
+    loadPipeline();
+  }, [loadPipeline]);
 
   const handleAddPartner = async (partnerData: Partial<TeamingPartner>) => {
     if (!email) return;
@@ -175,6 +215,64 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     }
   };
 
+  const handleTogglePursuit = async (partnerName: string, opportunity: PipelineOpportunity) => {
+    if (!email) return;
+
+    const currentPartners = opportunity.teaming_partners || [];
+    const isAttached = currentPartners.includes(partnerName);
+    const nextPartners = isAttached
+      ? currentPartners.filter(name => name !== partnerName)
+      : [...currentPartners, partnerName];
+
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: opportunity.id,
+          user_email: email,
+          teaming_partners: nextPartners,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setPipeline(prev => prev.map(item => (
+          item.id === opportunity.id
+            ? { ...item, teaming_partners: data.opportunity.teaming_partners || [] }
+            : item
+        )));
+      } else {
+        setError(data.error || 'Failed to update pursuit partners');
+      }
+    } catch (err) {
+      console.error('Failed to attach pursuit:', err);
+      setError('Failed to update pursuit partners');
+    }
+  };
+
+  const getPartnerPursuits = (partnerName: string) => (
+    pipeline.filter(opp => (opp.teaming_partners || []).includes(partnerName))
+  );
+
+  const filteredPartners = partners.filter(partner => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    return [
+      partner.partner_name,
+      partner.contact_name,
+      partner.contact_email,
+      partner.contact_phone,
+      partner.contact_title,
+      partner.uei,
+      partner.cage_code,
+      partner.notes,
+      ...(partner.naics_codes || []),
+      ...(partner.certifications || []),
+    ].some(value => value?.toLowerCase().includes(query));
+  });
+
   const getStatusBadge = (status?: string) => {
     const statusConfig = OUTREACH_STATUSES.find(s => s.id === status) || OUTREACH_STATUSES[0];
     return statusConfig;
@@ -225,6 +323,9 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <span className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300">
+            {tierLabel}
+          </span>
           <button
             onClick={loadPartners}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
@@ -267,7 +368,14 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-3">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="min-w-0 flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-blue-500 outline-none"
+          placeholder="Search partners, contacts, NAICS, notes..."
+        />
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
@@ -291,12 +399,13 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       </div>
 
       {/* Partners List */}
-      {partners.length > 0 ? (
+      {filteredPartners.length > 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="divide-y divide-slate-800">
-            {partners.map(partner => {
+            {filteredPartners.map(partner => {
               const statusBadge = getStatusBadge(partner.outreach_status);
               const typeBadge = getTypeBadge(partner.partner_type);
+              const pursuits = getPartnerPursuits(partner.partner_name);
 
               return (
                 <div
@@ -323,13 +432,35 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
                           {partner.contact_title && <span className="text-slate-500"> • {partner.contact_title}</span>}
                         </div>
                       )}
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                        {partner.contact_email && <span>{partner.contact_email}</span>}
+                        {partner.contact_phone && <span>{partner.contact_phone}</span>}
+                        {partner.uei && <span>UEI {partner.uei}</span>}
+                        {partner.cage_code && <span>CAGE {partner.cage_code}</span>}
+                      </div>
                       {partner.naics_codes && partner.naics_codes.length > 0 && (
                         <div className="text-xs text-slate-500 mt-1">
                           NAICS: {partner.naics_codes.join(', ')}
                         </div>
                       )}
+                      {pursuits.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {pursuits.slice(0, 3).map(opp => (
+                            <span key={opp.id} className="px-2 py-1 rounded bg-slate-800 text-xs text-slate-300">
+                              {opp.title}
+                            </span>
+                          ))}
+                          {pursuits.length > 3 && (
+                            <span className="px-2 py-1 rounded bg-slate-800 text-xs text-slate-400">
+                              +{pursuits.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
+                      <div className="text-sm text-slate-400">Pursuits</div>
+                      <div className="text-sm text-white mb-3">{pursuits.length}</div>
                       <div className="text-sm text-slate-400">Last Contact</div>
                       <div className="text-sm text-white">{formatDate(partner.last_contact)}</div>
                     </div>
@@ -367,9 +498,13 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       {selectedPartner && (
         <PartnerModal
           partner={selectedPartner}
+          pipeline={pipeline}
+          attachedPursuits={getPartnerPursuits(selectedPartner.partner_name)}
+          pipelineLoading={pipelineLoading}
           onClose={() => setSelectedPartner(null)}
           onSave={(data) => handleUpdatePartner(selectedPartner.id, data)}
           onDelete={() => handleDeletePartner(selectedPartner.id)}
+          onTogglePursuit={(opportunity) => handleTogglePursuit(selectedPartner.partner_name, opportunity)}
         />
       )}
     </div>
@@ -379,12 +514,25 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
 // Partner Modal Component
 interface PartnerModalProps {
   partner?: TeamingPartner;
+  pipeline?: PipelineOpportunity[];
+  attachedPursuits?: PipelineOpportunity[];
+  pipelineLoading?: boolean;
   onClose: () => void;
   onSave: (data: Partial<TeamingPartner>) => void;
   onDelete?: () => void;
+  onTogglePursuit?: (opportunity: PipelineOpportunity) => void;
 }
 
-function PartnerModal({ partner, onClose, onSave, onDelete }: PartnerModalProps) {
+function PartnerModal({
+  partner,
+  pipeline = [],
+  attachedPursuits = [],
+  pipelineLoading = false,
+  onClose,
+  onSave,
+  onDelete,
+  onTogglePursuit,
+}: PartnerModalProps) {
   const [formData, setFormData] = useState<Partial<TeamingPartner>>({
     partner_name: partner?.partner_name || '',
     partner_type: partner?.partner_type || 'prime',
@@ -397,16 +545,25 @@ function PartnerModal({ partner, onClose, onSave, onDelete }: PartnerModalProps)
     outreach_status: partner?.outreach_status || 'none',
     notes: partner?.notes || '',
   });
+  const [naicsInput, setNaicsInput] = useState((partner?.naics_codes || []).join(', '));
+  const [certsInput, setCertsInput] = useState((partner?.certifications || []).join(', '));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.partner_name?.trim()) return;
-    onSave(formData);
+    onSave({
+      ...formData,
+      naics_codes: parseCsvList(naicsInput),
+      certifications: parseCsvList(certsInput),
+    });
   };
+
+  const attachedIds = new Set(attachedPursuits.map(opp => opp.id));
+  const activePipeline = pipeline.filter(opp => opp.stage !== 'lost' && opp.stage !== 'archived');
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-slate-800">
           <h3 className="text-lg font-semibold text-white">
             {partner ? 'Edit Partner' : 'Add Partner'}
@@ -521,6 +678,40 @@ function PartnerModal({ partner, onClose, onSave, onDelete }: PartnerModalProps)
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">NAICS Codes</label>
+              <input
+                type="text"
+                value={naicsInput}
+                onChange={(e) => setNaicsInput(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                placeholder="541512, 541611"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Certifications</label>
+              <input
+                type="text"
+                value={certsInput}
+                onChange={(e) => setCertsInput(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                placeholder="8(a), SDVOSB, HUBZone"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Past Performance</label>
+            <textarea
+              value={formData.past_performance || ''}
+              onChange={(e) => setFormData({ ...formData, past_performance: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none resize-none"
+              placeholder="Relevant agencies, contract vehicles, incumbent work, strengths..."
+            />
+          </div>
+
           <div>
             <label className="block text-sm text-slate-400 mb-1">Notes</label>
             <textarea
@@ -531,6 +722,57 @@ function PartnerModal({ partner, onClose, onSave, onDelete }: PartnerModalProps)
               placeholder="Add notes about this partner..."
             />
           </div>
+
+          {partner && (
+            <div className="border border-slate-800 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 bg-slate-800/60 border-b border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-white">Attached Pursuits</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {attachedPursuits.length} active pursuit{attachedPursuits.length !== 1 ? 's' : ''} linked to this partner
+                    </p>
+                  </div>
+                  {pipelineLoading && <span className="text-xs text-slate-500">Loading...</span>}
+                </div>
+              </div>
+
+              {activePipeline.length > 0 ? (
+                <div className="max-h-60 overflow-y-auto divide-y divide-slate-800">
+                  {activePipeline.map(opp => {
+                    const checked = attachedIds.has(opp.id);
+
+                    return (
+                      <label
+                        key={opp.id}
+                        className="flex items-start gap-3 px-4 py-3 hover:bg-slate-800/50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => onTogglePursuit?.(opp)}
+                          className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm text-white truncate">{opp.title}</span>
+                          <span className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
+                            {opp.agency && <span>{opp.agency}</span>}
+                            {opp.stage && <span>{opp.stage}</span>}
+                            {opp.priority && <span>{opp.priority} priority</span>}
+                            {opp.response_deadline && <span>Due {new Date(opp.response_deadline).toLocaleDateString()}</span>}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="px-4 py-5 text-sm text-slate-500">
+                  No active pipeline pursuits yet.
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-between pt-4">
             <div>
@@ -564,4 +806,11 @@ function PartnerModal({ partner, onClose, onSave, onDelete }: PartnerModalProps)
       </div>
     </div>
   );
+}
+
+function parseCsvList(value: string) {
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
 }

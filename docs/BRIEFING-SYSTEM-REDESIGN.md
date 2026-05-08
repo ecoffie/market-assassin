@@ -4,6 +4,17 @@
 **Status**: Implementation Required
 **Problem Duration**: Over 1 week of failed attempts
 
+## Strategic Context
+
+Briefings are not just emails. They are one of the core proof mechanisms for the GovCon Giants transition from training-first to platform-and-services.
+
+The briefing system should be measured by whether it helps small businesses:
+- Find relevant federal contracts they would not have found on their own
+- Understand why an opportunity is worth pursuing
+- Move from alert to pursuit, teaming, or white-glove support
+
+Operational dashboards should separate delivery health from customer engagement and outcomes. Sends are not the win. Profile completion, opens, clicks, time in MI, saved opportunities, pursuit creation, and contract progress are the signals that matter.
+
 ## Problem Statement
 
 The AI briefing system cannot deliver to 250+ users because:

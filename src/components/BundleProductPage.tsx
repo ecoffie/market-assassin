@@ -35,6 +35,10 @@ interface BundleProductPageProps {
   highlightText?: string;
   bestFor: string[];
   badge?: string;
+  accessSummary?: string;
+  accessBadgeLabel?: string;
+  includedProductsSubtitle?: string;
+  guaranteeText?: string;
 }
 
 export default function BundleProductPage({
@@ -54,6 +58,10 @@ export default function BundleProductPage({
   highlightText,
   bestFor,
   badge,
+  accessSummary,
+  accessBadgeLabel = 'Lifetime Access',
+  includedProductsSubtitle,
+  guaranteeText = '30-day money-back guarantee. Lifetime access. No subscriptions.',
 }: BundleProductPageProps) {
   const savings = originalPrice - price;
   const savingsPercent = Math.round((savings / originalPrice) * 100);
@@ -105,7 +113,9 @@ export default function BundleProductPage({
                     </span>
                   </div>
                 </div>
-                <p className="text-sm opacity-80">One-time payment. Lifetime access to all {includedProducts.length} products.</p>
+                <p className="text-sm opacity-80">
+                  {accessSummary || `One-time payment. Lifetime access to all ${includedProducts.length} products.`}
+                </p>
               </div>
 
               <a
@@ -148,7 +158,7 @@ export default function BundleProductPage({
           <div className="flex flex-wrap justify-center gap-8 text-center">
             <div className="flex items-center gap-2">
               <span className="text-2xl">∞</span>
-              <span className="text-gray-700 font-medium">Lifetime Access</span>
+              <span className="text-gray-700 font-medium">{accessBadgeLabel}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-2xl text-green-500">↩</span>
@@ -186,7 +196,9 @@ export default function BundleProductPage({
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Everything Included in Your Bundle</h2>
-            <p className="text-xl text-gray-600">Get lifetime access to all {includedProducts.length} premium products</p>
+            <p className="text-xl text-gray-600">
+              {includedProductsSubtitle || `Get lifetime access to all ${includedProducts.length} premium products`}
+            </p>
           </div>
 
           <div className="space-y-8">
@@ -363,7 +375,7 @@ export default function BundleProductPage({
             Get {title} Now - ${price.toLocaleString()}
           </a>
           <p className="mt-6 text-sm opacity-80">
-            30-day money-back guarantee. Lifetime access. No subscriptions.
+            {guaranteeText}
           </p>
         </div>
       </section>

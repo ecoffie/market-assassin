@@ -5,15 +5,34 @@ export default function UltimateBundlePage() {
     <BundleProductPage
       title="Ultimate GovCon Bundle"
       tagline="The complete arsenal for dominating federal contracting"
-      description="Get EVERYTHING. Every premium tool, every database, every report—all at the highest tier. The Ultimate Bundle is for contractors who are serious about building a dominant GovCon business and want no limitations."
+      description="Get EVERYTHING. Every premium tool, every database, every report, and lifetime Market Intelligence access. The Ultimate Bundle is for contractors who are serious about building a dominant GovCon business and want no limitations."
       primaryColor="#f59e0b"
       gradientFrom="#f59e0b"
       gradientTo="#ea580c"
       price={1497}
-      originalPrice={1788}
+      originalPrice={3285}
       checkoutUrl="https://buy.stripe.com/6oU3cwff897ceND84UfnO0t"
       badge="BEST VALUE - EVERYTHING INCLUDED"
+      accessSummary="One-time payment. Lifetime access to every included tool, including Market Intelligence."
+      accessBadgeLabel="Lifetime MI Included"
+      includedProductsSubtitle="Get lifetime access to every premium product, including Market Intelligence"
+      guaranteeText="30-day money-back guarantee. Lifetime access to the full Ultimate bundle, including Market Intelligence."
       includedProducts={[
+        {
+          name: 'Market Intelligence - Lifetime Access',
+          description: 'Lifetime access to the unified Market Intelligence platform: daily bid targets, weekly market deep dives, pursuit intelligence, pipeline tracking, teaming CRM, and secure team-ready workspace features.',
+          price: 1497,
+          icon: '🚀',
+          link: '/market-intelligence',
+          features: [
+            'Lifetime Market Intelligence access',
+            'Daily bid target briefings',
+            'Weekly market deep dives',
+            'Pursuit-focused intelligence',
+            'Pipeline and teaming workspace',
+            'Future MI platform updates included',
+          ],
+        },
         {
           name: 'Content Reaper (Full Fix)',
           description: 'The premium tier of Content Reaper with enhanced AI capabilities, more content types, and advanced customization for creating content that converts.',
@@ -62,7 +81,7 @@ export default function UltimateBundlePage() {
         },
         {
           name: 'Market Assassin Premium',
-          description: 'The full 8-report Market Assassin experience with unlimited generations, enhanced report depth, and all strategic intelligence reports unlocked.',
+          description: 'The full 8-report Market Assassin experience with unlimited generations, enhanced report depth, and all strategic intelligence reports unlocked. Pair it with lifetime MI for ongoing daily execution.',
           price: 497,
           icon: '🎯',
           link: '/market-assassin',
@@ -95,6 +114,7 @@ export default function UltimateBundlePage() {
       ]}
       bestFor={[
         "You want EVERYTHING with no limitations or restrictions",
+        "You want lifetime Market Intelligence included with the full toolkit",
         "You're building a serious GovCon business and need the best tools",
         "You want all premium tiers, not standard versions",
         "You need comprehensive market intelligence (all 8 reports)",
@@ -105,11 +125,12 @@ export default function UltimateBundlePage() {
         'VIP priority support',
         'Early access to new features',
         'All future product updates included',
+        'Lifetime Market Intelligence access included',
         'GovCon Giants VIP community access',
         'Quarterly strategy webinar access',
       ]}
       highlightTitle="For Contractors Who Refuse to Compromise"
-      highlightText="The Ultimate Bundle includes every tool at its highest tier. You get Market Assassin Premium with all 8 reports and unlimited generations. You get Content Reaper Full Fix with advanced AI capabilities. You get every database, every tracker, every tool we offer. This is for contractors who understand that having the best intelligence and tools is the difference between winning and losing contracts worth hundreds of thousands—or millions—of dollars."
+      highlightText="The Ultimate Bundle includes every tool at its highest tier plus lifetime Market Intelligence access. You get Market Assassin Premium with all 8 reports and unlimited generations. You get Content Reaper Full Fix with advanced AI capabilities. You get every database, every tracker, every tool we offer, and ongoing MI briefings to keep your pipeline moving. This is for contractors who understand that having the best intelligence and tools is the difference between winning and losing contracts worth hundreds of thousands—or millions—of dollars."
       reviews={[
         {
           name: 'Michael S.',

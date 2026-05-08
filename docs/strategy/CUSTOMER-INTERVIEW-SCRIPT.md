@@ -1,8 +1,25 @@
 # Customer Interview Script: MI SaaS Validation
 
-**Purpose:** Validate $149/mo MI SaaS model before Laurie call
+**Purpose:** Validate the Market Intelligence platform-and-services model before the Laurie call
 **Duration:** 10-15 minutes per call
 **Goal:** 10 interviews minimum this week
+
+---
+
+## Strategic Context
+
+This is not a training-product interview. GovCon Giants is moving to a platform-and-services model:
+
+- Free audience finds engaged users.
+- MI customers use the product to find better opportunities.
+- White-glove clients get help turning opportunities into wins.
+
+The interview should answer two questions:
+
+1. Does MI help this customer find federal contracts they would not have found on their own?
+2. What would help this customer move from finding opportunities to winning contracts?
+
+Prioritize qualified customers with behavior: purchases, profile completion, livestream attendance, email engagement, tool usage, and replies.
 
 ---
 

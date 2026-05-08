@@ -8,7 +8,13 @@
 
 ## Mission
 
-Validate MI SaaS pricing before calling Laurie Sayles. Get 50+ data points using the Wealth GENIUS two questions.
+Validate the Market Intelligence platform-and-services transition before calling Laurie Sayles. Get 50+ customer data points using the Wealth GENIUS two questions, then use that signal to shape pricing, onboarding, white-glove offers, and the May 30 launch.
+
+**Strategic context:** `GOVCON-GIANTS-STRATEGIC-TRANSITION-MEMO.md`
+
+**Rule for this plan:** customers and users first, advisory second. Annelle and Sikander should prioritize people who bought, configured profiles, attended, opened, clicked, replied, or otherwise demonstrated behavior. Advisory-board outreach is coach/Eric-owned and should support customer proof after we know what customers actually want.
+
+**Qualified outreach tracker:** `ANNELLE-SIKANDER-QUALIFIED-CUSTOMER-OUTREACH.csv`
 
 ---
 
@@ -24,7 +30,9 @@ Validate MI SaaS pricing before calling Laurie Sayles. Get 50+ data points using
 
 ### Annelle — Email Outreach
 
-**Task:** Send interview request emails to Ultimate Bundle buyers + high-engagement members
+**Task:** Send interview request emails to qualified customers first: Ultimate Bundle buyers, MI buyers, high-engagement members, recent purchasers, and people with evidence of product behavior.
+
+Use `ANNELLE-SIKANDER-QUALIFIED-CUSTOMER-OUTREACH.csv` as the working list. The 16 Ultimate Bundle buyers below are still important, but they are not the whole universe anymore.
 
 **Email List (16 Ultimate Bundle Buyers):**
 

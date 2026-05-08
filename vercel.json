@@ -238,6 +238,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/bootcamp-rollout?limit=2000",
+      "schedule": "0 17 * * *"
+    },
+    {
       "path": "/api/cron/check-briefing-health?email=true",
       "schedule": "30 12 * * *"
     },
@@ -388,10 +392,6 @@
     {
       "path": "/api/cron/briefing-watchdog",
       "schedule": "30 9 * * *"
-    },
-    {
-      "path": "/api/cron/briefing-watchdog",
-      "schedule": "0 10 * * *"
     },
     {
       "path": "/api/cron/sync-usaspending-awards",

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { grantBriefingsAccess } from '@/lib/briefings/access';
+import { sendBundleEmail, sendMarketIntelligenceWelcomeEmail } from '@/lib/send-email';
+import { updateAccessFlags } from '@/lib/supabase/user-profiles';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion,
@@ -186,6 +189,154 @@ async function handleChargeSucceeded(supabase: any, charge: Stripe.Charge) {
   if (error) {
     console.error('Error upserting charge:', error);
     throw error;
+  }
+
+  await applyPurchaseAutomation(supabase, charge, enrichedMetadata);
+}
+
+async function findCheckoutSessionForCharge(charge: Stripe.Charge) {
+  const paymentIntentId = typeof charge.payment_intent === 'string'
+    ? charge.payment_intent
+    : charge.payment_intent?.id;
+
+  if (!paymentIntentId) return null;
+
+  try {
+    const sessions = await stripe.checkout.sessions.list({
+      payment_intent: paymentIntentId,
+      limit: 1,
+      expand: ['data.line_items.data.price.product'],
+    } as Stripe.Checkout.SessionListParams);
+
+    return sessions.data[0] || null;
+  } catch (error) {
+    console.warn(`Unable to resolve checkout session for charge ${charge.id}:`, error);
+    return null;
+  }
+}
+
+function getChargeEmail(charge: Stripe.Charge, session: Stripe.Checkout.Session | null): string {
+  return (
+    session?.customer_email ||
+    session?.customer_details?.email ||
+    charge.billing_details?.email ||
+    charge.receipt_email ||
+    ''
+  ).toLowerCase().trim();
+}
+
+function getSessionProductName(session: Stripe.Checkout.Session | null): string | null {
+  const lineItems = (session as Stripe.Checkout.Session & {
+    line_items?: { data?: Array<{ description?: string | null; price?: { product?: string | Stripe.Product | Stripe.DeletedProduct | null } | null }> };
+  } | null)?.line_items?.data;
+
+  const line = lineItems?.[0];
+  const product = line?.price?.product;
+  if (product && typeof product !== 'string' && !('deleted' in product)) {
+    return product.name || null;
+  }
+
+  return line?.description || null;
+}
+
+function deriveAccessFromPurchase({
+  session,
+  metadata,
+  productName,
+  amount,
+}: {
+  session: Stripe.Checkout.Session | null;
+  metadata: Record<string, unknown>;
+  productName: string;
+  amount: number;
+}): { tier?: string; bundle?: string } {
+  const sessionMetadata = session?.metadata || {};
+  const metadataBundle = sessionMetadata.bundle || metadata.bundle;
+  const metadataTier = sessionMetadata.tier || metadata.tier;
+  const normalizedName = productName.toLowerCase();
+
+  let bundle = typeof metadataBundle === 'string' ? metadataBundle : undefined;
+  let tier = typeof metadataTier === 'string' ? metadataTier : undefined;
+
+  if (!bundle) {
+    if (normalizedName.includes('ultimate') && normalizedName.includes('bundle')) {
+      bundle = 'ultimate';
+    } else if (normalizedName.includes('pro giant') && normalizedName.includes('bundle')) {
+      bundle = 'pro';
+    } else if (normalizedName.includes('starter') && normalizedName.includes('bundle')) {
+      bundle = 'starter';
+    } else if (amount >= 149600 && amount <= 149800) {
+      bundle = 'ultimate';
+    } else if (amount >= 99600 && amount <= 99800) {
+      bundle = 'pro';
+    }
+  }
+
+  if (!tier) {
+    if (normalizedName.includes('market intelligence') || normalizedName.includes('daily briefing') || normalizedName.includes('briefing')) {
+      tier = normalizedName.includes('lifetime')
+        ? 'briefings_lifetime'
+        : normalizedName.includes('annual')
+          ? 'briefings_annual'
+          : 'briefings';
+    } else if (normalizedName.includes('federal contractor database')) {
+      tier = 'contractor_db';
+    } else if (normalizedName.includes('recompete')) {
+      tier = 'recompete';
+    }
+  }
+
+  return { tier, bundle };
+}
+
+async function applyPurchaseAutomation(
+  supabase: any,
+  charge: Stripe.Charge,
+  metadata: Record<string, unknown>
+) {
+  if (charge.status !== 'succeeded' || charge.refunded || charge.amount <= charge.amount_refunded) return;
+
+  const session = await findCheckoutSessionForCharge(charge);
+  const email = getChargeEmail(charge, session);
+  if (!email) return;
+
+  const productName =
+    getSessionProductName(session) ||
+    String(metadata.product_name || '') ||
+    charge.description ||
+    '';
+  const { tier, bundle } = deriveAccessFromPurchase({
+    session,
+    metadata,
+    productName,
+    amount: charge.amount,
+  });
+
+  if (!tier && !bundle) return;
+
+  const updates = await updateAccessFlags(email, tier, bundle);
+  if (updates.access_briefings) {
+    await grantBriefingsAccess(email);
+  }
+
+  await supabase
+    .from('user_notification_settings')
+    .upsert({
+      user_email: email,
+      alerts_enabled: true,
+      briefings_enabled: true,
+      alert_frequency: 'daily',
+      is_active: true,
+      subscription_status: 'beta',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_email' });
+
+  if (bundle && session) {
+    const customerName = session.customer_details?.name || charge.billing_details?.name || undefined;
+    await sendBundleEmail({ to: email, customerName, bundle });
+  } else if (updates.access_briefings) {
+    const customerName = session?.customer_details?.name || charge.billing_details?.name || undefined;
+    await sendMarketIntelligenceWelcomeEmail({ to: email, customerName });
   }
 }
 

@@ -116,7 +116,10 @@ export async function POST(request: NextRequest) {
   const skippedRecentlyReminded = usersNeedingSetup.length - eligibleUsers.length;
   const rawCursor = await kv.get<string | number>(CURSOR_KEY);
   const cursor = Math.max(Number(rawCursor || 0) || 0, 0);
-  const effectiveCursor = Math.min(cursor, eligibleUsers.length);
+  // The eligible list already removes recently-sent users, so it shrinks after every batch.
+  // If we keep applying yesterday's cursor to today's filtered list, failed or remaining
+  // users can get stranded behind the cursor. Wrap back to the front of the filtered queue.
+  const effectiveCursor = cursor >= eligibleUsers.length ? 0 : cursor;
   const nextEligibleUsers = getCursorWindow(eligibleUsers, effectiveCursor, limit);
 
   if (mode === 'preview') {

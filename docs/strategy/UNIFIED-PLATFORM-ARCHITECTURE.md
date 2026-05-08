@@ -136,6 +136,7 @@ Everything in MI Pro, plus:
 - 5 user seats
 - Team admin dashboard
 - Shared pipeline views
+- Deal Flow Board for shared pursuits, owners, next actions, teaming, and bid status
 - Per-user preferences
 - Team activity feed
 - Role-based access

@@ -358,12 +358,43 @@ export async function GET(request: NextRequest) {
     }
 
     const cachedStripePurchases = await fetchCachedStripePurchases(supabase, days);
-    if (cachedStripePurchases.length > 0) {
+    const latestCachedPurchase = cachedStripePurchases[0]?.purchased_at
+      ? new Date(cachedStripePurchases[0].purchased_at).getTime()
+      : 0;
+    const cacheIsFresh = latestCachedPurchase > Date.now() - 36 * 60 * 60 * 1000;
+
+    if (cachedStripePurchases.length > 0 && cacheIsFresh) {
       return NextResponse.json({
         purchases: cachedStripePurchases,
         source: 'stripe_cache',
         days,
       });
+    }
+
+    if (cachedStripePurchases.length > 0 && !cacheIsFresh) {
+      try {
+        const stripePurchases = await fetchStripePurchases(days);
+        return NextResponse.json({
+          purchases: stripePurchases,
+          source: 'stripe_live_cache_stale',
+          days,
+          staleCache: {
+            count: cachedStripePurchases.length,
+            latestPurchasedAt: cachedStripePurchases[0]?.purchased_at || null,
+          },
+        });
+      } catch (stripeError) {
+        console.warn('Stripe cache is stale and live fetch failed, returning stale cache:', stripeError);
+        return NextResponse.json({
+          purchases: cachedStripePurchases,
+          source: 'stripe_cache_stale',
+          days,
+          staleCache: {
+            count: cachedStripePurchases.length,
+            latestPurchasedAt: cachedStripePurchases[0]?.purchased_at || null,
+          },
+        });
+      }
     }
 
     const { data, error } = await supabase

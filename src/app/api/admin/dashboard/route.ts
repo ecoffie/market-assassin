@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,6 +38,7 @@ const PRO_TIER_PRODUCTS = [
   'pro-giant-bundle',
 ];
 const PROFILE_REMINDER_LAST_RUN_KEY = 'admin:profile-reminder:last-run';
+const BOOTCAMP_ATTENDEE_FILE = path.join(process.cwd(), 'data/bootcamp-attendees-to-enroll.txt');
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -103,6 +106,8 @@ export async function GET(request: NextRequest) {
     userHealth,
     weeklyAlertHealth,
     betaHealth,
+    miGrowth,
+    outcomeMetrics,
     providerEmailHealth,
     matchingQuality,
     alertTrend,
@@ -117,6 +122,8 @@ export async function GET(request: NextRequest) {
     getUserHealth(),
     getWeeklyAlertHealth(),
     getBetaHealth(),
+    getMiGrowthMetrics(),
+    getOutcomeMetrics(),
     getProviderEmailHealth(),
     getMatchingQuality(),
     getAlertTrend(sevenDaysAgo),
@@ -143,6 +150,12 @@ export async function GET(request: NextRequest) {
 
     // Section 2c: Beta monetization / engagement health
     betaHealth,
+
+    // Section 2c.1: Clear MI growth, onboarding, and engagement metrics
+    miGrowth,
+
+    // Section 2c.2: Customer-result funnel
+    outcomeMetrics,
 
     // Section 2d: Resend/provider delivery health
     providerEmailHealth,
@@ -180,6 +193,7 @@ async function getBootcampRollout() {
   const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
 
   const rollout = {
+    totalAttendees: 0,
     totalBootcampUsers: 0,
     invitationsSent: 0,
     invitationsRemaining: 0,
@@ -192,12 +206,47 @@ async function getBootcampRollout() {
 
   try {
     const supabase = getSupabase();
+    let bootcampUsers: Array<{
+      user_email: string;
+      naics_codes?: string[] | null;
+      alerts_enabled?: boolean | null;
+      treatment_type?: string | null;
+      invitation_sent_at?: string | null;
+      invitation_source?: string | null;
+    }> | null = null;
 
-    // Get all bootcamp users (needs_setup or bootcamp-batch-enroll source)
-    const { data: bootcampUsers } = await supabase
-      .from('user_notification_settings')
-      .select('user_email, naics_codes, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
-      .or('treatment_type.eq.needs_setup,invitation_source.eq.bootcamp-batch-enroll');
+    if (fs.existsSync(BOOTCAMP_ATTENDEE_FILE)) {
+      const attendeeEmails = Array.from(new Set(
+        fs.readFileSync(BOOTCAMP_ATTENDEE_FILE, 'utf8')
+          .split(/\r?\n/)
+          .map(email => email.toLowerCase().trim())
+          .filter(email => email && email.includes('@') && !email.includes(' '))
+      ));
+      rollout.totalAttendees = attendeeEmails.length;
+      bootcampUsers = [];
+
+      for (let i = 0; i < attendeeEmails.length; i += 500) {
+        const chunk = attendeeEmails.slice(i, i + 500);
+        const { data, error } = await supabase
+          .from('user_notification_settings')
+          .select('user_email, naics_codes, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
+          .in('user_email', chunk);
+
+        if (error) throw error;
+        bootcampUsers.push(...(data || []));
+      }
+    }
+
+    if (!bootcampUsers) {
+      // Fallback: all bootcamp users already enrolled in settings.
+      const { data } = await supabase
+        .from('user_notification_settings')
+        .select('user_email, naics_codes, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
+        .or('treatment_type.eq.needs_setup,invitation_source.eq.bootcamp-batch-enroll');
+      const fallbackUsers = data || [];
+      bootcampUsers = fallbackUsers;
+      rollout.totalAttendees = fallbackUsers.length;
+    }
 
     if (bootcampUsers) {
       rollout.totalBootcampUsers = bootcampUsers.length;
@@ -227,12 +276,12 @@ async function getBootcampRollout() {
         }
       }
 
-      rollout.invitationsRemaining = rollout.totalBootcampUsers - rollout.invitationsSent;
+      rollout.invitationsRemaining = Math.max(rollout.totalAttendees - rollout.invitationsSent, 0);
       rollout.profileCompletionRate = rollout.invitationsSent > 0
         ? `${Math.round((rollout.profilesCompleted / rollout.invitationsSent) * 100)}%`
         : '0%';
-      rollout.conversionRate = rollout.totalBootcampUsers > 0
-        ? `${Math.round((rollout.readyForAlerts / rollout.totalBootcampUsers) * 100)}%`
+      rollout.conversionRate = rollout.totalAttendees > 0
+        ? `${Math.round((rollout.readyForAlerts / rollout.totalAttendees) * 100)}%`
         : '0%';
     }
   } catch (error) {
@@ -713,6 +762,585 @@ async function getWeeklyAlertHealth() {
 
 function percent(numerator: number, denominator: number): string {
   return denominator > 0 ? `${Math.round((numerator / denominator) * 100)}%` : 'N/A';
+}
+
+function percentNumber(numerator: number, denominator: number): number {
+  return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
+}
+
+function trendMetric(current: number, previous: number) {
+  return {
+    current,
+    previous,
+    delta: current - previous,
+    direction: current > previous ? 'up' : current < previous ? 'down' : 'flat',
+  };
+}
+
+function isDefaultNaicsOnly(naicsCodes: string[] | null | undefined): boolean {
+  const codes = naicsCodes || [];
+  return codes.length > 0 && codes.every((code: string) => DEFAULT_NAICS_SET.has(code));
+}
+
+function hasCustomNaics(naicsCodes: string[] | null | undefined): boolean {
+  const codes = naicsCodes || [];
+  return codes.length > 0 && !isDefaultNaicsOnly(codes);
+}
+
+function engagementAreaLabel(source?: string | null, metadata?: Record<string, unknown> | null): string {
+  const panel = typeof metadata?.panel === 'string' ? metadata.panel : source;
+  const normalized = String(panel || 'market_intelligence').replace(/_/g, ' ');
+  return normalized
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+async function getMiGrowthMetrics() {
+  const now = new Date();
+  const periodDays = 7;
+  const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+  const previousStart = new Date(now.getTime() - periodDays * 2 * 24 * 60 * 60 * 1000);
+  const todayStart = new Date(now);
+  todayStart.setUTCHours(0, 0, 0, 0);
+
+  const metrics = {
+    periodDays,
+    windows: {
+      currentStart: periodStart.toISOString(),
+      previousStart: previousStart.toISOString(),
+      currentEnd: now.toISOString(),
+    },
+    acquisition: {
+      signups: trendMetric(0, 0),
+      profilesCompletedOrUpdated: trendMetric(0, 0),
+    },
+    audience: {
+      totalUsers: 0,
+      activeAlerts: 0,
+      dailyAlerts: 0,
+      weeklyAlerts: 0,
+      customProfiles: 0,
+      defaultProfilesOnly: 0,
+      noProfile: 0,
+      profileCompletionRate: '0%',
+      briefingsEntitled: 0,
+      briefingsEligible: 0,
+      briefingsProfileIncomplete: 0,
+    },
+    email: {
+      sent7d: 0,
+      delivered7d: 0,
+      opened7d: 0,
+      clicked7d: 0,
+      openRate: 'N/A',
+      clickRate: 'N/A',
+      topLinks: [] as Array<{ label: string; count: number }>,
+    },
+    app: {
+      activeUsers: trendMetric(0, 0),
+      activeToday: 0,
+      totalEvents7d: 0,
+      totalMinutes7d: 0,
+      avgMinutesPerActiveUser: 0,
+      topAreas: [] as Array<{ area: string; minutes: number; events: number; users: number }>,
+      trackingNote: 'App time is tracked from MI page activity going forward.',
+    },
+    levers: [] as Array<{ priority: 'high' | 'medium' | 'low'; label: string; detail: string }>,
+    definitions: [
+      'Audience is the current inventory of users and access flags.',
+      'Delivery is what was actually sent for a date or cycle after matching and dedupe.',
+      'Engagement is opens, clicks, and app activity inside the selected period.',
+    ],
+  };
+
+  try {
+    const supabase = getSupabase();
+    const [
+      settings,
+      classificationRows,
+      engagementRows,
+      providerHealth,
+    ] = await Promise.all([
+      fetchAllRows<{
+        user_email: string;
+        naics_codes?: string[] | null;
+        alerts_enabled?: boolean | null;
+        alert_frequency?: string | null;
+        briefings_enabled?: boolean | null;
+        is_active?: boolean | null;
+        created_at?: string | null;
+        updated_at?: string | null;
+      }>((from, to) =>
+        supabase
+          .from('user_notification_settings')
+          .select('user_email, naics_codes, alerts_enabled, alert_frequency, briefings_enabled, is_active, created_at, updated_at')
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        email: string;
+        briefings_access?: string | null;
+        briefings_expiry?: string | null;
+        classification_version?: number | null;
+      }>((from, to) =>
+        supabase
+          .from('customer_classifications')
+          .select('email, briefings_access, briefings_expiry, classification_version')
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        user_email: string | null;
+        event_type: string;
+        event_source?: string | null;
+        metadata?: Record<string, unknown> | null;
+        created_at: string;
+      }>((from, to) =>
+        supabase
+          .from('user_engagement')
+          .select('user_email, event_type, event_source, metadata, created_at')
+          .gte('created_at', previousStart.toISOString())
+          .range(from, to)
+      ),
+      getProviderEmailHealth(),
+    ]);
+
+    const latestClassificationVersion = classificationRows.reduce(
+      (max: number, row: { classification_version?: number | null }) =>
+        Math.max(max, Number(row.classification_version || 0)),
+      0
+    );
+    const entitledAccess = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
+    const currentEntitledEmails = new Set<string>();
+    const nowMs = now.getTime();
+
+    for (const row of classificationRows) {
+      if (Number(row.classification_version || 0) !== latestClassificationVersion) continue;
+      if (!entitledAccess.has(row.briefings_access || '')) continue;
+      if (row.briefings_expiry && new Date(row.briefings_expiry).getTime() <= nowMs) continue;
+      currentEntitledEmails.add(row.email.toLowerCase());
+    }
+
+    let signupsCurrent = 0;
+    let signupsPrevious = 0;
+    let profilesCurrent = 0;
+    let profilesPrevious = 0;
+
+    for (const user of settings) {
+      const email = user.user_email.toLowerCase();
+      const active = user.is_active !== false;
+      const customProfile = hasCustomNaics(user.naics_codes);
+      const defaultProfile = isDefaultNaicsOnly(user.naics_codes);
+      const createdAt = user.created_at ? new Date(user.created_at).getTime() : 0;
+      const updatedAt = user.updated_at ? new Date(user.updated_at).getTime() : 0;
+
+      metrics.audience.totalUsers++;
+      if (customProfile) metrics.audience.customProfiles++;
+      else if (defaultProfile) metrics.audience.defaultProfilesOnly++;
+      else metrics.audience.noProfile++;
+
+      if (active && user.alerts_enabled) {
+        metrics.audience.activeAlerts++;
+        if (user.alert_frequency === 'daily') metrics.audience.dailyAlerts++;
+        if (user.alert_frequency === 'weekly') metrics.audience.weeklyAlerts++;
+      }
+
+      if (currentEntitledEmails.has(email)) {
+        metrics.audience.briefingsEntitled++;
+        if (active && user.briefings_enabled) {
+          metrics.audience.briefingsEligible++;
+          if (!customProfile) metrics.audience.briefingsProfileIncomplete++;
+        }
+      }
+
+      if (createdAt >= periodStart.getTime()) signupsCurrent++;
+      else if (createdAt >= previousStart.getTime() && createdAt < periodStart.getTime()) signupsPrevious++;
+
+      if (customProfile && updatedAt >= periodStart.getTime()) profilesCurrent++;
+      else if (customProfile && updatedAt >= previousStart.getTime() && updatedAt < periodStart.getTime()) profilesPrevious++;
+    }
+
+    metrics.acquisition.signups = trendMetric(signupsCurrent, signupsPrevious);
+    metrics.acquisition.profilesCompletedOrUpdated = trendMetric(profilesCurrent, profilesPrevious);
+    metrics.audience.profileCompletionRate = percent(metrics.audience.customProfiles, metrics.audience.totalUsers);
+
+    metrics.email = {
+      sent7d: providerHealth.sends7d,
+      delivered7d: providerHealth.delivered7d,
+      opened7d: providerHealth.opened7d,
+      clicked7d: providerHealth.clicked7d,
+      openRate: percent(providerHealth.opened7d, providerHealth.delivered7d || providerHealth.sends7d),
+      clickRate: providerHealth.clickRate,
+      topLinks: providerHealth.topLinks,
+    };
+
+    if (metrics.email.sent7d === 0 && metrics.email.opened7d === 0 && metrics.email.clicked7d === 0) {
+      const topLinks: Record<string, number> = {};
+      for (const row of engagementRows) {
+        if (new Date(row.created_at).getTime() < periodStart.getTime()) continue;
+        if (row.event_type === 'email_open') metrics.email.opened7d++;
+        if (row.event_type === 'link_click') {
+          metrics.email.clicked7d++;
+          const metadata = row.metadata || {};
+          const label = typeof metadata.link_text === 'string'
+            ? metadata.link_text
+            : typeof metadata.url === 'string'
+              ? metadata.url
+              : 'Link click';
+          topLinks[label] = (topLinks[label] || 0) + 1;
+        }
+      }
+      metrics.email.topLinks = Object.entries(topLinks)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([label, count]) => ({ label, count }));
+      metrics.email.openRate = 'Tracked opens';
+      metrics.email.clickRate = metrics.email.opened7d > 0
+        ? percent(metrics.email.clicked7d, metrics.email.opened7d)
+        : 'Tracked clicks';
+    }
+
+    const appEventTypes = new Set(['page_view', 'tool_use', 'report_generate', 'export', 'login', 'profile_update', 'onboarding_step']);
+    const activeCurrent = new Set<string>();
+    const activePrevious = new Set<string>();
+    const activeToday = new Set<string>();
+    const areas = new Map<string, { minutes: number; events: number; users: Set<string> }>();
+
+    for (const row of engagementRows) {
+      if (!appEventTypes.has(row.event_type)) continue;
+      const email = row.user_email?.toLowerCase();
+      if (!email) continue;
+      const createdAt = new Date(row.created_at).getTime();
+      const isCurrent = createdAt >= periodStart.getTime();
+      const isPrevious = createdAt >= previousStart.getTime() && createdAt < periodStart.getTime();
+
+      if (isCurrent) {
+        activeCurrent.add(email);
+        metrics.app.totalEvents7d++;
+        if (createdAt >= todayStart.getTime()) activeToday.add(email);
+
+        const metadata = row.metadata || {};
+        const rawDuration = metadata.duration_ms;
+        const durationMs = typeof rawDuration === 'number' && Number.isFinite(rawDuration) ? rawDuration : 0;
+        const minutes = Math.round((durationMs / 60000) * 10) / 10;
+        metrics.app.totalMinutes7d += minutes;
+
+        const area = engagementAreaLabel(row.event_source, metadata);
+        const item = areas.get(area) || { minutes: 0, events: 0, users: new Set<string>() };
+        item.minutes += minutes;
+        item.events++;
+        item.users.add(email);
+        areas.set(area, item);
+      } else if (isPrevious) {
+        activePrevious.add(email);
+      }
+    }
+
+    metrics.app.activeUsers = trendMetric(activeCurrent.size, activePrevious.size);
+    metrics.app.activeToday = activeToday.size;
+    metrics.app.totalMinutes7d = Math.round(metrics.app.totalMinutes7d * 10) / 10;
+    metrics.app.avgMinutesPerActiveUser = activeCurrent.size > 0
+      ? Math.round((metrics.app.totalMinutes7d / activeCurrent.size) * 10) / 10
+      : 0;
+    metrics.app.topAreas = Array.from(areas.entries())
+      .sort((a, b) => (b[1].minutes - a[1].minutes) || (b[1].events - a[1].events))
+      .slice(0, 6)
+      .map(([area, item]) => ({
+        area,
+        minutes: Math.round(item.minutes * 10) / 10,
+        events: item.events,
+        users: item.users.size,
+      }));
+
+    const profileGap = metrics.audience.defaultProfilesOnly + metrics.audience.noProfile;
+    if (profileGap > 0) {
+      metrics.levers.push({
+        priority: profileGap > metrics.audience.customProfiles ? 'high' : 'medium',
+        label: 'Profile setup is the biggest matching lever',
+        detail: `${profileGap.toLocaleString()} users still need custom NAICS/profile data before alerts and briefings can feel personal.`,
+      });
+    }
+
+    const clickRateNumber = percentNumber(metrics.email.clicked7d, metrics.email.delivered7d || metrics.email.sent7d);
+    if (metrics.email.sent7d > 0 && clickRateNumber < 8) {
+      metrics.levers.push({
+        priority: 'medium',
+        label: 'Email clicks need attention',
+        detail: `7-day click rate is ${metrics.email.clickRate}. Test stronger first-link placement and subject lines against the top-clicked topics.`,
+      });
+    }
+
+    if (metrics.app.totalMinutes7d === 0) {
+      metrics.levers.push({
+        priority: 'high',
+        label: 'Start measuring time in MI',
+        detail: 'The dashboard now logs panel time from the MI app, so this becomes the Duolingo-style success metric going forward.',
+      });
+    } else if (metrics.app.avgMinutesPerActiveUser < 5) {
+      metrics.levers.push({
+        priority: 'medium',
+        label: 'Drive users deeper into the app',
+        detail: `Average app time is ${metrics.app.avgMinutesPerActiveUser} minutes per active user. Push email CTAs to the panels with the best retention.`,
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching MI growth metrics:', error);
+  }
+
+  return metrics;
+}
+
+async function getOutcomeMetrics() {
+  const now = new Date();
+  const periodDays = 7;
+  const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+  const periodStartIso = periodStart.toISOString();
+
+  const metrics = {
+    periodDays,
+    findContracts: {
+      opportunityClicks: 0,
+      uniqueClickers: 0,
+      savedOpportunities: 0,
+      savers: 0,
+      pursuitBriefsRequested: 0,
+      pursuitBriefsSent: 0,
+      topClicked: [] as Array<{ label: string; count: number }>,
+      topAgenciesSaved: [] as Array<{ agency: string; count: number }>,
+    },
+    winContracts: {
+      pipelineItemsCreated: 0,
+      pipelineUsers: 0,
+      pursuing: 0,
+      bidding: 0,
+      submitted: 0,
+      won: 0,
+      lost: 0,
+      dueSoon: 0,
+      totalPipelineValue: 0,
+      whiteGloveHelpRequests: 0,
+      nextActionBreakdown: [] as Array<{ action: string; count: number }>,
+      stageBreakdown: [] as Array<{ stage: string; count: number }>,
+    },
+    experience: {
+      helpfulRate: 'N/A',
+      helpful: 0,
+      notHelpful: 0,
+      zeroAlertUsers7d: 0,
+      highVolumeUsers7d: 0,
+    },
+    verdicts: {
+      findContracts: 'Needs data',
+      winContracts: 'Needs data',
+    },
+    levers: [] as Array<{ priority: 'high' | 'medium' | 'low'; label: string; detail: string }>,
+  };
+
+  try {
+    const supabase = getSupabase();
+    const [
+      engagementRows,
+      savedOpportunities,
+      pursuitBriefs,
+      pipelineRows,
+      matchingQuality,
+    ] = await Promise.all([
+      fetchAllRows<{
+        user_email: string | null;
+        event_type: string;
+        metadata?: Record<string, unknown> | null;
+        created_at: string;
+      }>((from, to) =>
+        supabase
+          .from('user_engagement')
+          .select('user_email, event_type, metadata, created_at')
+          .gte('created_at', periodStartIso)
+          .range(from, to)
+      ),
+      fetchAllRows<{
+        user_email: string;
+        agency?: string | null;
+        status?: string | null;
+        pursuit_brief_requested?: boolean | null;
+        pursuit_brief_sent_at?: string | null;
+        created_at: string;
+      }>((from, to) =>
+        supabase
+          .from('user_saved_opportunities')
+          .select('user_email, agency, status, pursuit_brief_requested, pursuit_brief_sent_at, created_at')
+          .gte('created_at', periodStartIso)
+          .range(from, to)
+      ).catch(() => []),
+      fetchAllRows<{
+        user_email: string;
+        delivery_status?: string | null;
+        sent_at?: string | null;
+        created_at: string;
+      }>((from, to) =>
+        supabase
+          .from('pursuit_brief_log')
+          .select('user_email, delivery_status, sent_at, created_at')
+          .gte('created_at', periodStartIso)
+          .range(from, to)
+      ).catch(() => []),
+      fetchAllRows<{
+        user_email: string;
+        stage?: string | null;
+        next_action?: string | null;
+        value_estimate?: string | null;
+        award_amount?: string | null;
+        response_deadline?: string | null;
+        created_at?: string | null;
+        updated_at?: string | null;
+      }>((from, to) =>
+        supabase
+          .from('user_pipeline')
+          .select('user_email, stage, next_action, value_estimate, award_amount, response_deadline, created_at, updated_at')
+          .or(`created_at.gte.${periodStartIso},updated_at.gte.${periodStartIso}`)
+          .range(from, to)
+      ).catch(() => []),
+      getMatchingQuality(),
+    ]);
+
+    const clickers = new Set<string>();
+    const topClicked: Record<string, number> = {};
+    for (const row of engagementRows) {
+      if (row.event_type !== 'link_click') continue;
+      const metadata = row.metadata || {};
+      const label = typeof metadata.link_text === 'string'
+        ? metadata.link_text
+        : typeof metadata.url === 'string'
+          ? metadata.url
+          : 'link_click';
+      const lowerLabel = label.toLowerCase();
+      const isOpportunityClick =
+        lowerLabel.includes('sam') ||
+        lowerLabel.includes('opportunity') ||
+        lowerLabel.includes('pursuit') ||
+        lowerLabel.includes('pipeline');
+
+      if (!isOpportunityClick) continue;
+
+      metrics.findContracts.opportunityClicks++;
+      if (row.user_email) clickers.add(row.user_email.toLowerCase());
+      topClicked[label] = (topClicked[label] || 0) + 1;
+    }
+    metrics.findContracts.uniqueClickers = clickers.size;
+    metrics.findContracts.topClicked = Object.entries(topClicked)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, count]) => ({ label, count }));
+
+    const savers = new Set<string>();
+    const agencyCounts: Record<string, number> = {};
+    for (const row of savedOpportunities) {
+      metrics.findContracts.savedOpportunities++;
+      savers.add(row.user_email.toLowerCase());
+      if (row.pursuit_brief_requested) metrics.findContracts.pursuitBriefsRequested++;
+      if (row.pursuit_brief_sent_at) metrics.findContracts.pursuitBriefsSent++;
+      const agency = row.agency || 'Unknown';
+      agencyCounts[agency] = (agencyCounts[agency] || 0) + 1;
+    }
+    for (const row of pursuitBriefs) {
+      if (row.delivery_status === 'sent' || row.sent_at) metrics.findContracts.pursuitBriefsSent++;
+    }
+    metrics.findContracts.savers = savers.size;
+    metrics.findContracts.topAgenciesSaved = Object.entries(agencyCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([agency, count]) => ({ agency, count }));
+
+    const pipelineUsers = new Set<string>();
+    const stages: Record<string, number> = {};
+    const nextActions: Record<string, number> = {};
+    const soon = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).getTime();
+    for (const row of pipelineRows) {
+      metrics.winContracts.pipelineItemsCreated++;
+      pipelineUsers.add(row.user_email.toLowerCase());
+      const stage = row.stage || 'tracking';
+      stages[stage] = (stages[stage] || 0) + 1;
+      if (stage === 'pursuing') metrics.winContracts.pursuing++;
+      if (stage === 'bidding') metrics.winContracts.bidding++;
+      if (stage === 'submitted') metrics.winContracts.submitted++;
+      if (stage === 'won') metrics.winContracts.won++;
+      if (stage === 'lost') metrics.winContracts.lost++;
+
+      if (row.next_action) {
+        nextActions[row.next_action] = (nextActions[row.next_action] || 0) + 1;
+        if (row.next_action === 'white_glove_help') metrics.winContracts.whiteGloveHelpRequests++;
+        if (row.next_action === 'request_pursuit_brief') metrics.findContracts.pursuitBriefsRequested++;
+      }
+
+      const deadline = row.response_deadline ? new Date(row.response_deadline).getTime() : 0;
+      if (deadline && deadline >= now.getTime() && deadline <= soon) metrics.winContracts.dueSoon++;
+
+      const amountText = String(row.award_amount || row.value_estimate || '').replace(/[^0-9.]/g, '');
+      const amount = Number(amountText);
+      if (Number.isFinite(amount)) metrics.winContracts.totalPipelineValue += amount;
+    }
+    metrics.winContracts.pipelineUsers = pipelineUsers.size;
+    metrics.winContracts.stageBreakdown = Object.entries(stages)
+      .sort((a, b) => b[1] - a[1])
+      .map(([stage, count]) => ({ stage, count }));
+    metrics.winContracts.nextActionBreakdown = Object.entries(nextActions)
+      .sort((a, b) => b[1] - a[1])
+      .map(([action, count]) => ({ action, count }));
+
+    metrics.experience = {
+      helpfulRate: matchingQuality.helpfulRate,
+      helpful: matchingQuality.helpful,
+      notHelpful: matchingQuality.notHelpful,
+      zeroAlertUsers7d: matchingQuality.zeroAlertUsers7d,
+      highVolumeUsers7d: matchingQuality.highVolumeUsers7d,
+    };
+
+    metrics.verdicts.findContracts = metrics.findContracts.opportunityClicks > 0 || metrics.findContracts.savedOpportunities > 0
+      ? 'Yes, if clicks become saves'
+      : 'Not proven this week';
+    metrics.verdicts.winContracts = metrics.winContracts.pipelineItemsCreated > 0 || metrics.winContracts.submitted > 0 || metrics.winContracts.won > 0
+      ? 'Partially, if pipeline advances'
+      : 'Not proven this week';
+
+    if (metrics.findContracts.opportunityClicks > 0 && metrics.findContracts.savedOpportunities === 0) {
+      metrics.levers.push({
+        priority: 'high',
+        label: 'Convert clicks into saved opportunities',
+        detail: `${metrics.findContracts.opportunityClicks} opportunity clicks but no saved opportunities. Make Save/Add to Pipeline the obvious next step.`,
+      });
+    }
+    if (metrics.findContracts.savedOpportunities > 0 && metrics.winContracts.pipelineItemsCreated === 0) {
+      metrics.levers.push({
+        priority: 'high',
+        label: 'Connect saved opportunities to pipeline',
+        detail: `${metrics.findContracts.savedOpportunities} saved opportunities but no pipeline items. The product should prompt next action and pursuit stage.`,
+      });
+    }
+    if (metrics.winContracts.whiteGloveHelpRequests > 0) {
+      metrics.levers.push({
+        priority: 'high',
+        label: 'Follow up on white-glove signals',
+        detail: `${metrics.winContracts.whiteGloveHelpRequests} users asked GovCon Giants for help from the MI next-action prompt.`,
+      });
+    }
+    if (metrics.experience.zeroAlertUsers7d > 0) {
+      metrics.levers.push({
+        priority: 'medium',
+        label: 'Fix users receiving no matches',
+        detail: `${metrics.experience.zeroAlertUsers7d} configured users had zero alerts in 7 days. Review NAICS breadth, keywords, and source coverage.`,
+      });
+    }
+    if (metrics.experience.helpfulRate !== 'N/A' && parseInt(metrics.experience.helpfulRate) < 60) {
+      metrics.levers.push({
+        priority: 'medium',
+        label: 'Improve match quality',
+        detail: `Helpful rate is ${metrics.experience.helpfulRate}. Use feedback reasons to tune scoring and filters.`,
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching outcome metrics:', error);
+  }
+
+  return metrics;
 }
 
 async function getBetaHealth() {

@@ -2,7 +2,9 @@
 
 **Your Mission:** Conduct 8-10 phone interviews with recent customers on Thursday May 8 and Friday May 9.
 
-**Why This Matters:** Eric needs real customer feedback before calling Laurie Sayles (a CEO who wants to buy). Your calls will determine if we price MI SaaS at $149/mo.
+**Why This Matters:** Eric needs real customer feedback before calling Laurie Sayles (a CEO who wants to buy). Your calls will shape the Market Intelligence launch, onboarding, white-glove offer, and pricing.
+
+**Strategic context:** GovCon Giants is moving from training-first to a platform-and-services company. We are prioritizing users first and advisory second. Talk to qualified customers from `ANNELLE-SIKANDER-QUALIFIED-CUSTOMER-OUTREACH.csv`, especially people who bought, configured, attended, opened, clicked, or replied.
 
 ---
 

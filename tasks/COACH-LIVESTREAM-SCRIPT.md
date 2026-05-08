@@ -6,6 +6,16 @@
 
 ---
 
+## Strategic Context For Coaches
+
+This is part of the GovCon Giants transition from training-first to platform-and-services. The goal is not to sell, teach, or defend the product during this moment. The goal is to identify who is engaged and what actually helps customers find and win federal contracts.
+
+Ask the questions exactly, listen for behavior, and capture exact words. The people who show up, answer, configure profiles, buy, click, and reply are the customer signals we are building around.
+
+Advisors come later. This livestream step is about users first.
+
+---
+
 ## The Script (Copy/Paste)
 
 Say this exactly:

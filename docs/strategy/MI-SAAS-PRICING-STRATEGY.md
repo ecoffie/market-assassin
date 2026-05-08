@@ -181,13 +181,14 @@ If we price too low, buyers think:
 - 5 user seats (additional seats $99/mo each)
 - Admin dashboard (user management, activity tracking)
 - Team briefings (shared pursuit tracking)
+- Deal Flow Board (shared opportunities, owners, next actions, teaming, bid status)
 - Custom alert configurations per user
 - Shared pipeline/CRM
 - Priority support (24-hour response)
 - Monthly strategy call (30 min with GovCon coach)
 
 **Positioning:**
-> "Your entire BD team on the same intelligence platform. Shared pursuits, coordinated alerts, unified pipeline — at 94% less than Deltek's team pricing."
+> "Your entire BD team on the same intelligence platform. Shared pursuits, coordinated alerts, a Deal Flow Board, and unified pipeline — at 94% less than Deltek's team pricing."
 
 **Savings vs Deltek:** 94% less than team tier ($60K → $6K)
 

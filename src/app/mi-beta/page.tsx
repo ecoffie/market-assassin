@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import UnifiedSidebarBeta, { type MIBetaPanel, type MIBetaTier } from '@/components/mi-beta/UnifiedSidebarBeta';
 import PanelContainer from '@/components/mi-beta/panels';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
+
+const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
+const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
 
 // Loading fallback
 function DashboardLoading() {
@@ -27,52 +30,86 @@ export default function MIBetaPage() {
   );
 }
 
-interface UserProfile {
-  naicsCodes: string[];
-  targetAgencies: string[];
-  keywords: string[];
-  states: string[];
-}
-
 function MIBetaDashboard() {
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<MIBetaTier>('free');
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activePanel, setActivePanel] = useState<MIBetaPanel>('dashboard');
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [authStep, setAuthStep] = useState<'email' | 'code'>('email');
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const activePanelRef = useRef<MIBetaPanel>('dashboard');
+  const panelStartedAtRef = useRef<number>(Date.now());
+  const sessionIdRef = useRef<string>(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
 
   const searchParams = useSearchParams();
 
-  // Load user profile on mount
-  useEffect(() => {
-    const emailParam = searchParams.get('email');
-    if (emailParam) {
-      loadUserProfile(emailParam);
-    } else {
-      // Check localStorage
-      const storedEmail = typeof window !== 'undefined'
-        ? localStorage.getItem('mi_beta_email')
-        : null;
-      if (storedEmail) {
-        loadUserProfile(storedEmail);
-      } else {
-        setIsLoading(false);
-      }
+  const getTwoFactorHeaders = useCallback((): Record<string, string> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem(TWO_FACTOR_TOKEN_KEY) : null;
+    return token ? { 'x-mi-2fa-token': token } : {};
+  }, []);
+
+  const trackEngagement = useCallback((
+    eventType: 'page_view' | 'tool_use' | 'login' | 'profile_update' | 'onboarding_step',
+    metadata: Record<string, unknown>,
+    options: { keepalive?: boolean; beacon?: boolean } = {}
+  ) => {
+    if (!email || typeof window === 'undefined') return;
+
+    const payload = JSON.stringify({
+      email,
+      eventType,
+      eventSource: 'market_intelligence',
+      metadata: {
+        ...metadata,
+        session_id: sessionIdRef.current,
+        path: window.location.pathname,
+      },
+    });
+
+    if (options.beacon && navigator.sendBeacon) {
+      navigator.sendBeacon('/api/mi-beta/engagement', new Blob([payload], { type: 'application/json' }));
+      return;
     }
-  }, [searchParams]);
+
+    fetch('/api/mi-beta/engagement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: options.keepalive,
+    }).catch(() => {});
+  }, [email]);
+
+  const flushPanelTime = useCallback((panel: MIBetaPanel, options: { keepalive?: boolean; beacon?: boolean } = {}) => {
+    const now = Date.now();
+    const durationMs = Math.max(now - panelStartedAtRef.current, 0);
+    panelStartedAtRef.current = now;
+
+    if (durationMs < 3000) return;
+
+    trackEngagement('tool_use', {
+      action: 'panel_time',
+      panel,
+      duration_ms: durationMs,
+    }, options);
+  }, [trackEngagement]);
 
   const loadUserProfile = useCallback(async (userEmail: string) => {
     setIsLoading(true);
     try {
-      // Fetch user profile and access level
-      const [profileRes, accessRes] = await Promise.all([
-        fetch(`/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`),
-        fetch(`/api/access/check?email=${encodeURIComponent(userEmail)}`),
-      ]);
-
-      const profileData = profileRes.ok ? await profileRes.json() : null;
+      // Fetch access level
+      const accessRes = await fetch(`/api/access/check?email=${encodeURIComponent(userEmail)}`, {
+        headers: getTwoFactorHeaders(),
+      });
       const accessData = accessRes.ok ? await accessRes.json() : null;
 
       // Determine tier based on access data
@@ -88,23 +125,183 @@ function MIBetaDashboard() {
 
       setEmail(userEmail);
       setTier(userTier);
-      setProfile({
-        naicsCodes: profileData?.profile?.naics_codes || [],
-        targetAgencies: profileData?.profile?.target_agencies || [],
-        keywords: profileData?.profile?.keywords || [],
-        states: profileData?.profile?.target_states || [],
-      });
 
       // Store email in localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('mi_beta_email', userEmail);
+        localStorage.setItem('mi_beta_2fa_verified_at', new Date().toISOString());
       }
     } catch (error) {
       console.error('Failed to load user profile:', error);
     } finally {
       setIsLoading(false);
     }
+  }, [getTwoFactorHeaders]);
+
+  useEffect(() => {
+    activePanelRef.current = activePanel;
+  }, [activePanel]);
+
+  useEffect(() => {
+    if (!email) return;
+
+    panelStartedAtRef.current = Date.now();
+    trackEngagement('page_view', { panel: activePanel, tier });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPanelTime(activePanelRef.current, { beacon: true });
+      } else {
+        panelStartedAtRef.current = Date.now();
+      }
+    };
+    const handleBeforeUnload = () => flushPanelTime(activePanelRef.current, { beacon: true });
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      flushPanelTime(activePanelRef.current, { keepalive: true });
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [email, tier, trackEngagement, flushPanelTime]);
+
+  const handlePanelChange = useCallback((nextPanel: MIBetaPanel) => {
+    if (nextPanel === activePanelRef.current) return;
+    flushPanelTime(activePanelRef.current, { keepalive: true });
+    activePanelRef.current = nextPanel;
+    panelStartedAtRef.current = Date.now();
+    setActivePanel(nextPanel);
+    trackEngagement('page_view', { panel: nextPanel, tier });
+  }, [flushPanelTime, tier, trackEngagement]);
+
+  const requestTwoFactorCode = useCallback(async (userEmail: string) => {
+    const normalizedEmail = userEmail.toLowerCase().trim();
+    if (!normalizedEmail) return;
+
+    setAuthLoading(true);
+    setAuthError(null);
+    setAuthMessage(null);
+
+    try {
+      const res = await fetch('/api/auth/two-factor/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        setAuthError(data.error || 'Failed to send verification code');
+        return;
+      }
+
+      setPendingEmail(normalizedEmail);
+      setAuthStep('code');
+      setVerificationCode('');
+      setAuthMessage(`Verification code sent to ${normalizedEmail}`);
+    } catch (error) {
+      console.error('Failed to request 2FA code:', error);
+      setAuthError('Failed to send verification code');
+    } finally {
+      setAuthLoading(false);
+    }
   }, []);
+
+  const verifyTwoFactorCode = async () => {
+    const normalizedEmail = pendingEmail.toLowerCase().trim();
+    if (!normalizedEmail || verificationCode.length !== 6) {
+      setAuthError('Enter the 6-digit verification code');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError(null);
+    setAuthMessage(null);
+
+    try {
+      const res = await fetch('/api/auth/two-factor/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, code: verificationCode }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        setAuthError(data.error || 'Invalid verification code');
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(TWO_FACTOR_TOKEN_KEY, data.sessionToken);
+        localStorage.setItem('mi_beta_2fa_verified_at', data.verifiedAt);
+      }
+
+      await loadUserProfile(normalizedEmail);
+    } catch (error) {
+      console.error('Failed to verify 2FA code:', error);
+      setAuthError('Failed to verify code');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const originalFetch = window.fetch.bind(window);
+
+    window.fetch = (input, init = {}) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const isApiRequest = url.startsWith('/api/') || url.startsWith(window.location.origin + '/api/');
+      const token = localStorage.getItem(TWO_FACTOR_TOKEN_KEY);
+
+      if (!isApiRequest || !token) {
+        return originalFetch(input, init);
+      }
+
+      const headers = new Headers(init.headers || (typeof input !== 'string' && !(input instanceof URL) ? input.headers : undefined));
+      if (!headers.has('x-mi-2fa-token')) {
+        headers.set('x-mi-2fa-token', token);
+      }
+
+      return originalFetch(input, { ...init, headers });
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
+
+  // Load user profile on mount
+  useEffect(() => {
+    const emailParam = searchParams.get('email');
+    if (emailParam) {
+      setPendingEmail(emailParam.toLowerCase().trim());
+      setIsLoading(false);
+    } else {
+      // Check localStorage
+      const storedEmail = typeof window !== 'undefined'
+        ? localStorage.getItem('mi_beta_email')
+        : null;
+      const verifiedAt = typeof window !== 'undefined'
+        ? localStorage.getItem('mi_beta_2fa_verified_at')
+        : null;
+      const verifiedRecently = verifiedAt
+        ? Date.now() - new Date(verifiedAt).getTime() < TWO_FACTOR_SESSION_MS
+        : false;
+
+      if (storedEmail && verifiedRecently) {
+        loadUserProfile(storedEmail);
+      } else {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('mi_beta_email');
+          localStorage.removeItem('mi_beta_2fa_verified_at');
+          localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
+        }
+        setIsLoading(false);
+      }
+    }
+  }, [searchParams, loadUserProfile]);
 
   // Loading state
   if (isLoading) {
@@ -136,60 +333,100 @@ function MIBetaDashboard() {
           {/* Email Entry */}
           <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-8 max-w-md mx-auto">
             <h2 className="text-lg font-semibold text-white mb-4 text-center">
-              Enter your email to test
+              {authStep === 'email' ? 'Sign in with two-factor verification' : 'Enter verification code'}
             </h2>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const emailValue = formData.get('email') as string;
-                if (emailValue) {
-                  loadUserProfile(emailValue);
-                }
-              }}
-              className="space-y-4"
-            >
-              <input
-                type="email"
-                name="email"
-                placeholder="your@email.com"
-                required
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-              />
-              <button
-                type="submit"
-                className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
+
+            {authStep === 'email' ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const emailValue = formData.get('email') as string;
+                  requestTwoFactorCode(emailValue);
+                }}
+                className="space-y-4"
               >
-                Access Beta Dashboard
-              </button>
-            </form>
-            <div className="mt-6 pt-6 border-t border-gray-800">
-              <p className="text-center text-gray-500 text-sm mb-3">
-                Testing different tiers:
-              </p>
-              <div className="flex justify-center gap-2">
+                <input
+                  type="email"
+                  name="email"
+                  value={pendingEmail}
+                  onChange={(e) => setPendingEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
                 <button
-                  onClick={() => {
-                    setEmail('test-free@test.com');
-                    setTier('free');
-                    setProfile({ naicsCodes: ['541512'], targetAgencies: [], keywords: [], states: [] });
-                  }}
-                  className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg transition-colors"
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
                 >
-                  Free Tier
+                  {authLoading ? 'Sending Code...' : 'Send Verification Code'}
                 </button>
+              </form>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  verifyTwoFactorCode();
+                }}
+                className="space-y-4"
+              >
+                <div className="text-sm text-gray-400 text-center">
+                  We sent a 6-digit code to <span className="text-white">{pendingEmail}</span>.
+                </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  required
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white text-center text-2xl tracking-[0.35em] placeholder-gray-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
                 <button
-                  onClick={() => {
-                    setEmail('test-pro@test.com');
-                    setTier('pro');
-                    setProfile({ naicsCodes: ['541512'], targetAgencies: [], keywords: [], states: [] });
-                  }}
-                  className="px-3 py-1.5 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-lg transition-colors"
+                  type="submit"
+                  disabled={authLoading || verificationCode.length !== 6}
+                  className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
                 >
-                  Pro Tier
+                  {authLoading ? 'Verifying...' : 'Verify & Access Dashboard'}
                 </button>
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthStep('email');
+                      setVerificationCode('');
+                      setAuthError(null);
+                      setAuthMessage(null);
+                    }}
+                    className="text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    Change email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => requestTwoFactorCode(pendingEmail)}
+                    disabled={authLoading}
+                    className="text-emerald-400 hover:text-emerald-300 disabled:text-gray-600 transition-colors"
+                  >
+                    Resend code
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {authMessage && (
+              <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                {authMessage}
               </div>
-            </div>
+            )}
+            {authError && (
+              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {authError}
+              </div>
+            )}
+
             <p className="text-center text-gray-500 text-sm mt-4">
               Production version:{' '}
               <a href="/briefings" className="text-emerald-400 hover:text-emerald-300">
@@ -227,7 +464,7 @@ function MIBetaDashboard() {
       {/* Sidebar */}
       <UnifiedSidebarBeta
         activePanel={activePanel}
-        onPanelChange={setActivePanel}
+        onPanelChange={handlePanelChange}
         userTier={tier}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -239,6 +476,7 @@ function MIBetaDashboard() {
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
           email={email}
+          mode={tier === 'free' ? 'alerts' : 'briefings'}
           onSaved={() => {
             loadUserProfile(email);
             setIsSettingsOpen(false);
@@ -279,8 +517,12 @@ function MIBetaDashboard() {
               <button
                 onClick={() => {
                   localStorage.removeItem('mi_beta_email');
+                  localStorage.removeItem('mi_beta_2fa_verified_at');
+                  localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
                   setEmail(null);
-                  setProfile(null);
+                  setPendingEmail('');
+                  setVerificationCode('');
+                  setAuthStep('email');
                 }}
                 className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
               >
