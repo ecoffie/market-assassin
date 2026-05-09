@@ -71,7 +71,9 @@ interface GeneratedBriefing {
 }
 
 interface BriefingEntry {
+  id?: string;
   briefing_date: string;
+  briefing_type?: string;
   generated_at: string;
   items_count: number;
   content: GeneratedBriefing;
@@ -139,6 +141,35 @@ interface SamGreenBriefingPayload {
   };
 }
 
+interface PursuitBriefingPayload {
+  id?: string;
+  sourceNoticeId?: string;
+  agency?: string;
+  contractName?: string;
+  contractNumber?: string;
+  value?: string;
+  opportunityScore?: number;
+  whyWorthPursuing?: string;
+  workingHypothesis?: string;
+  immediateNextMove?: string;
+  priorityIntel?: string[];
+  risks?: string[];
+  actionPlan?: Array<{
+    step?: string;
+    owner?: string;
+    due?: string;
+    notes?: string;
+  }>;
+  outreachTargets?: Array<{
+    name?: string;
+    role?: string;
+    organization?: string;
+    email?: string;
+    phone?: string;
+  }>;
+  relatedMarketSignals?: string[];
+}
+
 function isGeneratedBriefing(value: unknown): value is GeneratedBriefing {
   if (!value || typeof value !== 'object') return false;
   return 'summary' in value && 'topItems' in value;
@@ -165,9 +196,114 @@ function isSamGreenBriefing(value: unknown): value is SamGreenBriefingPayload {
   return 'noticeSummary' in value || 'deadlinesThisWeek' in value;
 }
 
+function isPursuitBriefing(value: unknown): value is PursuitBriefingPayload {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    'contractName' in record &&
+    ('whyWorthPursuing' in record || 'immediateNextMove' in record || 'actionPlan' in record)
+  );
+}
+
+function getBriefingKey(entry: Pick<BriefingEntry, 'id' | 'briefing_date' | 'generated_at' | 'briefing_type'>) {
+  return entry.id || `${entry.briefing_date}:${entry.briefing_type || 'briefing'}:${entry.generated_at}`;
+}
+
+function formatBriefingType(type?: string) {
+  if (type === 'pursuit') return 'Pursuit';
+  if (type === 'weekly') return 'Weekly';
+  if (type === 'daily') return 'Daily';
+  return 'Briefing';
+}
+
 function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGeneratedAt: string): GeneratedBriefing {
   if (isGeneratedBriefing(raw)) {
     return raw;
+  }
+
+  if (isPursuitBriefing(raw)) {
+    const briefing = raw;
+    const actionPlanText = (briefing.actionPlan || [])
+      .map((step, index) => [
+        `${index + 1}. ${step.step || 'Next action'}`,
+        step.owner ? `Owner: ${step.owner}` : null,
+        step.due ? `Due: ${step.due}` : null,
+        step.notes || null,
+      ].filter(Boolean).join(' - '))
+      .join('\n');
+    const outreachText = (briefing.outreachTargets || [])
+      .map(target => [
+        target.name,
+        target.role,
+        target.organization,
+        target.email,
+        target.phone,
+      ].filter(Boolean).join(' - '))
+      .join('\n');
+    const signals = [
+      briefing.agency,
+      briefing.contractNumber ? `Contract ${briefing.contractNumber}` : undefined,
+      briefing.sourceNoticeId ? `Notice ${briefing.sourceNoticeId}` : undefined,
+      ...(briefing.relatedMarketSignals || []),
+      ...(briefing.risks || []).map(risk => `Risk: ${risk}`),
+    ].filter(Boolean) as string[];
+    const item: BriefingItemFormatted = {
+      id: `pursuit-${briefing.sourceNoticeId || briefing.id || fallbackGeneratedAt}`,
+      rank: 1,
+      category: 'Pursuit Brief',
+      categoryIcon: '🎯',
+      title: briefing.contractName || 'Pursuit intelligence brief',
+      subtitle: [
+        briefing.agency || 'Federal agency',
+        briefing.value ? `Value: ${briefing.value}` : null,
+        typeof briefing.opportunityScore === 'number' ? `Score: ${briefing.opportunityScore}` : null,
+      ].filter(Boolean).join(' • '),
+      description: [
+        briefing.whyWorthPursuing,
+        briefing.workingHypothesis ? `Working hypothesis: ${briefing.workingHypothesis}` : null,
+        briefing.immediateNextMove ? `Immediate next move: ${briefing.immediateNextMove}` : null,
+        actionPlanText ? `Action plan:\n${actionPlanText}` : null,
+        outreachText ? `Outreach targets:\n${outreachText}` : null,
+      ].filter(Boolean).join('\n\n'),
+      detailLine: briefing.immediateNextMove || briefing.whyWorthPursuing || 'Capture guidance generated for this pursuit.',
+      urgencyBadge: 'HIGH',
+      amount: briefing.value,
+      actionUrl: briefing.sourceNoticeId ? `https://sam.gov/opp/${briefing.sourceNoticeId}/view` : '/briefings',
+      actionLabel: briefing.sourceNoticeId ? 'View source notice' : 'Open pursuit workspace',
+      signals,
+      noticeId: briefing.sourceNoticeId,
+      agency: briefing.agency,
+    };
+
+    return {
+      id: briefing.id || `pursuit-${fallbackDate}`,
+      generatedAt: fallbackGeneratedAt,
+      briefingDate: fallbackDate,
+      summary: {
+        headline: 'Pursuit intelligence brief',
+        subheadline: briefing.immediateNextMove || briefing.whyWorthPursuing || 'Capture guidance for one priority opportunity.',
+        quickStats: [
+          { label: 'Pursuits', value: 1 },
+          { label: 'Action Steps', value: briefing.actionPlan?.length || 0 },
+          { label: 'Contacts', value: briefing.outreachTargets?.length || 0 },
+        ],
+        urgentAlerts: 1,
+      },
+      topItems: [
+        {
+          title: 'Priority Pursuit',
+          items: [item],
+        },
+      ],
+      categorizedItems: {
+        pursuit: {
+          title: 'Pursuit Brief',
+          items: [item],
+        },
+      },
+      totalItems: 1,
+      sourcesIncluded: ['Briefing Log', 'GovCon Giants AI'],
+    };
   }
 
   if (isSamGreenBriefing(raw)) {
@@ -426,7 +562,7 @@ function BriefingsDashboardContent() {
   const [inputEmail, setInputEmail] = useState('');
   const [status, setStatus] = useState<PageStatus>('gate');
   const [briefings, setBriefings] = useState<BriefingEntry[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedBriefingKey, setSelectedBriefingKey] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [linkSending, setLinkSending] = useState(false);
@@ -451,7 +587,8 @@ function BriefingsDashboardContent() {
   // Track if user is on free tier (alerts only, no briefings access)
   const [isFreeUser, setIsFreeUser] = useState(false);
 
-  const selectedBriefing = briefings.find(b => b.briefing_date === selectedDate)?.content ?? null;
+  const selectedBriefingEntry = briefings.find(b => getBriefingKey(b) === selectedBriefingKey) ?? null;
+  const selectedBriefing = selectedBriefingEntry?.content ?? null;
 
   const trackEngagement = useCallback((
     eventType: 'page_view' | 'tool_use' | 'login' | 'profile_update' | 'onboarding_step' | 'export',
@@ -650,7 +787,9 @@ function BriefingsDashboardContent() {
     }
 
     const entries: BriefingEntry[] = (data.briefings || []).map((entry: {
+      id?: string;
       briefing_date: string;
+      briefing_type?: string;
       generated_at: string;
       items_count: number;
       content: unknown;
@@ -660,17 +799,20 @@ function BriefingsDashboardContent() {
     }));
     // Single briefing response (days=1 fallback)
     if (data.briefing && !data.briefings) {
-      entries.push({
+      const singleEntry = {
+        id: data.id,
         briefing_date: data.briefing_date,
+        briefing_type: data.briefing_type,
         generated_at: data.generated_at,
         items_count: data.briefing?.totalItems || 0,
         content: normalizeBriefing(data.briefing, data.briefing_date, data.generated_at),
-      });
+      };
+      entries.push(singleEntry);
     }
 
     setBriefings(entries);
     if (entries.length > 0) {
-      setSelectedDate(entries[0].briefing_date);
+      setSelectedBriefingKey(getBriefingKey(entries[0]));
     }
     setEmail(userEmail);
     localStorage.setItem('briefings_access_email', userEmail);
@@ -946,6 +1088,7 @@ function BriefingsDashboardContent() {
     setStatus('gate');
     setEmail('');
     setBriefings([]);
+    setSelectedBriefingKey(null);
     setInputEmail('');
   };
 
@@ -1515,15 +1658,16 @@ function BriefingsDashboardContent() {
             <div className="flex lg:hidden overflow-x-auto gap-2 p-3">
               {briefings.map(b => (
                 <button
-                  key={b.briefing_date}
-                  onClick={() => { setSelectedDate(b.briefing_date); setExpandedItems(new Set()); }}
+                  key={getBriefingKey(b)}
+                  onClick={() => { setSelectedBriefingKey(getBriefingKey(b)); setExpandedItems(new Set()); }}
                   className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedDate === b.briefing_date
+                    selectedBriefingKey === getBriefingKey(b)
                       ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
                       : 'bg-gray-900 text-gray-400 border border-gray-800 hover:border-gray-700'
                   }`}
                 >
                   {formatDate(b.briefing_date)}
+                  <span className="ml-1 text-[10px] uppercase opacity-50">{formatBriefingType(b.briefing_type)}</span>
                   <span className="ml-1.5 text-xs opacity-60">{b.items_count}</span>
                 </button>
               ))}
@@ -1533,15 +1677,18 @@ function BriefingsDashboardContent() {
               <p className="text-xs text-gray-500 uppercase tracking-wider mb-3 px-2">Past Briefings</p>
               {briefings.map(b => (
                 <button
-                  key={b.briefing_date}
-                  onClick={() => { setSelectedDate(b.briefing_date); setExpandedItems(new Set()); }}
+                  key={getBriefingKey(b)}
+                  onClick={() => { setSelectedBriefingKey(getBriefingKey(b)); setExpandedItems(new Set()); }}
                   className={`w-full text-left px-3 py-2.5 rounded-lg mb-1 transition-colors ${
-                    selectedDate === b.briefing_date
+                    selectedBriefingKey === getBriefingKey(b)
                       ? 'bg-purple-500/15 text-purple-400'
                       : 'text-gray-400 hover:bg-gray-900 hover:text-gray-300'
                   }`}
                 >
                   <span className="font-medium text-sm">{formatDate(b.briefing_date)}</span>
+                  <span className="ml-2 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide opacity-70">
+                    {formatBriefingType(b.briefing_type)}
+                  </span>
                   <span className="float-right text-xs opacity-50">{b.items_count} items</span>
                 </button>
               ))}
@@ -1553,7 +1700,14 @@ function BriefingsDashboardContent() {
             {selectedBriefing ? (
               <>
                 {/* Date heading */}
-                <p className="text-gray-500 text-sm mb-1">{formatDateLong(selectedBriefing.briefingDate)}</p>
+                <p className="text-gray-500 text-sm mb-1">
+                  {formatDateLong(selectedBriefing.briefingDate)}
+                  {selectedBriefingEntry?.briefing_type ? (
+                    <span className="ml-2 rounded bg-purple-500/15 px-2 py-0.5 text-xs uppercase tracking-wide text-purple-300">
+                      {formatBriefingType(selectedBriefingEntry.briefing_type)}
+                    </span>
+                  ) : null}
+                </p>
 
                 {/* Search and Filter Bar */}
                 <div className="mb-6 mt-4 space-y-3">

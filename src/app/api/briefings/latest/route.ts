@@ -46,10 +46,11 @@ function getSupabase() {
 
   const { data, error } = await getSupabase()
     .from('briefing_log')
-    .select('briefing_date, briefing_content, items_count, created_at')
+    .select('id, briefing_date, briefing_type, briefing_content, items_count, created_at')
     .eq('user_email', email)
     .lte('briefing_date', today)
     .order('briefing_date', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(days);
 
   if (error) {
@@ -68,8 +69,10 @@ function getSupabase() {
   if (days === 1) {
     return NextResponse.json({
       success: true,
+      id: data[0].id,
       briefing: data[0].briefing_content,
       briefing_date: data[0].briefing_date,
+      briefing_type: data[0].briefing_type,
       generated_at: data[0].created_at,
     });
   }
@@ -77,8 +80,10 @@ function getSupabase() {
   return NextResponse.json({
     success: true,
     count: data.length,
-    briefings: data.map((d: { briefing_date: string; created_at: string; items_count: number; briefing_content: unknown }) => ({
+    briefings: data.map((d: { id?: string; briefing_date: string; briefing_type?: string; created_at: string; items_count: number; briefing_content: unknown }) => ({
+      id: d.id,
       briefing_date: d.briefing_date,
+      briefing_type: d.briefing_type,
       generated_at: d.created_at,
       items_count: d.items_count,
       content: d.briefing_content,
