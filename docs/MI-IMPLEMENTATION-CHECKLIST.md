@@ -6,6 +6,34 @@
 
 ---
 
+## Deployment Log - May 9, 2026
+
+### Shipped to Production
+
+- [x] MI beta email + password login
+- [x] Optional 2FA step after password login
+- [x] Forgot password and reset password pages
+- [x] Account setup route for existing entitled users without Supabase Auth accounts
+- [x] Admin dashboard language alignment around current inventory vs. 7-day movement
+- [x] Dashboard explanation for profile setup counts so completed profiles do not appear to "go down" when the metric is actually a 7-day activity window
+- [x] Email engagement labeling split between provider click tracking and saved helpful/not helpful feedback records
+- [x] Free/pro alert suppression logic documented for avoiding redundant free alerts to Pro users
+
+### Verified
+
+- [x] `npm run build` completed successfully
+- [x] Production deploy completed on Vercel
+- [x] `https://tools.govcongiants.org/admin/dashboard` returned HTTP 200
+- [x] `https://tools.govcongiants.org/mi-beta` returned HTTP 200
+
+### Still Open
+
+- [ ] Rebrand Supabase Auth email templates to Market Intelligence
+- [ ] Send setup links to existing MI Free and MI Pro users missing Supabase Auth accounts
+- [ ] Add admin account status view for entitlement, identity, profile, setup, and login state
+- [ ] Finish API/database alignment for forecasts, grants, recompetes, contractors, pipeline, and teaming where beta screens still show fetch errors or stale counts
+- [ ] Redirect old `.org` site paths to the new `.com` site and maintain SEO handoff
+
 ## Overview
 
 This checklist tracks all work needed to consolidate to the unified MI product model:

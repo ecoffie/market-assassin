@@ -7,6 +7,40 @@
 
 ---
 
+## Current Production Baseline - May 9, 2026
+
+MI beta is now deployed as the working bridge from the old training/tools model into the unified SaaS product.
+
+### What Is Live
+
+- Email + password login for MI beta with optional 2FA.
+- Forgot/reset password flow.
+- Account setup support for entitled users who still need to create a password identity.
+- Dashboard labels that separate customer inventory from recent movement, so the team can see what is growing, what is slipping, and what needs intervention.
+- Admin metrics reframed around useful levers: profile setup, active alert audience, email clicks, helpful/not helpful feedback, and time spent in MI.
+
+### What This Means for Launch
+
+The launch message should keep pointing to one outcome:
+
+> Market Intelligence helps small businesses find federal contracts they would have missed and move the right ones toward a win.
+
+The dashboard should support that same operating rhythm:
+
+- Who joined or was imported?
+- Who finished enough profile data for MI to work?
+- Who opened, clicked, saved, searched, or came back?
+- Which opportunities moved into pipeline, teaming, proposal, submitted, won, or lost?
+- Which users need profile help, better matches, fewer alerts, or a higher-touch service path?
+
+### Immediate Launch Priorities
+
+1. Fix and rebrand account setup/password reset email templates.
+2. Send setup links to MI Free and MI Pro users who have entitlement but no login identity.
+3. Finish beta screen/database alignment for forecasts, grants, recompetes, contractors, pipeline, and teaming.
+4. Redirect old `.org` website paths to the new `.com` site so public links stop timing out.
+5. Keep 10-10 Forever outreach focused on users who show behavior: profile completion, email engagement, product usage, pipeline movement, and buying history.
+
 ## Table of Contents
 
 1. [The New Pitch](#1-the-new-pitch)

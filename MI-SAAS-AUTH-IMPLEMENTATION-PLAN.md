@@ -1,5 +1,25 @@
 # MI SaaS Auth Implementation Plan
 
+## Deployment Status - May 9, 2026
+
+Phase 1 is now deployed to production for MI beta:
+
+- Email + password is the primary login path for MI Free, MI Pro, team, and internal users.
+- 2FA remains available as an optional second step after password login.
+- Forgot password and reset password flows are live.
+- Account setup APIs are in place for existing purchasers/users who have entitlement but do not yet have a Supabase Auth identity.
+- Entitlement remains separate from identity, so a user can have a login account without paid MI Pro access, and a purchaser can have MI access while still needing account setup.
+- Admin account setup support is available through the new MI account setup route.
+
+Production check: `https://tools.govcongiants.org/mi-beta` returned HTTP 200 after deployment.
+
+Next work:
+
+- Rebrand Supabase Auth email templates from legacy GovCon Content Generator language to Market Intelligence.
+- Send account setup links to existing entitled MI users who do not yet have Supabase Auth accounts.
+- Add an admin-facing account status panel for setup sent, setup completed, last login, entitlement, profile completion, and reset actions.
+- Continue improving team/workspace identity before Deal Flow Board collaboration launches.
+
 ## Decision
 
 Market Intelligence should use a standard SaaS login model:
