@@ -9,7 +9,7 @@ export type MIPanel =
   | 'research'       // Market Research (Federal Market Assassin)
   | 'forecasts'      // 7,700+ upcoming procurements
   | 'recompetes'     // Expiring contracts
-  | 'contractors'    // 3,500+ with contacts
+  | 'contractors'    // prime contractor database
   | 'pipeline'       // Track pursuits (Pro tier)
   | 'contacts'       // CRM & relationships (Pro tier)
   | 'content'        // Content Reaper
@@ -78,14 +78,14 @@ const navigation: NavSection[] = [
         name: 'Recompetes',
         panel: 'recompetes',
         icon: '⏰',
-        description: '12,000+ expiring contracts',
+        description: 'Expiring award DB',
         tier: 'pro',
       },
       {
         name: 'Contractors',
         panel: 'contractors',
         icon: '🏢',
-        description: '3,500+ with contacts',
+        description: 'Prime contractor DB',
         tier: 'pro',
       },
       {

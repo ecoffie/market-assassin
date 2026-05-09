@@ -159,8 +159,15 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       <div>
         <h1 className="text-2xl font-bold text-white">Federal Contractors</h1>
         <p className="text-slate-400 mt-1">
-          {stats ? `${stats.totalContractors.toLocaleString()} contractors` : '3,500+ contractors'} with SBLO contacts
+          {stats
+            ? `${stats.totalContractors.toLocaleString()} federal contractor records`
+            : 'Federal contractor database'}
         </p>
+        {stats && (
+          <p className="text-sm text-slate-500 mt-1">
+            {stats.withContact.toLocaleString()} with contact data · {stats.withEmail.toLocaleString()} with email · {stats.withPhone.toLocaleString()} with phone
+          </p>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -172,7 +179,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-emerald-400">{stats.withContact.toLocaleString()}</div>
-            <div className="text-xs text-slate-500">With SBLO Contact</div>
+            <div className="text-xs text-slate-500">With Contact Data</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-blue-400">{stats.withEmail.toLocaleString()}</div>
@@ -222,7 +229,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none"
             >
               <option value="all">All Contractors</option>
-              <option value="withContact">With SBLO Contact</option>
+              <option value="withContact">With Contact Data</option>
               <option value="withEmail">With Email</option>
             </select>
           </div>

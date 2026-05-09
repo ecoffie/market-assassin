@@ -764,6 +764,19 @@ function percent(numerator: number, denominator: number): string {
   return denominator > 0 ? `${Math.round((numerator / denominator) * 100)}%` : 'N/A';
 }
 
+function formatEmailClickLabel(label: string): string {
+  const cleaned = label.trim();
+  const normalized = cleaned.toLowerCase();
+
+  if (normalized === 'feedback_helpful') return 'Feedback CTA: helpful';
+  if (normalized === 'feedback_not_helpful') return 'Feedback CTA: not helpful';
+  if (normalized === 'sam_gov_opportunity') return 'SAM.gov opportunity';
+  if (normalized === 'unsubscribe') return 'Unsubscribe';
+  if (normalized === 'unknown') return 'Unknown link';
+
+  return cleaned;
+}
+
 function percentNumber(numerator: number, denominator: number): number {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
 }
@@ -983,9 +996,9 @@ async function getMiGrowthMetrics() {
           metrics.email.clicked7d++;
           const metadata = row.metadata || {};
           const label = typeof metadata.link_text === 'string'
-            ? metadata.link_text
+            ? formatEmailClickLabel(metadata.link_text)
             : typeof metadata.url === 'string'
-              ? metadata.url
+              ? formatEmailClickLabel(metadata.url)
               : 'Link click';
           topLinks[label] = (topLinks[label] || 0) + 1;
         }
@@ -1478,8 +1491,12 @@ async function getProviderEmailHealth() {
           : link.includes('market-intelligence')
             ? 'Market Intelligence'
             : link.includes('feedback')
-              ? 'Feedback'
-              : link;
+              ? link.includes('type=not_helpful')
+                ? 'Feedback CTA: not helpful'
+                : link.includes('type=helpful')
+                  ? 'Feedback CTA: helpful'
+                  : 'Feedback CTA'
+              : formatEmailClickLabel(link);
         topLinks[label] = (topLinks[label] || 0) + 1;
       } else if (event.event_type === 'email.bounced') health.bounced7d++;
       else if (event.event_type === 'email.complained') health.complained7d++;

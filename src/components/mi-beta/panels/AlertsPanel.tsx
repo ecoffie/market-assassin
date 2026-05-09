@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -47,6 +48,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [totalCount, setTotalCount] = useState(0);
 
   const canUsePipeline = tier !== 'free';
+  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadAlerts = useCallback(async () => {
     setIsLoading(true);
@@ -56,7 +58,9 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       if (email) params.set('email', email);
       params.set('limit', '50');
 
-      const res = await fetch(`/api/mi-beta/opportunities?${params.toString()}`);
+      const res = await fetch(`/api/mi-beta/opportunities?${params.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
 
       if (data.success) {
@@ -73,7 +77,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [email]);
+  }, [email, getAuthHeaders]);
 
   useEffect(() => {
     loadAlerts();
@@ -97,7 +101,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     try {
       const res = await fetch('/api/pipeline', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
           notice_id: alert.id,

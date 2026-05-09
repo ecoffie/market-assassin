@@ -5,6 +5,7 @@ import { createSecureAccessUrl } from '@/lib/access-links';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
+import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -145,6 +146,16 @@ function getAlertSource(user: AlertUser, tier: 'free' | 'pro'): WeeklyAlertSourc
   return null;
 }
 
+async function getWeeklyDeepDiveAudienceEmails(): Promise<Set<string>> {
+  try {
+    const audience = await resolveBriefingAudience(getSupabase());
+    return new Set(audience.users.map(user => user.email.toLowerCase()));
+  } catch (error) {
+    console.warn('[Weekly Alerts] Could not resolve Weekly Deep Dive audience for suppression:', getErrorMessage(error));
+    return new Set();
+  }
+}
+
 async function persistProcessedWeeklyAlert({
   user,
   alertDate,
@@ -216,15 +227,26 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
     buyerEmailsCache = null;
     await fetchBuyerEmails();
 
+    // Suppress fallback weekly alerts for users already receiving the richer Weekly Deep Dive.
+    // If a user explicitly chose weekly alerts, honor that preference.
+    const weeklyDeepDiveAudienceEmails = options.email ? new Set<string>() : await getWeeklyDeepDiveAudienceEmails();
+
     // Filter to:
     // 1. Users who chose weekly
     // 2. Free tier users (no product purchase) regardless of preference
+    // 3. Exclude users already covered by Weekly Deep Dive unless they explicitly chose weekly alerts
     let users: AlertUser[] = [];
     for (const user of allUsers) {
       const { tier } = await getAlertLimit(user.user_email);
+      const normalizedEmail = user.user_email.toLowerCase();
+      const explicitlyWeekly = user.alert_frequency === 'weekly';
+
+      if (!explicitlyWeekly && weeklyDeepDiveAudienceEmails.has(normalizedEmail)) {
+        continue;
+      }
 
       // Include if explicitly weekly OR free tier
-      if (user.alert_frequency === 'weekly' || tier === 'free') {
+      if (explicitlyWeekly || tier === 'free') {
         users.push(user as AlertUser);
       }
     }
@@ -607,8 +629,8 @@ async function sendAlertEmail(
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 20px; background: #f3f4f6;">
   <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Market Assassin</h1>
-    <p style="color: #c4b5fd; margin: 8px 0 0 0; font-size: 16px;">Weekly Opportunity Alert</p>
+    <h1 style="color: white; margin: 0; font-size: 24px;">Market Intelligence</h1>
+    <p style="color: #c4b5fd; margin: 8px 0 0 0; font-size: 16px;">Weekly SAM.gov Opportunity Alert</p>
   </div>
 
   <div style="background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none;">
@@ -686,7 +708,7 @@ async function sendAlertEmail(
   await sendEmail({
     from: `"GovCon Giants" <${process.env.EMAIL_FROM || 'alerts@govcongiants.com'}>`,
     to: email,
-    subject: `${opportunities.length} New Opportunities Match Your Profile - Week of ${formatDate(new Date().toISOString())}`,
+    subject: `MI Weekly Alert: ${opportunities.length} New SAM.gov Matches - Week of ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     text: `${opportunities.length} new opportunities matched your profile this week. Manage preferences: ${preferencesUrl}`,
     emailType: 'weekly_alert',

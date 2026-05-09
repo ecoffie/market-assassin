@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface TeamPanelProps {
   email: string | null;
@@ -48,6 +49,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadWorkspace = useCallback(async () => {
     if (!email) return;
@@ -55,7 +57,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
       if (!data.success) {
         setError(data.error || 'Failed to load team workspace');
@@ -73,7 +77,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [email]);
+  }, [email, getAuthHeaders]);
 
   useEffect(() => {
     loadWorkspace();
@@ -87,7 +91,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     try {
       const res = await fetch('/api/mi-beta/workspace', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email,
           invited_email: inviteEmail.trim(),

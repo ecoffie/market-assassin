@@ -1,6 +1,6 @@
 /**
  * Federal Contractor Database Module
- * GovCon Giants - 2,768 Prime Contractors with SBLO Contacts
+ * GovCon Giants - Prime contractor records with optional contact fields
  */
 
 import contractorsData from '@/data/contractors.json';

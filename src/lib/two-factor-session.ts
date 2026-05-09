@@ -7,6 +7,7 @@ interface TwoFactorPayload {
   email: string;
   exp: number;
   verifiedAt: string;
+  authLevel?: 'password' | '2fa';
 }
 
 function normalizeEmail(email: string) {
@@ -38,6 +39,19 @@ export function createTwoFactorSessionToken(email: string) {
     email: normalizeEmail(email),
     exp: now + SESSION_TTL_MS,
     verifiedAt: new Date(now).toISOString(),
+    authLevel: '2fa',
+  };
+  const encodedPayload = toBase64Url(JSON.stringify(payload));
+  return `${encodedPayload}.${sign(encodedPayload)}`;
+}
+
+export function createMIAuthSessionToken(email: string) {
+  const now = Date.now();
+  const payload: TwoFactorPayload = {
+    email: normalizeEmail(email),
+    exp: now + SESSION_TTL_MS,
+    verifiedAt: new Date(now).toISOString(),
+    authLevel: 'password',
   };
   const encodedPayload = toBase64Url(JSON.stringify(payload));
   return `${encodedPayload}.${sign(encodedPayload)}`;
@@ -73,6 +87,9 @@ export function verifyTwoFactorSessionToken(token: string | null | undefined, ex
 }
 
 export function getTwoFactorTokenFromRequest(request: NextRequest) {
+  const miAuthHeader = request.headers.get('x-mi-auth-token');
+  if (miAuthHeader) return miAuthHeader;
+
   const header = request.headers.get('x-mi-2fa-token');
   if (header) return header;
 
@@ -92,6 +109,19 @@ export function requireTwoFactorSession(request: NextRequest, expectedEmail?: st
     ok: false as const,
     response: NextResponse.json(
       { success: false, error: result.error || 'Two-factor verification required' },
+      { status: 401 }
+    ),
+  };
+}
+
+export function requireMIAuthSession(request: NextRequest, expectedEmail?: string | null) {
+  const result = verifyTwoFactorSessionToken(getTwoFactorTokenFromRequest(request), expectedEmail);
+  if (result.valid) return { ok: true as const, session: result };
+
+  return {
+    ok: false as const,
+    response: NextResponse.json(
+      { success: false, error: result.error || 'Sign in required' },
       { status: 401 }
     ),
   };

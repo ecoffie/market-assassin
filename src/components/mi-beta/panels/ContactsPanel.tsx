@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface ContactsPanelProps {
   email: string | null;
@@ -72,6 +73,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
   const [filterType, setFilterType] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
   const tierLabel = tier === 'free' ? 'Free CRM' : tier === 'pro' ? 'Pro CRM' : 'Full CRM';
+  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadPipeline = useCallback(async () => {
     if (!email) return;
@@ -79,7 +81,9 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     setPipelineLoading(true);
 
     try {
-      const res = await fetch(`/api/pipeline?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/pipeline?email=${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
 
       if (data.error) {
@@ -93,7 +97,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     } finally {
       setPipelineLoading(false);
     }
-  }, [email]);
+  }, [email, getAuthHeaders]);
 
   const loadPartners = useCallback(async () => {
     if (!email) {
@@ -109,7 +113,9 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       if (filterType) params.set('type', filterType);
       if (filterStatus) params.set('status', filterStatus);
 
-      const res = await fetch(`/api/teaming?${params.toString()}`);
+      const res = await fetch(`/api/teaming?${params.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
 
       if (data.error) {
@@ -129,7 +135,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [email, filterType, filterStatus]);
+  }, [email, filterType, filterStatus, getAuthHeaders]);
 
   useEffect(() => {
     loadPartners();
@@ -145,7 +151,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     try {
       const res = await fetch('/api/teaming', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           ...partnerData,
           user_email: email,
@@ -171,7 +177,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     try {
       const res = await fetch('/api/teaming', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           id,
           user_email: email,
@@ -198,7 +204,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     try {
       const res = await fetch('/api/teaming', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ id, user_email: email }),
       });
       const data = await res.json();
@@ -227,7 +233,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     try {
       const res = await fetch('/api/pipeline', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           id: opportunity.id,
           user_email: email,

@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { requireTwoFactorSession } from '@/lib/two-factor-session';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordMIBetaActivity } from '@/lib/mi-beta/workspace';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const twoFactor = requireTwoFactorSession(request, email);
-  if (!twoFactor.ok) return twoFactor.response;
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) return authSession.response;
   const { workspaceId } = await ensureWorkspaceMember(email);
 
   try {
@@ -136,8 +136,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const twoFactor = requireTwoFactorSession(request, body.user_email);
-    if (!twoFactor.ok) return twoFactor.response;
+    const authSession = requireMIAuthSession(request, body.user_email);
+    if (!authSession.ok) return authSession.response;
 
     // Normalize email
     body.user_email = body.user_email.toLowerCase();
@@ -208,8 +208,8 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const twoFactor = requireTwoFactorSession(request, user_email);
-    if (!twoFactor.ok) return twoFactor.response;
+    const authSession = requireMIAuthSession(request, user_email);
+    if (!authSession.ok) return authSession.response;
     const { workspaceId } = await ensureWorkspaceMember(user_email);
     updates.updated_by = user_email.toLowerCase();
     updates.workspace_id = updates.workspace_id || workspaceId;
@@ -288,8 +288,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const twoFactor = requireTwoFactorSession(request, user_email);
-    if (!twoFactor.ok) return twoFactor.response;
+    const authSession = requireMIAuthSession(request, user_email);
+    if (!authSession.ok) return authSession.response;
     const { workspaceId } = await ensureWorkspaceMember(user_email);
 
     const { error } = await getSupabase()

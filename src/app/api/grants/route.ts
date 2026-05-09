@@ -76,8 +76,14 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status') || 'posted';
   const limit = parseInt(searchParams.get('limit') || '25', 10);
 
+  const isMetadataRequest = !searchParams.has('keyword')
+    && !searchParams.has('agency')
+    && !searchParams.has('category')
+    && !searchParams.has('status')
+    && !searchParams.has('limit');
+
   // If no search params, return summary/metadata
-  if (!keyword && !agency && !category) {
+  if (isMetadataRequest) {
     return NextResponse.json({
       success: true,
       summary: {

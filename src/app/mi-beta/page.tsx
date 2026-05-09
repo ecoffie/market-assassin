@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import UnifiedSidebarBeta, { type MIBetaPanel, type MIBetaTier } from '@/components/mi-beta/UnifiedSidebarBeta';
 import PanelContainer from '@/components/mi-beta/panels';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
+const MI_AUTH_TOKEN_KEY = 'mi_beta_auth_token';
 
 // Loading fallback
 function DashboardLoading() {
@@ -53,10 +55,18 @@ function MIBetaDashboard() {
   );
 
   const searchParams = useSearchParams();
+  const resetSuccess = searchParams.get('reset') === 'success';
+  const setupSuccess = searchParams.get('setup') === 'success';
 
   const getTwoFactorHeaders = useCallback((): Record<string, string> => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem(TWO_FACTOR_TOKEN_KEY) : null;
-    return token ? { 'x-mi-2fa-token': token } : {};
+    if (typeof window === 'undefined') return {};
+
+    const authToken = localStorage.getItem(MI_AUTH_TOKEN_KEY);
+    const twoFactorToken = localStorage.getItem(TWO_FACTOR_TOKEN_KEY);
+    const headers: Record<string, string> = {};
+    if (authToken) headers['x-mi-auth-token'] = authToken;
+    if (twoFactorToken) headers['x-mi-2fa-token'] = twoFactorToken;
+    return headers;
   }, []);
 
   const trackEngagement = useCallback((
@@ -113,14 +123,18 @@ function MIBetaDashboard() {
       });
       const accessData = accessRes.ok ? await accessRes.json() : null;
 
-      // Determine tier based on access data
+      // Determine tier from the unified MI entitlement first.
       let userTier: MIBetaTier = 'free';
-      if (accessData?.access) {
+      if (['free', 'pro', 'team', 'enterprise'].includes(accessData?.tier)) {
+        userTier = accessData.tier as MIBetaTier;
+      } else if (accessData?.access) {
         const access = accessData.access;
-        if (access.briefings || access.mi_pro || access.team) {
-          userTier = access.team ? 'team' : 'pro';
-        } else if (access.enterprise) {
+        if (access.enterprise) {
           userTier = 'enterprise';
+        } else if (access.team) {
+          userTier = 'team';
+        } else if (access.briefings || access.mi_pro) {
+          userTier = 'pro';
         }
       }
 
@@ -130,7 +144,7 @@ function MIBetaDashboard() {
       // Store email in localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('mi_beta_email', userEmail);
-        localStorage.setItem('mi_beta_2fa_verified_at', new Date().toISOString());
+        localStorage.setItem('mi_beta_authenticated_at', new Date().toISOString());
       }
     } catch (error) {
       console.error('Failed to load user profile:', error);
@@ -176,6 +190,44 @@ function MIBetaDashboard() {
     setActivePanel(nextPanel);
     trackEngagement('page_view', { panel: nextPanel, tier });
   }, [flushPanelTime, tier, trackEngagement]);
+
+  const loginWithPassword = useCallback(async (userEmail: string, password: string) => {
+    const normalizedEmail = userEmail.toLowerCase().trim();
+    if (!normalizedEmail || !password) {
+      setAuthError('Enter your email and password');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError(null);
+    setAuthMessage(null);
+
+    try {
+      const res = await fetch('/api/auth/mi-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        setAuthError(data.error || 'Failed to sign in');
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
+        localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt);
+      }
+
+      await loadUserProfile(normalizedEmail);
+    } catch (error) {
+      console.error('Failed to sign in:', error);
+      setAuthError('Failed to sign in');
+    } finally {
+      setAuthLoading(false);
+    }
+  }, [loadUserProfile]);
 
   const requestTwoFactorCode = useCallback(async (userEmail: string, password: string) => {
     const normalizedEmail = userEmail.toLowerCase().trim();
@@ -239,7 +291,9 @@ function MIBetaDashboard() {
 
       if (typeof window !== 'undefined') {
         localStorage.setItem(TWO_FACTOR_TOKEN_KEY, data.sessionToken);
+        localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
         localStorage.setItem('mi_beta_2fa_verified_at', data.verifiedAt);
+        localStorage.setItem('mi_beta_authenticated_at', data.verifiedAt);
       }
 
       await loadUserProfile(normalizedEmail);
@@ -257,15 +311,19 @@ function MIBetaDashboard() {
     window.fetch = (input, init = {}) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const isApiRequest = url.startsWith('/api/') || url.startsWith(window.location.origin + '/api/');
-      const token = localStorage.getItem(TWO_FACTOR_TOKEN_KEY);
+      const authToken = localStorage.getItem(MI_AUTH_TOKEN_KEY);
+      const twoFactorToken = localStorage.getItem(TWO_FACTOR_TOKEN_KEY);
 
-      if (!isApiRequest || !token) {
+      if (!isApiRequest || (!authToken && !twoFactorToken)) {
         return originalFetch(input, init);
       }
 
       const headers = new Headers(init.headers || (typeof input !== 'string' && !(input instanceof URL) ? input.headers : undefined));
-      if (!headers.has('x-mi-2fa-token')) {
-        headers.set('x-mi-2fa-token', token);
+      if (authToken && !headers.has('x-mi-auth-token')) {
+        headers.set('x-mi-auth-token', authToken);
+      }
+      if (twoFactorToken && !headers.has('x-mi-2fa-token')) {
+        headers.set('x-mi-2fa-token', twoFactorToken);
       }
 
       return originalFetch(input, { ...init, headers });
@@ -288,7 +346,7 @@ function MIBetaDashboard() {
         ? localStorage.getItem('mi_beta_email')
         : null;
       const verifiedAt = typeof window !== 'undefined'
-        ? localStorage.getItem('mi_beta_2fa_verified_at')
+        ? localStorage.getItem('mi_beta_authenticated_at') || localStorage.getItem('mi_beta_2fa_verified_at')
         : null;
       const verifiedRecently = verifiedAt
         ? Date.now() - new Date(verifiedAt).getTime() < TWO_FACTOR_SESSION_MS
@@ -299,7 +357,9 @@ function MIBetaDashboard() {
       } else {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('mi_beta_email');
+          localStorage.removeItem('mi_beta_authenticated_at');
           localStorage.removeItem('mi_beta_2fa_verified_at');
+          localStorage.removeItem(MI_AUTH_TOKEN_KEY);
           localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
         }
         setIsLoading(false);
@@ -340,6 +400,17 @@ function MIBetaDashboard() {
               {authStep === 'credentials' ? 'Sign in to Market Intelligence' : 'Enter verification code'}
             </h2>
 
+            {resetSuccess && authStep === 'credentials' && (
+              <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
+                Password updated. Sign in with your new password, then complete 2FA.
+              </div>
+            )}
+            {setupSuccess && authStep === 'credentials' && (
+              <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
+                Account password created. Sign in, then complete 2FA.
+              </div>
+            )}
+
             {authStep === 'credentials' ? (
               <form
                 onSubmit={(e) => {
@@ -347,7 +418,7 @@ function MIBetaDashboard() {
                   const formData = new FormData(e.currentTarget);
                   const emailValue = formData.get('email') as string;
                   const passwordValue = formData.get('password') as string;
-                  requestTwoFactorCode(emailValue, passwordValue);
+                  loginWithPassword(emailValue, passwordValue);
                 }}
                 className="space-y-4"
               >
@@ -371,12 +442,28 @@ function MIBetaDashboard() {
                   autoComplete="current-password"
                   className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                 />
+                <div className="flex items-center justify-between text-sm">
+                  <Link href="/mi-beta/setup-account" className="font-medium text-slate-400 hover:text-slate-200">
+                    Set up account
+                  </Link>
+                  <Link href="/mi-beta/forgot-password" className="text-sm font-medium text-emerald-400 hover:text-emerald-300">
+                    Forgot password?
+                  </Link>
+                </div>
                 <button
                   type="submit"
                   disabled={authLoading || !pendingEmail.trim() || !signInPassword}
                   className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
                 >
-                  {authLoading ? 'Checking...' : 'Continue to 2FA'}
+                  {authLoading ? 'Signing in...' : 'Sign in'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => requestTwoFactorCode(pendingEmail, signInPassword)}
+                  disabled={authLoading || !pendingEmail.trim() || !signInPassword}
+                  className="w-full px-4 py-3 border border-slate-700 text-slate-300 hover:border-emerald-500 hover:text-emerald-300 disabled:border-slate-800 disabled:text-slate-600 font-medium rounded-lg transition-colors"
+                >
+                  Use optional 2FA instead
                 </button>
               </form>
             ) : (
@@ -533,7 +620,9 @@ function MIBetaDashboard() {
               <button
                 onClick={() => {
                   localStorage.removeItem('mi_beta_email');
+                  localStorage.removeItem('mi_beta_authenticated_at');
                   localStorage.removeItem('mi_beta_2fa_verified_at');
+                  localStorage.removeItem(MI_AUTH_TOKEN_KEY);
                   localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
                   setEmail(null);
                   setPendingEmail('');

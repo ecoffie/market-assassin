@@ -10,7 +10,7 @@ export type MIBetaPanel =
   | 'research'       // Market Research (Federal Market Assassin)
   | 'forecasts'      // 7,700+ upcoming procurements
   | 'recompetes'     // Expiring contracts
-  | 'contractors'    // 3,500+ with contacts
+  | 'contractors'    // prime contractor database
   | 'pipeline'       // Track pursuits
   | 'contacts'       // CRM & relationships
   | 'team'           // Team access and seats
@@ -77,14 +77,14 @@ const NAV_SECTIONS: NavSection[] = [
         id: 'recompetes',
         label: 'Recompetes',
         icon: '⏰',
-        description: '12,000+ expiring',
+        description: 'Expiring award DB',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'contractors',
         label: 'Contractors',
         icon: '🏢',
-        description: '3,500+ with contacts',
+        description: 'Prime contractor DB',
         tier: ['pro', 'team', 'enterprise'],
       },
     ],
@@ -131,7 +131,7 @@ const NAV_SECTIONS: NavSection[] = [
         id: 'grants',
         label: 'Federal Grants',
         icon: '💰',
-        description: '$700B+ in grants',
+        description: 'Grants.gov search',
         tier: ['pro', 'team', 'enterprise'],
       },
     ],

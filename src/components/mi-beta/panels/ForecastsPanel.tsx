@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface ForecastsPanelProps {
   email: string | null;
@@ -99,12 +100,15 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   const [naicsFilter, setNaicsFilter] = useState('');
   const [agencyFilter, setAgencyFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const getForecastHeaders = useCallback(() => (
+    getMIApiHeaders(email)
+  ), [email]);
 
   // Fetch summary on mount
   useEffect(() => {
     async function fetchSummary() {
       try {
-        const response = await fetch('/api/forecasts');
+        const response = await fetch('/api/forecasts', { headers: getForecastHeaders() });
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
@@ -119,7 +123,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       }
     }
     fetchSummary();
-  }, []);
+  }, [getForecastHeaders]);
 
   // Load user profile and auto-search
   useEffect(() => {
@@ -159,7 +163,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       if (query) params.append('search', query);
       params.append('limit', '50');
 
-      const response = await fetch(`/api/forecasts?${params.toString()}`);
+      const response = await fetch(`/api/forecasts?${params.toString()}`, {
+        headers: getForecastHeaders(),
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -177,7 +183,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
     } finally {
       setSearching(false);
     }
-  }, []);
+  }, [getForecastHeaders]);
 
   const handleSearch = () => {
     handleSearchWithParams(naicsFilter, agencyFilter, searchQuery);

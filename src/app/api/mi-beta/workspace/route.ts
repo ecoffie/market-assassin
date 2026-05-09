@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireTwoFactorSession } from '@/lib/two-factor-session';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 import {
   ensureMIBetaWorkspaceSchema,
   ensureWorkspaceMember,
@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
   if (!email) return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
 
-  const twoFactor = requireTwoFactorSession(request, email);
-  if (!twoFactor.ok) return twoFactor.response;
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) return authSession.response;
 
   const schema = await ensureMIBetaWorkspaceSchema();
   if (!schema.ready) return NextResponse.json({ success: false, error: schema.error }, { status: 500 });
@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'email and invited_email are required' }, { status: 400 });
   }
 
-  const twoFactor = requireTwoFactorSession(request, email);
-  if (!twoFactor.ok) return twoFactor.response;
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) return authSession.response;
 
   const schema = await ensureMIBetaWorkspaceSchema();
   if (!schema.ready) return NextResponse.json({ success: false, error: schema.error }, { status: 500 });
@@ -122,8 +122,8 @@ export async function PATCH(request: NextRequest) {
   const email = normalizeEmail(String(body.email || ''));
   if (!email) return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
 
-  const twoFactor = requireTwoFactorSession(request, email);
-  if (!twoFactor.ok) return twoFactor.response;
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) return authSession.response;
 
   const schema = await ensureMIBetaWorkspaceSchema();
   if (!schema.ready) return NextResponse.json({ success: false, error: schema.error }, { status: 500 });

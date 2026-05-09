@@ -1,5 +1,12 @@
 import { NextRequest } from 'next/server';
-import { hasMarketAssassinAccess } from '@/lib/access-codes';
+import {
+  getMarketAssassinAccess,
+  hasBriefingAccess,
+  hasContentGeneratorAccess,
+  hasEmailDatabaseAccess,
+  hasOpportunityHunterProAccess,
+  hasRecompeteAccess,
+} from '@/lib/access-codes';
 import { hasBriefingsAccess } from '@/lib/briefings/access';
 
 export interface AuthResult {
@@ -8,11 +15,25 @@ export interface AuthResult {
   error?: string;
 }
 
-export type MIAccessTier = 'free' | 'pro' | 'none';
+export type MIAccessTier = 'free' | 'pro' | 'team' | 'enterprise' | 'none';
+export type MIStaffRole = 'none' | 'staff' | 'admin';
+
+export interface MIAccessSources {
+  marketAssassin: boolean;
+  marketAssassinPremium: boolean;
+  contentReaper: boolean;
+  opportunityHunterPro: boolean;
+  recompete: boolean;
+  contractorDb: boolean;
+  briefings: boolean;
+}
 
 export interface MIAuthResult {
   tier: MIAccessTier;
   email: string | null;
+  isStaff?: boolean;
+  staffRole?: MIStaffRole;
+  sources?: MIAccessSources;
   error?: string;
 }
 
@@ -43,7 +64,7 @@ export async function verifyMAAccess(email: string | null): Promise<AuthResult> 
     return { authenticated: false, email: null, error: 'Email required for access verification' };
   }
 
-  const hasAccess = await hasMarketAssassinAccess(email);
+  const hasAccess = !!(await getMarketAssassinAccess(email));
   if (!hasAccess) {
     return { authenticated: false, email, error: 'No Market Assassin access found for this email' };
   }
@@ -51,10 +72,41 @@ export async function verifyMAAccess(email: string | null): Promise<AuthResult> 
   return { authenticated: true, email };
 }
 
+function parseEmailList(value: string | undefined): Set<string> {
+  return new Set(
+    (value || '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function getStaffRole(email: string): MIStaffRole {
+  const normalizedEmail = email.toLowerCase();
+  const domain = normalizedEmail.split('@')[1] || '';
+  const configuredStaff = parseEmailList(process.env.MI_STAFF_EMAILS);
+  const configuredAdmins = parseEmailList(process.env.MI_ADMIN_EMAILS);
+
+  if (normalizedEmail === 'eric@govcongiants.com' || configuredAdmins.has(normalizedEmail)) {
+    return 'admin';
+  }
+
+  if (
+    domain === 'govcongiants.com'
+    || domain === 'govcongiants.org'
+    || configuredStaff.has(normalizedEmail)
+  ) {
+    return 'staff';
+  }
+
+  return 'none';
+}
+
 /**
  * Verify Market Intelligence access level.
- * - 'pro': Has MA access OR briefings access (paid features)
- * - 'free': Any email (4 free reports)
+ * - 'pro': Has any legacy paid GovCon tool or MI/briefings access.
+ * - staff/admin is tracked separately from the customer tier.
+ * - 'free': Any email (free MI surface)
  * - 'none': No email provided
  */
 export async function verifyMIAccess(email: string | null): Promise<MIAuthResult> {
@@ -62,16 +114,55 @@ export async function verifyMIAccess(email: string | null): Promise<MIAuthResult
     return { tier: 'none', email: null, error: 'Email required for access' };
   }
 
-  // Check for pro access (MA or briefings)
-  const [hasMA, hasBriefings] = await Promise.all([
-    hasMarketAssassinAccess(email),
+  const normalizedEmail = email.toLowerCase();
+
+  const [
+    marketAssassinAccess,
+    hasContentReaper,
+    hasOpportunityHunterPro,
+    hasRecompete,
+    hasContractorDb,
+    hasBriefings,
+    hasLegacyBriefing,
+  ] = await Promise.all([
+    getMarketAssassinAccess(normalizedEmail),
+    hasContentGeneratorAccess(normalizedEmail),
+    hasOpportunityHunterProAccess(normalizedEmail),
+    hasRecompeteAccess(normalizedEmail),
+    hasEmailDatabaseAccess(normalizedEmail),
     hasBriefingsAccess(email),
+    hasBriefingAccess(normalizedEmail),
   ]);
 
-  if (hasMA || hasBriefings) {
-    return { tier: 'pro', email };
+  const staffRole = getStaffRole(normalizedEmail);
+  const sources: MIAccessSources = {
+    marketAssassin: !!marketAssassinAccess,
+    marketAssassinPremium: marketAssassinAccess?.tier === 'premium',
+    contentReaper: hasContentReaper,
+    opportunityHunterPro: hasOpportunityHunterPro,
+    recompete: hasRecompete,
+    contractorDb: hasContractorDb,
+    briefings: hasBriefings || hasLegacyBriefing,
+  };
+
+  const hasUnifiedProAccess = Object.values(sources).some(Boolean) || staffRole !== 'none';
+
+  if (hasUnifiedProAccess) {
+    return {
+      tier: 'pro',
+      email: normalizedEmail,
+      isStaff: staffRole !== 'none',
+      staffRole,
+      sources,
+    };
   }
 
   // Free tier for any email
-  return { tier: 'free', email };
+  return {
+    tier: 'free',
+    email: normalizedEmail,
+    isStaff: staffRole !== 'none',
+    staffRole,
+    sources,
+  };
 }

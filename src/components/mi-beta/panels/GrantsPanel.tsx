@@ -125,7 +125,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       <div>
         <h1 className="text-2xl font-bold text-white">Federal Grants</h1>
         <p className="text-slate-400 mt-1">
-          $700B+ in federal grant funding from Grants.gov
+          Search open and forecasted opportunities from Grants.gov
           {totalHits > 0 && <span className="text-emerald-400 ml-2">({totalHits} results)</span>}
         </p>
       </div>
@@ -293,7 +293,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
           <div className="text-4xl mb-4">🔍</div>
           <h3 className="text-lg font-medium text-white mb-2">No Grants Found</h3>
           <p className="text-slate-400 text-sm">
-            Try adjusting your search criteria or browse by agency/category.
+            No grants matched this search. Try a broader keyword, a different agency, or forecasted status.
           </p>
         </div>
       )}

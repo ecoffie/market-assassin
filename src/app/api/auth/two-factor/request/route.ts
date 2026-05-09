@@ -5,11 +5,6 @@ import { sendEmail } from '@/lib/send-email';
 
 const CODE_TTL_MINUTES = 10;
 const RESEND_WINDOW_SECONDS = 60;
-const MI_SIGN_IN_PASSWORD =
-  process.env.MI_BETA_ACCESS_PASSWORD ||
-  process.env.MARKET_INTELLIGENCE_PASSWORD ||
-  process.env.MA_ACCESS_PASSWORD ||
-  'gcg-assassin-2024';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -21,6 +16,19 @@ function getSupabase() {
     );
   }
   return _supabase;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _authSupabase: any = null;
+function getAuthSupabase() {
+  if (!_authSupabase) {
+    _authSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    );
+  }
+  return _authSupabase;
 }
 
 function normalizeEmail(email: string) {
@@ -90,8 +98,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Password is required' }, { status: 400 });
     }
 
-    if (password !== MI_SIGN_IN_PASSWORD) {
-      return NextResponse.json({ success: false, error: 'Invalid email or password' }, { status: 401 });
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return NextResponse.json({ success: false, error: 'Authentication is not configured' }, { status: 500 });
+    }
+
+    const { data: authData, error: authError } = await getAuthSupabase().auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError || !authData.user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid email or password. Use forgot password if you already have an account.',
+          needsAccountSetup: true,
+        },
+        { status: 401 }
+      );
     }
 
     const table = await ensureTwoFactorTable();

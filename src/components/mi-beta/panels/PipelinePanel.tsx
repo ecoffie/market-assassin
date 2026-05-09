@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -67,6 +68,7 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
   const [stats, setStats] = useState<Record<string, number>>({});
   const [selectedOpportunity, setSelectedOpportunity] = useState<PipelineOpportunity | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadPipeline = useCallback(async () => {
     if (!email) {
@@ -78,7 +80,9 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/pipeline?email=${encodeURIComponent(email)}&stats=true`);
+      const res = await fetch(`/api/pipeline?email=${encodeURIComponent(email)}&stats=true`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
 
       if (data.error) {
@@ -99,7 +103,7 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [email]);
+  }, [email, getAuthHeaders]);
 
   useEffect(() => {
     loadPipeline();
@@ -109,7 +113,9 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     if (!email) return;
 
     try {
-      const res = await fetch(`/api/teaming?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/teaming?email=${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
       if (!data.error) {
         setPartners(data.partners || []);
@@ -117,7 +123,7 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     } catch (err) {
       console.error('Failed to load partners:', err);
     }
-  }, [email]);
+  }, [email, getAuthHeaders]);
 
   useEffect(() => {
     loadPartners();
@@ -143,7 +149,7 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     try {
       const res = await fetch('/api/pipeline', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           id: selectedOpportunity.id,
           user_email: email,
@@ -183,7 +189,7 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     try {
       const res = await fetch('/api/pipeline', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           id: selectedOpportunity.id,
           user_email: email,
@@ -216,7 +222,7 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     try {
       const res = await fetch('/api/teaming', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
           partner_name: normalizedName,

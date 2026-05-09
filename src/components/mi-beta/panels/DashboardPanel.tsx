@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -58,11 +59,14 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedBriefing, setSelectedBriefing] = useState<Briefing | null>(null);
+  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadWorkspace = useCallback(async () => {
     if (!email) return;
     try {
-      const res = await fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
       if (data.success) {
         setWorkspace({
@@ -75,7 +79,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
     } catch (err) {
       console.error('Failed to load workspace summary:', err);
     }
-  }, [email]);
+  }, [email, getAuthHeaders]);
 
   const loadBriefings = useCallback(async () => {
     if (!email) return;

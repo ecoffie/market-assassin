@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -34,6 +35,29 @@ interface ContractSummary {
   urgentContracts: number;
 }
 
+interface RecompeteApiContract {
+  contract_id?: string | null;
+  award_id?: string | null;
+  piid?: string | null;
+  incumbent_name?: string | null;
+  incumbent_uei?: string | null;
+  awarding_agency?: string | null;
+  awarding_sub_agency?: string | null;
+  awarding_office?: string | null;
+  naics_code?: string | null;
+  naics_description?: string | null;
+  description?: string | null;
+  total_obligation?: number | null;
+  potential_total_value?: number | null;
+  period_of_performance_current_end?: string | null;
+  place_of_performance_city?: string | null;
+  place_of_performance_state?: string | null;
+  place_of_performance_zip?: string | null;
+  competition_type?: string | null;
+  number_of_offers?: number | null;
+  recompete_likelihood?: string | null;
+}
+
 function formatCurrency(value: number): string {
   if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -51,6 +75,60 @@ function formatDate(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+function getDaysUntil(dateStr?: string | null): number {
+  if (!dateStr) return 0;
+  const target = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getCompetitionLevel(contract: RecompeteApiContract): string {
+  const competitionType = (contract.competition_type || '').toLowerCase();
+  const offers = contract.number_of_offers || 0;
+
+  if (competitionType.includes('not competed') || competitionType.includes('sole source') || offers === 1) {
+    return 'sole_source';
+  }
+
+  if (offers > 1 && offers <= 3) {
+    return 'low';
+  }
+
+  return 'full';
+}
+
+function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract {
+  const expirationDate = contract.period_of_performance_current_end || '';
+  const piid = contract.piid || contract.award_id || contract.contract_id || '';
+  const incumbentName = contract.incumbent_name || 'Unknown incumbent';
+
+  return {
+    piid,
+    title: contract.description || contract.naics_description || `${incumbentName} recompete`,
+    incumbent: {
+      name: incumbentName,
+      uei: contract.incumbent_uei || '',
+    },
+    agency: contract.awarding_agency || 'Unknown agency',
+    subAgency: contract.awarding_sub_agency || contract.awarding_office || undefined,
+    naics: contract.naics_code || '',
+    value: contract.total_obligation || 0,
+    potentialValue: contract.potential_total_value || contract.total_obligation || 0,
+    expirationDate,
+    daysUntilExpiration: getDaysUntil(expirationDate),
+    bidsReceived: contract.number_of_offers || 0,
+    competitionLevel: getCompetitionLevel(contract),
+    competitionType: contract.competition_type || contract.recompete_likelihood || 'Recompete candidate',
+    location: {
+      city: contract.place_of_performance_city || undefined,
+      state: contract.place_of_performance_state || undefined,
+      zip: contract.place_of_performance_zip || undefined,
+    },
+  };
 }
 
 export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
@@ -105,15 +183,44 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       const params = new URLSearchParams();
       params.set('naics', naics);
       params.set('months', months);
-      if (competition) params.set('competition', competition);
-      params.set('limit', '50');
+      params.set('limit', '200');
+      params.set('sort', 'value');
+      params.set('order', 'desc');
 
-      const res = await fetch(`/api/contract-intel/expiring?${params.toString()}`);
+      const res = await fetch(`/api/recompete?${params.toString()}`, {
+        headers: getMIApiHeaders(email),
+      });
       const data = await res.json();
 
       if (data.success) {
-        setContracts(data.contracts || []);
-        setSummary(data.summary || null);
+        let mappedContracts: ExpiringContract[] = ((data.contracts || []) as RecompeteApiContract[])
+          .map(mapRecompeteContract);
+
+        if (competition === 'sole_source') {
+          mappedContracts = mappedContracts.filter(contract => contract.competitionLevel === 'sole_source');
+        } else if (competition === 'low') {
+          mappedContracts = mappedContracts.filter(contract =>
+            contract.competitionLevel === 'low' || contract.competitionLevel === 'sole_source'
+          );
+        }
+
+        const totalValue = mappedContracts.reduce((sum, contract) => sum + contract.value, 0);
+        const offersWithValues = mappedContracts.filter(contract => contract.bidsReceived > 0);
+        const avgBids = offersWithValues.length > 0
+          ? offersWithValues.reduce((sum, contract) => sum + contract.bidsReceived, 0) / offersWithValues.length
+          : 0;
+
+        setContracts(mappedContracts);
+        setSummary({
+          totalContracts: competition ? mappedContracts.length : (data.pagination?.total || mappedContracts.length),
+          totalValue,
+          avgBidsPerContract: Math.round(avgBids * 10) / 10,
+          soleSourceContracts: mappedContracts.filter(contract => contract.competitionLevel === 'sole_source').length,
+          lowCompetitionContracts: mappedContracts.filter(contract => contract.competitionLevel === 'low').length,
+          urgentContracts: mappedContracts.filter(contract =>
+            contract.daysUntilExpiration > 0 && contract.daysUntilExpiration <= 90
+          ).length,
+        });
       } else {
         setError(data.error || 'Failed to search contracts');
         setContracts([]);
@@ -126,7 +233,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       setSearching(false);
       setLoading(false);
     }
-  }, []);
+  }, [email]);
 
   const handleSearch = () => {
     searchContracts(naicsFilter, monthsFilter, competitionFilter);
@@ -170,7 +277,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Recompete Tracker</h1>
-        <p className="text-slate-400 mt-1">Find expiring contracts before your competition</p>
+        <p className="text-slate-400 mt-1">Search the live recompete database for expiring federal awards</p>
       </div>
 
       {/* Summary Cards */}
@@ -178,11 +285,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-white">{summary.totalContracts}</div>
-            <div className="text-xs text-slate-500">Total Contracts</div>
+            <div className="text-xs text-slate-500">Matching Awards</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-emerald-400">{formatCurrency(summary.totalValue)}</div>
-            <div className="text-xs text-slate-500">Total Value</div>
+            <div className="text-xs text-slate-500">Visible Value</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-green-400">{summary.soleSourceContracts}</div>
@@ -258,7 +365,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-800">
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-              {contracts.length} Expiring Contracts
+              {contracts.length} Expiring Awards
             </h3>
           </div>
           <div className="divide-y divide-slate-800">
@@ -334,11 +441,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 border border-amber-500/30 rounded-xl p-6 text-center">
           <div className="text-5xl mb-4">⏰</div>
           <p className="text-slate-300 mb-2">
-            <strong className="text-white">Find expiring contracts!</strong>
+            <strong className="text-white">No recompetes found for these filters</strong>
           </p>
           <p className="text-slate-400 text-sm mb-4">
-            Enter a NAICS code to discover contracts that are about to expire.
-            Position yourself early for the recompete.
+            Try a broader NAICS prefix, a longer expiration window, or all competition types.
           </p>
           <a
             href="/recompete"

@@ -979,7 +979,7 @@ export default function AdminDashboard() {
               <div>
                 <h2 className="text-xl font-semibold text-white">MI Growth & Engagement</h2>
                 <p className="text-sm text-gray-400">
-                  Separates audience inventory, onboarding progress, email engagement, and time spent in MI.
+                  Current user inventory is separated from 7-day movement, email clicks, and app time.
                 </p>
               </div>
               <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">
@@ -987,19 +987,23 @@ export default function AdminDashboard() {
               </span>
             </div>
 
+            <div className="mb-5 rounded-lg border border-blue-900/50 bg-blue-950/20 p-3 text-xs leading-5 text-blue-100/80">
+              Deltas compare the last {data.miGrowth.periodDays} days against the prior {data.miGrowth.periodDays} days, so they can go down even when total profiles go up. Inventory totals live in Audience Funnel.
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
               <div className="bg-gray-900/60 rounded-lg p-4">
-                <p className="text-gray-400 text-sm">New / Imported Users</p>
+                <p className="text-gray-400 text-sm">New or Imported Users</p>
                 <p className="text-3xl font-bold text-white">{data.miGrowth.acquisition.signups.current.toLocaleString()}</p>
                 <p className={`text-xs mt-1 ${trendClass(data.miGrowth.acquisition.signups)}`}>
                   {formatSignedDelta(data.miGrowth.acquisition.signups.delta)} vs prior {data.miGrowth.periodDays}d
                 </p>
               </div>
               <div className="bg-gray-900/60 rounded-lg p-4">
-                <p className="text-gray-400 text-sm">Profile Activity</p>
+                <p className="text-gray-400 text-sm">Profile Setups/Updates</p>
                 <p className="text-3xl font-bold text-green-400">{data.miGrowth.acquisition.profilesCompletedOrUpdated.current.toLocaleString()}</p>
                 <p className={`text-xs mt-1 ${trendClass(data.miGrowth.acquisition.profilesCompletedOrUpdated)}`}>
-                  completed/updated, {formatSignedDelta(data.miGrowth.acquisition.profilesCompletedOrUpdated.delta)} vs prior {data.miGrowth.periodDays}d
+                  activity window, {formatSignedDelta(data.miGrowth.acquisition.profilesCompletedOrUpdated.delta)} vs prior {data.miGrowth.periodDays}d
                 </p>
               </div>
               <div className="bg-gray-900/60 rounded-lg p-4">
@@ -1020,19 +1024,22 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               <div className="bg-gray-900/60 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-white mb-3">Audience Funnel</h3>
+                <h3 className="text-sm font-semibold text-white mb-1">Audience Funnel</h3>
+                <p className="mb-3 text-xs text-gray-500">Current inventory, not a 7-day trend.</p>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-gray-400">Total users</span><span className="font-mono text-white">{data.miGrowth.audience.totalUsers.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">Active alert audience</span><span className="font-mono text-white">{data.miGrowth.audience.activeAlerts.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">Custom profiles</span><span className="font-mono text-green-400">{data.miGrowth.audience.customProfiles.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Default/no profile</span><span className="font-mono text-yellow-300">{(data.miGrowth.audience.defaultProfilesOnly + data.miGrowth.audience.noProfile).toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Default profile only</span><span className="font-mono text-yellow-300">{data.miGrowth.audience.defaultProfilesOnly.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">No profile yet</span><span className="font-mono text-red-300">{data.miGrowth.audience.noProfile.toLocaleString()}</span></div>
                   <div className="flex justify-between pt-2 border-t border-gray-700"><span className="text-gray-400">Briefings eligible</span><span className="font-mono text-white">{data.miGrowth.audience.briefingsEligible.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Briefings need profile</span><span className="font-mono text-orange-300">{data.miGrowth.audience.briefingsProfileIncomplete.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Briefings blocked: need profile</span><span className="font-mono text-orange-300">{data.miGrowth.audience.briefingsProfileIncomplete.toLocaleString()}</span></div>
                 </div>
               </div>
 
               <div className="bg-gray-900/60 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-white mb-3">Email Engagement</h3>
+                <h3 className="text-sm font-semibold text-white mb-1">Email Click Tracking</h3>
+                <p className="text-xs text-gray-500 mb-3">Provider clicks from email links. These are not the same as saved feedback records.</p>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div><p className="text-gray-500">Sent</p><p className="font-mono text-white">{data.miGrowth.email.sent7d.toLocaleString()}</p></div>
                   <div><p className="text-gray-500">Delivered</p><p className="font-mono text-green-400">{data.miGrowth.email.delivered7d.toLocaleString()}</p></div>
@@ -1041,7 +1048,7 @@ export default function AdminDashboard() {
                 </div>
                 {data.miGrowth.email.topLinks.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-700">
-                    <p className="text-xs text-gray-500 mb-2">Top clicked links</p>
+                    <p className="text-xs text-gray-500 mb-2">Top clicked email links</p>
                     <div className="flex flex-wrap gap-2">
                       {data.miGrowth.email.topLinks.slice(0, 4).map(link => (
                         <span key={link.label} className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-200">
@@ -1232,7 +1239,7 @@ export default function AdminDashboard() {
                 <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-800 pt-3 text-sm">
                   <div className="flex justify-between"><span className="text-gray-300">Due soon</span><span className="font-mono text-yellow-300">{data.outcomeMetrics.winContracts.dueSoon}</span></div>
                   <div className="flex justify-between"><span className="text-gray-300">Pipeline value</span><span className="font-mono text-white">{formatCurrencyCompact(data.outcomeMetrics.winContracts.totalPipelineValue)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-300">Helpful rate</span><span className="font-mono text-white">{data.outcomeMetrics.experience.helpfulRate}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-300">Recorded helpful rate</span><span className="font-mono text-white">{data.outcomeMetrics.experience.helpfulRate}</span></div>
                   <div className="flex justify-between"><span className="text-gray-300">Zero-alert users</span><span className="font-mono text-yellow-300">{data.outcomeMetrics.experience.zeroAlertUsers7d}</span></div>
                 </div>
               </div>
@@ -1263,20 +1270,20 @@ export default function AdminDashboard() {
         <div className="bg-gray-800 rounded-lg p-6 mb-8">
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
-              <h2 className="text-xl font-semibold text-white">Email Launch Snapshot</h2>
-              <p className="text-sm text-gray-400">Email opens/clicks and alert audience inventory. This is not app time.</p>
+              <h2 className="text-xl font-semibold text-white">Legacy Email Snapshot</h2>
+              <p className="text-sm text-gray-400">Email-only launch activity from the older briefing dashboard. Use MI Growth above for the primary engagement read.</p>
             </div>
             <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">Last 7 days</span>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-900/60 rounded-lg p-4">
-              <p className="text-gray-400 text-sm">Engaged Users</p>
+              <p className="text-gray-400 text-sm">Email-Engaged Users</p>
               <p className="text-3xl font-bold text-white">{data.betaHealth.weeklyActiveUsers.toLocaleString()}</p>
               <p className="text-xs text-gray-500 mt-1">Opened or clicked</p>
             </div>
             <div className="bg-gray-900/60 rounded-lg p-4">
-              <p className="text-gray-400 text-sm">DAU / WAU</p>
+              <p className="text-gray-400 text-sm">Email DAU / WAU</p>
               <p className="text-3xl font-bold text-purple-300">{data.betaHealth.dauWauRatio}</p>
               <p className="text-xs text-gray-500 mt-1">{data.betaHealth.dailyActiveUsers} email-active today</p>
             </div>
@@ -1286,7 +1293,7 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-500 mt-1">{data.betaHealth.queueSize.toLocaleString()} queued</p>
             </div>
             <div className="bg-gray-900/60 rounded-lg p-4">
-              <p className="text-gray-400 text-sm">Profile Completion</p>
+              <p className="text-gray-400 text-sm">Profile Completion Snapshot</p>
               <p className="text-3xl font-bold text-green-400">{data.betaHealth.profileCompletionRate}</p>
               <p className="text-xs text-gray-500 mt-1">{data.betaHealth.activationRate7d} active in 7d</p>
             </div>
@@ -1341,8 +1348,8 @@ export default function AdminDashboard() {
           <div className="bg-gray-800 rounded-lg p-6">
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
-                <h2 className="text-lg font-semibold text-white">Resend Delivery Health</h2>
-                <p className="text-sm text-gray-400">Provider events captured from Resend webhooks.</p>
+                <h2 className="text-lg font-semibold text-white">Provider Delivery Health</h2>
+                <p className="text-sm text-gray-400">7-day email provider events. Link clicks here are raw engagement signals.</p>
               </div>
               <a href="/admin/emails" className="text-sm text-purple-300 hover:text-purple-200">Email History</a>
             </div>
@@ -1380,7 +1387,7 @@ export default function AdminDashboard() {
             </div>
             {data.providerEmailHealth.topLinks.length > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-700">
-                <p className="text-gray-400 text-sm mb-2">Top Clicks</p>
+                <p className="text-gray-400 text-sm mb-2">Top Provider Link Clicks</p>
                 <div className="flex flex-wrap gap-2">
                   {data.providerEmailHealth.topLinks.map((link) => (
                     <span key={link.label} className="px-2 py-1 bg-gray-700 rounded text-sm text-white">
@@ -1391,7 +1398,7 @@ export default function AdminDashboard() {
               </div>
             )}
             <p className="text-xs text-gray-500 mt-4">
-              Click rate is the decision metric. Opens can be inflated by Apple Mail Privacy Protection.
+              Use this for deliverability and CTA interest. Helpful/not-helpful totals are stored feedback records in Matching Quality.
             </p>
           </div>
 
@@ -1399,44 +1406,44 @@ export default function AdminDashboard() {
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-lg font-semibold text-white">Matching Quality</h2>
-                <p className="text-sm text-gray-400">Feedback and alert-volume risk signals.</p>
+                <p className="text-sm text-gray-400">Saved helpful/not-helpful feedback records plus alert-volume risk signals.</p>
               </div>
               <a href="/admin/feedback" className="text-sm text-purple-300 hover:text-purple-200">Feedback</a>
             </div>
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-gray-900/60 rounded p-3">
-                <p className="text-xs text-gray-400">Helpful Rate</p>
+                <p className="text-xs text-gray-400">Recorded Helpful Rate</p>
                 <p className={`text-2xl font-bold ${parseInt(data.matchingQuality.helpfulRate) >= 60 ? 'text-green-400' : 'text-red-400'}`}>
                   {data.matchingQuality.helpfulRate}
                 </p>
               </div>
               <div className="bg-gray-900/60 rounded p-3">
-                <p className="text-xs text-gray-400">Zero Alerts</p>
+                <p className="text-xs text-gray-400">Zero Alerts 7d</p>
                 <p className="text-2xl font-bold text-yellow-300">{data.matchingQuality.zeroAlertUsers7d}</p>
               </div>
               <div className="bg-gray-900/60 rounded p-3">
-                <p className="text-xs text-gray-400">30+ Alerts</p>
+                <p className="text-xs text-gray-400">30+ Alerts 7d</p>
                 <p className="text-2xl font-bold text-orange-300">{data.matchingQuality.highVolumeUsers7d}</p>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3 text-sm">
               <div>
-                <p className="text-gray-500">Total</p>
+                <p className="text-gray-500">Recorded total</p>
                 <p className="text-white font-mono">{data.matchingQuality.totalFeedback}</p>
               </div>
               <div>
-                <p className="text-gray-500">Helpful</p>
+                <p className="text-gray-500">Recorded helpful</p>
                 <p className="text-green-400 font-mono">{data.matchingQuality.helpful}</p>
               </div>
               <div>
-                <p className="text-gray-500">Not Helpful</p>
+                <p className="text-gray-500">Recorded not helpful</p>
                 <p className="text-red-400 font-mono">{data.matchingQuality.notHelpful}</p>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-3">
               {Object.entries(data.matchingQuality.byType).map(([type, stats]) => (
                 <div key={type} className="bg-gray-700/70 rounded p-3">
-                  <p className="text-white capitalize font-medium">{type}</p>
+                  <p className="text-white capitalize font-medium">{type} feedback</p>
                   <p className="text-sm text-gray-300 mt-1">
                     <span className="text-green-400">{stats.helpful}</span>
                     <span className="text-gray-500"> / </span>
@@ -1456,7 +1463,7 @@ export default function AdminDashboard() {
             <div className="flex justify-between items-start gap-4 mb-5">
               <div>
                 <h2 className="text-lg font-semibold text-white">Daily Alerts</h2>
-                <p className="mt-1 text-xs text-gray-500">Completed send window, not today-in-progress.</p>
+                <p className="mt-1 text-xs text-gray-500">Completed send date, not a cumulative total.</p>
               </div>
               <span className="shrink-0 text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
                 {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Yesterday'}
@@ -1464,7 +1471,7 @@ export default function AdminDashboard() {
             </div>
             <div className="mb-5">
               <p className="text-5xl font-bold text-green-400">{data.emailOperations.alerts.sent.toLocaleString()}</p>
-              <p className="mt-1 text-sm text-gray-400">emails sent to {alertAudience.toLocaleString()} active alert users</p>
+              <p className="mt-1 text-sm text-gray-400">emails sent on this completed date to {alertAudience.toLocaleString()} active alert users</p>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between">
@@ -1494,7 +1501,7 @@ export default function AdminDashboard() {
             <div className="flex justify-between items-start gap-4 mb-5">
               <div>
                 <h2 className="text-lg font-semibold text-white">Briefings</h2>
-                <p className="mt-1 text-xs text-gray-500">Paid briefing sends after entitlement, matching, and dedupe.</p>
+                <p className="mt-1 text-xs text-gray-500">Completed send date after entitlement, matching, and dedupe.</p>
               </div>
               <span className="shrink-0 text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
                 {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Yesterday'}
@@ -1502,7 +1509,7 @@ export default function AdminDashboard() {
             </div>
             <div className="mb-5">
               <p className="text-5xl font-bold text-purple-300">{data.emailOperations.briefings.sent.toLocaleString()}</p>
-              <p className="mt-1 text-sm text-gray-400">sent from {briefingAudience.toLocaleString()} currently eligible users</p>
+              <p className="mt-1 text-sm text-gray-400">sent on this completed date from {briefingAudience.toLocaleString()} currently eligible users</p>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between">
@@ -1562,7 +1569,7 @@ export default function AdminDashboard() {
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Enrolled in settings</span>
+                  <span className="text-gray-400">Imported into MI settings</span>
                   <span className="text-white font-mono">{data.bootcampRollout.totalBootcampUsers.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
@@ -1570,14 +1577,14 @@ export default function AdminDashboard() {
                   <span className="text-yellow-400 font-mono">{data.bootcampRollout.invitationsRemaining.toLocaleString()}</span>
                 </div>
                 <div className="pt-2 border-t border-gray-700 flex justify-between items-center">
-                  <span className="text-gray-400">Profiles completed</span>
+                  <span className="text-gray-400">Profiles completed from rollout</span>
                   <div className="flex items-center gap-2">
                     <span className="text-white font-mono">{data.bootcampRollout.profilesCompleted}</span>
                     <span className="text-gray-500 text-sm">({data.bootcampRollout.profileCompletionRate})</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Ready for Alerts</span>
+                  <span className="text-gray-400">Alert-ready after setup</span>
                   <div className="flex items-center gap-2">
                     <span className="text-emerald-400 font-mono">{data.bootcampRollout.readyForAlerts}</span>
                     <span className="text-gray-500 text-sm">({data.bootcampRollout.conversionRate})</span>
@@ -1600,10 +1607,11 @@ export default function AdminDashboard() {
 
           {/* User Health */}
           <div id="user-health" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">User Health</h2>
+            <h2 className="text-lg font-semibold text-white mb-1">User Inventory Health</h2>
+            <p className="mb-4 text-xs text-gray-500">Current account/settings inventory. These totals should not be compared directly to daily sends.</p>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-400">Total Users</span>
+                <span className="text-gray-400">Total user records</span>
                 <span className="text-white font-mono">{data.userHealth.totalUsers}</span>
               </div>
               {/* NAICS Breakdown */}
@@ -1656,31 +1664,31 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Daily Alerts Enabled</span>
+                <span className="text-gray-400">Alerts enabled total</span>
                 <span className="text-white font-mono">{data.userHealth.alertsEnabledTotal}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Alert Frequency: Daily</span>
+                <span className="text-gray-400">Configured daily alerts</span>
                 <span className="text-white font-mono">{data.userHealth.dailyFrequencyConfigured}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Alert Frequency: Weekly</span>
+                <span className="text-gray-400">Configured weekly alerts</span>
                 <span className="text-white font-mono">{data.userHealth.weeklyFrequencyConfigured}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Briefings Entitled</span>
+                <span className="text-gray-400">Paid briefings entitled</span>
                 <span className="text-white font-mono">{data.userHealth.briefingsEntitled}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Briefings Cron Eligible</span>
+                <span className="text-gray-400">Briefings delivery eligible</span>
                 <span className="text-white font-mono">{data.userHealth.briefingsCronEligible}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Briefings Flag Enabled</span>
+                <span className="text-gray-400">Briefings setting enabled</span>
                 <span className="text-white font-mono">{data.userHealth.briefingsEnabled}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Briefings Profile Incomplete</span>
+                <span className="text-gray-400">Briefings blocked: profile incomplete</span>
                 <span className="text-orange-300 font-mono">{data.userHealth.briefingsProfileIncomplete}</span>
               </div>
               <div className="flex justify-between">
@@ -1692,8 +1700,8 @@ export default function AdminDashboard() {
                 <span className="text-white font-mono">{data.userHealth.internalExcluded}</span>
               </div>
               <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
-                Briefings Cron Eligible is entitlement-gated and excludes internal, free, and expired users.
-                Actual sends also depend on fresh matches and daily deduplication.
+                Delivery eligible is entitlement-gated and excludes internal, free, and expired users.
+                Actual sends also depend on fresh matches and daily deduplication, so sends can differ from inventory.
               </p>
             </div>
           </div>

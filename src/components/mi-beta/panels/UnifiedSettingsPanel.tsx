@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
@@ -35,6 +36,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadSettings = useCallback(async () => {
     if (!email) return;
@@ -42,7 +44,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setError(null);
 
     try {
-      const res = await fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
       if (!data.success) {
         setError(data.error || 'Failed to load settings');
@@ -67,7 +71,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     } finally {
       setLoading(false);
     }
-  }, [email]);
+  }, [email, getAuthHeaders]);
 
   useEffect(() => {
     loadSettings();
@@ -82,7 +86,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     try {
       const res = await fetch('/api/mi-beta/workspace', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email,
           company_name: form.company_name,

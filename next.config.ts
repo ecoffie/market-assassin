@@ -21,6 +21,28 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'govcongiants.org',
+          },
+        ],
+        destination: 'https://www.govcongiants.com/:path*',
+        permanent: true,
+      },
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.govcongiants.org',
+          },
+        ],
+        destination: 'https://www.govcongiants.com/:path*',
+        permanent: true,
+      },
+      {
         source: '/opportunity-scout.html',
         destination: '/opportunity-hunter',
         permanent: true,
