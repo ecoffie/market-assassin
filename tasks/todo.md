@@ -1,5 +1,42 @@
 # GovCon Giants - Current Tasks
 
+## Session State (May 9, 2026)
+
+### 🔐 TODO: Classify and Harden Remaining API Routes
+
+**Status:** Next security pass
+
+After hardening `/api/pain-points`, the API auth audit still shows **67 candidate routes** that need review. Each route needs to be intentionally classified and either protected or documented as safe public access.
+
+**Audit command:**
+```bash
+npm run audit:api-auth
+```
+
+**Classification needed:**
+
+| Class | Meaning | Expected Protection |
+|-------|---------|---------------------|
+| Public | Safe marketing/demo/feed route | Explicit allowlist in audit script |
+| Token protected | Webhook, cron, or shared secret route | Secret/password/token validation |
+| Admin only | Internal operational route | Admin password/session gate |
+| MI user protected | Customer data or paid feature | MI auth session / entitlement check |
+
+**Security rule:** No API route should remain accidentally open. If it returns customer data, operational data, paid data, admin data, or writes to the database, it must require authorization.
+
+**Recent fix completed:**
+- `/api/pain-points` now requires MI auth session.
+- `scripts/audit-api-auth.js` added.
+- `npm run audit:api-auth` added to `package.json`.
+- Production verified with 401 response when unauthenticated.
+
+**Next actions:**
+- [ ] Run the audit and export the 67 candidate routes.
+- [ ] Group them by public/token/admin/MI user.
+- [ ] Harden the highest-risk routes first: write routes, admin routes, paid-data routes.
+- [ ] Add intentional public routes to the audit allowlist with comments.
+- [ ] Re-run `npm run audit:api-auth` until all remaining routes are classified.
+
 ## Session State (April 20, 2026)
 
 ### ✅ COMPLETED: Cron Bug Fixes (All 5 Bugs Fixed)

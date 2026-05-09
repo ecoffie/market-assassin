@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import ContractorSalesHistoryDrawer from '../contractors/ContractorSalesHistoryDrawer';
 
 interface ContractorsPanelProps {
   email: string | null;
@@ -50,6 +51,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [filteredCount, setFilteredCount] = useState(0);
+  const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
 
   // Search filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -298,7 +300,16 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
           {contractors.map((contractor, idx) => (
             <div
               key={`${contractor.company}-${idx}`}
-              className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-emerald-500/50 transition-colors"
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedContractor(contractor)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setSelectedContractor(contractor);
+                }
+              }}
+              className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-emerald-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
             >
               <div className="flex items-start justify-between gap-4">
                 {/* Company Info */}
@@ -345,6 +356,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     {contractor.email && contractor.email !== 'N/A' && (
                       <a
                         href={`mailto:${contractor.email}`}
+                        onClick={(event) => event.stopPropagation()}
                         className="text-blue-400 hover:text-blue-300"
                       >
                         ✉️ {contractor.email}
@@ -353,6 +365,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     {contractor.phone && contractor.phone !== 'N/A' && (
                       <a
                         href={`tel:${contractor.phone}`}
+                        onClick={(event) => event.stopPropagation()}
                         className="text-slate-400 hover:text-slate-300"
                       >
                         📞 {contractor.phone}
@@ -381,6 +394,9 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     {contractor.contract_count}
                   </div>
                   <div className="text-xs text-slate-500">Contracts</div>
+                  <div className="mt-3 text-xs font-medium text-emerald-400">
+                    View award history →
+                  </div>
                 </div>
               </div>
             </div>
@@ -483,6 +499,14 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
           </button>
         ))}
       </div>
+
+      {selectedContractor && (
+        <ContractorSalesHistoryDrawer
+          contractor={selectedContractor}
+          email={email}
+          onClose={() => setSelectedContractor(null)}
+        />
+      )}
     </div>
   );
 }
