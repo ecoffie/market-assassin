@@ -1086,9 +1086,9 @@ async function sendDailyAlertEmail(
     return trackingToken ? generateTrackedLink(trackingToken, urlWithUtm, label) : urlWithUtm;
   };
 
-  const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `https://mi.govcongiants.com/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const dailyBriefingsUrl = 'https://shop.govcongiants.org/market-intelligence';
+  const dailyBriefingsUrl = 'https://shop.govcongiants.com/market-intelligence';
   const totalCount = opportunities.length + grants.length;
 
   const opportunitiesHtml = opportunities.slice(0, 20).map((opp, i) => {
@@ -1258,10 +1258,10 @@ async function sendDailyAlertEmail(
       Was this alert helpful?
     </p>
     <div style="display: inline-block;">
-      <a href="${trackedUrl(`https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+      <a href="${trackedUrl(`https://mi.govcongiants.com/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
         👍 Yes
       </a>
-      <a href="${trackedUrl(`https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+      <a href="${trackedUrl(`https://mi.govcongiants.com/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
         👎 No
       </a>
     </div>
@@ -1290,7 +1290,7 @@ async function sendDailyAlertEmail(
       <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #475569; text-decoration: none;">Unsubscribe</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
-      © ${new Date().getFullYear()} GovCon Giants • tools.govcongiants.org
+      © ${new Date().getFullYear()} GovCon Giants • mi.govcongiants.com
     </p>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}

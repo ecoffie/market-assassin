@@ -93,7 +93,7 @@ function getStaffRole(email: string): MIStaffRole {
 
   if (
     domain === 'govcongiants.com'
-    || domain === 'govcongiants.org'
+    || domain === 'govcongiants.com'
     || configuredStaff.has(normalizedEmail)
   ) {
     return 'staff';

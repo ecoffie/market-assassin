@@ -437,7 +437,7 @@ export default function MarketScanner({ email, initialNaics = '', initialState =
               <OpportunitySource
                 source="Agency Forecasts"
                 count={result.whatIsAvailable.forecasts.count}
-                url="https://tools.govcongiants.org/forecasts"
+                url="https://mi.govcongiants.com/forecasts"
               />
             </div>
           </SectionCard>

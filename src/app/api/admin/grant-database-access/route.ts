@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     // Create database access token
     const dbToken = await createDatabaseToken(email, name || undefined);
-    const accessLink = `https://tools.govcongiants.org/api/database-access/${dbToken.token}`;
+    const accessLink = `https://mi.govcongiants.com/api/database-access/${dbToken.token}`;
 
     console.log(`🔑 Admin granted database access to ${email}, token: ${dbToken.token}`);
 

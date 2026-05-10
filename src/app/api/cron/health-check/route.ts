@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
-const BASE_URL = 'https://tools.govcongiants.org';
+const BASE_URL = 'https://mi.govcongiants.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
 // Lazy init Supabase
@@ -104,7 +104,7 @@ const tests = [
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: `healthcheck-${Date.now()}@test.govcongiants.org`,
+          email: `healthcheck-${Date.now()}@test.govcongiants.com`,
           naicsCodes: ['541511'],
           businessType: 'SDVOSB',
           source: 'free-signup',
@@ -268,7 +268,7 @@ const tests = [
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: `healthcheck-lead-${Date.now()}@test.govcongiants.org`,
+          email: `healthcheck-lead-${Date.now()}@test.govcongiants.com`,
           resourceId: 'ai-prompts', // Valid resource ID from FREE_RESOURCES
         }),
       });

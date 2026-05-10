@@ -314,7 +314,7 @@ export default function SharedOpportunityPage() {
       <footer className="border-t border-gray-800 mt-16">
         <div className="max-w-4xl mx-auto px-4 py-8 text-center">
           <p className="text-gray-500 text-sm">
-            Powered by <a href="https://govcongiants.org" className="text-purple-400 hover:text-purple-300">GovCon Giants</a>
+            Powered by <a href="https://govcongiants.com" className="text-purple-400 hover:text-purple-300">GovCon Giants</a>
           </p>
         </div>
       </footer>

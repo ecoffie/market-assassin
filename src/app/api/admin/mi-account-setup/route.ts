@@ -59,7 +59,7 @@ function normalizeEmail(value: string | null | undefined): string {
 
 function isInternalEmail(email: string): boolean {
   const domain = email.split('@')[1] || '';
-  return email === 'eric@govcongiants.com' || domain === 'govcongiants.com' || domain === 'govcongiants.org';
+  return email === 'eric@govcongiants.com' || domain === 'govcongiants.com' || domain === 'govcongiants.com';
 }
 
 function addCandidate(candidates: Map<string, Set<string>>, email: string, source: string) {

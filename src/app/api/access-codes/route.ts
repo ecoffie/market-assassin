@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       accessCode,
-      accessLink: `https://tools.govcongiants.org/access/${accessCode.code}`,
+      accessLink: `https://mi.govcongiants.com/access/${accessCode.code}`,
     });
   }
 

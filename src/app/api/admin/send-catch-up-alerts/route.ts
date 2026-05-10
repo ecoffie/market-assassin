@@ -237,8 +237,8 @@ function getDaysUntil(dateString: string): number {
 
 async function sendWelcomeOnlyEmail(email: string, user: AlertUser) {
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const unsubscribeUrl = `https://shop.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
-  const maUrl = 'https://tools.govcongiants.org/market-assassin';
+  const unsubscribeUrl = `https://shop.govcongiants.com/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const maUrl = 'https://mi.govcongiants.com/market-assassin';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -291,7 +291,7 @@ async function sendWelcomeOnlyEmail(email: string, user: AlertUser) {
       <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
-      &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.org
+      &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.com
     </p>
   </div>
 </body>
@@ -312,7 +312,7 @@ async function sendCatchUpEmail(
   user: AlertUser,
   totalAvailable: number
 ) {
-  const unsubscribeUrl = `https://shop.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `https://shop.govcongiants.com/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
 
   const opportunitiesHtml = opportunities.map((opp, i) => {
@@ -398,7 +398,7 @@ async function sendCatchUpEmail(
       <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
-      &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.org
+      &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.com
     </p>
   </div>
 </body>

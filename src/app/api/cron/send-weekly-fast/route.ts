@@ -469,7 +469,7 @@ function getSupabase() {
 }
 
 function generateWeeklyEmailHtml(briefing: WeeklyBriefing): string {
-  const preferencesUrl = 'https://tools.govcongiants.org/alerts/preferences';
+  const preferencesUrl = 'https://mi.govcongiants.com/alerts/preferences';
 
   return `
 <!DOCTYPE html>

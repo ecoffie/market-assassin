@@ -4,7 +4,7 @@
  * GET /api/admin/seed-alerts?password=...&mode=preview
  * GET /api/admin/seed-alerts?password=...&mode=execute
  *
- * Fetches all buyers from shop.govcongiants.org and creates
+ * Fetches all buyers from shop.govcongiants.com and creates
  * alert profiles for them so they receive weekly SAM alerts.
  */
 
@@ -48,7 +48,7 @@ const DEFAULT_NAICS_CODES = [
 
 async function fetchShopPurchases(): Promise<ShopPurchase[]> {
   try {
-    const res = await fetch('https://shop.govcongiants.org/api/admin/purchases-report?days=365', {
+    const res = await fetch('https://shop.govcongiants.com/api/admin/purchases-report?days=365', {
       headers: { 'x-admin-password': SHOP_ADMIN_PASSWORD },
     });
     if (!res.ok) return [];
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
   if (purchases.length === 0) {
     return NextResponse.json({
       error: 'Could not fetch purchases from shop',
-      hint: 'Check shop.govcongiants.org/api/admin/purchases-report',
+      hint: 'Check shop.govcongiants.com/api/admin/purchases-report',
     }, { status: 500 });
   }
 

@@ -232,7 +232,7 @@ export function logToolUse(
  * Insert before </body> in email templates
  */
 export function generateTrackingPixel(token: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://tools.govcongiants.org';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mi.govcongiants.com';
   return `<img src="${baseUrl}/api/track?t=${token}" width="1" height="1" style="display:none;width:1px;height:1px;border:0;" alt="" />`;
 }
 
@@ -241,7 +241,7 @@ export function generateTrackingPixel(token: string): string {
  * Wraps the destination URL with tracking redirect
  */
 export function generateTrackedLink(token: string, url: string, linkText?: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://tools.govcongiants.org';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mi.govcongiants.com';
   const encodedUrl = encodeURIComponent(url);
   const label = linkText ? `&l=${encodeURIComponent(linkText)}` : '';
   return `${baseUrl}/api/track?t=${token}&a=click&url=${encodedUrl}${label}`;

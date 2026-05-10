@@ -112,7 +112,7 @@ async function markInvitationsSent(supabase: ReturnType<typeof getSupabase>, ema
 }
 
 function generateEmailHtml(email: string) {
-  const setupUrl = `https://tools.govcongiants.org/alerts/signup?email=${encodeURIComponent(email)}`;
+  const setupUrl = `https://mi.govcongiants.com/alerts/signup?email=${encodeURIComponent(email)}`;
 
   return `
 <!DOCTYPE html>

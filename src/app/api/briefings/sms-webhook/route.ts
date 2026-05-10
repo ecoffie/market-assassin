@@ -14,7 +14,7 @@
  *
  * Configure in Twilio Console:
  *   Phone Numbers → your number → Messaging → "A message comes in"
- *   → Webhook: https://tools.govcongiants.org/api/briefings/sms-webhook (HTTP POST)
+ *   → Webhook: https://mi.govcongiants.com/api/briefings/sms-webhook (HTTP POST)
  */
 
 import { NextResponse } from 'next/server';
@@ -319,7 +319,7 @@ async function handleChat(parsed: ParsedMessage): Promise<WorkflowResult> {
   const hasAccess = await kv.get(`briefings:${email}`);
   if (!hasAccess) {
     return {
-      response: 'Your briefing access has expired. Visit shop.govcongiants.org to renew.',
+      response: 'Your briefing access has expired. Visit shop.govcongiants.com to renew.',
     };
   }
 

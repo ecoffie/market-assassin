@@ -24,7 +24,7 @@ function normalizeEmail(email: string) {
 function isInternalEmail(email: string) {
   const normalized = normalizeEmail(email);
   const domain = normalized.split('@')[1] || '';
-  return (domain === 'govcongiants.com' || domain === 'govcongiants.org') &&
+  return (domain === 'govcongiants.com' || domain === 'govcongiants.com') &&
     !normalized.includes('healthcheck') &&
     !normalized.includes('+shoptest');
 }
@@ -136,9 +136,9 @@ async function getInternalTargets(supabase: ReturnType<typeof getSupabase>) {
   const emails = new Set<string>();
 
   const [profiles, settings, classifications] = await Promise.all([
-    supabase.from('user_profiles').select('email').or('email.ilike.%@govcongiants.com,email.ilike.%@govcongiants.org').limit(500),
-    supabase.from('user_notification_settings').select('user_email').or('user_email.ilike.%@govcongiants.com,user_email.ilike.%@govcongiants.org').limit(500),
-    supabase.from('customer_classifications').select('email').or('email.ilike.%@govcongiants.com,email.ilike.%@govcongiants.org').limit(500),
+    supabase.from('user_profiles').select('email').or('email.ilike.%@govcongiants.com,email.ilike.%@govcongiants.com').limit(500),
+    supabase.from('user_notification_settings').select('user_email').or('user_email.ilike.%@govcongiants.com,user_email.ilike.%@govcongiants.com').limit(500),
+    supabase.from('customer_classifications').select('email').or('email.ilike.%@govcongiants.com,email.ilike.%@govcongiants.com').limit(500),
   ]);
 
   for (const row of profiles.data || []) if (row.email && isInternalEmail(row.email)) emails.add(normalizeEmail(row.email));

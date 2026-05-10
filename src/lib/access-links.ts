@@ -18,7 +18,7 @@ function normalizeEmail(email: string): string {
 }
 
 function buildAccessUrl(token: string): string {
-  return `${process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org'}/access?token=${encodeURIComponent(token)}`;
+  return `${process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com'}/access?token=${encodeURIComponent(token)}`;
 }
 
 function getTransporter() {

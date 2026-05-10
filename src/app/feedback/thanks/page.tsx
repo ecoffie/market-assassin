@@ -56,7 +56,7 @@ function ThankYouContent() {
             Update My Preferences
           </a>
           <a
-            href="https://govcongiants.org"
+            href="https://govcongiants.com"
             className="block w-full py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition"
           >
             Back to GovCon Giants

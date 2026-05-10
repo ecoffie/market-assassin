@@ -319,7 +319,7 @@ const DEFAULT_CHECKLIST: Omit<ChecklistItem, 'checked' | 'notes'>[] = [
   { id: 'fr-gate', section: 'Free Resources', description: 'Email capture modal appears before download' },
   { id: 'fr-download', section: 'Free Resources', description: 'At least one resource downloads successfully' },
   // Store
-  { id: 'store-redirect', section: 'Store', description: 'Redirects to shop.govcongiants.org', url: '/store' },
+  { id: 'store-redirect', section: 'Store', description: 'Redirects to shop.govcongiants.com', url: '/store' },
   // Activate
   { id: 'activate-page', section: 'Activate', description: 'Email lookup works, shows tool list', url: '/activate' },
   // Bundles

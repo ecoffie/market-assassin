@@ -137,7 +137,7 @@ export function generateSMSMessage(briefing: GeneratedBriefing): SMSMessage {
     body += `Top: ${headline}`;
   }
 
-  body += ' View: shop.govcongiants.org/briefings';
+  body += ' View: shop.govcongiants.com/briefings';
 
   const truncated = body.length > MAX_SMS_LENGTH;
 

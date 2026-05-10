@@ -2,6 +2,25 @@
 
 ## Session State (May 9, 2026)
 
+### TODO: MI Operating System - Skills and Agents
+
+**Status:** Started
+
+We are turning repeated founder/team workflows into reusable skills, tools, and agent specs so launch planning, dashboard alignment, customer outreach, and MI growth ops do not depend on one-off chat threads.
+
+**New specs:**
+- `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` - Top skills, tools/plugins, agents, missing MD sections, and build order.
+- `tasks/skills/dashboard-clarity-skill.md` - Repeatable dashboard review framework for action-oriented MI metrics.
+- `tasks/agents/mi-growth-ops-agent.md` - Daily/weekly growth ops agent spec for activation, engagement, outcomes, and next actions.
+
+**Next actions:**
+- [ ] Review the MI Operating System Roadmap and confirm the build order.
+- [ ] Review the Dashboard Clarity Skill with the current admin dashboard.
+- [ ] Review the MI Growth Ops Agent against available Supabase, Stripe, email, and app activity data.
+- [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
+- [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
+- [ ] Convert the MI Growth Ops Agent spec into an implementation PRD once the source-of-truth endpoint is agreed.
+
 ### 🔐 TODO: Classify and Harden Remaining API Routes
 
 **Status:** Next security pass

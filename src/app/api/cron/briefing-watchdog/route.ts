@@ -31,7 +31,7 @@ function getSupabase() {
 const ALERT_EMAIL = 'eric@govcongiants.com';
 const BASE_URL = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
-  : 'https://tools.govcongiants.org';
+  : 'https://mi.govcongiants.com';
 
 // Thresholds
 const FAILURE_RATE_WARNING = 0.05;  // 5%

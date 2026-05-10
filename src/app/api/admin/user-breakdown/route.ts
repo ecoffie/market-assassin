@@ -9,7 +9,7 @@
  * - user_briefing_profile (alert configs)
  * - user_alert_settings (MA Premium alerts)
  * - user_search_history (OH searches)
- * - purchases from SHOP database (shop.govcongiants.org)
+ * - purchases from SHOP database (shop.govcongiants.com)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -29,7 +29,7 @@ interface ShopPurchase {
 
 async function fetchShopPurchases(): Promise<ShopPurchase[]> {
   try {
-    const res = await fetch('https://shop.govcongiants.org/api/admin/purchases-report?days=365', {
+    const res = await fetch('https://shop.govcongiants.com/api/admin/purchases-report?days=365', {
       headers: { 'x-admin-password': SHOP_ADMIN_PASSWORD },
       next: { revalidate: 0 },
     });

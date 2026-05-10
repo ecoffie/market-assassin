@@ -72,7 +72,7 @@ const nextConfig: NextConfig = {
       // Redirect store to production shop site
       {
         source: '/store',
-        destination: 'https://shop.govcongiants.org',
+        destination: 'https://shop.govcongiants.com',
         permanent: false,
       },
     ];

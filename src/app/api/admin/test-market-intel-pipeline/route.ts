@@ -375,7 +375,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Trigger the appropriate test
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tools.govcongiants.org';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com';
   let testUrl = '';
 
   switch (component) {

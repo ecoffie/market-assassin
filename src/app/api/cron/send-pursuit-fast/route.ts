@@ -363,7 +363,7 @@ function getSupabase() {
 function generatePursuitEmailHtml(brief: PursuitBrief): string {
   const scoreColor = brief.opportunityScore >= 75 ? SUCCESS_COLOR : brief.opportunityScore >= 60 ? '#f59e0b' : '#ef4444';
   const scoreLabel = brief.opportunityScore >= 75 ? 'STRONG PURSUIT' : brief.opportunityScore >= 60 ? 'CONDITIONAL' : 'EVALUATE';
-  const preferencesUrl = 'https://tools.govcongiants.org/alerts/preferences';
+  const preferencesUrl = 'https://mi.govcongiants.com/alerts/preferences';
 
   return `
 <!DOCTYPE html>

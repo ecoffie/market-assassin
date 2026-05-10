@@ -287,11 +287,11 @@ export async function POST(request: NextRequest) {
       await sendOpportunityHunterProEmail({ to: email, customerName });
     } else if (tier === 'contractor_db') {
       // Federal Contractor Database
-      const accessLink = `https://tools.govcongiants.org/contractor-database?email=${encodeURIComponent(email)}`;
+      const accessLink = `https://mi.govcongiants.com/contractor-database?email=${encodeURIComponent(email)}`;
       await sendDatabaseAccessEmail({ to: email, customerName, accessLink });
     } else if (tier === 'assassin_standard' || tier === 'assassin_premium' || tier === 'assassin_premium_upgrade') {
       // Market Assassin - use access code email with tutorial
-      const accessLink = `https://tools.govcongiants.org/market-assassin?email=${encodeURIComponent(email)}`;
+      const accessLink = `https://mi.govcongiants.com/market-assassin?email=${encodeURIComponent(email)}`;
       await sendAccessCodeEmail({
         to: email,
         companyName: customerName,

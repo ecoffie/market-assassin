@@ -179,7 +179,7 @@ function generateInviteEmail(name: string): string {
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td align="center" style="padding: 20px 0;">
-              <a href="https://tools.govcongiants.org/alerts/preferences"
+              <a href="https://mi.govcongiants.com/alerts/preferences"
                  style="display: inline-block; background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); color: white; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                 Set Up My Alerts →
               </a>

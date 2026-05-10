@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   const noticeId = request.nextUrl.searchParams.get('noticeId');
   const dataParam = request.nextUrl.searchParams.get('data');
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://tools.govcongiants.org';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mi.govcongiants.com';
 
   // Validate required params
   if (!email || !noticeId) {

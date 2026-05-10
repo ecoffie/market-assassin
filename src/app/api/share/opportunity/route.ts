@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     if (existingShare) {
       // Return existing share link
-      const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org'}/shared/opp/${existingShare.share_id}`;
+      const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com'}/shared/opp/${existingShare.share_id}`;
       return NextResponse.json({
         success: true,
         shareUrl,
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org'}/shared/opp/${shareId}`;
+    const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com'}/shared/opp/${shareId}`;
 
     return NextResponse.json({
       success: true,

@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
                   </ul>
 
                   <div style="text-align: center; margin: 30px 0;">
-                    <a href="https://tools.govcongiants.org/briefings" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                    <a href="https://mi.govcongiants.com/briefings" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                       Update My Preferences
                     </a>
                   </div>

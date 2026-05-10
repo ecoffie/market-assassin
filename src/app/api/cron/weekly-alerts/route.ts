@@ -59,13 +59,13 @@ const PRO_TIER_PRODUCTS = [
 let buyerEmailsCache: Set<string> | null = null;
 
 /**
- * Fetch buyer emails from shop.govcongiants.org purchases
+ * Fetch buyer emails from shop.govcongiants.com purchases
  */
 async function fetchBuyerEmails(): Promise<Set<string>> {
   if (buyerEmailsCache) return buyerEmailsCache;
 
   try {
-    const res = await fetch('https://shop.govcongiants.org/api/admin/purchases-report?days=365', {
+    const res = await fetch('https://shop.govcongiants.com/api/admin/purchases-report?days=365', {
       headers: { 'x-admin-password': 'admin123' },
     });
     if (!res.ok) {
@@ -584,9 +584,9 @@ async function sendAlertEmail(
     return trackingToken ? generateTrackedLink(trackingToken, urlWithUtm, label) : urlWithUtm;
   };
 
-  const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.org'}/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.com'}/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const briefingsUpgradeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org'}/market-intelligence`;
+  const briefingsUpgradeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com'}/market-intelligence`;
   const ohProUpgradeUrl = 'https://buy.stripe.com/7sIaGqevYeIcdri147'; // OH Pro payment link
 
   const showUpgradeToOHPro = tier === 'free' && totalAvailable > 5;
@@ -681,10 +681,10 @@ async function sendAlertEmail(
         Was this weekly digest helpful?
       </p>
       <div>
-        <a href="${trackedUrl(`https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=weekly_digest`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+        <a href="${trackedUrl(`https://mi.govcongiants.com/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=weekly_digest`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
           👍 Yes
         </a>
-        <a href="${trackedUrl(`https://tools.govcongiants.org/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=weekly_digest`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+        <a href="${trackedUrl(`https://mi.govcongiants.com/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=weekly_digest`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
           👎 No
         </a>
       </div>
@@ -697,7 +697,7 @@ async function sendAlertEmail(
       <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
-      &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.org
+      &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.com
     </p>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}

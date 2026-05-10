@@ -442,7 +442,7 @@ export async function sendOpportunityHunterProEmail({
   to,
   customerName,
 }: SendOpportunityHunterProEmailParams): Promise<boolean> {
-  const accessLink = 'https://tools.govcongiants.org/opportunity-hunter';
+  const accessLink = 'https://mi.govcongiants.com/opportunity-hunter';
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
@@ -586,9 +586,9 @@ export async function sendFreeResourceEmail({
   resourceDescription,
   downloadUrl,
 }: SendFreeResourceEmailParams): Promise<boolean> {
-  const fullDownloadUrl = `https://shop.govcongiants.org${downloadUrl}`;
-  const freeResourcesUrl = 'https://shop.govcongiants.org/free-resources';
-  const storeUrl = 'https://shop.govcongiants.org/store';
+  const fullDownloadUrl = `https://shop.govcongiants.com${downloadUrl}`;
+  const freeResourcesUrl = 'https://shop.govcongiants.com/free-resources';
+  const storeUrl = 'https://shop.govcongiants.com/store';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -700,7 +700,7 @@ export async function sendLicenseKeyEmail({
   productName,
   accessLink,
 }: SendLicenseKeyEmailParams): Promise<boolean> {
-  const activateUrl = 'https://shop.govcongiants.org/activate';
+  const activateUrl = 'https://shop.govcongiants.com/activate';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -814,7 +814,7 @@ export async function sendContentReaperEmail({
   customerName,
   tier = 'standard',
 }: SendContentReaperEmailParams): Promise<boolean> {
-  const accessLink = 'https://tools.govcongiants.org/content-generator';
+  const accessLink = 'https://mi.govcongiants.com/content-generator';
   const isFullFix = tier === 'full_fix';
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
@@ -944,7 +944,7 @@ export async function sendRecompeteEmail({
   to,
   customerName,
 }: SendRecompeteEmailParams): Promise<boolean> {
-  const accessLink = 'https://tools.govcongiants.org/recompete';
+  const accessLink = 'https://mi.govcongiants.com/recompete';
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
@@ -1076,7 +1076,7 @@ export async function sendBundleEmail({
   customerName,
   bundle,
 }: SendBundleEmailParams): Promise<boolean> {
-  const activateUrl = 'https://shop.govcongiants.org/activate';
+  const activateUrl = 'https://shop.govcongiants.com/activate';
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   // Define what's in each bundle
@@ -1084,59 +1084,59 @@ export async function sendBundleEmail({
     'starter': {
       name: 'GovCon Starter Bundle',
       tools: [
-        { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
       ],
     },
     'govcon-starter-bundle': {
       name: 'GovCon Starter Bundle',
       tools: [
-        { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
       ],
     },
     'pro': {
       name: 'Pro Giant Bundle',
       tools: [
-        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Market Assassin Standard', link: 'https://tools.govcongiants.org/market-assassin', description: 'Strategic market intelligence reports' },
-        { name: 'Content Reaper', link: 'https://tools.govcongiants.org/content-generator', description: 'AI-powered LinkedIn content generator' },
-        { name: 'Market Intelligence - 1 Year Access', link: 'https://tools.govcongiants.org/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
+        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Standard', link: 'https://mi.govcongiants.com/market-assassin', description: 'Strategic market intelligence reports' },
+        { name: 'Content Reaper', link: 'https://mi.govcongiants.com/content-generator', description: 'AI-powered LinkedIn content generator' },
+        { name: 'Market Intelligence - 1 Year Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'pro-giant-bundle': {
       name: 'Pro Giant Bundle',
       tools: [
-        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Market Assassin Standard', link: 'https://tools.govcongiants.org/market-assassin', description: 'Strategic market intelligence reports' },
-        { name: 'Content Reaper', link: 'https://tools.govcongiants.org/content-generator', description: 'AI-powered LinkedIn content generator' },
-        { name: 'Market Intelligence - 1 Year Access', link: 'https://tools.govcongiants.org/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
+        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Standard', link: 'https://mi.govcongiants.com/market-assassin', description: 'Strategic market intelligence reports' },
+        { name: 'Content Reaper', link: 'https://mi.govcongiants.com/content-generator', description: 'AI-powered LinkedIn content generator' },
+        { name: 'Market Intelligence - 1 Year Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'ultimate': {
       name: 'Ultimate GovCon Bundle',
       tools: [
-        { name: 'Content Reaper Full Fix', link: 'https://tools.govcongiants.org/content-generator', description: 'Advanced AI content with quote graphics' },
-        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Market Assassin Premium', link: 'https://tools.govcongiants.org/market-assassin', description: 'All 8 strategic intelligence reports' },
-        { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Market Intelligence - Lifetime Access', link: 'https://tools.govcongiants.org/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
+        { name: 'Content Reaper Full Fix', link: 'https://mi.govcongiants.com/content-generator', description: 'Advanced AI content with quote graphics' },
+        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Premium', link: 'https://mi.govcongiants.com/market-assassin', description: 'All 8 strategic intelligence reports' },
+        { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Market Intelligence - Lifetime Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
     'ultimate-govcon-bundle': {
       name: 'Ultimate GovCon Bundle',
       tools: [
-        { name: 'Content Reaper Full Fix', link: 'https://tools.govcongiants.org/content-generator', description: 'Advanced AI content with quote graphics' },
-        { name: 'Federal Contractor Database', link: 'https://tools.govcongiants.org/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://tools.govcongiants.org/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Market Assassin Premium', link: 'https://tools.govcongiants.org/market-assassin', description: 'All 8 strategic intelligence reports' },
-        { name: 'Opportunity Hunter Pro', link: 'https://tools.govcongiants.org/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Market Intelligence - Lifetime Access', link: 'https://tools.govcongiants.org/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
+        { name: 'Content Reaper Full Fix', link: 'https://mi.govcongiants.com/content-generator', description: 'Advanced AI content with quote graphics' },
+        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Premium', link: 'https://mi.govcongiants.com/market-assassin', description: 'All 8 strategic intelligence reports' },
+        { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Market Intelligence - Lifetime Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
   };
@@ -1289,7 +1289,7 @@ export async function sendMarketIntelligenceWelcomeEmail({
         <p>Hi${customerName ? ` ${customerName}` : ''},</p>
         <p>Your GovCon Giants Market Intelligence purchase is active. Use your purchase email, <strong>${to}</strong>, to access your dashboard and briefings.</p>
         <p style="margin: 28px 0;">
-          <a href="https://tools.govcongiants.org/market-intelligence" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Market Intelligence</a>
+          <a href="https://mi.govcongiants.com/market-intelligence" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Market Intelligence</a>
         </p>
         <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 18px; margin: 24px 0;">
           <strong>Set up your briefing preferences</strong>
@@ -1306,7 +1306,7 @@ Hi${customerName ? ` ${customerName}` : ''},
 Your GovCon Giants Market Intelligence purchase is active.
 
 Access Market Intelligence:
-https://tools.govcongiants.org/market-intelligence
+https://mi.govcongiants.com/market-intelligence
 
 Set up briefing preferences:
 ${setupLink}
@@ -1328,7 +1328,7 @@ export async function sendFHCWelcomeEmail({
   customerName,
 }: SendFHCWelcomeEmailParams): Promise<boolean> {
   const fhcLink = 'https://federalhelpcenter.com';
-  const maLink = 'https://tools.govcongiants.org/market-assassin';
+  const maLink = 'https://mi.govcongiants.com/market-assassin';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -1454,7 +1454,7 @@ export async function sendAlertProWelcomeEmail({
   customerName,
 }: SendAlertProWelcomeEmailParams): Promise<boolean> {
   const preferencesLink = await createSecureAccessUrl(to, 'preferences');
-  const maLink = 'https://tools.govcongiants.org/market-assassin';
+  const maLink = 'https://mi.govcongiants.com/market-assassin';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -1508,7 +1508,7 @@ export async function sendAlertProWelcomeEmail({
       Questions? Reply to this email or contact <a href="mailto:service@govcongiants.com" style="color: #059669;">service@govcongiants.com</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
-      © ${new Date().getFullYear()} GovCon Giants • tools.govcongiants.org
+      © ${new Date().getFullYear()} GovCon Giants • mi.govcongiants.com
     </p>
   </div>
 </body>

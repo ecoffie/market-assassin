@@ -188,8 +188,8 @@ function generateFullHtmlBody(briefing: ContractorDBBriefing, dateStr: string): 
     <div class="footer">
       <p>
         <strong>GovCon Giants AI</strong><br>
-        <a href="https://tools.govcongiants.org/briefings/settings">Settings</a> •
-        <a href="https://tools.govcongiants.org/briefings/unsubscribe">Unsubscribe</a>
+        <a href="https://mi.govcongiants.com/briefings/settings">Settings</a> •
+        <a href="https://mi.govcongiants.com/briefings/unsubscribe">Unsubscribe</a>
       </p>
     </div>
   </div>
@@ -390,14 +390,14 @@ function generateCondensedHtmlBody(briefing: CondensedContractorDBBriefing, date
 
     <div class="cta-section">
       <p class="cta-text">Get full teaming analysis and all SBLO contacts</p>
-      <a href="https://tools.govcongiants.org/briefings" class="cta-button">View Full Briefing</a>
+      <a href="https://mi.govcongiants.com/briefings" class="cta-button">View Full Briefing</a>
     </div>
 
     <div class="footer">
       <p>
         <strong>GovCon Giants AI</strong><br>
-        <a href="https://tools.govcongiants.org/briefings/settings">Settings</a> •
-        <a href="https://tools.govcongiants.org/briefings/unsubscribe">Unsubscribe</a>
+        <a href="https://mi.govcongiants.com/briefings/settings">Settings</a> •
+        <a href="https://mi.govcongiants.com/briefings/unsubscribe">Unsubscribe</a>
       </p>
     </div>
   </div>
@@ -454,7 +454,7 @@ SBLO CONTACTS
 
   text += `---
 GovCon Giants AI
-Settings: https://tools.govcongiants.org/briefings/settings
+Settings: https://mi.govcongiants.com/briefings/settings
 `;
 
   return text;
@@ -479,7 +479,7 @@ ${briefing.teamingOppsCount} teaming opportunities, ${briefing.sbloUpdatesCount}
     text += `SIGNAL: ${briefing.topPartnershipSignal.headline}\n`;
   }
 
-  text += `\n---\nGovCon Giants AI\nhttps://tools.govcongiants.org/briefings\n`;
+  text += `\n---\nGovCon Giants AI\nhttps://mi.govcongiants.com/briefings\n`;
 
   return text;
 }

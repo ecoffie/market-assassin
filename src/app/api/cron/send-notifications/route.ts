@@ -198,7 +198,7 @@ async function sendAlertEmail(
   opportunities: (SAMOpportunity & { score: number })[]
 ): Promise<void> {
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const unsubscribeUrl = `https://tools.govcongiants.org/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `https://mi.govcongiants.com/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
 
   const opportunitiesHtml = opportunities.slice(0, 15).map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);

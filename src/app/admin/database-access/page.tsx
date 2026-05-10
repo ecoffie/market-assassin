@@ -82,7 +82,7 @@ export default function AdminDatabaseAccessPage() {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    email: 'admin@govcongiants.org',
+                    email: 'admin@govcongiants.com',
                     name: 'Admin',
                     adminPassword
                   }),

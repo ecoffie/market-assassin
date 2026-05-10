@@ -32,7 +32,7 @@ const QUOTES = [
 
 export async function sendWeeklyDigestEmail(data: WeeklyDigestData): Promise<boolean> {
   const quote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
-  const plannerUrl = 'https://tools.govcongiants.org/planner';
+  const plannerUrl = 'https://mi.govcongiants.com/planner';
 
   const streakText = data.currentStreak > 0
     ? `<span style="font-size: 32px; font-weight: bold; color: #1e40af;">${data.currentStreak}</span><br><span style="color: #6b7280; font-size: 14px;">day streak</span>`

@@ -15,13 +15,13 @@ export default function HomeRedesign() {
             <div className="hidden md:flex items-center gap-8">
               <a href="#programs" className="text-slate-400 hover:text-white transition text-sm font-medium">Programs</a>
               <a href="https://freegovconcourse.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition text-sm font-medium">Free Course</a>
-              <a href="https://govcongiants.org/opp" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition text-sm font-medium">Opportunity Hunter</a>
-              <a href="https://shop.govcongiants.org/free-resources" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition text-sm font-medium">Free Resources</a>
+              <a href="https://govcongiants.com/opp" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition text-sm font-medium">Opportunity Hunter</a>
+              <a href="https://shop.govcongiants.com/free-resources" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition text-sm font-medium">Free Resources</a>
             </div>
 
             <div className="flex items-center gap-3">
               <a
-                href="https://govcongiants.org/opp"
+                href="https://govcongiants.com/opp"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-semibold text-sm transition-all"
@@ -48,7 +48,7 @@ export default function HomeRedesign() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="https://govcongiants.org/surge"
+              href="https://govcongiants.com/surge"
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold text-lg transition-all"
@@ -56,7 +56,7 @@ export default function HomeRedesign() {
               Join January 31 Bootcamp
             </a>
             <a
-              href="https://govcongiants.org/opp"
+              href="https://govcongiants.com/opp"
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-full font-bold text-lg transition-all border border-slate-600"
@@ -117,7 +117,7 @@ export default function HomeRedesign() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* January 31 Bootcamp */}
             <a
-              href="https://govcongiants.org/surge"
+              href="https://govcongiants.com/surge"
               target="_blank"
               rel="noopener noreferrer"
               className="group bg-slate-800 border border-slate-700 rounded-2xl p-6 transition-all hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/10"
@@ -150,7 +150,7 @@ export default function HomeRedesign() {
 
             {/* Surge Bootcamp */}
             <a
-              href="https://govcongiants.org/bootcamp"
+              href="https://govcongiants.com/bootcamp"
               target="_blank"
               rel="noopener noreferrer"
               className="group bg-slate-800 border border-slate-700 rounded-2xl p-6 transition-all hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10"
@@ -216,7 +216,7 @@ export default function HomeRedesign() {
 
             {/* Opportunity Hunter */}
             <a
-              href="https://govcongiants.org/opp"
+              href="https://govcongiants.com/opp"
               target="_blank"
               rel="noopener noreferrer"
               className="group bg-slate-800 border border-slate-700 rounded-2xl p-6 transition-all hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/10"
@@ -249,7 +249,7 @@ export default function HomeRedesign() {
 
             {/* Free Resources */}
             <a
-              href="https://shop.govcongiants.org/free-resources"
+              href="https://shop.govcongiants.com/free-resources"
               target="_blank"
               rel="noopener noreferrer"
               className="group bg-slate-800 border border-slate-700 rounded-2xl p-6 transition-all hover:border-rose-500 hover:shadow-lg hover:shadow-rose-500/10"
@@ -294,7 +294,7 @@ export default function HomeRedesign() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="https://govcongiants.org/surge"
+              href="https://govcongiants.com/surge"
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-4 bg-white hover:bg-gray-100 text-emerald-800 rounded-full font-bold text-lg transition-all"
@@ -302,7 +302,7 @@ export default function HomeRedesign() {
               Join January 31 Bootcamp
             </a>
             <a
-              href="https://govcongiants.org/opp"
+              href="https://govcongiants.com/opp"
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-4 bg-emerald-700 hover:bg-emerald-600 text-white rounded-full font-bold text-lg transition-all border border-emerald-600"
@@ -329,22 +329,22 @@ export default function HomeRedesign() {
             <div>
               <h4 className="font-semibold text-white mb-4">Bootcamps</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="https://govcongiants.org/surge" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">January 31 Bootcamp</a></li>
-                <li><a href="https://govcongiants.org/bootcamp" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Surge Bootcamp</a></li>
+                <li><a href="https://govcongiants.com/surge" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">January 31 Bootcamp</a></li>
+                <li><a href="https://govcongiants.com/bootcamp" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Surge Bootcamp</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Resources</h4>
               <ul className="space-y-2 text-sm">
                 <li><a href="https://freegovconcourse.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Free GovCon Course</a></li>
-                <li><a href="https://govcongiants.org/opp" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Opportunity Hunter</a></li>
-                <li><a href="https://shop.govcongiants.org/free-resources" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Free Resources</a></li>
+                <li><a href="https://govcongiants.com/opp" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Opportunity Hunter</a></li>
+                <li><a href="https://shop.govcongiants.com/free-resources" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Free Resources</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Company</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="https://govcongiants.org" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Main Website</a></li>
+                <li><a href="https://govcongiants.com" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Main Website</a></li>
                 <li><a href="mailto:support@govcongiants.com" className="text-slate-400 hover:text-white transition">Contact</a></li>
               </ul>
             </div>

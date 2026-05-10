@@ -167,7 +167,7 @@ function normalizeArray(values: string[] | null | undefined): string[] {
 function isInternalBriefingRecipient(email: string): boolean {
   const domain = email.split('@')[1] || '';
   return domain === 'govcongiants.com'
-    || domain === 'govcongiants.org'
+    || domain === 'govcongiants.com'
     || INTERNAL_BRIEFING_EMAILS.has(email);
 }
 

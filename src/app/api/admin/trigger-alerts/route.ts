@@ -69,7 +69,7 @@ let buyerEmailsCache: Set<string> | null = null;
 async function fetchBuyerEmails(): Promise<Set<string>> {
   if (buyerEmailsCache) return buyerEmailsCache;
   try {
-    const res = await fetch('https://shop.govcongiants.org/api/admin/purchases-report?days=365', {
+    const res = await fetch('https://shop.govcongiants.com/api/admin/purchases-report?days=365', {
       headers: { 'x-admin-password': SHOP_ADMIN_PASSWORD },
     });
     if (!res.ok) return new Set();
@@ -287,7 +287,7 @@ async function sendAlertEmail(
   tier: string,
   totalAvailable: number
 ) {
-  const unsubscribeUrl = `https://tools.govcongiants.org/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `https://mi.govcongiants.com/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const ohProUpgradeUrl = 'https://buy.stripe.com/7sIaGqevYeIcdri147';
 
@@ -362,7 +362,7 @@ async function sendAlertEmail(
       <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
-      &copy; ${new Date().getFullYear()} GovCon Giants | tools.govcongiants.org
+      &copy; ${new Date().getFullYear()} GovCon Giants | mi.govcongiants.com
     </p>
   </div>
 </body>

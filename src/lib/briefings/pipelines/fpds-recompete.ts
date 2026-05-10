@@ -403,7 +403,7 @@ export async function fetchExpiringContractsFromLocal(
     naicsCodes = [],
     monthsToExpiration = 12,
     limit = 200,
-    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tools.govcongiants.org',
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com',
   } = params;
 
   console.log(`[Recompete-Local] Fetching from contracts-data.json for NAICS: ${naicsCodes.join(', ') || 'all'}`);

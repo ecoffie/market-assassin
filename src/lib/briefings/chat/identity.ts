@@ -47,7 +47,7 @@ export async function linkPhoneToEmail(
   if (!briefingAccess) {
     return {
       success: false,
-      error: 'This email does not have briefing access. Purchase a qualifying product at shop.govcongiants.org',
+      error: 'This email does not have briefing access. Purchase a qualifying product at shop.govcongiants.com',
     };
   }
 

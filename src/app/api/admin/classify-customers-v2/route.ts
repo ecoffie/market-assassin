@@ -220,12 +220,12 @@ function isContentEngine(tier: string | null) {
 
 function isGovConInternal(email: string) {
   const domain = email.split('@')[1] || '';
-  return domain === 'govcongiants.com' || domain === 'govcongiants.org';
+  return domain === 'govcongiants.com' || domain === 'govcongiants.com';
 }
 
 function isSystemTestEmail(email: string) {
   const domain = email.split('@')[1] || '';
-  return email.includes('healthcheck') || email.includes('test') || domain.endsWith('.govcongiants.org');
+  return email.includes('healthcheck') || email.includes('test') || domain.endsWith('.govcongiants.com');
 }
 
 function isExplicitCompAccount(email: string) {
