@@ -635,6 +635,127 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing, userEmail?: s
     return { label: 'Notice', cssClass: 'type-other' };
   };
 
+  const getBadgeStyle = (cssClass: string): string => {
+    const styles: Record<string, string> = {
+      'type-rfp': 'background:#dbeafe;color:#1e40af;',
+      'type-rfq': 'background:#fef3c7;color:#92400e;',
+      'type-sources': 'background:#d1fae5;color:#065f46;',
+      'type-presol': 'background:#f3e8ff;color:#6b21a8;',
+      'type-combined': 'background:#fce7f3;color:#9d174d;',
+      'type-other': 'background:#f3f4f6;color:#374151;',
+    };
+    return styles[cssClass] || styles['type-other'];
+  };
+
+  const getSatBadgeStyle = (level: string): string => {
+    if (level === 'high') return 'background:#dcfce7;color:#166534;';
+    if (level === 'moderate') return 'background:#fef9c3;color:#854d0e;';
+    return 'background:#f3f4f6;color:#374151;';
+  };
+
+  const renderBadge = (label: string, style: string): string => (
+    `<span style="display:inline-block;${style}font-size:12px;line-height:16px;font-weight:700;padding:4px 8px;border-radius:6px;margin:0 6px 6px 0;white-space:nowrap;">${escapeHtml(label)}</span>`
+  );
+
+  const renderMetaRow = (label: string, value: string): string => `
+    <tr>
+      <td style="width:120px;padding:4px 10px 4px 0;color:#6b7280;font-size:12px;line-height:18px;text-transform:uppercase;vertical-align:top;">${label}</td>
+      <td style="padding:4px 0;color:#111827;font-size:14px;line-height:20px;font-weight:700;vertical-align:top;">${escapeHtml(value)}</td>
+    </tr>
+  `;
+
+  const renderButton = (href: string, label: string, background: string, width = 160): string => `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;margin:0 8px 8px 0;">
+      <tr>
+        <td bgcolor="${background}" style="background:${background};border-radius:8px;text-align:center;">
+          <a href="${href}" target="_blank" style="display:inline-block;width:${width}px;padding:12px 0;color:#ffffff !important;text-decoration:none !important;font-size:14px;line-height:18px;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+            <span style="color:#ffffff !important;text-decoration:none !important;">${label}</span>
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  const renderOpportunityCard = (opp: SamDailyOpportunity): string => {
+    const oppTypeInfo = getNoticeTypeInfo(opp.noticeType);
+    const satInfo = getSatBadgeForAgency(opp.agency);
+    const muteHref = `https://mi.govcongiants.com/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}`;
+    const badges = [
+      renderBadge(oppTypeInfo.label, getBadgeStyle(oppTypeInfo.cssClass)),
+      satInfo.badge ? renderBadge(satInfo.badge, getSatBadgeStyle(satInfo.level)) : '',
+      renderBadge(getUrgencyLabel(opp.daysRemaining), `background:${getUrgencyColor(opp.daysRemaining)};color:#ffffff;`),
+    ].join('');
+
+    return `
+      <div class="opp-card">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="width:36px;vertical-align:top;padding:0 10px 10px 0;">
+              <div style="width:30px;height:30px;border-radius:18px;background:#059669;color:#ffffff;text-align:center;font-size:14px;line-height:30px;font-weight:700;">${opp.rank}</div>
+            </td>
+            <td style="vertical-align:top;padding:0 0 10px 0;">
+              <h3 style="font-size:18px;line-height:24px;font-weight:800;color:#111827;margin:0 0 10px 0;">${escapeHtml(opp.title)}</h3>
+              <div style="line-height:22px;">${badges}</div>
+            </td>
+          </tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 12px 0;">
+          ${renderMetaRow('Agency', opp.agency)}
+          ${renderMetaRow('Posted', opp.postedDate)}
+          ${renderMetaRow('Response Due', opp.responseDeadline)}
+          ${renderMetaRow('NAICS', opp.naicsCode)}
+          ${renderMetaRow('Set-Aside', opp.setAside || 'Full & Open')}
+        </table>
+
+        <div class="assessment-box">
+          <div class="assessment-label">Quick Win Assessment</div>
+          <p class="assessment-text">${escapeHtml(opp.quickWinAssessment)}</p>
+        </div>
+
+        <div style="margin-top:14px;">
+          ${renderButton(opp.samLink, 'View on SAM.gov ->', '#059669', 180)}
+          ${userEmail ? renderButton(muteHref, 'Not Interested', '#475569', 150) : ''}
+        </div>
+      </div>
+    `;
+  };
+
+  const renderDeadlineItem = (d: SamDailyBriefing['deadlinesThisWeek'][number]): string => {
+    const typeInfo = getNoticeTypeInfo(d.noticeType);
+    const satInfo = getSatBadgeForAgency(d.agency);
+    const muteHref = `https://mi.govcongiants.com/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(d.fullTitle)}&notice_id=${encodeURIComponent(d.noticeId)}`;
+    const daysLabel = d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : `${d.daysRemaining} days`;
+    const badges = [
+      renderBadge(typeInfo.label, getBadgeStyle(typeInfo.cssClass)),
+      satInfo.badge ? renderBadge(satInfo.badge, getSatBadgeStyle(satInfo.level)) : '',
+    ].join('');
+
+    return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom:1px dashed #fcd34d;">
+        <tr>
+          <td style="padding:14px 0 8px 0;color:#78350f;font-size:16px;line-height:22px;font-weight:700;">
+            ${escapeHtml(d.title)}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 0 8px 0;line-height:22px;">
+            ${badges}
+            <span style="display:inline-block;background:${getUrgencyColor(d.daysRemaining)};color:#ffffff;font-size:13px;line-height:18px;font-weight:800;padding:6px 10px;border-radius:7px;margin:0 6px 6px 0;white-space:nowrap;">${daysLabel}</span>
+          </td>
+        </tr>
+        ${userEmail ? `
+        <tr>
+          <td style="padding:0 0 14px 0;">
+            ${renderButton(d.samLink, 'View ->', '#059669', 96)}
+            ${renderButton(muteHref, 'Not Interested', '#475569', 132)}
+          </td>
+        </tr>
+        ` : ''}
+      </table>
+    `;
+  };
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -735,79 +856,14 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing, userEmail?: s
       <div class="section-header">
         <h2>🎯 TOP ${briefing.opportunities.length} OPPORTUNITIES TO BID</h2>
       </div>
-      ${briefing.opportunities.map(opp => {
-        const oppTypeInfo = getNoticeTypeInfo(opp.noticeType);
-        const satInfo = getSatBadgeForAgency(opp.agency);
-        const satBadgeHtml = satInfo.badge ? `<span class="sat-badge sat-${satInfo.level}">${satInfo.badge}</span>` : '';
-        return `
-        <div class="opp-card">
-          <div class="opp-header">
-            <div style="display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px;">
-              <span class="opp-rank">${opp.rank}</span>
-              <h3 class="opp-title">${escapeHtml(opp.title)}</h3>
-              <span class="opp-type-badge ${oppTypeInfo.cssClass}">${oppTypeInfo.label}</span>${satBadgeHtml}
-            </div>
-            <span class="urgency-badge" style="background: ${getUrgencyColor(opp.daysRemaining)};">${getUrgencyLabel(opp.daysRemaining)}</span>
-          </div>
-          <div class="opp-meta">
-            <div class="opp-meta-item">
-              <span class="opp-meta-label">Agency</span>
-              <span class="opp-meta-value">${escapeHtml(opp.agency)}</span>
-            </div>
-            <div class="opp-meta-item">
-              <span class="opp-meta-label">Posted</span>
-              <span class="opp-meta-value">${escapeHtml(opp.postedDate)}</span>
-            </div>
-            <div class="opp-meta-item">
-              <span class="opp-meta-label">Response Due</span>
-              <span class="opp-meta-value">${escapeHtml(opp.responseDeadline)}</span>
-            </div>
-            <div class="opp-meta-item">
-              <span class="opp-meta-label">NAICS</span>
-              <span class="opp-meta-value">${escapeHtml(opp.naicsCode)}</span>
-            </div>
-            <div class="opp-meta-item">
-              <span class="opp-meta-label">Set-Aside</span>
-              <span class="opp-meta-value">${escapeHtml(opp.setAside || 'Full & Open')}</span>
-            </div>
-          </div>
-          <div class="assessment-box">
-            <div class="assessment-label">Quick Win Assessment</div>
-            <p class="assessment-text">${escapeHtml(opp.quickWinAssessment)}</p>
-          </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;">
-            <a href="${opp.samLink}" class="sam-link" target="_blank" style="margin-top: 0;">View on SAM.gov →</a>
-            ${userEmail ? `
-            <a href="https://mi.govcongiants.com/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}" style="display: inline-block; background: #475569; color: white; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;">🔇 Not Interested</a>
-            ` : ''}
-          </div>
-        </div>
-      `}).join('')}
+      ${briefing.opportunities.map(renderOpportunityCard).join('')}
     </div>
 
     ${briefing.deadlinesThisWeek.length > 0 ? `
     <div class="section" style="padding-top: 0;">
       <div class="deadline-section">
         <h3 class="deadline-header">⏰ DEADLINES THIS WEEK</h3>
-        ${briefing.deadlinesThisWeek.map(d => {
-          const typeInfo = getNoticeTypeInfo(d.noticeType);
-          const deadlineSatInfo = getSatBadgeForAgency(d.agency);
-          const deadlineSatBadgeHtml = deadlineSatInfo.badge ? `<span class="sat-badge sat-${deadlineSatInfo.level}" style="font-size: 9px; padding: 2px 5px;">${deadlineSatInfo.badge}</span>` : '';
-          const deadlineMuteUrl = userEmail ? `https://mi.govcongiants.com/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(d.fullTitle)}&notice_id=${encodeURIComponent(d.noticeId)}` : '';
-          return `
-          <div class="deadline-item" style="flex-direction: column; align-items: flex-start;">
-            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-              <span class="deadline-title">${escapeHtml(d.title)}<span class="deadline-type ${typeInfo.cssClass}">${typeInfo.label}</span>${deadlineSatBadgeHtml}</span>
-              <span class="deadline-days" style="background: ${getUrgencyColor(d.daysRemaining)};">${d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : d.daysRemaining + ' days'}</span>
-            </div>
-            ${userEmail ? `
-            <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
-              <a href="${d.samLink}" style="display: inline-block; background: #059669; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-decoration: none;">View →</a>
-              <a href="${deadlineMuteUrl}" style="display: inline-block; background: #475569; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-decoration: none;">🔇</a>
-            </div>
-            ` : ''}
-          </div>
-        `}).join('')}
+        ${briefing.deadlinesThisWeek.map(renderDeadlineItem).join('')}
       </div>
     </div>
     ` : ''}
