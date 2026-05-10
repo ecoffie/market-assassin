@@ -1,0 +1,130 @@
+# MI Team Alignment Brief
+
+**Date:** May 9, 2026  
+**Audience:** GovCon Giants team  
+**Purpose:** Align the team around the Market Intelligence pivot, customer-first outreach, and the next operating priorities.
+
+## Slack Version
+
+**Headline:** GovCon Giants is now operating around Market Intelligence as the core product, not training as the main offer.
+
+**What changed:**  
+We are moving from trying to teach everyone everything to helping serious small businesses find, evaluate, pursue, and win federal contracts through MI.
+
+**What this means:**  
+Training still matters, but it supports onboarding, retention, and customer success. MI is the product. White-glove is the execution path for committed clients.
+
+**Who we prioritize now:**  
+Customers and users first. Advisory relationships second. We are watching behavior: purchases, profile completion, custom NAICS, briefing opens/clicks, MI usage, replies, calls booked, pipeline activity, and serious execution pain.
+
+**Operating rule:**  
+Do not spend heavy human time trying to persuade disengaged free users. Free users are audience until behavior shows intent. Paid, active, responsive, and profile-complete users get team attention.
+
+**Annelle / Sikander:**  
+Use the qualified customer outreach list and prioritize A1/A2 customers first. The goal is not to pitch immediately. The goal is to learn what customers value, what blocks them, and what would make MI worth using every week.
+
+**Engineering / Product:**  
+Keep aligning dashboards and features around actionable questions:
+- Are users signing up?
+- Are they completing profiles?
+- Are they using MI?
+- Where are they spending time?
+- Are alerts and briefings helping them act?
+- Are they saving opportunities, building pipeline, finding partners, starting proposals, or reporting wins?
+
+**Dashboard rule:**  
+Every metric needs an owner and action. If a number does not help us decide what to do next, it should be renamed, moved, or removed.
+
+**Offer rule:**  
+Use these labels consistently:
+- MI Free = basic opportunity alerts and profile setup
+- MI Pro = paid intelligence, briefings, forecasts, recompetes, contractors, pipeline, teaming, and proposal workflows
+- MI Internal = team/admin access only
+- White-glove = execution support for committed clients
+
+**Immediate actions this week:**
+
+| Owner | Action | Due |
+| --- | --- | --- |
+| Annelle | Start A1/A2 customer outreach from the ranked list | This week |
+| Sikander | Track replies, calls, objections, and feature requests | This week |
+| Eric | Call top 10-10 Forever candidates | This week |
+| Product/Engineering | Continue dashboard and API alignment around action metrics | This sprint |
+| Team | Use MI Free / MI Pro / MI Internal language consistently | Starting now |
+
+**Metrics we are watching:**
+- New/imported users
+- Profiles completed
+- MI active users
+- Time in MI
+- Briefing and alert engagement
+- Helpful/not helpful feedback
+- Pipeline adds
+- Teaming adds
+- Upgrade candidates
+- White-glove candidates
+
+**Next update:**  
+The next team update should summarize customer outreach results: who responded, what they value, what confused them, who wants help, and what product changes would increase weekly MI usage.
+
+## Full Memo
+
+### Story So Far
+
+GovCon Giants has been operating with many product names, training offers, tools, dashboards, and customer segments. The result is confusion for customers and for the team.
+
+The strategic direction is now clearer:
+
+- Market Intelligence is the unified product.
+- MI Free is the entry point.
+- MI Pro is the paid self-serve platform.
+- White-glove is for committed customers who need execution support.
+- Team and enterprise features matter because serious customers do not work alone.
+
+The 9K free audience matters, but it is not where our highest human attention goes. The best customers identify themselves through action.
+
+### Current Issue
+
+We need every launch plan, memo, dashboard, email, and customer conversation to reinforce the same operating model.
+
+If the team uses different names, different metrics, or different definitions of success, we will keep creating confusion.
+
+### Recommendation
+
+Use a customer-first operating system:
+
+1. Identify committed users from behavior.
+2. Help them activate and use MI.
+3. Learn what would make MI valuable weekly.
+4. Improve the product around the actions that help them find and win contracts.
+5. Invite the strongest customers into deeper relationships, proof stories, team accounts, or white-glove.
+
+### Risks
+
+- If dashboards stay confusing, the team will make bad decisions from mismatched numbers.
+- If MI Free and MI Pro overlap too much, paid users may get redundant emails.
+- If old product names stay in emails and pages, customers will not understand what they bought.
+- If we chase inactive users too hard, we waste the team’s highest-value time.
+
+### Team Actions
+
+| Area | Action |
+| --- | --- |
+| Customer Outreach | Prioritize qualified buyers and active users before advisory conversations |
+| Product | Keep feature work tied to finding, deciding, tracking, teaming, proposing, and winning |
+| Dashboards | Separate inventory, entitlement, delivery, engagement, and outcomes |
+| Emails | Use Market Intelligence branding and correct tier language |
+| Website | Position MI around outcomes, not training or disconnected tools |
+| Security | No API route should be accidentally open |
+
+### Open Questions
+
+- Which Slack channel should receive the weekly MI Growth Ops brief?
+- Which customer actions count as “ready for white-glove”?
+- Which public contractor data should be shown for SEO before gating?
+- What should the first Deal Flow Board version include?
+
+### Decision Owner
+
+Eric owns the strategic direction. Product/engineering owns implementation clarity. Annelle/Sikander own the first customer learning loop.
+
