@@ -23,11 +23,14 @@ Do not spend heavy human time trying to persuade disengaged free users. Free use
 **Annelle / Sikander:**  
 Use the qualified customer outreach list and prioritize A1/A2 customers first. The goal is not to pitch immediately. The goal is to learn what customers value, what blocks them, and what would make MI worth using every week.
 
-**Ryan / Zach / Randie:**
+**Ryan / Zach / Randie / Tavin:**
 You are part of the 10x MI strategy, not just training support. Your role is to capture customer-success signals, ask the two validation questions during relevant calls/lives, surface partner and enterprise leads, identify proof stories, and flag users who may need MI setup, team access, or white-glove support.
 
-**Tavin / Branden / Kash / Usama / Muneeba:**
-You are part of the MI growth system. Tavin and Branden help coordinate launch assets, content QA, publishing readiness, and campaign execution. Kash owns YouTube. Usama owns Instagram. Muneeba owns LinkedIn. Social content should be tracked by the business signal it creates: MI signups, profile completions, replies, booked calls, partner leads, proof stories, and white-glove candidates.
+**Branden:**
+You own package presentation and enterprise selling follow-through. When a qualified buyer needs MI Pro, a team plan, an enterprise package, a bundle, or white-glove, your job is to present the right path, capture objections, track next steps, and escalate strategic/high-ticket conversations to Eric with clean context.
+
+**Kash / Usama / Muneeba:**
+You are part of the MI growth system. Kash owns YouTube. Usama owns Instagram. Muneeba owns LinkedIn. Social content should be tracked by the business signal it creates: MI signups, profile completions, replies, booked calls, partner leads, proof stories, and white-glove candidates.
 
 **Engineering / Product:**  
 Keep aligning dashboards and features around actionable questions:
@@ -57,8 +60,8 @@ Use these labels consistently:
 | Ryan | Capture coach/customer-success signals and partner leads | This week |
 | Zach | Capture coach/customer-success signals and partner leads | This week |
 | Randie | Capture coach/customer-success signals and partner leads | This week |
-| Tavin | Coordinate MI launch content assets and publishing readiness | This week |
-| Branden | Support content QA, links, assets, and launch distribution tasks | This week |
+| Tavin | Capture coach/customer-success signals and partner leads | This week |
+| Branden | Present packages and track enterprise/team/white-glove follow-up | This week |
 | Kash | Track YouTube posts/clips, links, engagement, and MI signups | This week |
 | Usama | Track Instagram posts/reels/stories, DMs, links, and MI signups | This week |
 | Muneeba | Track LinkedIn posts/comments, replies, links, and MI signups | This week |
@@ -83,7 +86,7 @@ Use these labels consistently:
 The next team update should summarize customer outreach results: who responded, what they value, what confused them, who wants help, and what product changes would increase weekly MI usage.
 
 **Internal system direction:**
-We should move toward one private MI Launch Command Center link for Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering. The command center should replace manual CSV/email/Slack handoffs and become the source of truth for outreach, coach activity, content/social activity, notes, tags, and next actions.
+We should move toward one private MI Launch Command Center link for Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering. The command center should replace manual CSV/email/Slack handoffs and become the source of truth for outreach, coach activity, enterprise/package sales activity, content/social activity, notes, tags, and next actions.
 
 ## Full Memo
 
@@ -131,8 +134,9 @@ Use a customer-first operating system:
 | Area | Action |
 | --- | --- |
 | Customer Outreach | Prioritize qualified buyers and active users before advisory conversations |
-| Coaches | Capture validation, customer-success, partner, and enterprise signals in one shared system |
-| Content/Social | Track YouTube, Instagram, LinkedIn, and launch assets by business outcome, not just views |
+| Coaches | Ryan, Zach, Randie, and Tavin capture validation, customer-success, partner, and enterprise signals in one shared system |
+| Enterprise Sales | Branden presents packages and tracks team/enterprise/white-glove follow-up |
+| Content/Social | Kash, Usama, and Muneeba track YouTube, Instagram, and LinkedIn by business outcome, not just views |
 | Product | Keep feature work tied to finding, deciding, tracking, teaming, proposing, and winning |
 | Dashboards | Separate inventory, entitlement, delivery, engagement, and outcomes |
 | Emails | Use Market Intelligence branding and correct tier language |

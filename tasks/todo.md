@@ -33,7 +33,7 @@ We are turning repeated founder/team workflows into reusable skills, tools, and 
 - [ ] Use the PRD Builder Skill on the contractor sales history chart and Deal Flow Board before expanding implementation.
 - [ ] Use the GovCon Offer Reframing Skill to clean up MI website, auth emails, onboarding, and dashboard labels.
 - [x] Use the Team Alignment Brief Skill to convert the MI pivot and customer-first outreach into one team-ready Slack memo.
-- [ ] Build the MI Internal Launch Command Center so outreach, coach activity, content/social activity, notes, tags, and team memos live behind one private link.
+- [ ] Build the MI Internal Launch Command Center so outreach, coach activity, enterprise/package sales activity, content/social activity, notes, tags, and team memos live behind one private link.
 - [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
 - [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
 - [ ] Convert the MI Growth Ops Agent spec into an implementation PRD once the source-of-truth endpoint is agreed.

@@ -41,8 +41,8 @@ This is an internal product for:
 | Ryan | Capture coach/live/customer-success signals and partner opportunities |
 | Zach | Capture coach/live/customer-success signals and partner opportunities |
 | Randie | Capture coach/live/customer-success signals and partner opportunities |
-| Tavin | Coordinate content operations, launch assets, and campaign execution |
-| Branden | Support content operations, asset QA, and launch distribution tasks |
+| Tavin | Capture coach/live/customer-success signals and partner opportunities |
+| Branden | Present packages, support enterprise selling, and escalate white-glove/team opportunities |
 | Kash | Own YouTube distribution, clips, descriptions, links, and engagement signals |
 | Usama | Own Instagram distribution, reels/stories/posts, links, and engagement signals |
 | Muneeba | Own LinkedIn distribution, posts, comments, lead signals, and engagement signals |
@@ -83,7 +83,7 @@ The team’s operating model should be:
 
 > Customers and users first. Advisory second. Coaches help identify, activate, retain, and scale committed users.
 
-Ryan, Zach, and Randie should not be limited to old weekly training roles. They should be included in the 10x strategy as:
+Ryan, Zach, Randie, and Tavin should not be limited to old weekly training roles. They should be included in the 10x strategy as:
 
 - Customer success signal collectors
 - MI activation helpers
@@ -92,9 +92,15 @@ Ryan, Zach, and Randie should not be limited to old weekly training roles. They 
 - Team/enterprise opportunity spotters
 - Proof-story and white-glove referral sources
 
-Tavin, Branden, Kash, Usama, and Muneeba should be included in the 10x strategy as the content/distribution system:
+Branden should be included in the 10x strategy as the package and enterprise sales owner:
 
-- Tavin and Branden help coordinate launch assets, content QA, publishing readiness, and campaign execution.
+- Present MI, team, bundle, and white-glove packages to qualified prospects.
+- Help convert qualified conversations into the right offer path.
+- Own enterprise selling follow-through when a buyer needs a team or organization-level package.
+- Escalate high-ticket, white-glove, and strategic partnership conversations to Eric with clean context.
+
+Kash, Usama, and Muneeba should be included in the 10x strategy as the content/distribution system:
+
 - Kash owns YouTube distribution and should track which videos, clips, descriptions, and calls-to-action drive MI traffic.
 - Usama owns Instagram distribution and should track which reels, posts, stories, and DMs produce MI signups or replies.
 - Muneeba owns LinkedIn distribution and should track which posts, comments, and outreach create qualified conversations.
@@ -148,7 +154,7 @@ Statuses:
 
 ### 6.3 Coach Queue
 
-Ryan, Zach, and Randie should have a separate but connected queue.
+Ryan, Zach, Randie, and Tavin should have a separate but connected queue.
 
 Coach work types:
 
@@ -171,7 +177,39 @@ Fields:
 - Customer signals captured
 - Follow-up needed
 
-### 6.4 Customer Detail View
+### 6.4 Enterprise / Package Sales Queue
+
+Branden should have a separate but connected queue for qualified prospects who need a package presentation, team plan, enterprise offer, bundle, or white-glove path.
+
+Enterprise/package work types:
+
+- `mi_pro_package`
+- `team_plan`
+- `enterprise_package`
+- `ultimate_bundle`
+- `white_glove`
+- `partner_bulk_access`
+- `strategic_escalation`
+
+Fields:
+
+- Owner
+- Prospect person/org
+- Segment
+- Current product/access
+- Recommended package
+- Buyer pain
+- Decision maker
+- Budget signal
+- Team size
+- Status
+- Presentation date
+- Follow-up date
+- Objections
+- Next action
+- Escalation needed
+
+### 6.5 Customer Detail View
 
 For any customer/contact, show:
 
@@ -189,12 +227,13 @@ For any customer/contact, show:
 - Coach notes
 - Call notes
 - Social/source attribution
+- Enterprise/package sales notes
 - Outcome tags
 - Recommended next action
 
-### 6.5 Content / Social Queue
+### 6.6 Content / Social Queue
 
-Tavin, Branden, Kash, Usama, and Muneeba should have a separate but connected queue.
+Kash, Usama, and Muneeba should have a separate but connected queue.
 
 Content work types:
 
@@ -205,7 +244,6 @@ Content work types:
 - `instagram_post`
 - `linkedin_post`
 - `linkedin_comment_reply`
-- `launch_asset`
 - `customer_proof_clip`
 - `mi_feature_demo`
 
@@ -225,7 +263,7 @@ Fields:
 - Customer questions captured
 - Follow-up needed
 
-### 6.6 Team Briefing Hub
+### 6.7 Team Briefing Hub
 
 One place to see:
 
@@ -240,7 +278,7 @@ One place to see:
 - Dashboard definitions
 - Open decisions
 
-### 6.7 Metrics That Matter
+### 6.8 Metrics That Matter
 
 Show only metrics tied to decisions:
 
@@ -258,6 +296,9 @@ Show only metrics tied to decisions:
 - White-glove candidates
 - Coach partner leads
 - Partner meetings booked
+- Package presentations
+- Enterprise opportunities
+- White-glove opportunities
 - YouTube clicks/signups
 - Instagram clicks/signups
 - LinkedIn clicks/signups
@@ -268,7 +309,7 @@ Show only metrics tied to decisions:
 - Proposal starts
 - Reported wins
 
-### 6.8 Notes and Outcome Capture
+### 6.9 Notes and Outcome Capture
 
 Every call or customer interaction should capture:
 
@@ -294,6 +335,9 @@ Outcome tags:
 - `upgrade_candidate`
 - `partner_lead`
 - `enterprise_lead`
+- `package_presentation_needed`
+- `team_plan_candidate`
+- `enterprise_package_candidate`
 - `youtube_signal`
 - `instagram_signal`
 - `linkedin_signal`
@@ -315,6 +359,7 @@ Phase 1 can start semi-manual but must write to one source of truth.
 | App usage | MI activity events |
 | Call notes | New internal table |
 | Coach activity | New internal table |
+| Enterprise/package sales activity | New internal table |
 | Content/social activity | New internal table |
 | Team memos | Repo docs linked or synced |
 
@@ -375,6 +420,29 @@ Phase 1 can start semi-manual but must write to one source of truth.
 - `created_at`
 - `updated_at`
 
+### `internal_enterprise_sales_activity`
+
+- `id`
+- `owner`
+- `prospect_name`
+- `prospect_org`
+- `prospect_email`
+- `segment`
+- `current_access`
+- `recommended_package`
+- `buyer_pain`
+- `decision_maker`
+- `budget_signal`
+- `team_size`
+- `status`
+- `presentation_at`
+- `follow_up_at`
+- `objections`
+- `next_action`
+- `escalation_needed`
+- `created_at`
+- `updated_at`
+
 ### `internal_content_activity`
 
 - `id`
@@ -418,6 +486,7 @@ First screen:
 - My assigned actions
 - Top customer actions
 - Top coach actions
+- Top enterprise/package sales actions
 - Top content/social actions
 - Latest team memo
 
@@ -454,8 +523,8 @@ V1 should centralize the work and capture clean data.
 
 - [ ] Annelle can see her outreach queue.
 - [ ] Sikander can see calls booked and log call notes.
-- [ ] Ryan, Zach, and Randie can see their coach/partner/customer-success actions.
-- [ ] Tavin and Branden can see launch asset and content operations tasks.
+- [ ] Ryan, Zach, Randie, and Tavin can see their coach/partner/customer-success actions.
+- [ ] Branden can see package presentation, enterprise selling, team plan, and white-glove follow-up actions.
 - [ ] Kash can see YouTube content tasks, links, and engagement signals.
 - [ ] Usama can see Instagram content tasks, links, and engagement signals.
 - [ ] Muneeba can see LinkedIn content tasks, links, and engagement signals.
@@ -464,6 +533,7 @@ V1 should centralize the work and capture clean data.
 - [ ] Customer notes and outcome tags are stored in one source of truth.
 - [ ] Latest team memo is visible from the dashboard.
 - [ ] The dashboard separates customer outreach from coach/partner activity.
+- [ ] The dashboard separates enterprise/package sales activity from customer outreach and coach activity.
 - [ ] The dashboard separates content/social activity from customer outreach and coach activity.
 - [ ] The dashboard is private and requires internal auth.
 
@@ -473,8 +543,9 @@ V1 should centralize the work and capture clean data.
 2. Import Annelle/Sikander outreach CSV into a table.
 3. Add owner/status/notes updates.
 4. Add coach activity queue.
-5. Add content/social queue.
-6. Link latest strategy/memo docs.
-7. Pull in Stripe/Supabase customer context.
-8. Add weekly rollup metrics.
-9. Add Slack/email digest after the data model is stable.
+5. Add enterprise/package sales queue.
+6. Add content/social queue.
+7. Link latest strategy/memo docs.
+8. Pull in Stripe/Supabase customer context.
+9. Add weekly rollup metrics.
+10. Add Slack/email digest after the data model is stable.

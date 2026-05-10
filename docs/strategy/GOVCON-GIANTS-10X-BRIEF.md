@@ -40,7 +40,7 @@
 - 1 Conversion: **Market Intelligence SaaS ($149/mo)**
 - 1 Delivery: Federal Help Center (AI-powered tools platform)
 
-**Internal Scale System:** The coaches, outreach team, and content/social team need one shared operating dashboard. Annelle/Sikander own customer outreach and validation. Ryan/Zach/Randie own coach-led validation, activation, partner BD, enterprise referrals, and customer-success signal capture. Tavin/Branden support content operations and launch asset execution. Kash owns YouTube, Usama owns Instagram, and Muneeba owns LinkedIn. All of this should feed a private MI Launch Command Center instead of scattered CSVs, Slack posts, and email threads.
+**Internal Scale System:** The coaches, outreach team, enterprise sales, and content/social team need one shared operating dashboard. Annelle/Sikander own customer outreach and validation. Ryan/Zach/Randie/Tavin own coach-led validation, activation, partner BD, enterprise referrals, and customer-success signal capture. Branden owns package presentation, team-plan follow-up, enterprise selling, and white-glove escalation support. Kash owns YouTube, Usama owns Instagram, and Muneeba owns LinkedIn. All of this should feed a private MI Launch Command Center instead of scattered CSVs, Slack posts, and email threads.
 
 ---
 
@@ -106,8 +106,9 @@ Referrals      →   Hunter Pro ($49)→   ────────────�
 |----------|-------|-----------|----------------|
 | **MI SaaS (AI-powered)** | Self-serve | **YES - INFINITE** | **100% margin** |
 | **Daily Briefings (AI)** | Automated | **YES - INFINITE** | **100% margin** |
-| Coach/customer success signals | Ryan, Zach, Randie | Partially | Retention, activation, enterprise leads |
-| Content/social distribution | Kash, Usama, Muneeba, Tavin, Branden | Partially | Traffic, signups, proof, customer signals |
+| Coach/customer success signals | Ryan, Zach, Randie, Tavin | Partially | Retention, activation, enterprise leads |
+| Package and enterprise selling | Branden | Partially | Team plans, bundles, white-glove, enterprise deals |
+| Content/social distribution | Kash, Usama, Muneeba | Partially | Traffic, signups, proof, customer signals |
 | Pro Member training | Speakers | Partially | Retention tool |
 | Bootcamps | Eric | Partially | Lead gen for MI |
 

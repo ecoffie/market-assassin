@@ -105,7 +105,8 @@ The dashboard should support that same operating rhythm:
 - 9,000 warm leads
 - Monthly bootcamps
 - Livestreams (3x/week)
-- Coach-led customer-success and validation loops from Ryan, Zach, and Randie
+- Coach-led customer-success and validation loops from Ryan, Zach, Randie, and Tavin
+- Package presentations and enterprise selling from Branden
 - Social distribution from Kash on YouTube, Usama on Instagram, and Muneeba on LinkedIn
 
 ### Channel 2: APEX Accelerators (Future)
@@ -128,8 +129,8 @@ APEX Accelerators counsel 30,000+ small businesses annually across 90+ locations
 The launch should not depend on manual file passing. The command center becomes the one private link for:
 
 - Annelle/Sikander outreach queue
-- Ryan/Zach/Randie coach activity
-- Tavin/Branden content operations and launch asset tasks
+- Ryan/Zach/Randie/Tavin coach activity
+- Branden package presentations, enterprise selling, team-plan follow-up, and white-glove escalations
 - Kash YouTube distribution and engagement signals
 - Usama Instagram distribution and engagement signals
 - Muneeba LinkedIn distribution and engagement signals
