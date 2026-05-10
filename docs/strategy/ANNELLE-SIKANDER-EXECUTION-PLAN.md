@@ -11,15 +11,23 @@
 
 | Focus | Owner | Goal |
 |-------|-------|------|
-| **Customer Validation** | Annelle (emails) + Sikander (calls) | 8-10 customer interviews |
+| **Customer Validation** | Annelle (emails) + Sikander (calls) | 15-20 customer interviews from a 60-person qualified list |
 
 **Strategic rule:** Human time follows customer behavior. Prioritize people who bought, configured profiles, attended, opened, clicked, replied, or otherwise demonstrated commitment.
 
 **Target audience:**
 - FHC (Federal Help Center) members
 - People who paid us money in the last 3-6 months
+- Recent Market Intelligence / Alert / AI Tools / Pro Member buyers
+- High-value lifetime buyers from the unified paid customer list
+- 10-10 proof customers and bench names only when they are actual customers/users
 
 **NOT in scope:** Advisory board outreach (coaches handle that separately)
+
+**Working files:**
+- `ANNELLE-SIKANDER-QUALIFIED-CUSTOMER-OUTREACH.csv` - current 60-person tracker in workspace root.
+- `ANNELLE-SIKANDER-CUSTOMER-QUALIFICATION-SCORING.md` - scoring model and first-batch logic.
+- `ANNELLE-SIKANDER-NEXT-OUTREACH-BATCH.csv` - first 20 scored contacts for immediate execution.
 
 ---
 
