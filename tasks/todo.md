@@ -11,12 +11,16 @@ We are turning repeated founder/team workflows into reusable skills, tools, and 
 **New specs:**
 - `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` - Top skills, tools/plugins, agents, missing MD sections, and build order.
 - `tasks/skills/dashboard-clarity-skill.md` - Repeatable dashboard review framework for action-oriented MI metrics.
+- `tasks/skills/launch-memo-skill.md` - Repeatable launch memo structure for team-ready execution.
 - `tasks/agents/mi-growth-ops-agent.md` - Daily/weekly growth ops agent spec for activation, engagement, outcomes, and next actions.
+- `tasks/agents/customer-qualification-agent.md` - Customer ranking agent spec for Annelle/Sikander outreach, MI Pro upgrades, and 10-10 candidates.
 
 **Next actions:**
 - [ ] Review the MI Operating System Roadmap and confirm the build order.
 - [ ] Review the Dashboard Clarity Skill with the current admin dashboard.
+- [ ] Use the Launch Memo Skill to rewrite the May 30 bootcamp / MI launch memo.
 - [ ] Review the MI Growth Ops Agent against available Supabase, Stripe, email, and app activity data.
+- [ ] Use the Customer Qualification Agent spec to generate the next Annelle/Sikander qualified outreach list.
 - [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
 - [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
 - [ ] Convert the MI Growth Ops Agent spec into an implementation PRD once the source-of-truth endpoint is agreed.

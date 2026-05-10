@@ -20,8 +20,8 @@ The operating system below is designed to reduce founder bottlenecks, improve te
 
 | Priority | Skill | Purpose | First Use |
 | --- | --- | --- | --- |
-| 1 | Dashboard Clarity Skill | Turn confusing dashboard metrics into action-oriented decisions | Admin dashboard alignment |
-| 2 | Launch Memo Skill | Turn messy launch ideas into team-ready memos | May 30 bootcamp and MI launch |
+| 1 | [Dashboard Clarity Skill](skills/dashboard-clarity-skill.md) | Turn confusing dashboard metrics into action-oriented decisions | Admin dashboard alignment |
+| 2 | [Launch Memo Skill](skills/launch-memo-skill.md) | Turn messy launch ideas into team-ready memos | May 30 bootcamp and MI launch |
 | 3 | 10-10 Forever Customer Strategy Skill | Identify committed users worth deep investment | Customer qualification and outreach |
 | 4 | Customer Outreach Campaign Skill | Build outreach lists, call scripts, emails, and follow-up sequences | Annelle/Sikander outreach |
 | 5 | PRD Builder Skill | Convert product ideas into scoped specs | Contractor sales chart, Deal Flow Board |
@@ -45,8 +45,8 @@ The operating system below is designed to reduce founder bottlenecks, improve te
 
 | Priority | Agent | Mission | First Version |
 | --- | --- | --- | --- |
-| 1 | MI Growth Ops Agent | Monitor activation, engagement, outcomes, and next actions | Manual daily/weekly brief |
-| 2 | Customer Qualification Agent | Find the most valuable users from Stripe, usage, and engagement | Outreach candidate list |
+| 1 | [MI Growth Ops Agent](agents/mi-growth-ops-agent.md) | Monitor activation, engagement, outcomes, and next actions | Manual daily/weekly brief |
+| 2 | [Customer Qualification Agent](agents/customer-qualification-agent.md) | Find the most valuable users from Stripe, usage, and engagement | Outreach candidate list |
 | 3 | Launch Manager Agent | Keep launch plans, memos, tasks, and team updates aligned | May 30 launch support |
 | 4 | SEO Contractor Pages Agent | Identify contractor pages to create, update, and gate | Public contractor profiles |
 | 5 | API Security Audit Agent | Classify and harden API routes | 67 candidate route review |
