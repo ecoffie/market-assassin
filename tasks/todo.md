@@ -8,19 +8,19 @@
 
 We are turning repeated founder/team workflows into reusable skills, tools, and agent specs so launch planning, dashboard alignment, customer outreach, and MI growth ops do not depend on one-off chat threads.
 
-### TODO: Canonical `.com` Migration
+### TODO: Canonical `.com` + MI Platform Migration
 
 **Status:** Active direction as of May 10, 2026
 
-Everything new should be built on `govcongiants.com` moving forward. `.org`, `tools.govcongiants.org`, `mi.govcongiants.com`, and shop domains are transition/redirect surfaces only. Do not introduce new launch pages, internal pages, SEO pages, product links, email CTAs, or social links on the old domains.
+Everything new should use the `.com` brand system moving forward. Public website, SEO, sales, pricing, content, and launch pages live on `govcongiants.com`. The MI SaaS platform lives on `mi.govcongiants.com` and replaces `tools.govcongiants.org`. `.org`, `tools.govcongiants.org`, and shop domains are transition/redirect surfaces only.
 
 **Next actions:**
-- [ ] Create the canonical route map for MI Free, MI Pro, admin, launch command center, pricing, onboarding, briefings, contractor profiles, and public SEO pages on `govcongiants.com`.
-- [ ] Confirm whether `.com` app routing will be handled by the funnels repo, this repo, Vercel rewrites, or a shared shell.
-- [ ] Add compatibility redirects from `.org`, `tools`, `mi`, and `shop` only after the matching `.com` destination path exists.
-- [ ] Update email templates and generated links to use canonical `.com` URLs.
-- [ ] Update social, YouTube, LinkedIn, IG, coaching scripts, launch plans, and team briefs to use one `.com` link system.
-- [ ] Keep `mi.govcongiants.com` available as a temporary technical alias until all customer-facing links have moved.
+- [ ] Create the canonical route map: public pages on `govcongiants.com`; app/admin/account pages on `mi.govcongiants.com`.
+- [ ] Confirm which public MI sales/SEO pages belong in the funnels repo versus which product surfaces stay in this repo.
+- [ ] Add compatibility redirects from `.org`, `tools`, and `shop` only after the matching `.com` or `mi.govcongiants.com` destination path exists.
+- [ ] Update email templates and generated links: sales/content CTAs to `govcongiants.com`, product/account CTAs to `mi.govcongiants.com`.
+- [ ] Update social, YouTube, LinkedIn, IG, coaching scripts, launch plans, and team briefs to use the correct `.com` role.
+- [ ] Keep `mi.govcongiants.com` as the primary MI platform domain.
 
 **New specs:**
 - `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` - Top skills, tools/plugins, agents, missing MD sections, and build order.

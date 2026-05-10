@@ -42,9 +42,9 @@ tools.govcongiants.org/briefings/dashboard
 ...etc
 ```
 
-### Canonical State: Unified `.com` Dashboard
+### Canonical State: Unified MI Platform
 ```
-govcongiants.com/mi
+mi.govcongiants.com
   └── /dashboard     (Daily Bid Targets - home)
   └── /opportunities (Full matching list - Opportunity Hunter)
   └── /market        (Market Assassin deep research)
@@ -56,7 +56,7 @@ govcongiants.com/mi
   └── /settings      (Profile, NAICS, preferences)
 ```
 
-**Domain rule:** all new MI product routes, launch pages, SEO pages, and internal team links should be planned as `govcongiants.com/...` paths. `tools.govcongiants.org` and `mi.govcongiants.com` are legacy/transition domains only.
+**Domain rule:** all MI product, account, app, and admin routes should live on `mi.govcongiants.com`. Public SEO, pricing, sales, content, and launch pages should live on `govcongiants.com`. `tools.govcongiants.org` is the legacy tool host being replaced by MI.
 
 ---
 

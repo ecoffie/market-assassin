@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Consolidate all GovCon Giants properties under `govcongiants.com` (.com) with a unified MI SaaS product model. Kill the shop. Migrate from nonprofit (.org) to for-profit structure. Moving forward, new pages, launch links, customer journeys, SEO pages, and internal command-center links should be built on `govcongiants.com` paths. Legacy hosts only exist to preserve old links and redirect traffic.
+Consolidate all GovCon Giants properties under the `.com` brand with a unified MI SaaS product model. Kill the shop. Migrate from nonprofit (.org) to for-profit structure. Moving forward, the public website and SEO engine live on `govcongiants.com`, while the MI SaaS platform lives on `mi.govcongiants.com`. Legacy `.org`, `tools`, and shop hosts only exist to preserve old links and redirect traffic.
 
 ---
 
@@ -35,11 +35,11 @@ Consolidate all GovCon Giants properties under `govcongiants.com` (.com) with a 
 
 | Purpose | URL | Codebase |
 |---------|-----|----------|
-| **Marketing/SEO** | `govcongiants.com` | govcon-funnels |
-| **SaaS/App Experience** | `govcongiants.com/mi`, `govcongiants.com/briefings`, `govcongiants.com/admin/...` | govcon-funnels shell + market-assassin app surfaces |
+| **Marketing/SEO** | `govcongiants.com` / `www.govcongiants.com` | govcon-funnels |
+| **MI SaaS Platform** | `mi.govcongiants.com` | market-assassin |
 | **Shop** | KILLED | Redirect to `/pricing` or MI offer pages |
 
-**Canonical rule:** no new product, launch, internal, or SEO page should be introduced on `.org`, `tools.govcongiants.org`, `mi.govcongiants.com`, or `shop.govcongiants.*`. Those domains may remain as redirect and compatibility layers while old emails, bookmarks, and customer links age out.
+**Canonical rule:** no new page should be introduced on `.org`, `tools.govcongiants.org`, or `shop.govcongiants.*`. Public brand, sales, content, and SEO pages go on `govcongiants.com`. Product/app/admin pages go on `mi.govcongiants.com`.
 
 ### Email Structure
 
@@ -115,7 +115,7 @@ Research from [Lovable](https://lovable.dev/guides/org-vs-com-domain-extension-g
 
 ---
 
-## Path-First Decision
+## Domain Roles
 
 Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery/tenant-routing-strategies-for-saas-applications-on-aws/) and [Serverless First](https://serverlessfirst.com/how-to-select-a-future-proof-subdomain-structure-for-saas-web-app/):
 
@@ -127,7 +127,13 @@ Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery
 | Independent deployment | Yes | No |
 | Per-customer routing | DNS-based | Complex |
 
-**Updated May 10, 2026:** use paths on `govcongiants.com` for the customer-facing product and launch experience because the brand needs one destination, one SEO footprint, and one link system. Subdomains may still be used behind the scenes for infrastructure, white-label experiments, or temporary compatibility, but they are not the public product architecture.
+**Updated May 10, 2026:** use one `.com` brand system with clear domain roles:
+
+- `govcongiants.com` is the public website, SEO hub, content library, pricing, launch pages, and customer education surface.
+- `mi.govcongiants.com` is the MI SaaS app that replaces `tools.govcongiants.org`.
+- `tools.govcongiants.org`, `govcongiants.org`, and shop domains are legacy redirect surfaces.
+
+This keeps the brand unified without burying the application inside the marketing site.
 
 ---
 
@@ -147,14 +153,13 @@ Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery
 ## Migration Plan
 
 ### Phase 1: DNS Setup (Day 1)
-- [ ] Confirm `govcongiants.com` / `www.govcongiants.com` owns all public customer paths.
-- [ ] Attach or proxy MI app routes into canonical `.com` paths before changing hard redirects.
+- [ ] Confirm `govcongiants.com` / `www.govcongiants.com` owns all public website, SEO, pricing, and launch paths.
+- [ ] Confirm `mi.govcongiants.com` owns all MI product, app, admin, and user account paths.
 - [ ] Configure SSL certificates
 
 ### Phase 2: Redirects (Day 2)
 - [ ] `govcongiants.org/*` → `govcongiants.com/*` (301)
-- [ ] `tools.govcongiants.org/*` → matching `govcongiants.com/*` path once those paths exist
-- [ ] `mi.govcongiants.com/*` → matching `govcongiants.com/*` path once those paths exist
+- [ ] `tools.govcongiants.org/*` → matching `mi.govcongiants.com/*` app path
 - [ ] `shop.govcongiants.org/*` → `govcongiants.com/pricing` (301)
 
 ### Phase 3: Email Migration (Week 1)
@@ -181,7 +186,7 @@ Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery
 ## SEO Considerations
 
 - **301 redirects preserve SEO** — Google follows redirects
-- **Consolidate links** — use `govcongiants.com` as the canonical link target across emails, SEO pages, internal docs, social, and launch materials
+- **Consolidate links by role** — use `govcongiants.com` for public/SEO/sales pages and `mi.govcongiants.com` for MI app/account/admin links
 - **Update sitemap** — Submit new URLs to Google Search Console
 - **Monitor traffic** — Watch for drops in first 30 days
 
@@ -219,7 +224,7 @@ Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery
 | May 4, 2026 | Kill shop | SaaS model, one conversion point |
 | May 4, 2026 | MI Free = OH + Daily Alerts | Habit-forming hook, same onboarding |
 | May 4, 2026 | Grandfather $49 subscribers | Honor commitments, retention |
-| May 10, 2026 | Build future pages on govcongiants.com paths | Eliminate .org confusion, stop sending users to separate product pages, consolidate SEO and customer journeys |
+| May 10, 2026 | Keep `mi.govcongiants.com` as the MI SaaS platform | Replace `tools.govcongiants.org` while keeping `govcongiants.com` focused on brand, SEO, and sales |
 
 ---
 
