@@ -2,6 +2,25 @@
 
 These are the top internal workflows to turn into Codex skills. Each skill should be concise, triggerable by name, and backed by references only when needed.
 
+## MI Operating System Skills
+
+The MI pivot also has a dedicated skill set in `tasks/skills/`. These are the current growth, launch, SEO, dashboard, and customer-success skills for the software-and-services model:
+
+| Skill | Use |
+| --- | --- |
+| `dashboard-clarity-skill.md` | Review dashboard metrics and turn them into action-oriented sections |
+| `launch-memo-skill.md` | Turn messy launch thinking into team-ready memos |
+| `10-10-forever-customer-strategy-skill.md` | Identify committed users worth deep investment |
+| `customer-outreach-campaign-skill.md` | Build outreach campaigns, scripts, and follow-up tags |
+| `prd-builder-skill.md` | Scope product ideas like contractor sales charts and Deal Flow Board |
+| `govcon-offer-reframing-skill.md` | Reframe MI Free, MI Pro, bundles, and white-glove around outcomes |
+| `team-alignment-brief-skill.md` | Create internal Slack/memo briefs that reduce founder hand-holding |
+| `seo-page-strategy-skill.md` | Plan public/gated SEO pages that rank and convert into MI |
+| `customer-success-insight-skill.md` | Turn usage signals into rescue, activation, upgrade, and white-glove actions |
+| `founder-decision-memo-skill.md` | Convert high-stakes founder decisions into clear execution memos |
+
+Use `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` as the source of truth for build order and strategy.
+
 ## 1. Campaign Packet Builder
 
 **Use when:** launching activation, reactivation, onboarding, upsell, beta, or access campaigns.
@@ -128,4 +147,3 @@ These are the top internal workflows to turn into Codex skills. Each skill shoul
 **Required sections:** problem, audience, user flows, data model, endpoints, UI states, metrics, risks, rollout, test plan.
 
 **Output:** concise PRD or technical spec with clear first milestone.
-

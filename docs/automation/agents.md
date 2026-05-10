@@ -2,6 +2,20 @@
 
 These agents should run with bounded autonomy, strong dry-run behavior, and clear reporting.
 
+## MI Operating System Agents
+
+The MI pivot has a dedicated agent layer in `tasks/agents/`. These should become the primary growth, launch, SEO, and security agents for Market Intelligence:
+
+| Agent | Mission |
+| --- | --- |
+| `mi-growth-ops-agent.md` | Monitor activation, engagement, outcomes, and next actions |
+| `customer-qualification-agent.md` | Rank users for Annelle/Sikander outreach, MI Pro upgrades, and 10-10 candidates |
+| `launch-manager-agent.md` | Keep launch memos, assets, owners, blockers, and team updates aligned |
+| `seo-contractor-pages-agent.md` | Identify contractor SEO pages to create, refresh, and gate |
+| `api-security-audit-agent.md` | Classify and harden API routes so no route remains accidentally open |
+
+Use `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` as the source of truth for build order and strategy.
+
 ## 1. Daily Briefings Operations Agent
 
 **Trigger:** every morning after briefing send windows; on-demand during incidents.
@@ -79,4 +93,3 @@ These agents should run with bounded autonomy, strong dry-run behavior, and clea
 **Output:** freshness dashboard and source-specific repair commands.
 
 **Autonomy limits:** scraper execution requires configured allowed sources and rate-limit safeguards.
-

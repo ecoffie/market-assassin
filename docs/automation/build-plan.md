@@ -2,6 +2,21 @@
 
 Prioritize by impact, repeat frequency, and implementation ease.
 
+## MI Pivot Addendum
+
+The MI operating-system layer is now documented in `tasks/MI-OPERATING-SYSTEM-ROADMAP.md`.
+
+Recommended MI-specific build sequence:
+
+1. Dashboard Clarity Skill
+2. MI Growth Ops Agent
+3. Customer Qualification Agent
+4. Customer Success Insight Skill
+5. SEO Page Strategy Skill
+6. API Security Audit Agent
+
+The older automation phases below still matter, but MI launch and growth work should reference the roadmap first so customer activation, usage, SEO, and security stay tied to the same strategy.
+
 ## Phase 1: Read-Only Operations Visibility
 
 **Build first:** Daily Briefings Operations Agent + Supabase Ops Tool.
