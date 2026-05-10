@@ -40,6 +40,7 @@ Everything new should use the `.com` brand system moving forward. Public website
 - `tasks/agents/seo-contractor-pages-agent.md` - SEO page agent spec for contractor profile candidates, public/gated data, and refresh priorities.
 - `tasks/agents/api-security-audit-agent.md` - API hardening agent spec for classifying and protecting route surfaces.
 - `tasks/PRD-mi-growth-ops-agent.md` - Implementation PRD for the read-only MI Growth Brief, action queues, freshness notes, and internal dashboard feed.
+- `tasks/PRD-api-security-audit-agent.md` - Implementation PRD for classifying and hardening the 68 current open API route candidates.
 - `docs/strategy/MI-TEAM-ALIGNMENT-SLACK-BRIEF.md` - Team-ready Slack/memo version of the MI pivot, outreach priorities, and operating rules.
 - `docs/strategy/MI-INTERNAL-COMMAND-CENTER-PRD.md` - Private dashboard PRD for Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering.
 
@@ -63,13 +64,14 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
 - [x] Convert the MI Growth Ops Agent spec into an implementation PRD for a read-only Growth Brief and action queues.
 - [ ] Build the admin-protected MI Growth Brief endpoint/output shape from `tasks/PRD-mi-growth-ops-agent.md`.
-- [ ] Convert the Launch Manager, SEO Contractor Pages, and API Security Audit agent specs into implementation PRDs after the data sources and owners are confirmed.
+- [ ] Convert the Launch Manager and SEO Contractor Pages agent specs into implementation PRDs after the data sources and owners are confirmed.
+- [x] Convert the API Security Audit agent spec into an implementation PRD with the current 68-route baseline.
 
 ### 🔐 TODO: Classify and Harden Remaining API Routes
 
 **Status:** Next security pass
 
-After hardening `/api/pain-points`, the API auth audit still shows **67 candidate routes** that need review. Each route needs to be intentionally classified and either protected or documented as safe public access.
+After hardening `/api/pain-points`, the May 10 API auth audit shows **68 candidate routes** that need review. Each route needs to be intentionally classified and either protected or documented as safe public access.
 
 **Audit command:**
 ```bash
@@ -94,7 +96,7 @@ npm run audit:api-auth
 - Production verified with 401 response when unauthenticated.
 
 **Next actions:**
-- [ ] Run the audit and export the 67 candidate routes.
+- [x] Run the audit and export the current candidate route count.
 - [ ] Group them by public/token/admin/MI user.
 - [ ] Harden the highest-risk routes first: write routes, admin routes, paid-data routes.
 - [ ] Add intentional public routes to the audit allowlist with comments.
