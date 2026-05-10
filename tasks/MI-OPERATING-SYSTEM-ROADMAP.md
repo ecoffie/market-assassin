@@ -26,7 +26,7 @@ The operating system below is designed to reduce founder bottlenecks, improve te
 | 4 | [Customer Outreach Campaign Skill](skills/customer-outreach-campaign-skill.md) | Build outreach lists, call scripts, emails, and follow-up sequences | Annelle/Sikander outreach |
 | 5 | [PRD Builder Skill](skills/prd-builder-skill.md) | Convert product ideas into scoped specs | Contractor sales chart, Deal Flow Board |
 | 6 | [GovCon Offer Reframing Skill](skills/govcon-offer-reframing-skill.md) | Reframe offers around outcomes, not training | MI Free, MI Pro, white-glove |
-| 7 | Team Alignment Brief Skill | Create internal briefs that reduce confusion and founder hand-holding | Slack/team updates |
+| 7 | [Team Alignment Brief Skill](skills/team-alignment-brief-skill.md) | Create internal briefs that reduce confusion and founder hand-holding | Slack/team updates |
 | 8 | SEO Page Strategy Skill | Design public/gated pages that rank and convert | Contractor profile pages |
 | 9 | Customer Success Insight Skill | Turn usage behavior into rescue, upgrade, or white-glove actions | MI engagement follow-up |
 | 10 | Founder Decision Memo Skill | Convert high-stakes founder thinking into decisions and tradeoffs | Pricing, access, roadmap |
