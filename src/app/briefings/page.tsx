@@ -151,23 +151,69 @@ interface PursuitBriefingPayload {
   opportunityScore?: number;
   whyWorthPursuing?: string;
   workingHypothesis?: string;
-  immediateNextMove?: string;
-  priorityIntel?: string[];
-  risks?: string[];
+  immediateNextMove?: unknown;
+  priorityIntel?: unknown[];
+  risks?: unknown[];
   actionPlan?: Array<{
     step?: string;
+    action?: string;
+    day?: number;
     owner?: string;
     due?: string;
+    deadline?: string;
     notes?: string;
   }>;
   outreachTargets?: Array<{
     name?: string;
     role?: string;
     organization?: string;
+    company?: string;
     email?: string;
     phone?: string;
+    approach?: string;
   }>;
-  relatedMarketSignals?: string[];
+  relatedMarketSignals?: unknown[];
+}
+
+type PursuitActionPlanItem = NonNullable<PursuitBriefingPayload['actionPlan']>[number];
+type PursuitOutreachTarget = NonNullable<PursuitBriefingPayload['outreachTargets']>[number];
+
+function asArray<T = unknown>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
+function displayText(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const preferred = [
+      record.action,
+      record.step,
+      record.headline,
+      record.risk,
+      record.implication,
+      record.mitigation,
+      record.approach,
+      record.notes,
+      record.name,
+    ].map(part => displayText(part)).find(Boolean);
+
+    if (preferred) {
+      const details = [
+        record.owner ? `Owner: ${displayText(record.owner)}` : null,
+        record.deadline ? `Deadline: ${displayText(record.deadline)}` : null,
+        record.due ? `Due: ${displayText(record.due)}` : null,
+        record.impact ? `Impact: ${displayText(record.impact)}` : null,
+        record.likelihood ? `Likelihood: ${displayText(record.likelihood)}` : null,
+      ].filter(Boolean);
+      return details.length > 0 ? `${preferred} (${details.join(' • ')})` : preferred;
+    }
+  }
+
+  return fallback;
 }
 
 function isGeneratedBriefing(value: unknown): value is GeneratedBriefing {
@@ -223,29 +269,38 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
 
   if (isPursuitBriefing(raw)) {
     const briefing = raw;
-    const actionPlanText = (briefing.actionPlan || [])
+    const actionPlan = asArray<PursuitActionPlanItem>(briefing.actionPlan);
+    const outreachTargets = asArray<PursuitOutreachTarget>(briefing.outreachTargets);
+    const relatedSignals = asArray(briefing.relatedMarketSignals).map(signal => displayText(signal)).filter(Boolean);
+    const risks = asArray(briefing.risks).map(risk => displayText(risk)).filter(Boolean);
+    const priorityIntel = asArray(briefing.priorityIntel).map(item => displayText(item)).filter(Boolean);
+    const immediateNextMove = displayText(briefing.immediateNextMove);
+
+    const actionPlanText = actionPlan
       .map((step, index) => [
-        `${index + 1}. ${step.step || 'Next action'}`,
+        `${index + 1}. ${step.step || step.action || 'Next action'}`,
         step.owner ? `Owner: ${step.owner}` : null,
-        step.due ? `Due: ${step.due}` : null,
+        step.due || step.deadline ? `Due: ${step.due || step.deadline}` : null,
         step.notes || null,
       ].filter(Boolean).join(' - '))
       .join('\n');
-    const outreachText = (briefing.outreachTargets || [])
+    const outreachText = outreachTargets
       .map(target => [
         target.name,
         target.role,
-        target.organization,
+        target.organization || target.company,
         target.email,
         target.phone,
+        target.approach,
       ].filter(Boolean).join(' - '))
       .join('\n');
     const signals = [
       briefing.agency,
       briefing.contractNumber ? `Contract ${briefing.contractNumber}` : undefined,
       briefing.sourceNoticeId ? `Notice ${briefing.sourceNoticeId}` : undefined,
-      ...(briefing.relatedMarketSignals || []),
-      ...(briefing.risks || []).map(risk => `Risk: ${risk}`),
+      ...priorityIntel.map(item => `Intel: ${item}`),
+      ...relatedSignals,
+      ...risks.map(risk => `Risk: ${risk}`),
     ].filter(Boolean) as string[];
     const item: BriefingItemFormatted = {
       id: `pursuit-${briefing.sourceNoticeId || briefing.id || fallbackGeneratedAt}`,
@@ -261,11 +316,11 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
       description: [
         briefing.whyWorthPursuing,
         briefing.workingHypothesis ? `Working hypothesis: ${briefing.workingHypothesis}` : null,
-        briefing.immediateNextMove ? `Immediate next move: ${briefing.immediateNextMove}` : null,
+        immediateNextMove ? `Immediate next move: ${immediateNextMove}` : null,
         actionPlanText ? `Action plan:\n${actionPlanText}` : null,
         outreachText ? `Outreach targets:\n${outreachText}` : null,
       ].filter(Boolean).join('\n\n'),
-      detailLine: briefing.immediateNextMove || briefing.whyWorthPursuing || 'Capture guidance generated for this pursuit.',
+      detailLine: immediateNextMove || briefing.whyWorthPursuing || 'Capture guidance generated for this pursuit.',
       urgencyBadge: 'HIGH',
       amount: briefing.value,
       actionUrl: briefing.sourceNoticeId ? `https://sam.gov/opp/${briefing.sourceNoticeId}/view` : '/briefings',
@@ -281,11 +336,11 @@ function normalizeBriefing(raw: unknown, fallbackDate: string, fallbackGenerated
       briefingDate: fallbackDate,
       summary: {
         headline: 'Pursuit intelligence brief',
-        subheadline: briefing.immediateNextMove || briefing.whyWorthPursuing || 'Capture guidance for one priority opportunity.',
+        subheadline: immediateNextMove || briefing.whyWorthPursuing || 'Capture guidance for one priority opportunity.',
         quickStats: [
           { label: 'Pursuits', value: 1 },
-          { label: 'Action Steps', value: briefing.actionPlan?.length || 0 },
-          { label: 'Contacts', value: briefing.outreachTargets?.length || 0 },
+          { label: 'Action Steps', value: actionPlan.length },
+          { label: 'Contacts', value: outreachTargets.length },
         ],
         urgentAlerts: 1,
       },
@@ -645,12 +700,15 @@ function BriefingsDashboardContent() {
     // Apply search filter
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.title.toLowerCase().includes(term) ||
-        item.subtitle.toLowerCase().includes(term) ||
-        item.description.toLowerCase().includes(term) ||
-        item.signals.some(s => s.toLowerCase().includes(term))
-      );
+      filtered = filtered.filter(item => {
+        const searchableParts = [
+          item.title,
+          item.subtitle,
+          item.description,
+          ...asArray(item.signals),
+        ];
+        return searchableParts.some(part => displayText(part).toLowerCase().includes(term));
+      });
     }
 
     // Apply category filter
