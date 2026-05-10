@@ -39,6 +39,7 @@ Everything new should use the `.com` brand system moving forward. Public website
 - `tasks/agents/launch-manager-agent.md` - Launch coordination agent spec for memos, assets, owners, blockers, and team updates.
 - `tasks/agents/seo-contractor-pages-agent.md` - SEO page agent spec for contractor profile candidates, public/gated data, and refresh priorities.
 - `tasks/agents/api-security-audit-agent.md` - API hardening agent spec for classifying and protecting route surfaces.
+- `tasks/PRD-mi-growth-ops-agent.md` - Implementation PRD for the read-only MI Growth Brief, action queues, freshness notes, and internal dashboard feed.
 - `docs/strategy/MI-TEAM-ALIGNMENT-SLACK-BRIEF.md` - Team-ready Slack/memo version of the MI pivot, outreach priorities, and operating rules.
 - `docs/strategy/MI-INTERNAL-COMMAND-CENTER-PRD.md` - Private dashboard PRD for Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering.
 
@@ -60,7 +61,8 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [ ] Wire the MI Internal Launch Command Center to Supabase, Stripe, email engagement, MI app activity, and owner-updated launch action data.
 - [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
 - [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
-- [ ] Convert the MI Growth Ops Agent spec into an implementation PRD once the source-of-truth endpoint is agreed.
+- [x] Convert the MI Growth Ops Agent spec into an implementation PRD for a read-only Growth Brief and action queues.
+- [ ] Build the admin-protected MI Growth Brief endpoint/output shape from `tasks/PRD-mi-growth-ops-agent.md`.
 - [ ] Convert the Launch Manager, SEO Contractor Pages, and API Security Audit agent specs into implementation PRDs after the data sources and owners are confirmed.
 
 ### 🔐 TODO: Classify and Harden Remaining API Routes
