@@ -12,6 +12,8 @@ We are turning repeated founder/team workflows into reusable skills, tools, and 
 - `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` - Top skills, tools/plugins, agents, missing MD sections, and build order.
 - `tasks/skills/dashboard-clarity-skill.md` - Repeatable dashboard review framework for action-oriented MI metrics.
 - `tasks/skills/launch-memo-skill.md` - Repeatable launch memo structure for team-ready execution.
+- `tasks/skills/10-10-forever-customer-strategy-skill.md` - Repeatable framework for ranking customers worth deep founder/team investment.
+- `tasks/skills/customer-outreach-campaign-skill.md` - Segment-based outreach playbook for interviews, activation, upgrades, and proof stories.
 - `tasks/agents/mi-growth-ops-agent.md` - Daily/weekly growth ops agent spec for activation, engagement, outcomes, and next actions.
 - `tasks/agents/customer-qualification-agent.md` - Customer ranking agent spec for Annelle/Sikander outreach, MI Pro upgrades, and 10-10 candidates.
 
@@ -21,6 +23,8 @@ We are turning repeated founder/team workflows into reusable skills, tools, and 
 - [ ] Use the Launch Memo Skill to rewrite the May 30 bootcamp / MI launch memo.
 - [ ] Review the MI Growth Ops Agent against available Supabase, Stripe, email, and app activity data.
 - [ ] Use the Customer Qualification Agent spec to generate the next Annelle/Sikander qualified outreach list.
+- [ ] Use the 10-10 Forever Customer Strategy Skill to identify Eric's next founder-call list.
+- [ ] Use the Customer Outreach Campaign Skill to turn the next outreach batch into call scripts, emails, and follow-up tags.
 - [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
 - [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
 - [ ] Convert the MI Growth Ops Agent spec into an implementation PRD once the source-of-truth endpoint is agreed.

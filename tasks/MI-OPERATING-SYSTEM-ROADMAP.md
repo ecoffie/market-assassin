@@ -22,8 +22,8 @@ The operating system below is designed to reduce founder bottlenecks, improve te
 | --- | --- | --- | --- |
 | 1 | [Dashboard Clarity Skill](skills/dashboard-clarity-skill.md) | Turn confusing dashboard metrics into action-oriented decisions | Admin dashboard alignment |
 | 2 | [Launch Memo Skill](skills/launch-memo-skill.md) | Turn messy launch ideas into team-ready memos | May 30 bootcamp and MI launch |
-| 3 | 10-10 Forever Customer Strategy Skill | Identify committed users worth deep investment | Customer qualification and outreach |
-| 4 | Customer Outreach Campaign Skill | Build outreach lists, call scripts, emails, and follow-up sequences | Annelle/Sikander outreach |
+| 3 | [10-10 Forever Customer Strategy Skill](skills/10-10-forever-customer-strategy-skill.md) | Identify committed users worth deep investment | Customer qualification and outreach |
+| 4 | [Customer Outreach Campaign Skill](skills/customer-outreach-campaign-skill.md) | Build outreach lists, call scripts, emails, and follow-up sequences | Annelle/Sikander outreach |
 | 5 | PRD Builder Skill | Convert product ideas into scoped specs | Contractor sales chart, Deal Flow Board |
 | 6 | GovCon Offer Reframing Skill | Reframe offers around outcomes, not training | MI Free, MI Pro, white-glove |
 | 7 | Team Alignment Brief Skill | Create internal briefs that reduce confusion and founder hand-holding | Slack/team updates |
