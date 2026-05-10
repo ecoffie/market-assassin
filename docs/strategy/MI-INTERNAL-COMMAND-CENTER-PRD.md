@@ -3,7 +3,7 @@
 **Date:** May 9, 2026  
 **Status:** Draft  
 **Owner:** Eric / Product  
-**Primary Users:** Eric, Annelle, Sikander, Ryan, Zach, Randie, internal team  
+**Primary Users:** Eric, Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, internal team
 **Goal:** Replace scattered files, email threads, Slack messages, and manual updates with one private internal dashboard for MI launch, customer outreach, coach execution, and 10x scaling.
 
 ## 1. Problem
@@ -26,6 +26,7 @@ That makes it hard for Annelle, Sikander, coaches, and the rest of the team to k
 - Which customers are MI Free, MI Pro, bundle, high-ticket, or 10-10 candidates
 - Which customer feedback should change product, launch, or offer strategy
 - Which coach is responsible for which validation, customer success, or partnership action
+- Which content/social owner is responsible for each campaign, post, or customer signal
 - What has already happened
 
 ## 2. Customer / Internal Segment
@@ -40,6 +41,11 @@ This is an internal product for:
 | Ryan | Capture coach/live/customer-success signals and partner opportunities |
 | Zach | Capture coach/live/customer-success signals and partner opportunities |
 | Randie | Capture coach/live/customer-success signals and partner opportunities |
+| Tavin | Coordinate content operations, launch assets, and campaign execution |
+| Branden | Support content operations, asset QA, and launch distribution tasks |
+| Kash | Own YouTube distribution, clips, descriptions, links, and engagement signals |
+| Usama | Own Instagram distribution, reels/stories/posts, links, and engagement signals |
+| Muneeba | Own LinkedIn distribution, posts, comments, lead signals, and engagement signals |
 | Product/Engineering | See customer issues, dashboard gaps, and product priorities |
 
 ## 3. Core Outcome
@@ -51,7 +57,8 @@ The team should be able to open one private link and know:
 3. What has already happened.
 4. Which customer signals matter.
 5. Which coach/team member owns each action.
-6. Whether MI is helping users find and move toward winning federal contracts.
+6. Which social/channel activity is creating signups, replies, calls, or MI usage.
+7. Whether MI is helping users find and move toward winning federal contracts.
 
 ## 4. Business Goal
 
@@ -61,6 +68,8 @@ The command center supports:
 - 10-10 Forever customer selection
 - Customer-first validation
 - Coach-led scaling
+- Content/social distribution
+- Channel attribution
 - White-glove qualification
 - Team accountability
 - Reduced founder bottleneck
@@ -82,6 +91,17 @@ Ryan, Zach, and Randie should not be limited to old weekly training roles. They 
 - Partner / APEX / SBDC / chamber BD owners
 - Team/enterprise opportunity spotters
 - Proof-story and white-glove referral sources
+
+Tavin, Branden, Kash, Usama, and Muneeba should be included in the 10x strategy as the content/distribution system:
+
+- Tavin and Branden help coordinate launch assets, content QA, publishing readiness, and campaign execution.
+- Kash owns YouTube distribution and should track which videos, clips, descriptions, and calls-to-action drive MI traffic.
+- Usama owns Instagram distribution and should track which reels, posts, stories, and DMs produce MI signups or replies.
+- Muneeba owns LinkedIn distribution and should track which posts, comments, and outreach create qualified conversations.
+
+Social media should not be measured only by views. The operating question is:
+
+> Did this content create a signup, profile completion, MI login, customer reply, booked call, partner lead, or white-glove candidate?
 
 ## 6. First Version Scope
 
@@ -168,10 +188,44 @@ For any customer/contact, show:
 - Outreach history
 - Coach notes
 - Call notes
+- Social/source attribution
 - Outcome tags
 - Recommended next action
 
-### 6.5 Team Briefing Hub
+### 6.5 Content / Social Queue
+
+Tavin, Branden, Kash, Usama, and Muneeba should have a separate but connected queue.
+
+Content work types:
+
+- `youtube_video`
+- `youtube_short`
+- `instagram_reel`
+- `instagram_story`
+- `instagram_post`
+- `linkedin_post`
+- `linkedin_comment_reply`
+- `launch_asset`
+- `customer_proof_clip`
+- `mi_feature_demo`
+
+Fields:
+
+- Owner
+- Channel
+- Campaign
+- Asset title
+- Source content
+- CTA link
+- UTM/source tag
+- Status
+- Publish date
+- Engagement notes
+- Leads/signups attributed
+- Customer questions captured
+- Follow-up needed
+
+### 6.6 Team Briefing Hub
 
 One place to see:
 
@@ -180,11 +234,13 @@ One place to see:
 - Current Annelle/Sikander script
 - Coach scripts
 - Current offer language
+- Current content calendar
+- Current social campaign links
 - Current access model
 - Dashboard definitions
 - Open decisions
 
-### 6.6 Metrics That Matter
+### 6.7 Metrics That Matter
 
 Show only metrics tied to decisions:
 
@@ -202,12 +258,17 @@ Show only metrics tied to decisions:
 - White-glove candidates
 - Coach partner leads
 - Partner meetings booked
+- YouTube clicks/signups
+- Instagram clicks/signups
+- LinkedIn clicks/signups
+- Social replies and DMs
+- Content-driven calls booked
 - Pipeline adds
 - Teaming adds
 - Proposal starts
 - Reported wins
 
-### 6.7 Notes and Outcome Capture
+### 6.8 Notes and Outcome Capture
 
 Every call or customer interaction should capture:
 
@@ -218,6 +279,7 @@ Every call or customer interaction should capture:
 - What contract outcome they want
 - What their next action is
 - What GovCon Giants should do next
+- Which source/channel created the signal
 
 Outcome tags:
 
@@ -232,6 +294,10 @@ Outcome tags:
 - `upgrade_candidate`
 - `partner_lead`
 - `enterprise_lead`
+- `youtube_signal`
+- `instagram_signal`
+- `linkedin_signal`
+- `content_question`
 - `not_now`
 - `wrong_fit`
 
@@ -249,6 +315,7 @@ Phase 1 can start semi-manual but must write to one source of truth.
 | App usage | MI activity events |
 | Call notes | New internal table |
 | Coach activity | New internal table |
+| Content/social activity | New internal table |
 | Team memos | Repo docs linked or synced |
 
 ## 8. Proposed Tables
@@ -308,6 +375,28 @@ Phase 1 can start semi-manual but must write to one source of truth.
 - `created_at`
 - `updated_at`
 
+### `internal_content_activity`
+
+- `id`
+- `owner`
+- `channel`
+- `campaign`
+- `asset_title`
+- `source_content`
+- `cta_link`
+- `utm_source`
+- `status`
+- `published_at`
+- `engagement_notes`
+- `lead_count`
+- `signup_count`
+- `reply_count`
+- `call_booked_count`
+- `customer_questions`
+- `next_action`
+- `created_at`
+- `updated_at`
+
 ## 9. Access and Security
 
 This must be private.
@@ -329,6 +418,7 @@ First screen:
 - My assigned actions
 - Top customer actions
 - Top coach actions
+- Top content/social actions
 - Latest team memo
 
 Key interaction:
@@ -345,7 +435,7 @@ Loading state:
 
 Error state:
 
-- Explain what failed: customer data, outreach data, coach data, or memo data.
+- Explain what failed: customer data, outreach data, coach data, content data, or memo data.
 
 ## 11. Non-Goals For V1
 
@@ -365,11 +455,16 @@ V1 should centralize the work and capture clean data.
 - [ ] Annelle can see her outreach queue.
 - [ ] Sikander can see calls booked and log call notes.
 - [ ] Ryan, Zach, and Randie can see their coach/partner/customer-success actions.
+- [ ] Tavin and Branden can see launch asset and content operations tasks.
+- [ ] Kash can see YouTube content tasks, links, and engagement signals.
+- [ ] Usama can see Instagram content tasks, links, and engagement signals.
+- [ ] Muneeba can see LinkedIn content tasks, links, and engagement signals.
 - [ ] Eric can see top 10-10 candidates, white-glove candidates, and launch risks.
 - [ ] Team can update status without editing CSV files.
 - [ ] Customer notes and outcome tags are stored in one source of truth.
 - [ ] Latest team memo is visible from the dashboard.
 - [ ] The dashboard separates customer outreach from coach/partner activity.
+- [ ] The dashboard separates content/social activity from customer outreach and coach activity.
 - [ ] The dashboard is private and requires internal auth.
 
 ## 13. Recommended Build Order
@@ -378,8 +473,8 @@ V1 should centralize the work and capture clean data.
 2. Import Annelle/Sikander outreach CSV into a table.
 3. Add owner/status/notes updates.
 4. Add coach activity queue.
-5. Link latest strategy/memo docs.
-6. Pull in Stripe/Supabase customer context.
-7. Add weekly rollup metrics.
-8. Add Slack/email digest after the data model is stable.
-
+5. Add content/social queue.
+6. Link latest strategy/memo docs.
+7. Pull in Stripe/Supabase customer context.
+8. Add weekly rollup metrics.
+9. Add Slack/email digest after the data model is stable.

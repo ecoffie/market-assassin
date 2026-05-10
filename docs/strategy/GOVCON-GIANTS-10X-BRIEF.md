@@ -40,7 +40,7 @@
 - 1 Conversion: **Market Intelligence SaaS ($149/mo)**
 - 1 Delivery: Federal Help Center (AI-powered tools platform)
 
-**Internal Scale System:** The coaches and outreach team need one shared operating dashboard. Annelle/Sikander own customer outreach and validation. Ryan/Zach/Randie own coach-led validation, activation, partner BD, enterprise referrals, and customer-success signal capture. All of this should feed a private MI Launch Command Center instead of scattered CSVs, Slack posts, and email threads.
+**Internal Scale System:** The coaches, outreach team, and content/social team need one shared operating dashboard. Annelle/Sikander own customer outreach and validation. Ryan/Zach/Randie own coach-led validation, activation, partner BD, enterprise referrals, and customer-success signal capture. Tavin/Branden support content operations and launch asset execution. Kash owns YouTube, Usama owns Instagram, and Muneeba owns LinkedIn. All of this should feed a private MI Launch Command Center instead of scattered CSVs, Slack posts, and email threads.
 
 ---
 
@@ -107,6 +107,7 @@ Referrals      →   Hunter Pro ($49)→   ────────────�
 | **MI SaaS (AI-powered)** | Self-serve | **YES - INFINITE** | **100% margin** |
 | **Daily Briefings (AI)** | Automated | **YES - INFINITE** | **100% margin** |
 | Coach/customer success signals | Ryan, Zach, Randie | Partially | Retention, activation, enterprise leads |
+| Content/social distribution | Kash, Usama, Muneeba, Tavin, Branden | Partially | Traffic, signups, proof, customer signals |
 | Pro Member training | Speakers | Partially | Retention tool |
 | Bootcamps | Eric | Partially | Lead gen for MI |
 
@@ -129,6 +130,7 @@ Referrals      →   Hunter Pro ($49)→   ────────────�
 - Launch MI SaaS at $149/mo
 - Use bootcamps as launch events for MI (not training products)
 - Repurpose speakers/coaches as customer success, validation, partner BD, and enterprise signal collectors (not low-ticket training revenue centers)
+- Treat YouTube, Instagram, and LinkedIn as measurable MI acquisition channels, not disconnected content calendars
 - Build team/enterprise tiers
 
 ---

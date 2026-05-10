@@ -26,6 +26,9 @@ Use the qualified customer outreach list and prioritize A1/A2 customers first. T
 **Ryan / Zach / Randie:**
 You are part of the 10x MI strategy, not just training support. Your role is to capture customer-success signals, ask the two validation questions during relevant calls/lives, surface partner and enterprise leads, identify proof stories, and flag users who may need MI setup, team access, or white-glove support.
 
+**Tavin / Branden / Kash / Usama / Muneeba:**
+You are part of the MI growth system. Tavin and Branden help coordinate launch assets, content QA, publishing readiness, and campaign execution. Kash owns YouTube. Usama owns Instagram. Muneeba owns LinkedIn. Social content should be tracked by the business signal it creates: MI signups, profile completions, replies, booked calls, partner leads, proof stories, and white-glove candidates.
+
 **Engineering / Product:**  
 Keep aligning dashboards and features around actionable questions:
 - Are users signing up?
@@ -54,6 +57,11 @@ Use these labels consistently:
 | Ryan | Capture coach/customer-success signals and partner leads | This week |
 | Zach | Capture coach/customer-success signals and partner leads | This week |
 | Randie | Capture coach/customer-success signals and partner leads | This week |
+| Tavin | Coordinate MI launch content assets and publishing readiness | This week |
+| Branden | Support content QA, links, assets, and launch distribution tasks | This week |
+| Kash | Track YouTube posts/clips, links, engagement, and MI signups | This week |
+| Usama | Track Instagram posts/reels/stories, DMs, links, and MI signups | This week |
+| Muneeba | Track LinkedIn posts/comments, replies, links, and MI signups | This week |
 | Eric | Call top 10-10 Forever candidates | This week |
 | Product/Engineering | Continue dashboard and API alignment around action metrics | This sprint |
 | Team | Use MI Free / MI Pro / MI Internal language consistently | Starting now |
@@ -64,6 +72,7 @@ Use these labels consistently:
 - MI active users
 - Time in MI
 - Briefing and alert engagement
+- YouTube / Instagram / LinkedIn engagement that turns into action
 - Helpful/not helpful feedback
 - Pipeline adds
 - Teaming adds
@@ -74,7 +83,7 @@ Use these labels consistently:
 The next team update should summarize customer outreach results: who responded, what they value, what confused them, who wants help, and what product changes would increase weekly MI usage.
 
 **Internal system direction:**
-We should move toward one private MI Launch Command Center link for Annelle, Sikander, Ryan, Zach, Randie, Eric, and product/engineering. The command center should replace manual CSV/email/Slack handoffs and become the source of truth for outreach, coach activity, notes, tags, and next actions.
+We should move toward one private MI Launch Command Center link for Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering. The command center should replace manual CSV/email/Slack handoffs and become the source of truth for outreach, coach activity, content/social activity, notes, tags, and next actions.
 
 ## Full Memo
 
@@ -90,6 +99,7 @@ The strategic direction is now clearer:
 - White-glove is for committed customers who need execution support.
 - Team and enterprise features matter because serious customers do not work alone.
 - Coaches are part of the scaling system: they help activate users, gather validation, surface partner leads, and identify proof/white-glove opportunities.
+- Content and social are part of the scaling system: YouTube, Instagram, and LinkedIn should create measurable MI traffic, signups, replies, and customer signals.
 
 The 9K free audience matters, but it is not where our highest human attention goes. The best customers identify themselves through action.
 
@@ -122,6 +132,7 @@ Use a customer-first operating system:
 | --- | --- |
 | Customer Outreach | Prioritize qualified buyers and active users before advisory conversations |
 | Coaches | Capture validation, customer-success, partner, and enterprise signals in one shared system |
+| Content/Social | Track YouTube, Instagram, LinkedIn, and launch assets by business outcome, not just views |
 | Product | Keep feature work tied to finding, deciding, tracking, teaming, proposing, and winning |
 | Dashboards | Separate inventory, entitlement, delivery, engagement, and outcomes |
 | Emails | Use Market Intelligence branding and correct tier language |

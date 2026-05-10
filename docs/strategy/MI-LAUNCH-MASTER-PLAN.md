@@ -40,7 +40,7 @@ The dashboard should support that same operating rhythm:
 3. Finish beta screen/database alignment for forecasts, grants, recompetes, contractors, pipeline, and teaming.
 4. Redirect old `.org` website paths to the new `.com` site so public links stop timing out.
 5. Keep 10-10 Forever outreach focused on users who show behavior: profile completion, email engagement, product usage, pipeline movement, and buying history.
-6. Build the internal MI Launch Command Center so Annelle, Sikander, Ryan, Zach, Randie, Eric, and product/engineering work from one private source of truth instead of CSVs, Slack fragments, and manual email updates.
+6. Build the internal MI Launch Command Center so Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering work from one private source of truth instead of CSVs, Slack fragments, and manual email updates.
 
 ## Table of Contents
 
@@ -106,6 +106,7 @@ The dashboard should support that same operating rhythm:
 - Monthly bootcamps
 - Livestreams (3x/week)
 - Coach-led customer-success and validation loops from Ryan, Zach, and Randie
+- Social distribution from Kash on YouTube, Usama on Instagram, and Muneeba on LinkedIn
 
 ### Channel 2: APEX Accelerators (Future)
 **See:** `APEX-GROWTH-STRATEGY.md` (separate document)
@@ -128,11 +129,17 @@ The launch should not depend on manual file passing. The command center becomes 
 
 - Annelle/Sikander outreach queue
 - Ryan/Zach/Randie coach activity
+- Tavin/Branden content operations and launch asset tasks
+- Kash YouTube distribution and engagement signals
+- Usama Instagram distribution and engagement signals
+- Muneeba LinkedIn distribution and engagement signals
 - Customer notes and outcome tags
 - 10-10 Forever candidates
 - White-glove candidates
 - Latest team memo
 - Launch metrics and open decisions
+
+Content should be treated as a measurable acquisition and learning channel. Every major YouTube, Instagram, and LinkedIn push should answer: did it produce MI signups, profile completions, replies, booked calls, partner leads, or white-glove candidates?
 
 ---
 
