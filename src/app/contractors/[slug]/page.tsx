@@ -8,6 +8,50 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+const SITE_URL = 'https://tools.govcongiants.org';
+const SITE_NAME = 'GovCon Giants';
+
+/**
+ * Gated content schema - tells Google which parts are free vs paywalled
+ * Free preview: stats, YoY chart, top agencies/NAICS (visible to all)
+ * Paid content: full award list, contacts, teaming workflows, exports
+ */
+function gatedContractorJsonLd({
+  company,
+  description,
+  slug,
+}: {
+  company: string;
+  description: string;
+  slug: string;
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: `${company} Federal Contract Awards & Sales History`,
+    description,
+    url: `${SITE_URL}/contractors/${slug}`,
+    isAccessibleForFree: false,
+    hasPart: [
+      {
+        '@type': 'WebPageElement',
+        isAccessibleForFree: true,
+        cssSelector: '.free-preview',
+      },
+      {
+        '@type': 'WebPageElement',
+        isAccessibleForFree: false,
+        cssSelector: '.premium-content',
+      },
+    ],
+    publisher: {
+      '@type': 'Organization',
+      name: SITE_NAME,
+      url: SITE_URL,
+    },
+  };
+}
+
 interface ContractorPageProps {
   params: Promise<{ slug: string }>;
 }
@@ -83,8 +127,20 @@ export default async function ContractorPage({ params }: ContractorPageProps) {
   const totalValue = history?.summary.totalObligations || contractor.contract_value_num || 0;
   const awardCount = history?.summary.awardCount || contractor.contract_count || 'N/A';
 
+  const jsonLd = gatedContractorJsonLd({
+    company: contractor.company,
+    description: `Research ${contractor.company} federal contract sales, award history, agencies, NAICS codes, and recent government contracting activity.`,
+    slug,
+  });
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      {/* JSON-LD for gated content - tells Google what's free vs paid */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <section className="border-b border-slate-800 bg-slate-900">
         <div className="mx-auto max-w-6xl px-6 py-12">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -110,7 +166,8 @@ export default async function ContractorPage({ params }: ContractorPageProps) {
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl space-y-8 px-6 py-10">
+      {/* FREE PREVIEW SECTION - Indexed by Google */}
+      <div className="free-preview mx-auto max-w-6xl space-y-8 px-6 py-10">
         <div className="grid gap-4 md:grid-cols-4">
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
             <div className="text-3xl font-bold text-white">{formatCompactCurrency(totalValue)}</div>
@@ -212,6 +269,10 @@ export default async function ContractorPage({ params }: ContractorPageProps) {
           </section>
         </div>
 
+      </div>
+
+      {/* PREMIUM CONTENT SECTION - Gated, not fully indexed by Google */}
+      <div className="premium-content mx-auto max-w-6xl px-6 pb-10">
         <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
