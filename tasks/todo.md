@@ -71,7 +71,8 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [x] Convert the API Security Audit agent spec into an implementation PRD with the current 68-route baseline.
 - [x] Build the read-only Launch Manager brief generator from `tasks/PRD-launch-manager-agent.md`.
 - [ ] Add the Launch Manager brief output to `/admin/launch-command-center` once the JSON shape is stable.
-- [ ] Build the read-only SEO Contractor Pages candidate scorer from `tasks/PRD-seo-contractor-pages-agent.md`.
+- [x] Build the read-only SEO Contractor Pages candidate scorer from `tasks/PRD-seo-contractor-pages-agent.md`.
+- [ ] Add Search Console, MI usage events, and route-crawl canonical status to the SEO Contractor Pages candidate scorer.
 - [ ] Fix public contractor page canonicals to `govcongiants.com` while keeping authenticated MI app links on `mi.govcongiants.com`.
 
 ### 🔐 TODO: Classify and Harden Remaining API Routes
