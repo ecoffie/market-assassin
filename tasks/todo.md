@@ -42,6 +42,7 @@ Everything new should use the `.com` brand system moving forward. Public website
 - `tasks/PRD-mi-growth-ops-agent.md` - Implementation PRD for the read-only MI Growth Brief, action queues, freshness notes, and internal dashboard feed.
 - `tasks/PRD-api-security-audit-agent.md` - Implementation PRD for classifying and hardening the 68 current open API route candidates.
 - `tasks/PRD-launch-manager-agent.md` - Implementation PRD for launch status briefs, team broadcast drafts, owner actions, and decision tracking.
+- `tasks/PRD-seo-contractor-pages-agent.md` - Implementation PRD for ranking public contractor SEO pages, public/gated data rules, `.com` canonicals, and MI deep links.
 - `docs/strategy/MI-TEAM-ALIGNMENT-SLACK-BRIEF.md` - Team-ready Slack/memo version of the MI pivot, outreach priorities, and operating rules.
 - `docs/strategy/MI-INTERNAL-COMMAND-CENTER-PRD.md` - Private dashboard PRD for Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering.
 
@@ -66,9 +67,11 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [x] Convert the MI Growth Ops Agent spec into an implementation PRD for a read-only Growth Brief and action queues.
 - [ ] Build the admin-protected MI Growth Brief endpoint/output shape from `tasks/PRD-mi-growth-ops-agent.md`.
 - [x] Convert the Launch Manager agent spec into an implementation PRD for launch briefs, team broadcasts, owner actions, and decision tracking.
-- [ ] Convert the SEO Contractor Pages agent spec into an implementation PRD after the data sources and owners are confirmed.
+- [x] Convert the SEO Contractor Pages agent spec into an implementation PRD after the data sources and owners are confirmed.
 - [x] Convert the API Security Audit agent spec into an implementation PRD with the current 68-route baseline.
 - [ ] Build the read-only Launch Manager brief generator from `tasks/PRD-launch-manager-agent.md`.
+- [ ] Build the read-only SEO Contractor Pages candidate scorer from `tasks/PRD-seo-contractor-pages-agent.md`.
+- [ ] Fix public contractor page canonicals to `govcongiants.com` while keeping authenticated MI app links on `mi.govcongiants.com`.
 
 ### 🔐 TODO: Classify and Harden Remaining API Routes
 
