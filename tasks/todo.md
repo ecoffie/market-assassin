@@ -69,7 +69,8 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [x] Convert the Launch Manager agent spec into an implementation PRD for launch briefs, team broadcasts, owner actions, and decision tracking.
 - [x] Convert the SEO Contractor Pages agent spec into an implementation PRD after the data sources and owners are confirmed.
 - [x] Convert the API Security Audit agent spec into an implementation PRD with the current 68-route baseline.
-- [ ] Build the read-only Launch Manager brief generator from `tasks/PRD-launch-manager-agent.md`.
+- [x] Build the read-only Launch Manager brief generator from `tasks/PRD-launch-manager-agent.md`.
+- [ ] Add the Launch Manager brief output to `/admin/launch-command-center` once the JSON shape is stable.
 - [ ] Build the read-only SEO Contractor Pages candidate scorer from `tasks/PRD-seo-contractor-pages-agent.md`.
 - [ ] Fix public contractor page canonicals to `govcongiants.com` while keeping authenticated MI app links on `mi.govcongiants.com`.
 

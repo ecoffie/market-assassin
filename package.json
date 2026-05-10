@@ -12,6 +12,7 @@
     "test:local": "bash tests/test-pre-deploy.sh --local",
     "test:schema": "node tests/test-schema-sync.js",
     "audit:api-auth": "node scripts/audit-api-auth.js",
+    "launch:brief": "node scripts/generate-launch-manager-brief.js",
     "predeploy": "npm run test:schema && npm run test:pre-deploy",
     "deploy": "npm run predeploy && vercel --prod",
     "experiment:dry-run": "DRY_RUN=true npx tsx scripts/assign-experiment-cohorts.ts",
