@@ -8,6 +8,20 @@
 
 We are turning repeated founder/team workflows into reusable skills, tools, and agent specs so launch planning, dashboard alignment, customer outreach, and MI growth ops do not depend on one-off chat threads.
 
+### TODO: Canonical `.com` Migration
+
+**Status:** Active direction as of May 10, 2026
+
+Everything new should be built on `govcongiants.com` moving forward. `.org`, `tools.govcongiants.org`, `mi.govcongiants.com`, and shop domains are transition/redirect surfaces only. Do not introduce new launch pages, internal pages, SEO pages, product links, email CTAs, or social links on the old domains.
+
+**Next actions:**
+- [ ] Create the canonical route map for MI Free, MI Pro, admin, launch command center, pricing, onboarding, briefings, contractor profiles, and public SEO pages on `govcongiants.com`.
+- [ ] Confirm whether `.com` app routing will be handled by the funnels repo, this repo, Vercel rewrites, or a shared shell.
+- [ ] Add compatibility redirects from `.org`, `tools`, `mi`, and `shop` only after the matching `.com` destination path exists.
+- [ ] Update email templates and generated links to use canonical `.com` URLs.
+- [ ] Update social, YouTube, LinkedIn, IG, coaching scripts, launch plans, and team briefs to use one `.com` link system.
+- [ ] Keep `mi.govcongiants.com` available as a temporary technical alias until all customer-facing links have moved.
+
 **New specs:**
 - `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` - Top skills, tools/plugins, agents, missing MD sections, and build order.
 - `tasks/skills/dashboard-clarity-skill.md` - Repeatable dashboard review framework for action-oriented MI metrics.

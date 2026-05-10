@@ -2,18 +2,18 @@
 
 ## The Problem: Tool Fragmentation
 
-**Current State:** Multiple overlapping tools, 2 tech stacks, confusing user experience
+**Current State:** Multiple overlapping tools, 2 tech stacks, confusing user experience, and too many public domains.
 
 | Tool | Current Location | Tech Stack | Status | Future |
 |------|------------------|------------|--------|--------|
-| Market Assassin | tools.govcongiants.org/market-assassin | Next.js/Supabase | ✅ Live | → MI Pro |
-| Opportunity Hunter | tools.govcongiants.org/opportunity-hunter | Next.js/Supabase | ✅ Live | → MI Free |
-| Recompete Tracker | tools.govcongiants.org/recompete | Next.js/Supabase | ✅ Live | → MI feature |
-| Contractor Database | tools.govcongiants.org/contractor-database | Next.js/Supabase | ✅ Live | → MI feature |
-| Forecast Intelligence | tools.govcongiants.org/forecasts | Next.js/Supabase | ✅ Live | → MI feature |
-| Market Scanner | tools.govcongiants.org/bd-assist (SCANNER tab) | Next.js/Supabase | ✅ Live | → MI feature |
-| BD Assist Pipeline | tools.govcongiants.org/bd-assist | Next.js/Supabase | ✅ Live | → Execution tier |
-| Action Planner | tools.govcongiants.org/planner | Next.js/Supabase | ✅ Live | → Execution tier |
+| Market Assassin | legacy: tools.govcongiants.org/market-assassin | Next.js/Supabase | ✅ Live | → `govcongiants.com/mi` / MI Pro |
+| Opportunity Hunter | legacy: tools.govcongiants.org/opportunity-hunter | Next.js/Supabase | ✅ Live | → `govcongiants.com/mi` / MI Free |
+| Recompete Tracker | legacy: tools.govcongiants.org/recompete | Next.js/Supabase | ✅ Live | → `govcongiants.com/mi/recompetes` |
+| Contractor Database | legacy: tools.govcongiants.org/contractor-database | Next.js/Supabase | ✅ Live | → `govcongiants.com/mi/contractors` |
+| Forecast Intelligence | legacy: tools.govcongiants.org/forecasts | Next.js/Supabase | ✅ Live | → `govcongiants.com/mi/forecasts` |
+| Market Scanner | legacy: tools.govcongiants.org/bd-assist | Next.js/Supabase | ✅ Live | → `govcongiants.com/mi/market-research` |
+| BD Assist Pipeline | legacy: tools.govcongiants.org/bd-assist | Next.js/Supabase | ✅ Live | → `govcongiants.com/mi/pipeline` |
+| Action Planner | legacy: tools.govcongiants.org/planner | Next.js/Supabase | ✅ Live | → `govcongiants.com/mi/planner` |
 | Daily Briefings | Email + Dashboard | Next.js/Supabase | ✅ Live | → MI Pro core |
 | Weekly Deep Dives | Email | Next.js/Supabase | ✅ Live | → MI Pro core |
 | Pursuit Briefs | Email + Dashboard | Next.js/Supabase | ✅ Live | → MI Pro core |
@@ -79,7 +79,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     GOVCON GIANTS PLATFORM                       │
-│                    tools.govcongiants.org                        │
+│                       govcongiants.com                           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐│

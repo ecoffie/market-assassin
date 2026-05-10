@@ -1,13 +1,13 @@
 # Domain & Brand Consolidation Strategy
 
 **Decision Date:** May 4, 2026
-**Status:** Approved — Implementation Pending
+**Status:** Approved — Canonical `.com` model updated May 10, 2026
 
 ---
 
 ## Executive Summary
 
-Consolidate all GovCon Giants properties under `govcongiants.com` (.com) with a unified MI SaaS product model. Kill the shop. Migrate from nonprofit (.org) to for-profit structure.
+Consolidate all GovCon Giants properties under `govcongiants.com` (.com) with a unified MI SaaS product model. Kill the shop. Migrate from nonprofit (.org) to for-profit structure. Moving forward, new pages, launch links, customer journeys, SEO pages, and internal command-center links should be built on `govcongiants.com` paths. Legacy hosts only exist to preserve old links and redirect traffic.
 
 ---
 
@@ -36,8 +36,10 @@ Consolidate all GovCon Giants properties under `govcongiants.com` (.com) with a 
 | Purpose | URL | Codebase |
 |---------|-----|----------|
 | **Marketing/SEO** | `govcongiants.com` | govcon-funnels |
-| **SaaS App** | `mi.govcongiants.com` | market-assassin |
-| **Shop** | KILLED | Redirect to /pricing |
+| **SaaS/App Experience** | `govcongiants.com/mi`, `govcongiants.com/briefings`, `govcongiants.com/admin/...` | govcon-funnels shell + market-assassin app surfaces |
+| **Shop** | KILLED | Redirect to `/pricing` or MI offer pages |
+
+**Canonical rule:** no new product, launch, internal, or SEO page should be introduced on `.org`, `tools.govcongiants.org`, `mi.govcongiants.com`, or `shop.govcongiants.*`. Those domains may remain as redirect and compatibility layers while old emails, bookmarks, and customer links age out.
 
 ### Email Structure
 
@@ -113,7 +115,7 @@ Research from [Lovable](https://lovable.dev/guides/org-vs-com-domain-extension-g
 
 ---
 
-## Why Subdomain Over Path
+## Path-First Decision
 
 Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery/tenant-routing-strategies-for-saas-applications-on-aws/) and [Serverless First](https://serverlessfirst.com/how-to-select-a-future-proof-subdomain-structure-for-saas-web-app/):
 
@@ -125,7 +127,7 @@ Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery
 | Independent deployment | Yes | No |
 | Per-customer routing | DNS-based | Complex |
 
-**At 100K users, subdomain is mandatory for enterprise features.**
+**Updated May 10, 2026:** use paths on `govcongiants.com` for the customer-facing product and launch experience because the brand needs one destination, one SEO footprint, and one link system. Subdomains may still be used behind the scenes for infrastructure, white-label experiments, or temporary compatibility, but they are not the public product architecture.
 
 ---
 
@@ -145,13 +147,14 @@ Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery
 ## Migration Plan
 
 ### Phase 1: DNS Setup (Day 1)
-- [ ] Add `govcongiants.com` to Vercel (govcon-funnels)
-- [ ] Add `mi.govcongiants.com` to Vercel (market-assassin)
+- [ ] Confirm `govcongiants.com` / `www.govcongiants.com` owns all public customer paths.
+- [ ] Attach or proxy MI app routes into canonical `.com` paths before changing hard redirects.
 - [ ] Configure SSL certificates
 
 ### Phase 2: Redirects (Day 2)
 - [ ] `govcongiants.org/*` → `govcongiants.com/*` (301)
-- [ ] `tools.govcongiants.org/*` → `mi.govcongiants.com/*` (301)
+- [ ] `tools.govcongiants.org/*` → matching `govcongiants.com/*` path once those paths exist
+- [ ] `mi.govcongiants.com/*` → matching `govcongiants.com/*` path once those paths exist
 - [ ] `shop.govcongiants.org/*` → `govcongiants.com/pricing` (301)
 
 ### Phase 3: Email Migration (Week 1)
@@ -178,7 +181,7 @@ Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery
 ## SEO Considerations
 
 - **301 redirects preserve SEO** — Google follows redirects
-- **Interlink heavily** — govcongiants.com ↔ mi.govcongiants.com
+- **Consolidate links** — use `govcongiants.com` as the canonical link target across emails, SEO pages, internal docs, social, and launch materials
 - **Update sitemap** — Submit new URLs to Google Search Console
 - **Monitor traffic** — Watch for drops in first 30 days
 
@@ -216,7 +219,8 @@ Research from [AWS](https://aws.amazon.com/blogs/networking-and-content-delivery
 | May 4, 2026 | Kill shop | SaaS model, one conversion point |
 | May 4, 2026 | MI Free = OH + Daily Alerts | Habit-forming hook, same onboarding |
 | May 4, 2026 | Grandfather $49 subscribers | Honor commitments, retention |
+| May 10, 2026 | Build future pages on govcongiants.com paths | Eliminate .org confusion, stop sending users to separate product pages, consolidate SEO and customer journeys |
 
 ---
 
-*Last Updated: May 4, 2026*
+*Last Updated: May 10, 2026*
