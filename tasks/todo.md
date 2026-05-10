@@ -31,8 +31,14 @@ Everything new should use the `.com` brand system moving forward. Public website
 - `tasks/skills/prd-builder-skill.md` - Repeatable PRD framework for MI features, SEO pages, public/gated data, and access/security.
 - `tasks/skills/govcon-offer-reframing-skill.md` - Repeatable copy and positioning framework for MI Free, MI Pro, bundles, internal users, and white-glove.
 - `tasks/skills/team-alignment-brief-skill.md` - Repeatable memo/Slack brief framework for team decisions, dashboard findings, and launch changes.
+- `tasks/skills/seo-page-strategy-skill.md` - Repeatable framework for public/gated SEO pages that rank and convert into MI.
+- `tasks/skills/customer-success-insight-skill.md` - Repeatable framework for turning usage signals into rescue, activation, upgrade, and white-glove actions.
+- `tasks/skills/founder-decision-memo-skill.md` - Repeatable framework for turning founder decisions into clear team execution memos.
 - `tasks/agents/mi-growth-ops-agent.md` - Daily/weekly growth ops agent spec for activation, engagement, outcomes, and next actions.
 - `tasks/agents/customer-qualification-agent.md` - Customer ranking agent spec for Annelle/Sikander outreach, MI Pro upgrades, and 10-10 candidates.
+- `tasks/agents/launch-manager-agent.md` - Launch coordination agent spec for memos, assets, owners, blockers, and team updates.
+- `tasks/agents/seo-contractor-pages-agent.md` - SEO page agent spec for contractor profile candidates, public/gated data, and refresh priorities.
+- `tasks/agents/api-security-audit-agent.md` - API hardening agent spec for classifying and protecting route surfaces.
 - `docs/strategy/MI-TEAM-ALIGNMENT-SLACK-BRIEF.md` - Team-ready Slack/memo version of the MI pivot, outreach priorities, and operating rules.
 - `docs/strategy/MI-INTERNAL-COMMAND-CENTER-PRD.md` - Private dashboard PRD for Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering.
 
@@ -46,12 +52,16 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [ ] Use the Customer Outreach Campaign Skill to turn the next outreach batch into call scripts, emails, and follow-up tags.
 - [ ] Use the PRD Builder Skill on the contractor sales history chart and Deal Flow Board before expanding implementation.
 - [ ] Use the GovCon Offer Reframing Skill to clean up MI website, auth emails, onboarding, and dashboard labels.
+- [ ] Use the SEO Page Strategy Skill to map contractor profile pages and `.com` public/gated SEO surfaces.
+- [ ] Use the Customer Success Insight Skill to define rescue, activation, upgrade, and white-glove outreach queues.
+- [ ] Use the Founder Decision Memo Skill for pricing, access model, and `.com`/MI domain decisions.
 - [x] Use the Team Alignment Brief Skill to convert the MI pivot and customer-first outreach into one team-ready Slack memo.
 - [x] Build the MI Internal Launch Command Center V1 shell so outreach, coach activity, enterprise/package sales activity, content/social activity, notes, tags, and team memos live behind one private link.
 - [ ] Wire the MI Internal Launch Command Center to Supabase, Stripe, email engagement, MI app activity, and owner-updated launch action data.
 - [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
 - [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
 - [ ] Convert the MI Growth Ops Agent spec into an implementation PRD once the source-of-truth endpoint is agreed.
+- [ ] Convert the Launch Manager, SEO Contractor Pages, and API Security Audit agent specs into implementation PRDs after the data sources and owners are confirmed.
 
 ### 🔐 TODO: Classify and Harden Remaining API Routes
 

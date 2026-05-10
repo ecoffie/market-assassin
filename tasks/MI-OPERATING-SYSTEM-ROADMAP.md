@@ -27,9 +27,9 @@ The operating system below is designed to reduce founder bottlenecks, improve te
 | 5 | [PRD Builder Skill](skills/prd-builder-skill.md) | Convert product ideas into scoped specs | Contractor sales chart, Deal Flow Board |
 | 6 | [GovCon Offer Reframing Skill](skills/govcon-offer-reframing-skill.md) | Reframe offers around outcomes, not training | MI Free, MI Pro, white-glove |
 | 7 | [Team Alignment Brief Skill](skills/team-alignment-brief-skill.md) | Create internal briefs that reduce confusion and founder hand-holding | Slack/team updates |
-| 8 | SEO Page Strategy Skill | Design public/gated pages that rank and convert | Contractor profile pages |
-| 9 | Customer Success Insight Skill | Turn usage behavior into rescue, upgrade, or white-glove actions | MI engagement follow-up |
-| 10 | Founder Decision Memo Skill | Convert high-stakes founder thinking into decisions and tradeoffs | Pricing, access, roadmap |
+| 8 | [SEO Page Strategy Skill](skills/seo-page-strategy-skill.md) | Design public/gated pages that rank and convert | Contractor profile pages |
+| 9 | [Customer Success Insight Skill](skills/customer-success-insight-skill.md) | Turn usage behavior into rescue, upgrade, or white-glove actions | MI engagement follow-up |
+| 10 | [Founder Decision Memo Skill](skills/founder-decision-memo-skill.md) | Convert high-stakes founder thinking into decisions and tradeoffs | Pricing, access, roadmap |
 
 ## Top 5 Tools / Plugins Needed
 
@@ -47,9 +47,9 @@ The operating system below is designed to reduce founder bottlenecks, improve te
 | --- | --- | --- | --- |
 | 1 | [MI Growth Ops Agent](agents/mi-growth-ops-agent.md) | Monitor activation, engagement, outcomes, and next actions | Manual daily/weekly brief |
 | 2 | [Customer Qualification Agent](agents/customer-qualification-agent.md) | Find the most valuable users from Stripe, usage, and engagement | Outreach candidate list |
-| 3 | Launch Manager Agent | Keep launch plans, memos, tasks, and team updates aligned | May 30 launch support |
-| 4 | SEO Contractor Pages Agent | Identify contractor pages to create, update, and gate | Public contractor profiles |
-| 5 | API Security Audit Agent | Classify and harden API routes | 67 candidate route review |
+| 3 | [Launch Manager Agent](agents/launch-manager-agent.md) | Keep launch plans, memos, tasks, and team updates aligned | May 30 launch support |
+| 4 | [SEO Contractor Pages Agent](agents/seo-contractor-pages-agent.md) | Identify contractor pages to create, update, and gate | Public contractor profiles |
+| 5 | [API Security Audit Agent](agents/api-security-audit-agent.md) | Classify and harden API routes | 67 candidate route review |
 
 ## Missing MD Sections
 

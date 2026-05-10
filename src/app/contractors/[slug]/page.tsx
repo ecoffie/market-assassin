@@ -8,7 +8,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const SITE_URL = 'https://tools.govcongiants.org';
+const SITE_URL = 'https://mi.govcongiants.com';
 const SITE_NAME = 'GovCon Giants';
 
 /**
@@ -80,12 +80,12 @@ export async function generateMetadata({ params }: ContractorPageProps): Promise
     title,
     description,
     alternates: {
-      canonical: `https://www.govcongiants.com/contractors/${slug}`,
+      canonical: `https://mi.govcongiants.com/contractors/${slug}`,
     },
     openGraph: {
       title,
       description,
-      url: `https://www.govcongiants.com/contractors/${slug}`,
+      url: `https://mi.govcongiants.com/contractors/${slug}`,
       type: 'website',
     },
   };
