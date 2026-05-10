@@ -23,6 +23,9 @@ Do not spend heavy human time trying to persuade disengaged free users. Free use
 **Annelle / Sikander:**  
 Use the qualified customer outreach list and prioritize A1/A2 customers first. The goal is not to pitch immediately. The goal is to learn what customers value, what blocks them, and what would make MI worth using every week.
 
+**Ryan / Zach / Randie:**
+You are part of the 10x MI strategy, not just training support. Your role is to capture customer-success signals, ask the two validation questions during relevant calls/lives, surface partner and enterprise leads, identify proof stories, and flag users who may need MI setup, team access, or white-glove support.
+
 **Engineering / Product:**  
 Keep aligning dashboards and features around actionable questions:
 - Are users signing up?
@@ -48,6 +51,9 @@ Use these labels consistently:
 | --- | --- | --- |
 | Annelle | Start A1/A2 customer outreach from the ranked list | This week |
 | Sikander | Track replies, calls, objections, and feature requests | This week |
+| Ryan | Capture coach/customer-success signals and partner leads | This week |
+| Zach | Capture coach/customer-success signals and partner leads | This week |
+| Randie | Capture coach/customer-success signals and partner leads | This week |
 | Eric | Call top 10-10 Forever candidates | This week |
 | Product/Engineering | Continue dashboard and API alignment around action metrics | This sprint |
 | Team | Use MI Free / MI Pro / MI Internal language consistently | Starting now |
@@ -67,6 +73,9 @@ Use these labels consistently:
 **Next update:**  
 The next team update should summarize customer outreach results: who responded, what they value, what confused them, who wants help, and what product changes would increase weekly MI usage.
 
+**Internal system direction:**
+We should move toward one private MI Launch Command Center link for Annelle, Sikander, Ryan, Zach, Randie, Eric, and product/engineering. The command center should replace manual CSV/email/Slack handoffs and become the source of truth for outreach, coach activity, notes, tags, and next actions.
+
 ## Full Memo
 
 ### Story So Far
@@ -80,6 +89,7 @@ The strategic direction is now clearer:
 - MI Pro is the paid self-serve platform.
 - White-glove is for committed customers who need execution support.
 - Team and enterprise features matter because serious customers do not work alone.
+- Coaches are part of the scaling system: they help activate users, gather validation, surface partner leads, and identify proof/white-glove opportunities.
 
 The 9K free audience matters, but it is not where our highest human attention goes. The best customers identify themselves through action.
 
@@ -111,6 +121,7 @@ Use a customer-first operating system:
 | Area | Action |
 | --- | --- |
 | Customer Outreach | Prioritize qualified buyers and active users before advisory conversations |
+| Coaches | Capture validation, customer-success, partner, and enterprise signals in one shared system |
 | Product | Keep feature work tied to finding, deciding, tracking, teaming, proposing, and winning |
 | Dashboards | Separate inventory, entitlement, delivery, engagement, and outcomes |
 | Emails | Use Market Intelligence branding and correct tier language |
@@ -120,6 +131,7 @@ Use a customer-first operating system:
 ### Open Questions
 
 - Which Slack channel should receive the weekly MI Growth Ops brief?
+- Should the MI Launch Command Center be `/admin/launch-command-center` or `/internal/mi-command-center`?
 - Which customer actions count as “ready for white-glove”?
 - Which public contractor data should be shown for SEO before gating?
 - What should the first Deal Flow Board version include?
@@ -127,4 +139,3 @@ Use a customer-first operating system:
 ### Decision Owner
 
 Eric owns the strategic direction. Product/engineering owns implementation clarity. Annelle/Sikander own the first customer learning loop.
-

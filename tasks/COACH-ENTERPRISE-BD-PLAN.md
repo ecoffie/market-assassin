@@ -209,6 +209,43 @@ This is a **massive misallocation of talent**.
 
 **Review:** Every Friday, 30 minutes, coaches report numbers.
 
+## MI Launch Command Center Integration
+
+The coach plan should feed the same internal operating system as Annelle/Sikander customer outreach.
+
+**Source of truth:** `docs/strategy/MI-INTERNAL-COMMAND-CENTER-PRD.md`
+
+Ryan, Zach, and Randie should log the following inside the MI Launch Command Center:
+
+- Partner leads from APEX, SBDC, chamber, trade association, and enterprise conversations
+- Customer-success signals from calls, livestreams, and community interactions
+- Users who need MI setup, profile completion, team access, or white-glove support
+- Proof-story candidates who found, pursued, or won opportunities through MI
+- Enterprise or bulk-access opportunities that should be escalated to Eric
+
+Coach activity types:
+
+- `partner_bd`
+- `livestream_validation`
+- `customer_success_checkin`
+- `enterprise_referral`
+- `proof_story`
+- `white_glove_referral`
+
+Required fields:
+
+- Coach owner
+- Target person/org
+- Channel
+- Segment
+- Objective
+- Status
+- Customer signal captured
+- Next action
+- Escalation needed
+
+The Friday coach review should use the command center, not separate spreadsheets or memory. This lets the team connect partner work to MI Free signups, MI Pro upgrades, profile completion, app usage, and contract outcomes.
+
 ---
 
 ## Tools for Coaches
@@ -347,6 +384,6 @@ A: See COACH-PARTNERSHIP-CALL-SCRIPT.md (to be created)
 ---
 
 *Created: May 3, 2026*
-*Updated: May 3, 2026 — Clarified FHC trainings are the problem, not free bootcamps*
+*Updated: May 9, 2026 — Added MI Launch Command Center integration for coach-led scaling*
 *Timeline: May - October 2026*
 *Goal: 100K free users → $250K MRR*

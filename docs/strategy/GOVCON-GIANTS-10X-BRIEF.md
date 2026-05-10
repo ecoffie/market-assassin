@@ -40,6 +40,8 @@
 - 1 Conversion: **Market Intelligence SaaS ($149/mo)**
 - 1 Delivery: Federal Help Center (AI-powered tools platform)
 
+**Internal Scale System:** The coaches and outreach team need one shared operating dashboard. Annelle/Sikander own customer outreach and validation. Ryan/Zach/Randie own coach-led validation, activation, partner BD, enterprise referrals, and customer-success signal capture. All of this should feed a private MI Launch Command Center instead of scattered CSVs, Slack posts, and email threads.
+
 ---
 
 ## Part 1: The Diagnosis (Traffic-Systems-Skills)
@@ -104,6 +106,7 @@ Referrals      →   Hunter Pro ($49)→   ────────────�
 |----------|-------|-----------|----------------|
 | **MI SaaS (AI-powered)** | Self-serve | **YES - INFINITE** | **100% margin** |
 | **Daily Briefings (AI)** | Automated | **YES - INFINITE** | **100% margin** |
+| Coach/customer success signals | Ryan, Zach, Randie | Partially | Retention, activation, enterprise leads |
 | Pro Member training | Speakers | Partially | Retention tool |
 | Bootcamps | Eric | Partially | Lead gen for MI |
 
@@ -125,7 +128,7 @@ Referrals      →   Hunter Pro ($49)→   ────────────�
 **To scale to $1M+ ARR:**
 - Launch MI SaaS at $149/mo
 - Use bootcamps as launch events for MI (not training products)
-- Repurpose speakers as customer success (not revenue center)
+- Repurpose speakers/coaches as customer success, validation, partner BD, and enterprise signal collectors (not low-ticket training revenue centers)
 - Build team/enterprise tiers
 
 ---

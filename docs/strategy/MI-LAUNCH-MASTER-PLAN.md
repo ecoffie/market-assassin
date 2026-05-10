@@ -40,6 +40,7 @@ The dashboard should support that same operating rhythm:
 3. Finish beta screen/database alignment for forecasts, grants, recompetes, contractors, pipeline, and teaming.
 4. Redirect old `.org` website paths to the new `.com` site so public links stop timing out.
 5. Keep 10-10 Forever outreach focused on users who show behavior: profile completion, email engagement, product usage, pipeline movement, and buying history.
+6. Build the internal MI Launch Command Center so Annelle, Sikander, Ryan, Zach, Randie, Eric, and product/engineering work from one private source of truth instead of CSVs, Slack fragments, and manual email updates.
 
 ## Table of Contents
 
@@ -104,6 +105,7 @@ The dashboard should support that same operating rhythm:
 - 9,000 warm leads
 - Monthly bootcamps
 - Livestreams (3x/week)
+- Coach-led customer-success and validation loops from Ryan, Zach, and Randie
 
 ### Channel 2: APEX Accelerators (Future)
 **See:** `APEX-GROWTH-STRATEGY.md` (separate document)
@@ -116,6 +118,21 @@ APEX Accelerators counsel 30,000+ small businesses annually across 90+ locations
 - Encore Funding model ($5,767/mo)
 - White Glove clients ($6K/mo)
 - Replicate with similar organizations
+- Coaches help surface partner leads, enterprise referrals, and white-glove candidates through their calls, livestreams, and organization relationships.
+
+### Internal Operating Channel: MI Launch Command Center
+
+**See:** `MI-INTERNAL-COMMAND-CENTER-PRD.md`
+
+The launch should not depend on manual file passing. The command center becomes the one private link for:
+
+- Annelle/Sikander outreach queue
+- Ryan/Zach/Randie coach activity
+- Customer notes and outcome tags
+- 10-10 Forever candidates
+- White-glove candidates
+- Latest team memo
+- Launch metrics and open decisions
 
 ---
 
