@@ -1,10 +1,14 @@
 # PRD: MI Internal Launch Command Center
 
 **Date:** May 9, 2026  
-**Status:** Draft  
+**Status:** V1 shell built  
 **Owner:** Eric / Product  
 **Primary Users:** Eric, Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, internal team
 **Goal:** Replace scattered files, email threads, Slack messages, and manual updates with one private internal dashboard for MI launch, customer outreach, coach execution, and 10x scaling.
+
+**V1 Route:** `/admin/launch-command-center`
+
+**Implementation note:** V1 is a private, admin-password-gated command-center shell with role lanes, weekly priorities, operating queues, metric definitions, source docs, and next build slices. V2 should wire live Supabase, Stripe, email engagement, MI app activity, and owner-updated action data.
 
 ## 1. Problem
 
