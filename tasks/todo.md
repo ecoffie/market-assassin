@@ -15,7 +15,7 @@ We are turning repeated founder/team workflows into reusable skills, tools, and 
 Everything new should use the `.com` brand system moving forward. Public website, SEO, sales, pricing, content, and launch pages live on `govcongiants.com`. The MI SaaS platform lives on `mi.govcongiants.com` and replaces `tools.govcongiants.org`. `.org`, `tools.govcongiants.org`, and shop domains are transition/redirect surfaces only.
 
 **Next actions:**
-- [ ] Create the canonical route map: public pages on `govcongiants.com`; app/admin/account pages on `mi.govcongiants.com`.
+- [x] Create the canonical route map: public pages on `govcongiants.com`; app/admin/account pages on `mi.govcongiants.com`.
 - [ ] Confirm which public MI sales/SEO pages belong in the funnels repo versus which product surfaces stay in this repo.
 - [ ] Add compatibility redirects from `.org`, `tools`, and `shop` only after the matching `.com` or `mi.govcongiants.com` destination path exists.
 - [ ] Update email templates and generated links: sales/content CTAs to `govcongiants.com`, product/account CTAs to `mi.govcongiants.com`.
@@ -23,6 +23,7 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [ ] Keep `mi.govcongiants.com` as the primary MI platform domain.
 
 **New specs:**
+- `tasks/CANONICAL-DOMAIN-ROUTE-MAP.md` - Canonical domain and route ownership map for `.com`, `mi.govcongiants.com`, and legacy redirect surfaces.
 - `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` - Top skills, tools/plugins, agents, missing MD sections, and build order.
 - `tasks/skills/dashboard-clarity-skill.md` - Repeatable dashboard review framework for action-oriented MI metrics.
 - `tasks/skills/launch-memo-skill.md` - Repeatable launch memo structure for team-ready execution.
