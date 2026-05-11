@@ -65,7 +65,7 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
 - [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
 - [x] Convert the MI Growth Ops Agent spec into an implementation PRD for a read-only Growth Brief and action queues.
-- [ ] Build the admin-protected MI Growth Brief endpoint/output shape from `tasks/PRD-mi-growth-ops-agent.md`.
+- [x] Build the admin-protected MI Growth Brief endpoint/output shape from `tasks/PRD-mi-growth-ops-agent.md`.
 - [x] Convert the Launch Manager agent spec into an implementation PRD for launch briefs, team broadcasts, owner actions, and decision tracking.
 - [x] Convert the SEO Contractor Pages agent spec into an implementation PRD after the data sources and owners are confirmed.
 - [x] Convert the API Security Audit agent spec into an implementation PRD with the current 68-route baseline.
