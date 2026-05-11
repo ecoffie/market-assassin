@@ -339,6 +339,7 @@ export default function LaunchCommandCenterPage() {
   const [checking, setChecking] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   const [growthBrief, setGrowthBrief] = useState<GrowthBrief | null>(null);
   const [growthLoading, setGrowthLoading] = useState(false);
@@ -532,14 +533,24 @@ export default function LaunchCommandCenterPage() {
             One internal link for launch priorities, owners, outreach, coach signals, enterprise sales, and social distribution.
           </p>
           <form className="mt-8 space-y-4" onSubmit={handleLogin}>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Admin password"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-emerald-400"
-              autoFocus
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Admin password"
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 pr-24 text-white outline-none transition focus:border-emerald-400"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-3 py-1.5 text-sm font-semibold text-emerald-300 transition hover:bg-slate-800 hover:text-emerald-200"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
             {authError ? <p className="text-sm text-red-300">{authError}</p> : null}
             <button
               type="submit"
