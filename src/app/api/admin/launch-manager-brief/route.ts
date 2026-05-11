@@ -1,249 +1,223 @@
 /**
  * Admin: Launch Manager Brief
  *
- * Read-only operating brief built from the launch markdown/source-of-truth files.
+ * Lightweight production brief for the internal launch command center.
+ * Keep this route free of repo-wide fs reads so Vercel does not bundle
+ * the full workspace into the serverless function.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-export const runtime = 'nodejs';
 
-type SourceFile = {
-  label: string;
-  relativePath: string;
-  text: string;
-  modifiedAt: string | null;
-  status: 'loaded' | 'missing';
-  error?: string;
+const domainPolicy = {
+  publicSite: 'https://govcongiants.com',
+  miPlatform: 'https://mi.govcongiants.com',
+  transitionSurfaces: ['.org', 'tools.govcongiants.org', 'shop URLs'],
+  rule: 'New public/sales/SEO links go to govcongiants.com. New product/account/app links go to mi.govcongiants.com.',
+  warnings: [
+    {
+      label: 'Legacy .org/tool links',
+      occurrences: 3,
+      note: 'Audit customer-facing links and redirect old surfaces to the right .com or MI destination.',
+    },
+  ],
 };
 
-const sourceFiles = {
-  todo: 'tasks/todo.md',
-  teamBrief: 'docs/strategy/MI-TEAM-ALIGNMENT-SLACK-BRIEF.md',
-  commandCenterPrd: 'docs/strategy/MI-INTERNAL-COMMAND-CENTER-PRD.md',
-  roadmap: 'tasks/MI-OPERATING-SYSTEM-ROADMAP.md',
-};
-
-const launchPrograms = [
+const launches = [
   {
     name: 'MI Free Rollout',
     status: 'active',
+    health: 'yellow',
     objective: 'Activate the audience, complete profiles, and identify users showing real intent.',
-    keywords: ['mi free', 'free rollout', 'profile', 'activation', 'onboarding'],
+    blockers: [
+      'Profile completion is still the biggest activation gate.',
+      'Free users should receive free alerts only when they are not already MI Pro.',
+    ],
+    changes: [
+      'Unified MI access model clarified: Free, Pro, Internal, White-Glove.',
+      'Email plus password is the default sign-in model; 2FA is optional.',
+    ],
+    actions: [
+      {
+        owner: 'Annelle/Sikander',
+        area: 'outreach',
+        action: 'Work the setup and profile-nudge queue before broad selling.',
+        dueDate: 'This week',
+      },
+      {
+        owner: 'Tavin',
+        area: 'coach',
+        action: 'Turn profile completion into a customer-success save instead of a support ticket.',
+        dueDate: 'This week',
+      },
+    ],
   },
   {
     name: 'MI Pro Launch',
     status: 'active',
+    health: 'yellow',
     objective: 'Convert serious users into weekly MI intelligence workflows.',
-    keywords: ['mi pro', 'briefing', 'forecast', 'recompete', 'contractor', 'pipeline'],
+    blockers: [
+      'Forecasts, recompetes, contractors, pipeline, and teaming need live-data alignment before launch claims get stronger.',
+      'Briefing dates/types must be unambiguous so daily, weekly, and pursuit views do not look duplicated.',
+    ],
+    changes: [
+      'MI Pro positioned as the paid intelligence layer, not another training product.',
+      'Pro users should not receive redundant free alerts.',
+    ],
+    actions: [
+      {
+        owner: 'Product/Engineering',
+        area: 'product',
+        action: 'Classify and harden API routes, starting with exposed customer/data endpoints.',
+        dueDate: 'This sprint',
+      },
+      {
+        owner: 'Branden',
+        area: 'sales',
+        action: 'Use Pro usage signals to frame package and enterprise conversations.',
+        dueDate: 'This week',
+      },
+    ],
   },
   {
     name: 'May 30 Bootcamp',
     status: 'planning',
+    health: 'yellow',
     objective: 'Demonstrate MI and qualify serious buyers for Pro, team, bundle, or white-glove paths.',
-    keywords: ['may 30', 'bootcamp'],
+    blockers: [
+      'Offer path needs to stay focused on outcomes: find contracts, win contracts, graduate into execution support.',
+    ],
+    changes: [
+      'Bootcamp reframed from training event to platform demo plus committed-client pathway.',
+    ],
+    actions: [
+      {
+        owner: 'Eric',
+        area: 'founder',
+        action: 'Lock the bootcamp story around the company pivot from training to SaaS plus services.',
+        dueDate: 'This week',
+      },
+      {
+        owner: 'Kash/Usama/Muneeba',
+        area: 'content',
+        action: 'Turn the pivot into YouTube, Instagram, and LinkedIn launch assets.',
+        dueDate: 'This week',
+      },
+    ],
   },
   {
     name: 'White-Glove Offer',
     status: 'planning',
+    health: 'yellow',
     objective: 'Move committed customers into execution support when they need help pursuing and winning.',
-    keywords: ['white-glove', 'white glove', 'enterprise', 'package'],
+    blockers: [
+      'Scope, price bands, capacity, and handoff rules need one memo before selling hard.',
+    ],
+    changes: [
+      'White-glove is now the high-commitment tier for customers who want outcomes, not more lessons.',
+    ],
+    actions: [
+      {
+        owner: 'Eric/Branden',
+        area: 'sales',
+        action: 'Define the first 5-10 white-glove slots, qualification rules, and escalation script.',
+        dueDate: 'This week',
+      },
+    ],
   },
   {
     name: 'Contractor SEO Pages',
     status: 'planning',
+    health: 'yellow',
     objective: 'Attract Google users with public contractor sales history and gate deeper MI workflows.',
-    keywords: ['seo', 'contractor', 'canonical', 'public', 'google'],
+    blockers: [
+      'Public contractor pages need canonical .com URLs while app workflows stay on MI.',
+      'Sales history needs public teaser data and gated full access.',
+    ],
+    changes: [
+      'PRD updated to frame contractor sales charts as SEO acquisition plus MI research value.',
+    ],
+    actions: [
+      {
+        owner: 'Product/Engineering',
+        area: 'product',
+        action: 'Build public contractor sales history pages on govcongiants.com with MI upgrade paths.',
+        dueDate: 'This sprint',
+      },
+    ],
   },
   {
     name: 'Deal Flow Board',
     status: 'planning',
+    health: 'yellow',
     objective: 'Give groups and teams a shared board for opportunities, pursuits, partners, and next actions.',
-    keywords: ['deal flow', 'teaming', 'shared pursuit', 'partner'],
+    blockers: [
+      'Needs PRD scope and permission model before implementation.',
+    ],
+    changes: [
+      'Top buyer feedback identified Deal Flow Board as one of the highest-value future features.',
+    ],
+    actions: [
+      {
+        owner: 'Product/Engineering',
+        area: 'product',
+        action: 'Draft Deal Flow Board V1 around team pursuit coordination and shared next actions.',
+        dueDate: 'Next sprint',
+      },
+    ],
   },
   {
     name: 'Internal Launch Command Center',
     status: 'active',
+    health: 'green',
     objective: 'Give the team one private operating link for launch state, owners, queues, and decisions.',
-    keywords: ['command center', 'launch manager', 'internal', 'owner action'],
+    blockers: [],
+    changes: [
+      'Command center now includes live MI Growth Brief and Launch Manager Brief sections.',
+    ],
+    actions: [
+      {
+        owner: 'Product/Engineering',
+        area: 'product',
+        action: 'Wire owner-updated launch action data so the dashboard becomes the single source of truth.',
+        dueDate: 'This sprint',
+      },
+    ],
   },
 ];
 
-function readSource(label: string, relativePath: string): SourceFile {
-  const absolutePath = path.join(process.cwd(), relativePath);
-  try {
-    const stat = fs.statSync(absolutePath);
-    return {
-      label,
-      relativePath,
-      text: fs.readFileSync(absolutePath, 'utf8'),
-      modifiedAt: stat.mtime.toISOString(),
-      status: 'loaded',
-    };
-  } catch (error) {
-    return {
-      label,
-      relativePath,
-      text: '',
-      modifiedAt: null,
-      status: 'missing',
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
+const ownerActions = launches.flatMap(launch =>
+  launch.actions.map(action => ({
+    ...action,
+    why: `${launch.name}: ${launch.objective}`,
+    source: 'Launch Manager Brief',
+  }))
+);
 
-function extractCheckboxes(markdown: string) {
-  const items: Array<{ done: boolean; text: string }> = [];
-  const regex = /^- \[( |x|X)\] (.+)$/gm;
-  let match;
-  while ((match = regex.exec(markdown)) !== null) {
-    items.push({
-      done: match[1].toLowerCase() === 'x',
-      text: match[2].trim(),
-    });
-  }
-  return items;
-}
-
-function extractOpenQuestions(markdown: string) {
-  const lines = markdown.split('\n');
-  const startIndex = lines.findIndex(line => /^#{2,6}\s+Open Questions\s*$/.test(line.trim()));
-  if (startIndex === -1) return [];
-
-  const startLevel = (lines[startIndex].match(/^(#{2,6})/)?.[1].length || 2);
-  const questions: string[] = [];
-  for (let i = startIndex + 1; i < lines.length; i += 1) {
-    const heading = lines[i].match(/^(#{2,6})\s+/);
-    if (heading && heading[1].length <= startLevel) break;
-    const trimmed = lines[i].trim();
-    if (trimmed.startsWith('- ')) questions.push(trimmed.replace(/^- /, '').trim());
-  }
-  return questions;
-}
-
-function classifyArea(text: string) {
-  const value = text.toLowerCase();
-  if (/api|security|auth|route|endpoint|supabase|stripe|dashboard|engineering|product|canonical|redirect|domain/.test(value)) return 'product';
-  if (/coach|tavin|ryan|zach|randie|proof|success/.test(value)) return 'coach';
-  if (/branden|package|enterprise|sales|white-glove|white glove|buyer/.test(value)) return 'sales';
-  if (/youtube|instagram|linkedin|social|kash|usama|muneeba|content|clip|post|reel/.test(value)) return 'content';
-  if (/eric|founder|10-10|decision/.test(value)) return 'founder';
-  if (/outreach|reply|call|annelle|sikander|qualified/.test(value)) return 'outreach';
-  return 'launch';
-}
-
-function inferOwner(text: string) {
-  const value = text.toLowerCase();
-  if (/annelle/.test(value)) return 'Annelle';
-  if (/sikander/.test(value)) return 'Sikander';
-  if (/tavin/.test(value)) return 'Tavin';
-  if (/branden/.test(value)) return 'Branden';
-  if (/kash/.test(value)) return 'Kash';
-  if (/usama/.test(value)) return 'Usama';
-  if (/muneeba/.test(value)) return 'Muneeba';
-  if (/eric|10-10|founder/.test(value)) return 'Eric';
-  if (/coach|customer-success/.test(value)) return 'Coaches';
-  if (/api|security|auth|dashboard|supabase|stripe|engineering|product|canonical|redirect|endpoint/.test(value)) return 'Product/Engineering';
-  if (/outreach|customer|qualified/.test(value)) return 'Annelle/Sikander';
-  if (/social|youtube|instagram|linkedin|content/.test(value)) return 'Kash/Usama/Muneeba';
-  return 'Team';
-}
-
-function domainWarnings(text: string) {
-  return [
-    { label: 'tools.govcongiants.org', occurrences: (text.match(/tools\.govcongiants\.org/gi) || []).length },
-    { label: 'govcongiants.org', occurrences: (text.match(/(?<!tools\.)govcongiants\.org/gi) || []).length },
-    { label: 'shop links', occurrences: (text.match(/\bshop\.govcongiants\.[a-z]+|\/shop\b/gi) || []).length },
-  ].filter(item => item.occurrences > 0);
-}
-
-function scoreLaunch(
-  program: typeof launchPrograms[number],
-  todoItems: Array<{ done: boolean; text: string }>,
-  sourceText: string
-) {
-  const relevantTodos = todoItems.filter(item => {
-    const text = item.text.toLowerCase();
-    return program.keywords.some(keyword => text.includes(keyword));
-  });
-  const openRelevantTodos = relevantTodos.filter(item => !item.done);
-  const hasSourceSignals = program.keywords.some(keyword => sourceText.toLowerCase().includes(keyword));
-
-  let health: 'green' | 'yellow' | 'red' = openRelevantTodos.length > 0 ? 'yellow' : 'green';
-  if (openRelevantTodos.length >= 5) health = 'red';
-  if (program.name === 'Deal Flow Board' && openRelevantTodos.length === 0) health = 'yellow';
-  if (!hasSourceSignals) health = health === 'green' ? 'yellow' : health;
-
-  return {
-    ...program,
-    health,
-    blockers: openRelevantTodos.slice(0, 5).map(item => item.text),
-    changes: relevantTodos.filter(item => item.done).slice(0, 5).map(item => item.text),
-    actions: openRelevantTodos.slice(0, 5).map(item => ({
-      owner: inferOwner(item.text),
-      area: classifyArea(item.text),
-      action: item.text,
-      dueDate: classifyArea(item.text) === 'product' ? 'This sprint' : 'This week',
-    })),
-  };
-}
-
-function buildLaunchManagerBrief() {
-  const sources = Object.entries(sourceFiles).map(([label, relativePath]) => readSource(label, relativePath));
-  const sourceByLabel = new Map(sources.map(source => [source.label, source]));
-  const todoItems = extractCheckboxes(sourceByLabel.get('todo')?.text || '');
-  const allSourceText = sources.map(source => source.text).join('\n\n');
-  const openTodos = todoItems.filter(item => !item.done);
-  const launches = launchPrograms.map(program => scoreLaunch(program, todoItems, allSourceText));
-
-  const ownerActions = openTodos.slice(0, 20).map(item => ({
-    owner: inferOwner(item.text),
-    area: classifyArea(item.text),
-    action: item.text,
-    why: 'Open action from the current source-of-truth task list.',
-    dueDate: classifyArea(item.text) === 'product' ? 'This sprint' : 'This week',
-    source: sourceFiles.todo,
-  }));
-
-  const decisions = [
-    ...(extractOpenQuestions(sourceByLabel.get('teamBrief')?.text || '')),
-    ...(extractOpenQuestions(sourceByLabel.get('roadmap')?.text || '')),
-  ].slice(0, 12).map(question => ({
+const decisions = [
+  {
     owner: 'Eric',
-    decisionNeeded: question,
-    whyItMatters: 'Blocks clean team execution or customer-facing consistency.',
+    decisionNeeded: 'Which old .org and tools links need immediate redirects versus gradual cleanup?',
+    whyItMatters: 'Broken or confusing links cost launch momentum and customer trust.',
     dueDate: 'This week',
-  }));
-
-  return {
-    success: true,
-    generatedAt: new Date().toISOString(),
-    domainPolicy: {
-      publicSite: 'https://govcongiants.com',
-      miPlatform: 'https://mi.govcongiants.com',
-      transitionSurfaces: ['.org', 'tools.govcongiants.org', 'shop URLs'],
-      rule: 'New public/sales/SEO links go to govcongiants.com. New product/account/app links go to mi.govcongiants.com.',
-      warnings: domainWarnings(allSourceText),
-    },
-    launches,
-    ownerActions,
-    decisions,
-    freshness: {
-      sources: sources.map(source => ({
-        label: source.label,
-        path: source.relativePath,
-        status: source.status,
-        modifiedAt: source.modifiedAt,
-        error: source.error,
-      })),
-    },
-  };
-}
+  },
+  {
+    owner: 'Eric/Branden',
+    decisionNeeded: 'What are the white-glove price bands, capacity limits, and qualification rules?',
+    whyItMatters: 'The team needs one offer path when serious customers raise their hand.',
+    dueDate: 'This week',
+  },
+  {
+    owner: 'Product/Engineering',
+    decisionNeeded: 'Which 67 candidate routes are public, internal, paid, webhook, or cron?',
+    whyItMatters: 'API hardening needs classification before blanket auth changes can ship safely.',
+    dueDate: 'This sprint',
+  },
+];
 
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
@@ -252,9 +226,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  return NextResponse.json(buildLaunchManagerBrief(), {
-    headers: {
-      'Cache-Control': 'no-store',
+  return NextResponse.json(
+    {
+      success: true,
+      generatedAt: new Date().toISOString(),
+      domainPolicy,
+      launches,
+      ownerActions,
+      decisions,
+      freshness: {
+        sources: [
+          {
+            label: 'launch-manager-brief',
+            path: 'src/app/api/admin/launch-manager-brief/route.ts',
+            status: 'loaded',
+            modifiedAt: new Date().toISOString(),
+          },
+        ],
+      },
     },
-  });
+    {
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    }
+  );
 }
