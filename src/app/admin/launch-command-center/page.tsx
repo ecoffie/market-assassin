@@ -30,6 +30,59 @@ type QueueItem = {
   tone: StatusTone;
 };
 
+type GrowthQueueName = 'setupInvite' | 'profileNudge' | 'activationRescue' | 'proUpgrade' | 'whiteGloveCandidate';
+
+type GrowthBrief = {
+  generatedAt: string;
+  window: {
+    days: number;
+    from: string;
+    to: string;
+  };
+  audience: {
+    totalUsers: number;
+    miFree: number;
+    miPro: number;
+    miInternal: number;
+    profileComplete: number;
+    profileCompletionRate: string;
+    activeAlertAudience: number;
+    briefingsEligible: number;
+    briefingsNeedProfile: number;
+  };
+  engagement: {
+    activeToday: number;
+    active7d: number;
+    timeInMiMinutes: number;
+    avgMinutesPerActiveUser: number;
+    topAreas: Array<{ area: string; minutes: number; users: number }>;
+  };
+  email: {
+    sent: number;
+    delivered: number;
+    clicked: number;
+    failed: number;
+    deliveryRate: string;
+    clickRate: string;
+    topLinks: Array<{ link: string; clicks: number }>;
+  };
+  queues: Record<GrowthQueueName, Array<{
+    email: string;
+    reason: string;
+    owner: string;
+    nextAction: string;
+    signals: string[];
+  }>>;
+  recommendedActions: Array<{
+    owner: string;
+    action: string;
+    why: string;
+  }>;
+  freshness: {
+    warnings: string[];
+  };
+};
+
 const toneClasses: Record<StatusTone, string> = {
   green: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
   blue: 'border-blue-500/40 bg-blue-500/10 text-blue-200',
@@ -196,6 +249,24 @@ const sourceDocs = [
   'tasks/MI-OPERATING-SYSTEM-ROADMAP.md',
 ];
 
+const growthQueueLabels: Record<GrowthQueueName, string> = {
+  setupInvite: 'Setup Invites',
+  profileNudge: 'Profile Nudges',
+  activationRescue: 'Activation Rescue',
+  proUpgrade: 'Pro Upgrade',
+  whiteGloveCandidate: 'White-Glove',
+};
+
+function formatNumber(value: number | undefined): string {
+  return typeof value === 'number' ? value.toLocaleString('en-US') : '0';
+}
+
+function formatMinutes(value: number | undefined): string {
+  if (!value) return '0m';
+  if (value >= 60) return `${Math.round((value / 60) * 10) / 10}h`;
+  return `${Math.round(value * 10) / 10}m`;
+}
+
 function LoadingState() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
@@ -230,6 +301,9 @@ export default function LaunchCommandCenterPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [growthBrief, setGrowthBrief] = useState<GrowthBrief | null>(null);
+  const [growthLoading, setGrowthLoading] = useState(false);
+  const [growthError, setGrowthError] = useState('');
 
   const currentDate = useMemo(() => {
     return new Intl.DateTimeFormat('en-US', {
@@ -316,6 +390,49 @@ export default function LaunchCommandCenterPage() {
     }
   }
 
+  useEffect(() => {
+    if (!authenticated || !password) return;
+
+    let cancelled = false;
+
+    async function loadGrowthBrief() {
+      setGrowthLoading(true);
+      setGrowthError('');
+
+      try {
+        const response = await fetch(`/api/admin/mi-growth-brief?password=${encodeURIComponent(password)}&days=7`, {
+          cache: 'no-store',
+        });
+        const data = await response.json();
+
+        if (cancelled) return;
+
+        if (!response.ok || !data.success) {
+          setGrowthError(data.error || 'Could not load growth brief');
+          setGrowthBrief(null);
+          return;
+        }
+
+        setGrowthBrief(data as GrowthBrief);
+      } catch {
+        if (!cancelled) {
+          setGrowthError('Could not load growth brief');
+          setGrowthBrief(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setGrowthLoading(false);
+        }
+      }
+    }
+
+    loadGrowthBrief();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, password]);
+
   if (checking) {
     return <LoadingState />;
   }
@@ -394,6 +511,125 @@ export default function LaunchCommandCenterPage() {
       </header>
 
       <div className="mx-auto max-w-7xl space-y-8 px-6 py-8">
+        <section className="rounded-lg border border-slate-800 bg-slate-900 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Live Growth Brief</p>
+              <h2 className="mt-2 text-3xl font-bold">What changed and who needs action</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Pulled from the protected MI Growth Brief endpoint for the last {growthBrief?.window.days || 7} days.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const storedPassword = sessionStorage.getItem('adminPassword') || password;
+                if (storedPassword) {
+                  setPassword(storedPassword);
+                  setGrowthBrief(null);
+                  setAuthenticated(true);
+                  setGrowthLoading(true);
+                  fetch(`/api/admin/mi-growth-brief?password=${encodeURIComponent(storedPassword)}&days=7`, { cache: 'no-store' })
+                    .then((response) => response.json().then((data) => ({ response, data })))
+                    .then(({ response, data }) => {
+                      if (!response.ok || !data.success) {
+                        setGrowthError(data.error || 'Could not load growth brief');
+                        setGrowthBrief(null);
+                      } else {
+                        setGrowthError('');
+                        setGrowthBrief(data as GrowthBrief);
+                      }
+                    })
+                    .catch(() => {
+                      setGrowthError('Could not load growth brief');
+                      setGrowthBrief(null);
+                    })
+                    .finally(() => setGrowthLoading(false));
+                }
+              }}
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-emerald-400 hover:text-emerald-200"
+            >
+              Refresh Brief
+            </button>
+          </div>
+
+          {growthLoading ? (
+            <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                <div className="command-center-loader h-full w-1/3 rounded-full bg-gradient-to-r from-emerald-400 via-blue-400 to-purple-400" />
+              </div>
+              <p className="mt-3 text-sm text-slate-400">Loading MI growth signals...</p>
+            </div>
+          ) : growthError ? (
+            <div className="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 p-5 text-red-100">
+              {growthError}
+            </div>
+          ) : growthBrief ? (
+            <div className="mt-6 space-y-6">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <p className="text-sm text-slate-400">Profiles Complete</p>
+                  <p className="mt-2 text-4xl font-bold text-emerald-300">{formatNumber(growthBrief.audience.profileComplete)}</p>
+                  <p className="mt-1 text-sm text-slate-500">{growthBrief.audience.profileCompletionRate} of {formatNumber(growthBrief.audience.totalUsers)} users</p>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <p className="text-sm text-slate-400">Active In MI</p>
+                  <p className="mt-2 text-4xl font-bold text-blue-300">{formatNumber(growthBrief.engagement.active7d)}</p>
+                  <p className="mt-1 text-sm text-slate-500">{formatNumber(growthBrief.engagement.activeToday)} active today</p>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <p className="text-sm text-slate-400">Time In MI</p>
+                  <p className="mt-2 text-4xl font-bold text-purple-300">{formatMinutes(growthBrief.engagement.timeInMiMinutes)}</p>
+                  <p className="mt-1 text-sm text-slate-500">{formatMinutes(growthBrief.engagement.avgMinutesPerActiveUser)} per active user</p>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <p className="text-sm text-slate-400">Email Click Rate</p>
+                  <p className="mt-2 text-4xl font-bold text-amber-300">{growthBrief.email.clickRate}</p>
+                  <p className="mt-1 text-sm text-slate-500">{formatNumber(growthBrief.email.clicked)} clicks from {formatNumber(growthBrief.email.sent)} sent</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <h3 className="text-xl font-bold">Action Queues</h3>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {(Object.keys(growthQueueLabels) as GrowthQueueName[]).map((queueName) => (
+                      <div key={queueName} className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
+                        <p className="text-sm text-slate-400">{growthQueueLabels[queueName]}</p>
+                        <p className="mt-2 text-3xl font-bold text-white">{formatNumber(growthBrief.queues[queueName]?.length || 0)}</p>
+                        <p className="mt-1 text-xs text-slate-500">{growthBrief.queues[queueName]?.[0]?.owner || 'No owner needed'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <h3 className="text-xl font-bold">Recommended Team Actions</h3>
+                  <div className="mt-4 space-y-3">
+                    {growthBrief.recommendedActions.slice(0, 4).map((item) => (
+                      <div key={`${item.owner}-${item.action}`} className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
+                        <p className="text-sm font-semibold text-emerald-200">{item.owner}</p>
+                        <p className="mt-1 text-sm text-white">{item.action}</p>
+                        <p className="mt-1 text-xs text-slate-500">{item.why}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {growthBrief.freshness.warnings.length > 0 ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                  Data quality notes: {growthBrief.freshness.warnings.slice(0, 3).join(' | ')}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-slate-400">
+              Growth brief will load after admin authentication.
+            </div>
+          )}
+        </section>
+
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-5">
             <p className="text-sm uppercase tracking-[0.18em] text-emerald-200">Launch Objective</p>
@@ -562,6 +798,20 @@ export default function LaunchCommandCenterPage() {
           </div>
         </section>
       </div>
+      <style jsx global>{`
+        @keyframes command-center-slide {
+          0% {
+            transform: translateX(-120%);
+          }
+          100% {
+            transform: translateX(320%);
+          }
+        }
+
+        .command-center-loader {
+          animation: command-center-slide 1.25s ease-in-out infinite;
+        }
+      `}</style>
     </main>
   );
 }

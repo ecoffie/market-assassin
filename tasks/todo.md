@@ -61,6 +61,7 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [ ] Use the Founder Decision Memo Skill for pricing, access model, and `.com`/MI domain decisions.
 - [x] Use the Team Alignment Brief Skill to convert the MI pivot and customer-first outreach into one team-ready Slack memo.
 - [x] Build the MI Internal Launch Command Center V1 shell so outreach, coach activity, enterprise/package sales activity, content/social activity, notes, tags, and team memos live behind one private link.
+- [x] Surface the live MI Growth Brief on `/admin/launch-command-center` so the team sees action queues, engagement, email, and data quality signals in one place.
 - [ ] Wire the MI Internal Launch Command Center to Supabase, Stripe, email engagement, MI app activity, and owner-updated launch action data.
 - [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
 - [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
