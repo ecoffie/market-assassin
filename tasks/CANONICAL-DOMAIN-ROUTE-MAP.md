@@ -54,6 +54,57 @@ These should live on `mi.govcongiants.com`.
 | `/admin/launch-command-center` | Internal launch command center | Private/internal only |
 | `/admin/*` | Internal admin operations | Private/internal only |
 
+## Current Repo Ownership
+
+Source check completed May 10, 2026.
+
+| Repo | Canonical domain | Owns |
+| --- | --- | --- |
+| `govcon-funnels` | `govcongiants.com` | Public website, SEO pages, sales pages, offer pages, public contractor/company pages, resources, blog/guides/video/glossary pages, public tools, and public lead capture |
+| `market-assassin` | `mi.govcongiants.com` | MI product app, authentication/account setup, alerts, profiles, briefings, forecasts, recompetes, contractor research inside MI, pipeline, teaming, proposal workflows, admin dashboards, cron jobs, and internal operational APIs |
+
+### `govcon-funnels` Public Website Pages
+
+The public website repo already contains the main surfaces that should become the `.com` system:
+
+- Brand and content: `/`, `/blog`, `/guides`, `/videos`, `/glossary`, `/about`
+- Sales and offers: `/pricing`, `/premium`, `/premium/[slug]`, `/premium/[slug]/checkout`, `/done-for-you`, `/demo`, `/mi-free`
+- Public SEO/data: `/data/contractors`, `/data/contractors/[uei]`, `/data/agencies`, `/data/forecasts`
+- Product education: `/features/*`, `/for/*`, `/compare/*`, `/resources/*`, `/tools/*`
+- Public intake and event flows: `/jobs/*`, public calculators/checkers, and lead capture APIs
+
+This repo should be the primary home for pages meant to rank in Google, educate visitors, capture leads, and convert people into MI Free, MI Pro, or white-glove.
+
+### `market-assassin` MI Platform Pages
+
+The MI platform repo already contains the authenticated/app surfaces that should remain on `mi.govcongiants.com`:
+
+- App and login: `/`, `/mi-beta`, `/mi-beta/setup-account`, `/mi-beta/setup-password`, `/mi-beta/forgot-password`, `/mi-beta/reset-password`
+- Customer product: `/briefings`, `/alerts/preferences`, `/profile/setup`, `/profile/complete`, `/pipeline`
+- Admin/internal: `/admin/dashboard`, `/admin/launch-command-center`, `/admin/*`
+- Operational APIs: cron, email, entitlement, dashboard, admin, MI app, and data feeds
+
+This repo should be the primary home for product behavior, customer data, app sessions, permissions, paid features, internal dashboards, and delivery systems.
+
+### `market-assassin` Routes To De-Emphasize Or Redirect
+
+These route families currently exist in `market-assassin`, but they look like public website, sales, or SEO surfaces. They should either move to `govcon-funnels`, redirect to `govcongiants.com`, or become thin compatibility routes after the `.com` destination exists:
+
+- `/about`
+- `/store`
+- `/purchase/success`
+- `/market-intelligence`
+- `/contractors/[slug]`
+- `/contractor-database`
+- `/forecasts`
+- `/recompete`
+- `/free-resources`
+- `/guides-templates`
+- `/content-generator-product`
+- `/bundles/*`
+
+Do not delete these until redirects are mapped and tested. Treat them as compatibility surfaces during migration.
+
 ## Redirect Surfaces
 
 These should not be used in new customer-facing links except as redirects.
@@ -93,7 +144,6 @@ These should not be used in new customer-facing links except as redirects.
 
 ## Open Questions
 
-- Which exact public pages live in the funnels repo versus this repo?
 - Which current `tools.govcongiants.org` routes need direct redirects to `mi.govcongiants.com` first?
 - Should `mi.govcongiants.com/admin/*` exist long term, or should internal admin remain on a separate private admin surface?
 - What is the canonical checkout/payment surface after the shop cleanup?

@@ -16,7 +16,7 @@ Everything new should use the `.com` brand system moving forward. Public website
 
 **Next actions:**
 - [x] Create the canonical route map: public pages on `govcongiants.com`; app/admin/account pages on `mi.govcongiants.com`.
-- [ ] Confirm which public MI sales/SEO pages belong in the funnels repo versus which product surfaces stay in this repo.
+- [x] Confirm which public MI sales/SEO pages belong in the funnels repo versus which product surfaces stay in this repo.
 - [ ] Add compatibility redirects from `.org`, `tools`, and `shop` only after the matching `.com` or `mi.govcongiants.com` destination path exists.
 - [ ] Update email templates and generated links: sales/content CTAs to `govcongiants.com`, product/account CTAs to `mi.govcongiants.com`.
 - [ ] Update social, YouTube, LinkedIn, IG, coaching scripts, launch plans, and team briefs to use the correct `.com` role.
