@@ -380,7 +380,7 @@ export default function LaunchCommandCenterPage() {
           return;
         }
 
-        if (data.success) {
+        if (data.valid || data.success) {
           setAuthenticated(true);
           setPassword(storedPassword);
         } else {
@@ -419,7 +419,7 @@ export default function LaunchCommandCenterPage() {
       });
       const data = await response.json();
 
-      if (!data.success) {
+      if (!data.valid && !data.success) {
         setAuthError('Invalid admin password');
         return;
       }
