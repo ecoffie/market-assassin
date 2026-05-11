@@ -83,6 +83,39 @@ type GrowthBrief = {
   };
 };
 
+type LaunchHealth = 'green' | 'yellow' | 'red';
+
+type LaunchManagerBrief = {
+  generatedAt: string;
+  domainPolicy: {
+    publicSite: string;
+    miPlatform: string;
+    rule: string;
+    warnings: Array<{ label: string; occurrences: number }>;
+  };
+  launches: Array<{
+    name: string;
+    status: string;
+    objective: string;
+    health: LaunchHealth;
+    blockers: string[];
+    changes: string[];
+  }>;
+  ownerActions: Array<{
+    owner: string;
+    area: string;
+    action: string;
+    why: string;
+    dueDate: string;
+  }>;
+  decisions: Array<{
+    owner: string;
+    decisionNeeded: string;
+    whyItMatters: string;
+    dueDate: string;
+  }>;
+};
+
 const toneClasses: Record<StatusTone, string> = {
   green: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
   blue: 'border-blue-500/40 bg-blue-500/10 text-blue-200',
@@ -90,6 +123,12 @@ const toneClasses: Record<StatusTone, string> = {
   purple: 'border-purple-500/40 bg-purple-500/10 text-purple-200',
   red: 'border-red-500/40 bg-red-500/10 text-red-200',
   slate: 'border-slate-500/40 bg-slate-500/10 text-slate-200',
+};
+
+const launchHealthClasses: Record<LaunchHealth, string> = {
+  green: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+  yellow: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+  red: 'border-red-500/40 bg-red-500/10 text-red-200',
 };
 
 const roleLanes: RoleLane[] = [
@@ -304,6 +343,9 @@ export default function LaunchCommandCenterPage() {
   const [growthBrief, setGrowthBrief] = useState<GrowthBrief | null>(null);
   const [growthLoading, setGrowthLoading] = useState(false);
   const [growthError, setGrowthError] = useState('');
+  const [launchBrief, setLaunchBrief] = useState<LaunchManagerBrief | null>(null);
+  const [launchLoading, setLaunchLoading] = useState(false);
+  const [launchError, setLaunchError] = useState('');
 
   const currentDate = useMemo(() => {
     return new Intl.DateTimeFormat('en-US', {
@@ -427,6 +469,49 @@ export default function LaunchCommandCenterPage() {
     }
 
     loadGrowthBrief();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, password]);
+
+  useEffect(() => {
+    if (!authenticated || !password) return;
+
+    let cancelled = false;
+
+    async function loadLaunchBrief() {
+      setLaunchLoading(true);
+      setLaunchError('');
+
+      try {
+        const response = await fetch(`/api/admin/launch-manager-brief?password=${encodeURIComponent(password)}`, {
+          cache: 'no-store',
+        });
+        const data = await response.json();
+
+        if (cancelled) return;
+
+        if (!response.ok || !data.success) {
+          setLaunchError(data.error || 'Could not load launch brief');
+          setLaunchBrief(null);
+          return;
+        }
+
+        setLaunchBrief(data as LaunchManagerBrief);
+      } catch {
+        if (!cancelled) {
+          setLaunchError('Could not load launch brief');
+          setLaunchBrief(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLaunchLoading(false);
+        }
+      }
+    }
+
+    loadLaunchBrief();
 
     return () => {
       cancelled = true;
@@ -626,6 +711,133 @@ export default function LaunchCommandCenterPage() {
           ) : (
             <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-slate-400">
               Growth brief will load after admin authentication.
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-slate-800 bg-slate-900 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-blue-300">Launch Manager Brief</p>
+              <h2 className="mt-2 text-3xl font-bold">What the team should execute next</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Built from the source-of-truth docs, task list, launch roadmap, and team alignment memo.
+              </p>
+            </div>
+            {launchBrief ? (
+              <p className="rounded-lg border border-slate-800 bg-slate-950/50 px-4 py-2 text-sm text-slate-400">
+                Updated {new Date(launchBrief.generatedAt).toLocaleString('en-US')}
+              </p>
+            ) : null}
+          </div>
+
+          {launchLoading ? (
+            <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                <div className="command-center-loader h-full w-1/3 rounded-full bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400" />
+              </div>
+              <p className="mt-3 text-sm text-slate-400">Loading launch manager brief...</p>
+            </div>
+          ) : launchError ? (
+            <div className="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 p-5 text-red-100">
+              {launchError}
+            </div>
+          ) : launchBrief ? (
+            <div className="mt-6 space-y-6">
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-5">
+                <p className="text-xs uppercase tracking-[0.18em] text-emerald-200">Domain Rule</p>
+                <p className="mt-2 text-lg font-semibold text-white">{launchBrief.domainPolicy.rule}</p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg bg-slate-950/40 p-4">
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Public / SEO / Sales</p>
+                    <p className="mt-1 font-mono text-sm text-emerald-200">{launchBrief.domainPolicy.publicSite}</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-950/40 p-4">
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">MI Product Platform</p>
+                    <p className="mt-1 font-mono text-sm text-blue-200">{launchBrief.domainPolicy.miPlatform}</p>
+                  </div>
+                </div>
+                {launchBrief.domainPolicy.warnings.length > 0 ? (
+                  <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                    Link cleanup signals: {launchBrief.domainPolicy.warnings.map((warning) => `${warning.label}: ${warning.occurrences}`).join(' | ')}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                {launchBrief.launches.map((launch) => (
+                  <article key={launch.name} className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-xl font-bold text-white">{launch.name}</h3>
+                        <p className="mt-1 text-sm text-slate-500">{launch.status}</p>
+                      </div>
+                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${launchHealthClasses[launch.health]}`}>
+                        {launch.health}
+                      </span>
+                    </div>
+                    <p className="mt-4 text-sm text-slate-300">{launch.objective}</p>
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg bg-slate-900/70 p-4">
+                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Blockers</p>
+                        <p className="mt-2 text-2xl font-bold text-amber-200">{formatNumber(launch.blockers.length)}</p>
+                      </div>
+                      <div className="rounded-lg bg-slate-900/70 p-4">
+                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Done Signals</p>
+                        <p className="mt-2 text-2xl font-bold text-emerald-200">{formatNumber(launch.changes.length)}</p>
+                      </div>
+                    </div>
+                    {launch.blockers[0] ? (
+                      <p className="mt-4 rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-400">
+                        Next blocker: {launch.blockers[0]}
+                      </p>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <h3 className="text-xl font-bold">Owner Actions</h3>
+                  <div className="mt-4 space-y-3">
+                    {launchBrief.ownerActions.slice(0, 8).map((item) => (
+                      <div key={`${item.owner}-${item.action}`} className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-blue-200">{item.owner}</p>
+                            <p className="mt-1 text-sm text-white">{item.action}</p>
+                          </div>
+                          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">
+                            {item.dueDate}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">{item.why}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <h3 className="text-xl font-bold">Open Decisions</h3>
+                  <div className="mt-4 space-y-3">
+                    {launchBrief.decisions.length > 0 ? launchBrief.decisions.slice(0, 6).map((item) => (
+                      <div key={item.decisionNeeded} className="rounded-lg border border-slate-800 bg-slate-900/70 p-4">
+                        <p className="text-sm font-semibold text-purple-200">{item.owner}</p>
+                        <p className="mt-1 text-sm text-white">{item.decisionNeeded}</p>
+                        <p className="mt-2 text-xs text-slate-500">{item.whyItMatters}</p>
+                      </div>
+                    )) : (
+                      <p className="rounded-lg border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-400">
+                        No open decisions found in the current source docs.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-slate-400">
+              Launch manager brief will load after admin authentication.
             </div>
           )}
         </section>
