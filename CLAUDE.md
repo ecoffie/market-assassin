@@ -1155,6 +1155,40 @@ recordToolSuccess(ToolNames.CONTENT_REAPER).catch(() => {});
 7. **Use unified `user_notification_settings` table** — Old tables (`user_alert_settings`, `user_briefing_profile`) were dropped. All code uses unified table now.
 8. **Always add fallback NAICS** — If user has no NAICS, use defaults: `541512, 541611, 541330, 541990, 561210`.
 9. **Supabase LIKE uses `%` not `*`** — For pattern matching, use `naics_code.like.236%` not `naics_code.like.236*`. The `*` wildcard returns 0 results.
+10. **All KV operations must have try-catch fallback** — KV quota can be exceeded (500K requests/month on free tier). Functions must gracefully degrade: rate limits allow requests, abuse checks return false, access checks return null. See `src/lib/abuse-detection.ts` and `src/lib/access-codes.ts` for patterns.
+
+---
+
+## Vercel KV Resilience (May 2026)
+
+**Problem:** Upstash KV free tier has 500K requests/month limit. When exceeded, all KV operations throw `UpstashError: ERR max requests limit exceeded`.
+
+**Solution:** All KV-dependent functions now have try-catch fallback handling:
+
+| Function | On KV Failure |
+|----------|---------------|
+| `checkRateLimit()` | Returns `allowed: true` (allows request) |
+| `trackGeneration()` | Returns 0, allows request |
+| `isUserBlocked()` | Returns `false` (allows request) |
+| `getMarketAssassinAccess()` | Returns `null` (free tier) |
+| `getAbuseRecord()` | Returns 0 |
+| `getFlaggedUsers()` | Returns empty array |
+
+**Key Files:**
+- `src/lib/rate-limit.ts` — Rate limiting with KV fallback
+- `src/lib/abuse-detection.ts` — Abuse tracking with KV fallback
+- `src/lib/access-codes.ts` — Access checks with KV fallback
+
+**Monitoring:**
+```bash
+# Check KV usage in Vercel Dashboard → Storage → KV → Usage
+# Logs show: "[RateLimit] KV unavailable for..." when quota exceeded
+```
+
+**Prevention:**
+- Free tier: 500K requests/month, 10K commands/day
+- Consider upgrading to Pro ($10/mo) for 10M requests/month
+- KV quota resets on the 1st of each month
 
 ---
 
