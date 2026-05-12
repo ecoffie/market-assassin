@@ -1,13 +1,15 @@
 import { NextRequest } from 'next/server';
 import {
-  getMarketAssassinAccess,
-  hasBriefingAccess,
-  hasContentGeneratorAccess,
-  hasEmailDatabaseAccess,
-  hasOpportunityHunterProAccess,
-  hasRecompeteAccess,
-} from '@/lib/access-codes';
-import { hasBriefingsAccess } from '@/lib/briefings/access';
+  getMarketAssassinAccessResilient,
+  hasBriefingsAccessResilient,
+  hasContentGeneratorAccessResilient,
+  hasContractorDbAccessResilient,
+  hasOHProAccessResilient,
+  hasRecompeteAccessResilient,
+} from '@/lib/kv-resilience';
+
+// Legacy imports for backward compatibility (now with try-catch fallback)
+import { hasBriefingAccess } from '@/lib/access-codes';
 
 export interface AuthResult {
   authenticated: boolean;
@@ -57,14 +59,15 @@ export function getEmailFromRequest(
 }
 
 /**
- * Verify that an email has Market Assassin access via KV.
+ * Verify that an email has Market Assassin access via resilient KV layer.
+ * Uses: Local Cache → KV (with circuit breaker) → Supabase fallback
  */
 export async function verifyMAAccess(email: string | null): Promise<AuthResult> {
   if (!email) {
     return { authenticated: false, email: null, error: 'Email required for access verification' };
   }
 
-  const hasAccess = !!(await getMarketAssassinAccess(email));
+  const hasAccess = !!(await getMarketAssassinAccessResilient(email));
   if (!hasAccess) {
     return { authenticated: false, email, error: 'No Market Assassin access found for this email' };
   }
@@ -116,6 +119,7 @@ export async function verifyMIAccess(email: string | null): Promise<MIAuthResult
 
   const normalizedEmail = email.toLowerCase();
 
+  // Use resilient functions with LRU cache + circuit breaker + Supabase fallback
   const [
     marketAssassinAccess,
     hasContentReaper,
@@ -125,13 +129,13 @@ export async function verifyMIAccess(email: string | null): Promise<MIAuthResult
     hasBriefings,
     hasLegacyBriefing,
   ] = await Promise.all([
-    getMarketAssassinAccess(normalizedEmail),
-    hasContentGeneratorAccess(normalizedEmail),
-    hasOpportunityHunterProAccess(normalizedEmail),
-    hasRecompeteAccess(normalizedEmail),
-    hasEmailDatabaseAccess(normalizedEmail),
-    hasBriefingsAccess(email),
-    hasBriefingAccess(normalizedEmail),
+    getMarketAssassinAccessResilient(normalizedEmail),
+    hasContentGeneratorAccessResilient(normalizedEmail),
+    hasOHProAccessResilient(normalizedEmail),
+    hasRecompeteAccessResilient(normalizedEmail),
+    hasContractorDbAccessResilient(normalizedEmail),
+    hasBriefingsAccessResilient(email),
+    hasBriefingAccess(normalizedEmail), // Legacy function still has its own fallback
   ]);
 
   const staffRole = getStaffRole(normalizedEmail);
