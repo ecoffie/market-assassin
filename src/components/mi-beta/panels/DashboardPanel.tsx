@@ -291,6 +291,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [savingPipeline, setSavingPipeline] = useState<Set<string>>(new Set());
+  const [pipelineSaved, setPipelineSaved] = useState<Set<string>>(new Set());
 
   const loadBriefings = useCallback(async () => {
     if (!email) return;
@@ -385,6 +387,45 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
       return next;
     });
   }, []);
+
+  const handleTrackInPipeline = useCallback(async (item: BriefingItem) => {
+    if (!email) return;
+
+    setSavingPipeline(prev => new Set(prev).add(item.id));
+
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: email,
+          notice_id: item.id,
+          title: item.title,
+          agency: item.subtitle?.split(' • ')[0] || '',
+          naics_code: item.signals.find(s => s.startsWith('NAICS'))?.replace('NAICS ', '') || '',
+          set_aside: item.signals.find(s => ['8(a)', 'WOSB', 'SDVOSB', 'HUBZone', 'SBA', 'Small Business'].some(sa => s.includes(sa))) || '',
+          response_deadline: item.deadline || null,
+          estimated_value: item.amount || null,
+          sam_link: item.actionUrl || '',
+          stage: 'tracking',
+          priority: 'medium',
+          source: 'briefing',
+        }),
+      });
+
+      if (res.ok) {
+        setPipelineSaved(prev => new Set(prev).add(item.id));
+      }
+    } catch (err) {
+      console.error('Failed to add to pipeline:', err);
+    } finally {
+      setSavingPipeline(prev => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }, [email]);
 
   if (tier === 'free') {
     return (
@@ -584,15 +625,34 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                           {item.signals.slice(0, 4).map(signal => (
                             <span key={signal} className="rounded bg-slate-800/80 px-2 py-1 text-xs text-slate-400">{signal}</span>
                           ))}
+                        </div>
+                        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleTrackInPipeline(item);
+                            }}
+                            disabled={savingPipeline.has(item.id) || pipelineSaved.has(item.id)}
+                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              pipelineSaved.has(item.id)
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-default'
+                                : savingPipeline.has(item.id)
+                                  ? 'bg-slate-800 text-slate-400 cursor-wait'
+                                  : 'bg-purple-600 text-white hover:bg-purple-500'
+                            }`}
+                          >
+                            {pipelineSaved.has(item.id) ? '✓ Tracking' : savingPipeline.has(item.id) ? 'Adding...' : '📈 Track in Pipeline'}
+                          </button>
                           {item.actionUrl && (
                             <a
                               href={item.actionUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(event) => event.stopPropagation()}
-                              className="ml-auto text-sm text-slate-300 hover:text-white"
+                              className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                             >
-                              {item.actionLabel || 'View details'} →
+                              {item.actionLabel || 'View on SAM.gov'} →
                             </a>
                           )}
                         </div>

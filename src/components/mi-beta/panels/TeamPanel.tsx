@@ -38,17 +38,27 @@ interface Reminder {
   daysUntilDue: number;
 }
 
+interface WorkspaceSettings {
+  company_name?: string;
+  default_naics_codes?: string[];
+  default_agencies?: string[];
+}
+
 export default function TeamPanel({ email, tier }: TeamPanelProps) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [workspaceName, setWorkspaceName] = useState('Workspace');
+  const [workspaceId, setWorkspaceId] = useState('');
   const [currentRole, setCurrentRole] = useState('member');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>({});
+  const [settingsForm, setSettingsForm] = useState<WorkspaceSettings>({});
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadWorkspace = useCallback(async () => {
@@ -70,7 +80,18 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
       setActivity(data.activity || []);
       setReminders(data.reminders || []);
       setWorkspaceName(data.workspace?.name || 'Workspace');
+      setWorkspaceId(data.workspace?.id || '');
       setCurrentRole(data.currentMember?.role || 'member');
+      // Load workspace settings from settings if available
+      if (data.settings) {
+        const settings: WorkspaceSettings = {
+          company_name: data.settings.company_name,
+          default_naics_codes: data.settings.naics_codes,
+          default_agencies: data.settings.target_agencies,
+        };
+        setWorkspaceSettings(settings);
+        setSettingsForm(settings);
+      }
     } catch (err) {
       console.error('Failed to load workspace:', err);
       setError('Failed to load team workspace');
@@ -115,6 +136,39 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
   };
 
   const canInvite = ['owner', 'admin'].includes(currentRole);
+  const canEditSettings = ['owner', 'admin'].includes(currentRole);
+
+  const saveWorkspaceSettings = async () => {
+    if (!email) return;
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/mi-beta/workspace', {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          email,
+          company_name: settingsForm.company_name,
+          naics_codes: settingsForm.default_naics_codes,
+          target_agencies: settingsForm.default_agencies,
+        }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        setError(data.error || 'Failed to save settings');
+      } else {
+        setWorkspaceSettings(settingsForm);
+        setShowSettings(false);
+      }
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+      setError('Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -138,7 +192,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
           <p className="text-slate-400 mt-1">{workspaceName} shared workspace</p>
         </div>
         <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs text-blue-300">
-          {tier === 'team' || tier === 'enterprise' ? 'Team-ready' : 'Beta team preview'}
+          {tier === 'team' || tier === 'enterprise' ? 'Team Plan' : 'Team Preview'}
         </span>
       </div>
 
@@ -251,6 +305,100 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
           {activity.length === 0 && <p className="text-sm text-slate-500">No team activity yet.</p>}
         </div>
       </div>
+
+      {/* Workspace Settings - Admin/Owner only */}
+      {canEditSettings && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-slate-800/50 transition-colors"
+          >
+            <div>
+              <h2 className="font-semibold text-white">Workspace Settings</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                {workspaceSettings.company_name || workspaceName} • Manage team defaults
+              </p>
+            </div>
+            <svg
+              className={`w-5 h-5 text-slate-400 transition-transform ${showSettings ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showSettings && (
+            <div className="px-5 pb-5 space-y-4 border-t border-slate-800">
+              <div className="pt-4">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Company Name
+                </label>
+                <input
+                  type="text"
+                  value={settingsForm.company_name || ''}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, company_name: e.target.value })}
+                  placeholder={workspaceName}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Default NAICS Codes (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={(settingsForm.default_naics_codes || []).join(', ')}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    default_naics_codes: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                  })}
+                  placeholder="541512, 541611, 541330"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1">Applied to new team members by default</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Target Agencies (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={(settingsForm.default_agencies || []).join(', ')}
+                  onChange={(e) => setSettingsForm({
+                    ...settingsForm,
+                    default_agencies: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                  })}
+                  placeholder="DOD, VA, HHS"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setSettingsForm(workspaceSettings);
+                    setShowSettings(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveWorkspaceSettings}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  {saving ? 'Saving...' : 'Save Settings'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

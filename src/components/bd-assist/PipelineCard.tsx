@@ -14,7 +14,11 @@ export interface PipelineCardProps {
     win_probability?: number;
     notice_id?: string;
     source?: string;
+    owner_email?: string;
+    next_action?: string;
+    next_action_date?: string;
   };
+  currentUserEmail?: string;
   onStageChange: (id: string, newStage: string) => void;
   onEdit: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -22,7 +26,8 @@ export interface PipelineCardProps {
 
 const STAGES = ['tracking', 'pursuing', 'bidding', 'submitted', 'won', 'lost'];
 
-export default function PipelineCard({ item, onStageChange, onEdit, onDelete }: PipelineCardProps) {
+export default function PipelineCard({ item, currentUserEmail, onStageChange, onEdit, onDelete }: PipelineCardProps) {
+  const isTeamItem = item.owner_email && item.owner_email !== currentUserEmail;
   const [showActions, setShowActions] = useState(false);
 
   // Calculate urgency based on deadline
@@ -120,6 +125,23 @@ export default function PipelineCard({ item, onStageChange, onEdit, onDelete }: 
         <div className="text-xs text-gray-500 mb-2">
           <span className="bg-gray-100 px-2 py-0.5 rounded">
             {item.source === 'sam.gov' ? 'SAM.gov' : item.source}
+          </span>
+        </div>
+      )}
+
+      {/* Next Action */}
+      {item.next_action && (
+        <div className="text-xs text-gray-600 mb-2 flex items-center gap-1">
+          <span className="text-blue-500">→</span>
+          <span className="line-clamp-1">{item.next_action}</span>
+        </div>
+      )}
+
+      {/* Owner (for team items) */}
+      {isTeamItem && item.owner_email && (
+        <div className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+            👤 {item.owner_email.split('@')[0]}
           </span>
         </div>
       )}

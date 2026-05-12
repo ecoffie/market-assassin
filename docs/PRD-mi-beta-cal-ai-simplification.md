@@ -1,5 +1,21 @@
 # PRD: MI Beta Cal AI Simplification
 
+**Status:** ✅ Complete (May 12, 2026)
+
+## Implementation Summary
+
+All slices completed:
+- ✅ Slice 1: Naming and Hierarchy - Labels finalized (Today's Intel, Source Feed, Upcoming Buys, Expiring Contracts, My Pursuits, My Network, Settings)
+- ✅ Slice 2: Paid Card Actions - Review Fit with expandable cards + Track in Pipeline
+- ✅ Slice 3: Source Feed Positioning - Paid users see "Source Feed", free users see "Daily Alerts" in legacy
+- ✅ Slice 4: Global Defaults - Profile defaults applied across all tabs, Clear Filters / View All available
+
+Open Decisions resolved:
+- Review Fit opens inline expandable cards (not modal or drawer)
+- Today's Intel does not auto-expand top item (user clicks to expand)
+- Source Feed remains in Intelligence section as secondary to Today's Intel
+- Scoring uses match signals (NAICS, set-aside, agency, deadline proximity)
+
 ## Decision
 
 Market Intelligence beta should behave less like a collection of tools and more like an outcome workspace. The paid user should not feel like they bought access to more filters. They should feel like the product already knows their profile, finds the right opportunities, explains the fit, and tells them what to do next.
@@ -121,10 +137,10 @@ Primary experience:
 - Lower navigation to raw Source Feed as the first paid action.
 - Increased free-to-paid conversion from Daily Alerts.
 
-## Open Decisions
+## Open Decisions (Resolved)
 
-- Should Review Fit open an inline drawer, a modal, or a dedicated opportunity detail page?
-- Should Today's Intel automatically expand the top opportunity by default?
-- Should Source Feed be hidden under Research for paid users, or remain in Intelligence as a secondary item?
-- What exact score/rubric should drive "Top 5 to Review" ordering?
+- ✅ Review Fit opens inline expandable cards showing description, category, signals, and action URL
+- ✅ Today's Intel does not auto-expand - users click to expand individual cards
+- ✅ Source Feed remains in Intelligence section as secondary item after Today's Intel
+- ✅ Top opportunities ordered by match signals (NAICS match, set-aside, agency, deadline proximity)
 

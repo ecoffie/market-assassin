@@ -166,7 +166,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
           <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-800 bg-slate-800/40 p-4">
             <div>
               <div className="text-sm font-medium text-white">Require two-factor verification</div>
-              <div className="text-xs text-slate-500 mt-1">Beta currently enforces this for unified platform access.</div>
+              <div className="text-xs text-slate-500 mt-1">Adds an extra layer of security to your account.</div>
             </div>
             <input
               type="checkbox"

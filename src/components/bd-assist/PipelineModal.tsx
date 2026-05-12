@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import CommentsSection from './CommentsSection';
 
 export interface PipelineModalProps {
   isOpen: boolean;
@@ -321,6 +322,11 @@ export default function PipelineModal({ isOpen, onClose, onSave, initialData, em
                 placeholder="Internal notes, strategy, key contacts..."
               />
             </div>
+
+            {/* Team Comments - only show when editing existing item */}
+            {initialData?.id && (
+              <CommentsSection pipelineId={initialData.id} email={email} />
+            )}
           </div>
 
           {/* Error */}

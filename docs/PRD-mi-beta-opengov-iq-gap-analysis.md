@@ -1,8 +1,35 @@
 # PRD: MI Beta + OpenGov IQ Intelligence Layer
 
 Date: 2026-05-12
-Status: Release-candidate product plan
+**Status:** ✅ Phase 4B Complete - Production-Ready (May 12, 2026)
 Related TODO: `docs/TODO-mi-beta-opengov-iq-database-buildout.md`
+
+## Implementation Status
+
+### Completed (May 12, 2026)
+
+**Phase 1-3: Core Features**
+- ✅ Relationships panel with 4 tabs (Find Buyers, OSBP Contacts, Partners, My Network)
+- ✅ Save to My Network action
+- ✅ Attach contact/partner to pursuit
+- ✅ Market Research as answer-first market map (no setup form)
+- ✅ Pursuit detail drawer with notes, next action, attached contacts
+- ✅ Market Focus saved filter sets
+- ✅ Request this forecast workflow + admin queue
+- ✅ Review Fit with Track in Pipeline action
+
+**Phase 4B: Production-Ready**
+- ✅ Removed all customer-facing beta language (BETA badges, "Testing Environment")
+- ✅ Finalized navigation labels (Today's Intel, Source Feed, Settings, etc.)
+- ✅ Free/Pro/Teams feature gates confirmed
+- ✅ Auth flows (setup-account, forgot-password, reset-password) route to MI experience
+- ✅ Rollback strategy documented (/briefings remains as fallback)
+
+### Pending (End-of-May Launch)
+- [ ] Choose final route name (`/mi-beta` → `/mi` or `/dashboard`)
+- [ ] Update email links to point to new MI experience
+- [ ] Redirect paid users from `/briefings` to new MI by default
+- [ ] Teams workspace features (Phase 5+)
 
 ## Summary
 
@@ -902,23 +929,28 @@ Mitigation:
 
 ## End-Of-May Release Checklist
 
-- Relationships exists for Pro.
-- Market Research no longer uses the old setup-form-first flow.
-- Upcoming Buys and Expiring Contracts default to saved profile and support View All/Clear Filters.
-- Every trackable item has a clear Track/Add to My Pursuits action.
-- My Pursuits has enough detail for customers to understand what they saved and what to do next.
-- Free, Pro, and Teams navigation differences are clear.
-- Password reset and setup emails return users to the new MI experience.
-- Existing OpenGov IQ database has been audited and mapped.
-- Production route promotion plan is ready.
-- Rollback path is documented.
+- [x] Relationships exists for Pro.
+- [x] Market Research no longer uses the old setup-form-first flow.
+- [x] Upcoming Buys and Expiring Contracts default to saved profile and support View All/Clear Filters.
+- [x] Every trackable item has a clear Track/Add to My Pursuits action.
+- [x] My Pursuits has enough detail for customers to understand what they saved and what to do next.
+- [x] Free, Pro, and Teams navigation differences are clear.
+- [x] Password reset and setup emails return users to the new MI experience.
+- [x] Existing OpenGov IQ database has been audited and mapped.
+- [ ] Production route promotion plan is ready (decision: final route name).
+- [x] Rollback path is documented.
 
 ## Open Questions
 
-- What is the current canonical OpenGov IQ database source?
-- Do federal contacts currently live in BigQuery?
-- Do we have a refresh process for federal contacts?
-- Do forecasts live in a database, uploaded files, or both?
-- Should `Relationships` replace `Teaming CRM` in the nav or absorb it as a tab?
-- Should saved contacts be personal in Pro and workspace-owned in Teams, or always workspace-owned with personal workspace defaults?
-- What final route should replace `/mi-beta`: `/market-intelligence`, `/briefings`, or keep `/mi-beta` behind a renamed app shell until launch?
+- [x] What is the current canonical OpenGov IQ database source?
+  - BigQuery project `fresh-ward-455220-j0`, dataset `samgovcons`
+- [x] Do federal contacts currently live in BigQuery?
+  - Yes, `AllSamContacts` table; also imported to Supabase `opengov_iq_contacts`
+- [ ] Do we have a refresh process for federal contacts?
+- [x] Do forecasts live in a database, uploaded files, or both?
+  - Database: `agency_forecasts` table with 7,764 records from 11 agencies
+- [x] Should `Relationships` replace `Teaming CRM` in the nav or absorb it as a tab?
+  - Replaced. Pro nav shows "My Network" for relationships; Teams workspace/CRM is a later feature.
+- [ ] Should saved contacts be personal in Pro and workspace-owned in Teams, or always workspace-owned with personal workspace defaults?
+- [ ] What final route should replace `/mi-beta`: `/market-intelligence`, `/briefings`, or keep `/mi-beta` behind a renamed app shell until launch?
+  - Decision pending. Current: `/mi-beta` works, `/briefings` is legacy fallback.

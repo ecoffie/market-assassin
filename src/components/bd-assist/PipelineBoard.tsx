@@ -24,6 +24,10 @@ interface PipelineOpportunity {
   notes?: string;
   external_url?: string;
   teaming_partners?: string[] | string;
+  owner_email?: string;
+  next_action?: string;
+  next_action_date?: string;
+  workspace_id?: string;
 }
 
 const STAGES = [
@@ -285,6 +289,7 @@ export default function PipelineBoard({ email }: PipelineBoardProps) {
                         <PipelineCard
                           key={opp.id}
                           item={opp}
+                          currentUserEmail={email}
                           onStageChange={handleStageChange}
                           onEdit={handleEdit}
                           onDelete={handleDelete}

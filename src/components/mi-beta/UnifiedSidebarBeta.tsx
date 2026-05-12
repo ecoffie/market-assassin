@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
 
 // Panel types for the unified MI platform
 export type MIBetaPanel =
@@ -141,7 +142,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       {
         id: 'settings',
-        label: 'Unified Settings',
+        label: 'Settings',
         icon: '⚙️',
         description: 'Profile, NAICS, security',
         tier: ['free', 'pro', 'team', 'enterprise'],
@@ -154,6 +155,9 @@ interface UnifiedSidebarBetaProps {
   activePanel: MIBetaPanel;
   onPanelChange: (panel: MIBetaPanel) => void;
   userTier: MIBetaTier;
+  userEmail?: string | null;
+  currentWorkspaceId?: string | null;
+  onWorkspaceChange?: (workspaceId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -162,6 +166,9 @@ export default function UnifiedSidebarBeta({
   activePanel,
   onPanelChange,
   userTier,
+  userEmail,
+  currentWorkspaceId,
+  onWorkspaceChange,
   isCollapsed = false,
   onToggleCollapse,
 }: UnifiedSidebarBetaProps) {
@@ -241,9 +248,6 @@ export default function UnifiedSidebarBeta({
               </div>
               <div>
                 <span className="font-semibold text-white text-sm">Market Intel</span>
-                <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded">
-                  BETA
-                </span>
               </div>
             </Link>
           )}
@@ -269,6 +273,16 @@ export default function UnifiedSidebarBeta({
           </div>
         )}
       </div>
+
+      {/* Workspace Switcher - only for team/enterprise tiers */}
+      {(userTier === 'team' || userTier === 'enterprise') && userEmail && onWorkspaceChange && (
+        <WorkspaceSwitcher
+          email={userEmail}
+          currentWorkspaceId={currentWorkspaceId || null}
+          onWorkspaceChange={onWorkspaceChange}
+          isCollapsed={isCollapsed}
+        />
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4">
@@ -353,14 +367,14 @@ export default function UnifiedSidebarBeta({
               href="/briefings"
               className="block text-center text-xs text-slate-500 hover:text-slate-400 transition-colors"
             >
-              ← Back to Production
+              ← Legacy View
             </Link>
           </div>
         ) : (
           <Link
             href="/briefings"
             className="block text-center text-slate-500 hover:text-slate-400"
-            title="Back to Production"
+            title="Legacy View"
           >
             ←
           </Link>

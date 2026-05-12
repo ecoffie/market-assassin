@@ -144,18 +144,39 @@ Teams phase:
 - [x] Add `Market Focus` saved filter sets.
   - API: `/api/mi-beta/market-focus`.
   - UI: Market Research saved profile/focus switcher and save-current-focus flow.
-- [ ] Add `Request this forecast` when forecast data is missing.
+- [x] Add `Request this forecast` when forecast data is missing.
+  - API: `/api/mi-beta/forecast-request` (user submissions).
+  - Admin API: `/api/admin/forecast-requests` (internal queue management).
+  - UI: Request modal in ForecastsPanel, triggered when search returns few/no results.
 
 ## Phase 4B: Production-Ready Beta
 
-- [ ] Remove or minimize customer-facing beta-only language before launch.
-- [ ] Confirm final navigation labels.
-- [ ] Confirm Free, Pro, and Teams feature gates.
-- [ ] Confirm setup-account, forgot-password, and reset-password redirects use the final MI route.
-- [ ] Confirm email links route users into the new MI experience.
+- [x] Remove or minimize customer-facing beta-only language before launch.
+  - Removed BETA badges from sidebar header, top bar, and login page.
+  - Updated "Back to Production" to "Legacy View".
+  - Updated "Beta team preview" to "Team Preview".
+  - Updated 2FA description to remove beta reference.
+  - Simplified "Unified Settings" to "Settings".
+- [x] Confirm final navigation labels.
+  - Labels finalized: Today's Intel, Source Feed, Market Research, Upcoming Buys, Expiring Contracts, Contractors, My Pursuits, My Network, Team Access, Proposal Assist, Federal Grants, Settings.
+- [x] Confirm Free, Pro, and Teams feature gates.
+  - Free: Source Feed, Market Research, Settings.
+  - Pro: All panels except Team Access.
+  - Team/Enterprise: All panels including Team Access.
+- [x] Confirm setup-account, forgot-password, and reset-password redirects use the final MI route.
+  - All auth pages route to `/mi-beta` and include redirect to `mi.govcongiants.com`.
+- [x] Confirm email links route users into the new MI experience.
+  - Email links use `mi.govcongiants.com/briefings` (legacy dashboard).
+  - Decision pending: When to update email links to `/mi-beta` or final route.
 - [ ] Confirm all paid users land in the new MI shell.
+  - Decision needed: When to update `/briefings` to redirect Pro users to `/mi-beta`.
+  - Current: Both dashboards work independently; users can use either.
 - [ ] Confirm old production pages can redirect or remain as fallback.
+  - Current: `/briefings` remains as legacy dashboard, `/mi-beta` is new unified experience.
+  - Decision needed: Final route name (`/mi-beta` → `/mi` or `/dashboard`?).
 - [ ] Confirm rollback route if launch needs to be reversed.
+  - Rollback: Simply keep `/briefings` as primary, `/mi-beta` as optional.
+  - Email links still point to `/briefings`, so no email changes needed for rollback.
 
 ## Phase 5: Teams Features
 

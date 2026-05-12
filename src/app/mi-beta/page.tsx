@@ -26,7 +26,7 @@ function DashboardLoading() {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center">
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-400">Loading Market Intelligence Beta...</p>
+        <p className="text-gray-400">Loading Market Intelligence...</p>
       </div>
     </div>
   );
@@ -48,6 +48,7 @@ function MIBetaDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
@@ -398,9 +399,6 @@ function MIBetaDashboard() {
         <div className="max-w-4xl mx-auto px-6 py-16">
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="inline-block px-3 py-1 bg-amber-500/20 border border-amber-500/30 rounded-full text-amber-400 text-sm font-medium mb-4">
-              BETA - Testing Environment
-            </div>
             <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center mx-auto mb-6">
               <span className="text-white font-bold text-2xl">MI</span>
             </div>
@@ -550,7 +548,7 @@ function MIBetaDashboard() {
             )}
 
             <p className="text-center text-gray-500 text-sm mt-4">
-              Production version:{' '}
+              Legacy dashboard:{' '}
               <a href="/briefings" className="text-emerald-400 hover:text-emerald-300">
                 /briefings →
               </a>
@@ -588,6 +586,9 @@ function MIBetaDashboard() {
         activePanel={activePanel}
         onPanelChange={handlePanelChange}
         userTier={tier}
+        userEmail={email}
+        currentWorkspaceId={currentWorkspaceId}
+        onWorkspaceChange={setCurrentWorkspaceId}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
@@ -612,9 +613,6 @@ function MIBetaDashboard() {
         <header className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <span className="px-2 py-1 text-xs bg-amber-500/20 text-amber-400 rounded">
-                BETA
-              </span>
               <span className="text-sm text-slate-400">
                 Logged in as <span className="text-white">{email}</span>
               </span>

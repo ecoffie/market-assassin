@@ -121,6 +121,15 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   const [naicsFilter, setNaicsFilter] = useState('');
   const [agencyFilter, setAgencyFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Forecast request state
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestAgency, setRequestAgency] = useState('');
+  const [requestOffice, setRequestOffice] = useState('');
+  const [requestNaics, setRequestNaics] = useState('');
+  const [requestDescription, setRequestDescription] = useState('');
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
   const getForecastHeaders = useCallback(() => (
     getMIApiHeaders(email)
   ), [email]);
@@ -255,6 +264,51 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
   const getAgencyColors = (agency: string) => {
     return AGENCY_COLORS[agency] || { bg: 'bg-slate-500/20', text: 'text-slate-400' };
+  };
+
+  const handleRequestForecast = async () => {
+    if (!email || !requestAgency) return;
+
+    setRequestSubmitting(true);
+    try {
+      const res = await fetch('/api/mi-beta/forecast-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getForecastHeaders() },
+        body: JSON.stringify({
+          email,
+          agency: requestAgency,
+          office: requestOffice,
+          naicsCode: requestNaics,
+          description: requestDescription,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setRequestSuccess(true);
+        setTimeout(() => {
+          setShowRequestModal(false);
+          setRequestSuccess(false);
+          setRequestAgency('');
+          setRequestOffice('');
+          setRequestNaics('');
+          setRequestDescription('');
+        }, 2000);
+      } else {
+        setError(data.error || 'Failed to submit request');
+      }
+    } catch (err) {
+      console.error('Forecast request error:', err);
+      setError('Failed to submit request');
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
+  const openRequestModal = (prefillAgency?: string, prefillNaics?: string) => {
+    setRequestAgency(prefillAgency || agencyFilter || '');
+    setRequestNaics(prefillNaics || naicsFilter || '');
+    setShowRequestModal(true);
   };
 
   const toggleForecast = (forecastId: string) => {
@@ -683,6 +737,122 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
           <p className="text-slate-400 text-sm">
             Search forecasts to find upcoming opportunities 6-18 months before they hit SAM.gov.
           </p>
+        </div>
+      )}
+
+      {/* Request Missing Forecast Card - shown when search returns no/few results */}
+      {forecasts.length < 5 && (naicsFilter || agencyFilter) && !loading && !searching && (
+        <div className="bg-slate-900 border border-purple-500/30 rounded-xl p-5">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
+              <span className="text-2xl">📋</span>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-white font-medium mb-1">Missing forecast data?</h4>
+              <p className="text-slate-400 text-sm mb-3">
+                {forecasts.length === 0
+                  ? `We don't have forecast data matching your search yet.`
+                  : `Only ${forecasts.length} forecasts found for this search.`
+                } Request this data and we'll research it for you.
+              </p>
+              <button
+                onClick={() => openRequestModal()}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Request This Forecast
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forecast Request Modal */}
+      {showRequestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Request Forecast Data</h3>
+              <button
+                onClick={() => setShowRequestModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {requestSuccess ? (
+              <div className="text-center py-8">
+                <div className="text-5xl mb-4">✅</div>
+                <p className="text-emerald-400 font-medium">Request submitted!</p>
+                <p className="text-slate-400 text-sm mt-2">We'll notify you when this data is available.</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-slate-400 text-sm mb-4">
+                  Tell us what forecast data you need. Our team will research and add it to the database.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Agency *</label>
+                    <input
+                      type="text"
+                      value={requestAgency}
+                      onChange={(e) => setRequestAgency(e.target.value)}
+                      placeholder="e.g., Department of Defense, VA, HHS"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Office (optional)</label>
+                    <input
+                      type="text"
+                      value={requestOffice}
+                      onChange={(e) => setRequestOffice(e.target.value)}
+                      placeholder="e.g., AFMC, VA Office of Acquisition"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">NAICS Code (optional)</label>
+                    <input
+                      type="text"
+                      value={requestNaics}
+                      onChange={(e) => setRequestNaics(e.target.value)}
+                      placeholder="e.g., 541512"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">What are you looking for?</label>
+                    <textarea
+                      value={requestDescription}
+                      onChange={(e) => setRequestDescription(e.target.value)}
+                      placeholder="Describe the type of opportunities you're trying to find..."
+                      rows={3}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setShowRequestModal(false)}
+                    className="px-4 py-2 text-slate-400 hover:text-white text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRequestForecast}
+                    disabled={!requestAgency || requestSubmitting}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {requestSubmitting ? 'Submitting...' : 'Submit Request'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
