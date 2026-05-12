@@ -11,7 +11,7 @@ const ForecastsPanel = lazy(() => import('./ForecastsPanel'));
 const RecompetesPanel = lazy(() => import('./RecompetesPanel'));
 const ContractorsPanel = lazy(() => import('./ContractorsPanel'));
 const PipelinePanel = lazy(() => import('./PipelinePanel'));
-const ContactsPanel = lazy(() => import('./ContactsPanel'));
+const RelationshipsPanel = lazy(() => import('./RelationshipsPanel'));
 const TeamPanel = lazy(() => import('./TeamPanel'));
 const UnifiedSettingsPanel = lazy(() => import('./UnifiedSettingsPanel'));
 const ProposalsPanel = lazy(() => import('./ProposalsPanel'));
@@ -52,7 +52,7 @@ export default function PanelContainer({ activePanel, email, tier }: PanelContai
       case 'pipeline':
         return <PipelinePanel email={email} tier={tier} />;
       case 'contacts':
-        return <ContactsPanel email={email} tier={tier} />;
+        return <RelationshipsPanel email={email} tier={tier} />;
       case 'team':
         return <TeamPanel email={email} tier={tier} />;
       case 'settings':

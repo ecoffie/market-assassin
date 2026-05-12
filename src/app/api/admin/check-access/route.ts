@@ -45,6 +45,29 @@ const SUPABASE_FLAGS = [
   'access_briefings',
 ];
 
+async function safeKvGet<T>(key: string): Promise<{ value: T | null; available: boolean; error: string | null }> {
+  try {
+    return { value: await kv.get<T>(key), available: true, error: null };
+  } catch (error) {
+    console.warn(`[Admin Check Access] KV unavailable for ${key}`, error);
+    return {
+      value: null,
+      available: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function safeKvSet(key: string, value: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await kv.set(key, value);
+    return { ok: true };
+  } catch (error) {
+    console.warn(`[Admin Check Access] KV write failed for ${key}`, error);
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const password = searchParams.get('password');
@@ -61,8 +84,13 @@ export async function GET(request: NextRequest) {
 
   // 1. Check all KV keys
   const kvResults: Record<string, { hasAccess: boolean; value: string | null }> = {};
+  const kvErrors: string[] = [];
   for (const { key, label } of KV_KEYS) {
-    const val = await kv.get(`${key}:${email}`);
+    const result = await safeKvGet<string>(`${key}:${email}`);
+    const val = result.value;
+    if (!result.available && result.error) {
+      kvErrors.push(`${label}: ${result.error}`);
+    }
     kvResults[label] = {
       hasAccess: !!val,
       value: val as string | null,
@@ -72,7 +100,11 @@ export async function GET(request: NextRequest) {
   // Also check dbtoken (Contractor DB uses token-based access)
   let dbTokenFound: string | null = null;
   // Check if any dbtoken maps to this email
-  const dbAccessVal = await kv.get(`dbaccess:${email}`);
+  const dbAccessResult = await safeKvGet(`dbaccess:${email}`);
+  const dbAccessVal = dbAccessResult.value;
+  if (!dbAccessResult.available && dbAccessResult.error) {
+    kvErrors.push(`Contractor DB token: ${dbAccessResult.error}`);
+  }
   if (dbAccessVal) {
     dbTokenFound = String(dbAccessVal);
   }
@@ -156,15 +188,23 @@ export async function GET(request: NextRequest) {
         const tool = gap.split(':')[0].trim();
         for (const [kvKey, label] of Object.entries(kvMap)) {
           if (label === tool || tool.startsWith(label)) {
-            await kv.set(`${kvKey}:${email}`, 'true');
-            fixed.push(`Granted KV ${kvKey}:${email}`);
+            const result = await safeKvSet(`${kvKey}:${email}`, 'true');
+            fixed.push(
+              result.ok
+                ? `Granted KV ${kvKey}:${email}`
+                : `Failed KV ${kvKey}:${email}: ${result.error}`
+            );
           }
         }
       }
     } else {
       // Grant specific tool
-      await kv.set(`${fix}:${email}`, 'true');
-      fixed.push(`Granted KV ${fix}:${email}`);
+      const result = await safeKvSet(`${fix}:${email}`, 'true');
+      fixed.push(
+        result.ok
+          ? `Granted KV ${fix}:${email}`
+          : `Failed KV ${fix}:${email}: ${result.error}`
+      );
     }
   }
 
@@ -184,6 +224,7 @@ export async function GET(request: NextRequest) {
     },
     gaps,
     fixed: fixed.length > 0 ? fixed : undefined,
+    warnings: kvErrors.length > 0 ? kvErrors : undefined,
     summary: {
       kvToolCount: Object.values(kvResults).filter(v => v.hasAccess).length,
       supabaseFlagCount: Object.values(supabaseFlags).filter(v => v).length,

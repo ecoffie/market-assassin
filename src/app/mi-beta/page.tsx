@@ -11,6 +11,15 @@ const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
 const MI_AUTH_TOKEN_KEY = 'mi_beta_auth_token';
 
+function clearStoredMIBetaAuth() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('mi_beta_email');
+  localStorage.removeItem('mi_beta_authenticated_at');
+  localStorage.removeItem('mi_beta_2fa_verified_at');
+  localStorage.removeItem(MI_AUTH_TOKEN_KEY);
+  localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
+}
+
 // Loading fallback
 function DashboardLoading() {
   return (
@@ -121,7 +130,20 @@ function MIBetaDashboard() {
       const accessRes = await fetch(`/api/access/check?email=${encodeURIComponent(userEmail)}`, {
         headers: getTwoFactorHeaders(),
       });
-      const accessData = accessRes.ok ? await accessRes.json() : null;
+      const accessData = await accessRes.json().catch(() => null);
+
+      if (!accessRes.ok || !accessData?.success) {
+        if (accessRes.status === 401) {
+          clearStoredMIBetaAuth();
+          setEmail(null);
+          setTier('free');
+          setPendingEmail(userEmail);
+          setAuthError('Your MI session expired. Sign in again to restore Pro access.');
+          return;
+        }
+
+        throw new Error(accessData?.error || 'Could not verify Market Intelligence access');
+      }
 
       // Determine tier from the unified MI entitlement first.
       let userTier: MIBetaTier = 'free';
@@ -351,17 +373,14 @@ function MIBetaDashboard() {
       const verifiedRecently = verifiedAt
         ? Date.now() - new Date(verifiedAt).getTime() < TWO_FACTOR_SESSION_MS
         : false;
+      const hasStoredToken = typeof window !== 'undefined'
+        ? Boolean(localStorage.getItem(MI_AUTH_TOKEN_KEY) || localStorage.getItem(TWO_FACTOR_TOKEN_KEY))
+        : false;
 
-      if (storedEmail && verifiedRecently) {
+      if (storedEmail && verifiedRecently && hasStoredToken) {
         loadUserProfile(storedEmail);
       } else {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('mi_beta_email');
-          localStorage.removeItem('mi_beta_authenticated_at');
-          localStorage.removeItem('mi_beta_2fa_verified_at');
-          localStorage.removeItem(MI_AUTH_TOKEN_KEY);
-          localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
-        }
+        clearStoredMIBetaAuth();
         setIsLoading(false);
       }
     }
@@ -619,11 +638,7 @@ function MIBetaDashboard() {
               </button>
               <button
                 onClick={() => {
-                  localStorage.removeItem('mi_beta_email');
-                  localStorage.removeItem('mi_beta_authenticated_at');
-                  localStorage.removeItem('mi_beta_2fa_verified_at');
-                  localStorage.removeItem(MI_AUTH_TOKEN_KEY);
-                  localStorage.removeItem(TWO_FACTOR_TOKEN_KEY);
+                  clearStoredMIBetaAuth();
                   setEmail(null);
                   setPendingEmail('');
                   setSignInPassword('');

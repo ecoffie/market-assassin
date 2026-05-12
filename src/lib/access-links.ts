@@ -21,6 +21,17 @@ function buildAccessUrl(token: string): string {
   return `${process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com'}/access?token=${encodeURIComponent(token)}`;
 }
 
+function buildFallbackUrl(email: string, destination: AccessDestination): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com';
+  const normalizedEmail = normalizeEmail(email);
+
+  if (destination === 'preferences') {
+    return `${baseUrl}/alerts/preferences?email=${encodeURIComponent(normalizedEmail)}`;
+  }
+
+  return `${baseUrl}/briefings?email=${encodeURIComponent(normalizedEmail)}`;
+}
+
 function getTransporter() {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.office365.com',
@@ -64,8 +75,16 @@ export async function createAccessLink(email: string, destination: AccessDestina
 }
 
 export async function createSecureAccessUrl(email: string, destination: AccessDestination): Promise<string> {
-  const token = await createAccessLink(email, destination);
-  return buildAccessUrl(token);
+  try {
+    const token = await createAccessLink(email, destination);
+    return buildAccessUrl(token);
+  } catch (error) {
+    console.warn('[access-links] KV unavailable while creating secure link; using direct fallback URL', {
+      destination,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return buildFallbackUrl(email, destination);
+  }
 }
 
 export async function consumeAccessLink(token: string): Promise<AccessLinkPayload | null> {

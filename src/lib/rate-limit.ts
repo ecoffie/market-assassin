@@ -18,22 +18,32 @@ export async function checkRateLimit(
   windowSeconds: number
 ): Promise<RateLimitResult> {
   const kvKey = `rl:${key}`;
-  const count = await kv.incr(kvKey);
+  try {
+    const count = await kv.incr(kvKey);
 
-  // Set TTL on first hit only
-  if (count === 1) {
-    await kv.expire(kvKey, windowSeconds);
+    // Set TTL on first hit only
+    if (count === 1) {
+      await kv.expire(kvKey, windowSeconds);
+    }
+
+    const ttl = await kv.ttl(kvKey);
+    const resetAt = Math.floor(Date.now() / 1000) + (ttl > 0 ? ttl : windowSeconds);
+
+    return {
+      allowed: count <= limit,
+      remaining: Math.max(0, limit - count),
+      limit,
+      resetAt,
+    };
+  } catch (error) {
+    console.warn(`[RateLimit] KV unavailable for ${kvKey}; allowing request without rate limit`, error);
+    return {
+      allowed: true,
+      remaining: limit,
+      limit,
+      resetAt: Math.floor(Date.now() / 1000) + windowSeconds,
+    };
   }
-
-  const ttl = await kv.ttl(kvKey);
-  const resetAt = Math.floor(Date.now() / 1000) + (ttl > 0 ? ttl : windowSeconds);
-
-  return {
-    allowed: count <= limit,
-    remaining: Math.max(0, limit - count),
-    limit,
-    resetAt,
-  };
 }
 
 /** 50 report generations per day per email */
@@ -59,17 +69,29 @@ export function checkUnauthenticatedIPRateLimit(ip: string): Promise<RateLimitRe
 /** Get current usage count without incrementing (for usage endpoint) */
 export async function getUsageCount(key: string): Promise<number> {
   const kvKey = `rl:${key}`;
-  const count = await kv.get<number>(kvKey);
-  return count ?? 0;
+  try {
+    const count = await kv.get<number>(kvKey);
+    return count ?? 0;
+  } catch (error) {
+    console.warn(`[RateLimit] Could not read usage count for ${kvKey}`, error);
+    return 0;
+  }
 }
 
 /** Get report usage for a user */
 export async function getReportUsage(email: string): Promise<{ used: number; limit: number; remaining: number; resetAt: number }> {
   const key = `rl:report:${email.toLowerCase()}`;
-  const count = await kv.get<number>(key) ?? 0;
-  const ttl = await kv.ttl(key);
   const limit = 50;
-  const resetAt = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : Math.floor(Date.now() / 1000) + 86400;
+  let count = 0;
+  let resetAt = Math.floor(Date.now() / 1000) + 86400;
+
+  try {
+    count = await kv.get<number>(key) ?? 0;
+    const ttl = await kv.ttl(key);
+    resetAt = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : resetAt;
+  } catch (error) {
+    console.warn(`[RateLimit] Could not read report usage for ${key}`, error);
+  }
 
   return {
     used: count,
@@ -82,10 +104,17 @@ export async function getReportUsage(email: string): Promise<{ used: number; lim
 /** Get content generation usage for a user */
 export async function getContentUsage(email: string): Promise<{ used: number; limit: number; remaining: number; resetAt: number }> {
   const key = `rl:content:${email.toLowerCase()}`;
-  const count = await kv.get<number>(key) ?? 0;
-  const ttl = await kv.ttl(key);
   const limit = 10;
-  const resetAt = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : Math.floor(Date.now() / 1000) + 86400;
+  let count = 0;
+  let resetAt = Math.floor(Date.now() / 1000) + 86400;
+
+  try {
+    count = await kv.get<number>(key) ?? 0;
+    const ttl = await kv.ttl(key);
+    resetAt = ttl > 0 ? Math.floor(Date.now() / 1000) + ttl : resetAt;
+  } catch (error) {
+    console.warn(`[RateLimit] Could not read content usage for ${key}`, error);
+  }
 
   return {
     used: count,

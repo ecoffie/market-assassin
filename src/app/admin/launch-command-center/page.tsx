@@ -590,6 +590,9 @@ export default function LaunchCommandCenterPage() {
               <a className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500" href="/admin/dashboard">
                 Admin Dashboard
               </a>
+              <a className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500" href="/admin/mi-accounts">
+                MI Accounts
+              </a>
               <button
                 className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500"
                 onClick={() => {

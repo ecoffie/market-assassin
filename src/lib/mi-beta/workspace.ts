@@ -75,6 +75,18 @@ export async function ensureMIBetaWorkspaceSchema() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS mi_beta_market_focuses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id TEXT NOT NULL,
+        user_email TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        filters JSONB NOT NULL DEFAULT '{}'::jsonb,
+        is_default BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
       ALTER TABLE user_pipeline ADD COLUMN IF NOT EXISTS workspace_id TEXT;
       ALTER TABLE user_pipeline ADD COLUMN IF NOT EXISTS owner_email TEXT;
       ALTER TABLE user_pipeline ADD COLUMN IF NOT EXISTS created_by TEXT;
@@ -87,6 +99,8 @@ export async function ensureMIBetaWorkspaceSchema() {
       CREATE INDEX IF NOT EXISTS idx_mi_beta_team_workspace ON mi_beta_team_members(workspace_id);
       CREATE INDEX IF NOT EXISTS idx_mi_beta_settings_workspace ON mi_beta_user_settings(workspace_id);
       CREATE INDEX IF NOT EXISTS idx_mi_beta_activity_workspace ON mi_beta_activity(workspace_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_mi_beta_market_focuses_workspace ON mi_beta_market_focuses(workspace_id, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_mi_beta_market_focuses_user ON mi_beta_market_focuses(user_email, updated_at DESC);
       CREATE INDEX IF NOT EXISTS idx_pipeline_workspace ON user_pipeline(workspace_id);
       CREATE INDEX IF NOT EXISTS idx_teaming_workspace ON user_teaming_partners(workspace_id);
     `,

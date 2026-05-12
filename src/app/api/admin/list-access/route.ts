@@ -4,6 +4,16 @@ import { kv } from '@vercel/kv';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
+async function safeSection<T>(label: string, getter: () => Promise<T>, fallback: T): Promise<{ data: T; warning?: string }> {
+  try {
+    return { data: await getter() };
+  } catch (error) {
+    const warning = error instanceof Error ? error.message : String(error);
+    console.warn(`[Admin List Access] ${label} unavailable`, error);
+    return { data: fallback, warning };
+  }
+}
+
 // Admin endpoint to list all access records
 export async function GET(request: NextRequest) {
   const ip = getClientIP(request);
@@ -16,36 +26,49 @@ export async function GET(request: NextRequest) {
   }
   try {
     // Get Market Assassin records
-    const marketAssassin = await getAllMarketAssassinAccess();
+    const marketAssassin = await safeSection('Market Assassin records', getAllMarketAssassinAccess, []);
 
     // Get Opportunity Hunter Pro records
-    const osProEmails = await kv.lrange('ospro:all', 0, -1) as string[];
-    const opportunityScoutPro = [];
+    const opportunityScoutPro = await safeSection('Opportunity Hunter Pro records', async () => {
+      const osProEmails = await kv.lrange('ospro:all', 0, -1) as string[];
+      const records = [];
 
-    if (osProEmails && osProEmails.length > 0) {
-      for (const email of osProEmails) {
-        const access = await kv.get(`ospro:${email}`);
-        if (access) {
-          opportunityScoutPro.push(access);
+      if (osProEmails && osProEmails.length > 0) {
+        for (const email of osProEmails) {
+          const access = await kv.get(`ospro:${email}`);
+          if (access) {
+            records.push(access);
+          }
         }
       }
-    }
+
+      return records;
+    }, []);
 
     // Get Content Reaper records
-    const contentGenerator = await getAllContentGeneratorAccess();
+    const contentGenerator = await safeSection('Content Reaper records', getAllContentGeneratorAccess, []);
 
     // Get Recompete records
-    const recompete = await getAllRecompeteAccess();
+    const recompete = await safeSection('Recompete records', getAllRecompeteAccess, []);
 
     // Get Database records
-    const database = await getAllDatabaseAccess();
+    const database = await safeSection('Database records', getAllDatabaseAccess, []);
+
+    const warnings = [
+      marketAssassin.warning && `marketAssassin: ${marketAssassin.warning}`,
+      opportunityScoutPro.warning && `opportunityScoutPro: ${opportunityScoutPro.warning}`,
+      contentGenerator.warning && `contentGenerator: ${contentGenerator.warning}`,
+      recompete.warning && `recompete: ${recompete.warning}`,
+      database.warning && `database: ${database.warning}`,
+    ].filter(Boolean);
 
     return NextResponse.json({
-      marketAssassin,
-      opportunityScoutPro,
-      contentGenerator,
-      recompete,
-      database,
+      marketAssassin: marketAssassin.data,
+      opportunityScoutPro: opportunityScoutPro.data,
+      contentGenerator: contentGenerator.data,
+      recompete: recompete.data,
+      database: database.data,
+      warnings,
     });
 
   } catch (error) {

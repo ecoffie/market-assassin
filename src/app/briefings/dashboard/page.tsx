@@ -114,7 +114,9 @@ const US_STATES = [
 function MIDashboardContent() {
   const searchParams = useSearchParams();
   const emailFromUrl = searchParams.get('email') || '';
-  const isProfileFiltered = !!emailFromUrl;
+  const initialScope = searchParams.get('scope');
+  const [profileFilterActive, setProfileFilterActive] = useState(!!emailFromUrl && initialScope !== 'all');
+  const isProfileFiltered = !!emailFromUrl && profileFilterActive;
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -135,11 +137,26 @@ function MIDashboardContent() {
   // Expanded rows
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const hasLocalFilters = !!(search || noticeType || urgency || setAside || naicsFilter || stateFilter || agencyFilter);
+  const hasAnyFilter = hasLocalFilters || isProfileFiltered;
+
+  const updateDashboardScope = useCallback((useProfile: boolean) => {
+    if (!emailFromUrl) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('email', emailFromUrl);
+    if (useProfile) {
+      url.searchParams.delete('scope');
+    } else {
+      url.searchParams.set('scope', 'all');
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, [emailFromUrl]);
+
   const fetchStats = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       params.set('mode', 'stats');
-      if (emailFromUrl) params.set('email', emailFromUrl);
+      if (isProfileFiltered) params.set('email', emailFromUrl);
 
       const res = await fetch(`/api/mi-dashboard?${params.toString()}`);
       const data = await res.json();
@@ -149,7 +166,7 @@ function MIDashboardContent() {
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
-  }, [emailFromUrl]);
+  }, [emailFromUrl, isProfileFiltered]);
 
   const fetchOpportunities = useCallback(async () => {
     setLoadingOpps(true);
@@ -157,7 +174,7 @@ function MIDashboardContent() {
       const params = new URLSearchParams();
       params.set('page', String(page));
       params.set('limit', '25');
-      if (emailFromUrl) params.set('email', emailFromUrl);
+      if (isProfileFiltered) params.set('email', emailFromUrl);
       if (search) params.set('search', search);
       if (noticeType) params.set('noticeType', noticeType);
       if (urgency) params.set('urgency', urgency);
@@ -177,7 +194,7 @@ function MIDashboardContent() {
     } finally {
       setLoadingOpps(false);
     }
-  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, emailFromUrl]);
+  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, emailFromUrl, isProfileFiltered]);
 
   useEffect(() => {
     fetchStats().then(() => setLoading(false));
@@ -202,6 +219,21 @@ function MIDashboardContent() {
     setStateFilter('');
     setAgencyFilter('');
     setPage(1);
+  };
+
+  const clearAllFilters = () => {
+    clearFilters();
+    if (emailFromUrl) {
+      setProfileFilterActive(false);
+      updateDashboardScope(false);
+    }
+  };
+
+  const useProfileFilters = () => {
+    if (!emailFromUrl) return;
+    clearFilters();
+    setProfileFilterActive(true);
+    updateDashboardScope(true);
   };
 
   const exportToCSV = () => {
@@ -296,23 +328,37 @@ function MIDashboardContent() {
               )}
             </div>
           </div>
-          <button
-            onClick={exportToCSV}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-purple-600 hover:bg-purple-500 transition-colors flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Export CSV
-          </button>
-          {isProfileFiltered && (
-            <Link
-              href="/briefings/dashboard"
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+          <div className="flex items-center gap-2">
+            {emailFromUrl && (
+              <div className="flex rounded-lg bg-gray-800 p-1 text-sm">
+                <button
+                  onClick={useProfileFilters}
+                  className={`px-3 py-1.5 rounded-md transition-colors ${isProfileFiltered ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+                >
+                  Your Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setProfileFilterActive(false);
+                    updateDashboardScope(false);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-md transition-colors ${!isProfileFiltered ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+                >
+                  All SAM
+                </button>
+              </div>
+            )}
+            <button
+              onClick={exportToCSV}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-purple-600 hover:bg-purple-500 transition-colors flex items-center gap-2"
             >
-              View All →
-            </Link>
-          )}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export CSV
+            </button>
+          </div>
         </div>
       </header>
 
@@ -411,6 +457,47 @@ function MIDashboardContent() {
 
         {/* Filters */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-gray-500 uppercase tracking-wider">Current view</span>
+              {isProfileFiltered ? (
+                <span className="px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  Your saved profile
+                </span>
+              ) : (
+                <span className="px-2 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700">
+                  All SAM opportunities
+                </span>
+              )}
+              {search && <span className="px-2 py-1 rounded-full bg-gray-800 text-gray-300">Search: {search}</span>}
+              {noticeType && <span className="px-2 py-1 rounded-full bg-gray-800 text-gray-300">{noticeType}</span>}
+              {urgency && <span className="px-2 py-1 rounded-full bg-gray-800 text-gray-300">{urgency}</span>}
+              {setAside && <span className="px-2 py-1 rounded-full bg-gray-800 text-gray-300">{SET_ASIDE_LABELS[setAside] || setAside}</span>}
+              {naicsFilter && <span className="px-2 py-1 rounded-full bg-gray-800 text-gray-300">NAICS {naicsFilter}</span>}
+              {stateFilter && <span className="px-2 py-1 rounded-full bg-gray-800 text-gray-300">{stateFilter}</span>}
+              {agencyFilter && <span className="px-2 py-1 rounded-full bg-gray-800 text-gray-300">{agencyFilter}</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              {hasLocalFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors"
+                >
+                  Clear search filters
+                </button>
+              )}
+              {hasAnyFilter && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+                >
+                  View all opportunities
+                </button>
+              )}
+            </div>
+          </div>
           <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-3">
             {/* Search */}
             <div className="flex-1 min-w-[200px]">
@@ -505,13 +592,13 @@ function MIDashboardContent() {
               Search
             </button>
 
-            {(search || noticeType || urgency || setAside || naicsFilter || stateFilter || agencyFilter) && (
+            {hasLocalFilters && (
               <button
                 type="button"
                 onClick={clearFilters}
                 className="px-3 py-2 text-sm text-gray-400 hover:text-gray-300"
               >
-                Clear
+                Clear search
               </button>
             )}
           </form>
@@ -522,8 +609,13 @@ function MIDashboardContent() {
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-400">
               Showing {opportunities.length} of {pagination.total.toLocaleString()} opportunities
-              {(search || noticeType || urgency || setAside || naicsFilter || stateFilter || agencyFilter) && ' (filtered)'}
+              {hasAnyFilter && ' (filtered)'}
             </p>
+            {!isProfileFiltered && emailFromUrl && (
+              <button onClick={useProfileFilters} className="text-sm text-purple-400 hover:text-purple-300">
+                Return to your profile matches
+              </button>
+            )}
           </div>
         )}
 

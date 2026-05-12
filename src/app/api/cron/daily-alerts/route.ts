@@ -26,11 +26,15 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 
+export const maxDuration = 300;
+
 // BATCH_SIZE: Process this many users per cron run
 // Apr 23, 2026: Reduced from 100 to 35 to prevent Vercel 60s timeout
 // With 29 runs/day (11:00-15:40 UTC, every 10 min), 35 users × 29 = 1015 users/day
 // Each user requires ~2-3 Supabase queries, so 35 users ≈ 105 queries in 60s
-const BATCH_SIZE = 35;
+// May 12, 2026: Raised after fixing skipped/failed users being reprocessed every batch
+// and moving per-user AI tips behind a feature flag.
+const BATCH_SIZE = parseInt(process.env.DAILY_ALERT_BATCH_SIZE || '150', 10);
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -244,13 +248,16 @@ async function retryFailedAlerts(): Promise<{ retried: number; succeeded: number
   // Get failed alerts from last 3 days with retry_count < 3
   const threeDaysAgo = new Date();
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  const today = new Date().toISOString().split('T')[0];
 
   const { data: failedAlerts } = await getSupabase()
     .from('alert_log')
     .select('*')
+    .eq('alert_type', 'daily')
     .eq('delivery_status', 'failed')
     .lt('retry_count', 3)
-    .gte('alert_date', threeDaysAgo.toISOString().split('T')[0]);
+    .gte('alert_date', threeDaysAgo.toISOString().split('T')[0])
+    .lt('alert_date', today);
 
   if (!failedAlerts || failedAlerts.length === 0) return results;
 
@@ -389,39 +396,40 @@ async function runDailyAlertJob(options?: {
     metrics.recordUserEligible(); // Track total eligible before filtering
 
     // =====================================================
-    // BATCHING: Only process users who haven't received alerts today
+    // BATCHING: Only process users who have not been handled today.
     // Multiple cron runs (11, 12, 14, 16 UTC) will process all users
     // =====================================================
     const today = new Date().toISOString().split('T')[0];
-    const { data: alreadySentToday } = await getSupabase()
+    const { data: alreadyProcessedToday } = await getSupabase()
       .from('alert_log')
-      .select('user_email')
+      .select('user_email, delivery_status')
       .eq('alert_date', today)
-      .eq('delivery_status', 'sent');
+      .eq('alert_type', 'daily')
+      .in('delivery_status', ['sent', 'skipped', 'failed']);
 
-    const alreadySentEmails = new Set((alreadySentToday || []).map((s: { user_email: string }) => s.user_email));
+    const alreadyProcessedEmails = new Set((alreadyProcessedToday || []).map((s: { user_email: string }) => s.user_email));
     if (options?.forceResend && options.testEmail) {
-      alreadySentEmails.delete(options.testEmail);
+      alreadyProcessedEmails.delete(options.testEmail);
     }
-    const alreadySentCount = alreadySentEmails.size;
+    const alreadyProcessedCount = alreadyProcessedEmails.size;
 
-    // Filter out already-sent users and apply BATCH_SIZE limit
-    let usersToProcess = (users as AlertUser[])
-      .filter(u => !alreadySentEmails.has(u.user_email))
+    // Filter out already-processed users and apply BATCH_SIZE limit
+    const usersToProcess = (users as AlertUser[])
+      .filter(u => !alreadyProcessedEmails.has(u.user_email))
       .slice(0, BATCH_SIZE);
 
-    const remainingAfterFilter = (users as AlertUser[]).filter(u => !alreadySentEmails.has(u.user_email)).length;
+    const remainingAfterFilter = (users as AlertUser[]).filter(u => !alreadyProcessedEmails.has(u.user_email)).length;
     const remainingAfterBatch = remainingAfterFilter - usersToProcess.length;
 
-    console.log(`[Daily Alerts] Batching: ${alreadySentCount} already sent today, processing ${usersToProcess.length} of ${remainingAfterFilter} remaining (${remainingAfterBatch} for next run)`);
+    console.log(`[Daily Alerts] Batching: ${alreadyProcessedCount} already processed today, processing ${usersToProcess.length} of ${remainingAfterFilter} remaining (${remainingAfterBatch} for next run)`);
 
     if (usersToProcess.length === 0) {
       console.log('[Daily Alerts] All users already processed today');
       return NextResponse.json({
         success: true,
-        message: 'All users already received alerts today',
+        message: 'All users already processed today',
         sent: 0,
-        alreadySent: alreadySentCount,
+        alreadyProcessed: alreadyProcessedCount,
         totalEligible,
         retryResults
       });
@@ -825,7 +833,7 @@ async function runDailyAlertJob(options?: {
       batching: {
         batchSize: BATCH_SIZE,
         totalEligible,
-        alreadySentToday: alreadySentCount,
+        alreadyProcessedToday: alreadyProcessedCount,
         processedThisRun: usersToProcess.length,
         remainingForNextRun: remainingAfterBatch,
       },
@@ -1022,6 +1030,13 @@ async function generateActionTips(
   ];
 
   if (opportunities.length === 0) {
+    return defaultTips;
+  }
+
+  // Keep the production sender on the same fast path as briefings.
+  // Per-user AI calls are useful for experiments, but they slow batches enough
+  // that the daily alert cron may not cover the full audience.
+  if (process.env.ENABLE_DAILY_ALERT_AI_TIPS !== 'true') {
     return defaultTips;
   }
 

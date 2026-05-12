@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface MarketResearchPanelProps {
   email: string | null;
   tier: MIBetaTier;
+  onNavigate?: (panel: string, context?: Record<string, unknown>) => void;
 }
 
 type BusinessType = 'Women Owned' | 'HUBZone' | '8(a) Certified' | 'Small Business' | 'Native American/Tribal' | '';
@@ -19,6 +21,72 @@ interface FormData {
   veteranStatus: VeteranStatus;
   companyName: string;
   excludeDOD: boolean;
+}
+
+interface WorkspaceProfileRow {
+  naics_codes?: string[] | null;
+  agencies?: string[] | null;
+  target_agencies?: string[] | null;
+  keywords?: string[] | null;
+  business_type?: string | null;
+  company_name?: string | null;
+  zip_code?: string | null;
+  zip_codes?: string[] | null;
+  certifications?: string[] | null;
+  set_aside_preferences?: string[] | null;
+  aggregated_profile?: {
+    naics_codes?: string[] | null;
+    agencies?: string[] | null;
+    keywords?: string[] | null;
+    zip_codes?: string[] | null;
+    psc_codes?: string[] | null;
+    business_type?: string | null;
+    company_name?: string | null;
+  } | null;
+}
+
+interface WorkspaceData {
+  settings?: WorkspaceProfileRow | null;
+  profile?: {
+    notification?: WorkspaceProfileRow | null;
+    briefing?: WorkspaceProfileRow | null;
+  };
+}
+
+interface AlertPreferencesData {
+  naicsCodes?: string[];
+  pscCodes?: string[];
+  targetAgencies?: string[];
+  agencies?: string[];
+  locationState?: string;
+  locationStates?: string[];
+  businessType?: string;
+  companyName?: string;
+}
+
+interface SavedResearchProfile {
+  businessType: BusinessType;
+  naicsCodes: string[];
+  pscCodes: string[];
+  agencies: string[];
+  zipCode: string;
+  companyName: string;
+  source: string;
+}
+
+interface MarketFocus {
+  id: string;
+  name: string;
+  description?: string | null;
+  filters: {
+    businessType?: BusinessType | string;
+    naicsCodes?: string[];
+    pscCodes?: string[];
+    agencies?: string[];
+    zipCode?: string;
+    companyName?: string;
+    excludeDOD?: boolean;
+  };
 }
 
 interface Report {
@@ -141,51 +209,102 @@ const REPORTS: Report[] = [
   { id: 'forecast', title: 'Market Forecast', description: 'Future opportunity pipeline', icon: '🔮', tier: 'pro', reportKey: 'forecastList' },
 ];
 
-// PSC Category options
-const PSC_CATEGORIES = [
-  { value: '', label: 'Select PSC Category...' },
-  { value: 'D', label: 'D - IT & Telecom Services' },
-  { value: 'R', label: 'R - Professional Services' },
-  { value: 'J', label: 'J - Maintenance & Repair' },
-  { value: 'S', label: 'S - Utilities & Housekeeping' },
-  { value: 'Y', label: 'Y - Construction of Structures' },
-  { value: 'Z', label: 'Z - Maintenance of Real Property' },
-  { value: 'B', label: 'B - Special Studies & Analysis' },
-  { value: 'C', label: 'C - Architect & Engineering' },
-  { value: 'F', label: 'F - Natural Resources Management' },
-  { value: 'G', label: 'G - Social Services' },
-  { value: 'H', label: 'H - Quality Control & Testing' },
-  { value: 'K', label: 'K - Modification of Equipment' },
-  { value: 'L', label: 'L - Technical Representative' },
-  { value: 'M', label: 'M - Operation of Facilities' },
-  { value: 'N', label: 'N - Installation of Equipment' },
-  { value: 'P', label: 'P - Salvage Services' },
-  { value: 'Q', label: 'Q - Medical Services' },
-  { value: 'T', label: 'T - Photo, Map, Print, Publishing' },
-  { value: 'U', label: 'U - Education & Training' },
-  { value: 'V', label: 'V - Transportation & Travel' },
-  { value: 'W', label: 'W - Lease/Rental of Equipment' },
-  { value: 'X', label: 'X - Lease/Rental of Facilities' },
-  { value: 'A', label: 'A - R&D Services' },
-  { value: '70', label: '70 - IT Equipment & Software' },
-  { value: '58', label: '58 - Communication Equipment' },
-  { value: '65', label: '65 - Medical & Dental Equipment' },
-  { value: '66', label: '66 - Instruments & Lab Equipment' },
-  { value: '75', label: '75 - Office Supplies' },
-  { value: '71', label: '71 - Furniture' },
-  { value: '23', label: '23 - Motor Vehicles' },
-  { value: '25', label: '25 - Vehicular Equipment' },
-  { value: '15', label: '15 - Aircraft & Airframe Components' },
-  { value: '59', label: '59 - Electrical Equipment' },
-  { value: '36', label: '36 - Special Industry Machinery' },
-  { value: '89', label: '89 - Subsistence (Food)' },
-  { value: '84', label: '84 - Clothing & Textiles' },
-];
+const RESEARCH_LENSES = [
+  { id: 'map', label: 'Market Map', description: 'Where to focus first', reports: ['buyers', 'budget', 'analytics'] },
+  { id: 'buyers', label: 'Buyers', description: 'Offices and contacts', reports: ['buyers', 'osbp'] },
+  { id: 'competition', label: 'Competition', description: 'Primes and vehicles', reports: ['primes', 'vehicles'] },
+  { id: 'signals', label: 'Signals', description: 'Needs and upcoming demand', reports: ['pain', 'positioning', 'forecast'] },
+  { id: 'partners', label: 'Partners', description: 'Teaming targets', reports: ['teaming'] },
+] as const;
+
+type ResearchLensId = typeof RESEARCH_LENSES[number]['id'];
 
 const BUSINESS_TYPES: BusinessType[] = ['Women Owned', 'HUBZone', '8(a) Certified', 'Small Business', 'Native American/Tribal'];
-const VETERAN_STATUSES: VeteranStatus[] = ['Not Applicable', 'Veteran Owned', 'Service Disabled Veteran'];
 
-export default function MarketResearchPanel({ email, tier }: MarketResearchPanelProps) {
+function firstArray(...values: Array<string[] | null | undefined>): string[] {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0) {
+      return value.map(String).map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values
+    .map(value => (value || '').trim())
+    .filter(Boolean)));
+}
+
+function extractNaicsCode(value?: string | null): string {
+  return (value || '').match(/\d{2,6}/)?.[0] || '';
+}
+
+function normalizeBusinessType(value?: string | null, certifications: string[] = []): BusinessType {
+  const combined = [value || '', ...certifications].join(' ').toLowerCase();
+  if (combined.includes('women') || combined.includes('wosb') || combined.includes('edwosb')) return 'Women Owned';
+  if (combined.includes('hubzone')) return 'HUBZone';
+  if (combined.includes('8(a)') || combined.includes('8a')) return '8(a) Certified';
+  if (combined.includes('tribal') || combined.includes('native')) return 'Native American/Tribal';
+  if (combined.includes('small')) return 'Small Business';
+  return '';
+}
+
+function buildSavedResearchProfile(data: WorkspaceData | null): SavedResearchProfile | null {
+  if (!data) return null;
+
+  const settings = data.settings || {};
+  const notification = data.profile?.notification || {};
+  const briefing = data.profile?.briefing || {};
+  const notificationAggregated = notification.aggregated_profile || {};
+  const briefingAggregated = briefing.aggregated_profile || {};
+
+  const naicsCodes = firstArray(
+    settings.naics_codes,
+    notificationAggregated.naics_codes,
+    notification.naics_codes,
+    briefingAggregated.naics_codes,
+    briefing.naics_codes
+  );
+  const pscCodes = firstArray(notificationAggregated.psc_codes, briefingAggregated.psc_codes);
+  const agencies = firstArray(
+    settings.target_agencies,
+    notificationAggregated.agencies,
+    notification.agencies,
+    briefingAggregated.agencies,
+    briefing.agencies
+  );
+  const certifications = firstArray(briefing.certifications, briefing.set_aside_preferences);
+  const businessType = normalizeBusinessType(
+    notification.business_type || notificationAggregated.business_type || briefingAggregated.business_type,
+    certifications
+  );
+  const zipCodes = firstArray(notificationAggregated.zip_codes, notification.zip_codes, briefingAggregated.zip_codes);
+  const companyName = String(
+    settings.company_name ||
+    notification.company_name ||
+    notificationAggregated.company_name ||
+    briefing.company_name ||
+    briefingAggregated.company_name ||
+    ''
+  ).trim();
+
+  if (naicsCodes.length === 0 && pscCodes.length === 0 && agencies.length === 0 && !businessType && !companyName) {
+    return null;
+  }
+
+  return {
+    businessType,
+    naicsCodes,
+    pscCodes,
+    agencies,
+    zipCode: briefing.zip_code || zipCodes[0] || '',
+    companyName,
+    source: data.settings ? 'MI workspace settings' : notification.naics_codes || notificationAggregated.naics_codes ? 'briefing settings' : 'saved profile',
+  };
+}
+
+export default function MarketResearchPanel({ email, tier, onNavigate }: MarketResearchPanelProps) {
   const [formData, setFormData] = useState<FormData>({
     businessType: '',
     naicsCode: '',
@@ -202,54 +321,97 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const [generatedReports, setGeneratedReports] = useState<Set<string>>(new Set());
+  const [savedProfile, setSavedProfile] = useState<SavedResearchProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileApplied, setProfileApplied] = useState(false);
+  const [showAdvancedProfile, setShowAdvancedProfile] = useState(false);
+  const [activeLens, setActiveLens] = useState<ResearchLensId>('map');
+  const [marketFocuses, setMarketFocuses] = useState<MarketFocus[]>([]);
+  const [activeFocusId, setActiveFocusId] = useState<string>('saved-profile');
+  const [showSaveFocus, setShowSaveFocus] = useState(false);
+  const [newFocusName, setNewFocusName] = useState('');
+  const [focusSaving, setFocusSaving] = useState(false);
+  const autoGeneratedRef = useRef(false);
+  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
-  const canAccessReport = (reportTier: 'free' | 'pro') => {
+  const canAccessReport = useCallback((reportTier: 'free' | 'pro') => {
     if (reportTier === 'free') return true;
     return tier !== 'free';
-  };
+  }, [tier]);
 
-  const validateForm = (): boolean => {
+  const validateForm = useCallback((data: FormData = formData, agencyValue: string = selectedAgency): boolean => {
     setValidationError(null);
 
-    if (!formData.businessType) {
-      setValidationError('Please select a business type');
-      return false;
-    }
+    const hasBusinessType = data.businessType && data.businessType.trim();
 
-    const hasNaics = formData.naicsCode && formData.naicsCode.trim();
-    const hasPsc = formData.pscCode && formData.pscCode.trim();
+    const hasNaics = data.naicsCode && data.naicsCode.trim();
+    const hasPsc = data.pscCode && data.pscCode.trim();
+    const hasAgency = agencyValue && agencyValue.trim();
 
-    if (!hasNaics && !hasPsc) {
-      setValidationError('Please enter either a NAICS code or select a PSC code/category');
+    if (!hasBusinessType && !hasNaics && !hasPsc && !hasAgency) {
+      setValidationError('Your saved profile needs at least an industry, service code, or target agency.');
       return false;
     }
 
     return true;
-  };
+  }, [formData, selectedAgency]);
 
-  const handleGenerateAll = useCallback(async () => {
+  const loadMarketFocuses = useCallback(async () => {
+    if (!email || tier === 'free') return;
+
+    try {
+      const res = await fetch(`/api/mi-beta/market-focus?email=${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) setMarketFocuses(data.focuses || []);
+    } catch (err) {
+      console.error('Failed to load market focuses:', err);
+    }
+  }, [email, getAuthHeaders, tier]);
+
+  const getCurrentFocusFilters = useCallback(() => ({
+    businessType: formData.businessType,
+    naicsCodes: formData.naicsCode.split(',').map((item) => item.trim()).filter(Boolean),
+    pscCodes: formData.pscCode.split(',').map((item) => item.trim()).filter(Boolean),
+    agencies: selectedAgency.split(',').map((item) => item.trim()).filter(Boolean),
+    zipCode: formData.zipCode,
+    companyName: formData.companyName,
+    excludeDOD: formData.excludeDOD,
+  }), [formData, selectedAgency]);
+
+  const handleGenerateAll = useCallback(async (override?: { nextFormData?: FormData; nextSelectedAgency?: string }) => {
     if (!email) return;
-    if (!validateForm()) return;
+    const activeFormData = override?.nextFormData || formData;
+    const activeSelectedAgency = override?.nextSelectedAgency ?? selectedAgency;
+    if (!validateForm(activeFormData, activeSelectedAgency)) return;
 
     setIsGenerating(true);
     setError(null);
 
     try {
+      const selectedAgencies = activeSelectedAgency
+        .split(',')
+        .map(agency => agency.trim())
+        .filter(Boolean);
+
       const res = await fetch('/api/reports/generate-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inputs: {
-            naicsCode: formData.naicsCode,
-            pscCode: formData.pscCode,
-            businessType: formData.businessType || 'Small Business',
-            veteranStatus: formData.veteranStatus,
-            zipCode: formData.zipCode,
-            companyName: formData.companyName,
-            excludeDOD: formData.excludeDOD,
+            naicsCode: activeFormData.naicsCode,
+            pscCode: activeFormData.pscCode,
+            businessType: activeFormData.businessType || 'Small Business',
+            veteranStatus: activeFormData.veteranStatus,
+            zipCode: activeFormData.zipCode,
+            companyName: activeFormData.companyName,
+            excludeDOD: activeFormData.excludeDOD,
             goodsOrServices: 'services',
           },
-          selectedAgencies: selectedAgency ? [selectedAgency] : ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration'],
+          selectedAgencies: selectedAgencies.length > 0
+            ? selectedAgencies
+            : ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration'],
           userEmail: email,
         }),
       });
@@ -275,7 +437,190 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
     } finally {
       setIsGenerating(false);
     }
-  }, [email, formData, selectedAgency, tier]);
+  }, [canAccessReport, email, formData, selectedAgency, validateForm]);
+
+  const applySavedProfile = useCallback((profile: SavedResearchProfile) => {
+    setFormData((current) => ({
+      ...current,
+      businessType: profile.businessType || current.businessType || 'Small Business',
+      naicsCode: profile.naicsCodes.length > 0 ? profile.naicsCodes.slice(0, 8).join(', ') : current.naicsCode,
+      pscCode: profile.pscCodes[0] || current.pscCode,
+      zipCode: profile.zipCode || current.zipCode,
+      companyName: profile.companyName || current.companyName,
+    }));
+
+    if (profile.agencies.length > 0) {
+      setSelectedAgency(profile.agencies.slice(0, 3).join(', '));
+    }
+
+    setProfileApplied(true);
+    setActiveFocusId('saved-profile');
+    setValidationError(null);
+  }, []);
+
+  const applyMarketFocus = useCallback((focus: MarketFocus) => {
+    const filters = focus.filters || {};
+    const nextFormData: FormData = {
+      businessType: (filters.businessType as BusinessType) || 'Small Business',
+      naicsCode: (filters.naicsCodes || []).join(', '),
+      pscCode: (filters.pscCodes || []).join(', '),
+      zipCode: filters.zipCode || '',
+      veteranStatus: 'Not Applicable',
+      companyName: filters.companyName || '',
+      excludeDOD: Boolean(filters.excludeDOD),
+    };
+    const nextSelectedAgency = (filters.agencies || []).join(', ');
+
+    setFormData(nextFormData);
+    setSelectedAgency(nextSelectedAgency);
+    setActiveFocusId(focus.id);
+    setProfileApplied(false);
+    setShowAdvancedProfile(false);
+    setValidationError(null);
+    handleGenerateAll({ nextFormData, nextSelectedAgency });
+  }, [handleGenerateAll]);
+
+  const handleSaveMarketFocus = useCallback(async () => {
+    if (!email || tier === 'free') return;
+    const name = newFocusName.trim();
+    if (!name) {
+      setValidationError('Name this market focus before saving it.');
+      return;
+    }
+
+    setFocusSaving(true);
+    setValidationError(null);
+
+    try {
+      const res = await fetch('/api/mi-beta/market-focus', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          email,
+          name,
+          filters: getCurrentFocusFilters(),
+        }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        setValidationError(data.error || 'Could not save market focus.');
+        return;
+      }
+
+      setMarketFocuses((current) => [data.focus, ...current.filter((focus) => focus.id !== data.focus.id)]);
+      setActiveFocusId(data.focus.id);
+      setNewFocusName('');
+      setShowSaveFocus(false);
+    } catch (err) {
+      console.error('Failed to save market focus:', err);
+      setValidationError('Could not save market focus.');
+    } finally {
+      setFocusSaving(false);
+    }
+  }, [email, getAuthHeaders, getCurrentFocusFilters, newFocusName, tier]);
+
+  const handleDeleteMarketFocus = useCallback(async (focusId: string) => {
+    if (!email) return;
+
+    try {
+      const res = await fetch('/api/mi-beta/market-focus', {
+        method: 'DELETE',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email, id: focusId }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setValidationError(data.error || 'Could not delete market focus.');
+        return;
+      }
+
+      setMarketFocuses((current) => current.filter((focus) => focus.id !== focusId));
+      if (activeFocusId === focusId) setActiveFocusId('saved-profile');
+    } catch (err) {
+      console.error('Failed to delete market focus:', err);
+      setValidationError('Could not delete market focus.');
+    }
+  }, [activeFocusId, email, getAuthHeaders]);
+
+  useEffect(() => {
+    if (!email) return;
+
+    let cancelled = false;
+    setProfileLoading(true);
+
+    Promise.all([
+      fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders(),
+      }).then((res) => res.ok ? res.json() : null).catch(() => null),
+      fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`)
+        .then((res) => res.ok ? res.json() : null)
+        .catch(() => null),
+    ])
+      .then(([workspace, prefs]) => {
+        if (cancelled) return;
+
+        const workspaceProfile = workspace?.success ? buildSavedResearchProfile(workspace as WorkspaceData) : null;
+        const prefsData = (prefs?.data || {}) as AlertPreferencesData;
+        const naicsCodes = uniqueStrings([
+          ...(workspaceProfile?.naicsCodes || []),
+          ...(prefsData.naicsCodes || []),
+        ]).map(extractNaicsCode).filter(Boolean);
+        const pscCodes = uniqueStrings([
+          ...(workspaceProfile?.pscCodes || []),
+          ...(prefsData.pscCodes || []),
+        ]);
+        const agencies = uniqueStrings([
+          ...(workspaceProfile?.agencies || []),
+          ...(prefsData.targetAgencies || []),
+          ...(prefsData.agencies || []),
+        ]);
+
+        const profile: SavedResearchProfile | null = (
+          workspaceProfile || naicsCodes.length > 0 || pscCodes.length > 0 || agencies.length > 0 || prefsData.businessType || prefsData.companyName
+        ) ? {
+          businessType: workspaceProfile?.businessType || normalizeBusinessType(prefsData.businessType),
+          naicsCodes,
+          pscCodes,
+          agencies,
+          zipCode: workspaceProfile?.zipCode || '',
+          companyName: workspaceProfile?.companyName || prefsData.companyName || '',
+          source: workspaceProfile?.source || 'alert settings',
+        } : null;
+
+        setSavedProfile(profile);
+
+        if (profile) {
+          applySavedProfile(profile);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load saved MI profile for market research:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [email, applySavedProfile, getAuthHeaders]);
+
+  useEffect(() => {
+    loadMarketFocuses();
+  }, [loadMarketFocuses]);
+
+  useEffect(() => {
+    if (autoGeneratedRef.current || profileLoading || !profileApplied || !email) return;
+    const hasInputs = Boolean(
+      (formData.businessType && (formData.naicsCode.trim() || formData.pscCode.trim())) ||
+      selectedAgency.trim()
+    );
+    if (!hasInputs) return;
+
+    autoGeneratedRef.current = true;
+    handleGenerateAll();
+  }, [email, formData.businessType, formData.naicsCode, formData.pscCode, handleGenerateAll, profileApplied, profileLoading, selectedAgency]);
 
   const handleReportClick = (report: Report) => {
     if (!canAccessReport(report.tier)) return;
@@ -302,248 +647,471 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
     return `$${value.toLocaleString()}`;
   };
 
+  // === SAVE ACTIONS ===
+  const [savingContact, setSavingContact] = useState<string | null>(null);
+  const [savedContacts, setSavedContacts] = useState<Set<string>>(new Set());
+  const [savingOpportunity, setSavingOpportunity] = useState<string | null>(null);
+  const [savedOpportunities, setSavedOpportunities] = useState<Set<string>>(new Set());
+
+  const handleSaveBuyer = useCallback(async (buyer: {
+    contractingOffice: string;
+    parentAgency?: string;
+    subAgency?: string;
+    osbp?: { director?: string; email?: string; phone?: string } | null;
+  }) => {
+    if (!email || tier === 'free') return;
+    const contactKey = `buyer:${buyer.contractingOffice}`;
+    if (savedContacts.has(contactKey)) return;
+
+    setSavingContact(contactKey);
+    try {
+      const res = await fetch('/api/mi-beta/relationships', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          user_email: email,
+          contact_type: 'government_buyer',
+          full_name: buyer.osbp?.director || buyer.contractingOffice,
+          title: buyer.osbp?.director ? 'Small Business Liaison' : 'Contracting Office',
+          email: buyer.osbp?.email || '',
+          phone: buyer.osbp?.phone || '',
+          organization: buyer.contractingOffice,
+          agency: buyer.parentAgency || buyer.subAgency || '',
+          office: buyer.contractingOffice,
+          source: 'market_research',
+          source_record_id: `market-research:${buyer.contractingOffice}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSavedContacts((prev) => new Set(prev).add(contactKey));
+      }
+    } catch (err) {
+      console.error('Failed to save buyer:', err);
+    } finally {
+      setSavingContact(null);
+    }
+  }, [email, getAuthHeaders, savedContacts, tier]);
+
+  const handleSavePartner = useCallback(async (partner: {
+    name: string;
+    reason?: string;
+    email?: string;
+    phone?: string;
+    sbloName?: string;
+    certifications?: string[];
+    naicsCategories?: string[];
+  }) => {
+    if (!email || tier === 'free') return;
+    const contactKey = `partner:${partner.name}`;
+    if (savedContacts.has(contactKey)) return;
+
+    setSavingContact(contactKey);
+    try {
+      const res = await fetch('/api/mi-beta/relationships', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          user_email: email,
+          contact_type: 'prime',
+          full_name: partner.sbloName || partner.name,
+          title: partner.sbloName ? 'Small Business Liaison' : 'Teaming Partner',
+          email: partner.email || '',
+          phone: partner.phone || '',
+          organization: partner.name,
+          notes: partner.reason || '',
+          source: 'market_research',
+          source_record_id: `market-research:${partner.name}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSavedContacts((prev) => new Set(prev).add(contactKey));
+      }
+    } catch (err) {
+      console.error('Failed to save partner:', err);
+    } finally {
+      setSavingContact(null);
+    }
+  }, [email, getAuthHeaders, savedContacts, tier]);
+
+  const handleTrackOpportunity = useCallback(async (forecast: {
+    agency: string;
+    description?: string;
+    estimatedValue?: string;
+    solicitationDate?: string;
+    naicsCode?: string;
+  }) => {
+    if (!email || tier === 'free') return;
+    const oppKey = `forecast:${forecast.agency}:${forecast.description?.slice(0, 50)}`;
+    if (savedOpportunities.has(oppKey)) return;
+
+    setSavingOpportunity(oppKey);
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          user_email: email,
+          title: forecast.description?.slice(0, 100) || `${forecast.agency} Forecast`,
+          agency: forecast.agency,
+          stage: 'tracking',
+          value_estimate: forecast.estimatedValue,
+          naics_code: forecast.naicsCode,
+          source: 'market_research_forecast',
+          notes: `Forecasted solicitation: ${forecast.solicitationDate || 'TBD'}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSavedOpportunities((prev) => new Set(prev).add(oppKey));
+      }
+    } catch (err) {
+      console.error('Failed to track opportunity:', err);
+    } finally {
+      setSavingOpportunity(null);
+    }
+  }, [email, getAuthHeaders, savedOpportunities, tier]);
+
+  const handleNavigateToRelationships = useCallback(() => {
+    if (onNavigate) {
+      onNavigate('relationships', { tab: 'network' });
+    }
+  }, [onNavigate]);
+
+  const handleNavigateToPipeline = useCallback(() => {
+    if (onNavigate) {
+      onNavigate('pipeline');
+    }
+  }, [onNavigate]);
+
+  const buyers = reportData?.governmentBuyers?.agencies || [];
+  const buyerSummary = reportData?.governmentBuyers?.summary;
+  const painSummary = reportData?.agencyPainPoints?.summary;
+  const primeSummary = reportData?.primeContractor?.summary;
+  const vehicleSummary = reportData?.idvContracts?.summary;
+  const forecastSummary = reportData?.forecastList?.summary;
+  const bestBuyer = buyers[0];
+  const topNeed = reportData?.agencyPainPoints?.highOpportunityMatches?.[0] || reportData?.agencyPainPoints?.painPoints?.[0];
+  const recommendedReports: readonly string[] = RESEARCH_LENSES.find(lens => lens.id === activeLens)?.reports || [];
+  const readyReports = REPORTS.filter(report => recommendedReports.includes(report.id) && canAccessReport(report.tier));
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Market Research</h1>
-        <p className="text-slate-400 mt-1">Generate strategic intelligence reports</p>
+      {/* Compact Header with Inline Profile Pills */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold text-white">Market Research</h1>
+          {profileLoading ? (
+            <span className="text-sm text-slate-500">Loading profile...</span>
+          ) : savedProfile ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {savedProfile.naicsCodes.length > 0 && (
+                <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                  {savedProfile.naicsCodes.slice(0, 2).join(', ')}{savedProfile.naicsCodes.length > 2 ? ` +${savedProfile.naicsCodes.length - 2}` : ''}
+                </span>
+              )}
+              {savedProfile.businessType && (
+                <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                  {savedProfile.businessType}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAdvancedProfile((v) => !v)}
+                className="text-xs text-slate-500 hover:text-slate-300"
+              >
+                {showAdvancedProfile ? '✕' : 'Edit'}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowAdvancedProfile(true)}
+              className="text-xs text-amber-400 hover:text-amber-300"
+            >
+              + Set profile
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Market Focus Pills (Pro only, inline) */}
+          {tier !== 'free' && marketFocuses.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              {marketFocuses.slice(0, 3).map((focus) => (
+                <button
+                  key={focus.id}
+                  type="button"
+                  onClick={() => applyMarketFocus(focus)}
+                  className={`rounded px-2 py-1 text-xs transition-colors ${
+                    activeFocusId === focus.id
+                      ? 'bg-emerald-500/20 text-emerald-300'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {focus.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => handleGenerateAll()}
+            disabled={isGenerating || profileLoading}
+            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+          >
+            {isGenerating ? 'Building...' : reportData ? 'Refresh' : 'Build Market Map'}
+          </button>
+        </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">
-          {error}
-          <button onClick={() => setError(null)} className="ml-2 text-red-300 hover:text-red-200">✕</button>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-300 hover:text-red-200">✕</button>
         </div>
       )}
 
-      {/* Input Form - Full Federal Market Assassin */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <div className="mb-4">
-          <h3 className="font-semibold text-white">Enter Your 5 Core Inputs</h3>
-          <p className="text-sm text-slate-500 mt-1">Provide your business information to discover matching government agencies</p>
+      {/* Validation Error */}
+      {validationError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm flex items-center">
+          <span className="mr-2">⚠️</span>
+          {validationError}
         </div>
+      )}
 
-        {/* Validation Error */}
-        {validationError && (
-          <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm flex items-start">
-            <span className="mr-2">⚠️</span>
-            {validationError}
-          </div>
-        )}
-
-        {/* Business Type - Required */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-slate-300 mb-2">
-            1. Business Type <span className="text-red-400">*</span>
-          </label>
-          <select
-            value={formData.businessType}
-            onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
-            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-          >
-            <option value="">Select your business type...</option>
-            {BUSINESS_TYPES.map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* NAICS Code and PSC Code - Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              2. NAICS Code(s) <span className="text-slate-500 text-xs">(or use PSC)</span>
-            </label>
-            <input
-              type="text"
-              value={formData.naicsCode}
-              onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
-              placeholder="e.g., 236, 238320, 541511"
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              Multiple codes OK: <span className="text-blue-400">236, 238</span> = all construction
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              PSC Code <span className="text-slate-500 text-xs">(or use NAICS)</span>
-            </label>
-            <input
-              type="text"
-              value={formData.pscCode}
-              onChange={(e) => setFormData({ ...formData, pscCode: e.target.value.toUpperCase() })}
-              placeholder="e.g., D310, 7030"
-              maxLength={4}
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-            />
-            <p className="mt-1 text-xs text-slate-500">Product/Service Code (4-char)</p>
-          </div>
-        </div>
-
-        {/* Zip Code and Veteran Status - Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              3. Zip Code <span className="text-slate-500 text-xs">(Optional)</span>
-            </label>
-            <input
-              type="text"
-              value={formData.zipCode}
-              onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-              placeholder="e.g., 20001"
-              maxLength={5}
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              4. Veteran Status <span className="text-slate-500 text-xs">(Optional)</span>
-            </label>
-            <select
-              value={formData.veteranStatus}
-              onChange={(e) => setFormData({ ...formData, veteranStatus: e.target.value as VeteranStatus })}
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+      {/* Collapsible Profile Editor */}
+      {showAdvancedProfile && (
+        <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium text-white">Explore a Different Market</h3>
+            <button
+              type="button"
+              onClick={() => setShowAdvancedProfile(false)}
+              className="text-slate-500 hover:text-slate-300"
             >
-              {VETERAN_STATUSES.map((status) => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
+              ✕
+            </button>
           </div>
-        </div>
 
-        {/* PSC Category and Company Name - Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              5. PSC Category <span className="text-slate-500 text-xs">(Optional)</span>
-            </label>
-            <select
-              value={formData.pscCode}
-              onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-            >
-              {PSC_CATEGORIES.map((cat) => (
-                <option key={cat.value} value={cat.value}>{cat.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Company Name <span className="text-slate-500 text-xs">(Optional)</span>
-            </label>
-            <input
-              type="text"
-              value={formData.companyName}
-              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-              placeholder="Your company name"
-              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Civilian Agencies Only Checkbox */}
-        <div className="mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-          <label className="flex items-start cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.excludeDOD}
-              onChange={(e) => setFormData({ ...formData, excludeDOD: e.target.checked })}
-              className="mt-0.5 h-4 w-4 text-amber-500 bg-slate-800 border-slate-600 rounded focus:ring-amber-500"
-            />
-            <div className="ml-3">
-              <span className="text-sm font-semibold text-amber-400">Civilian Agencies Only</span>
-              <p className="text-xs text-amber-300/70 mt-0.5">
-                Exclude Department of Defense (DOD) agencies. Civilian agencies are often more accessible for startups and small businesses.
-              </p>
-            </div>
-          </label>
-        </div>
-
-        {/* Target Agency (optional override) */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-300 mb-2">
-            Target Agency <span className="text-slate-500 text-xs">(Optional - focuses reports on specific agency)</span>
-          </label>
-          <input
-            type="text"
-            value={selectedAgency}
-            onChange={(e) => setSelectedAgency(e.target.value)}
-            placeholder="e.g., Department of Defense, VA, GSA"
-            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-          />
-        </div>
-
-        {/* Generate Button - At Bottom of Form */}
-        <button
-          onClick={handleGenerateAll}
-          disabled={isGenerating}
-          className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-        >
-          {isGenerating ? (
-            <>
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Finding Target Agencies...
-            </>
-          ) : (
-            <>
-              Find Target Agencies
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Reports Grid */}
-      <div>
-        <h3 className="font-semibold text-white mb-4">Available Reports</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {REPORTS.map((report) => {
-            const hasAccess = canAccessReport(report.tier);
-            const isGenerated = generatedReports.has(report.id);
-            const isActive = activeReportId === report.id;
-            return (
-              <div
-                key={report.id}
-                className={`
-                  bg-slate-900 border rounded-xl p-4 transition-all
-                  ${isActive ? 'border-emerald-500 ring-1 ring-emerald-500' : ''}
-                  ${hasAccess
-                    ? 'border-slate-800 hover:border-emerald-500/50 cursor-pointer'
-                    : 'border-slate-800/50 opacity-60'
-                  }
-                `}
-                onClick={() => handleReportClick(report)}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <label className="block">
+              <span className="text-sm text-slate-400">Business type</span>
+              <select
+                value={formData.businessType}
+                onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white outline-none focus:border-emerald-500"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-2xl">{report.icon}</span>
-                  <div className="flex gap-2">
-                    {isGenerated && (
-                      <span className="px-2 py-0.5 text-xs bg-emerald-500/20 text-emerald-400 rounded">
-                        Ready
-                      </span>
-                    )}
-                    {!hasAccess && (
-                      <span className="px-2 py-0.5 text-xs bg-purple-500/20 text-purple-400 rounded">
-                        Pro
-                      </span>
-                    )}
+                <option value="">Use saved/default</option>
+                {BUSINESS_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-400">Industry codes</span>
+              <input
+                type="text"
+                value={formData.naicsCode}
+                onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
+                placeholder="236, 541512"
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-400">Target agency</span>
+              <input
+                type="text"
+                value={selectedAgency}
+                onChange={(e) => setSelectedAgency(e.target.value)}
+                placeholder="VA, GSA, DOD"
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {savedProfile && (
+              <button
+                type="button"
+                onClick={() => {
+                  applySavedProfile(savedProfile);
+                  setShowAdvancedProfile(false);
+                }}
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+              >
+                Reset to profile
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                handleGenerateAll();
+                setShowAdvancedProfile(false);
+              }}
+              disabled={isGenerating}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-slate-700"
+            >
+              Apply & Refresh
+            </button>
+            {tier !== 'free' && (
+              <>
+                <div className="h-5 w-px bg-slate-700" />
+                {showSaveFocus ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={newFocusName}
+                      onChange={(event) => setNewFocusName(event.target.value)}
+                      placeholder="Name this focus..."
+                      className="w-40 rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveMarketFocus}
+                      disabled={focusSaving}
+                      className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-500 disabled:bg-slate-700"
+                    >
+                      {focusSaving ? '...' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSaveFocus(false)}
+                      className="text-slate-500 hover:text-slate-300"
+                    >
+                      ✕
+                    </button>
                   </div>
-                </div>
-                <h4 className="font-medium text-white mb-1">{report.title}</h4>
-                <p className="text-sm text-slate-500">{report.description}</p>
-              </div>
-            );
-          })}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveFocus(true)}
+                    className="text-sm text-emerald-400 hover:text-emerald-300"
+                  >
+                    Save as focus
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
+      {isGenerating && (
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-5 text-blue-200">
+          Building your market map from spending, buyers, budgets, forecasts, and partners...
         </div>
-      </div>
+      )}
+
+      {reportData && (
+        <>
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <MetricCard label="Agencies to review" value={(buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
+            <MetricCard label="Relevant spending" value={formatCurrency(buyerSummary?.totalSpending)} tone="green" />
+            <MetricCard label="Competition signals" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} />
+            <MetricCard label="Upcoming signals" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" />
+          </section>
+
+          <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Start Here</h2>
+                <p className="text-sm text-slate-500">The three things worth looking at first.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveReportId('buyers')}
+                className="self-start rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700"
+              >
+                View all buyers
+              </button>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <InsightCard
+                label="Best first agency"
+                title={bestBuyer?.parentAgency || bestBuyer?.contractingOffice || 'No agency found yet'}
+                detail={bestBuyer ? `${formatCurrency(bestBuyer.spending)} tracked spend • ${bestBuyer.contractCount || 0} contracts` : 'Refresh research after your profile loads.'}
+                action="See buyers"
+                onClick={() => setActiveReportId('buyers')}
+              />
+              <InsightCard
+                label="Strongest need signal"
+                title={topNeed?.agency || 'Needs analysis'}
+                detail={'painPoint' in (topNeed || {}) && topNeed?.painPoint ? topNeed.painPoint : 'Open the needs view to see positioning themes.'}
+                action="See signals"
+                onClick={() => setActiveReportId('pain')}
+              />
+              <InsightCard
+                label="Competition angle"
+                title={`${primeSummary?.totalPrimes || 0} prime targets`}
+                detail={`${vehicleSummary?.totalContracts || 0} contract vehicle records in this market.`}
+                action="See competition"
+                onClick={() => setActiveReportId('primes')}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <h2 className="mb-4 text-xl font-semibold text-white">Choose What You Need</h2>
+            <div className="grid gap-3 md:grid-cols-5">
+              {RESEARCH_LENSES.map((lens) => (
+                <button
+                  key={lens.id}
+                  type="button"
+                  onClick={() => setActiveLens(lens.id)}
+                  className={`rounded-lg border p-4 text-left transition-colors ${
+                    activeLens === lens.id
+                      ? 'border-emerald-500 bg-emerald-500/10'
+                      : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="font-medium text-white">{lens.label}</div>
+                  <div className="mt-1 text-sm text-slate-500">{lens.description}</div>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {readyReports.map((report) => (
+                <button
+                  key={report.id}
+                  type="button"
+                  onClick={() => handleReportClick(report)}
+                  className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-left hover:border-emerald-500/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{report.icon}</span>
+                    <div>
+                      <div className="font-medium text-white">{report.title}</div>
+                      <div className="text-sm text-slate-500">{report.description}</div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+              {readyReports.length === 0 && (
+                <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-4 text-sm text-purple-200">
+                  This section is available on Pro.
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
+
+      {!reportData && !isGenerating && (
+        <section className="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center">
+          <h2 className="text-xl font-semibold text-white">Your market map is ready to build</h2>
+          <p className="mx-auto mt-2 max-w-xl text-slate-400">
+            MI will use your saved profile to find target agencies, buyers, budgets, competition, vehicles, and partner signals.
+          </p>
+          <button
+            type="button"
+            onClick={() => handleGenerateAll()}
+            className="mt-5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
+          >
+            Build My Market Map
+          </button>
+        </section>
+      )}
 
       {/* Report Viewer */}
       {activeReportId && reportData && (
@@ -552,15 +1120,23 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
           reportData={getReportContent(activeReportId)}
           onClose={() => setActiveReportId(null)}
           formatCurrency={formatCurrency}
+          onSaveBuyer={handleSaveBuyer}
+          onSavePartner={handleSavePartner}
+          onTrackOpportunity={handleTrackOpportunity}
+          savingContact={savingContact}
+          savedContacts={savedContacts}
+          savingOpportunity={savingOpportunity}
+          savedOpportunities={savedOpportunities}
+          tier={tier}
         />
       )}
 
       {/* Upgrade CTA for Free Users */}
       {tier === 'free' && (
         <div className="bg-gradient-to-r from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-xl p-6 text-center">
-          <h3 className="font-semibold text-white mb-2">Unlock All 10 Reports</h3>
+          <h3 className="font-semibold text-white mb-2">Unlock deeper market research</h3>
           <p className="text-slate-400 text-sm mb-4">
-            Upgrade to Pro to access Pain Points, Prime Analysis, Teaming Partners, and more.
+            Upgrade to see pain points, prime targets, teaming partners, and forecast detail.
           </p>
           <a
             href="/market-intelligence"
@@ -574,15 +1150,92 @@ export default function MarketResearchPanel({ email, tier }: MarketResearchPanel
   );
 }
 
+function MetricCard({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'green' | 'amber' }) {
+  const color = tone === 'green' ? 'text-emerald-400' : tone === 'amber' ? 'text-amber-300' : 'text-white';
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+      <div className={`text-2xl font-bold ${color}`}>{value}</div>
+      <div className="mt-1 text-sm text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function InsightCard({
+  label,
+  title,
+  detail,
+  action,
+  onClick,
+}: {
+  label: string;
+  title: string;
+  detail: string;
+  action: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-xl border border-slate-800 bg-slate-950/50 p-5 text-left hover:border-emerald-500/50"
+    >
+      <div className="text-xs uppercase tracking-wider text-emerald-300">{label}</div>
+      <div className="mt-3 text-lg font-semibold text-white">{title}</div>
+      <div className="mt-2 line-clamp-3 text-sm text-slate-400">{detail}</div>
+      <div className="mt-4 text-sm font-medium text-emerald-300">{action} →</div>
+    </button>
+  );
+}
+
 // Report Viewer Component
 interface ReportViewerProps {
   reportId: string;
   reportData: ReportData[keyof ReportData] | null;
   onClose: () => void;
   formatCurrency: (value?: number) => string;
+  onSaveBuyer: (buyer: {
+    contractingOffice: string;
+    parentAgency?: string;
+    subAgency?: string;
+    osbp?: { director?: string; email?: string; phone?: string } | null;
+  }) => void;
+  onSavePartner: (partner: {
+    name: string;
+    reason?: string;
+    email?: string;
+    phone?: string;
+    sbloName?: string;
+    certifications?: string[];
+    naicsCategories?: string[];
+  }) => void;
+  onTrackOpportunity: (forecast: {
+    agency: string;
+    description?: string;
+    estimatedValue?: string;
+    solicitationDate?: string;
+    naicsCode?: string;
+  }) => void;
+  savingContact: string | null;
+  savedContacts: Set<string>;
+  savingOpportunity: string | null;
+  savedOpportunities: Set<string>;
+  tier: MIBetaTier;
 }
 
-function ReportViewer({ reportId, reportData, onClose, formatCurrency }: ReportViewerProps) {
+function ReportViewer({
+  reportId,
+  reportData,
+  onClose,
+  formatCurrency,
+  onSaveBuyer,
+  onSavePartner,
+  onTrackOpportunity,
+  savingContact,
+  savedContacts,
+  savingOpportunity,
+  savedOpportunities,
+  tier,
+}: ReportViewerProps) {
   if (!reportData) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -590,7 +1243,7 @@ function ReportViewer({ reportId, reportData, onClose, formatCurrency }: ReportV
           <h3 className="font-semibold text-white">Report Loading...</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
-        <p className="text-slate-400">Click "Generate All Reports" to load this report.</p>
+        <p className="text-slate-400">Generate reports to load this view.</p>
       </div>
     );
   }
@@ -624,34 +1277,84 @@ function ReportViewer({ reportId, reportData, onClose, formatCurrency }: ReportV
               <div className="text-xs text-slate-500">Contracts</div>
             </div>
           </div>
-          {(reportData as ReportData['governmentBuyers'])?.agencies?.slice(0, 10).map((agency, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
-              <div className="font-medium text-white">{agency.contractingOffice}</div>
-              {agency.parentAgency && <div className="text-xs text-slate-500">{agency.parentAgency}</div>}
-              <div className="flex gap-4 mt-2 text-sm">
-                <span className="text-emerald-400">{formatCurrency(agency.spending)}</span>
-                <span className="text-slate-400">{agency.contractCount} contracts</span>
+          {(reportData as ReportData['governmentBuyers'])?.agencies?.slice(0, 10).map((agency, idx) => {
+            const buyerKey = `buyer:${agency.contractingOffice}`;
+            const isSaved = savedContacts.has(buyerKey);
+            const isSaving = savingContact === buyerKey;
+            return (
+              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white">{agency.contractingOffice}</div>
+                    {agency.parentAgency && <div className="text-xs text-slate-500">{agency.parentAgency}</div>}
+                    <div className="flex gap-4 mt-2 text-sm">
+                      <span className="text-emerald-400">{formatCurrency(agency.spending)}</span>
+                      <span className="text-slate-400">{agency.contractCount} contracts</span>
+                    </div>
+                  </div>
+                  {tier !== 'free' && (
+                    <button
+                      type="button"
+                      onClick={() => onSaveBuyer(agency)}
+                      disabled={isSaved || isSaving}
+                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        isSaved
+                          ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
+                          : isSaving
+                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
+                      }`}
+                    >
+                      {isSaved ? '✓ Saved' : isSaving ? 'Saving...' : 'Save to Network'}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* OSBP Contacts */}
       {reportId === 'osbp' && 'agencies' in reportData && (
         <div className="space-y-3">
-          {(reportData as ReportData['governmentBuyers'])?.agencies?.filter(a => a.osbp).slice(0, 10).map((agency, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
-              <div className="font-medium text-white">{agency.contractingOffice}</div>
-              {agency.osbp && (
-                <div className="mt-2 text-sm">
-                  {agency.osbp.director && <div className="text-slate-300">👤 {agency.osbp.director}</div>}
-                  {agency.osbp.email && <div className="text-blue-400">✉️ {agency.osbp.email}</div>}
-                  {agency.osbp.phone && <div className="text-slate-400">📞 {agency.osbp.phone}</div>}
+          {(reportData as ReportData['governmentBuyers'])?.agencies?.filter(a => a.osbp).slice(0, 10).map((agency, idx) => {
+            const buyerKey = `buyer:${agency.contractingOffice}`;
+            const isSaved = savedContacts.has(buyerKey);
+            const isSaving = savingContact === buyerKey;
+            return (
+              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white">{agency.contractingOffice}</div>
+                    {agency.osbp && (
+                      <div className="mt-2 text-sm">
+                        {agency.osbp.director && <div className="text-slate-300">👤 {agency.osbp.director}</div>}
+                        {agency.osbp.email && <div className="text-blue-400">✉️ {agency.osbp.email}</div>}
+                        {agency.osbp.phone && <div className="text-slate-400">📞 {agency.osbp.phone}</div>}
+                      </div>
+                    )}
+                  </div>
+                  {tier !== 'free' && (
+                    <button
+                      type="button"
+                      onClick={() => onSaveBuyer(agency)}
+                      disabled={isSaved || isSaving}
+                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        isSaved
+                          ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
+                          : isSaving
+                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
+                      }`}
+                    >
+                      {isSaved ? '✓ Saved' : isSaving ? 'Saving...' : 'Save to Network'}
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -687,16 +1390,41 @@ function ReportViewer({ reportId, reportData, onClose, formatCurrency }: ReportV
       {/* Prime Contractors */}
       {reportId === 'primes' && 'suggestedPrimes' in reportData && (
         <div className="space-y-3">
-          {(reportData as ReportData['primeContractor'])?.suggestedPrimes?.slice(0, 10).map((prime, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
-              <div className="font-medium text-white">{prime.name}</div>
-              {prime.reason && <div className="text-sm text-slate-400 mt-1">{prime.reason}</div>}
-              {prime.email && <div className="text-sm text-blue-400 mt-1">✉️ {prime.email}</div>}
-              {prime.naicsCategories && prime.naicsCategories.length > 0 && (
-                <div className="text-xs text-slate-500 mt-1">NAICS: {prime.naicsCategories.slice(0, 3).join(', ')}</div>
-              )}
-            </div>
-          ))}
+          {(reportData as ReportData['primeContractor'])?.suggestedPrimes?.slice(0, 10).map((prime, idx) => {
+            const partnerKey = `partner:${prime.name}`;
+            const isSaved = savedContacts.has(partnerKey);
+            const isSaving = savingContact === partnerKey;
+            return (
+              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white">{prime.name}</div>
+                    {prime.reason && <div className="text-sm text-slate-400 mt-1">{prime.reason}</div>}
+                    {prime.email && <div className="text-sm text-blue-400 mt-1">✉️ {prime.email}</div>}
+                    {prime.naicsCategories && prime.naicsCategories.length > 0 && (
+                      <div className="text-xs text-slate-500 mt-1">NAICS: {prime.naicsCategories.slice(0, 3).join(', ')}</div>
+                    )}
+                  </div>
+                  {tier !== 'free' && (
+                    <button
+                      type="button"
+                      onClick={() => onSavePartner(prime)}
+                      disabled={isSaved || isSaving}
+                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        isSaved
+                          ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
+                          : isSaving
+                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
+                      }`}
+                    >
+                      {isSaved ? '✓ Saved' : isSaving ? 'Saving...' : 'Save Partner'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -707,17 +1435,42 @@ function ReportViewer({ reportId, reportData, onClose, formatCurrency }: ReportV
             <div className="text-lg font-bold text-white">{(reportData as ReportData['forecastList'])?.summary?.totalForecasts || 0}</div>
             <div className="text-xs text-slate-500">Upcoming Forecasts</div>
           </div>
-          {(reportData as ReportData['forecastList'])?.forecasts?.slice(0, 10).map((forecast, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
-              <div className="font-medium text-white">{forecast.agency}</div>
-              <div className="text-sm text-slate-400 mt-1 line-clamp-2">{forecast.description}</div>
-              <div className="flex gap-4 mt-2 text-xs">
-                {forecast.estimatedValue && <span className="text-emerald-400">{forecast.estimatedValue}</span>}
-                {forecast.quarter && <span className="text-slate-500">{forecast.quarter}</span>}
-                {forecast.naicsCode && <span className="text-slate-500">NAICS {forecast.naicsCode}</span>}
+          {(reportData as ReportData['forecastList'])?.forecasts?.slice(0, 10).map((forecast, idx) => {
+            const oppKey = `forecast:${forecast.agency}:${forecast.description?.slice(0, 50)}`;
+            const isTracked = savedOpportunities.has(oppKey);
+            const isTracking = savingOpportunity === oppKey;
+            return (
+              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white">{forecast.agency}</div>
+                    <div className="text-sm text-slate-400 mt-1 line-clamp-2">{forecast.description}</div>
+                    <div className="flex gap-4 mt-2 text-xs">
+                      {forecast.estimatedValue && <span className="text-emerald-400">{forecast.estimatedValue}</span>}
+                      {forecast.quarter && <span className="text-slate-500">{forecast.quarter}</span>}
+                      {forecast.naicsCode && <span className="text-slate-500">NAICS {forecast.naicsCode}</span>}
+                    </div>
+                  </div>
+                  {tier !== 'free' && (
+                    <button
+                      type="button"
+                      onClick={() => onTrackOpportunity(forecast)}
+                      disabled={isTracked || isTracking}
+                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        isTracked
+                          ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
+                          : isTracking
+                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+                      }`}
+                    >
+                      {isTracked ? '✓ Tracked' : isTracking ? 'Adding...' : 'Track in Pipeline'}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -804,22 +1557,47 @@ function ReportViewer({ reportId, reportData, onClose, formatCurrency }: ReportV
       {/* Teaming Partners */}
       {reportId === 'teaming' && 'suggestedPrimes' in reportData && (
         <div className="space-y-3">
-          {(reportData as ReportData['tier2Subcontracting'])?.suggestedPrimes?.slice(0, 10).map((partner, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
-              <div className="font-medium text-white">{partner.name}</div>
-              {partner.reason && <div className="text-sm text-slate-400 mt-1">{partner.reason}</div>}
-              {partner.email && <div className="text-sm text-blue-400 mt-1">✉️ {partner.email}</div>}
-              {partner.certifications && partner.certifications.length > 0 && (
-                <div className="flex gap-1 mt-2">
-                  {partner.certifications.slice(0, 3).map((cert, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">
-                      {cert}
-                    </span>
-                  ))}
+          {(reportData as ReportData['tier2Subcontracting'])?.suggestedPrimes?.slice(0, 10).map((partner, idx) => {
+            const partnerKey = `partner:${partner.name}`;
+            const isSaved = savedContacts.has(partnerKey);
+            const isSaving = savingContact === partnerKey;
+            return (
+              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white">{partner.name}</div>
+                    {partner.reason && <div className="text-sm text-slate-400 mt-1">{partner.reason}</div>}
+                    {partner.email && <div className="text-sm text-blue-400 mt-1">✉️ {partner.email}</div>}
+                    {partner.certifications && partner.certifications.length > 0 && (
+                      <div className="flex gap-1 mt-2">
+                        {partner.certifications.slice(0, 3).map((cert, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">
+                            {cert}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {tier !== 'free' && (
+                    <button
+                      type="button"
+                      onClick={() => onSavePartner(partner)}
+                      disabled={isSaved || isSaving}
+                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        isSaved
+                          ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
+                          : isSaving
+                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
+                      }`}
+                    >
+                      {isSaved ? '✓ Saved' : isSaving ? 'Saving...' : 'Save to Network'}
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 

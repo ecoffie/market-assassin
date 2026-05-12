@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
+import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -58,6 +59,25 @@ interface RecompeteApiContract {
   recompete_likelihood?: string | null;
 }
 
+interface StaticRecompeteContract {
+  'Award ID'?: string;
+  Agency?: string;
+  Office?: string;
+  Recipient?: string;
+  NAICS?: string;
+  'Total Value'?: string;
+  'Start Date'?: string;
+  Expiration?: string;
+  State?: string;
+}
+
+interface SavedProfileDefaults {
+  naicsCodes: string[];
+  agencies: string[];
+  states: string[];
+  source: string;
+}
+
 function formatCurrency(value: number): string {
   if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -86,6 +106,28 @@ function getDaysUntil(dateStr?: string | null): number {
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function parseCurrency(value?: string): number {
+  if (!value) return 0;
+  return parseFloat(value.replace(/[$,\s]/g, '')) || 0;
+}
+
+function parseStaticDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) return dateStr;
+  return parsed.toISOString().split('T')[0];
+}
+
+function extractNaicsCode(value?: string | null): string {
+  return (value || '').match(/\d{2,6}/)?.[0] || '';
+}
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values
+    .map(value => (value || '').trim())
+    .filter(Boolean)));
+}
+
 function getCompetitionLevel(contract: RecompeteApiContract): string {
   const competitionType = (contract.competition_type || '').toLowerCase();
   const offers = contract.number_of_offers || 0;
@@ -99,6 +141,49 @@ function getCompetitionLevel(contract: RecompeteApiContract): string {
   }
 
   return 'full';
+}
+
+function getRecompeteOverview(contract: ExpiringContract): string {
+  const agency = contract.agency || 'this agency';
+  const incumbent = contract.incumbent?.name || 'the incumbent';
+  const daysText = contract.daysUntilExpiration <= 0
+    ? 'the current award has reached its listed end date'
+    : `the current award ends in ${contract.daysUntilExpiration} days`;
+  const competitionText = contract.competitionLevel === 'sole_source'
+    ? 'It appears to have a sole-source or single-offer competition signal, so validate whether the next requirement may open up or remain limited.'
+    : contract.competitionLevel === 'low'
+      ? `It shows a lower-competition signal with ${contract.bidsReceived} recorded offers, so this may be worth early capture work.`
+      : 'Use this as an early warning to research the incumbent, agency buyer, and likely recompete path.';
+
+  return `${agency} has an expiring award held by ${incumbent}; ${daysText}. ${competitionText}`;
+}
+
+function mapStaticContract(contract: StaticRecompeteContract): ExpiringContract {
+  const expirationDate = parseStaticDate(contract.Expiration);
+  const naics = extractNaicsCode(contract.NAICS);
+  const value = parseCurrency(contract['Total Value']);
+
+  return {
+    piid: contract['Award ID'] || `${contract.Recipient || 'contract'}-${contract.Expiration || ''}`,
+    title: contract.NAICS || `${contract.Recipient || 'Incumbent'} recompete`,
+    incumbent: {
+      name: contract.Recipient || 'Unknown incumbent',
+      uei: '',
+    },
+    agency: contract.Agency || 'Unknown agency',
+    subAgency: contract.Office || undefined,
+    naics,
+    value,
+    potentialValue: value,
+    expirationDate,
+    daysUntilExpiration: getDaysUntil(expirationDate),
+    bidsReceived: 0,
+    competitionLevel: 'full',
+    competitionType: 'Expiring contract',
+    location: {
+      state: contract.State || undefined,
+    },
+  };
 }
 
 function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract {
@@ -132,57 +217,115 @@ function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract 
 }
 
 export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
+  void tier;
   const [contracts, setContracts] = useState<ExpiringContract[]>([]);
+  const [allContracts, setAllContracts] = useState<ExpiringContract[]>([]);
   const [summary, setSummary] = useState<ContractSummary | null>(null);
+  const [profileDefaults, setProfileDefaults] = useState<SavedProfileDefaults | null>(null);
+  const [usingProfileDefaults, setUsingProfileDefaults] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
 
   // Search filters
   const [naicsFilter, setNaicsFilter] = useState('');
-  const [monthsFilter, setMonthsFilter] = useState('12');
+  const [monthsFilter, setMonthsFilter] = useState('24');
   const [competitionFilter, setCompetitionFilter] = useState('');
 
-  // Load user profile on mount
-  useEffect(() => {
-    if (!email) return;
-
-    async function loadProfile() {
-      try {
-        const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`);
-        const data = await res.json();
-
-        if (data.success && data.data?.naicsCodes?.length > 0) {
-          const firstNaics = data.data.naicsCodes[0];
-          setNaicsFilter(firstNaics);
-          searchContracts(firstNaics, '12', '');
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Failed to load profile:', err);
-        setLoading(false);
+  const toggleExpandedContract = (contractId: string) => {
+    setExpandedContracts(prev => {
+      const next = new Set(prev);
+      if (next.has(contractId)) {
+        next.delete(contractId);
+      } else {
+        next.add(contractId);
       }
+      return next;
+    });
+  };
+
+  const applyFilters = useCallback((
+    sourceContracts: ExpiringContract[],
+    naics: string,
+    months: string,
+    competition: string,
+    defaults?: SavedProfileDefaults | null
+  ) => {
+    const naicsTerms = uniqueStrings(naics.split(/[, ]+/)).map(extractNaicsCode).filter(Boolean);
+    const agencyTerms = defaults?.agencies || [];
+    const stateTerms = defaults?.states || [];
+    const monthsNumber = months === 'all' ? null : parseInt(months, 10);
+    const now = new Date();
+
+    let mappedContracts = sourceContracts.filter(contract => {
+      if (naicsTerms.length > 0 && !naicsTerms.some(term => contract.naics.startsWith(term))) {
+        return false;
+      }
+
+      if (agencyTerms.length > 0) {
+        const agencyText = `${contract.agency} ${contract.subAgency || ''}`.toLowerCase();
+        if (!agencyTerms.some(agency => agencyText.includes(agency.toLowerCase()))) {
+          return false;
+        }
+      }
+
+      if (stateTerms.length > 0 && contract.location.state && !stateTerms.includes(contract.location.state)) {
+        return false;
+      }
+
+      if (monthsNumber) {
+        const expiration = new Date(`${contract.expirationDate}T00:00:00`);
+        if (Number.isNaN(expiration.getTime())) return false;
+        const monthsAway = (expiration.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+        if (monthsAway < 0 || monthsAway > monthsNumber) return false;
+      }
+
+      return true;
+    });
+
+    if (competition === 'sole_source') {
+      mappedContracts = mappedContracts.filter(contract => contract.competitionLevel === 'sole_source');
+    } else if (competition === 'low') {
+      mappedContracts = mappedContracts.filter(contract =>
+        contract.competitionLevel === 'low' || contract.competitionLevel === 'sole_source'
+      );
     }
 
-    loadProfile();
-  }, [email]);
+    mappedContracts = mappedContracts.sort((a, b) => b.value - a.value);
+
+    const totalValue = mappedContracts.reduce((sum, contract) => sum + contract.value, 0);
+    const offersWithValues = mappedContracts.filter(contract => contract.bidsReceived > 0);
+    const avgBids = offersWithValues.length > 0
+      ? offersWithValues.reduce((sum, contract) => sum + contract.bidsReceived, 0) / offersWithValues.length
+      : 0;
+
+    setContracts(mappedContracts);
+    setSummary({
+      totalContracts: mappedContracts.length,
+      totalValue,
+      avgBidsPerContract: Math.round(avgBids * 10) / 10,
+      soleSourceContracts: mappedContracts.filter(contract => contract.competitionLevel === 'sole_source').length,
+      lowCompetitionContracts: mappedContracts.filter(contract => contract.competitionLevel === 'low').length,
+      urgentContracts: mappedContracts.filter(contract =>
+        contract.daysUntilExpiration > 0 && contract.daysUntilExpiration <= 90
+      ).length,
+    });
+  }, []);
 
   const searchContracts = useCallback(async (naics: string, months: string, competition: string) => {
-    if (!naics) {
-      setContracts([]);
-      setSummary(null);
-      setLoading(false);
-      return;
-    }
-
     setSearching(true);
     setError(null);
 
     try {
+      if (allContracts.length > 0) {
+        applyFilters(allContracts, naics, months, competition, usingProfileDefaults ? profileDefaults : null);
+        return;
+      }
+
       const params = new URLSearchParams();
-      params.set('naics', naics);
-      params.set('months', months);
+      if (naics) params.set('naics', naics.split(/[, ]+/)[0]);
+      params.set('months', months === 'all' ? '60' : months);
       params.set('limit', '200');
       params.set('sort', 'value');
       params.set('order', 'desc');
@@ -192,39 +335,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       });
       const data = await res.json();
 
-      if (data.success) {
-        let mappedContracts: ExpiringContract[] = ((data.contracts || []) as RecompeteApiContract[])
-          .map(mapRecompeteContract);
+      if (!data.success) throw new Error(data.error || 'Failed to search contracts');
 
-        if (competition === 'sole_source') {
-          mappedContracts = mappedContracts.filter(contract => contract.competitionLevel === 'sole_source');
-        } else if (competition === 'low') {
-          mappedContracts = mappedContracts.filter(contract =>
-            contract.competitionLevel === 'low' || contract.competitionLevel === 'sole_source'
-          );
-        }
-
-        const totalValue = mappedContracts.reduce((sum, contract) => sum + contract.value, 0);
-        const offersWithValues = mappedContracts.filter(contract => contract.bidsReceived > 0);
-        const avgBids = offersWithValues.length > 0
-          ? offersWithValues.reduce((sum, contract) => sum + contract.bidsReceived, 0) / offersWithValues.length
-          : 0;
-
-        setContracts(mappedContracts);
-        setSummary({
-          totalContracts: competition ? mappedContracts.length : (data.pagination?.total || mappedContracts.length),
-          totalValue,
-          avgBidsPerContract: Math.round(avgBids * 10) / 10,
-          soleSourceContracts: mappedContracts.filter(contract => contract.competitionLevel === 'sole_source').length,
-          lowCompetitionContracts: mappedContracts.filter(contract => contract.competitionLevel === 'low').length,
-          urgentContracts: mappedContracts.filter(contract =>
-            contract.daysUntilExpiration > 0 && contract.daysUntilExpiration <= 90
-          ).length,
-        });
-      } else {
-        setError(data.error || 'Failed to search contracts');
-        setContracts([]);
-      }
+      const mappedContracts = ((data.contracts || []) as RecompeteApiContract[]).map(mapRecompeteContract);
+      applyFilters(mappedContracts, naics, months, competition, usingProfileDefaults ? profileDefaults : null);
     } catch (err) {
       console.error('Contract search error:', err);
       setError('Failed to connect to server');
@@ -233,10 +347,95 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       setSearching(false);
       setLoading(false);
     }
-  }, [email]);
+  }, [allContracts, applyFilters, email, profileDefaults, usingProfileDefaults]);
+
+  // Load the shared profile defaults once, then apply them to the full recompete dataset.
+  useEffect(() => {
+    if (!email) return;
+
+    async function loadProfileAndContracts() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [prefsResponse, workspaceResponse, contractsResponse] = await Promise.all([
+          fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`),
+          fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email as string)}`, {
+            headers: getMIApiHeaders(email),
+          }),
+          fetch('/contracts-data.js'),
+        ]);
+
+        const [prefs, workspace, contractsText] = await Promise.all([
+          prefsResponse.json().catch(() => null),
+          workspaceResponse.json().catch(() => null),
+          contractsResponse.text(),
+        ]);
+
+        const parsedStaticContracts = JSON.parse(
+          contractsText
+            .replace(/^var\s+expiringContractsData\s*=\s*/, '')
+            .replace(/;\s*$/, '')
+        ) as StaticRecompeteContract[];
+        const mappedContracts = parsedStaticContracts.map(mapStaticContract);
+        setAllContracts(mappedContracts);
+
+        const workspaceSettings = workspace?.settings || {};
+        const workspaceProfile = workspace?.profile || {};
+        const profileDefaultsNext: SavedProfileDefaults = {
+          naicsCodes: uniqueStrings([
+            ...(prefs?.data?.naicsCodes || []),
+            ...(workspaceSettings.naics_codes || []),
+            ...(workspaceProfile.notification?.naics_codes || []),
+            ...(workspaceProfile.briefing?.naics_codes || []),
+          ]).map(extractNaicsCode).filter(Boolean),
+          agencies: uniqueStrings([
+            ...(prefs?.data?.targetAgencies || []),
+            ...(workspaceSettings.target_agencies || []),
+            ...(workspaceProfile.notification?.agencies || []),
+            ...(workspaceProfile.briefing?.agencies || []),
+          ]),
+          states: uniqueStrings([
+            ...(prefs?.data?.locationStates || []),
+            prefs?.data?.locationState,
+          ]).map(state => state.toUpperCase()),
+          source: prefs?.data ? 'saved settings profile' : 'workspace profile',
+        };
+
+        setProfileDefaults(profileDefaultsNext);
+        const profileNaics = profileDefaultsNext.naicsCodes.join(', ');
+        setNaicsFilter(profileNaics);
+        setUsingProfileDefaults(profileDefaultsNext.naicsCodes.length > 0 || profileDefaultsNext.agencies.length > 0 || profileDefaultsNext.states.length > 0);
+        applyFilters(mappedContracts, profileNaics, '24', '', profileDefaultsNext);
+      } catch (err) {
+        console.error('Failed to load recompete defaults:', err);
+        setError('Failed to load recompete dataset.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProfileAndContracts();
+  }, [applyFilters, email]);
 
   const handleSearch = () => {
+    setUsingProfileDefaults(false);
     searchContracts(naicsFilter, monthsFilter, competitionFilter);
+  };
+
+  const useSavedProfile = () => {
+    const profileNaics = profileDefaults?.naicsCodes.join(', ') || '';
+    setNaicsFilter(profileNaics);
+    setUsingProfileDefaults(true);
+    applyFilters(allContracts, profileNaics, monthsFilter, competitionFilter, profileDefaults);
+  };
+
+  const viewAllContracts = () => {
+    setNaicsFilter('');
+    setMonthsFilter('all');
+    setCompetitionFilter('');
+    setUsingProfileDefaults(false);
+    applyFilters(allContracts, '', 'all', '', null);
   };
 
   const getCompetitionBadge = (level: string) => {
@@ -256,6 +455,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     if (days <= 180) return { bg: 'bg-blue-500/20', text: 'text-blue-400', label: '📅 6 mo' };
     return { bg: 'bg-slate-500/20', text: 'text-slate-400', label: `${Math.round(days / 30)} mo` };
   };
+  const shownContractsCount = summary?.totalContracts || 0;
 
   if (loading) {
     return (
@@ -275,9 +475,53 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Recompete Tracker</h1>
-        <p className="text-slate-400 mt-1">Search the live recompete database for expiring federal awards</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Expiring Contracts</h1>
+          <p className="text-slate-400 mt-1">
+            Existing awards ending soon that may be rebid. Use this to spot recompete targets before the next solicitation.
+          </p>
+          {profileDefaults && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                {usingProfileDefaults ? 'Using saved profile' : 'Custom search'}
+              </span>
+              {profileDefaults.naicsCodes.length > 0 && (
+                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                  NAICS {profileDefaults.naicsCodes.slice(0, 4).join(', ')}
+                  {profileDefaults.naicsCodes.length > 4 ? ` +${profileDefaults.naicsCodes.length - 4}` : ''}
+                </span>
+              )}
+              {profileDefaults.agencies.length > 0 && (
+                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                  {profileDefaults.agencies.length} target agencies
+                </span>
+              )}
+              {profileDefaults.states.length > 0 && (
+                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                  {profileDefaults.states.join(', ')}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={viewAllContracts}
+            disabled={allContracts.length === 0}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-sm rounded-lg transition-colors"
+          >
+            View all {allContracts.length.toLocaleString()}
+          </button>
+          <a
+            href="/recompete"
+            target="_blank"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
+          >
+            Full Expiring Contracts Tool →
+          </a>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -285,34 +529,53 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-white">{summary.totalContracts}</div>
-            <div className="text-xs text-slate-500">Matching Awards</div>
+            <div className="text-xs text-slate-500">{usingProfileDefaults ? 'Profile Matches' : 'Expiring Awards Shown'}</div>
+            <div className="text-[11px] text-slate-600 mt-1">{allContracts.length.toLocaleString()} total in database</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-emerald-400">{formatCurrency(summary.totalValue)}</div>
-            <div className="text-xs text-slate-500">Visible Value</div>
+            <div className="text-xs text-slate-500">Potential Rebid Value</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-green-400">{summary.soleSourceContracts}</div>
             <div className="text-xs text-slate-500">Sole Source</div>
+            <div className="text-[11px] text-slate-600 mt-1">Likely fewer competitors if rebid</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-red-400">{summary.urgentContracts}</div>
-            <div className="text-xs text-slate-500">Urgent (&lt;90 days)</div>
+            <div className="text-xs text-slate-500">Ending Soon</div>
+            <div className="text-[11px] text-slate-600 mt-1">Within 90 days</div>
           </div>
         </div>
       )}
 
       {/* Search Form */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Search Expiring Contracts</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Profile-Aware Search</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Defaults come from settings. Change fields here only to explore a different slice.
+            </p>
+          </div>
+          {profileDefaults && (
+            <button
+              onClick={useSavedProfile}
+              disabled={allContracts.length === 0}
+              className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-50 text-emerald-300 text-sm rounded-lg transition-colors"
+            >
+              Use Saved Profile
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">NAICS Code</label>
+            <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
             <input
               type="text"
               value={naicsFilter}
               onChange={(e) => setNaicsFilter(e.target.value)}
-              placeholder="541512"
+              placeholder="541512, 236, 238"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none"
             />
           </div>
@@ -323,6 +586,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               onChange={(e) => setMonthsFilter(e.target.value)}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
             >
+              <option value="all">All Dates</option>
               <option value="6">6 Months</option>
               <option value="12">12 Months</option>
               <option value="18">18 Months</option>
@@ -344,13 +608,25 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           <div className="flex items-end">
             <button
               onClick={handleSearch}
-              disabled={searching || !naicsFilter}
+              disabled={searching}
               className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
             >
               {searching ? 'Searching...' : 'Search'}
             </button>
           </div>
         </div>
+        {usingProfileDefaults && allContracts.length > shownContractsCount && (
+          <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-sm text-slate-400">
+            Showing {shownContractsCount.toLocaleString()} matches from your saved profile. The full database has {allContracts.length.toLocaleString()} expiring awards.
+            <button
+              type="button"
+              onClick={viewAllContracts}
+              className="ml-2 font-medium text-emerald-300 hover:text-emerald-200"
+            >
+              View all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Error */}
@@ -365,12 +641,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-800">
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-              {contracts.length} Expiring Awards
+              {contracts.length.toLocaleString()} Expiring Awards
             </h3>
           </div>
           <div className="divide-y divide-slate-800">
-            {contracts.map((contract) => {
+            {contracts.slice(0, 1000).map((contract) => {
               const urgency = getUrgencyBadge(contract.daysUntilExpiration);
+              const isExpanded = expandedContracts.has(contract.piid);
 
               return (
                 <div key={contract.piid} className={`p-5 hover:bg-slate-800/50 transition-colors ${contract.daysUntilExpiration <= 90 ? 'bg-red-500/5' : ''}`}>
@@ -393,7 +670,19 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       </div>
 
                       {/* Title */}
-                      <h4 className="text-white font-medium mb-1 line-clamp-2">{contract.title || 'Contract'}</h4>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandedContract(contract.piid)}
+                        className="group mb-1 flex w-full items-start gap-2 text-left"
+                        aria-expanded={isExpanded}
+                      >
+                        <h4 className="text-white font-medium line-clamp-2 group-hover:text-amber-200">
+                          {contract.title || 'Contract'}
+                        </h4>
+                        <span className="mt-0.5 shrink-0 text-xs font-medium text-amber-300 group-hover:text-amber-200">
+                          {isExpanded ? 'Hide details' : 'Details'}
+                        </span>
+                      </button>
 
                       {/* Agency */}
                       <p className="text-slate-400 text-sm mb-1">
@@ -418,7 +707,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                     </div>
 
                     {/* Value & Dates */}
-                    <div className="text-right shrink-0 min-w-[120px]">
+                    <div className="text-right shrink-0 min-w-[150px] flex flex-col items-end">
                       <div className="text-lg font-bold text-emerald-400">{formatCurrency(contract.value)}</div>
                       <div className="text-xs text-slate-500">Contract Value</div>
                       <div className="text-sm font-medium text-white mt-2">
@@ -427,11 +716,113 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       <div className={`text-xs mt-1 ${urgency.text}`}>
                         {contract.daysUntilExpiration} days left
                       </div>
+                      <div className="mt-3 flex flex-col items-end gap-1">
+                        <div className="text-[11px] uppercase tracking-wider text-slate-600">Add to My Pursuits</div>
+                        <SaveToPipelineButton
+                          opportunity={{
+                            title: contract.title || `${contract.incumbent?.name || 'Incumbent'} recompete`,
+                            noticeId: contract.piid,
+                            solicitationNumber: contract.piid,
+                            agency: contract.agency,
+                            naicsCode: contract.naics || undefined,
+                            deadline: contract.expirationDate || undefined,
+                            valueEstimate: formatCurrency(contract.potentialValue || contract.value),
+                            source: 'mi_beta_expiring_contracts',
+                          }}
+                          email={email || ''}
+                          variant="small"
+                        />
+                      </div>
                     </div>
                   </div>
+
+                  {isExpanded && (
+                    <div className="mt-5 rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+                      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+                        <div>
+                          <h5 className="text-sm font-semibold text-white">Overview</h5>
+                          <p className="mt-2 text-sm leading-6 text-slate-300">
+                            {getRecompeteOverview(contract)}
+                          </p>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {contract.piid && (
+                              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                                Award {contract.piid}
+                              </span>
+                            )}
+                            {contract.incumbent?.uei && (
+                              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                                UEI {contract.incumbent.uei}
+                              </span>
+                            )}
+                            {contract.naics && (
+                              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                                NAICS {contract.naics}
+                              </span>
+                            )}
+                            {contract.location?.state && (
+                              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                                {contract.location.city ? `${contract.location.city}, ` : ''}{contract.location.state}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+                          <h5 className="text-sm font-semibold text-white">Capture Notes</h5>
+                          <dl className="mt-3 space-y-3 text-sm">
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">Incumbent</dt>
+                              <dd className="text-right text-slate-200">{contract.incumbent?.name || 'Unknown'}</dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">Potential value</dt>
+                              <dd className="text-right text-emerald-300">{formatCurrency(contract.potentialValue || contract.value)}</dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">Competition</dt>
+                              <dd className="text-right text-slate-200">{contract.competitionType || 'Unknown'}</dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">Offers</dt>
+                              <dd className="text-right text-slate-200">{contract.bidsReceived || 'Unknown'}</dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">Expires</dt>
+                              <dd className="text-right text-slate-200">{formatDate(contract.expirationDate)}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
+                        <SaveToPipelineButton
+                          opportunity={{
+                            title: contract.title || `${contract.incumbent?.name || 'Incumbent'} recompete`,
+                            noticeId: contract.piid,
+                            solicitationNumber: contract.piid,
+                            agency: contract.agency,
+                            naicsCode: contract.naics || undefined,
+                            deadline: contract.expirationDate || undefined,
+                            valueEstimate: formatCurrency(contract.potentialValue || contract.value),
+                            source: 'mi_beta_expiring_contracts',
+                          }}
+                          email={email || ''}
+                        />
+                        <span className="text-xs text-slate-500">
+                          After tracking, open My Pursuits to move it from Tracking to Pursuing, Bidding, Submitted, Won, or Lost.
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
+            {contracts.length > 1000 && (
+              <div className="p-5 text-center text-sm text-slate-400">
+                Showing first 1,000 by value. Narrow the filters or open the full tool for export.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -451,7 +842,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             target="_blank"
             className="inline-block px-6 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            View Full Recompete Tool →
+            View Full Expiring Contracts Tool →
           </a>
         </div>
       )}

@@ -178,6 +178,56 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     }
   };
 
+  const moveOpportunityToStage = async (opportunity: PipelineOpportunity, nextStage: PipelineStage) => {
+    if (!email || opportunity.stage === nextStage) return;
+
+    const previousStage = opportunity.stage;
+    const nextStageLabel = STAGES.find(stage => stage.id === nextStage)?.label || nextStage;
+
+    setError(null);
+    setNotice(null);
+    setOpportunities(prev => prev.map(opp => (
+      opp.id === opportunity.id ? { ...opp, stage: nextStage } : opp
+    )));
+
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          id: opportunity.id,
+          user_email: email,
+          stage: nextStage,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setOpportunities(prev => prev.map(opp => (
+          opp.id === opportunity.id ? { ...opp, stage: previousStage } : opp
+        )));
+        setError(data.error || 'Failed to move pipeline item');
+        return;
+      }
+
+      const updatedOpportunity = data.opportunity as PipelineOpportunity;
+      setOpportunities(prev => prev.map(opp => (
+        opp.id === updatedOpportunity.id ? updatedOpportunity : opp
+      )));
+      if (selectedOpportunity?.id === updatedOpportunity.id) {
+        setSelectedOpportunity(updatedOpportunity);
+      }
+      setNotice(`Moved to ${nextStageLabel}.`);
+      loadPipeline();
+    } catch (err) {
+      console.error('Failed to move opportunity:', err);
+      setOpportunities(prev => prev.map(opp => (
+        opp.id === opportunity.id ? { ...opp, stage: previousStage } : opp
+      )));
+      setError('Failed to move pipeline item');
+    }
+  };
+
   const removeOpportunity = async () => {
     if (!email || !selectedOpportunity) return;
     if (!confirm('Remove this opportunity from your pipeline?')) return;
@@ -289,17 +339,41 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
     );
   }
 
+  // Urgency computation
+  const urgentOpportunities = opportunities.filter(opp => {
+    if (!opp.response_deadline) return false;
+    const daysUntil = Math.ceil((new Date(opp.response_deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return daysUntil <= 7 && daysUntil > 0;
+  });
+
+  const overdueOpportunities = opportunities.filter(opp => {
+    if (!opp.response_deadline) return false;
+    return new Date(opp.response_deadline) < new Date();
+  });
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Pipeline Tracker</h1>
-          <p className="text-slate-400 mt-1">
-            {opportunities.length} opportunities in pipeline
-          </p>
+      {/* Compact Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-4">
+          <h1 className="text-2xl font-bold text-white">My Pursuits</h1>
+          <div className="flex items-center gap-2">
+            <span className="rounded bg-slate-800 px-2 py-1 text-sm text-slate-300">
+              {opportunities.length} tracked
+            </span>
+            {urgentOpportunities.length > 0 && (
+              <span className="rounded bg-amber-500/20 px-2 py-1 text-sm text-amber-300">
+                ⚡ {urgentOpportunities.length} due soon
+              </span>
+            )}
+            {overdueOpportunities.length > 0 && (
+              <span className="rounded bg-red-500/20 px-2 py-1 text-sm text-red-300">
+                🔥 {overdueOpportunities.length} overdue
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="flex bg-slate-800 rounded-lg p-1">
             <button
               onClick={() => setViewMode('board')}
@@ -320,9 +394,9 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
           </div>
           <button
             onClick={loadPipeline}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
+            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-sm rounded-lg transition-colors"
           >
-            🔄 Refresh
+            ↻
           </button>
         </div>
       </div>
@@ -396,6 +470,9 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
                     {opp.agency && (
                       <div className="text-xs text-slate-500 mb-1">{opp.agency}</div>
                     )}
+                    {opp.value_estimate && (
+                      <div className="mb-2 text-xs font-medium text-emerald-400">{opp.value_estimate}</div>
+                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-slate-500">{formatDate(opp.response_deadline)}</span>
                       {opp.priority && (
@@ -409,6 +486,27 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
                         Next: {opp.next_action}
                       </div>
                     )}
+                    <div className="mt-3 text-xs font-medium text-blue-300">
+                      Open details
+                    </div>
+                    <label
+                      className="mt-3 block"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <span className="sr-only">Move pursuit stage</span>
+                      <select
+                        value={opp.stage}
+                        onChange={(event) => {
+                          event.stopPropagation();
+                          moveOpportunityToStage(opp, event.target.value as PipelineStage);
+                        }}
+                        className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 outline-none transition-colors hover:border-slate-500 focus:border-blue-500"
+                      >
+                        {STAGES.map(item => (
+                          <option key={item.id} value={item.id}>Move to {item.label}</option>
+                        ))}
+                      </select>
+                    </label>
                     {opp.owner_email && (
                       <div className="mt-1 text-[10px] text-slate-500">
                         Owner: {opp.owner_email}
@@ -488,11 +586,24 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">{opp.agency || '-'}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        STAGES.find(s => s.id === opp.stage)?.color || 'bg-slate-500'
-                      } bg-opacity-20 text-white`}>
-                        {opp.stage}
-                      </span>
+                      <label
+                        className="block min-w-36"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <span className="sr-only">Move pursuit stage</span>
+                        <select
+                          value={opp.stage}
+                          onChange={(event) => {
+                            event.stopPropagation();
+                            moveOpportunityToStage(opp, event.target.value as PipelineStage);
+                          }}
+                          className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 outline-none transition-colors hover:border-slate-500 focus:border-blue-500"
+                        >
+                          {STAGES.map(item => (
+                            <option key={item.id} value={item.id}>{item.label}</option>
+                          ))}
+                        </select>
+                      </label>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400">{formatDate(opp.response_deadline)}</td>
                     <td className="px-4 py-3 text-sm text-slate-400">{opp.owner_email || '-'}</td>
@@ -513,20 +624,32 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
 
       {/* Empty State */}
       {!loading && opportunities.length === 0 && !error && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-          <div className="text-5xl mb-4">📈</div>
-          <h3 className="text-xl font-semibold text-white mb-2">Start Your Pipeline</h3>
-          <p className="text-slate-400 mb-4 max-w-md mx-auto">
-            Add opportunities from your alerts to track them through your pursuit process.
-            Click &quot;Add to Pipeline&quot; on any opportunity to get started.
-          </p>
-          <a
-            href="/bd-assist"
-            target="_blank"
-            className="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            Open Full BD Assist →
-          </a>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8">
+          <div className="text-center mb-8">
+            <div className="text-5xl mb-4">📈</div>
+            <h3 className="text-xl font-semibold text-white mb-2">Start Your Pipeline</h3>
+            <p className="text-slate-400 max-w-lg mx-auto">
+              Track opportunities through your pursuit process. Add from Market Research, alerts, or forecasts.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-lg mb-2">📊</div>
+              <h4 className="text-sm font-medium text-white mb-1">Market Research</h4>
+              <p className="text-xs text-slate-500">Click &quot;Track in Pipeline&quot; on any forecast opportunity</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-lg mb-2">🔔</div>
+              <h4 className="text-sm font-medium text-white mb-1">Daily Alerts</h4>
+              <p className="text-xs text-slate-500">Track opportunities from your personalized alerts</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-lg mb-2">🔮</div>
+              <h4 className="text-sm font-medium text-white mb-1">Forecasts</h4>
+              <p className="text-xs text-slate-500">Add upcoming procurements to track early</p>
+            </div>
+          </div>
         </div>
       )}
 

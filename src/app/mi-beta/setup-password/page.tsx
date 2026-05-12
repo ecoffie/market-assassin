@@ -15,6 +15,11 @@ export default function MISetupPasswordPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (window.location.hostname === 'tools.govcongiants.org') {
+      window.location.replace(`https://mi.govcongiants.com${window.location.pathname}${window.location.search}${window.location.hash}`);
+      return;
+    }
+
     const supabase = getSupabase();
     if (!supabase) return;
 

@@ -84,16 +84,20 @@ export function searchContractors(options: ContractorSearchOptions = {}): Contra
 
   // NAICS filter
   if (naics) {
+    const naicsTerms = naics.split(/[, ]+/).map(n => n.trim()).filter(Boolean);
     filtered = filtered.filter(c =>
-      c.naics.split(',').some(n => n.trim().startsWith(naics))
+      c.naics.split(',').some(n => {
+        const trimmed = n.trim();
+        return naicsTerms.some(term => trimmed.startsWith(term));
+      })
     );
   }
 
   // Agency filter
   if (agency) {
-    const agencyLower = agency.toLowerCase();
+    const agencyTerms = agency.split(',').map(a => a.trim().toLowerCase()).filter(Boolean);
     filtered = filtered.filter(c =>
-      c.agencies.toLowerCase().includes(agencyLower)
+      agencyTerms.some(term => c.agencies.toLowerCase().includes(term))
     );
   }
 

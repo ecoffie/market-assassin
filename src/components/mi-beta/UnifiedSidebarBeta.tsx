@@ -12,7 +12,7 @@ export type MIBetaPanel =
   | 'recompetes'     // Expiring contracts
   | 'contractors'    // prime contractor database
   | 'pipeline'       // Track pursuits
-  | 'contacts'       // CRM & relationships
+  | 'contacts'       // Relationships
   | 'team'           // Team access and seats
   | 'settings'       // Unified account settings
   | 'proposals'      // AI Proposal Assist
@@ -101,9 +101,9 @@ const NAV_SECTIONS: NavSection[] = [
       },
       {
         id: 'contacts',
-        label: 'Teaming CRM',
+        label: 'Relationships',
         icon: '🤝',
-        description: 'Partner relationships',
+        description: 'Buyers + partners',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
@@ -169,6 +169,44 @@ export default function UnifiedSidebarBeta({
 
   const hasAccess = (itemTier: MIBetaTier[]) => {
     return itemTier.includes(userTier);
+  };
+
+  const getItemDisplay = (item: NavItem) => {
+    if (userTier !== 'free') {
+      const paidLabels: Partial<Record<MIBetaPanel, { label: string; description: string }>> = {
+        dashboard: {
+          label: "Today's Intel",
+          description: 'Best matches + next steps',
+        },
+        alerts: {
+          label: 'Source Feed',
+          description: 'Raw SAM.gov matches',
+        },
+        forecasts: {
+          label: 'Upcoming Buys',
+          description: 'Future procurement signals',
+        },
+        recompetes: {
+          label: 'Expiring Contracts',
+          description: 'Recompete opportunities',
+        },
+        pipeline: {
+          label: 'My Pursuits',
+          description: 'Tracked opportunities',
+        },
+        contacts: {
+          label: 'Relationships',
+          description: 'Buyers + partners',
+        },
+      };
+
+      if (paidLabels[item.id]) return paidLabels[item.id]!;
+    }
+
+    return {
+      label: item.label,
+      description: item.description,
+    };
   };
 
   const tierColors: Record<MIBetaTier, string> = {
@@ -246,6 +284,7 @@ export default function UnifiedSidebarBeta({
                 const isActive = activePanel === item.id;
                 const canAccess = hasAccess(item.tier);
                 const isHovered = hoveredItem === item.id;
+                const display = getItemDisplay(item);
 
                 return (
                   <button
@@ -265,14 +304,14 @@ export default function UnifiedSidebarBeta({
                       }
                       ${isCollapsed ? 'justify-center' : ''}
                     `}
-                    title={isCollapsed ? item.label : undefined}
+                    title={isCollapsed ? display.label : undefined}
                   >
                     <span className="text-lg">{item.icon}</span>
                     {!isCollapsed && (
                       <>
                         <div className="flex-1 text-left">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{item.label}</span>
+                            <span className="text-sm font-medium">{display.label}</span>
                             {item.badge && (
                               <span className="px-1.5 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 rounded">
                                 {item.badge}
@@ -281,7 +320,7 @@ export default function UnifiedSidebarBeta({
                           </div>
                           {(isHovered || isActive) && (
                             <div className="text-xs text-slate-500 mt-0.5">
-                              {item.description}
+                              {display.description}
                             </div>
                           )}
                         </div>

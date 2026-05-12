@@ -8,8 +8,9 @@ function normalizeEmail(email: unknown): string {
   return typeof email === 'string' ? email.toLowerCase().trim() : '';
 }
 
-function getBaseUrl(request: NextRequest): string {
-  return process.env.NEXT_PUBLIC_APP_URL || `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+function getSupabaseAuthRedirectUrl(path: string): string {
+  const authRedirectOrigin = process.env.SUPABASE_AUTH_REDIRECT_ORIGIN || 'https://tools.govcongiants.org';
+  return `${authRedirectOrigin.replace(/\/$/, '')}${path}`;
 }
 
 function getSupabaseAdmin() {
@@ -49,32 +50,54 @@ async function generatePasswordResetLink(email: string, redirectTo: string): Pro
 
 function buildResetEmailHtml(resetUrl: string): string {
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #111827; background: #ffffff;">
-      <div style="background: linear-gradient(135deg, #064e3b, #059669); color: #ffffff; padding: 34px 32px; border-radius: 16px 16px 0 0;">
-        <div style="font-size: 14px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.85;">GovCon Giants</div>
-        <h1 style="font-size: 30px; line-height: 1.15; margin: 10px 0 0;">Market Intelligence</h1>
-        <p style="font-size: 16px; line-height: 1.5; margin: 10px 0 0; opacity: 0.9;">Federal opportunity alerts, briefings, forecasts, and capture intelligence.</p>
+    <div style="margin:0; padding:0; background:#f4f7fb;">
+      <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
+        Create a new password for GovCon Giants Market Intelligence.
       </div>
-      <div style="border: 1px solid #d1d5db; border-top: 0; border-radius: 0 0 16px 16px; padding: 32px;">
-        <h2 style="font-size: 24px; margin: 0 0 14px; color: #0f172a;">Reset your MI password</h2>
-        <p style="font-size: 16px; line-height: 1.6; margin: 0 0 22px; color: #334155;">
-          We received a request to reset your Market Intelligence password. Use the secure link below to create a new password.
-        </p>
-        <p style="font-size: 16px; line-height: 1.6; margin: 0 0 26px; color: #334155;">
-          After resetting, you will sign in with email and password. Two-factor verification is optional for extra protection.
-        </p>
-        <p style="margin: 30px 0;">
-          <a href="${resetUrl}" style="display: inline-block; background: #059669; color: white; padding: 15px 24px; border-radius: 10px; text-decoration: none; font-weight: 700;">
-            Reset MI password
-          </a>
-        </p>
-        <p style="font-size: 14px; line-height: 1.5; color: #64748b; margin: 26px 0 0;">
-          If the button does not work, paste this link into your browser:<br>
-          <a href="${resetUrl}" style="color: #059669; word-break: break-all;">${resetUrl}</a>
-        </p>
-        <p style="font-size: 14px; line-height: 1.5; color: #64748b; margin: 24px 0 0;">
-          If you did not request this reset, you can safely ignore this email.
-        </p>
+      <div style="font-family: Arial, Helvetica, sans-serif; max-width:680px; margin:0 auto; padding:32px 18px; color:#0f172a;">
+        <div style="background:#07111f; border-radius:18px; overflow:hidden; box-shadow:0 18px 45px rgba(15,23,42,0.16);">
+          <div style="padding:34px 34px 30px; background:linear-gradient(135deg,#062f2a 0%,#0b7a5a 55%,#10b981 100%); color:#ffffff;">
+            <div style="font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; opacity:0.82;">GovCon Giants</div>
+            <h1 style="font-size:32px; line-height:1.12; margin:12px 0 8px; font-weight:800;">Market Intelligence</h1>
+            <p style="font-size:16px; line-height:1.5; margin:0; color:#d7ffef;">
+              Federal opportunity alerts, briefings, forecasts, and capture intelligence.
+            </p>
+          </div>
+
+          <div style="background:#ffffff; padding:34px;">
+            <div style="display:inline-block; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; border-radius:999px; padding:7px 12px; font-size:12px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase;">
+              Password reset
+            </div>
+            <h2 style="font-size:28px; line-height:1.2; margin:18px 0 12px; color:#0f172a; font-weight:800;">Choose a new MI password</h2>
+            <p style="font-size:16px; line-height:1.65; margin:0 0 22px; color:#334155;">
+              We received a request to reset your GovCon Giants Market Intelligence password. Use the secure button below to create a new password.
+            </p>
+
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:22px; margin:26px 0;">
+              <p style="font-size:14px; line-height:1.5; margin:0 0 18px; color:#475569;">
+                This link opens the MI reset page and lets you set a new password for email/password sign-in.
+              </p>
+              <a href="${resetUrl}" style="display:block; text-align:center; background:#059669; color:#ffffff; padding:16px 22px; border-radius:10px; text-decoration:none; font-size:16px; font-weight:800;">
+                Reset MI password
+              </a>
+            </div>
+
+            <p style="font-size:14px; line-height:1.6; margin:0 0 16px; color:#64748b;">
+              After resetting, return to <strong style="color:#334155;">mi.govcongiants.com/mi-beta</strong> and sign in with your email and new password.
+            </p>
+
+            <div style="border-top:1px solid #e2e8f0; padding-top:20px; margin-top:24px;">
+              <p style="font-size:13px; line-height:1.6; color:#64748b; margin:0 0 8px;">
+                Button not working? Paste this secure link into your browser:
+              </p>
+              <a href="${resetUrl}" style="color:#047857; font-size:13px; line-height:1.5; word-break:break-all;">${resetUrl}</a>
+            </div>
+
+            <p style="font-size:13px; line-height:1.6; color:#64748b; margin:24px 0 0;">
+              If you did not request this reset, you can ignore this email. Your existing password will stay unchanged.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -89,7 +112,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
     }
 
-    const redirectTo = `${getBaseUrl(request)}/mi-beta/reset-password`;
+    const redirectTo = getSupabaseAuthRedirectUrl('/mi-beta/reset-password');
     const resetUrl = await generatePasswordResetLink(email, redirectTo);
 
     if (resetUrl) {

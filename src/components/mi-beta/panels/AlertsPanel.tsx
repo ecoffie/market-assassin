@@ -48,6 +48,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [totalCount, setTotalCount] = useState(0);
 
   const canUsePipeline = tier !== 'free';
+  const isFreeTier = tier === 'free';
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadAlerts = useCallback(async () => {
@@ -245,15 +246,17 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">Free Daily Alerts</h1>
-            {tier === 'free' && (
+            <h1 className="text-2xl font-bold text-white">{isFreeTier ? 'Free Daily Alerts' : 'SAM Opportunity Feed'}</h1>
+            {isFreeTier && (
               <span className="px-2 py-1 text-xs bg-slate-800 text-slate-300 rounded">
                 Free Service
               </span>
             )}
           </div>
           <p className="text-slate-400 mt-1">
-            Basic SAM.gov opportunities matching your saved filters
+            {isFreeTier
+              ? 'Basic SAM.gov opportunities matching your saved filters'
+              : 'Raw SAM.gov opportunities behind your AI briefings, using your saved profile'}
             {totalCount > 0 && <span className="text-emerald-400 ml-2">({totalCount} found)</span>}
           </p>
         </div>
@@ -266,7 +269,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         </button>
       </div>
 
-      {tier === 'free' && (
+      {isFreeTier ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-white">Daily Alerts is the free feed.</h2>
@@ -280,6 +283,13 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           >
             Compare MI Access
           </a>
+        </div>
+      ) : (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+          <h2 className="text-sm font-semibold text-emerald-200">Included raw feed for paid accounts</h2>
+          <p className="text-sm text-emerald-100/80 mt-1">
+            Use this when you want to search or validate every SAM.gov match. AI Briefings remains the prioritized daily view with summaries and recommendations.
+          </p>
         </div>
       )}
 

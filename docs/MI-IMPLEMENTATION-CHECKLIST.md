@@ -30,7 +30,7 @@
 
 - [ ] Rebrand Supabase Auth email templates to Market Intelligence
 - [ ] Send setup links to existing MI Free and MI Pro users missing Supabase Auth accounts
-- [ ] Add admin account status view for entitlement, identity, profile, setup, and login state
+- [x] Add admin account status view for entitlement, identity, profile, setup, and login state
 - [ ] Finish API/database alignment for forecasts, grants, recompetes, contractors, pipeline, and teaming where beta screens still show fetch errors or stale counts
 - [ ] Redirect old `.org` site paths to the new `.com` site and maintain SEO handoff
 

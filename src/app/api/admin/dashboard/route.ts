@@ -54,6 +54,24 @@ function getSupabase() {
 
 const SUPABASE_PAGE_SIZE = 1000;
 
+async function safeKvGet<T>(key: string, fallback: T | null = null): Promise<T | null> {
+  try {
+    return await kv.get<T>(key);
+  } catch (error) {
+    console.warn(`[Dashboard] KV unavailable for ${key}; using fallback`, error);
+    return fallback;
+  }
+}
+
+async function safeMetric<T>(label: string, getter: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await getter();
+  } catch (error) {
+    console.error(`[Dashboard] ${label} failed; using fallback`, error);
+    return fallback;
+  }
+}
+
 async function fetchAllRows<T>(
   buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>
 ): Promise<T[]> {
@@ -118,21 +136,21 @@ export async function GET(request: NextRequest) {
     alerts,
     profileReminderLastRun
   ] = await Promise.all([
-    getEmailStats(reportDate),
-    getUserHealth(),
-    getWeeklyAlertHealth(),
-    getBetaHealth(),
-    getMiGrowthMetrics(),
-    getOutcomeMetrics(),
-    getProviderEmailHealth(),
-    getMatchingQuality(),
-    getAlertTrend(sevenDaysAgo),
-    getBriefingTrend(sevenDaysAgo),
-    getDeadLetterStats(),
-    getForecastStats(),
-    getRevenueMetrics(),
-    getSystemAlerts(reportDate),
-    kv.get(PROFILE_REMINDER_LAST_RUN_KEY)
+    safeMetric('email stats', () => getEmailStats(reportDate), emptyEmailStats(reportDate)),
+    safeMetric('user health', getUserHealth, emptyUserHealth()),
+    safeMetric('weekly alert health', getWeeklyAlertHealth, emptyWeeklyAlertHealth()),
+    safeMetric('beta health', getBetaHealth, emptyBetaHealth()),
+    safeMetric('MI growth metrics', getMiGrowthMetrics, emptyMiGrowthMetrics()),
+    safeMetric('outcome metrics', getOutcomeMetrics, emptyOutcomeMetrics()),
+    safeMetric('provider email health', getProviderEmailHealth, emptyProviderEmailHealth()),
+    safeMetric('matching quality', getMatchingQuality, emptyMatchingQuality()),
+    safeMetric('alert trend', () => getAlertTrend(sevenDaysAgo), []),
+    safeMetric('briefing trend', () => getBriefingTrend(sevenDaysAgo), []),
+    safeMetric('dead letter stats', getDeadLetterStats, emptyDeadLetterStats()),
+    safeMetric('forecast stats', getForecastStats, emptyForecastStats()),
+    safeMetric('revenue metrics', getRevenueMetrics, { available: false, error: 'Unavailable' }),
+    safeMetric('system alerts', () => getSystemAlerts(reportDate), []),
+    safeKvGet(PROFILE_REMINDER_LAST_RUN_KEY)
   ]);
 
   return NextResponse.json({
@@ -787,6 +805,223 @@ function trendMetric(current: number, previous: number) {
     previous,
     delta: current - previous,
     direction: current > previous ? 'up' : current < previous ? 'down' : 'flat',
+  };
+}
+
+function emptyEmailStats(date: string) {
+  return {
+    date,
+    alerts: { sent: 0, failed: 0, skipped: 0, successRate: 'N/A' },
+    briefings: {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      pending: 0,
+      successRate: 'N/A',
+      byType: { daily: 0, weekly: 0, pursuit: 0 },
+    },
+  };
+}
+
+function emptyUserHealth() {
+  return {
+    totalUsers: 0,
+    naicsConfigured: 0,
+    naicsPercent: 'N/A',
+    defaultNaicsOnly: 0,
+    noNaics: 0,
+    businessTypeSet: 0,
+    businessTypePercent: 'N/A',
+    alertsEnabledTotal: 0,
+    dailyFrequencyConfigured: 0,
+    weeklyFrequencyConfigured: 0,
+    postBetaPaidDailyEligible: 0,
+    postBetaFreeWeeklyFallback: 0,
+    briefingsProfileIncomplete: 0,
+    briefingsProfileIncompleteEmails: [] as string[],
+    briefingsEnabled: 0,
+    briefingsEntitled: 0,
+    briefingsCronEligible: 0,
+    briefingsExpired: 0,
+    internalExcluded: 0,
+    unconfiguredEmails: [] as string[],
+  };
+}
+
+function emptyWeeklyAlertHealth() {
+  const cycle = getWeeklyCycleDates();
+  return {
+    cycleDate: cycle.cycleDate,
+    scheduledAtUtc: cycle.scheduledAtUtc,
+    nextScheduledAtUtc: cycle.nextScheduledAtUtc,
+    eligibleTotal: 0,
+    eligibleWithNaics: 0,
+    explicitWeeklyUsers: 0,
+    freeFallbackUsers: 0,
+    processedFreeFallback: 0,
+    eligibleWithCustomNaics: 0,
+    eligibleWithDefaultNaicsOnly: 0,
+    eligibleNoNaics: 0,
+    processedExplicitWeekly: 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    processed: 0,
+    remaining: 0,
+    successRate: 'N/A',
+    lastSentAt: null as string | null,
+  };
+}
+
+function emptyBetaHealth() {
+  return {
+    weeklyActiveUsers: 0,
+    dailyActiveUsers: 0,
+    dauWauRatio: 'N/A',
+    activeBetaUsers: 0,
+    queueSize: 0,
+    activationRate7d: 'N/A',
+    profileCompletionRate: 'N/A',
+    firstClickUsers7d: 0,
+  };
+}
+
+function emptyProviderEmailHealth() {
+  return {
+    sends7d: 0,
+    delivered7d: 0,
+    opened7d: 0,
+    clicked7d: 0,
+    bounced7d: 0,
+    complained7d: 0,
+    failed7d: 0,
+    deliveryRate: 'N/A',
+    clickRate: 'N/A',
+    complaintRate: 'N/A',
+    topLinks: [] as Array<{ label: string; count: number }>,
+  };
+}
+
+function emptyMatchingQuality() {
+  return {
+    totalFeedback: 0,
+    helpful: 0,
+    notHelpful: 0,
+    helpfulRate: 'N/A',
+    last7Days: { total: 0, helpful: 0, notHelpful: 0, helpfulRate: 'N/A' },
+    byType: {
+      daily: { helpful: 0, notHelpful: 0, helpfulRate: 'N/A' },
+      weekly: { helpful: 0, notHelpful: 0, helpfulRate: 'N/A' },
+      pursuit: { helpful: 0, notHelpful: 0, helpfulRate: 'N/A' },
+    },
+    usersNeedingAttention: 0,
+    repeatNegative: [] as Array<{ email: string; count: number }>,
+    zeroAlertUsers7d: 0,
+    highVolumeUsers7d: 0,
+  };
+}
+
+function emptyMiGrowthMetrics() {
+  return {
+    periodDays: 7,
+    acquisition: {
+      signups: trendMetric(0, 0),
+      profilesCompletedOrUpdated: trendMetric(0, 0),
+    },
+    audience: {
+      totalUsers: 0,
+      activeAlerts: 0,
+      dailyAlerts: 0,
+      weeklyAlerts: 0,
+      customProfiles: 0,
+      defaultProfilesOnly: 0,
+      noProfile: 0,
+      profileCompletionRate: 'N/A',
+      briefingsEntitled: 0,
+      briefingsEligible: 0,
+      briefingsProfileIncomplete: 0,
+    },
+    email: {
+      sent7d: 0,
+      delivered7d: 0,
+      opened7d: 0,
+      clicked7d: 0,
+      openRate: 'N/A',
+      clickRate: 'N/A',
+      topLinks: [] as Array<{ label: string; count: number }>,
+    },
+    app: {
+      activeUsers: trendMetric(0, 0),
+      activeToday: 0,
+      totalEvents7d: 0,
+      totalMinutes7d: 0,
+      avgMinutesPerActiveUser: 0,
+      topAreas: [] as Array<{ area: string; minutes: number; events: number; users: number }>,
+      trackingNote: 'Admin metric unavailable.',
+    },
+    levers: [] as Array<{ priority: 'high' | 'medium' | 'low'; label: string; detail: string }>,
+    definitions: [] as string[],
+  };
+}
+
+function emptyOutcomeMetrics() {
+  return {
+    periodDays: 7,
+    findContracts: {
+      opportunityClicks: 0,
+      uniqueClickers: 0,
+      savedOpportunities: 0,
+      savers: 0,
+      pursuitBriefsRequested: 0,
+      pursuitBriefsSent: 0,
+      topClicked: [] as Array<{ label: string; count: number }>,
+      topAgenciesSaved: [] as Array<{ agency: string; count: number }>,
+    },
+    winContracts: {
+      pipelineItemsCreated: 0,
+      pipelineUsers: 0,
+      pursuing: 0,
+      bidding: 0,
+      submitted: 0,
+      won: 0,
+      lost: 0,
+      dueSoon: 0,
+      totalPipelineValue: 0,
+      whiteGloveHelpRequests: 0,
+      nextActionBreakdown: [] as Array<{ action: string; count: number }>,
+      stageBreakdown: [] as Array<{ stage: string; count: number }>,
+    },
+    experience: {
+      helpfulRate: 'N/A',
+      helpful: 0,
+      notHelpful: 0,
+      zeroAlertUsers7d: 0,
+      highVolumeUsers7d: 0,
+    },
+    verdicts: {
+      findContracts: 'Unavailable',
+      winContracts: 'Unavailable',
+    },
+    levers: [] as Array<{ priority: 'high' | 'medium' | 'low'; label: string; detail: string }>,
+  };
+}
+
+function emptyDeadLetterStats() {
+  return {
+    total: 0,
+    pending: 0,
+    exhausted: 0,
+    resolved: 0,
+    oldestPending: null as string | null,
+  };
+}
+
+function emptyForecastStats() {
+  return {
+    totalForecasts: 0,
+    byAgency: {} as Record<string, number>,
+    samCacheCount: 0,
+    samCacheLastUpdate: null as string | null,
   };
 }
 
@@ -2209,7 +2444,7 @@ async function getSystemAlerts(today: string) {
   const userHealth = await getUserHealth();
   const weeklyAlertHealth = await getWeeklyAlertHealth();
   const deadLetter = await getDeadLetterStats();
-  const profileReminderLastRun = await kv.get<{
+  const profileReminderLastRun = await safeKvGet<{
     summary?: {
       eligibleToSend?: number;
       cursorSkipped?: number;
@@ -2304,7 +2539,7 @@ export async function POST(request: NextRequest) {
       case 'send-test-alert':
         // Trigger test alert to specified email
         const alertResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/cron/daily-alerts?password=${ADMIN_PASSWORD}&testEmail=${email}&skipTimezone=true`
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/cron/daily-alerts?password=${ADMIN_PASSWORD}&email=${encodeURIComponent(email)}&skipTimezone=true&forceResend=true`
         );
         const alertResult = await alertResponse.json();
         return NextResponse.json({ success: true, action: 'send-test-alert', result: alertResult });

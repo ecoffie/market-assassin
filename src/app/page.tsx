@@ -1,8 +1,26 @@
 import Link from "next/link";
+import Script from "next/script";
+import { AuthRecoveryRedirect } from "./AuthRecoveryRedirect";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+      <Script id="auth-recovery-redirect" strategy="beforeInteractive">
+        {`
+          (function () {
+            var hash = window.location.hash || '';
+            if (!hash || hash.charAt(0) !== '#') return;
+            var params = new URLSearchParams(hash.slice(1));
+            if (!params.get('access_token')) return;
+            var type = params.get('type');
+            var path = type === 'recovery'
+              ? '/mi-beta/reset-password'
+              : (type === 'invite' || type === 'signup' ? '/mi-beta/setup-password' : null);
+            if (path) window.location.replace('https://mi.govcongiants.com' + path + hash);
+          })();
+        `}
+      </Script>
+      <AuthRecoveryRedirect />
       {/* Header */}
       <header className="py-8 px-6">
         <div className="max-w-6xl mx-auto text-center">

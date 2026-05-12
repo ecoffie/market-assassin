@@ -141,16 +141,29 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (naics) {
+      const naicsTerms = naics.split(/[, ]+/).map(term => term.trim()).filter(Boolean);
       // Support both exact and prefix matching
-      if (naics.length <= 4) {
-        query = query.ilike('naics_code', `${naics}%`);
-      } else {
-        query = query.eq('naics_code', naics);
+      if (naicsTerms.length > 1) {
+        query = query.or(naicsTerms.map(term => (
+          term.length <= 4 ? `naics_code.ilike.${term}%` : `naics_code.eq.${term}`
+        )).join(','));
+      } else if (naicsTerms[0]) {
+        const term = naicsTerms[0];
+        if (term.length <= 4) {
+          query = query.ilike('naics_code', `${term}%`);
+        } else {
+          query = query.eq('naics_code', term);
+        }
       }
     }
 
     if (agency) {
-      query = query.ilike('source_agency', `%${agency}%`);
+      const agencyTerms = agency.split(',').map(term => term.trim()).filter(Boolean);
+      if (agencyTerms.length > 1) {
+        query = query.or(agencyTerms.map(term => `source_agency.ilike.%${term}%`).join(','));
+      } else if (agencyTerms[0]) {
+        query = query.ilike('source_agency', `%${agencyTerms[0]}%`);
+      }
     }
 
     if (state) {

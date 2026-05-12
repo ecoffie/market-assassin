@@ -21,15 +21,26 @@ export async function GET(request: NextRequest) {
 
   const { workspaceId, member } = await ensureWorkspaceMember(email);
   const supabase = getMIBetaSupabase();
+  const normalizedEmail = normalizeEmail(email);
 
-  const [{ data: members }, { data: settings }, { data: activity }, { data: pipeline }] = await Promise.all([
+  const [{ data: members }, { data: settings }, { data: notificationProfile }, { data: briefingProfile }, { data: activity }, { data: pipeline }] = await Promise.all([
     supabase.from('mi_beta_team_members').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
-    supabase.from('mi_beta_user_settings').select('*').eq('user_email', normalizeEmail(email)).maybeSingle(),
+    supabase.from('mi_beta_user_settings').select('*').eq('user_email', normalizedEmail).maybeSingle(),
+    supabase
+      .from('user_notification_settings')
+      .select('user_email, naics_codes, agencies, keywords, business_type, company_name, aggregated_profile, zip_codes')
+      .eq('user_email', normalizedEmail)
+      .maybeSingle(),
+    supabase
+      .from('user_briefing_profile')
+      .select('user_email, naics_codes, agencies, keywords, company_name, zip_code, certifications, set_aside_preferences, aggregated_profile')
+      .eq('user_email', normalizedEmail)
+      .maybeSingle(),
     supabase.from('mi_beta_activity').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(20),
     supabase
       .from('user_pipeline')
       .select('id,title,agency,stage,priority,next_action,next_action_date,owner_email,response_deadline,teaming_partners')
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${normalizeEmail(email)}`)
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${normalizedEmail}`)
       .order('next_action_date', { ascending: true, nullsFirst: false })
       .limit(100),
   ]);
@@ -62,6 +73,10 @@ export async function GET(request: NextRequest) {
     currentMember: member,
     members: members || [],
     settings,
+    profile: {
+      notification: notificationProfile || null,
+      briefing: briefingProfile || null,
+    },
     activity: activity || [],
     reminders,
   });

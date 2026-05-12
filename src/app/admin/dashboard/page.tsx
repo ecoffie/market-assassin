@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface DashboardData {
   timestamp: string;
@@ -265,6 +265,19 @@ interface ToolAccessSummary {
   uniqueEmails: number;
 }
 
+interface MIAccountSetupSummary {
+  entitledCandidates: number;
+  existingAuthAccounts: number;
+  needsSetup: number;
+  needsProfile?: number;
+  needsAttention?: number;
+  ready?: number;
+  setupEmailsSent?: number;
+  internalUsers?: number;
+  authDirectorySize: number;
+  warnings: number;
+}
+
 type PreviewRecipient = string | { email: string; createdAt?: string | null; updatedAt?: string | null };
 
 function getPreviewEmail(user: PreviewRecipient): string {
@@ -294,6 +307,15 @@ function formatCurrencyCompact(value: number) {
     maximumFractionDigits: 0,
     notation: value >= 1000000 ? 'compact' : 'standard',
   }).format(value);
+}
+
+function formatMinutes(value: number | undefined) {
+  if (!value) return '0m';
+  if (value >= 60) {
+    const hours = value / 60;
+    return `${hours >= 10 ? Math.round(hours) : Math.round(hours * 10) / 10}h`;
+  }
+  return `${Math.round(value * 10) / 10}m`;
 }
 
 function formatNextAction(action: string) {
@@ -418,6 +440,7 @@ function getSystemAlertAction(alert: DashboardData['systemAlerts'][number]) {
 const adminTabs = [
   { href: '/admin/dashboard', label: 'Operations', icon: '📊' },
   { href: '/admin', label: 'Access Control', icon: '🔐' },
+  { href: '/admin/mi-accounts', label: 'MI Accounts', icon: '👥' },
   { href: '/admin/purchases', label: 'Purchases', icon: '💳' },
   { href: '/admin/emails', label: 'Email History', icon: '📧' },
   { href: '/admin/feedback', label: 'Feedback', icon: '💬' },
@@ -432,20 +455,27 @@ export default function AdminDashboard() {
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [profileReminderRun, setProfileReminderRun] = useState<ProfileReminderRun | null>(null);
   const [toolAccessSummary, setToolAccessSummary] = useState<ToolAccessSummary | null>(null);
+  const [miAccountSummary, setMiAccountSummary] = useState<MIAccountSetupSummary | null>(null);
   const [testEmail, setTestEmail] = useState('eric@govcongiants.com');
   const [profileReminderLimit, setProfileReminderLimit] = useState(25);
   const [loadingStep, setLoadingStep] = useState(0);
+  const restoredSession = useRef(false);
 
-  const fetchDashboard = useCallback(async () => {
+  const fetchDashboard = useCallback(async (passwordOverride?: string) => {
+    const adminPassword = passwordOverride || password;
+    if (!adminPassword) return;
+
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/dashboard?password=${password}`, {
+      const res = await fetch(`/api/admin/dashboard?password=${encodeURIComponent(adminPassword)}`, {
         cache: 'no-store',
       });
       if (!res.ok) {
         if (res.status === 401) {
           setAuthenticated(false);
+          sessionStorage.removeItem('adminAuth');
+          sessionStorage.removeItem('adminPassword');
           setError('Invalid password');
           return;
         }
@@ -458,7 +488,7 @@ export default function AdminDashboard() {
       }
       try {
         const accessRes = await fetch('/api/admin/list-access', {
-          headers: { 'x-admin-password': password },
+          headers: { 'x-admin-password': adminPassword },
           cache: 'no-store',
         });
         if (accessRes.ok) {
@@ -486,6 +516,22 @@ export default function AdminDashboard() {
       } catch {
         setToolAccessSummary(null);
       }
+      try {
+        const accountRes = await fetch(`/api/admin/mi-account-setup?password=${encodeURIComponent(adminPassword)}&limit=1`, {
+          cache: 'no-store',
+        });
+        if (accountRes.ok) {
+          const accountData = await accountRes.json();
+          if (accountData.success && accountData.summary) {
+            setMiAccountSummary(accountData.summary);
+          }
+        }
+      } catch {
+        setMiAccountSummary(null);
+      }
+      setPassword(adminPassword);
+      sessionStorage.setItem('adminAuth', 'true');
+      sessionStorage.setItem('adminPassword', adminPassword);
       setAuthenticated(true);
     } catch (e) {
       setError(String(e));
@@ -493,6 +539,17 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   }, [password]);
+
+  useEffect(() => {
+    if (restoredSession.current) return;
+    restoredSession.current = true;
+
+    const storedPassword = sessionStorage.getItem('adminPassword');
+    if (storedPassword) {
+      setPassword(storedPassword);
+      fetchDashboard(storedPassword);
+    }
+  }, [fetchDashboard]);
 
   useEffect(() => {
     // Auto-refresh every 60 seconds if authenticated
@@ -517,7 +574,7 @@ export default function AdminDashboard() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchDashboard();
+    fetchDashboard(password);
   };
 
   const handleAction = async (action: string, extraBody: Record<string, unknown> = {}) => {
@@ -715,7 +772,7 @@ export default function AdminDashboard() {
             <p className="text-gray-400">Last updated: {new Date(data.timestamp).toLocaleString()}</p>
           </div>
           <button
-            onClick={fetchDashboard}
+            onClick={() => fetchDashboard()}
             disabled={loading}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
           >
@@ -846,8 +903,8 @@ export default function AdminDashboard() {
                 </div>
                 <div className="rounded bg-gray-900/60 p-3">
                   <p className="text-xs text-gray-500">Time in MI</p>
-                  <p className="text-2xl font-bold text-white">{appMinutes.toLocaleString()}m</p>
-                  <p className="mt-1 text-xs text-gray-500">{data.miGrowth?.app.avgMinutesPerActiveUser || 0}m/user</p>
+                  <p className="text-2xl font-bold text-white">{formatMinutes(appMinutes)}</p>
+                  <p className="mt-1 text-xs text-gray-500">{formatMinutes(data.miGrowth?.app.avgMinutesPerActiveUser || 0)}/user</p>
                 </div>
               </div>
               <div className="mt-4 space-y-2 text-sm">
@@ -1015,9 +1072,9 @@ export default function AdminDashboard() {
               </div>
               <div className="bg-gray-900/60 rounded-lg p-4">
                 <p className="text-gray-400 text-sm">Time In MI</p>
-                <p className="text-3xl font-bold text-white">{data.miGrowth.app.totalMinutes7d.toLocaleString()}m</p>
+                <p className="text-3xl font-bold text-white">{formatMinutes(data.miGrowth.app.totalMinutes7d)}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {data.miGrowth.app.avgMinutesPerActiveUser}m per active user
+                  {formatMinutes(data.miGrowth.app.avgMinutesPerActiveUser)} per active user
                 </p>
               </div>
             </div>
@@ -1067,7 +1124,7 @@ export default function AdminDashboard() {
                     {data.miGrowth.app.topAreas.map(area => (
                       <div key={area.area} className="flex items-center justify-between gap-3 text-sm">
                         <span className="truncate text-gray-300">{area.area}</span>
-                        <span className="shrink-0 font-mono text-white">{area.minutes}m</span>
+                        <span className="shrink-0 font-mono text-white">{formatMinutes(area.minutes)}</span>
                       </div>
                     ))}
                   </div>
@@ -1301,6 +1358,48 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tool Access Snapshot */}
+        {miAccountSummary && (
+          <div className="bg-gray-800 rounded-lg p-6 mb-8">
+            <div className="flex flex-col gap-2 mb-5 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">MI Account Setup Snapshot</h2>
+                <p className="text-sm text-gray-400">
+                  Entitlement, login identity, profile readiness, and setup-email status for MI beta users.
+                </p>
+              </div>
+              <a href="/admin/mi-accounts" className="rounded bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600">
+                Open MI Accounts
+              </a>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+              <div className="rounded bg-gray-900/60 p-4">
+                <p className="text-xs text-gray-400">Entitled Users</p>
+                <p className="text-2xl font-bold text-white">{miAccountSummary.entitledCandidates.toLocaleString()}</p>
+              </div>
+              <div className="rounded bg-gray-900/60 p-4">
+                <p className="text-xs text-gray-400">Have Login</p>
+                <p className="text-2xl font-bold text-emerald-300">{miAccountSummary.existingAuthAccounts.toLocaleString()}</p>
+              </div>
+              <div className="rounded bg-gray-900/60 p-4">
+                <p className="text-xs text-gray-400">Need Setup</p>
+                <p className="text-2xl font-bold text-amber-300">{miAccountSummary.needsSetup.toLocaleString()}</p>
+              </div>
+              <div className="rounded bg-gray-900/60 p-4">
+                <p className="text-xs text-gray-400">Need Profile</p>
+                <p className="text-2xl font-bold text-blue-300">{(miAccountSummary.needsProfile || 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded bg-gray-900/60 p-4">
+                <p className="text-xs text-gray-400">Setup Emails</p>
+                <p className="text-2xl font-bold text-purple-300">{(miAccountSummary.setupEmailsSent || 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded bg-gray-900/60 p-4">
+                <p className="text-xs text-gray-400">Internal Users</p>
+                <p className="text-2xl font-bold text-cyan-300">{(miAccountSummary.internalUsers || 0).toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {toolAccessSummary && (
           <div className="bg-gray-800 rounded-lg p-6 mb-8">
             <div className="flex flex-col gap-2 mb-5 md:flex-row md:items-start md:justify-between">
@@ -1463,7 +1562,7 @@ export default function AdminDashboard() {
             <div className="flex justify-between items-start gap-4 mb-5">
               <div>
                 <h2 className="text-lg font-semibold text-white">Daily Alerts</h2>
-                <p className="mt-1 text-xs text-gray-500">Completed send date, not a cumulative total.</p>
+                <p className="mt-1 text-xs text-gray-500">Sent on this date. Audience totals live below.</p>
               </div>
               <span className="shrink-0 text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
                 {data.emailOperations.date ? new Date(data.emailOperations.date + 'T00:00:00').toLocaleDateString() : 'Yesterday'}
@@ -1471,7 +1570,9 @@ export default function AdminDashboard() {
             </div>
             <div className="mb-5">
               <p className="text-5xl font-bold text-green-400">{data.emailOperations.alerts.sent.toLocaleString()}</p>
-              <p className="mt-1 text-sm text-gray-400">emails sent on this completed date to {alertAudience.toLocaleString()} active alert users</p>
+              <p className="mt-1 text-sm text-gray-400">
+                sent from {alertProcessed.toLocaleString()} processed users; {alertAudience.toLocaleString()} active alert users total
+              </p>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between">
@@ -1491,7 +1592,7 @@ export default function AdminDashboard() {
                 <span className="text-white font-semibold">{data.emailOperations.alerts.successRate}</span>
               </div>
               <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
-                Lever: profile completion and NAICS quality increase useful matches; failed sends are the reliability risk.
+                This can move down when fewer users qualify for that date, more users are skipped by rules, or the send window is still catching up.
               </p>
             </div>
           </div>
@@ -1815,31 +1916,61 @@ export default function AdminDashboard() {
 
         {/* Second Row - 7-Day Trends */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* 7-Day Alert Trend */}
+          {/* 7-Day Alert Delivery */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">7-Day Alert Trend ($19/mo)</h2>
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-white">7-Day Alert Delivery ($19/mo)</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  Sent emails by completed send date. This is delivery volume, not subscriber growth.
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-green-400">{alertAudience.toLocaleString()}</div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">active alert audience</div>
+              </div>
+            </div>
             {data.trends.alerts.length > 0 ? (
               <div className="space-y-2">
-                {data.trends.alerts.map((day) => (
-                  <div key={day.date} className="flex items-center gap-4">
-                    <span className="text-gray-400 w-24 text-sm">{day.date}</span>
-                    <div className="flex-1 flex items-center gap-2">
-                      <div
-                        className="h-4 bg-green-600 rounded"
-                        style={{ width: `${Math.max(day.sent / 10, 2)}%` }}
-                        title={`Sent: ${day.sent}`}
-                      />
-                      {day.failed > 0 && (
+                {data.trends.alerts.map((day) => {
+                  const processed = day.sent + day.failed + day.skipped;
+                  return (
+                    <div key={day.date} className="flex items-center gap-4">
+                      <span className="text-gray-400 w-24 text-sm">{day.date}</span>
+                      <div className="flex-1 flex items-center gap-2">
                         <div
-                          className="h-4 bg-red-600 rounded"
-                          style={{ width: `${Math.max(day.failed / 10, 2)}%` }}
-                          title={`Failed: ${day.failed}`}
+                          className="h-4 bg-green-600 rounded"
+                          style={{ width: `${Math.max(day.sent / 10, 2)}%` }}
+                          title={`Sent: ${day.sent}`}
                         />
-                      )}
+                        {day.skipped > 0 && (
+                          <div
+                            className="h-4 bg-yellow-500 rounded"
+                            style={{ width: `${Math.max(day.skipped / 10, 2)}%` }}
+                            title={`Skipped by rules or dedupe: ${day.skipped}`}
+                          />
+                        )}
+                        {day.failed > 0 && (
+                          <div
+                            className="h-4 bg-red-600 rounded"
+                            style={{ width: `${Math.max(day.failed / 10, 2)}%` }}
+                            title={`Failed: ${day.failed}`}
+                          />
+                        )}
+                      </div>
+                      <div className="w-24 text-right">
+                        <div className="text-white font-mono text-sm">{day.sent}</div>
+                        {processed !== day.sent && (
+                          <div className="text-[11px] text-gray-500">{processed} processed</div>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-white font-mono text-sm w-12 text-right">{day.sent}</span>
-                  </div>
-                ))}
+                  );
+                })}
+                <p className="text-xs text-gray-500 pt-2">
+                  A lower send day usually means fewer fresh matches, more dedupe/skips, or a partial cron run.
+                  Audience growth is tracked separately in Audience Funnel.
+                </p>
               </div>
             ) : (
               <p className="text-gray-500">No alert data for this period</p>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
+import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 
 interface ForecastsPanelProps {
   email: string | null;
@@ -53,6 +54,12 @@ interface ForecastsStats {
   topNaics: { naics_code: string; naics_title?: string; record_count: number }[];
 }
 
+interface SavedForecastDefaults {
+  naicsCodes: string[];
+  agencies: string[];
+  states: string[];
+}
+
 const AGENCY_COLORS: Record<string, { bg: string; text: string }> = {
   DOE: { bg: 'bg-amber-500/20', text: 'text-amber-400' },
   DOD: { bg: 'bg-blue-500/20', text: 'text-blue-400' },
@@ -88,13 +95,27 @@ function formatDate(dateStr: string | undefined): string {
   }
 }
 
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values
+    .map(value => (value || '').trim())
+    .filter(Boolean)));
+}
+
+function extractNaicsCode(value?: string | null): string {
+  return (value || '').match(/\d{2,6}/)?.[0] || '';
+}
+
 export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
+  void tier;
   const [summary, setSummary] = useState<ForecastsSummary | null>(null);
   const [stats, setStats] = useState<ForecastsStats | null>(null);
   const [forecasts, setForecasts] = useState<Forecast[]>([]);
+  const [profileDefaults, setProfileDefaults] = useState<SavedForecastDefaults | null>(null);
+  const [usingProfileDefaults, setUsingProfileDefaults] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedForecastIds, setExpandedForecastIds] = useState<Set<string>>(new Set());
 
   // Search filters
   const [naicsFilter, setNaicsFilter] = useState('');
@@ -125,28 +146,6 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
     fetchSummary();
   }, [getForecastHeaders]);
 
-  // Load user profile and auto-search
-  useEffect(() => {
-    if (!email) return;
-
-    async function loadProfileAndSearch() {
-      try {
-        const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`);
-        const data = await res.json();
-
-        if (data.success && data.data?.naicsCodes?.length > 0) {
-          const codes = data.data.naicsCodes;
-          setNaicsFilter(codes[0]);
-          handleSearchWithParams(codes[0], '', '');
-        }
-      } catch (err) {
-        console.error('Failed to load profile for forecasts:', err);
-      }
-    }
-
-    loadProfileAndSearch();
-  }, [email]);
-
   const handleSearchWithParams = useCallback(async (naics: string, agency: string, query: string) => {
     if (!naics && !agency && !query) {
       setForecasts([]);
@@ -161,7 +160,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       if (naics) params.append('naics', naics);
       if (agency) params.append('agency', agency);
       if (query) params.append('search', query);
-      params.append('limit', '50');
+      params.append('limit', '200');
 
       const response = await fetch(`/api/forecasts?${params.toString()}`, {
         headers: getForecastHeaders(),
@@ -185,13 +184,93 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
     }
   }, [getForecastHeaders]);
 
+  // Load shared profile and auto-search all saved NAICS/agencies.
+  useEffect(() => {
+    if (!email) return;
+
+    async function loadProfileAndSearch() {
+      try {
+        const [prefsResponse, workspaceResponse] = await Promise.all([
+          fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`),
+          fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email as string)}`, {
+            headers: getForecastHeaders(),
+          }),
+        ]);
+        const [prefs, workspace] = await Promise.all([
+          prefsResponse.json().catch(() => null),
+          workspaceResponse.json().catch(() => null),
+        ]);
+
+        const settings = workspace?.settings || {};
+        const profile = workspace?.profile || {};
+        const defaults: SavedForecastDefaults = {
+          naicsCodes: uniqueStrings([
+            ...(prefs?.data?.naicsCodes || []),
+            ...(settings.naics_codes || []),
+            ...(profile.notification?.naics_codes || []),
+            ...(profile.briefing?.naics_codes || []),
+          ]).map(extractNaicsCode).filter(Boolean),
+          agencies: uniqueStrings([
+            ...(prefs?.data?.targetAgencies || []),
+            ...(settings.target_agencies || []),
+            ...(profile.notification?.agencies || []),
+            ...(profile.briefing?.agencies || []),
+          ]),
+          states: uniqueStrings([
+            ...(prefs?.data?.locationStates || []),
+            prefs?.data?.locationState,
+          ]).map(state => state.toUpperCase()),
+        };
+
+        setProfileDefaults(defaults);
+        const profileNaics = defaults.naicsCodes.join(', ');
+        const profileAgencies = defaults.agencies.join(', ');
+        setNaicsFilter(profileNaics);
+        setUsingProfileDefaults(defaults.naicsCodes.length > 0 || defaults.agencies.length > 0);
+        if (profileNaics || profileAgencies) {
+          handleSearchWithParams(profileNaics, profileAgencies, '');
+        }
+      } catch (err) {
+        console.error('Failed to load profile for forecasts:', err);
+      }
+    }
+
+    loadProfileAndSearch();
+  }, [email, getForecastHeaders, handleSearchWithParams]);
+
   const handleSearch = () => {
+    setUsingProfileDefaults(false);
     handleSearchWithParams(naicsFilter, agencyFilter, searchQuery);
+  };
+
+  const useSavedProfile = () => {
+    const profileNaics = profileDefaults?.naicsCodes.join(', ') || '';
+    const profileAgencies = profileDefaults?.agencies.join(', ') || '';
+    setNaicsFilter(profileNaics);
+    setAgencyFilter('');
+    setSearchQuery('');
+    setUsingProfileDefaults(true);
+    handleSearchWithParams(profileNaics, profileAgencies, '');
   };
 
   const getAgencyColors = (agency: string) => {
     return AGENCY_COLORS[agency] || { bg: 'bg-slate-500/20', text: 'text-slate-400' };
   };
+
+  const toggleForecast = (forecastId: string) => {
+    setExpandedForecastIds(prev => {
+      const next = new Set(prev);
+      if (next.has(forecastId)) {
+        next.delete(forecastId);
+      } else {
+        next.add(forecastId);
+      }
+      return next;
+    });
+  };
+
+  const agencyCoverageCount = summary?.activeSources || stats?.byAgency.length || 0;
+  const agencyCoverageLabel = `${agencyCoverageCount.toLocaleString()} ${agencyCoverageCount === 1 ? 'Agency' : 'Agencies'}`;
 
   if (loading) {
     return (
@@ -211,11 +290,39 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Procurement Forecasts</h1>
-        <p className="text-slate-400 mt-1">
-          Plan ahead with {summary?.totalForecasts.toLocaleString() || '7,700+'} upcoming agency procurements
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Upcoming Buys</h1>
+          <p className="text-slate-400 mt-1">
+            Planned agency purchases that have not hit SAM.gov yet. Use this to get in early before the solicitation drops.
+          </p>
+          {profileDefaults && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                {usingProfileDefaults ? 'Using saved profile' : 'Custom search'}
+              </span>
+              {profileDefaults.naicsCodes.length > 0 && (
+                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                  NAICS {profileDefaults.naicsCodes.slice(0, 4).join(', ')}
+                  {profileDefaults.naicsCodes.length > 4 ? ` +${profileDefaults.naicsCodes.length - 4}` : ''}
+                </span>
+              )}
+              {profileDefaults.agencies.length > 0 && (
+                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                  {profileDefaults.agencies.length} target agencies
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        {profileDefaults && (
+          <button
+            onClick={useSavedProfile}
+            className="px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-sm rounded-lg transition-colors"
+          >
+            Use Saved Profile
+          </button>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -227,7 +334,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                 <span className="text-xl">📊</span>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Total Forecasts</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Upcoming Buys</p>
                 <p className="text-2xl font-bold text-white">{summary.totalForecasts.toLocaleString()}</p>
               </div>
             </div>
@@ -238,8 +345,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                 <span className="text-xl">🏛️</span>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Active Sources</p>
-                <p className="text-2xl font-bold text-white">{summary.activeSources} Agencies</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Agencies Covered</p>
+                <p className="text-2xl font-bold text-white">{agencyCoverageLabel}</p>
+                <p className="text-[11px] text-slate-600 mt-1">Forecast sources with upcoming-buy data</p>
               </div>
             </div>
           </div>
@@ -249,8 +357,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                 <span className="text-xl">💰</span>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Spend Coverage</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Estimated Spend Coverage</p>
                 <p className="text-2xl font-bold text-white">{summary.estimatedSpendCoverage}</p>
+                <p className="text-[11px] text-slate-600 mt-1">Share of forecast records with value data</p>
               </div>
             </div>
           </div>
@@ -259,20 +368,20 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
       {/* Search Form */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Search Forecasts</h3>
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Explore Upcoming Buys</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">NAICS Code</label>
+            <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
             <input
               type="text"
               value={naicsFilter}
               onChange={(e) => setNaicsFilter(e.target.value)}
-              placeholder="541512"
+              placeholder="541512, 236, 238"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Agency</label>
+            <label className="block text-xs text-slate-500 mb-1">Agency Override</label>
             <select
               value={agencyFilter}
               onChange={(e) => setAgencyFilter(e.target.value)}
@@ -321,24 +430,33 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-800">
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-              {forecasts.length} Forecasts Found
+              {forecasts.length} Upcoming Buys Found
             </h3>
           </div>
           <div className="divide-y divide-slate-800">
             {forecasts.map((forecast) => {
               const agencyCode = forecast.agency || forecast.source_agency || 'Unknown';
               const naicsCode = forecast.naics || forecast.naics_code;
+              const naicsDesc = forecast.naicsDescription || forecast.naics_description;
               const setAside = forecast.setAside || forecast.set_aside_type;
               const valueMin = forecast.valueMin || forecast.estimated_value_min;
               const valueMax = forecast.valueMax || forecast.estimated_value_max;
               const valueRange = forecast.valueRange || forecast.estimated_value_range;
               const awardDate = forecast.awardDate || forecast.anticipated_award_date;
+              const fiscalYear = forecast.fiscalYear || forecast.fiscal_year;
+              const state = forecast.state || forecast.pop_state;
               const colors = getAgencyColors(agencyCode);
+              const expanded = expandedForecastIds.has(forecast.id);
 
               return (
                 <div key={forecast.id} className="p-5 hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleForecast(forecast.id)}
+                      className="flex-1 min-w-0 text-left"
+                      aria-expanded={expanded}
+                    >
                       {/* Badges */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors.bg} ${colors.text}`}>
@@ -349,15 +467,33 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                             {setAside}
                           </span>
                         )}
+                        {forecast.contractType && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400">
+                            {forecast.contractType}
+                          </span>
+                        )}
                         {naicsCode && (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300" title={naicsDesc}>
                             NAICS {naicsCode}
+                          </span>
+                        )}
+                        {forecast.psc && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">
+                            PSC {forecast.psc}
+                          </span>
+                        )}
+                        {forecast.status && forecast.status !== 'forecast' && (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
+                            {forecast.status}
                           </span>
                         )}
                       </div>
 
                       {/* Title */}
-                      <h4 className="text-white font-medium mb-1 line-clamp-2">{forecast.title}</h4>
+                      <div className="flex items-start gap-2">
+                        <h4 className="text-white font-medium mb-1 line-clamp-2">{forecast.title}</h4>
+                        <span className="mt-0.5 text-xs text-slate-500">{expanded ? 'Hide' : 'Details'}</span>
+                      </div>
 
                       {/* Department/Office */}
                       {(forecast.department || forecast.office) && (
@@ -368,7 +504,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
                       {/* Description */}
                       {forecast.description && (
-                        <p className="text-slate-500 text-sm line-clamp-2 mb-2">{forecast.description}</p>
+                        <p className={`text-slate-500 text-sm mb-2 ${expanded ? '' : 'line-clamp-2'}`}>
+                          {forecast.description}
+                        </p>
                       )}
 
                       {/* Incumbent */}
@@ -378,10 +516,40 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                           <span className="text-xs text-amber-400 font-medium">{forecast.incumbent}</span>
                         </div>
                       )}
-                    </div>
+
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                        {fiscalYear && (
+                          <span>FY {fiscalYear}{forecast.quarter ? ` ${forecast.quarter}` : ''}</span>
+                        )}
+                        {awardDate && (
+                          <span>Planned award {formatDate(awardDate)}</span>
+                        )}
+                        {state && (
+                          <span>{state}</span>
+                        )}
+                        {naicsDesc && (
+                          <span>{naicsDesc}</span>
+                        )}
+                      </div>
+
+                      {expanded && (
+                        <div className="mt-4 grid gap-3 rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm md:grid-cols-2">
+                          <DetailItem label="Agency" value={forecast.department || agencyCode} />
+                          <DetailItem label="Office" value={forecast.office} />
+                          <DetailItem label="NAICS" value={naicsCode ? `${naicsCode}${naicsDesc ? ` - ${naicsDesc}` : ''}` : naicsDesc} />
+                          <DetailItem label="PSC" value={forecast.psc} />
+                          <DetailItem label="Set-aside" value={setAside} />
+                          <DetailItem label="Contract type" value={forecast.contractType} />
+                          <DetailItem label="Forecast timing" value={[fiscalYear && `FY ${fiscalYear}`, forecast.quarter].filter(Boolean).join(' ')} />
+                          <DetailItem label="Place of performance" value={state} />
+                          <DetailItem label="Incumbent" value={forecast.incumbent} />
+                          <DetailItem label="Status" value={forecast.status} />
+                        </div>
+                      )}
+                    </button>
 
                     {/* Value */}
-                    <div className="text-right shrink-0 min-w-[100px]">
+                    <div className="text-right shrink-0 min-w-[120px] flex flex-col items-end gap-2">
                       {(valueMin || valueMax || valueRange) && (
                         <>
                           <div className="text-lg font-bold text-emerald-400">
@@ -398,6 +566,22 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                           Award: {formatDate(awardDate)}
                         </div>
                       )}
+                      <div className="mt-2 flex flex-col items-end gap-1">
+                        <div className="text-[11px] uppercase tracking-wider text-slate-600">Add to My Pursuits</div>
+                        <SaveToPipelineButton
+                          opportunity={{
+                            title: forecast.title,
+                            noticeId: forecast.id,
+                            solicitationNumber: forecast.id,
+                            agency: agencyCode,
+                            naicsCode: naicsCode || undefined,
+                            setAside: setAside || undefined,
+                            deadline: awardDate || undefined,
+                          }}
+                          email={email || ''}
+                          variant="small"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -471,6 +655,17 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wider text-slate-600">{label}</div>
+      <div className="mt-0.5 text-slate-300">{value}</div>
     </div>
   );
 }

@@ -72,24 +72,39 @@ export async function GET(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
-  const { workspaceId } = await ensureWorkspaceMember(email);
+  const normalizedEmail = email.toLowerCase().trim();
+  const { workspaceId } = await ensureWorkspaceMember(normalizedEmail);
 
   try {
-    let query = getSupabase()
-      .from('user_pipeline')
-      .select('*')
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${email.toLowerCase()}`)
-      .order('response_deadline', { ascending: true, nullsFirst: false });
+    const buildQuery = (useWorkspace: boolean) => {
+      let query = getSupabase()
+        .from('user_pipeline')
+        .select('*');
 
-    if (stage) {
-      query = query.eq('stage', stage);
+      query = useWorkspace
+        ? query.or(`workspace_id.eq.${workspaceId},user_email.eq.${normalizedEmail}`)
+        : query.eq('user_email', normalizedEmail);
+
+      query = query.order('response_deadline', { ascending: true, nullsFirst: false });
+
+      if (stage) {
+        query = query.eq('stage', stage);
+      }
+
+      if (priority) {
+        query = query.eq('priority', priority);
+      }
+
+      return query;
+    };
+
+    let { data: opportunities, error } = await buildQuery(true);
+
+    if (error && (error.code === '42703' || error.message?.includes('workspace_id'))) {
+      const fallback = await buildQuery(false);
+      opportunities = fallback.data;
+      error = fallback.error;
     }
-
-    if (priority) {
-      query = query.eq('priority', priority);
-    }
-
-    const { data: opportunities, error } = await query;
 
     if (error) {
       // Table might not exist yet

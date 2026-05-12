@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 
 type EntitledCandidate = {
@@ -23,6 +23,59 @@ type CandidateRow = {
   access_briefings?: boolean | null;
   briefings_enabled?: boolean | null;
   is_active?: boolean | null;
+  alerts_enabled?: boolean | null;
+  naics_codes?: string[] | null;
+  keywords?: string[] | null;
+  agencies?: string[] | null;
+};
+
+type EmailSendRow = {
+  user_email?: string | null;
+  email_type?: string | null;
+  subject?: string | null;
+  status?: string | null;
+  sent_at?: string | null;
+};
+
+type AuthUserSummary = {
+  email: string;
+  createdAt: string | null;
+  emailConfirmedAt: string | null;
+  lastSignInAt: string | null;
+};
+
+type AccountStatus = 'ready' | 'needs_setup' | 'needs_profile' | 'needs_attention';
+
+type AccountStatusRow = {
+  email: string;
+  status: AccountStatus;
+  recommendedAction: string;
+  sources: string[];
+  isInternal: boolean;
+  auth: {
+    hasAccount: boolean;
+    createdAt: string | null;
+    emailConfirmedAt: string | null;
+    lastSignInAt: string | null;
+  };
+  profile: {
+    exists: boolean;
+    accessBriefings: boolean;
+  };
+  settings: {
+    exists: boolean;
+    isActive: boolean;
+    alertsEnabled: boolean;
+    briefingsEnabled: boolean;
+    hasProfileSignals: boolean;
+  };
+  setupEmail: {
+    sent: boolean;
+    sentAt: string | null;
+    type: string | null;
+    status: string | null;
+    subject: string | null;
+  };
 };
 
 const ENTITLED_BRIEFING_ACCESS = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
@@ -97,8 +150,8 @@ async function fetchAllRows<T>(
   return rows;
 }
 
-async function fetchAuthEmails(supabase: SupabaseClient): Promise<Set<string>> {
-  const emails = new Set<string>();
+async function fetchAuthUsers(supabase: SupabaseClient): Promise<Map<string, AuthUserSummary>> {
+  const usersByEmail = new Map<string, AuthUserSummary>();
   const perPage = 1000;
 
   for (let page = 1; page <= 50; page += 1) {
@@ -111,16 +164,27 @@ async function fetchAuthEmails(supabase: SupabaseClient): Promise<Set<string>> {
     const users = data?.users || [];
     for (const user of users) {
       const email = normalizeEmail(user.email);
-      if (email) emails.add(email);
+      if (email) {
+        usersByEmail.set(email, summarizeAuthUser(user));
+      }
     }
 
     if (users.length < perPage) break;
   }
 
-  return emails;
+  return usersByEmail;
 }
 
-async function fetchEntitledCandidates(supabase: SupabaseClient, warnings: string[]): Promise<EntitledCandidate[]> {
+function summarizeAuthUser(user: User): AuthUserSummary {
+  return {
+    email: normalizeEmail(user.email),
+    createdAt: user.created_at || null,
+    emailConfirmedAt: user.email_confirmed_at || null,
+    lastSignInAt: user.last_sign_in_at || null,
+  };
+}
+
+async function fetchEntitlementData(supabase: SupabaseClient, warnings: string[]) {
   const candidates = new Map<string, Set<string>>();
   const now = Date.now();
 
@@ -140,7 +204,7 @@ async function fetchEntitledCandidates(supabase: SupabaseClient, warnings: strin
     fetchAllRows<CandidateRow>(
       supabase,
       'user_notification_settings',
-      'user_email, briefings_enabled, is_active',
+      'user_email, briefings_enabled, alerts_enabled, is_active, naics_codes, keywords, agencies',
       warnings
     ),
   ]);
@@ -191,9 +255,159 @@ async function fetchEntitledCandidates(supabase: SupabaseClient, warnings: strin
     }
   }
 
-  return Array.from(candidates.entries())
+  const entitledCandidates = Array.from(candidates.entries())
     .map(([email, sources]) => ({ email, sources: Array.from(sources).sort() }))
     .sort((a, b) => a.email.localeCompare(b.email));
+
+  return {
+    candidates: entitledCandidates,
+    profilesByEmail: new Map(profileRows.map((row) => [normalizeEmail(row.email), row])),
+    settingsByEmail: new Map(settingsRows.map((row) => [normalizeEmail(row.user_email), row])),
+  };
+}
+
+async function fetchLatestSetupEmails(
+  supabase: SupabaseClient,
+  emails: string[],
+  warnings: string[]
+): Promise<Map<string, EmailSendRow>> {
+  const latestByEmail = new Map<string, EmailSendRow>();
+  const setupTypes = ['mi_account_setup', 'market_intelligence_welcome', 'profile_reminder'];
+
+  for (let i = 0; i < emails.length; i += 200) {
+    const chunk = emails.slice(i, i + 200);
+    const { data, error } = await supabase
+      .from('email_provider_sends')
+      .select('user_email, email_type, subject, status, sent_at')
+      .in('user_email', chunk)
+      .in('email_type', setupTypes)
+      .order('sent_at', { ascending: false })
+      .limit(1000);
+
+    if (error) {
+      warnings.push(`email_provider_sends: ${error.message}`);
+      return latestByEmail;
+    }
+
+    for (const row of (data || []) as EmailSendRow[]) {
+      const email = normalizeEmail(row.user_email);
+      if (email && !latestByEmail.has(email)) {
+        latestByEmail.set(email, row);
+      }
+    }
+  }
+
+  return latestByEmail;
+}
+
+function hasProfileSignals(settings?: CandidateRow): boolean {
+  if (!settings) return false;
+  return Boolean(
+    settings.naics_codes?.length ||
+    settings.keywords?.length ||
+    settings.agencies?.length
+  );
+}
+
+function getAccountStatus(row: {
+  hasAuth: boolean;
+  hasSettings: boolean;
+  hasProfileSignals: boolean;
+  briefingsEnabled: boolean;
+}): { status: AccountStatus; recommendedAction: string } {
+  if (!row.hasAuth) {
+    return {
+      status: 'needs_setup',
+      recommendedAction: 'Send account setup link and confirm they can create a password.',
+    };
+  }
+
+  if (!row.hasSettings || !row.hasProfileSignals) {
+    return {
+      status: 'needs_profile',
+      recommendedAction: 'Nudge profile setup so alerts and briefings are personalized.',
+    };
+  }
+
+  if (!row.briefingsEnabled) {
+    return {
+      status: 'needs_attention',
+      recommendedAction: 'Review entitlement versus notification settings before outreach.',
+    };
+  }
+
+  return {
+    status: 'ready',
+    recommendedAction: 'No account setup action needed.',
+  };
+}
+
+function buildAccountRows({
+  candidates,
+  authUsers,
+  profilesByEmail,
+  settingsByEmail,
+  setupEmails,
+}: {
+  candidates: EntitledCandidate[];
+  authUsers: Map<string, AuthUserSummary>;
+  profilesByEmail: Map<string, CandidateRow>;
+  settingsByEmail: Map<string, CandidateRow>;
+  setupEmails: Map<string, EmailSendRow>;
+}): AccountStatusRow[] {
+  return candidates.map((candidate) => {
+    const authUser = authUsers.get(candidate.email);
+    const profile = profilesByEmail.get(candidate.email);
+    const settings = settingsByEmail.get(candidate.email);
+    const setupEmail = setupEmails.get(candidate.email);
+    const profileSignals = hasProfileSignals(settings);
+    const accountState = getAccountStatus({
+      hasAuth: Boolean(authUser),
+      hasSettings: Boolean(settings),
+      hasProfileSignals: profileSignals,
+      briefingsEnabled: settings?.briefings_enabled === true,
+    });
+
+    return {
+      email: candidate.email,
+      status: accountState.status,
+      recommendedAction: accountState.recommendedAction,
+      sources: candidate.sources,
+      isInternal: isInternalEmail(candidate.email),
+      auth: {
+        hasAccount: Boolean(authUser),
+        createdAt: authUser?.createdAt || null,
+        emailConfirmedAt: authUser?.emailConfirmedAt || null,
+        lastSignInAt: authUser?.lastSignInAt || null,
+      },
+      profile: {
+        exists: Boolean(profile),
+        accessBriefings: profile?.access_briefings === true,
+      },
+      settings: {
+        exists: Boolean(settings),
+        isActive: settings?.is_active === true,
+        alertsEnabled: settings?.alerts_enabled === true,
+        briefingsEnabled: settings?.briefings_enabled === true,
+        hasProfileSignals: profileSignals,
+      },
+      setupEmail: {
+        sent: Boolean(setupEmail),
+        sentAt: setupEmail?.sent_at || null,
+        type: setupEmail?.email_type || null,
+        status: setupEmail?.status || null,
+        subject: setupEmail?.subject || null,
+      },
+    };
+  }).sort((a, b) => {
+    const statusOrder: Record<AccountStatus, number> = {
+      needs_setup: 0,
+      needs_profile: 1,
+      needs_attention: 2,
+      ready: 3,
+    };
+    return statusOrder[a.status] - statusOrder[b.status] || a.email.localeCompare(b.email);
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -205,26 +419,52 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
     const warnings: string[] = [];
-    const [authEmails, candidates] = await Promise.all([
-      fetchAuthEmails(supabase),
-      fetchEntitledCandidates(supabase, warnings),
+    const [authUsers, entitlementData] = await Promise.all([
+      fetchAuthUsers(supabase),
+      fetchEntitlementData(supabase, warnings),
     ]);
+    const candidates = entitlementData.candidates;
+    const setupEmails = await fetchLatestSetupEmails(
+      supabase,
+      candidates.map((candidate) => candidate.email),
+      warnings
+    );
+    const accounts = buildAccountRows({
+      candidates,
+      authUsers,
+      profilesByEmail: entitlementData.profilesByEmail,
+      settingsByEmail: entitlementData.settingsByEmail,
+      setupEmails,
+    });
 
-    const needsSetup = candidates.filter((candidate) => !authEmails.has(candidate.email));
-    const hasAuth = candidates.filter((candidate) => authEmails.has(candidate.email));
     const sampleLimit = Number(request.nextUrl.searchParams.get('limit') || 500);
+    const byStatus = accounts.reduce<Record<AccountStatus, number>>((acc, row) => {
+      acc[row.status] += 1;
+      return acc;
+    }, {
+      ready: 0,
+      needs_setup: 0,
+      needs_profile: 0,
+      needs_attention: 0,
+    });
 
     return NextResponse.json({
       success: true,
       summary: {
         entitledCandidates: candidates.length,
-        existingAuthAccounts: hasAuth.length,
-        needsSetup: needsSetup.length,
-        authDirectorySize: authEmails.size,
+        existingAuthAccounts: accounts.filter((row) => row.auth.hasAccount).length,
+        needsSetup: byStatus.needs_setup,
+        needsProfile: byStatus.needs_profile,
+        needsAttention: byStatus.needs_attention,
+        ready: byStatus.ready,
+        setupEmailsSent: accounts.filter((row) => row.setupEmail.sent).length,
+        internalUsers: accounts.filter((row) => row.isInternal).length,
+        authDirectorySize: authUsers.size,
         warnings: warnings.length,
       },
-      needsSetup: needsSetup.slice(0, sampleLimit),
-      hasAuth: hasAuth.slice(0, Math.min(sampleLimit, 100)),
+      accounts: accounts.slice(0, sampleLimit),
+      needsSetup: accounts.filter((row) => row.status === 'needs_setup').slice(0, sampleLimit),
+      hasAuth: accounts.filter((row) => row.auth.hasAccount).slice(0, Math.min(sampleLimit, 100)),
       warnings,
     });
   } catch (error) {

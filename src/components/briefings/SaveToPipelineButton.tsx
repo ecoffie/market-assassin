@@ -12,6 +12,8 @@ interface SaveToPipelineButtonProps {
     setAside?: string;
     deadline?: string;
     samLink?: string;
+    valueEstimate?: string;
+    source?: string;
   };
   email: string;
   variant?: 'default' | 'small';
@@ -68,8 +70,9 @@ export function SaveToPipelineButton({
           naics: opportunity.naicsCode,
           setAside: opportunity.setAside,
           deadline: opportunity.deadline,
+          value: opportunity.valueEstimate,
           externalUrl: opportunity.samLink,
-          source: 'briefings_dashboard',
+          source: opportunity.source || 'briefings_dashboard',
           stage: 'tracking',
         }),
       });

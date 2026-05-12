@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import ContractorSalesHistoryDrawer from '../contractors/ContractorSalesHistoryDrawer';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface ContractorsPanelProps {
   email: string | null;
@@ -36,6 +37,11 @@ interface ContractorStats {
   sources: string[];
 }
 
+interface SavedContractorDefaults {
+  naicsCodes: string[];
+  agencies: string[];
+}
+
 function formatCurrency(value: number): string {
   if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -43,9 +49,22 @@ function formatCurrency(value: number): string {
   return `$${value.toLocaleString()}`;
 }
 
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values
+    .map(value => (value || '').trim())
+    .filter(Boolean)));
+}
+
+function extractNaicsCode(value?: string | null): string {
+  return (value || '').match(/\d{2,6}/)?.[0] || '';
+}
+
 export default function ContractorsPanel({ email, tier }: ContractorsPanelProps) {
+  void tier;
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [stats, setStats] = useState<ContractorStats | null>(null);
+  const [profileDefaults, setProfileDefaults] = useState<SavedContractorDefaults | null>(null);
+  const [usingProfileDefaults, setUsingProfileDefaults] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,18 +75,13 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   // Search filters
   const [searchQuery, setSearchQuery] = useState('');
   const [naicsFilter, setNaicsFilter] = useState('');
+  const [profileAgencyFilter, setProfileAgencyFilter] = useState('');
   const [contactFilter, setContactFilter] = useState<'all' | 'withContact' | 'withEmail'>('all');
   const [sortBy, setSortBy] = useState<'contract_value' | 'company' | 'contract_count'>('contract_value');
 
   // Pagination
   const [page, setPage] = useState(0);
   const limit = 25;
-
-  // Load stats on mount
-  useEffect(() => {
-    loadStats();
-    searchContractors('', '', 'all', 'contract_value', 0);
-  }, []);
 
   const loadStats = async () => {
     try {
@@ -84,6 +98,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   const searchContractors = useCallback(async (
     search: string,
     naics: string,
+    agency: string,
     contact: 'all' | 'withContact' | 'withEmail',
     sort: 'contract_value' | 'company' | 'contract_count',
     pageNum: number
@@ -95,6 +110,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (naics) params.set('naics', naics);
+      if (agency) params.set('agency', agency);
       if (contact === 'withContact') params.set('hasContact', 'true');
       if (contact === 'withEmail') params.set('hasEmail', 'true');
       params.set('sortBy', sort);
@@ -123,14 +139,84 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
     }
   }, []);
 
+  // Load stats on mount
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  useEffect(() => {
+    if (!email) {
+      searchContractors('', '', '', 'all', 'contract_value', 0);
+      return;
+    }
+
+    async function loadProfileAndSearch() {
+      try {
+        const [prefsResponse, workspaceResponse] = await Promise.all([
+          fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`),
+          fetch(`/api/mi-beta/workspace?email=${encodeURIComponent(email as string)}`, {
+            headers: getMIApiHeaders(email),
+          }),
+        ]);
+        const [prefs, workspace] = await Promise.all([
+          prefsResponse.json().catch(() => null),
+          workspaceResponse.json().catch(() => null),
+        ]);
+
+        const settings = workspace?.settings || {};
+        const profile = workspace?.profile || {};
+        const defaults: SavedContractorDefaults = {
+          naicsCodes: uniqueStrings([
+            ...(prefs?.data?.naicsCodes || []),
+            ...(settings.naics_codes || []),
+            ...(profile.notification?.naics_codes || []),
+            ...(profile.briefing?.naics_codes || []),
+          ]).map(extractNaicsCode).filter(Boolean),
+          agencies: uniqueStrings([
+            ...(prefs?.data?.targetAgencies || []),
+            ...(settings.target_agencies || []),
+            ...(profile.notification?.agencies || []),
+            ...(profile.briefing?.agencies || []),
+          ]),
+        };
+
+        const profileNaics = defaults.naicsCodes.join(', ');
+        const profileAgencies = defaults.agencies.join(', ');
+        setProfileDefaults(defaults);
+        setNaicsFilter(profileNaics);
+        setProfileAgencyFilter(profileAgencies);
+        setUsingProfileDefaults(defaults.naicsCodes.length > 0 || defaults.agencies.length > 0);
+        searchContractors('', profileNaics, profileAgencies, 'all', 'contract_value', 0);
+      } catch (err) {
+        console.error('Failed to load contractor profile defaults:', err);
+        searchContractors('', '', '', 'all', 'contract_value', 0);
+      }
+    }
+
+    loadProfileAndSearch();
+  }, [email, searchContractors]);
+
   const handleSearch = () => {
     setPage(0);
-    searchContractors(searchQuery, naicsFilter, contactFilter, sortBy, 0);
+    setUsingProfileDefaults(false);
+    setProfileAgencyFilter('');
+    searchContractors(searchQuery, naicsFilter, '', contactFilter, sortBy, 0);
   };
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    searchContractors(searchQuery, naicsFilter, contactFilter, sortBy, newPage);
+    searchContractors(searchQuery, naicsFilter, profileAgencyFilter, contactFilter, sortBy, newPage);
+  };
+
+  const useSavedProfile = () => {
+    const profileNaics = profileDefaults?.naicsCodes.join(', ') || '';
+    const profileAgencies = profileDefaults?.agencies.join(', ') || '';
+    setSearchQuery('');
+    setNaicsFilter(profileNaics);
+    setProfileAgencyFilter(profileAgencies);
+    setUsingProfileDefaults(true);
+    setPage(0);
+    searchContractors('', profileNaics, profileAgencies, contactFilter, sortBy, 0);
   };
 
   const totalPages = Math.ceil(filteredCount / limit);
@@ -158,17 +244,45 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Federal Contractors</h1>
-        <p className="text-slate-400 mt-1">
-          {stats
-            ? `${stats.totalContractors.toLocaleString()} federal contractor records`
-            : 'Federal contractor database'}
-        </p>
-        {stats && (
-          <p className="text-sm text-slate-500 mt-1">
-            {stats.withContact.toLocaleString()} with contact data · {stats.withEmail.toLocaleString()} with email · {stats.withPhone.toLocaleString()} with phone
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Federal Contractors</h1>
+          <p className="text-slate-400 mt-1">
+            {stats
+              ? `${stats.totalContractors.toLocaleString()} federal contractor records`
+              : 'Federal contractor database'}
           </p>
+          {stats && (
+            <p className="text-sm text-slate-500 mt-1">
+              {stats.withContact.toLocaleString()} with contact data · {stats.withEmail.toLocaleString()} with email · {stats.withPhone.toLocaleString()} with phone
+            </p>
+          )}
+          {profileDefaults && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                {usingProfileDefaults ? 'Using saved profile' : 'Custom search'}
+              </span>
+              {profileDefaults.naicsCodes.length > 0 && (
+                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                  NAICS {profileDefaults.naicsCodes.slice(0, 4).join(', ')}
+                  {profileDefaults.naicsCodes.length > 4 ? ` +${profileDefaults.naicsCodes.length - 4}` : ''}
+                </span>
+              )}
+              {profileDefaults.agencies.length > 0 && (
+                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                  {profileDefaults.agencies.length} target agencies
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        {profileDefaults && (
+          <button
+            onClick={useSavedProfile}
+            className="px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-sm rounded-lg transition-colors"
+          >
+            Use Saved Profile
+          </button>
         )}
       </div>
 
@@ -212,12 +326,12 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
 
           {/* NAICS Filter */}
           <div>
-            <label className="block text-xs text-slate-500 mb-1">NAICS Code</label>
+            <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
             <input
               type="text"
               value={naicsFilter}
               onChange={(e) => setNaicsFilter(e.target.value)}
-              placeholder="541512"
+              placeholder="541512, 236, 238"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
             />
           </div>
@@ -261,7 +375,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               onClick={() => {
                 setSortBy(key as typeof sortBy);
                 setPage(0);
-                searchContractors(searchQuery, naicsFilter, contactFilter, key as typeof sortBy, 0);
+                searchContractors(searchQuery, naicsFilter, profileAgencyFilter, contactFilter, key as typeof sortBy, 0);
               }}
               className={`px-3 py-1 text-xs rounded-lg transition-colors ${
                 sortBy === key
@@ -465,9 +579,11 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
             onClick={() => {
               setSearchQuery('');
               setNaicsFilter('');
+              setProfileAgencyFilter('');
+              setUsingProfileDefaults(false);
               setContactFilter('all');
               setPage(0);
-              searchContractors('', '', 'all', 'contract_value', 0);
+              searchContractors('', '', '', 'all', 'contract_value', 0);
             }}
             className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors"
           >
@@ -490,8 +606,10 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
             key={naics}
             onClick={() => {
               setNaicsFilter(naics);
+              setProfileAgencyFilter('');
+              setUsingProfileDefaults(false);
               setPage(0);
-              searchContractors(searchQuery, naics, contactFilter, sortBy, 0);
+              searchContractors(searchQuery, naics, '', contactFilter, sortBy, 0);
             }}
             className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
           >
