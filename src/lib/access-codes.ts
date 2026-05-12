@@ -362,8 +362,14 @@ export async function hasMarketAssassinAccess(email: string): Promise<boolean> {
 
 // Get Market Assassin access details
 export async function getMarketAssassinAccess(email: string): Promise<MarketAssassinAccess | null> {
-  const access = await kv.get<MarketAssassinAccess>(`ma:${email.toLowerCase()}`);
-  return access;
+  try {
+    const access = await kv.get<MarketAssassinAccess>(`ma:${email.toLowerCase()}`);
+    return access;
+  } catch (error) {
+    // KV unavailable (quota exceeded, etc.) - return null to allow fallback behavior
+    console.warn(`[Access] KV unavailable for getMarketAssassinAccess ${email}; returning null`, error);
+    return null;
+  }
 }
 
 // Get Market Assassin tier for an email
