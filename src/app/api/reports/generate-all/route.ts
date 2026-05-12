@@ -48,8 +48,15 @@ export async function POST(request: NextRequest) {
     // Server-side access verification - MI tiers (free/pro/none)
     const auth = await verifyMIAccess(email);
     if (auth.tier === 'none') {
+      console.log('[generate-all] Access denied:', { email, authError: auth.error });
       return NextResponse.json(
-        { success: false, error: auth.error || 'Email required for access' },
+        {
+          success: false,
+          error: auth.error || 'Email required for access',
+          hint: !email
+            ? 'Please sign in to generate reports'
+            : 'Your session may have expired. Please sign in again.',
+        },
         { status: 403 }
       );
     }
@@ -873,9 +880,26 @@ export async function POST(request: NextRequest) {
       accessTier, // Let client know what tier they have
     });
   } catch (error) {
-    console.error('Error generating reports:', error);
+    // Log detailed error for debugging
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('[generate-all] Error:', {
+      message: errorMessage,
+      stack: errorStack?.split('\n').slice(0, 5).join('\n'),
+    });
+
+    // Return more helpful error message
     return NextResponse.json(
-      { success: false, error: 'Failed to generate reports' },
+      {
+        success: false,
+        error: `Failed to generate reports: ${errorMessage}`,
+        // Include hint for common issues
+        hint: errorMessage.includes('fetch') || errorMessage.includes('network')
+          ? 'Network error - please try again'
+          : errorMessage.includes('timeout')
+          ? 'Request timed out - please try again'
+          : 'Please try again or contact support if the issue persists',
+      },
       { status: 500 }
     );
   }

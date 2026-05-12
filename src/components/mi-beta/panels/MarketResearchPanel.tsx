@@ -429,11 +429,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         });
         setGeneratedReports(generated);
       } else {
-        setError(data.error || 'Failed to generate reports');
+        // Show error with hint if available
+        const errorMsg = data.error || 'Failed to generate reports';
+        const hint = data.hint ? ` (${data.hint})` : '';
+        setError(errorMsg + hint);
       }
     } catch (err) {
       console.error('Failed to generate reports:', err);
-      setError('Failed to connect to server');
+      setError('Failed to connect to server. Please check your connection and try again.');
     } finally {
       setIsGenerating(false);
     }
