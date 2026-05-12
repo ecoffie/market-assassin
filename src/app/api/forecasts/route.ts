@@ -190,22 +190,29 @@ export async function GET(request: NextRequest) {
         .from('agency_forecasts')
         .select('*', { count: 'exact', head: true });
 
-      // Get counts by agency
-      const { data: byAgency } = await supabase
-        .from('agency_forecasts')
-        .select('source_agency')
-        .then(async ({ data }) => {
-          if (!data) return { data: [] };
-          const counts: Record<string, number> = {};
-          data.forEach(row => {
-            counts[row.source_agency] = (counts[row.source_agency] || 0) + 1;
-          });
-          return {
-            data: Object.entries(counts)
-              .map(([agency, count]) => ({ agency, count }))
-              .sort((a, b) => b.count - a.count),
-          };
+      // Get counts by agency - paginate through all records to get accurate counts
+      const agencyCounts: Record<string, number> = {};
+      let agencyOffset = 0;
+      const agencyPageSize = 1000;
+      while (true) {
+        const { data: agencyPage } = await supabase
+          .from('agency_forecasts')
+          .select('source_agency')
+          .range(agencyOffset, agencyOffset + agencyPageSize - 1);
+
+        if (!agencyPage || agencyPage.length === 0) break;
+
+        agencyPage.forEach(row => {
+          agencyCounts[row.source_agency] = (agencyCounts[row.source_agency] || 0) + 1;
         });
+
+        if (agencyPage.length < agencyPageSize) break;
+        agencyOffset += agencyPageSize;
+      }
+
+      const byAgency = Object.entries(agencyCounts)
+        .map(([agency, count]) => ({ agency, count }))
+        .sort((a, b) => b.count - a.count);
 
       // Get top NAICS codes
       const { data: topNaics } = await supabase
@@ -213,22 +220,24 @@ export async function GET(request: NextRequest) {
         .select('*')
         .limit(10);
 
-      // Get coverage
+      // Get coverage from forecast_sources (the actual table)
       const { data: coverage } = await supabase
-        .from('forecast_coverage_dashboard')
-        .select('agency_code, total_records, estimated_spend_coverage, health_status')
+        .from('forecast_sources')
+        .select('agency_code, total_records, estimated_spend_coverage, is_active')
         .eq('is_active', true);
 
+      // If no active sources in forecast_sources, count directly from byAgency
+      const activeSources = coverage?.length || byAgency.length;
       const totalCoverage = coverage?.reduce((sum, s) => sum + (s.estimated_spend_coverage || 0), 0) || 0;
 
       return NextResponse.json({
         success: true,
         summary: {
           totalForecasts: totalCount || 0,
-          activeSources: coverage?.length || 0,
+          activeSources,
           estimatedSpendCoverage: `${totalCoverage.toFixed(1)}%`,
         },
-        byAgency: byAgency || [],
+        byAgency,
         topNaics: topNaics || [],
         coverage: coverage || [],
         usage: {
