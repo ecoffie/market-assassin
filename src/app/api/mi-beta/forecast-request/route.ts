@@ -3,10 +3,17 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 function cleanString(value: unknown): string {
   return String(value || '').trim();
@@ -20,7 +27,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('forecast_requests')
     .select('*')
     .eq('user_email', email)
@@ -52,7 +59,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Check for duplicate pending request
-  const { data: existing } = await supabase
+  const { data: existing } = await getSupabase()
     .from('forecast_requests')
     .select('id')
     .eq('user_email', email)
@@ -67,7 +74,7 @@ export async function POST(request: NextRequest) {
     }, { status: 409 });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('forecast_requests')
     .insert({
       user_email: email,
