@@ -169,8 +169,13 @@ export async function validateDatabaseToken(token: string): Promise<{ valid: boo
 
 // Check if an email has database access
 export async function hasEmailDatabaseAccess(email: string): Promise<boolean> {
-  const access = await kv.get(`dbaccess:${email.toLowerCase()}`);
-  return !!access;
+  try {
+    const access = await kv.get(`dbaccess:${email.toLowerCase()}`);
+    return !!access;
+  } catch (error) {
+    console.warn(`[Access] KV unavailable for hasEmailDatabaseAccess ${email}; returning false`, error);
+    return false;
+  }
 }
 
 // Get all database access records for admin
@@ -267,8 +272,13 @@ export async function grantOpportunityHunterProAccess(email: string, customerNam
 
 // Check if an email has Opportunity Hunter Pro access
 export async function hasOpportunityHunterProAccess(email: string): Promise<boolean> {
-  const access = await kv.get(`ospro:${email.toLowerCase()}`);
-  return !!access;
+  try {
+    const access = await kv.get(`ospro:${email.toLowerCase()}`);
+    return !!access;
+  } catch (error) {
+    console.warn(`[Access] KV unavailable for hasOpportunityHunterProAccess ${email}; returning false`, error);
+    return false;
+  }
 }
 
 // Get Opportunity Hunter Pro access details
@@ -615,8 +625,13 @@ export async function grantContentGeneratorAccess(
 
 // Check if an email has Content Reaper access
 export async function hasContentGeneratorAccess(email: string): Promise<boolean> {
-  const access = await kv.get(`contentgen:${email.toLowerCase()}`);
-  return !!access;
+  try {
+    const access = await kv.get(`contentgen:${email.toLowerCase()}`);
+    return !!access;
+  } catch (error) {
+    console.warn(`[Access] KV unavailable for hasContentGeneratorAccess ${email}; returning false`, error);
+    return false;
+  }
 }
 
 // Get Content Reaper access details
@@ -707,8 +722,13 @@ export async function grantRecompeteAccess(
 
 // Check if an email has Recompete access
 export async function hasRecompeteAccess(email: string): Promise<boolean> {
-  const access = await kv.get(`recompete:${email.toLowerCase()}`);
-  return !!access;
+  try {
+    const access = await kv.get(`recompete:${email.toLowerCase()}`);
+    return !!access;
+  } catch (error) {
+    console.warn(`[Access] KV unavailable for hasRecompeteAccess ${email}; returning false`, error);
+    return false;
+  }
 }
 
 // Get Recompete access details

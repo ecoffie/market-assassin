@@ -40,8 +40,13 @@ export async function hasBriefingsAccess(email: string): Promise<boolean> {
   const normalizedEmail = email.toLowerCase().trim();
   if (!normalizedEmail) return false;
 
-  const kvAccess = await kv.get(`briefings:${normalizedEmail}`);
-  if (kvAccess) return true;
+  try {
+    const kvAccess = await kv.get(`briefings:${normalizedEmail}`);
+    if (kvAccess) return true;
+  } catch (error) {
+    console.warn(`[Briefings Access] KV unavailable for hasBriefingsAccess ${normalizedEmail}; checking Supabase only`, error);
+    // Continue to check Supabase entitlement as fallback
+  }
 
   return hasBriefingsEntitlement(normalizedEmail);
 }
@@ -50,12 +55,22 @@ export async function grantBriefingsAccess(email: string): Promise<void> {
   const normalizedEmail = email.toLowerCase().trim();
   if (!normalizedEmail) return;
 
-  await kv.set(`briefings:${normalizedEmail}`, 'true');
+  try {
+    await kv.set(`briefings:${normalizedEmail}`, 'true');
+  } catch (error) {
+    console.warn(`[Briefings Access] KV unavailable for grantBriefingsAccess ${normalizedEmail}`, error);
+    // Grant operation failed but don't throw - caller can proceed
+  }
 }
 
 export async function revokeBriefingsAccess(email: string): Promise<void> {
   const normalizedEmail = email.toLowerCase().trim();
   if (!normalizedEmail) return;
 
-  await kv.del(`briefings:${normalizedEmail}`);
+  try {
+    await kv.del(`briefings:${normalizedEmail}`);
+  } catch (error) {
+    console.warn(`[Briefings Access] KV unavailable for revokeBriefingsAccess ${normalizedEmail}`, error);
+    // Revoke operation failed but don't throw
+  }
 }
