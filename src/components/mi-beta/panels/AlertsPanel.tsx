@@ -246,17 +246,17 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">{isFreeTier ? 'Free Daily Alerts' : 'SAM Opportunity Feed'}</h1>
+            <h1 className="text-2xl font-bold text-white">{isFreeTier ? 'Daily Alerts' : 'Source Feed'}</h1>
             {isFreeTier && (
               <span className="px-2 py-1 text-xs bg-slate-800 text-slate-300 rounded">
-                Free Service
+                Free
               </span>
             )}
           </div>
           <p className="text-slate-400 mt-1">
             {isFreeTier
-              ? 'Basic SAM.gov opportunities matching your saved filters'
-              : 'Raw SAM.gov opportunities behind your AI briefings, using your saved profile'}
+              ? 'SAM.gov opportunities matching your profile'
+              : 'Raw SAM.gov data layer behind Today\'s Intel'}
             {totalCount > 0 && <span className="text-emerald-400 ml-2">({totalCount} found)</span>}
           </p>
         </div>

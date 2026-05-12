@@ -406,15 +406,45 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none"
             />
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
             <button
               onClick={handleSearch}
               disabled={searching || (!naicsFilter && !agencyFilter && !searchQuery)}
-              className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+              className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
             >
               {searching ? 'Searching...' : 'Search'}
             </button>
           </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-800">
+          {(naicsFilter || agencyFilter || searchQuery) && (
+            <button
+              onClick={() => {
+                setNaicsFilter('');
+                setAgencyFilter('');
+                setSearchQuery('');
+                setForecasts([]);
+              }}
+              className="text-sm text-slate-400 hover:text-white"
+            >
+              Clear Filters
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setNaicsFilter('');
+              setAgencyFilter('');
+              setSearchQuery('');
+              handleSearch();
+            }}
+            disabled={searching}
+            className="text-sm text-amber-400 hover:text-amber-300"
+          >
+            View All Forecasts →
+          </button>
+          {usingProfileDefaults && (
+            <span className="text-xs text-slate-500">Using saved profile NAICS</span>
+          )}
         </div>
       </div>
 

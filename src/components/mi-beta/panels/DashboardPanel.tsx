@@ -391,9 +391,9 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
       <div className="p-6">
         <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center">
           <div className="text-4xl mb-4">📊</div>
-          <h2 className="text-2xl font-bold text-white mb-3">AI Briefings</h2>
+          <h2 className="text-2xl font-bold text-white mb-3">Today&apos;s Intel</h2>
           <p className="text-slate-400 mb-6 max-w-md mx-auto">
-            Upgrade to unlock daily briefings, weekly deep dives, pursuit intelligence, and the SAM-cache dashboard.
+            Upgrade to unlock AI-prioritized opportunities, weekly deep dives, pursuit briefs, and full intelligence.
           </p>
           <a
             href="/market-intelligence"
