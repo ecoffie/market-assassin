@@ -70,7 +70,7 @@ No decision fatigue. Clear upgrade path.
 
 **Domain Structure (May 2026):**
 - `govcongiants.com` → Marketing/SEO (govcon-funnels)
-- `mi.govcongiants.com` → SaaS app (market-assassin)
+- `mi.govcongiants.com` → SaaS app (market-assassin) — **migrating to `getmindy.ai`**
 - `shop.govcongiants.com` → KILLED (redirect to /pricing)
 - See `docs/strategy/DOMAIN-BRAND-CONSOLIDATION.md` for full plan
 

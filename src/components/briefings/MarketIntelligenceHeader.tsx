@@ -34,11 +34,11 @@ export default function MarketIntelligenceHeader({
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">MI</span>
+              <span className="text-white font-bold text-lg">M</span>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Market Intelligence</h1>
-              <p className="text-xs text-gray-400">GovCon Giants</p>
+              <h1 className="text-lg font-bold text-white">Mindy</h1>
+              <p className="text-xs text-gray-400">by GovCon Giants</p>
             </div>
           </div>
 

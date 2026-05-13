@@ -1,18 +1,21 @@
 # Canonical Domain Route Map
 
-Status: Draft operating rule  
-Last updated: May 10, 2026
+Status: Draft operating rule
+Last updated: May 13, 2026
 
 ## Core Rule
 
-GovCon Giants now has two primary surfaces:
+GovCon Giants now has three primary surfaces:
 
 | Surface | Domain | Job |
 | --- | --- | --- |
 | Public website | `https://govcongiants.com` | SEO, sales pages, pricing, content, public contractor pages, launch pages, and conversion CTAs |
-| MI platform | `https://mi.govcongiants.com` | Market Intelligence app, account setup, login, briefings, alerts, forecasts, recompetes, contractors, pipeline, teaming, proposal workflows, and internal/admin dashboards |
+| Mindy platform | `https://getmindy.ai` | **Primary** Mindy SaaS app — standalone brand for exit-ready positioning |
+| MI platform (legacy) | `https://mi.govcongiants.com` | **Redirects to getmindy.ai** — kept for backwards compatibility |
 
-Everything new should use one of those two domains. `.org`, `tools.govcongiants.org`, and old shop links are transition surfaces only.
+> **Update (May 13, 2026):** The MI platform is rebranding to "Mindy" with its own domain `getmindy.ai`. This positions Mindy as a standalone product for potential acquisition. The `mi.govcongiants.com` subdomain will redirect to `getmindy.ai`.
+
+Everything new should use `govcongiants.com` (public/marketing) or `getmindy.ai` (product/app). The `.org`, `tools.govcongiants.org`, `mi.govcongiants.com`, and old shop links are transition/redirect surfaces only.
 
 ## Public Website Routes
 

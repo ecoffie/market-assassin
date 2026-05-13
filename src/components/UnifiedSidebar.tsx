@@ -148,10 +148,10 @@ const navigation: NavSection[] = [
 
 // Tier display info
 const tierInfo: Record<MITier, { name: string; price: string; color: string }> = {
-  free: { name: 'MI Free', price: '$0', color: 'gray' },
-  pro: { name: 'MI Pro', price: '$149/mo', color: 'emerald' },
-  team: { name: 'MI Team', price: '$499/mo', color: 'blue' },
-  enterprise: { name: 'MI Enterprise', price: 'Contact Sales', color: 'amber' },
+  free: { name: 'Mindy Free', price: '$0', color: 'gray' },
+  pro: { name: 'Mindy Pro', price: '$149/mo', color: 'emerald' },
+  team: { name: 'Mindy Team', price: '$499/mo', color: 'blue' },
+  enterprise: { name: 'Mindy Enterprise', price: 'Contact Sales', color: 'amber' },
 };
 
 // Check if user has access to a feature based on their tier
@@ -228,7 +228,7 @@ export default function UnifiedSidebar({
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
               <div className={`w-8 h-8 rounded-lg bg-gradient-to-br from-${currentTierInfo.color}-500 to-${currentTierInfo.color}-700 flex items-center justify-center`}>
-                <span className="text-white font-bold text-sm">MI</span>
+                <span className="text-white font-bold text-sm">M</span>
               </div>
               <div className="text-left">
                 <span className="text-white font-semibold text-sm block">{currentTierInfo.name}</span>
@@ -242,7 +242,7 @@ export default function UnifiedSidebar({
               className="mx-auto hover:opacity-80 transition-opacity"
             >
               <div className={`w-8 h-8 rounded-lg bg-gradient-to-br from-${currentTierInfo.color}-500 to-${currentTierInfo.color}-700 flex items-center justify-center`}>
-                <span className="text-white font-bold text-sm">MI</span>
+                <span className="text-white font-bold text-sm">M</span>
               </div>
             </button>
           )}

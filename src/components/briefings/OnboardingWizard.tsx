@@ -305,15 +305,15 @@ export default function OnboardingWizard({
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
-              <span className="text-white font-bold text-xl">MI</span>
+              <span className="text-white font-bold text-xl">M</span>
             </div>
             <div className="text-left">
-              <h1 className="text-2xl font-bold text-white">Market Intelligence</h1>
-              <p className="text-purple-400 text-sm">Setup your briefing profile</p>
+              <h1 className="text-2xl font-bold text-white">Meet Mindy</h1>
+              <p className="text-purple-400 text-sm">Let&apos;s set up your briefings</p>
             </div>
           </div>
           <p className="text-gray-400 max-w-md mx-auto">
-            Tell us about your business so we can deliver personalized GovCon intelligence.
+            Tell Mindy about your business so she can deliver personalized intelligence every morning.
           </p>
         </div>
 

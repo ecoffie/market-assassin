@@ -36,8 +36,10 @@ Consolidate all GovCon Giants properties under the `.com` brand with a unified M
 | Purpose | URL | Codebase |
 |---------|-----|----------|
 | **Marketing/SEO** | `govcongiants.com` / `www.govcongiants.com` | govcon-funnels |
-| **MI SaaS Platform** | `mi.govcongiants.com` | market-assassin |
+| **Mindy SaaS Platform** | `getmindy.ai` (primary) / `mi.govcongiants.com` (redirect) | market-assassin |
 | **Shop** | KILLED | Redirect to `/pricing` or MI offer pages |
+
+> **Update (May 13, 2026):** Mindy is now a standalone brand with its own domain `getmindy.ai`. The `mi.govcongiants.com` subdomain will redirect to `getmindy.ai` as part of the exit-ready decoupling strategy.
 
 **Canonical rule:** no new page should be introduced on `.org`, `tools.govcongiants.org`, or `shop.govcongiants.*`. Public brand, sales, content, and SEO pages go on `govcongiants.com`. Product/app/admin pages go on `mi.govcongiants.com`.
 

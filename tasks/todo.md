@@ -1,5 +1,53 @@
 # GovCon Giants - Current Tasks
 
+## Session State (May 13, 2026)
+
+### ✅ COMPLETED: Infrastructure Upgrades
+
+**Status:** Done (May 13, 2026)
+
+**What Was Done:**
+
+1. **Daily Alerts Schedule Moved Earlier**
+   - Old: 7:00 AM - 11:40 AM ET
+   - New: **1:00 AM - 6:00 AM ET**
+   - Users now wake up with alerts already in inbox
+
+2. **Upstash KV Upgraded to Pay As You Go**
+   - Fixed 141 failed alerts from "ERR max requests limit exceeded"
+   - No more 500K/month request limit
+   - Cost: ~$0.20 per 100K commands (~$2-5/month at current usage)
+
+3. **Upstash QStash Installed (Pay As You Go)**
+   - 500K messages/day capacity
+   - Ready for future queue-based architecture to scale to 100K users
+   - Environment variables connected to market-assassin project
+
+---
+
+### 🔮 BACKLOG: Infrastructure Scaling (When Needed)
+
+**Status:** Deferred - KV upgrade solved immediate issue
+
+#### QStash Queue Architecture (For 10K+ Users)
+Replace multiple Vercel crons with queue-based processing:
+- 1 cron enqueues all users → QStash processes in parallel
+- Eliminates 100-cron Vercel limit
+- Better retry handling and observability
+
+**When to implement:** When approaching 10K users or hitting cron limits
+
+#### Supabase-Backed Access Links (Cost Optimization)
+Move access link tokens from KV to Supabase:
+- Store hashed tokens in `mi_access_links` table
+- KV becomes optional cache only
+- Adds audit trail of link usage
+- Eliminates KV dependency for critical auth flow
+
+**When to implement:** If KV costs become significant or need audit logging
+
+---
+
 ## Session State (May 9, 2026)
 
 ### TODO: MI Operating System - Skills and Agents
@@ -12,7 +60,7 @@ We are turning repeated founder/team workflows into reusable skills, tools, and 
 
 **Status:** Active direction as of May 10, 2026
 
-Everything new should use the `.com` brand system moving forward. Public website, SEO, sales, pricing, content, and launch pages live on `govcongiants.com`. The MI SaaS platform lives on `mi.govcongiants.com` and replaces `tools.govcongiants.org`. `.org`, `tools.govcongiants.org`, and shop domains are transition/redirect surfaces only.
+Everything new should use the `.com` brand system moving forward. Public website, SEO, sales, pricing, content, and launch pages live on `govcongiants.com`. The MI SaaS platform lives on `mi.govcongiants.com` (migrating to `getmindy.ai`) and replaces `tools.govcongiants.org`. `.org`, `tools.govcongiants.org`, and shop domains are transition/redirect surfaces only.
 
 **Next actions:**
 - [x] Create the canonical route map: public pages on `govcongiants.com`; app/admin/account pages on `mi.govcongiants.com`.
@@ -20,7 +68,7 @@ Everything new should use the `.com` brand system moving forward. Public website
 - [ ] Add compatibility redirects from `.org`, `tools`, and `shop` only after the matching `.com` or `mi.govcongiants.com` destination path exists.
 - [ ] Update email templates and generated links: sales/content CTAs to `govcongiants.com`, product/account CTAs to `mi.govcongiants.com`.
 - [ ] Update social, YouTube, LinkedIn, IG, coaching scripts, launch plans, and team briefs to use the correct `.com` role.
-- [ ] Keep `mi.govcongiants.com` as the primary MI platform domain.
+- [ ] Migrate MI platform to `getmindy.ai` (domain purchased May 13, 2026).
 
 **New specs:**
 - `tasks/CANONICAL-DOMAIN-ROUTE-MAP.md` - Canonical domain and route ownership map for `.com`, `mi.govcongiants.com`, and legacy redirect surfaces.
