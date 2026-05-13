@@ -5,6 +5,8 @@
  * POST /api/contacts - Create contact
  * PATCH /api/contacts - Update contact
  * DELETE /api/contacts?id=xxx&email=user@example.com - Delete contact
+ *
+ * SECURITY: All endpoints require verified user auth (session, token, or cookie).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,6 +18,7 @@ import {
   deleteContact,
   searchContacts,
 } from '@/lib/unified-platform';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // GET - List or search contacts
 export async function GET(request: NextRequest) {
@@ -32,9 +35,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     // Get single contact by ID
     if (id) {
-      const contact = await getContact(id, email);
+      const contact = await getContact(id, auth.email!);
       if (!contact) {
         return NextResponse.json(
           { success: false, error: 'Contact not found' },
@@ -46,12 +58,12 @@ export async function GET(request: NextRequest) {
 
     // Search contacts
     if (search) {
-      const contacts = await searchContacts(email, search);
+      const contacts = await searchContacts(auth.email!, search);
       return NextResponse.json({ success: true, contacts, count: contacts.length });
     }
 
     // List all contacts
-    const contacts = await getContacts(email);
+    const contacts = await getContacts(auth.email!);
     return NextResponse.json({ success: true, contacts, count: contacts.length });
   } catch (error) {
     console.error('GET /api/contacts error:', error);
@@ -74,8 +86,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, body.user_email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const contact = await createContact({
-      user_email: body.user_email,
+      user_email: auth.email!,
       name: body.name,
       email: body.email,
       phone: body.phone,
@@ -109,7 +130,16 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const contact = await updateContact(body.id, body.user_email, {
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, body.user_email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const contact = await updateContact(body.id, auth.email!, {
       name: body.name,
       email: body.email,
       phone: body.phone,
@@ -144,7 +174,16 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await deleteContact(id, email);
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    await deleteContact(id, auth.email!);
     return NextResponse.json({ success: true, message: 'Contact deleted' });
   } catch (error) {
     console.error('DELETE /api/contacts error:', error);

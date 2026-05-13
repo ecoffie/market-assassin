@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { canGenerateReport, incrementReportUsage } from '@/lib/access-codes';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // GET - Check user's current usage
 export async function GET(request: NextRequest) {
@@ -14,7 +15,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const usageInfo = await canGenerateReport(email);
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const usageInfo = await canGenerateReport(auth.email!);
 
     return NextResponse.json({
       success: true,
@@ -41,8 +51,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     // First check if they can generate
-    const canGenerate = await canGenerateReport(email);
+    const canGenerate = await canGenerateReport(auth.email!);
 
     if (!canGenerate.allowed) {
       return NextResponse.json(
@@ -57,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Increment usage
-    const usage = await incrementReportUsage(email);
+    const usage = await incrementReportUsage(auth.email!);
 
     return NextResponse.json({
       success: true,

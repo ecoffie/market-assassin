@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,6 +49,14 @@ export async function GET(request: NextRequest) {
   if (!email || !title) {
     return NextResponse.redirect(
       new URL('/pipeline/error?reason=missing_params', request.url)
+    );
+  }
+
+  // SECURITY: Verify user owns this email (via signed token or cookie)
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.redirect(
+      new URL('/pipeline/error?reason=unauthorized', request.url)
     );
   }
 
@@ -142,6 +151,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     // Check for existing
     let existingQuery = getSupabase()
       .from('user_pipeline')
@@ -227,6 +245,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'email, pipelineId, and nextAction are required' },
         { status: 400 }
+      );
+    }
+
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
       );
     }
 

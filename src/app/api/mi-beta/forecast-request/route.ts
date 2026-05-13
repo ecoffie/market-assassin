@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,15 +23,21 @@ function cleanString(value: unknown): string {
 // GET: List user's forecast requests
 export async function GET(request: NextRequest) {
   const email = cleanString(request.nextUrl.searchParams.get('email'));
-  
+
   if (!email) {
     return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
+  }
+
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
   const { data, error } = await getSupabase()
     .from('forecast_requests')
     .select('*')
-    .eq('user_email', email)
+    .eq('user_email', auth.email!)
     .order('created_at', { ascending: false })
     .limit(50);
 
@@ -54,6 +61,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
   }
 
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  }
+
   if (!agency) {
     return NextResponse.json({ success: false, error: 'Agency is required' }, { status: 400 });
   }
@@ -62,7 +75,7 @@ export async function POST(request: NextRequest) {
   const { data: existing } = await getSupabase()
     .from('forecast_requests')
     .select('id')
-    .eq('user_email', email)
+    .eq('user_email', auth.email!)
     .eq('agency', agency)
     .eq('status', 'pending')
     .maybeSingle();
@@ -77,7 +90,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await getSupabase()
     .from('forecast_requests')
     .insert({
-      user_email: email,
+      user_email: auth.email!,
       agency,
       office: office || null,
       naics_code: naicsCode || null,

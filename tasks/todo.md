@@ -1,615 +1,135 @@
-# GovCon Giants - Current Tasks
+# GovCon Giants - Tasks by Priority
 
-## Session State (May 13, 2026)
-
-### ✅ COMPLETED: Infrastructure Upgrades
-
-**Status:** Done (May 13, 2026)
-
-**What Was Done:**
-
-1. **Daily Alerts Schedule Moved Earlier**
-   - Old: 7:00 AM - 11:40 AM ET
-   - New: **1:00 AM - 6:00 AM ET**
-   - Users now wake up with alerts already in inbox
-
-2. **Upstash KV Upgraded to Pay As You Go**
-   - Fixed 141 failed alerts from "ERR max requests limit exceeded"
-   - No more 500K/month request limit
-   - Cost: ~$0.20 per 100K commands (~$2-5/month at current usage)
-
-3. **Upstash QStash Installed (Pay As You Go)**
-   - 500K messages/day capacity
-   - Ready for future queue-based architecture to scale to 100K users
-   - Environment variables connected to market-assassin project
+**Last Updated:** May 13, 2026
 
 ---
 
-### 🔮 BACKLOG: Infrastructure Scaling (When Needed)
+## P0 - CRITICAL (This Week)
 
-**Status:** Deferred - KV upgrade solved immediate issue
+### API Security Audit (68 Routes)
+**Status:** Audit script exists, need to classify routes
 
-#### QStash Queue Architecture (For 10K+ Users)
-Replace multiple Vercel crons with queue-based processing:
-- 1 cron enqueues all users → QStash processes in parallel
-- Eliminates 100-cron Vercel limit
-- Better retry handling and observability
+**Why Critical:** Security risk - customer data may be exposed. Real vulnerability.
 
-**When to implement:** When approaching 10K users or hitting cron limits
+**Run:** `npm run audit:api-auth`
 
-#### Supabase-Backed Access Links (Cost Optimization)
-Move access link tokens from KV to Supabase:
-- Store hashed tokens in `mi_access_links` table
-- KV becomes optional cache only
-- Adds audit trail of link usage
-- Eliminates KV dependency for critical auth flow
+- [ ] Group routes by: public/token/admin/MI user
+- [ ] Harden highest-risk routes first (write, admin, paid-data)
+- [ ] Add intentional public routes to allowlist
+- [ ] Re-run until all routes classified
 
-**When to implement:** If KV costs become significant or need audit logging
+**Classification:**
+| Class | Protection |
+|-------|------------|
+| Public | Explicit allowlist |
+| Token protected | Secret/password validation |
+| Admin only | Admin password gate |
+| MI user protected | MI auth session check |
 
 ---
 
-## Session State (May 9, 2026)
+## P1 - HIGH (This Sprint)
 
-### TODO: MI Operating System - Skills and Agents
+### MI Operating System - Skills and Agents
+**Status:** Started (specs written, PRDs created)
 
-**Status:** Started
+**Why High:** Foundation for scalable team operations.
 
-We are turning repeated founder/team workflows into reusable skills, tools, and agent specs so launch planning, dashboard alignment, customer outreach, and MI growth ops do not depend on one-off chat threads.
+**Next Actions:**
+- [ ] Review MI Operating System Roadmap (`tasks/MI-OPERATING-SYSTEM-ROADMAP.md`)
+- [ ] Review Dashboard Clarity Skill with current admin dashboard
+- [ ] Use Launch Memo Skill for May 30 bootcamp/MI launch
+- [ ] Generate Annelle/Sikander qualified outreach list via Customer Qualification Agent
+- [ ] Identify Eric's next founder-call list via 10-10 Forever Customer Strategy
 
-### TODO: Canonical `.com` + MI Platform Migration
+### Wire MI Internal Launch Command Center
+**Status:** V1 shell built at `/admin/launch-command-center`
 
-**Status:** Active direction as of May 10, 2026
+- [ ] Connect to Supabase (user activity, purchases)
+- [ ] Connect to Stripe (subscriptions, charges)
+- [ ] Connect email engagement metrics
+- [ ] Connect MI app activity data
+- [ ] Add owner-updated launch action tracking
 
-Everything new should use the `.com` brand system moving forward. Public website, SEO, sales, pricing, content, and launch pages live on `govcongiants.com`. The MI SaaS platform lives on `mi.govcongiants.com` (migrating to `getmindy.ai`) and replaces `tools.govcongiants.org`. `.org`, `tools.govcongiants.org`, and shop domains are transition/redirect surfaces only.
+### Update Email Templates for Correct Domains
+**Status:** Needed for domain migration
 
-**Next actions:**
-- [x] Create the canonical route map: public pages on `govcongiants.com`; app/admin/account pages on `mi.govcongiants.com`.
-- [x] Confirm which public MI sales/SEO pages belong in the funnels repo versus which product surfaces stay in this repo.
-- [ ] Add compatibility redirects from `.org`, `tools`, and `shop` only after the matching `.com` or `mi.govcongiants.com` destination path exists.
-- [ ] Update email templates and generated links: sales/content CTAs to `govcongiants.com`, product/account CTAs to `mi.govcongiants.com`.
-- [ ] Update social, YouTube, LinkedIn, IG, coaching scripts, launch plans, and team briefs to use the correct `.com` role.
-- [ ] Migrate MI platform to `getmindy.ai` (domain purchased May 13, 2026).
+- [ ] Sales/content CTAs → `govcongiants.com`
+- [ ] Product/account CTAs → `getmindy.ai` (was `mi.govcongiants.com`)
+- [ ] Audit all email templates in `src/lib/send-email.ts`
 
-**New specs:**
-- `tasks/CANONICAL-DOMAIN-ROUTE-MAP.md` - Canonical domain and route ownership map for `.com`, `mi.govcongiants.com`, and legacy redirect surfaces.
-- `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` - Top skills, tools/plugins, agents, missing MD sections, and build order.
-- `tasks/skills/dashboard-clarity-skill.md` - Repeatable dashboard review framework for action-oriented MI metrics.
-- `tasks/skills/launch-memo-skill.md` - Repeatable launch memo structure for team-ready execution.
-- `tasks/skills/10-10-forever-customer-strategy-skill.md` - Repeatable framework for ranking customers worth deep founder/team investment.
-- `tasks/skills/customer-outreach-campaign-skill.md` - Segment-based outreach playbook for interviews, activation, upgrades, and proof stories.
-- `tasks/skills/prd-builder-skill.md` - Repeatable PRD framework for MI features, SEO pages, public/gated data, and access/security.
-- `tasks/skills/govcon-offer-reframing-skill.md` - Repeatable copy and positioning framework for MI Free, MI Pro, bundles, internal users, and white-glove.
-- `tasks/skills/team-alignment-brief-skill.md` - Repeatable memo/Slack brief framework for team decisions, dashboard findings, and launch changes.
-- `tasks/skills/seo-page-strategy-skill.md` - Repeatable framework for public/gated SEO pages that rank and convert into MI.
-- `tasks/skills/customer-success-insight-skill.md` - Repeatable framework for turning usage signals into rescue, activation, upgrade, and white-glove actions.
-- `tasks/skills/founder-decision-memo-skill.md` - Repeatable framework for turning founder decisions into clear team execution memos.
-- `tasks/agents/mi-growth-ops-agent.md` - Daily/weekly growth ops agent spec for activation, engagement, outcomes, and next actions.
-- `tasks/agents/customer-qualification-agent.md` - Customer ranking agent spec for Annelle/Sikander outreach, MI Pro upgrades, and 10-10 candidates.
-- `tasks/agents/launch-manager-agent.md` - Launch coordination agent spec for memos, assets, owners, blockers, and team updates.
-- `tasks/agents/seo-contractor-pages-agent.md` - SEO page agent spec for contractor profile candidates, public/gated data, and refresh priorities.
-- `tasks/agents/api-security-audit-agent.md` - API hardening agent spec for classifying and protecting route surfaces.
-- `tasks/PRD-mi-growth-ops-agent.md` - Implementation PRD for the read-only MI Growth Brief, action queues, freshness notes, and internal dashboard feed.
-- `tasks/PRD-api-security-audit-agent.md` - Implementation PRD for classifying and hardening the 68 current open API route candidates.
-- `tasks/PRD-launch-manager-agent.md` - Implementation PRD for launch status briefs, team broadcast drafts, owner actions, and decision tracking.
-- `tasks/PRD-seo-contractor-pages-agent.md` - Implementation PRD for ranking public contractor SEO pages, public/gated data rules, `.com` canonicals, and MI deep links.
-- `docs/strategy/MI-TEAM-ALIGNMENT-SLACK-BRIEF.md` - Team-ready Slack/memo version of the MI pivot, outreach priorities, and operating rules.
-- `docs/strategy/MI-INTERNAL-COMMAND-CENTER-PRD.md` - Private dashboard PRD for Annelle, Sikander, Ryan, Zach, Randie, Tavin, Branden, Kash, Usama, Muneeba, Eric, and product/engineering.
+---
 
-**Next actions:**
-- [ ] Review the MI Operating System Roadmap and confirm the build order.
-- [ ] Review the Dashboard Clarity Skill with the current admin dashboard.
-- [ ] Use the Launch Memo Skill to rewrite the May 30 bootcamp / MI launch memo.
-- [ ] Review the MI Growth Ops Agent against available Supabase, Stripe, email, and app activity data.
-- [ ] Use the Customer Qualification Agent spec to generate the next Annelle/Sikander qualified outreach list.
-- [ ] Use the 10-10 Forever Customer Strategy Skill to identify Eric's next founder-call list.
-- [ ] Use the Customer Outreach Campaign Skill to turn the next outreach batch into call scripts, emails, and follow-up tags.
-- [ ] Use the PRD Builder Skill on the contractor sales history chart and Deal Flow Board before expanding implementation.
-- [ ] Use the GovCon Offer Reframing Skill to clean up MI website, auth emails, onboarding, and dashboard labels.
-- [ ] Use the SEO Page Strategy Skill to map contractor profile pages and `.com` public/gated SEO surfaces.
-- [ ] Use the Customer Success Insight Skill to define rescue, activation, upgrade, and white-glove outreach queues.
-- [ ] Use the Founder Decision Memo Skill for pricing, access model, and `.com`/MI domain decisions.
-- [x] Use the Team Alignment Brief Skill to convert the MI pivot and customer-first outreach into one team-ready Slack memo.
-- [x] Build the MI Internal Launch Command Center V1 shell so outreach, coach activity, enterprise/package sales activity, content/social activity, notes, tags, and team memos live behind one private link.
-- [x] Surface the live MI Growth Brief on `/admin/launch-command-center` so the team sees action queues, engagement, email, and data quality signals in one place.
-- [ ] Wire the MI Internal Launch Command Center to Supabase, Stripe, email engagement, MI app activity, and owner-updated launch action data.
-- [ ] Add the missing strategic sections to launch plans, briefings, and team memos: thesis, segments, core outcome, activation metrics, engagement metrics, outcome metrics, decision levers, access model, data quality notes, and next action mapping.
-- [ ] Decide whether to install Dashboard Clarity as a real Codex skill in `.codex/skills` after the repo version is stable.
-- [x] Convert the MI Growth Ops Agent spec into an implementation PRD for a read-only Growth Brief and action queues.
-- [x] Build the admin-protected MI Growth Brief endpoint/output shape from `tasks/PRD-mi-growth-ops-agent.md`.
-- [x] Convert the Launch Manager agent spec into an implementation PRD for launch briefs, team broadcasts, owner actions, and decision tracking.
-- [x] Convert the SEO Contractor Pages agent spec into an implementation PRD after the data sources and owners are confirmed.
-- [x] Convert the API Security Audit agent spec into an implementation PRD with the current 68-route baseline.
-- [x] Build the read-only Launch Manager brief generator from `tasks/PRD-launch-manager-agent.md`.
-- [x] Add the Launch Manager brief output to `/admin/launch-command-center` once the JSON shape is stable.
-- [x] Build the read-only SEO Contractor Pages candidate scorer from `tasks/PRD-seo-contractor-pages-agent.md`.
-- [ ] Add Search Console, MI usage events, and route-crawl canonical status to the SEO Contractor Pages candidate scorer.
-- [ ] Fix public contractor page canonicals to `govcongiants.com` while keeping authenticated MI app links on `mi.govcongiants.com`.
+## P2 - MEDIUM (Next 2 Weeks)
 
-### 🔐 TODO: Classify and Harden Remaining API Routes
+### Batch Enroll Bootcamp Attendees
+**Status:** 8,804 emails ready in `data/bootcamp-attendees-to-enroll.txt`
 
-**Status:** Next security pass
+**When:** After 2-3 weeks verifying current 457 users
 
-After hardening `/api/pain-points`, the May 10 API auth audit shows **68 candidate routes** that need review. Each route needs to be intentionally classified and either protected or documented as safe public access.
-
-**Audit command:**
 ```bash
-npm run audit:api-auth
+cat data/bootcamp-attendees-to-enroll.txt | while read email; do
+  curl -s -X POST "https://tools.govcongiants.org/api/alerts/save-profile" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\": \"$email\", \"naicsCodes\": [\"541512\", \"541611\", \"541330\"], \"businessType\": \"\", \"source\": \"free-signup\"}"
+done
 ```
 
-**Classification needed:**
+### Domain Migration to `getmindy.ai`
+**Status:** Domain purchased May 13, 2026
 
-| Class | Meaning | Expected Protection |
-|-------|---------|---------------------|
-| Public | Safe marketing/demo/feed route | Explicit allowlist in audit script |
-| Token protected | Webhook, cron, or shared secret route | Secret/password/token validation |
-| Admin only | Internal operational route | Admin password/session gate |
-| MI user protected | Customer data or paid feature | MI auth session / entitlement check |
+Not blocking anything - `mi.govcongiants.com` works fine. Brand improvement.
 
-**Security rule:** No API route should remain accidentally open. If it returns customer data, operational data, paid data, admin data, or writes to the database, it must require authorization.
+- [ ] Configure DNS for `getmindy.ai`
+- [ ] Add compatibility redirects from `mi.govcongiants.com` → `getmindy.ai`
+- [ ] Update Supabase auth redirect URLs
+- [ ] Update email templates for `getmindy.ai` links
+- [ ] Update social/YouTube/LinkedIn URLs
 
-**Recent fix completed:**
-- `/api/pain-points` now requires MI auth session.
-- `scripts/audit-api-auth.js` added.
-- `npm run audit:api-auth` added to `package.json`.
-- Production verified with 401 response when unauthenticated.
+### SEO Contractor Pages Improvements
+- [ ] Add Search Console data to candidate scorer
+- [ ] Add MI usage events tracking
+- [ ] Add route-crawl canonical status
+- [ ] Fix public contractor page canonicals to `govcongiants.com`
 
-**Next actions:**
-- [x] Run the audit and export the current candidate route count.
-- [ ] Group them by public/token/admin/MI user.
-- [ ] Harden the highest-risk routes first: write routes, admin routes, paid-data routes.
-- [ ] Add intentional public routes to the audit allowlist with comments.
-- [ ] Re-run `npm run audit:api-auth` until all remaining routes are classified.
+### Recompete Tracker: Expand to 2027 Data
+**Current:** 9,450 contracts, all 2026 expirations
+**Target:** Add contracts expiring through Oct 2027 (18-month window)
 
-## Session State (April 20, 2026)
-
-### ✅ COMPLETED: Cron Bug Fixes (All 5 Bugs Fixed)
-
-**Status:** Deployed to production (April 20, 2026)
-
-**Bugs Fixed:**
-
-| Bug | Severity | Fix |
-|-----|----------|-----|
-| **Briefing Type Collision** | CRITICAL | Changed unique constraint from `(user_email, briefing_date)` to `(user_email, briefing_date, briefing_type)` |
-| **Daily Briefings Dedupe** | HIGH | Fixed `send-briefings-fast` to filter by `briefing_type='daily'` |
-| **Pursuit Logging** | HIGH | Changed from non-existent `pursuit_brief_log` to `briefing_log` with `briefing_type='pursuit'` |
-| **Weekly-Alerts Batching** | HIGH | Added `BATCH_SIZE=15`, deduplication via `alert_type='weekly'` |
-| **Precompute Capacity** | HIGH | Increased `PROFILES_PER_RUN` from 10 to 25 in both precompute routes |
-| **Rollout Tracking** | MEDIUM | Fixed to use actual `activeCohortId` instead of `null` |
-
-**Files Modified:**
-| File | Changes |
-|------|---------|
-| `supabase/migrations/20260420_fix_briefing_log_unique_constraint.sql` | New migration for unique constraint |
-| `src/app/api/cron/send-briefings-fast/route.ts` | Filter by `briefing_type='daily'`, updated `onConflict` |
-| `src/app/api/cron/send-weekly-fast/route.ts` | Filter by `briefing_type='weekly'`, updated `onConflict` |
-| `src/app/api/cron/send-pursuit-fast/route.ts` | Changed from `pursuit_brief_log` to `briefing_log` |
-| `src/app/api/cron/weekly-alerts/route.ts` | Added `BATCH_SIZE=15`, deduplication, `alert_type='weekly'` |
-| `src/app/api/cron/precompute-weekly-briefings/route.ts` | `PROFILES_PER_RUN=25` |
-| `src/app/api/cron/precompute-pursuit-briefs/route.ts` | `PROFILES_PER_RUN=25` |
-
-**Database Migration Applied:**
-```sql
--- Change unique constraint to include briefing_type
-ALTER TABLE briefing_log DROP CONSTRAINT IF EXISTS briefing_log_user_email_briefing_date_key;
-ALTER TABLE briefing_log ADD CONSTRAINT briefing_log_user_email_date_type_key
-  UNIQUE (user_email, briefing_date, briefing_type);
-```
-
-**Key Architecture Rules (Updated in CLAUDE.md):**
-- Rule #11: Briefing log MUST include `briefing_type` in all queries
-- Rule #12: Weekly-alerts uses `BATCH_SIZE=15` with deduplication
-
----
-
-## Session State (April 19, 2026)
-
-### ✅ COMPLETED: Agency Intelligence Expansion
-
-**Status:** Deployed to production (April 19, 2026)
-
-**What Was Built:**
-
-Expanded agency pain points database from 250 to 307 agencies using real public API data (not AI-generated).
-
-| Metric | Before | After |
-|--------|--------|-------|
-| **Agencies** | 250 | **307** (+57 new) |
-| **Pain Points** | 2,765 | **3,045** (+280) |
-| **Priorities** | 2,500 | **2,611** (+111) |
-| **Database Records** | 0 | 557 |
-
-**Data Sources:**
-- GAO Reports via GovInfo API → 446 records → Pain Points
-- USASpending Agency Spending → 111 records → Priorities
-
-**New Agencies Added (sample):**
-- Federal Labor Relations Authority
-- Federal Mediation and Conciliation Service
-- American Battle Monuments Commission
-- Defense Nuclear Facilities Safety Board
-- National Credit Union Administration
-- 52 more independent agencies...
-
-**Files Created/Modified:**
-| File | Purpose |
-|------|---------|
-| `scripts/merge-agency-intelligence.js` | Merges DB into JSON (--preview / --merge) |
-| `src/lib/agency-intelligence/index.ts` | Added unified API functions |
-| `src/lib/agency-intelligence/fetchers/govinfo.ts` | 150+ topic-to-agency mappings |
-| `src/data/agency-pain-points.json` | Expanded to 307 agencies |
-| `docs/PRD-agency-intel-scrapers.md` | Updated with final status |
-
-**Unified API Functions:**
-```typescript
-import {
-  getUnifiedAgencyIntelligence,  // Combined static + DB
-  getAgencyPainPointsUnified,    // Deduplicated pain points
-  getAgencyPrioritiesUnified,    // Deduplicated priorities
-  getUnifiedIntelligenceForAgencies, // Batch fetch
-  searchAgencies,                // Search by keyword
-  getAllAgenciesList,            // All 307 agencies
-  getIntelligenceStats,          // System stats
-} from '@/lib/agency-intelligence';
-```
-
-**Integration Status:**
-- ✅ Market Assassin - Automatically uses expanded JSON via `getPainPointsForAgency()`
-- ✅ Content Reaper - Automatically uses expanded JSON via `getPainPointsForAgency()`
-- ✅ Agency Hierarchy API - Uses pain-points-linker.ts
-- ⏸️ Briefings - Not integrated yet (per plan)
-
-**Admin/Scripts:**
 ```bash
-# Preview what would be merged
-node scripts/merge-agency-intelligence.js --preview
+# Fetch and preview 2027 data
+node scripts/fetch-2027-contracts.js
 
-# Run the merge
-node scripts/merge-agency-intelligence.js --merge
-
-# Sync fresh data from APIs
-POST /api/admin/sync-agency-intel?password=xxx
+# Fetch and merge into contracts-data.js
+node scripts/fetch-2027-contracts.js --merge
 ```
 
----
-
-## Session State (April 16, 2026)
-
-### ✅ COMPLETED: SBIR + Grants Tabs for MI Dashboard
-
-**Status:** Deployed to production (April 16, 2026)
-
-**What Was Built:**
-
-Added 2 new tabs to the Market Intelligence dashboard (`/briefings`), expanding from 2 tabs to 4:
-
-| Tab | Color | Purpose | Data Source |
-|-----|-------|---------|-------------|
-| BRIEFINGS | Purple | Daily/Weekly/Pursuit intel | Pre-computed templates |
-| FORECASTS | Amber | 7,764 agency forecasts 6-18mo ahead | `agency_forecasts` table |
-| **SBIR** | Blue | SBIR/STTR small business R&D | NIH RePORTER API + Multisite |
-| **GRANTS** | Emerald | $700B+ federal grant funding | Grants.gov REST API |
-
-**Files Created:**
-| File | Purpose |
-|------|---------|
-| `src/app/api/grants/route.ts` | Grants.gov API wrapper (no auth required) |
-| `src/app/api/sbir/route.ts` | NIH RePORTER + Multisite SBIR/STTR wrapper |
-| `src/components/briefings/GrantsPanel.tsx` | Grants search UI with filters |
-| `src/components/briefings/SbirPanel.tsx` | SBIR/STTR search UI with phase info |
-
-**Files Modified:**
-- `src/app/briefings/page.tsx` — Added 2 new tabs with color-coded navigation
-
-**APIs:**
-- `/api/grants` — Grants.gov search (keyword, agency, category, status)
-- `/api/sbir` — NIH RePORTER search (keyword, agency, phase, source)
-
-**Key Implementation Details:**
-
-**Grants.gov API:**
-- No API key required - public REST API
-- Endpoint: `https://apply07.grants.gov/grantsws/rest/opportunities/search`
-- Response format: `totalHits` is array of opportunities (not a count)
-- 14 agency codes, 10 funding categories supported
-
-**NIH RePORTER API:**
-- Activity codes: R43 (SBIR Phase I), R44 (SBIR Phase II), R41/R42 (STTR)
-- Typical awards: Phase I $275K, Phase II $1.1M
-- Eligibility: US small business, <500 employees, 51%+ US-owned
-
-**Live URL:** https://tools.govcongiants.org/briefings
+- [ ] Run 2027 fetch script
+- [ ] Verify data quality (no duplicates)
+- [ ] Update cron job date range
+- [ ] Deploy with expanded dataset
+- [ ] Update "Data Through" display
 
 ---
 
-## Previous Session State (April 14, 2026)
+## P3 - LOW (Backlog)
 
-### ✅ COMPLETED: SAM.gov Data Infrastructure - Phase 2
+### Phase 1A: 21-Day Free Trial System
+- [ ] Add `trial_start_date`, `trial_end_date` columns
+- [ ] Create trial signup flow
+- [ ] Email sequence (welcome, day 14, day 18, day 21)
+- [ ] Trial expiration cron
 
-**Status:** Deployed to production (April 14, 2026)
+### Phase 1B: Weekly Bids Report
+- [ ] New cron `weekly-bids-report` (Monday 6 AM local)
+- [ ] Query SAM.gov for all open opps by user NAICS
+- [ ] Categorize by notice type
+- [ ] Format as digest email
 
-**What Was Built:**
-
-#### Build Error Fixes (Supabase Lazy Initialization)
-Fixed module-scope Supabase client initialization causing `Error: supabaseUrl is required` during Next.js build.
-
-**Pattern Applied:**
-```typescript
-// Before (causes build error)
-const supabase = createClient(url, key);
-
-// After (lazy initialization)
-let _supabase: SupabaseClient | null = null;
-function getSupabase(): SupabaseClient | null {
-  if (_supabase) return _supabase;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  _supabase = createClient(url, key, { auth: { persistSession: false } });
-  return _supabase;
-}
-```
-
-**Files Fixed:**
-| File | Functions Updated |
-|------|-------------------|
-| `src/lib/intelligence/guardrails.ts` | `logEvent()`, `isOpen()`, `trip()`, `logReset()`, `manualReset()`, `postSendValidation()`, `getGuardrailStatus()` |
-| `src/lib/intelligence/metrics.ts` | `save()`, `saveDirectly()`, `logIntelligenceDelivery()`, `recordUserFeedback()`, `getMetricsDashboard()` |
-| `src/app/api/search-capture/route.ts` | `POST()`, `GET()` |
-
-#### New Database Tables Created
-| Table | Purpose |
-|-------|---------|
-| `usaspending_awards` | Contract award data with winners/amounts from USASpending.gov |
-| `sam_events` | Industry days, webinars, RFIs extracted from SAM.gov Special Notices |
-
-**Migration File:** `supabase/migrations/20260414_usaspending_awards.sql`
-
-**Deployment:** Build succeeded, deployed to `tools.govcongiants.org`
-
----
-
-## Previous Session State (April 11, 2026)
-
-### ✅ COMPLETED: BD Assist Platform - Phase 1 & 2
-
-**Status:** Deployed to production (April 11, 2026)
-
-**Live URL:** https://tools.govcongiants.org/bd-assist
-
-**What Was Built:**
-
-#### Phase 1: Database & APIs
-| Component | Status |
-|-----------|--------|
-| `user_pipeline` table | ✅ Deployed |
-| `pipeline_history` table | ✅ Deployed |
-| `user_teaming_partners` table | ✅ Deployed |
-| Pipeline CRUD API | ✅ Working |
-| Pipeline Stats API | ✅ Working |
-| Teaming CRUD API | ✅ Working |
-| Federal Market Scanner API | ✅ Working (6-question intelligence) |
-
-#### Phase 2: UI Components
-| Component | Status |
-|-----------|--------|
-| BD Assist Dashboard | ✅ Built (`/bd-assist`) |
-| Pipeline Kanban Board | ✅ Built (6 stage columns) |
-| Pipeline Cards | ✅ Built (urgency indicators) |
-| Pipeline Modal | ✅ Built (add/edit form) |
-| Market Scanner UI | ✅ Built (22KB, 6 collapsible sections) |
-
-**API Endpoints:**
-| Endpoint | Purpose |
-|----------|---------|
-| `GET/POST/PATCH/DELETE /api/pipeline` | Pipeline CRUD |
-| `GET /api/pipeline/stats` | Pipeline metrics by stage |
-| `GET/POST/PATCH/DELETE /api/teaming` | Teaming partners CRUD |
-| `GET /api/market-scanner?naics=X&state=Y` | 6-question market scan |
-
-**Key Files:**
-- `src/app/bd-assist/page.tsx` — Main dashboard with tabs
-- `src/components/bd-assist/PipelineBoard.tsx` — Kanban board
-- `src/components/bd-assist/MarketScanner.tsx` — 6-question scanner UI
-- `src/app/api/market-scanner/route.ts` — Scanner API (870 lines)
-- `supabase/migrations/20260410_bd_assist_pipeline.sql` — Database schema
-
-**Documentation:**
-- `docs/PRD-bd-assist-platform.md` — Master PRD
-- `docs/bd-assist-apis.md` — API documentation
-- `docs/market-scanner-api.md` — Scanner API docs
-
-**Next Steps:**
+### BD Assist Enhancements
 - [ ] Add Teaming tab UI
 - [ ] Connect Intel tab to Daily Briefings
 - [ ] Add more forecast sources (DOD, HHS, USDA)
-- [x] Deploy to production ✅ (April 11, 2026)
-
----
-
-## Previous Session State (April 9, 2026)
-
-### ✅ COMPLETED: BD Assist API & MCP Infrastructure
-
-**Status:** APIs deployed (April 9, 2026)
-
-**bdassist-mcp Server:**
-- Location: `/Users/ericcoffie/mcp-servers/bdassist/`
-- 14 tools: Intel (5), Pipeline (4), Teaming (5)
-- Added to Claude config at `~/.claude.json`
-
----
-
-## Previous Session State (April 6, 2026)
-
-### ✅ COMPLETED: Forecast Intelligence System - Phase 1-2
-
-**Status:** 7,764 forecasts from 13 agencies (April 6, 2026)
-
-**Data Sources:**
-| Agency | Source | Records |
-|--------|--------|---------|
-| DOJ | justice.gov Excel | 3,140 |
-| DOI | GSA Acquisition Gateway CSV | 2,039 |
-| DOE | energy.gov Excel | 833 |
-| DHS | Puppeteer scraper | 683 |
-| NASA | nasa.gov Excel | 294 |
-| VA | GSA Acquisition Gateway CSV | 268 |
-| GSA | GSA Acquisition Gateway CSV | 164 |
-| NRC | GSA Acquisition Gateway CSV | 79 |
-| DOT | GSA Acquisition Gateway CSV | 68 |
-| SSA | Excel (SBF Report) | 60 |
-| NSF | PDF (Acquisition Forecast) | 56 |
-| DOL | GSA Acquisition Gateway CSV | 47 |
-| **Total** | | **7,764** |
-
-**Key Achievement:** Discovered GSA Acquisition Gateway CSV export (acquisitiongateway.gov/forecast) - single source for 7 agencies with 2,698 records.
-
-**Import Scripts:**
-- `scripts/import-forecasts.js` - Excel import (DOE, NASA, DOJ)
-- `scripts/import-gsa-forecasts.js` - GSA Acquisition Gateway CSV import
-- `scripts/import-nsf-forecasts.js` - NSF PDF data import (hardcoded from PDF)
-- `scripts/import-ssa-forecasts.js` - SSA Excel (.xlsm) import
-
-**Files Created/Modified:**
-- `scripts/import-gsa-forecasts.js` - NEW: Parses CSV with value ranges, set-asides, dates
-- `src/lib/forecasts/scrapers/` - Puppeteer scrapers (DHS working, others return 0)
-- Updated `CLAUDE.md` with Forecast Intelligence section
-
-**Phase 3-4 Pending (Puppeteer scrapers):**
-- HHS, Treasury, EPA, USDA, DOD - require SPA login or different approach
-- Alternative: Re-download GSA Acquisition Gateway CSV periodically
-
----
-
-### Previous: Multisite Aggregation - Phase 1 (Scrapers + Crons)
-
-**Scrapers Built:**
-1. **NIH RePORTER** - Working, 100 opportunities scraped
-2. **DARPA BAA** (via Grants.gov) - Working, 6 BAAs scraped
-3. **NSF SBIR** (via SBIR.gov) - API rate limited (429), will retry automatically
-
-**Cron Jobs Configured (vercel.json):**
-- NIH Reporter: `0 4 * * *` (12 AM ET daily)
-- DARPA BAA: `0 5 * * *` (1 AM ET daily)
-- NSF SBIR: `0 6 * * *` (2 AM ET daily)
-
-**Database State:**
-- `aggregated_opportunities`: **106 rows** (100 NIH + 6 DARPA)
-- `multisite_sources`: 24 sources configured
-- `scrape_log`: Audit trail working
-
-**Files Created:**
-- `src/lib/scrapers/apis/sbir-gov.ts` - SBIR.gov API client
-- `src/lib/scrapers/apis/darpa-baa.ts` - SAM.gov DARPA scraper (not used)
-- `src/lib/scrapers/apis/grantsgov-darpa.ts` - Grants.gov DARPA scraper (active)
-- Updated `src/lib/scrapers/index.ts` - Exports new scrapers
-- Updated `src/app/api/cron/snapshot-multisite/route.ts` - Uses new scrapers
-
-**Deferred (6 months):**
-- Daily Briefings integration - will revisit after multisite scraping stabilizes
-
-**MCP Tools:**
-```bash
-mcp__multisite__search_multisite     # Search all sources
-mcp__multisite__get_multisite_stats  # Stats (106 total opps)
-mcp__multisite__get_source_health    # Source health status
-mcp__multisite__trigger_scrape       # Manual trigger
-```
-
----
-
-### Previous: Multisite Database Setup
-
----
-
-### ✅ COMPLETED: USASpending MCP Fix
-
-**Problem:** USASpending MCP was returning 422 Unprocessable Entity errors.
-
-**Root Cause:** The USASpending API requires `award_type_codes` in the filters (mandatory field).
-
-**Fix Applied:**
-- Added `award_type_codes: ["A", "B", "C", "D"]` to filters in `/Users/ericcoffie/mcp-servers/usaspending-mcp/index.js`
-- Updated default fiscal year from 2024 to 2025
-- Award type codes: A=BPA Call, B=Purchase Order, C=Delivery Order, D=Definitive Contract
-
-**Test Command:**
-```bash
-mcp__usaspending__search_contracts with naics="541512" state="FL" limit=5
-```
-
----
-
-## Previous Session (April 4, 2026)
-
-### ✅ COMPLETED: Moat 7 - Agency Hierarchy API v2
-
-**Built unified federal agency intelligence API** combining:
-- SAM.gov Federal Hierarchy (official org structure)
-- Pain Points Database (250 agencies, 2,765 pain points)
-- Contractor/SBLO contacts (2,768 contractors)
-- Agency aliases (450+ abbreviation mappings)
-- USASpending.gov (spending aggregations)
-
-**Files Created:**
-- `src/lib/agency-hierarchy/` - Core module (index, unified-search, pain-points-linker, spending-stats)
-- `src/data/agency-aliases.json` - 450+ alias mappings (VA→Veterans Affairs, etc.)
-- `docs/agency-hierarchy-api.md` - Full API documentation
-- `tests/test-agency-hierarchy.sh` - 15 automated tests
-
-**API Endpoint:** `/api/agency-hierarchy`
-
-**Example Usage:**
-```bash
-# Search by abbreviation
-curl "https://tools.govcongiants.org/api/agency-hierarchy?search=VA"
-
-# CGAC code lookup
-curl "https://tools.govcongiants.org/api/agency-hierarchy?cgac=069"
-
-# Get spending data
-curl "https://tools.govcongiants.org/api/agency-hierarchy?mode=spending&agency=DOD"
-
-# Find buying offices for NAICS
-curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buying"
-```
-
-**Test:** `./tests/test-agency-hierarchy.sh local` or `./tests/test-agency-hierarchy.sh prod`
-
----
-
-## 📋 NEXT PRIORITY: Ship Daily Briefings
-
-**Goal:** Get Daily Briefings working reliably for current users before expanding
-
-**Current Status:**
-- ✅ Briefings code working
-- ✅ 457 users enrolled
-- ⏳ Monitoring delivery for 2-3 weeks
-
-**After Briefings Ship:**
-1. Batch enroll 8,804 bootcamp attendees
-2. Recompete Tracker: Add 2027 data
-3. 21-Day Free Trial system
-4. Restore and finish DSBS Profile Scorer after Federal Market Scanner is complete
-
----
-
-## 🔮 DEFERRED: Market Intelligence Expansion
-
-**Pushed to future date - after briefings ship successfully**
-
-### Moat 6 - Multi-Site Aggregation
-**Goal:** Scrape 85+ agency sites that SAM.gov doesn't capture (DOE Labs, NIH, DARPA, etc.)
-
-**Status:** MCP built, needs data population
-
-**Multisite MCP Ready:**
-- ✅ MCP server at `/Users/ericcoffie/mcp-servers/multisite/`
-- ✅ Configured in `~/.mcp.json`
-- ✅ 21 sources defined (Tier 1-3)
-- ❌ 0 opportunities in database - scrapers need to run
 
 ### Phase 3-4 Forecast Scrapers (Puppeteer)
 | Agency | Source | Est. Coverage |
@@ -620,362 +140,87 @@ curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buyi
 | USDA | forecast.edc.usda.gov | $4B |
 | DOD | Multi-source | $40B |
 
-### Post-FMS Follow-Up
-- DSBS Profile Scorer
-  - keep off the tools/store page until Federal Market Scanner is shipped
-  - revisit positioning, UX, and scoring logic after FMS launch
+### Teaming Network Visualization
+**Blocked:** Waiting on SAM.gov System Account approval (1-4 weeks)
 
 ---
 
-## Previous Session State (April 3, 2026)
+## DEFERRED - Infrastructure Scaling
 
-### 🔥 CRITICAL FIX: Daily Briefings Now Working
+### QStash Queue Architecture (For 10K+ Users)
+**When:** Approaching 10K users or hitting cron limits
 
-**Problem:** Briefings were being logged as "sent" in database but no one received them for 3 weeks.
+Replace multiple Vercel crons with queue-based processing:
+- 1 cron enqueues all users → QStash processes in parallel
+- Eliminates 100-cron Vercel limit
+- Better retry handling and observability
 
-**Root Causes Found & Fixed:**
+### Supabase-Backed Access Links
+**When:** KV costs become significant or need audit logging
 
-1. **JSON Parsing Error** - AI responses from Claude contained control characters that broke `JSON.parse()`
-   - **Fix:** Added `extractAndParseJSON()` helper with robust sanitization in `ai-briefing-generator.ts`
-
-2. **Timezone Filter Blocking 90%+ Users** - Only sent if local time 6-10 AM, but cron ran at wrong time
-   - **Fix:** Removed timezone filter entirely - briefings now go to ALL users
-
-3. **Cron Schedule Wrong** - Was running at 6 AM ET
-   - **Fix:** Changed to 3 AM ET so users see briefings when they wake up
-
-4. **Small Batch Sizes** - Only 10 users/batch, max 200 users/run
-   - **Fix:** Increased to 25/batch, 1000 max users per run
-
-**Files Modified:**
-- `src/lib/briefings/delivery/ai-briefing-generator.ts` - Added JSON sanitization
-- `src/app/api/cron/send-briefings/route.ts` - Removed timezone filter, increased batches
-- `vercel.json` - Changed cron from `0 10 * * *` to `0 7 * * *`
-- `src/app/api/admin/enable-briefings-all/route.ts` - New admin endpoint
-
-**Verification:** 9 briefings sent successfully via trigger-briefings. Check if zach@govcongiants.com received email.
-
-**Current Cron Schedule:**
-| Job | Schedule (ET) | Notes |
-|-----|----------------|------------|
-| send-briefings | 7 AM | 2-3 AM |
-| daily-alerts | 11 AM, 12 PM, 2 PM, 4 PM | 6-7 AM, 7-8 AM, 9-10 AM, 11 AM-12 PM |
+Move access link tokens from KV to Supabase:
+- Store hashed tokens in `mi_access_links` table
+- KV becomes optional cache only
+- Adds audit trail of link usage
 
 ---
 
-## 📋 ACTIVE: Intelligence Platform Moat Strategy
-
-**PRD:** `docs/PRD-intelligence-platform.md`
-
-### Priority Order:
-1. **NOW:** Moat 1 & 2 - Validate with 800 users (30 days) ← FIXING BRIEFINGS
-2. **NEXT:** Moat 3 - Proprietary Knowledge Base (RAG)
-3. **THEN:** Moat 4 - GovCon Data API
-4. **LAST:** Part 2 - Lead conversion for 8,000
-
-### Phase 1A: 21-Day Free Trial (PENDING - After briefings confirmed)
-- [ ] Add `trial_start_date`, `trial_end_date` columns
-- [ ] Create trial signup flow
-- [ ] Email sequence (welcome, day 14, day 18, day 21)
-- [ ] Trial expiration cron
-
-### Phase 1B: Weekly Bids Report (PENDING)
-- [ ] New cron `weekly-bids-report` (Monday 6 AM local)
-- [ ] Query SAM.gov for all open opps by user NAICS
-- [ ] Categorize by notice type
-- [ ] Format as digest email
-
----
-
-## 📋 FUTURE TASKS (After Moat Phases)
-
-### Recompete Tracker: Expand to 2027 Data
-**Priority:** After Moat 1 & 2 validation
-**Current state:** 9,450 contracts, all 2026 expirations
-**Target:** Add contracts expiring through Oct 2027 (18-month window)
-
-**Why:** Recompete tracking should be 12-18 months out for proper positioning
-
-**Script ready:** `scripts/fetch-2027-contracts.js`
-```bash
-# Fetch and preview 2027 data
-node scripts/fetch-2027-contracts.js
-
-# Fetch and merge into contracts-data.js
-node scripts/fetch-2027-contracts.js --merge
-```
-
-**Tasks:**
-- [ ] Run 2027 fetch script
-- [ ] Verify data quality (no duplicates, proper formatting)
-- [ ] Update cron job date range to include 2027
-- [ ] Deploy with expanded dataset
-- [ ] Update "Data Through" display to show Oct 2027
-
----
-
-## Previous Session State (March 30, 2026)
-
-### 🎯 PRIORITY: JTED 2026 Companion Guide & Landing Page
-
-**Event:** JTED 2026 AEC Industry Day at MacDill AFB — April 1, 2026
-
-**Full plan saved at:** `presentations/JTED-2026-PLAN.md`
-
-#### Completed Tasks (Session 36 - March 30, 2026)
-- [x] Pulled real expiring contract data from USASpending for 10 A/E/C contracts ($10B+ combined)
-- [x] Created JTED Intel Pack HTML guide (`presentations/JTED-2026-Intel-Pack.html`)
-- [x] Exported Intel Pack to PDF (`JTED-2026-Intel-Pack.pdf`)
-- [x] Exported presentation slides to PDF (`JTED-2026-Slides.pdf`)
-- [x] Created landing page at `/jted-2026` on govcon-funnels
-- [x] Created thank-you page with download links at `/jted-2026/thank-you`
-- [x] QR code slide already in presentation (slide 97) pointing to govcongiants.org/jted-2026
-
-#### Pending: Deploy
-- [ ] Deploy govcon-funnels to make /jted-2026 live
-
-#### Guide Sections (Actionable Intel - NOT a copy of slides)
-1. **10 Expiring A/E/C Contracts** — Daily briefing format with incumbent, value, why vulnerable
-2. **5 Teaming Plays** — Specific primes to approach with suggested openers
-3. **How to Set Up SAM.gov Alerts** — Step-by-step with screenshots
-4. **How to Track Recompetes** — USASpending.gov walkthrough
-5. **Top 5 SAT Agencies for Construction** — With search prefixes
-6. **Sources Sought Response Template** — Copy-paste template
-7. **IDIQ/MACC Vehicles Open for Bid** — Air Force RAES, NAVFAC MACC II, etc.
-8. **AI Prompts for GovCon** — 4 copy-paste prompts
-9. **Glossary & Resources**
-
-#### Downloads (Landing Page)
-1. A/E/C Federal Intel Pack (actionable guide)
-2. Presentation Slides PDF (separate file)
-
-#### Presentation Status
-- **File:** `presentations/JTED-2026-Revised.html` (98 slides)
-- **PDF:** `presentations/JTED-2026-Slides.pdf` (also in govcon-funnels/public/downloads/)
-- **Completed:** Full content, QR code slide, SAM alerts, recompete tracking, all sections
-
-#### Intel Pack Status
-- **HTML:** `presentations/JTED-2026-Intel-Pack.html` (10 sections of actionable intel)
-- **PDF:** `presentations/JTED-2026-Intel-Pack.pdf` (also in govcon-funnels/public/downloads/)
-- **Contents:** 10 expiring contracts, 5 teaming plays, SAM alerts guide, Sources Sought template, AI prompts, glossary
-
-#### Landing Page Status
-- **URL:** govcongiants.org/jted-2026
-- **Thank You:** govcongiants.org/jted-2026/thank-you (with download links)
-- **Source tag:** `jted-2026-landing`
-
----
-
-### 🔔 REMINDER: Batch Enroll Bootcamp Attendees (April 12-19, 2026)
-
-**After 2-3 weeks of testing alerts with current 457 users, enroll the remaining bootcamp attendees.**
-
-**Action:** Run this command to enroll 8,804 bootcamp attendees:
-```bash
-cd "/Users/ericcoffie/Market Assasin/market-assassin"
-cat data/bootcamp-attendees-to-enroll.txt | while read email; do
-  curl -s -X POST "https://tools.govcongiants.org/api/alerts/save-profile" \
-    -H "Content-Type: application/json" \
-    -d "{\"email\": \"$email\", \"naicsCodes\": [\"541512\", \"541611\", \"541330\"], \"businessType\": \"\", \"source\": \"free-signup\"}"
-done
-```
-
-**File location:** `data/bootcamp-attendees-to-enroll.txt` (8,804 emails)
-**Source:** GHL contacts with any "bootcamp" tag
-
----
-
-### Session 35 - Cron Fix & Bootcamp Enrollment (March 29, 2026)
-
-#### Completed
-- [x] Fixed cron health check (16/16 passing, was 15/16)
-- [x] Migrated all code from `user_alert_settings` → `user_notification_settings`
-- [x] Fixed `send-briefings`, `daily-alerts`, `trigger-alerts`, `save-profile`, `unsubscribe`, `briefings/preferences`
-- [x] Enrolled 58 Contract Vehicles Bootcamp attendees (Mar 28)
-- [x] Pulled 8,804 total bootcamp attendees from GHL (all tags containing "bootcamp")
-- [x] Saved to `data/bootcamp-attendees-to-enroll.txt` for future batch enrollment
-
-#### Pending
-- [ ] Verify alerts/briefings working with current 457 users (2-3 weeks)
-- [ ] Batch enroll 8,804 bootcamp attendees after verification
-
----
-
-## Previous Session State (March 28, 2026)
-
-### Just Completed - Market Intelligence Pipeline Fix
-
-**MAJOR FIX:** Daily Alerts and Daily Briefs now reach ALL 394+ users
-
-#### What Was Wrong
-- Daily Alerts queried `user_alert_settings` (394 users) ✅
-- Daily Briefs/Snapshots ONLY queried `user_notification_settings` (32 users) ❌
-- 362 users (94%) were missing Daily Briefs entirely
-
-#### What We Fixed
-- [x] `send-briefings/route.ts` - Now queries BOTH tables, deduplicates by email
-- [x] `snapshot-recompetes/route.ts` - Now queries BOTH tables + fallback NAICS
-- [x] `snapshot-awards/route.ts` - Now queries BOTH tables + fallback NAICS
-- [x] Added fallback NAICS codes: `541512, 541611, 541330, 236220, 238210`
-- [x] Added construction NAICS (236, 238) to coverage
-- [x] Auto-enroll ALL purchasers in alert_settings via Stripe webhook
-- [x] Added "BONUS: Free Daily Alerts" section to all purchase emails
-
-#### New Admin Endpoints
-- `/api/admin/test-market-intel-pipeline` - Full pipeline status/testing
-- `/api/admin/sync-alert-to-notification` - Sync users between tables
-- `/api/admin/send-naics-reminder` - Send NAICS setup reminder emails
-
-#### Documentation Updated
-- [x] `tasks/lessons.md` - 5 new lessons (two-table problem, fallback NAICS, etc.)
-- [x] `docs/ecosystem.md` - Market Intel pipeline diagram
-- [x] `CLAUDE.md` - New endpoints + bug prevention rules
-
-#### Market Intelligence Pricing (Finalized)
-
-**Beta Period:** Now through April 27, 2026 (FREE for everyone)
-
-**Post-Beta Pricing:**
-| User Type | Daily Alerts ($19/mo) | Daily Briefings ($49/mo) |
-|-----------|----------------------|--------------------------|
-| OH Free users (no purchase) | ❌ Pay $19/mo | ❌ Pay $49/mo |
-| OH Pro ($19/mo) subscribers | ✅ Included | ❌ Pay $49/mo |
-| Any product buyer (excl OH free) | ✅ Free | ❌ Pay $49/mo |
-| Pro Giant ($997) | ✅ Free | ✅ 1 year free |
-| Ultimate ($1,497) | ✅ Free | ✅ Lifetime free |
-| Beta users (no purchase) | 30 days free → $19/mo | 30 days free → $49/mo |
-
-**Schedule:**
-- **Daily Alerts** (4x/day) - SAM.gov opportunities matching user NAICS
-- **Daily Briefs** (3 AM ET) - Recompete intel, awards, teaming leads
-- **Weekly Pursuit Brief** (Monday 6 AM ET) - Auto-selects TOP opportunity
-- **Weekly Deep Dive** (Sunday 6 AM ET) - Comprehensive market analysis
-
-#### Test Endpoints
-```bash
-# Test full pipeline
-curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026"
-
-# Test specific user
-curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026&email=user@example.com"
-
-# Send test component
-curl -X POST "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026&email=user@example.com&component=briefs"
-```
-
-### Previously Completed - SAM.gov API Integration (Phase 1-4)
-
-Full SAM.gov API integration to replace retired FPDS.gov. Implemented 4 APIs with USASpending fallback.
-
-#### Phase 1: Contract Awards API
-- [x] Created `src/lib/sam/contract-awards.ts` - Core wrapper
-- [x] Created `src/lib/sam/usaspending-fallback.ts` - Fallback for bid counts
-- [x] USASpending as primary source (no System Account needed)
-- [x] Bid count data working (numberOfOffersReceived)
-- [x] Competition level classification (sole_source, low, medium, high)
-- [x] Admin test endpoint: `/api/admin/test-sam-awards`
-- [x] USASpending test endpoint: `/api/admin/test-usaspending`
-
-#### Phase 2: Entity Management API
-- [x] Created `src/lib/sam/entity-api.ts`
-- [x] Search entities by name, UEI, CAGE, NAICS
-- [x] SAM status verification
-- [x] Certification lookups (8a, SDVOSB, WOSB, HUBZone)
-- [x] Admin test endpoint: `/api/admin/test-sam-entity`
-
-#### Phase 3: Federal Hierarchy API
-- [x] Created `src/lib/sam/federal-hierarchy.ts`
-- [x] Agency structure lookups
-- [x] Office search by NAICS
-- [x] Buying offices summary
-- [x] Admin test endpoint: `/api/admin/test-sam-hierarchy`
-- [x] Public endpoint: `/api/agency-hierarchy`
-
-#### Phase 4: Subaward API
-- [x] Created `src/lib/sam/subaward-api.ts`
-- [x] Prime→Sub relationship mapping
-- [x] Teaming network builder
-- [x] Admin test endpoint: `/api/admin/test-sam-subaward`
-- [ ] **BLOCKED:** Requires SAM.gov System Account (requested, waiting 1-4 weeks)
-
-#### Shared Infrastructure
-- [x] Created `src/lib/sam/utils.ts` - Rate limiting, caching, error handling
-- [x] Created `src/lib/sam/index.ts` - Unified exports
-- [x] Supabase cache table: `sam_api_cache`
-- [x] Rate limit: 1,000 requests/day with in-memory tracking
-- [x] Cache TTL: 24h for awards/entity, 1h for opportunities
-
-### Waiting On
-- [ ] SAM.gov System Account approval (1-4 weeks)
-  - Entity reactivated ✅
-  - Request submitted ✅
-  - Once approved: Contract Awards + Subaward APIs will use SAM.gov directly
-
-### Pending
-- [ ] Teaming network visualization (blocked on Subaward API access)
-- [ ] Enrich Recompete Tracker static data with bid counts
-- [ ] Create JTED landing page with downloadable handout (`/jted`)
-
----
-
-## API Status
-
-| API | Status | Source | Requires System Account |
-|-----|--------|--------|------------------------|
-| Opportunities | ✅ Working | SAM.gov | No |
-| Entity Management | ✅ Working | SAM.gov | No |
-| Federal Hierarchy | ✅ Working | SAM.gov | No |
-| Contract Awards | ✅ Working | **USASpending** | Yes (using fallback) |
-| Subaward | ⏳ Waiting | SAM.gov | Yes |
-
-## Test Endpoints
-
-```bash
-# Contract Awards (uses USASpending)
-curl "https://tools.govcongiants.org/api/admin/test-sam-awards?password=galata-assassin-2026&naics=541512"
-
-# USASpending direct
-curl "https://tools.govcongiants.org/api/admin/test-usaspending?password=galata-assassin-2026&naics=541512"
-
-# Entity lookup
-curl "https://tools.govcongiants.org/api/admin/test-sam-entity?password=galata-assassin-2026&name=Booz"
-
-# Federal Hierarchy
-curl "https://tools.govcongiants.org/api/admin/test-sam-hierarchy?password=galata-assassin-2026&agency=VA"
-
-# Subaward (blocked until System Account)
-curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata-assassin-2026&prime_uei=XXX"
-```
-
----
-
-## Previous Session Work
-
-### Session 34 (Mar 28, 2026)
-- Fixed Market Intelligence pipeline (two-table problem)
-- All 394+ users now receive Daily Alerts AND Daily Briefs
-- Added construction NAICS (236, 238) to coverage
-- Auto-enroll all purchasers in alerts
-- Added bonus section to purchase emails
-- Created 3 new admin endpoints for pipeline testing
-
-### Session 33 (Mar 26, 2026)
-- Daily Alerts vs Market Intelligence clarification
-- SAM.gov API integration (Phase 1-4)
-
-### Session 31 (Mar 23, 2026)
-- Alerts & Briefings System Overhaul
-- Made daily alerts FREE FOR EVERYONE during beta
-- Added deduplication, retry logic, timezone-aware delivery
-- Added PSC crosswalk for broader search
-
----
-
-## Health Check Access
-```
-HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html
-JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
-```
+## COMPLETED (Reference)
+
+### May 13, 2026
+- [x] Daily Alerts Schedule moved earlier (1 AM - 6 AM ET)
+- [x] Upstash KV upgraded to Pay As You Go
+- [x] Upstash QStash installed (Pay As You Go)
+- [x] Fixed 141 failed alerts from KV quota
+
+### May 9-10, 2026
+- [x] Created canonical route map
+- [x] Confirmed MI sales pages belong in funnels repo
+- [x] Built MI Internal Launch Command Center V1 shell
+- [x] Converted agent specs into implementation PRDs
+- [x] Built read-only MI Growth Brief endpoint
+- [x] Built Launch Manager brief generator
+- [x] Built SEO Contractor Pages candidate scorer
+- [x] Created Team Alignment Slack Brief
+
+### April 20, 2026
+- [x] Fixed Briefing Type Collision (unique constraint)
+- [x] Fixed Daily Briefings Dedupe
+- [x] Fixed Pursuit Logging
+- [x] Fixed Weekly-Alerts Batching
+- [x] Fixed Precompute Capacity (10→25 profiles/run)
+- [x] Fixed Rollout Tracking
+
+### April 19, 2026
+- [x] Expanded agency intelligence: 250→307 agencies
+- [x] Added 280 pain points from GAO reports
+- [x] Added 111 priorities from spending patterns
+
+### April 16, 2026
+- [x] Added SBIR + Grants tabs to MI Dashboard
+- [x] Created `/api/grants` and `/api/sbir` endpoints
+
+### April 14, 2026
+- [x] Fixed Supabase lazy initialization build errors
+- [x] Created `usaspending_awards` table
+- [x] Created `sam_events` table
+
+### April 11, 2026
+- [x] Deployed BD Assist Platform Phase 1 & 2
+- [x] Built Federal Market Scanner (6-question intelligence)
+- [x] Built Pipeline Tracker Kanban
+- [x] Built Teaming CRM
+
+### April 6, 2026
+- [x] Forecast Intelligence: 7,764 forecasts from 13 agencies
+- [x] GSA Acquisition Gateway CSV import script
+
+### Earlier Sessions
+- [x] Agency Hierarchy API v2 (Moat 7)
+- [x] SAM.gov API Integration (Phase 1-4)
+- [x] Multisite Aggregation scrapers
+- [x] Daily Briefings system (all 3 types)
+- [x] USASpending MCP fix
 
 ---
 
@@ -986,6 +231,23 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 - GovCon Shop (production): `~/govcon-shop`
 - GovCon Funnels (marketing): `~/govcon-funnels`
 
-**Resume command:** `/continue`
+**Resume:** `/continue`
 
-**Last updated:** April 14, 2026
+**Health Check:**
+```
+HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html
+JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
+```
+
+---
+
+## Key Specs (for reference)
+
+| Spec | Location |
+|------|----------|
+| Canonical Domain Map | `tasks/CANONICAL-DOMAIN-ROUTE-MAP.md` |
+| MI Operating System Roadmap | `tasks/MI-OPERATING-SYSTEM-ROADMAP.md` |
+| Dashboard Clarity Skill | `tasks/skills/dashboard-clarity-skill.md` |
+| Launch Memo Skill | `tasks/skills/launch-memo-skill.md` |
+| API Security Audit PRD | `tasks/PRD-api-security-audit-agent.md` |
+| MI Growth Ops Agent PRD | `tasks/PRD-mi-growth-ops-agent.md` |

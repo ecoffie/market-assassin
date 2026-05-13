@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createSecureAccessUrl } from '@/lib/access-links';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -74,6 +75,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify user owns this email for POST requests
+    // (GET is intentionally unauthenticated for CAN-SPAM one-click unsubscribe compliance)
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { error } = await getSupabase()
       .from('user_notification_settings')
       .update({
@@ -81,7 +92,7 @@ export async function POST(request: NextRequest) {
         alert_frequency: 'paused',
         updated_at: new Date().toISOString(),
       })
-      .eq('user_email', email.toLowerCase());
+      .eq('user_email', auth.email!);
 
     if (error) {
       console.error('[Unsubscribe] Error:', error);

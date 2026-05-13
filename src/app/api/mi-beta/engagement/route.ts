@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EventTypes, logEngagement } from '@/lib/engagement';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,12 +32,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Valid email is required' }, { status: 400 });
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+    }
+
     if (!ALLOWED_EVENT_TYPES.has(eventType)) {
       return NextResponse.json({ success: false, error: 'Unsupported event type' }, { status: 400 });
     }
 
     const result = await logEngagement({
-      userEmail: email,
+      userEmail: auth.email!,
       eventType: eventType as typeof EventTypes[keyof typeof EventTypes],
       eventSource,
       metadata,

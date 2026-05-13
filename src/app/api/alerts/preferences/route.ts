@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 /**
  * Generate MD5 hash of NAICS profile for template matching
@@ -45,6 +46,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Email is required' },
         { status: 400 }
+      );
+    }
+
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
       );
     }
 
@@ -162,7 +172,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedEmail = email.toLowerCase();
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const normalizedEmail = auth.email!.toLowerCase();
 
     // Check if user exists
     const { data: existing } = await getSupabase()

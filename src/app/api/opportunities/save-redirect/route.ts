@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -38,6 +39,14 @@ export async function GET(request: NextRequest) {
   if (!email || !noticeId) {
     return NextResponse.redirect(
       `${baseUrl}/pursuit-brief/error?reason=missing_params`
+    );
+  }
+
+  // SECURITY: Verify user owns this email (supports signed token for email links)
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.redirect(
+      `${baseUrl}/pursuit-brief/error?reason=unauthorized`
     );
   }
 
@@ -64,7 +73,7 @@ export async function GET(request: NextRequest) {
     const { data: userSettings } = await supabase
       .from('user_notification_settings')
       .select('user_email, briefings_enabled')
-      .eq('user_email', email.toLowerCase())
+      .eq('user_email', auth.email!)
       .single();
 
     if (!userSettings) {
@@ -77,7 +86,7 @@ export async function GET(request: NextRequest) {
     const { data: savedOpp, error: saveError } = await supabase
       .from('user_saved_opportunities')
       .upsert({
-        user_email: email.toLowerCase(),
+        user_email: auth.email!,
         notice_id: noticeId,
         solicitation_number: oppData.solicitationNumber as string || null,
         opportunity_data: oppData,
@@ -108,7 +117,7 @@ export async function GET(request: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: email.toLowerCase(),
+        email: auth.email!,
         savedOpportunityId: savedOpp?.id,
         noticeId,
         opportunityData: oppData,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReportUsage, getContentUsage } from '@/lib/rate-limit';
 import { cookies } from 'next/headers';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,9 +30,18 @@ export async function GET(request: NextRequest) {
     }, { headers: corsHeaders });
   }
 
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({
+      success: false,
+      error: auth.error || 'Unauthorized',
+    }, { headers: corsHeaders, status: 401 });
+  }
+
   const usage = type === 'content'
-    ? await getContentUsage(email)
-    : await getReportUsage(email);
+    ? await getContentUsage(auth.email!)
+    : await getReportUsage(auth.email!);
 
   return NextResponse.json({
     success: true,
@@ -61,9 +71,18 @@ export async function POST(request: NextRequest) {
     }, { headers: corsHeaders });
   }
 
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({
+      success: false,
+      error: auth.error || 'Unauthorized',
+    }, { headers: corsHeaders, status: 401 });
+  }
+
   const usage = type === 'content'
-    ? await getContentUsage(email)
-    : await getReportUsage(email);
+    ? await getContentUsage(auth.email!)
+    : await getReportUsage(auth.email!);
 
   return NextResponse.json({
     success: true,

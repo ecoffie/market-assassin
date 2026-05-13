@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -39,11 +40,20 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json(
+      { error: auth.error || 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { data: opportunities, error } = await getSupabase()
       .from('user_pipeline')
       .select('stage, priority, value_estimate, response_deadline')
-      .eq('user_email', email.toLowerCase());
+      .eq('user_email', auth.email!);
 
     if (error) {
       // Table might not exist yet

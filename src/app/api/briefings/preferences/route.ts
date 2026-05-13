@@ -5,8 +5,9 @@
  * POST: Update user's briefing preferences (timezone, SMS, frequency)
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 interface BriefingPreferences {
   timezone: string;
@@ -16,18 +17,8 @@ interface BriefingPreferences {
   phone_number: string | null;
 }
 
-/**
- * GET /api/briefings/preferences?email=user@example.com
- */
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const email = searchParams.get('email');
-
-  if (!email) {
-    return NextResponse.json({ error: 'Email required' }, { status: 400 });
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Lazy Supabase client
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
 function getSupabase() {
   if (!_supabase) {
@@ -39,10 +30,27 @@ function getSupabase() {
   return _supabase;
 }
 
+/**
+ * GET /api/briefings/preferences?email=user@example.com
+ */
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const email = searchParams.get('email');
+
+  if (!email) {
+    return NextResponse.json({ error: 'Email required' }, { status: 400 });
+  }
+
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  }
+
   const { data, error } = await getSupabase()
     .from('user_notification_settings')
     .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number')
-    .eq('user_email', email)
+    .eq('user_email', auth.email!)
     .single();
 
   if (error && error.code !== 'PGRST116') {
@@ -67,12 +75,18 @@ function getSupabase() {
  * POST /api/briefings/preferences
  * Body: { email, timezone?, email_frequency?, preferred_delivery_hour?, sms_enabled?, phone_number? }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const body = await request.json();
   const { email, ...updates } = body;
 
   if (!email) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 });
+  }
+
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
   // Validate phone number if provided and SMS is being enabled
@@ -92,18 +106,6 @@ export async function POST(request: Request) {
     updates.phone_number = null;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabase: any = null;
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-  }
-  return _supabase;
-}
-
   // Map email_frequency to briefing_frequency for unified table
   const mappedUpdates = { ...updates };
   if ('email_frequency' in mappedUpdates) {
@@ -116,7 +118,7 @@ function getSupabase() {
     .from('user_notification_settings')
     .upsert(
       {
-        user_email: email,
+        user_email: auth.email!,
         briefings_enabled: true,
         ...mappedUpdates,
         updated_at: new Date().toISOString(),
@@ -131,7 +133,7 @@ function getSupabase() {
     return NextResponse.json({ error: 'Failed to update preferences' }, { status: 500 });
   }
 
-  console.log(`[BriefingPrefs] Updated preferences for ${email}:`, updates);
+  console.log(`[BriefingPrefs] Updated preferences for ${auth.email}:`, updates);
 
   return NextResponse.json({
     success: true,

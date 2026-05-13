@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -43,10 +44,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/briefings/feedback/error', request.url));
   }
 
+  // SECURITY: Verify user owns this email (supports signed token for email links)
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.redirect(new URL('/briefings/feedback/error?reason=unauthorized', request.url));
+  }
+
   try {
     // Record feedback - gracefully handle if table doesn't exist yet
     const feedbackData: Record<string, unknown> = {
-      user_email: email.toLowerCase(),
+      user_email: auth.email!,
       briefing_date: date,
       briefing_type: type || 'daily',
       rating: rating,
@@ -99,13 +106,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+    }
+
     // Validate reason if provided
     if (reason && !VALID_REASONS.includes(reason)) {
       return NextResponse.json({ success: false, error: 'Invalid reason' }, { status: 400 });
     }
 
     const feedbackData: Record<string, unknown> = {
-      user_email: email.toLowerCase(),
+      user_email: auth.email!,
       briefing_date: date,
       briefing_type: type || 'daily',
       rating: rating,

@@ -23,6 +23,7 @@
     "@anthropic-ai/sdk": "^0.80.0",
     "@supabase/supabase-js": "^2.90.0",
     "@tanstack/react-query": "^5.100.9",
+    "@upstash/qstash": "^2.11.0",
     "@vercel/kv": "^3.0.0",
     "jspdf": "^4.0.0",
     "next": "16.1.1",

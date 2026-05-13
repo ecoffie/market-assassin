@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReportUsage, getContentUsage } from '@/lib/rate-limit';
 import { cookies } from 'next/headers';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,14 +33,23 @@ export async function GET(request: NextRequest) {
     }, { headers: corsHeaders });
   }
 
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({
+      success: false,
+      error: auth.error || 'Unauthorized',
+    }, { headers: corsHeaders, status: 401 });
+  }
+
   const [reportUsage, contentUsage] = await Promise.all([
-    getReportUsage(email),
-    getContentUsage(email),
+    getReportUsage(auth.email!),
+    getContentUsage(auth.email!),
   ]);
 
   return NextResponse.json({
     success: true,
-    email,
+    email: auth.email,
     reports: {
       used: reportUsage.used,
       limit: reportUsage.limit,
@@ -76,10 +86,19 @@ export async function POST(request: NextRequest) {
     }, { headers: corsHeaders, status: 400 });
   }
 
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({
+      success: false,
+      error: auth.error || 'Unauthorized',
+    }, { headers: corsHeaders, status: 401 });
+  }
+
   if (action === 'check') {
     const usage = type === 'content'
-      ? await getContentUsage(email)
-      : await getReportUsage(email);
+      ? await getContentUsage(auth.email!)
+      : await getReportUsage(auth.email!);
 
     return NextResponse.json({
       success: true,
@@ -93,7 +112,7 @@ export async function POST(request: NextRequest) {
 
   // For increment/reset actions, just return current usage
   // (actual incrementing is done by the generate endpoints)
-  const reportUsage = await getReportUsage(email);
+  const reportUsage = await getReportUsage(auth.email!);
   return NextResponse.json({
     success: true,
     used: reportUsage.used,

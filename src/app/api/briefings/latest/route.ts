@@ -8,11 +8,12 @@
  * GET /api/briefings/latest?email=user@example.com&days=7  → last 7 days (max 30)
  */
 
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { hasBriefingsAccess } from '@/lib/briefings/access';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email')?.toLowerCase().trim();
   const daysParam = searchParams.get('days');
@@ -22,8 +23,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 });
   }
 
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  }
+
   // Check briefing access via KV and paid entitlement fallback
-  const hasAccess = await hasBriefingsAccess(email);
+  const hasAccess = await hasBriefingsAccess(auth.email!);
   if (!hasAccess) {
     return NextResponse.json({ error: 'No briefing access' }, { status: 403 });
   }
@@ -47,7 +54,7 @@ function getSupabase() {
   const { data, error } = await getSupabase()
     .from('briefing_log')
     .select('id, briefing_date, briefing_type, briefing_content, items_count, created_at')
-    .eq('user_email', email)
+    .eq('user_email', auth.email!)
     .lte('briefing_date', today)
     .order('briefing_date', { ascending: false })
     .order('created_at', { ascending: false })

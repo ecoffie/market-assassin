@@ -5,6 +5,7 @@ import { getNAICSForPSC } from '@/lib/utils/psc-crosswalk';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { sendEmail } from '@/lib/send-email';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -62,6 +63,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Use verified email from auth
+    const verifiedEmail = auth.email!;
+
     // Free tier sources don't require MA Premium access
     // paid_existing = subscriber activated via magic link invitation
     // free_signup / free-signup = MI Free signup from /alerts/signup
@@ -109,7 +122,7 @@ export async function POST(request: NextRequest) {
       const { data: profile } = await getSupabase()
         .from('user_profiles')
         .select('access_assassin_premium')
-        .eq('email', email.toLowerCase())
+        .eq('email', verifiedEmail)
         .single();
 
       if (!profile?.access_assassin_premium) {
@@ -122,7 +135,7 @@ export async function POST(request: NextRequest) {
 
     // Build upsert payload
     const upsertPayload: Record<string, unknown> = {
-      user_email: email.toLowerCase(),
+      user_email: verifiedEmail,
       naics_codes: expandedNaics.length > 0 ? expandedNaics : [],
       business_type: businessType || null,
       agencies: targetAgencies || [],
@@ -166,8 +179,8 @@ export async function POST(request: NextRequest) {
 
       // Grant KV access for briefings (gates actual tool access)
       try {
-        await grantBriefingsAccess(email);
-        console.log(`[Alerts] Granted briefings access to paid subscriber: ${email}`);
+        await grantBriefingsAccess(verifiedEmail);
+        console.log(`[Alerts] Granted briefings access to paid subscriber: ${verifiedEmail}`);
       } catch (kvError) {
         console.warn(`[Alerts] KV error granting briefings to ${email}:`, kvError);
         // Continue anyway - database flag will work as fallback
@@ -201,7 +214,7 @@ export async function POST(request: NextRequest) {
         await getSupabase()
           .from('user_business_profiles')
           .upsert({
-            user_email: email.toLowerCase().trim(),
+            user_email: verifiedEmail,
             business_description: cleanBusinessDescription || null,
             business_description_updated_at: cleanBusinessDescription ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
@@ -213,7 +226,7 @@ export async function POST(request: NextRequest) {
 
     // Send welcome email with opportunity preview (async, don't block response)
     sendWelcomeEmailWithOpportunities(
-      email.toLowerCase().trim(),
+      verifiedEmail,
       expandedNaics,
       targetAgencies || []
     ).catch(err => console.warn('[Alerts] Welcome email failed:', err));
@@ -417,10 +430,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { data, error } = await getSupabase()
       .from('user_notification_settings')
       .select('*')
-      .eq('user_email', email.toLowerCase())
+      .eq('user_email', auth.email!)
       .single();
 
     if (error || !data) {

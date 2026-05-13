@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -41,6 +42,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields: email and noticeId' },
         { status: 400 }
+      );
+    }
+
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: 401 }
       );
     }
 
@@ -158,6 +168,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Email required' }, { status: 400 });
   }
 
+  // SECURITY: Verify user owns this email
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  }
+
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
@@ -192,6 +208,12 @@ export async function DELETE(request: NextRequest) {
 
     if (!email || !noticeId) {
       return NextResponse.json({ error: 'Missing email or noticeId' }, { status: 400 });
+    }
+
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = getSupabase();

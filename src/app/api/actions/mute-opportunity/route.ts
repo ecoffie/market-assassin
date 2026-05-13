@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,6 +42,14 @@ export async function GET(request: NextRequest) {
   if (!email || !title) {
     return NextResponse.redirect(
       new URL('/opportunity/mute/error?reason=missing_params', request.url)
+    );
+  }
+
+  // SECURITY: Verify user owns this email (via signed token or cookie)
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.redirect(
+      new URL('/opportunity/mute/error?reason=unauthorized', request.url)
     );
   }
 
@@ -112,6 +121,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Email and title are required' },
         { status: 400 }
+      );
+    }
+
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { success: false, error: auth.error || 'Unauthorized' },
+        { status: 401 }
       );
     }
 

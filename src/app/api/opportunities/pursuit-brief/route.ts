@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 import { extractAndParseJSON, generateBriefingJson } from '@/lib/briefings/delivery/llm-router';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -63,6 +64,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SECURITY: Verify user owns this email
+    const auth = await verifyUserOwnsEmail(request, email);
+    if (!auth.authenticated) {
+      return NextResponse.json(
+        { error: auth.error || 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const supabase = getSupabase();
     if (!supabase) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
@@ -72,14 +82,14 @@ export async function POST(request: NextRequest) {
     const { data: userSettings } = await supabase
       .from('user_notification_settings')
       .select('naics_codes, agencies, keywords')
-      .eq('user_email', email.toLowerCase())
+      .eq('user_email', auth.email!)
       .single();
 
     const userNaics = userSettings?.naics_codes || [];
     const userAgencies = userSettings?.agencies || [];
     const userKeywords = userSettings?.keywords || [];
 
-    console.log(`[Pursuit Brief] Generating for ${email}, notice ${noticeId}...`);
+    console.log(`[Pursuit Brief] Generating for ${auth.email}, notice ${noticeId}...`);
 
     // Generate the pursuit brief
     const brief = await generatePursuitBrief(opportunityData, {
@@ -93,7 +103,7 @@ export async function POST(request: NextRequest) {
     const emailText = generatePursuitEmailText(brief);
 
     await sendEmail({
-      to: email,
+      to: auth.email!,
       subject: `🎯 PURSUIT BRIEF: ${brief.contractName} - Score: ${brief.opportunityScore}/100`,
       html: emailHtml,
       text: emailText,
@@ -103,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     // Log the pursuit brief (unified to briefing_log)
     await supabase.from('briefing_log').upsert({
-      user_email: email.toLowerCase(),
+      user_email: auth.email!,
       briefing_date: new Date().toISOString().split('T')[0],
       briefing_type: 'pursuit',
       briefing_content: {
@@ -130,7 +140,7 @@ export async function POST(request: NextRequest) {
         .eq('id', savedOpportunityId);
     }
 
-    console.log(`[Pursuit Brief] Sent to ${email} in ${processingTime}ms, score: ${brief.opportunityScore}/100`);
+    console.log(`[Pursuit Brief] Sent to ${auth.email} in ${processingTime}ms, score: ${brief.opportunityScore}/100`);
 
     return NextResponse.json({
       success: true,
@@ -140,7 +150,7 @@ export async function POST(request: NextRequest) {
         agency: brief.agency,
       },
       processingTimeMs: processingTime,
-      message: `Pursuit Brief sent to ${email}`,
+      message: `Pursuit Brief sent to ${auth.email}`,
     });
 
   } catch (error) {
