@@ -42,14 +42,22 @@ interface TeamingPartner {
   outreach_status?: 'none' | 'contacted' | 'responded' | 'meeting' | 'partnered';
 }
 
-const STAGES = [
+// Active stages shown on Board view (where BD spends 95% of time)
+const ACTIVE_STAGES = [
   { id: 'tracking', label: 'Tracking', color: 'bg-slate-500', icon: '👁️' },
   { id: 'pursuing', label: 'Pursuing', color: 'bg-blue-500', icon: '🎯' },
   { id: 'bidding', label: 'Bidding', color: 'bg-amber-500', icon: '📝' },
   { id: 'submitted', label: 'Submitted', color: 'bg-purple-500', icon: '📤' },
+] as const;
+
+// Completed stages (archived from Board, visible in List view filter)
+const COMPLETED_STAGES = [
   { id: 'won', label: 'Won', color: 'bg-emerald-500', icon: '🏆' },
   { id: 'lost', label: 'Lost', color: 'bg-red-500', icon: '❌' },
 ] as const;
+
+// All stages combined (for dropdowns and list view)
+const STAGES = [...ACTIVE_STAGES, ...COMPLETED_STAGES] as const;
 
 const PRIORITIES: Array<{ id: PipelinePriority; label: string }> = [
   { id: 'low', label: 'Low' },
@@ -65,6 +73,7 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'board' | 'list'>('list');
+  const [showCompleted, setShowCompleted] = useState(false); // Toggle for Won/Lost in list view
   const [sortField, setSortField] = useState<'deadline' | 'value' | 'stage' | 'priority' | 'title'>('deadline');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [stats, setStats] = useState<Record<string, number>>({});
@@ -167,8 +176,13 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
   const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
   const stageOrder: Record<string, number> = { tracking: 0, pursuing: 1, bidding: 2, submitted: 3, won: 4, lost: 5 };
 
+  // Filter opportunities: active only, or include completed
+  const activeOpportunities = opportunities.filter(opp => !['won', 'lost'].includes(opp.stage));
+  const completedOpportunities = opportunities.filter(opp => ['won', 'lost'].includes(opp.stage));
+  const filteredOpportunities = showCompleted ? opportunities : activeOpportunities;
+
   // Sorted opportunities for list view
-  const sortedOpportunities = [...opportunities].sort((a, b) => {
+  const sortedOpportunities = [...filteredOpportunities].sort((a, b) => {
     let comparison = 0;
     switch (sortField) {
       case 'deadline':
@@ -502,9 +516,9 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
         </div>
       )}
 
-      {/* Stats Bar */}
+      {/* Stats Bar - Only active stages + completed toggle */}
       <div className="flex gap-4 overflow-x-auto pb-2">
-        {STAGES.slice(0, 4).map(stage => (
+        {ACTIVE_STAGES.map(stage => (
           <div
             key={stage.id}
             className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg shrink-0"
@@ -514,12 +528,28 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
             <span className="text-white font-semibold">{stats[stage.id] || getOpportunitiesByStage(stage.id).length}</span>
           </div>
         ))}
+        {/* Completed toggle (Won + Lost) */}
+        {completedOpportunities.length > 0 && (
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg shrink-0 transition-colors ${
+              showCompleted
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+            }`}
+          >
+            <span>🏁</span>
+            <span className="text-sm">Completed:</span>
+            <span className="font-semibold">{completedOpportunities.length}</span>
+            {showCompleted && <span className="text-xs ml-1">✓</span>}
+          </button>
+        )}
       </div>
 
-      {/* Board View */}
+      {/* Board View - Only 4 active stages for wider columns */}
       {viewMode === 'board' && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {STAGES.map(stage => (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {ACTIVE_STAGES.map(stage => (
             <div key={stage.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
               <div className={`px-4 py-3 ${stage.color} bg-opacity-20 border-b border-slate-800`}>
                 <div className="flex items-center justify-between">
