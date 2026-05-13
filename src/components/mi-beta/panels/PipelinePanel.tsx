@@ -64,7 +64,9 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('list');
+  const [sortField, setSortField] = useState<'deadline' | 'value' | 'stage' | 'priority' | 'title'>('deadline');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [stats, setStats] = useState<Record<string, number>>({});
   const [selectedOpportunity, setSelectedOpportunity] = useState<PipelineOpportunity | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -132,6 +134,84 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
   const getOpportunitiesByStage = (stage: string) => {
     return opportunities.filter(opp => opp.stage === stage);
   };
+
+  // Parse value estimate to number for sorting (e.g., "$3.5M" -> 3500000)
+  const parseValue = (val?: string): number => {
+    if (!val) return 0;
+    const cleaned = val.replace(/[^0-9.BMK]/gi, '');
+    const num = parseFloat(cleaned) || 0;
+    if (val.toUpperCase().includes('B')) return num * 1_000_000_000;
+    if (val.toUpperCase().includes('M')) return num * 1_000_000;
+    if (val.toUpperCase().includes('K')) return num * 1_000;
+    return num;
+  };
+
+  // Get days until deadline (negative = overdue)
+  const getDaysUntilDeadline = (deadline?: string): number => {
+    if (!deadline) return 999999; // No deadline = sort to end
+    return Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Get urgency badge for list view
+  const getUrgencyBadge = (deadline?: string) => {
+    if (!deadline) return null;
+    const days = getDaysUntilDeadline(deadline);
+    if (days < 0) return { label: 'OVERDUE', color: 'bg-red-500 text-white' };
+    if (days <= 3) return { label: `${days}d`, color: 'bg-red-500 text-white' };
+    if (days <= 7) return { label: `${days}d`, color: 'bg-amber-500 text-white' };
+    if (days <= 14) return { label: `${days}d`, color: 'bg-yellow-500/20 text-yellow-300' };
+    return null;
+  };
+
+  // Priority order for sorting
+  const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  const stageOrder: Record<string, number> = { tracking: 0, pursuing: 1, bidding: 2, submitted: 3, won: 4, lost: 5 };
+
+  // Sorted opportunities for list view
+  const sortedOpportunities = [...opportunities].sort((a, b) => {
+    let comparison = 0;
+    switch (sortField) {
+      case 'deadline':
+        comparison = getDaysUntilDeadline(a.response_deadline) - getDaysUntilDeadline(b.response_deadline);
+        break;
+      case 'value':
+        comparison = parseValue(b.value_estimate) - parseValue(a.value_estimate); // Higher value first
+        break;
+      case 'stage':
+        comparison = stageOrder[a.stage] - stageOrder[b.stage];
+        break;
+      case 'priority':
+        comparison = (priorityOrder[a.priority || 'medium']) - (priorityOrder[b.priority || 'medium']);
+        break;
+      case 'title':
+        comparison = (a.title || '').localeCompare(b.title || '');
+        break;
+    }
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortHeader = ({ field, children }: { field: typeof sortField; children: React.ReactNode }) => (
+    <th
+      onClick={() => handleSort(field)}
+      className="text-left px-4 py-3 text-xs text-slate-500 font-medium cursor-pointer hover:text-slate-300 transition-colors select-none"
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field && (
+          <span className="text-blue-400">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+        )}
+      </div>
+    </th>
+  );
 
   const openOpportunity = (opportunity: PipelineOpportunity) => {
     setError(null);
@@ -539,83 +619,124 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
         </div>
       )}
 
-      {/* List View */}
+      {/* List View - Improved Table */}
       {viewMode === 'list' && opportunities.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[900px]">
               <thead>
-                <tr className="border-b border-slate-800">
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Opportunity</th>
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Agency</th>
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Stage</th>
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Deadline</th>
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Owner</th>
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Priority</th>
+                <tr className="border-b border-slate-800 bg-slate-900/50">
+                  <SortHeader field="title">Opportunity</SortHeader>
+                  <SortHeader field="value">Value</SortHeader>
+                  <SortHeader field="stage">Stage</SortHeader>
+                  <SortHeader field="deadline">Deadline</SortHeader>
+                  <SortHeader field="priority">Priority</SortHeader>
+                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Next Action</th>
                 </tr>
               </thead>
               <tbody>
-                {opportunities.map(opp => (
-                  <tr
-                    key={opp.id}
-                    onClick={() => openOpportunity(opp)}
-                    className="border-b border-slate-800/50 hover:bg-slate-800/30 cursor-pointer"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="text-sm text-white">{opp.title}</div>
-                      {opp.value_estimate && (
-                        <div className="text-xs text-emerald-400">{opp.value_estimate}</div>
-                      )}
-                      {opp.next_action && (
-                        <div className="text-xs text-slate-500 mt-1">Next: {opp.next_action}</div>
-                      )}
-                      {opp.teaming_partners && opp.teaming_partners.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {opp.teaming_partners.slice(0, 3).map(partner => (
-                            <span key={partner} className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-300 rounded">
-                              {partner}
-                            </span>
-                          ))}
-                          {opp.teaming_partners.length > 3 && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded">
-                              +{opp.teaming_partners.length - 3}
+                {sortedOpportunities.map(opp => {
+                  const urgency = getUrgencyBadge(opp.response_deadline);
+                  const stageInfo = STAGES.find(s => s.id === opp.stage);
+                  return (
+                    <tr
+                      key={opp.id}
+                      onClick={() => openOpportunity(opp)}
+                      className={`border-b border-slate-800/50 hover:bg-slate-800/50 cursor-pointer transition-colors ${
+                        urgency?.label === 'OVERDUE' ? 'bg-red-500/5' : ''
+                      }`}
+                    >
+                      {/* Opportunity Title + Agency */}
+                      <td className="px-4 py-3 max-w-[300px]">
+                        <div className="text-sm text-white font-medium line-clamp-1">{opp.title}</div>
+                        <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{opp.agency || 'Unknown Agency'}</div>
+                        {opp.teaming_partners && opp.teaming_partners.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {opp.teaming_partners.slice(0, 2).map(partner => (
+                              <span key={partner} className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-300 rounded">
+                                {partner}
+                              </span>
+                            ))}
+                            {opp.teaming_partners.length > 2 && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded">
+                                +{opp.teaming_partners.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Value */}
+                      <td className="px-4 py-3">
+                        {opp.value_estimate ? (
+                          <span className="text-sm font-semibold text-emerald-400">{opp.value_estimate}</span>
+                        ) : (
+                          <span className="text-xs text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      {/* Stage Dropdown */}
+                      <td className="px-4 py-3">
+                        <div
+                          className="inline-block"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <select
+                            value={opp.stage}
+                            onChange={(event) => {
+                              event.stopPropagation();
+                              moveOpportunityToStage(opp, event.target.value as PipelineStage);
+                            }}
+                            className={`rounded-lg border border-slate-700 ${stageInfo?.color || 'bg-slate-800'} bg-opacity-20 px-3 py-1.5 text-xs text-white font-medium outline-none transition-colors hover:border-slate-500 focus:border-blue-500 cursor-pointer`}
+                          >
+                            {STAGES.map(item => (
+                              <option key={item.id} value={item.id}>{item.icon} {item.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+
+                      {/* Deadline with Urgency Badge */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-300">{formatDate(opp.response_deadline)}</span>
+                          {urgency && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${urgency.color}`}>
+                              {urgency.label}
                             </span>
                           )}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-400">{opp.agency || '-'}</td>
-                    <td className="px-4 py-3">
-                      <label
-                        className="block min-w-36"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <span className="sr-only">Move pursuit stage</span>
-                        <select
-                          value={opp.stage}
-                          onChange={(event) => {
-                            event.stopPropagation();
-                            moveOpportunityToStage(opp, event.target.value as PipelineStage);
-                          }}
-                          className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 outline-none transition-colors hover:border-slate-500 focus:border-blue-500"
-                        >
-                          {STAGES.map(item => (
-                            <option key={item.id} value={item.id}>{item.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-400">{formatDate(opp.response_deadline)}</td>
-                    <td className="px-4 py-3 text-sm text-slate-400">{opp.owner_email || '-'}</td>
-                    <td className="px-4 py-3">
-                      {opp.priority && (
-                        <span className={`text-xs px-2 py-1 rounded ${getPriorityColor(opp.priority)}`}>
-                          {opp.priority}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      {/* Priority */}
+                      <td className="px-4 py-3">
+                        {opp.priority ? (
+                          <span className={`text-xs px-2 py-1 rounded font-medium ${getPriorityColor(opp.priority)}`}>
+                            {opp.priority.charAt(0).toUpperCase() + opp.priority.slice(1)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-600">-</span>
+                        )}
+                      </td>
+
+                      {/* Next Action */}
+                      <td className="px-4 py-3 max-w-[200px]">
+                        {opp.next_action ? (
+                          <div>
+                            <div className="text-xs text-slate-300 line-clamp-1">{opp.next_action}</div>
+                            {opp.next_action_date && (
+                              <div className="text-[10px] text-slate-500 mt-0.5">
+                                Due: {formatDate(opp.next_action_date)}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-600">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
