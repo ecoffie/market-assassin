@@ -1,0 +1,453 @@
+/**
+ * Customer Qualification Agent API
+ *
+ * Identifies users and customers worth personal outreach based on:
+ * - Purchase history (Stripe/Supabase)
+ * - MI engagement (briefings, alerts, app usage)
+ * - Profile completion
+ * - Activity signals
+ *
+ * GET /api/admin/qualify-customers?password=xxx           → Full qualification report
+ * GET /api/admin/qualify-customers?password=xxx&segment=10-10  → Specific segment
+ * GET /api/admin/qualify-customers?password=xxx&format=csv     → CSV export
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+
+// Scoring weights from the spec
+const SCORE_WEIGHTS = {
+  // Purchase signals
+  ULTIMATE_BUNDLE: 30,
+  ACTIVE_MI_PRO: 25,
+  MULTIPLE_PURCHASES: 20,
+  HIGH_TICKET: 15,
+  ACTIVE_SUBSCRIPTION: 20,
+
+  // Engagement signals
+  PROFILE_COMPLETED: 15,
+  CUSTOM_NAICS: 10,
+  BRIEFING_OPENED: 10,
+  BRIEFING_CLICKED: 5,
+  MI_APP_ACTIVE_7D: 15,
+  SAVED_OPPORTUNITY: 20,
+  USED_PIPELINE: 15,
+  USED_FORECASTS: 10,
+
+  // Intent signals
+  ATTENDED_BOOTCAMP: 15,
+  POSITIVE_FEEDBACK: 10,
+
+  // Negative signals
+  REFUND_DISPUTE: -30,
+  NO_PROFILE_NO_ENGAGEMENT: -20,
+  INACTIVE_30D: -10,
+};
+
+// Product tiers for scoring
+const HIGH_TICKET_PRODUCTS = [
+  'ultimate-giant',
+  'pro-giant',
+  'contractor-database',
+  'market-assassin-premium',
+];
+
+const BUNDLE_PRODUCTS = [
+  'ultimate-giant',
+  'pro-giant',
+  'starter-bundle',
+];
+
+interface QualifiedCustomer {
+  email: string;
+  name: string | null;
+  segment: string;
+  score: number;
+  signals: string[];
+  recommendedAction: string;
+  // Raw data for debugging
+  totalSpent: number;
+  purchaseCount: number;
+  productsOwned: string[];
+  hasActiveSubscription: boolean;
+  profileComplete: boolean;
+  hasCustomNaics: boolean;
+  briefingsReceived: number;
+  lastActivity: string | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
+
+// Default NAICS codes that indicate incomplete profile
+const DEFAULT_NAICS = new Set(['541512', '541611', '541330', '541990', '561210']);
+
+function hasCustomNaics(naicsCodes: string[] | null): boolean {
+  if (!naicsCodes || naicsCodes.length === 0) return false;
+  // Has custom if ANY code is not in the default set
+  return naicsCodes.some(code => !DEFAULT_NAICS.has(code));
+}
+
+function isProfileComplete(user: {
+  naics_codes: string[] | null;
+  business_type: string | null;
+  location_state: string | null;
+}): boolean {
+  return Boolean(
+    user.naics_codes &&
+    user.naics_codes.length > 0 &&
+    hasCustomNaics(user.naics_codes)
+  );
+}
+
+function determineSegment(score: number, signals: string[]): string {
+  const hasHighTicket = signals.some(s => s.includes('High-ticket') || s.includes('Ultimate'));
+  const hasPaid = signals.some(s => s.includes('purchase') || s.includes('subscription'));
+  const hasEngagement = signals.some(s => s.includes('briefing') || s.includes('pipeline') || s.includes('active'));
+
+  if (score >= 80 && hasHighTicket) return '10-10 Candidate';
+  if (score >= 70 && hasPaid) return 'White-glove Candidate';
+  if (score >= 50 && !hasPaid && hasEngagement) return 'MI Pro Upgrade';
+  if (score >= 40 && hasPaid && !hasEngagement) return 'Rescue Candidate';
+  if (score >= 30 && !hasEngagement) return 'Activation Candidate';
+  return 'Audience Only';
+}
+
+function getRecommendedAction(segment: string, signals: string[]): string {
+  const hasProfile = signals.some(s => s.includes('Profile complete'));
+
+  switch (segment) {
+    case '10-10 Candidate':
+      return 'Schedule founder call — high-value customer worth deep investment';
+    case 'White-glove Candidate':
+      return 'Sales call — discuss done-for-you services and enterprise needs';
+    case 'MI Pro Upgrade':
+      return 'Send upgrade campaign — active free user ready for paid';
+    case 'Rescue Candidate':
+      return hasProfile
+        ? 'Customer success check-in — paid but inactive, understand blockers'
+        : 'Send profile setup help — paid but hasn\'t configured';
+    case 'Activation Candidate':
+      return 'Send setup nudge — has access but incomplete onboarding';
+    default:
+      return 'Low-touch nurture — add to email sequence only';
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const password = searchParams.get('password');
+  const segment = searchParams.get('segment'); // Filter by specific segment
+  const format = searchParams.get('format'); // 'csv' for export
+  const limit = parseInt(searchParams.get('limit') || '100', 10);
+
+  if (password !== ADMIN_PASSWORD) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const supabase = getSupabase();
+
+    // Fetch all data sources in parallel
+    const [
+      purchasesRes,
+      usersRes,
+      briefingLogsRes,
+      subscriptionsRes,
+      pipelineRes,
+      feedbackRes,
+    ] = await Promise.all([
+      // All purchases
+      supabase
+        .from('purchases')
+        .select('user_email, product_name, amount_paid, created_at')
+        .order('created_at', { ascending: false }),
+
+      // All users with notification settings
+      supabase
+        .from('user_notification_settings')
+        .select('user_email, naics_codes, business_type, location_state, briefings_enabled, alerts_enabled, created_at, updated_at, treatment_type, products_owned, paid_status'),
+
+      // Briefing delivery log (last 30 days)
+      supabase
+        .from('briefing_log')
+        .select('user_email, briefing_date, briefing_type')
+        .gte('briefing_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+
+      // Active subscriptions
+      supabase
+        .from('stripe_subscriptions')
+        .select('customer_id, product_name, status, plan_amount')
+        .eq('status', 'active'),
+
+      // Pipeline activity (saved opportunities)
+      supabase
+        .from('user_pipeline')
+        .select('user_email, created_at')
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+
+      // Positive feedback
+      supabase
+        .from('briefing_feedback')
+        .select('user_email, rating')
+        .eq('rating', 'helpful'),
+    ]);
+
+    // Build lookup maps
+    const purchasesByEmail = new Map<string, { products: string[]; totalSpent: number; count: number }>();
+    for (const p of purchasesRes.data || []) {
+      const email = p.user_email?.toLowerCase();
+      if (!email) continue;
+      const existing = purchasesByEmail.get(email) || { products: [], totalSpent: 0, count: 0 };
+      existing.products.push(p.product_name);
+      existing.totalSpent += (p.amount_paid || 0) / 100; // Convert cents to dollars
+      existing.count++;
+      purchasesByEmail.set(email, existing);
+    }
+
+    const briefingsByEmail = new Map<string, number>();
+    for (const b of briefingLogsRes.data || []) {
+      const email = b.user_email?.toLowerCase();
+      if (!email) continue;
+      briefingsByEmail.set(email, (briefingsByEmail.get(email) || 0) + 1);
+    }
+
+    const pipelineByEmail = new Set<string>();
+    for (const p of pipelineRes.data || []) {
+      if (p.user_email) pipelineByEmail.add(p.user_email.toLowerCase());
+    }
+
+    const positiveFeedbackEmails = new Set<string>();
+    for (const f of feedbackRes.data || []) {
+      if (f.user_email) positiveFeedbackEmails.add(f.user_email.toLowerCase());
+    }
+
+    // Map customer IDs to emails from subscriptions (we need stripe_customers join)
+    const activeSubscriptionCustomers = new Set<string>();
+    for (const s of subscriptionsRes.data || []) {
+      if (s.customer_id) activeSubscriptionCustomers.add(s.customer_id);
+    }
+
+    // Score each user
+    const qualifiedCustomers: QualifiedCustomer[] = [];
+
+    for (const user of usersRes.data || []) {
+      const email = user.user_email?.toLowerCase();
+      if (!email) continue;
+
+      // Skip internal/test emails
+      if (email.includes('@govcongiants.com') ||
+          email.includes('@govconedu.com') ||
+          email.includes('test@')) {
+        continue;
+      }
+
+      const purchase = purchasesByEmail.get(email);
+      const briefingsCount = briefingsByEmail.get(email) || 0;
+      const hasPipeline = pipelineByEmail.has(email);
+      const hasPositiveFeedback = positiveFeedbackEmails.has(email);
+      const profileComplete = isProfileComplete(user);
+      const customNaics = hasCustomNaics(user.naics_codes);
+
+      let score = 0;
+      const signals: string[] = [];
+
+      // Purchase signals
+      if (purchase) {
+        const products = purchase.products.map(p => p?.toLowerCase() || '');
+
+        if (products.some(p => p.includes('ultimate'))) {
+          score += SCORE_WEIGHTS.ULTIMATE_BUNDLE;
+          signals.push('Ultimate Bundle buyer (+30)');
+        }
+
+        if (products.some(p => HIGH_TICKET_PRODUCTS.some(ht => p.includes(ht)))) {
+          score += SCORE_WEIGHTS.HIGH_TICKET;
+          signals.push('High-ticket purchase (+15)');
+        }
+
+        if (purchase.count >= 2) {
+          score += SCORE_WEIGHTS.MULTIPLE_PURCHASES;
+          signals.push(`Multiple purchases: ${purchase.count} (+20)`);
+        }
+
+        if (user.paid_status || user.treatment_type === 'briefings') {
+          score += SCORE_WEIGHTS.ACTIVE_MI_PRO;
+          signals.push('Active MI Pro / Briefings (+25)');
+        }
+      }
+
+      // Engagement signals
+      if (profileComplete) {
+        score += SCORE_WEIGHTS.PROFILE_COMPLETED;
+        signals.push('Profile complete (+15)');
+      }
+
+      if (customNaics) {
+        score += SCORE_WEIGHTS.CUSTOM_NAICS;
+        signals.push('Custom NAICS selected (+10)');
+      }
+
+      if (briefingsCount > 0) {
+        score += SCORE_WEIGHTS.BRIEFING_OPENED;
+        signals.push(`Briefings received: ${briefingsCount} (+10)`);
+      }
+
+      if (hasPipeline) {
+        score += SCORE_WEIGHTS.SAVED_OPPORTUNITY;
+        signals.push('Saved/tracked opportunity (+20)');
+      }
+
+      if (hasPositiveFeedback) {
+        score += SCORE_WEIGHTS.POSITIVE_FEEDBACK;
+        signals.push('Positive feedback (+10)');
+      }
+
+      // Negative signals
+      if (!profileComplete && briefingsCount === 0 && !purchase) {
+        score += SCORE_WEIGHTS.NO_PROFILE_NO_ENGAGEMENT;
+        signals.push('No profile, no engagement (-20)');
+      }
+
+      // Determine segment
+      const customerSegment = determineSegment(score, signals);
+      const recommendedAction = getRecommendedAction(customerSegment, signals);
+
+      qualifiedCustomers.push({
+        email,
+        name: null, // Would need to join with stripe_customers
+        segment: customerSegment,
+        score,
+        signals,
+        recommendedAction,
+        totalSpent: purchase?.totalSpent || 0,
+        purchaseCount: purchase?.count || 0,
+        productsOwned: purchase?.products || [],
+        hasActiveSubscription: user.paid_status || false,
+        profileComplete,
+        hasCustomNaics: customNaics,
+        briefingsReceived: briefingsCount,
+        lastActivity: user.updated_at,
+      });
+    }
+
+    // Sort by score descending
+    qualifiedCustomers.sort((a, b) => b.score - a.score);
+
+    // Filter by segment if requested
+    let filtered = qualifiedCustomers;
+    if (segment) {
+      const segmentLower = segment.toLowerCase();
+      filtered = qualifiedCustomers.filter(c =>
+        c.segment.toLowerCase().includes(segmentLower)
+      );
+    }
+
+    // Limit results
+    filtered = filtered.slice(0, limit);
+
+    // Generate segment summaries
+    const segmentCounts: Record<string, number> = {};
+    for (const c of qualifiedCustomers) {
+      segmentCounts[c.segment] = (segmentCounts[c.segment] || 0) + 1;
+    }
+
+    // CSV export
+    if (format === 'csv') {
+      const headers = ['Rank', 'Email', 'Segment', 'Score', 'Signals', 'Recommended Action', 'Total Spent', 'Products'];
+      const rows = filtered.map((c, i) => [
+        i + 1,
+        c.email,
+        c.segment,
+        c.score,
+        c.signals.join('; '),
+        c.recommendedAction,
+        `$${c.totalSpent.toFixed(2)}`,
+        c.productsOwned.join(', '),
+      ]);
+
+      const csv = [headers.join(','), ...rows.map(r => r.map(cell => `"${cell}"`).join(','))].join('\n');
+
+      return new NextResponse(csv, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="qualified-customers-${new Date().toISOString().split('T')[0]}.csv"`,
+        },
+      });
+    }
+
+    // JSON response
+    return NextResponse.json({
+      success: true,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalScored: qualifiedCustomers.length,
+        bySegment: segmentCounts,
+        top10Score: qualifiedCustomers.slice(0, 10).map(c => ({ email: c.email, score: c.score, segment: c.segment })),
+      },
+      lists: {
+        // Top 10 for founder calls
+        founderCalls: qualifiedCustomers
+          .filter(c => c.segment === '10-10 Candidate')
+          .slice(0, 10)
+          .map(c => ({
+            email: c.email,
+            score: c.score,
+            why: c.signals.slice(0, 3).join(', '),
+            action: c.recommendedAction,
+          })),
+
+        // Top 25 for Annelle/Sikander outreach
+        salesOutreach: qualifiedCustomers
+          .filter(c => ['10-10 Candidate', 'White-glove Candidate'].includes(c.segment))
+          .slice(0, 25)
+          .map(c => ({
+            email: c.email,
+            segment: c.segment,
+            score: c.score,
+            why: c.signals.slice(0, 3).join(', '),
+            action: c.recommendedAction,
+          })),
+
+        // MI Pro upgrade candidates
+        upgradeTargets: qualifiedCustomers
+          .filter(c => c.segment === 'MI Pro Upgrade')
+          .slice(0, 25)
+          .map(c => ({
+            email: c.email,
+            score: c.score,
+            why: c.signals.slice(0, 3).join(', '),
+          })),
+
+        // Rescue candidates (paid but inactive)
+        rescueCandidates: qualifiedCustomers
+          .filter(c => c.segment === 'Rescue Candidate')
+          .slice(0, 25)
+          .map(c => ({
+            email: c.email,
+            totalSpent: c.totalSpent,
+            products: c.productsOwned,
+            issue: c.profileComplete ? 'Inactive despite profile' : 'Never completed profile',
+          })),
+      },
+      customers: filtered,
+    });
+  } catch (error) {
+    console.error('[qualify-customers] Error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to qualify customers',
+    }, { status: 500 });
+  }
+}

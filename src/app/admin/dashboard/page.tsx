@@ -471,6 +471,20 @@ export default function AdminDashboard() {
     generatedAt: string;
   } | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
+  const [qualifiedCustomers, setQualifiedCustomers] = useState<{
+    summary: {
+      totalScored: number;
+      bySegment: Record<string, number>;
+    };
+    lists: {
+      founderCalls: Array<{ email: string; score: number; why: string; action: string }>;
+      salesOutreach: Array<{ email: string; segment: string; score: number; why: string; action: string }>;
+      upgradeTargets: Array<{ email: string; score: number; why: string }>;
+      rescueCandidates: Array<{ email: string; totalSpent: number; products: string[]; issue: string }>;
+    };
+    generatedAt: string;
+  } | null>(null);
+  const [qualifyLoading, setQualifyLoading] = useState(false);
 
   const fetchDashboard = useCallback(async (passwordOverride?: string) => {
     const adminPassword = passwordOverride || password;
@@ -819,6 +833,45 @@ export default function AdminDashboard() {
               )}
             </button>
             <button
+              onClick={async () => {
+                setQualifyLoading(true);
+                try {
+                  const res = await fetch(`/api/admin/qualify-customers?password=${encodeURIComponent(password)}`);
+                  if (res.ok) {
+                    const json = await res.json();
+                    if (json.success) {
+                      setQualifiedCustomers({
+                        summary: json.summary,
+                        lists: json.lists,
+                        generatedAt: json.generatedAt,
+                      });
+                    }
+                  }
+                } catch (e) {
+                  console.error('Failed to qualify customers:', e);
+                } finally {
+                  setQualifyLoading(false);
+                }
+              }}
+              disabled={qualifyLoading}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded transition-colors flex items-center gap-2"
+            >
+              {qualifyLoading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Qualifying...
+                </>
+              ) : (
+                <>
+                  <span>👥</span>
+                  Qualify Customers
+                </>
+              )}
+            </button>
+            <button
               onClick={() => fetchDashboard()}
               disabled={loading}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
@@ -916,6 +969,156 @@ export default function AdminDashboard() {
                   }`}>{item.answer}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Qualified Customers Panel */}
+        {qualifiedCustomers && (
+          <div id="qualified-customers" className="mb-6 bg-gradient-to-br from-amber-950/40 to-gray-800 rounded-lg border border-amber-700/50 p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>👥</span> Customer Qualification Agent
+                </h2>
+                <p className="text-gray-400 text-sm">Generated {new Date(qualifiedCustomers.generatedAt).toLocaleString()}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="px-3 py-1 rounded-full text-sm font-semibold bg-amber-600/30 text-amber-300">
+                  {qualifiedCustomers.summary.totalScored} customers scored
+                </div>
+                <a
+                  href={`/api/admin/qualify-customers?password=${encodeURIComponent(password)}&format=csv`}
+                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors"
+                >
+                  Export CSV
+                </a>
+                <button
+                  onClick={() => setQualifiedCustomers(null)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Segment Summary */}
+            <div className="mb-6 p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide mb-3">Segment Distribution</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {Object.entries(qualifiedCustomers.summary.bySegment).map(([segment, count]) => (
+                  <div key={segment} className={`p-3 rounded-lg text-center ${
+                    segment === '10-10 Candidate' ? 'bg-emerald-950/50 border border-emerald-800/50' :
+                    segment === 'White-glove Candidate' ? 'bg-purple-950/50 border border-purple-800/50' :
+                    segment === 'MI Pro Upgrade' ? 'bg-blue-950/50 border border-blue-800/50' :
+                    segment === 'Rescue Candidate' ? 'bg-orange-950/50 border border-orange-800/50' :
+                    segment === 'Activation Candidate' ? 'bg-yellow-950/50 border border-yellow-800/50' :
+                    'bg-gray-800/50 border border-gray-700/50'
+                  }`}>
+                    <p className="text-2xl font-bold text-white">{count}</p>
+                    <p className="text-xs text-gray-400">{segment}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Outreach Lists */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Founder Calls */}
+              <div className="bg-emerald-950/30 rounded-lg border border-emerald-800/30 p-4">
+                <h3 className="text-sm font-semibold text-emerald-300 uppercase tracking-wide mb-3">
+                  Top 10 for Founder Calls
+                </h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {qualifiedCustomers.lists.founderCalls.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No 10-10 candidates found</p>
+                  ) : (
+                    qualifiedCustomers.lists.founderCalls.map((c, i) => (
+                      <div key={i} className="flex items-start gap-2 p-2 bg-gray-900/50 rounded">
+                        <span className="text-emerald-400 font-bold text-sm">{i + 1}.</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm truncate">{c.email}</p>
+                          <p className="text-gray-500 text-xs truncate">{c.why}</p>
+                        </div>
+                        <span className="text-emerald-300 text-xs font-mono">{c.score}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Sales Outreach */}
+              <div className="bg-purple-950/30 rounded-lg border border-purple-800/30 p-4">
+                <h3 className="text-sm font-semibold text-purple-300 uppercase tracking-wide mb-3">
+                  Top 25 for Sales Outreach
+                </h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {qualifiedCustomers.lists.salesOutreach.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No sales outreach candidates found</p>
+                  ) : (
+                    qualifiedCustomers.lists.salesOutreach.slice(0, 10).map((c, i) => (
+                      <div key={i} className="flex items-start gap-2 p-2 bg-gray-900/50 rounded">
+                        <span className="text-purple-400 font-bold text-sm">{i + 1}.</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm truncate">{c.email}</p>
+                          <p className="text-gray-500 text-xs">{c.segment}</p>
+                        </div>
+                        <span className="text-purple-300 text-xs font-mono">{c.score}</span>
+                      </div>
+                    ))
+                  )}
+                  {qualifiedCustomers.lists.salesOutreach.length > 10 && (
+                    <p className="text-gray-500 text-xs text-center pt-2">
+                      +{qualifiedCustomers.lists.salesOutreach.length - 10} more in CSV export
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* MI Pro Upgrades */}
+              <div className="bg-blue-950/30 rounded-lg border border-blue-800/30 p-4">
+                <h3 className="text-sm font-semibold text-blue-300 uppercase tracking-wide mb-3">
+                  MI Pro Upgrade Targets
+                </h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {qualifiedCustomers.lists.upgradeTargets.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No upgrade candidates found</p>
+                  ) : (
+                    qualifiedCustomers.lists.upgradeTargets.slice(0, 10).map((c, i) => (
+                      <div key={i} className="flex items-start gap-2 p-2 bg-gray-900/50 rounded">
+                        <span className="text-blue-400 font-bold text-sm">{i + 1}.</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm truncate">{c.email}</p>
+                          <p className="text-gray-500 text-xs truncate">{c.why}</p>
+                        </div>
+                        <span className="text-blue-300 text-xs font-mono">{c.score}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Rescue Candidates */}
+              <div className="bg-orange-950/30 rounded-lg border border-orange-800/30 p-4">
+                <h3 className="text-sm font-semibold text-orange-300 uppercase tracking-wide mb-3">
+                  Rescue Candidates (Paid but Inactive)
+                </h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {qualifiedCustomers.lists.rescueCandidates.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No rescue candidates found</p>
+                  ) : (
+                    qualifiedCustomers.lists.rescueCandidates.slice(0, 10).map((c, i) => (
+                      <div key={i} className="flex items-start gap-2 p-2 bg-gray-900/50 rounded">
+                        <span className="text-orange-400 font-bold text-sm">{i + 1}.</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm truncate">{c.email}</p>
+                          <p className="text-gray-500 text-xs">${c.totalSpent.toFixed(0)} spent • {c.issue}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
