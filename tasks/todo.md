@@ -150,6 +150,17 @@ Move access link tokens from KV to Supabase:
 ## COMPLETED (Reference)
 
 ### May 13, 2026
+- [x] **Customer Qualification Agent** - Built scoring system for outreach prioritization
+  - Scores based on purchases (30pts Ultimate, 25pts MI Pro, 20pts multiple)
+  - Scores based on engagement (15pts profile, 10pts NAICS, 10pts briefings)
+  - Segments: 10-10 Candidate, White-glove, MI Pro Upgrade, Rescue, Activation
+  - API: `/api/admin/qualify-customers` with CSV export
+  - Commit: `8f0ca70`
+- [x] **MI Daily Brief Generator** - Transform dashboard metrics into actionable brief
+  - Health Score (0-100) with Decision Levers
+  - Answers 10 key questions from MI OS
+  - Copy to Slack button for team sharing
+  - Commit: `e9fddd0`
 - [x] **API Security Audit COMPLETE** - Hardened 31 routes with `verifyUserOwnsEmail`
   - Routes now verify authenticated user owns the email they're querying
   - 19 routes use `verifyUserOwnsEmail`, 12 use `requireMIAuthSession`

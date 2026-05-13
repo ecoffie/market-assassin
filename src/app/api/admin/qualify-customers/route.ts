@@ -160,49 +160,94 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabase();
 
     // Fetch all data sources in parallel
+    // Note: Supabase default limit is 1000 rows, we need to fetch in batches for large tables
+
+    // First, fetch purchases and smaller tables
     const [
       purchasesRes,
-      usersRes,
       briefingLogsRes,
       subscriptionsRes,
       pipelineRes,
       feedbackRes,
     ] = await Promise.all([
-      // All purchases
+      // All purchases (usually <500)
       supabase
         .from('purchases')
         .select('user_email, product_name, amount_paid, created_at')
-        .order('created_at', { ascending: false }),
-
-      // All users with notification settings
-      supabase
-        .from('user_notification_settings')
-        .select('user_email, naics_codes, business_type, location_state, briefings_enabled, alerts_enabled, created_at, updated_at, treatment_type, products_owned, paid_status'),
+        .order('created_at', { ascending: false })
+        .limit(2000),
 
       // Briefing delivery log (last 30 days)
       supabase
         .from('briefing_log')
         .select('user_email, briefing_date, briefing_type')
-        .gte('briefing_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+        .gte('briefing_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .limit(10000),
 
       // Active subscriptions
       supabase
         .from('stripe_subscriptions')
         .select('customer_id, product_name, status, plan_amount')
-        .eq('status', 'active'),
+        .eq('status', 'active')
+        .limit(1000),
 
       // Pipeline activity (saved opportunities)
       supabase
         .from('user_pipeline')
         .select('user_email, created_at')
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .limit(5000),
 
       // Positive feedback
       supabase
         .from('briefing_feedback')
         .select('user_email, rating')
-        .eq('rating', 'helpful'),
+        .eq('rating', 'helpful')
+        .limit(5000),
     ]);
+
+    // Fetch users in multiple batches to handle large user base (10K+ users)
+    const PAGE_SIZE = 2000;
+    const allUsers: Array<{
+      user_email: string;
+      naics_codes: string[] | null;
+      business_type: string | null;
+      location_state: string | null;
+      briefings_enabled: boolean;
+      alerts_enabled: boolean;
+      created_at: string;
+      updated_at: string;
+      treatment_type: string | null;
+      products_owned: string[] | null;
+      paid_status: boolean | null;
+    }> = [];
+
+    let page = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('user_notification_settings')
+        .select('user_email, naics_codes, business_type, location_state, briefings_enabled, alerts_enabled, created_at, updated_at, treatment_type, products_owned, paid_status')
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+        .order('user_email');
+
+      if (error) {
+        console.error('[qualify-customers] Error fetching users page', page, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allUsers.push(...data);
+        hasMore = data.length === PAGE_SIZE;
+        page++;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    const usersRes = { data: allUsers };
+
+    console.log(`[qualify-customers] Fetched ${purchasesRes.data?.length || 0} purchases, ${allUsers.length} users`);
 
     // Build lookup maps
     const purchasesByEmail = new Map<string, { products: string[]; totalSpent: number; count: number }>();
@@ -393,6 +438,10 @@ export async function GET(request: NextRequest) {
       generatedAt: new Date().toISOString(),
       summary: {
         totalScored: qualifiedCustomers.length,
+        totalUsers: allUsers.length,
+        totalPurchases: purchasesRes.data?.length || 0,
+        uniquePurchasers: purchasesByEmail.size,
+        purchasersWithProfile: qualifiedCustomers.filter(c => c.totalSpent > 0).length,
         bySegment: segmentCounts,
         top10Score: qualifiedCustomers.slice(0, 10).map(c => ({ email: c.email, score: c.score, segment: c.segment })),
       },
