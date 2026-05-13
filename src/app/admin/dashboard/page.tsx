@@ -460,6 +460,17 @@ export default function AdminDashboard() {
   const [profileReminderLimit, setProfileReminderLimit] = useState(25);
   const [loadingStep, setLoadingStep] = useState(0);
   const restoredSession = useRef(false);
+  const [dailyBrief, setDailyBrief] = useState<{
+    headline: string;
+    healthScore: number;
+    healthLabel: string;
+    answers: Array<{ question: string; answer: string; status: string }>;
+    levers: Array<{ priority: string; signal: string; action: string; owner: string; metric?: string }>;
+    topPriority: string;
+    slackSummary: string;
+    generatedAt: string;
+  } | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
 
   const fetchDashboard = useCallback(async (passwordOverride?: string) => {
     const adminPassword = passwordOverride || password;
@@ -771,14 +782,143 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-bold text-white">GovCon Giants Admin</h1>
             <p className="text-gray-400">Last updated: {new Date(data.timestamp).toLocaleString()}</p>
           </div>
-          <button
-            onClick={() => fetchDashboard()}
-            disabled={loading}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
-          >
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                setBriefLoading(true);
+                try {
+                  const res = await fetch(`/api/admin/generate-daily-brief?password=${encodeURIComponent(password)}`);
+                  if (res.ok) {
+                    const json = await res.json();
+                    if (json.success && json.brief) {
+                      setDailyBrief(json.brief);
+                    }
+                  }
+                } catch (e) {
+                  console.error('Failed to generate brief:', e);
+                } finally {
+                  setBriefLoading(false);
+                }
+              }}
+              disabled={briefLoading}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors flex items-center gap-2"
+            >
+              {briefLoading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <span>📋</span>
+                  Generate Daily Brief
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => fetchDashboard()}
+              disabled={loading}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         </div>
+
+        {/* Daily Brief Panel */}
+        {dailyBrief && (
+          <div id="daily-brief" className="mb-6 bg-gradient-to-br from-emerald-950/40 to-gray-800 rounded-lg border border-emerald-700/50 p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>📋</span> MI Daily Brief
+                </h2>
+                <p className="text-gray-400 text-sm">Generated {new Date(dailyBrief.generatedAt).toLocaleString()}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                  dailyBrief.healthScore >= 80 ? 'bg-emerald-600/30 text-emerald-300' :
+                  dailyBrief.healthScore >= 60 ? 'bg-yellow-600/30 text-yellow-300' :
+                  dailyBrief.healthScore >= 40 ? 'bg-orange-600/30 text-orange-300' :
+                  'bg-red-600/30 text-red-300'
+                }`}>
+                  {dailyBrief.healthLabel} ({dailyBrief.healthScore}/100)
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(dailyBrief.slackSummary);
+                    setActionResult('Copied to clipboard!');
+                    setTimeout(() => setActionResult(null), 2000);
+                  }}
+                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors"
+                >
+                  Copy for Slack
+                </button>
+                <button
+                  onClick={() => setDailyBrief(null)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Decision Levers */}
+            {dailyBrief.levers.length > 0 && (
+              <div className="mb-6 p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide mb-3">Decision Levers</h3>
+                <div className="space-y-2">
+                  {dailyBrief.levers.map((lever, i) => (
+                    <div key={i} className={`flex items-start gap-3 p-3 rounded-lg ${
+                      lever.priority === 'critical' ? 'bg-red-950/50 border border-red-800/50' :
+                      lever.priority === 'high' ? 'bg-orange-950/50 border border-orange-800/50' :
+                      lever.priority === 'medium' ? 'bg-yellow-950/50 border border-yellow-800/50' :
+                      'bg-gray-800/50 border border-gray-700/50'
+                    }`}>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
+                        lever.priority === 'critical' ? 'bg-red-700 text-red-100' :
+                        lever.priority === 'high' ? 'bg-orange-700 text-orange-100' :
+                        lever.priority === 'medium' ? 'bg-yellow-700 text-yellow-100' :
+                        'bg-gray-600 text-gray-200'
+                      }`}>
+                        {lever.priority}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-white font-medium">{lever.action}</p>
+                        <p className="text-gray-400 text-sm">{lever.signal}</p>
+                        {lever.metric && <p className="text-gray-500 text-xs mt-1">{lever.metric}</p>}
+                      </div>
+                      <span className="text-gray-500 text-sm">{lever.owner}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 10 Questions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {dailyBrief.answers.map((item, i) => (
+                <div key={i} className={`p-3 rounded-lg border ${
+                  item.status === 'good' ? 'bg-emerald-950/30 border-emerald-700/30' :
+                  item.status === 'warning' ? 'bg-yellow-950/30 border-yellow-700/30' :
+                  item.status === 'critical' ? 'bg-red-950/30 border-red-700/30' :
+                  'bg-gray-800/50 border-gray-700/30'
+                }`}>
+                  <p className="text-gray-400 text-xs font-medium mb-1">{item.question}</p>
+                  <p className={`text-sm ${
+                    item.status === 'good' ? 'text-emerald-200' :
+                    item.status === 'warning' ? 'text-yellow-200' :
+                    item.status === 'critical' ? 'text-red-200' :
+                    'text-gray-200'
+                  }`}>{item.answer}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* System Alerts */}
         {data.systemAlerts.length > 0 && (
