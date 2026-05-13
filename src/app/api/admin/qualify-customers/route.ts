@@ -207,7 +207,9 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Fetch users in multiple batches to handle large user base (10K+ users)
-    const PAGE_SIZE = 2000;
+    // Supabase default limit is 1000, we'll use that to avoid config issues
+    const PAGE_SIZE = 1000;
+    const MAX_PAGES = 15; // Safety limit: 15 pages × 1000 = 15K users max
     const allUsers: Array<{
       user_email: string;
       naics_codes: string[] | null;
@@ -224,7 +226,7 @@ export async function GET(request: NextRequest) {
 
     let page = 0;
     let hasMore = true;
-    while (hasMore) {
+    while (hasMore && page < MAX_PAGES) {
       const { data, error } = await supabase
         .from('user_notification_settings')
         .select('user_email, naics_codes, business_type, location_state, briefings_enabled, alerts_enabled, created_at, updated_at, treatment_type, products_owned, paid_status')
@@ -243,6 +245,9 @@ export async function GET(request: NextRequest) {
       } else {
         hasMore = false;
       }
+
+      // Log progress
+      console.log(`[qualify-customers] Fetched page ${page}, got ${data?.length || 0} users, total: ${allUsers.length}`);
     }
 
     const usersRes = { data: allUsers };
