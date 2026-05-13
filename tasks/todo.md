@@ -6,25 +6,7 @@
 
 ## P0 - CRITICAL (This Week)
 
-### API Security Audit (68 Routes)
-**Status:** Audit script exists, need to classify routes
-
-**Why Critical:** Security risk - customer data may be exposed. Real vulnerability.
-
-**Run:** `npm run audit:api-auth`
-
-- [ ] Group routes by: public/token/admin/MI user
-- [ ] Harden highest-risk routes first (write, admin, paid-data)
-- [ ] Add intentional public routes to allowlist
-- [ ] Re-run until all routes classified
-
-**Classification:**
-| Class | Protection |
-|-------|------------|
-| Public | Explicit allowlist |
-| Token protected | Secret/password validation |
-| Admin only | Admin password gate |
-| MI user protected | MI auth session check |
+*No critical items - security audit complete!*
 
 ---
 
@@ -168,6 +150,10 @@ Move access link tokens from KV to Supabase:
 ## COMPLETED (Reference)
 
 ### May 13, 2026
+- [x] **API Security Audit COMPLETE** - Hardened 31 routes with `verifyUserOwnsEmail`
+  - Routes now verify authenticated user owns the email they're querying
+  - 19 routes use `verifyUserOwnsEmail`, 12 use `requireMIAuthSession`
+  - Commit: `0a648f7` (24 files, 813 insertions)
 - [x] Daily Alerts Schedule moved earlier (1 AM - 6 AM ET)
 - [x] Upstash KV upgraded to Pay As You Go
 - [x] Upstash QStash installed (Pay As You Go)
