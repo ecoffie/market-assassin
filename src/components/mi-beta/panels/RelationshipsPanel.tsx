@@ -49,11 +49,13 @@ interface ContactLink {
   };
 }
 
-const TABS: Array<{ id: TabId; label: string; description: string; type?: ContactType }> = [
-  { id: 'buyers', label: 'Find Buyers', description: 'Government people tied to your market', type: 'government_buyer' },
-  { id: 'osbp', label: 'OSBP Contacts', description: 'Small business office contacts', type: 'osbp' },
-  { id: 'partners', label: 'Partners', description: 'Primes, subs, and teaming targets', type: 'prime' },
-  { id: 'network', label: 'My Network', description: 'Saved buyers and partners' },
+// Discovery tabs = search/find new contacts
+// My Network tab = your saved CRM contacts
+const TABS: Array<{ id: TabId; label: string; description: string; type?: ContactType; isDiscovery?: boolean }> = [
+  { id: 'network', label: 'My Network', description: 'Your saved contacts (CRM)' },
+  { id: 'buyers', label: 'Gov Buyers', description: 'Search gov employees from opportunities', type: 'government_buyer', isDiscovery: true },
+  { id: 'osbp', label: 'OSBP Directory', description: 'Agency small business office reps', type: 'osbp', isDiscovery: true },
+  { id: 'partners', label: 'Find Partners', description: 'Search contractors for teaming', type: 'prime', isDiscovery: true },
 ];
 
 function contactTypeLabel(type?: string) {
@@ -325,8 +327,16 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
       {/* Header with Stats */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">My Network</h1>
-          <p className="text-slate-400 mt-1">Your saved buyers, partners, and pursuit contacts.</p>
+          <h1 className="text-2xl font-bold text-white">Contacts &amp; CRM</h1>
+          <p className="text-slate-400 mt-1">
+            {activeTab === 'network'
+              ? 'Your saved buyers, partners, and pursuit contacts.'
+              : activeTab === 'buyers'
+              ? 'Government employees tied to your opportunities (from SAM.gov POC data).'
+              : activeTab === 'osbp'
+              ? 'Small business office reps who help small businesses win contracts.'
+              : 'Contractors you can partner with for teaming arrangements.'}
+          </p>
         </div>
         <div className="flex flex-wrap gap-3">
           <div className="rounded-lg bg-slate-800 px-4 py-2 text-center">
@@ -344,9 +354,33 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
-        {TABS.map(tab => (
+      {/* Tabs - My Network (CRM) | Find New Contacts (Discovery) */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+        {/* My Network tab (CRM) */}
+        <button
+          onClick={() => {
+            setActiveTab('network');
+            setNotice(null);
+            setError(null);
+          }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'network'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          📇 My Network
+          {stats.total > 0 && (
+            <span className="ml-2 text-xs text-slate-500">({stats.total})</span>
+          )}
+        </button>
+
+        {/* Divider */}
+        <div className="h-6 w-px bg-slate-700 mx-2" />
+        <span className="text-xs text-slate-500 uppercase tracking-wide">Find New:</span>
+
+        {/* Discovery tabs */}
+        {TABS.filter(tab => tab.isDiscovery).map(tab => (
           <button
             key={tab.id}
             onClick={() => {
@@ -356,14 +390,11 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
             }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? 'bg-emerald-500/20 text-emerald-300'
+                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
             {tab.label}
-            {tab.id === 'network' && stats.total > 0 && (
-              <span className="ml-2 text-xs text-slate-500">({stats.total})</span>
-            )}
           </button>
         ))}
       </div>

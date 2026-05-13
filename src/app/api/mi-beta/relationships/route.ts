@@ -637,19 +637,20 @@ function collectContactObjects(value: unknown, output: Record<string, unknown>[]
 function mapSamContactCandidate(row: Record<string, unknown>, contact: Record<string, unknown>, index: number): RelationshipCandidate | null {
   const email = getStringField(contact, ['email', 'emailAddress', 'contactEmail', 'pocEmail', 'poc_email']);
   const phone = getStringField(contact, ['phone', 'phoneNumber', 'contactPhone', 'pocPhone', 'poc_phone']);
+  // Get name from contact-specific fields only (NOT 'title' which could be job title or opportunity title)
   const name = getStringField(contact, [
     'fullName',
-    'name',
     'contactFullname',
     'ContactFullname',
     'contactName',
     'pocName',
     'poc_name',
-    'title',
   ]);
-  const title = getStringField(contact, ['title', 'contactTitle', 'ContactTitle', 'type', 'role']) || 'Government point of contact';
+  // Job title is separate from name - only look for title-specific fields
+  const jobTitle = getStringField(contact, ['contactTitle', 'ContactTitle', 'role', 'position']) || 'Government point of contact';
 
-  if (!email && !phone && !name) return null;
+  // MUST have email or phone - name alone is too unreliable (could be opportunity title leaking through)
+  if (!email && !phone) return null;
 
   const noticeId = String(row.notice_id || row.solicitation_number || index);
   const agency = String(row.department || '');
@@ -658,10 +659,10 @@ function mapSamContactCandidate(row: Record<string, unknown>, contact: Record<st
   const opportunityTitle = String(row.title || '');
 
   return {
-    id: `sam-contact:${noticeId}:${email || name || index}`,
+    id: `sam-contact:${noticeId}:${email || index}`,
     contact_type: 'government_buyer',
-    full_name: name || email || 'Government point of contact',
-    title,
+    full_name: name || email?.split('@')[0] || 'Government Contact',
+    title: jobTitle,
     email,
     phone,
     organization: office || subTier || agency,
@@ -669,7 +670,7 @@ function mapSamContactCandidate(row: Record<string, unknown>, contact: Record<st
     office,
     sub_tier: subTier,
     source: 'sam_opportunities',
-    source_record_id: `sam:${noticeId}:${email || name || index}`,
+    source_record_id: `sam:${noticeId}:${email || index}`,
     context: [opportunityTitle, row.solicitation_number ? `Sol# ${row.solicitation_number}` : '', row.response_deadline ? `Due ${row.response_deadline}` : ''].filter(Boolean).join(' · '),
   };
 }
