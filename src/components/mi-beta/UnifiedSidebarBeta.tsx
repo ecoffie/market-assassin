@@ -243,17 +243,17 @@ export default function UnifiedSidebarBeta({
         <div className="flex items-center justify-between">
           {!isCollapsed && (
             <Link href="/mi-beta" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">MI</span>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">M</span>
               </div>
               <div>
-                <span className="font-semibold text-white text-sm">Market Intel</span>
+                <span className="font-semibold text-white text-sm">Mindy</span>
               </div>
             </Link>
           )}
           {isCollapsed && (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center mx-auto">
-              <span className="text-white font-bold text-sm">MI</span>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mx-auto">
+              <span className="text-white font-bold text-sm">M</span>
             </div>
           )}
           {onToggleCollapse && (

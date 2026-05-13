@@ -26,7 +26,7 @@ function DashboardLoading() {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center">
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-400">Loading Market Intelligence...</p>
+        <p className="text-gray-400">Loading Mindy...</p>
       </div>
     </div>
   );
@@ -399,14 +399,14 @@ function MIBetaDashboard() {
         <div className="max-w-4xl mx-auto px-6 py-16">
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center mx-auto mb-6">
-              <span className="text-white font-bold text-2xl">MI</span>
+            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mx-auto mb-6">
+              <span className="text-white font-bold text-2xl">M</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Unified Market Intelligence
+              Meet Mindy
             </h1>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              All your GovCon tools in one place. AI briefings, market research,
+              Your AI-powered GovCon intelligence partner. Daily briefings, market research,
               forecasts, pipeline tracking, and more.
             </p>
           </div>
@@ -414,7 +414,7 @@ function MIBetaDashboard() {
           {/* Email Entry */}
           <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-8 max-w-md mx-auto">
             <h2 className="text-lg font-semibold text-white mb-4 text-center">
-              {authStep === 'credentials' ? 'Sign in to Market Intelligence' : 'Enter verification code'}
+              {authStep === 'credentials' ? 'Sign in to Mindy' : 'Enter verification code'}
             </h2>
 
             {resetSuccess && authStep === 'credentials' && (
