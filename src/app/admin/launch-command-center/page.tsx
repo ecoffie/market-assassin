@@ -85,6 +85,39 @@ type GrowthBrief = {
 
 type LaunchHealth = 'green' | 'yellow' | 'red';
 
+type QualificationCandidate = {
+  email: string;
+  score: number;
+  why: string;
+  action: string;
+};
+
+type CustomerQualificationBrief = {
+  success: boolean;
+  summary: {
+    totalScored: number;
+    totalPurchases: number;
+    uniquePurchasers: number;
+    bySegment: {
+      '10-10 Candidate': number;
+      'Activation Candidate': number;
+      'Rescue Candidate': number;
+      'Audience Only': number;
+    };
+    top10Score: Array<{
+      email: string;
+      score: number;
+      segment: string;
+    }>;
+  };
+  lists: {
+    founderCalls: QualificationCandidate[];
+    salesOutreach: QualificationCandidate[];
+    upgradeTargets: QualificationCandidate[];
+    rescueCandidates: QualificationCandidate[];
+  };
+};
+
 type LaunchManagerBrief = {
   generatedAt: string;
   domainPolicy: {
@@ -347,6 +380,9 @@ export default function LaunchCommandCenterPage() {
   const [launchBrief, setLaunchBrief] = useState<LaunchManagerBrief | null>(null);
   const [launchLoading, setLaunchLoading] = useState(false);
   const [launchError, setLaunchError] = useState('');
+  const [qualBrief, setQualBrief] = useState<CustomerQualificationBrief | null>(null);
+  const [qualLoading, setQualLoading] = useState(false);
+  const [qualError, setQualError] = useState('');
 
   const currentDate = useMemo(() => {
     return new Intl.DateTimeFormat('en-US', {
@@ -513,6 +549,49 @@ export default function LaunchCommandCenterPage() {
     }
 
     loadLaunchBrief();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, password]);
+
+  useEffect(() => {
+    if (!authenticated || !password) return;
+
+    let cancelled = false;
+
+    async function loadQualificationBrief() {
+      setQualLoading(true);
+      setQualError('');
+
+      try {
+        const response = await fetch(`/api/admin/qualify-customers?password=${encodeURIComponent(password)}`, {
+          cache: 'no-store',
+        });
+        const data = await response.json();
+
+        if (cancelled) return;
+
+        if (!response.ok || !data.success) {
+          setQualError(data.error || 'Could not load qualification data');
+          setQualBrief(null);
+          return;
+        }
+
+        setQualBrief(data as CustomerQualificationBrief);
+      } catch {
+        if (!cancelled) {
+          setQualError('Could not load qualification data');
+          setQualBrief(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setQualLoading(false);
+        }
+      }
+    }
+
+    loadQualificationBrief();
 
     return () => {
       cancelled = true;
@@ -725,6 +804,133 @@ export default function LaunchCommandCenterPage() {
           ) : (
             <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-slate-400">
               Growth brief will load after admin authentication.
+            </div>
+          )}
+        </section>
+
+        {/* Customer Qualification Section - 10-10 Candidates */}
+        <section className="rounded-lg border border-amber-500/30 bg-gradient-to-br from-amber-900/20 to-slate-900 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-amber-300">Customer Qualification Agent</p>
+              <h2 className="mt-2 text-3xl font-bold">High-Value Customer Outreach</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Purchase-based scoring identifies your best customers for founder calls, sales outreach, and rescue campaigns.
+              </p>
+            </div>
+          </div>
+
+          {qualLoading ? (
+            <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                <div className="command-center-loader h-full w-1/3 rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-red-400" />
+              </div>
+              <p className="mt-3 text-sm text-slate-400">Scoring customers by purchase history...</p>
+            </div>
+          ) : qualError ? (
+            <div className="mt-6 rounded-lg border border-red-500/40 bg-red-500/10 p-5 text-red-100">
+              {qualError}
+            </div>
+          ) : qualBrief ? (
+            <div className="mt-6 space-y-6">
+              {/* Segment Stats */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                  <p className="text-sm text-amber-200">10-10 Candidates</p>
+                  <p className="mt-2 text-4xl font-bold text-amber-300">{qualBrief.summary.bySegment['10-10 Candidate']}</p>
+                  <p className="mt-1 text-xs text-slate-400">Score 85+ • Founder calls</p>
+                </div>
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <p className="text-sm text-emerald-200">Activation Candidates</p>
+                  <p className="mt-2 text-4xl font-bold text-emerald-300">{qualBrief.summary.bySegment['Activation Candidate']}</p>
+                  <p className="mt-1 text-xs text-slate-400">Score 30-84 • Sales outreach</p>
+                </div>
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+                  <p className="text-sm text-red-200">Rescue Candidates</p>
+                  <p className="mt-2 text-4xl font-bold text-red-300">{qualBrief.summary.bySegment['Rescue Candidate']}</p>
+                  <p className="mt-1 text-xs text-slate-400">Paid but inactive • Re-engage</p>
+                </div>
+                <div className="rounded-lg border border-slate-500/30 bg-slate-500/10 p-4">
+                  <p className="text-sm text-slate-300">Total Purchasers</p>
+                  <p className="mt-2 text-4xl font-bold text-white">{qualBrief.summary.uniquePurchasers}</p>
+                  <p className="mt-1 text-xs text-slate-400">From {formatNumber(qualBrief.summary.totalPurchases)} purchases</p>
+                </div>
+              </div>
+
+              {/* Founder Call Queue */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border border-amber-500/20 bg-slate-950/50 p-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-amber-200">🎯 Founder Call Queue</h3>
+                    <span className="rounded-full bg-amber-500/20 px-3 py-1 text-sm font-semibold text-amber-300">
+                      {qualBrief.lists.founderCalls.length} candidates
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-400">High-value customers worth Eric&apos;s time</p>
+                  <div className="mt-4 max-h-80 space-y-3 overflow-y-auto">
+                    {qualBrief.lists.founderCalls.slice(0, 8).map((candidate) => (
+                      <div key={candidate.email} className="rounded-lg border border-slate-700 bg-slate-900/70 p-4">
+                        <div className="flex items-start justify-between">
+                          <p className="font-mono text-sm text-white">{candidate.email}</p>
+                          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
+                            {candidate.score}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">{candidate.why}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-emerald-500/20 bg-slate-950/50 p-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-emerald-200">💼 Sales Outreach Queue</h3>
+                    <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-sm font-semibold text-emerald-300">
+                      {qualBrief.lists.salesOutreach.length} candidates
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-400">Customers ready for Branden&apos;s upgrade pitch</p>
+                  <div className="mt-4 max-h-80 space-y-3 overflow-y-auto">
+                    {qualBrief.lists.salesOutreach.slice(0, 8).map((candidate) => (
+                      <div key={candidate.email} className="rounded-lg border border-slate-700 bg-slate-900/70 p-4">
+                        <div className="flex items-start justify-between">
+                          <p className="font-mono text-sm text-white">{candidate.email}</p>
+                          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold text-emerald-300">
+                            {candidate.score}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">{candidate.why}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Rescue Queue if any */}
+              {qualBrief.lists.rescueCandidates.length > 0 && (
+                <div className="rounded-lg border border-red-500/20 bg-slate-950/50 p-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-red-200">🚨 Rescue Queue</h3>
+                    <span className="rounded-full bg-red-500/20 px-3 py-1 text-sm font-semibold text-red-300">
+                      {qualBrief.lists.rescueCandidates.length} at risk
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-400">Paid customers who went dark — re-engage before churn</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {qualBrief.lists.rescueCandidates.map((candidate) => (
+                      <div key={candidate.email} className="rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+                        <p className="font-mono text-sm text-white">{candidate.email}</p>
+                        <p className="mt-2 text-xs text-slate-400">{candidate.why}</p>
+                        <p className="mt-2 text-xs font-semibold text-red-300">{candidate.action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-slate-400">
+              Qualification data will load after admin authentication.
             </div>
           )}
         </section>

@@ -923,6 +923,8 @@ function BriefingsDashboardContent() {
     setInputEmail(emailParam);
     setEmail(emailParam);
     localStorage.setItem('briefings_access_email', emailParam);
+    // Also set the auth cookie so API calls can verify ownership
+    document.cookie = `ma_access_email=${emailParam}; path=/; max-age=604800; SameSite=Lax`;
     void verifyAndLoadUser(emailParam);
   }, [searchParams, verifyAndLoadUser]);
 

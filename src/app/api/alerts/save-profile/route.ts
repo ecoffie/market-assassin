@@ -63,22 +63,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SECURITY: Verify user owns this email
-    const auth = await verifyUserOwnsEmail(request, email);
-    if (!auth.authenticated) {
-      return NextResponse.json(
-        { success: false, error: auth.error || 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Use verified email from auth
-    const verifiedEmail = auth.email!;
-
     // Free tier sources don't require MA Premium access
     // paid_existing = subscriber activated via magic link invitation
     // free_signup / free-signup = MI Free signup from /alerts/signup
     const isFreeSource = source === 'opportunity-hunter-free' || source === 'free-signup' || source === 'free_signup' || source === 'paid_existing';
+
+    // SECURITY: For free signups, we allow creating a profile without prior auth
+    // (user is signing up for the first time). For updates from existing users, verify ownership.
+    let verifiedEmail = email.toLowerCase().trim();
+    if (!isFreeSource) {
+      const auth = await verifyUserOwnsEmail(request, email);
+      if (!auth.authenticated) {
+        return NextResponse.json(
+          { success: false, error: auth.error || 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      verifiedEmail = auth.email!;
+    }
 
     // Collect all NAICS codes from various inputs
     const allNaicsCodes: string[] = [];

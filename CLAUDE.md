@@ -1048,6 +1048,72 @@ node scripts/merge-agency-intelligence.js --merge    # Apply
 | `/api/cron/health-check` | Automated API health tests |
 | `/api/admin/tool-health` | **AI Tool Health Dashboard** — unified monitoring |
 | `/api/admin/apply-tool-errors-migration` | Apply tool_errors database migration |
+| `/api/admin/mi-growth-brief` | **MI Growth Brief** — engagement metrics + behavioral queues |
+| `/api/admin/qualify-customers` | **Customer Qualification Agent** — purchase-based scoring |
+| `/api/admin/launch-manager-brief` | Launch Manager Brief — team execution guidance |
+
+---
+
+## MI Launch Command Center (May 2026)
+
+**URL:** `https://mi.govcongiants.com/admin/launch-command-center`
+
+**Purpose:** Single internal dashboard for launch execution, combining behavioral + purchase-based intelligence.
+
+### Data Sources
+
+| API | Purpose | Data |
+|-----|---------|------|
+| `/api/admin/mi-growth-brief` | Behavioral signals | User engagement, email metrics, 5 action queues |
+| `/api/admin/qualify-customers` | Purchase scoring | 10-10 candidates, sales targets, rescue queue |
+| `/api/admin/launch-manager-brief` | Execution guidance | Domain policy, launches, owner actions |
+
+### Queues Displayed
+
+**Growth Brief Queues (Behavioral):**
+| Queue | Purpose | Owner |
+|-------|---------|-------|
+| Setup Invite | Users need account setup | Annelle / Sikander |
+| Profile Nudge | Users need profile completion | Annelle / Sikander |
+| Activation Rescue | Users showing activation signals | Annelle / Sikander |
+| Pro Upgrade | Free users ready for upgrade | Branden |
+| White Glove | High-value enterprise candidates | Branden |
+
+**Customer Qualification Queues (Purchase-Based):**
+| Queue | Purpose | Owner |
+|-------|---------|-------|
+| Founder Calls | Score 85+ (10-10 candidates) | Eric |
+| Sales Outreach | High-value customers for upgrade | Branden |
+| Rescue Queue | Paid customers who went dark | Annelle / Sikander |
+
+### Scoring Model (Customer Qualification)
+
+**Purchase Factors:**
+- Ultimate Bundle buyer: +30
+- MI Pro / Briefings subscriber: +25
+- Multiple purchases: +20
+- Any single purchase: +10
+
+**Engagement Factors:**
+- Profile complete: +15
+- Custom NAICS (not defaults): +10
+- Briefings enabled: +10
+- App events (5+): +5
+
+**Segments:**
+- **10-10 Candidate**: Score 85+ → Founder calls
+- **Activation Candidate**: Score 30-84 → Sales outreach
+- **Rescue Candidate**: Paid but inactive → Re-engagement
+- **Audience Only**: Score <30 → Nurture sequence
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/app/admin/launch-command-center/page.tsx` | UI component (1100+ lines) |
+| `src/app/api/admin/mi-growth-brief/route.ts` | Growth Brief API (654 lines) |
+| `src/app/api/admin/qualify-customers/route.ts` | Qualification Agent (508 lines) |
+| `src/app/api/admin/launch-manager-brief/route.ts` | Launch Brief API |
 
 ---
 
@@ -1265,4 +1331,4 @@ done
 
 ---
 
-*Last Updated: April 21, 2026 — MI Dashboard Advanced Filters (NAICS, State, Agency), Forecasts State Filter*
+*Last Updated: May 13, 2026 — Command Center V2 (live data wiring with Customer Qualification + Growth Brief queues)*

@@ -11,7 +11,19 @@
   "crons": [
     {
       "path": "/api/cron/sync-sam-opportunities",
-      "schedule": "0 6 * * *"
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/sync-sam-opportunities?type=delta",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/sync-sam-opportunities?type=resume",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/sam-sync-watchdog",
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/planner/weekly-digest",

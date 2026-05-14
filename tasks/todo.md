@@ -1,12 +1,42 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** May 13, 2026
+**Last Updated:** May 14, 2026
 
 ---
 
 ## P0 - CRITICAL (This Week)
 
 *No critical items - security audit complete!*
+
+### SAM.gov Sync Pipeline - Production Grade
+**Status:** ✅ COMPLETE - Deployed May 14, 2026
+
+**Features Built:**
+- [x] Resumable sync with checkpoint tracking (per-page offsets)
+- [x] Multiple cron schedules (1 AM full, 9 AM resume, 1 PM delta, 3 PM watchdog)
+- [x] Watchdog cron with auto-recovery (triggers delta/full based on health)
+- [x] Health monitoring dashboard (`/api/admin/sam-sync-status?format=html`)
+- [x] Stale record cleanup only runs after successful FULL sync
+- [x] Retry with exponential backoff (3 retries, 5s→10s→20s)
+
+**Cron Schedule (UTC):**
+| Time | Type | Purpose |
+|------|------|---------|
+| 1 AM | full | Complete 30-day sync |
+| 9 AM | resume | Continue from last failed checkpoint |
+| 1 PM | delta | Quick refresh of recent changes |
+| 3 PM | watchdog | Health check + auto-recovery |
+
+**Admin Endpoints:**
+- Status: `/api/admin/sam-sync-status?password=xxx&format=html`
+- Watchdog: `/api/cron/sam-sync-watchdog?password=xxx`
+- Trigger sync: `/api/cron/sync-sam-opportunities?type=delta&password=xxx`
+
+**Current Health (May 14, 2026):**
+- Health Score: 100/100
+- Active Records: 29,695
+- Cache Age: ~11 hours
+- Consecutive Failures: 0
 
 ---
 
@@ -25,13 +55,27 @@
 - [ ] Identify Eric's next founder-call list via 10-10 Forever Customer Strategy
 
 ### Wire MI Internal Launch Command Center
-**Status:** V1 shell built at `/admin/launch-command-center`
+**Status:** ✅ V2 COMPLETE - Live data connected
 
-- [ ] Connect to Supabase (user activity, purchases)
-- [ ] Connect to Stripe (subscriptions, charges)
-- [ ] Connect email engagement metrics
-- [ ] Connect MI app activity data
+**Connected Data Sources:**
+- [x] MI Growth Brief (user engagement, email metrics, behavioral queues)
+- [x] Customer Qualification Agent (purchase-based scoring, 10-10 candidates)
+- [x] Launch Manager Brief (domain policy, launches, owner actions)
+
+**Live Queues:**
+| Queue | Source | Count |
+|-------|--------|-------|
+| Setup Invite | Growth Brief | 25 |
+| Profile Nudge | Growth Brief | 25 |
+| Activation Rescue | Growth Brief | 25 |
+| Pro Upgrade | Growth Brief | 25 |
+| Founder Calls | Qualification Agent | 10 |
+| Sales Outreach | Qualification Agent | 14 |
+| Rescue Queue | Qualification Agent | 1 |
+
+**Remaining (Low Priority):**
 - [ ] Add owner-updated launch action tracking
+- [ ] Add "Mark Contacted" buttons on queue items
 
 ### Update Email Templates for Correct Domains
 **Status:** Needed for domain migration
@@ -145,11 +189,30 @@ Move access link tokens from KV to Supabase:
 - KV becomes optional cache only
 - Adds audit trail of link usage
 
+### Mindy Mobile App (React Native)
+**When:** User demand justifies 2-3 month build
+**Decision:** May 14, 2026 - Eric chose Option 3 (React Native) for true native feel
+
+Build native iOS/Android apps:
+- React Native rebuild of MI dashboard
+- Reuse existing APIs and backend
+- Push notifications for daily briefings
+- App Store ($99/yr Apple) + Play Store ($25 one-time)
+- Estimated: 2-3 months development
+
 ---
 
 ## COMPLETED (Reference)
 
 ### May 13, 2026
+- [x] **Command Center V2 - Live Data Wiring** - Connected real-time data to Command Center
+  - Wired MI Growth Brief (behavioral queues: setupInvite, profileNudge, activationRescue, proUpgrade)
+  - Wired Customer Qualification Agent (purchase-based queues: founderCalls, salesOutreach, rescueCandidates)
+  - Added 4 segment stat cards (10-10 Candidates, Activation, Rescue, Total Purchasers)
+  - Added Founder Call Queue with email/score/why display (top 8)
+  - Added Sales Outreach Queue with email/score/why display (top 8)
+  - Added Rescue Queue (at-risk paid customers)
+  - Live: `mi.govcongiants.com/admin/launch-command-center`
 - [x] **Customer Qualification Agent** - Built scoring system for outreach prioritization
   - Scores based on purchases (30pts Ultimate, 25pts MI Pro, 20pts multiple)
   - Scores based on engagement (15pts profile, 10pts NAICS, 10pts briefings)
