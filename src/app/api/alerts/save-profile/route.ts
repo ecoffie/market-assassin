@@ -6,6 +6,15 @@ import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { sendEmail } from '@/lib/send-email';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import {
+  logSignupEvent,
+  logSignupCompleted,
+  logSignupFailed,
+  SignupEventType,
+  SignupStep,
+  extractIpAddress,
+  extractUserAgent,
+} from '@/lib/signup-events';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -56,7 +65,19 @@ export async function POST(request: NextRequest) {
       businessDescription,
     } = body;
 
+    // Log signup started event (non-blocking)
+    logSignupEvent({
+      eventType: SignupEventType.SIGNUP_STARTED,
+      source: source || 'unknown',
+      userEmail: email,
+      ipAddress: extractIpAddress(request),
+      userAgent: extractUserAgent(request),
+      metadata: { hasNaics: !!naicsCodes?.length, hasPsc: !!pscCode },
+    }).catch(() => {}); // Fire and forget
+
     if (!email) {
+      // Log validation failure
+      logSignupFailed(source || 'unknown', new Error('Email is required'), undefined, SignupStep.EMAIL).catch(() => {});
       return NextResponse.json(
         { success: false, error: 'Email is required' },
         { status: 400 }
@@ -74,6 +95,8 @@ export async function POST(request: NextRequest) {
     if (!isFreeSource) {
       const auth = await verifyUserOwnsEmail(request, email);
       if (!auth.authenticated) {
+        // Log auth failure event
+        logSignupFailed(source || 'unknown', new Error(auth.error || 'Unauthorized'), email).catch(() => {});
         return NextResponse.json(
           { success: false, error: auth.error || 'Unauthorized' },
           { status: 401 }
@@ -202,12 +225,21 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[Alerts] Error saving profile:', error);
+      // Log database error
+      logSignupFailed(source || 'unknown', error, email, SignupStep.DELIVERY).catch(() => {});
       const errorMessage = error.message || 'Failed to save alert profile';
       return NextResponse.json(
         { success: false, error: errorMessage },
         { status: 500 }
       );
     }
+
+    // Log successful signup completion
+    logSignupCompleted(source || 'unknown', verifiedEmail, {
+      naicsCount: expandedNaics.length,
+      agencyCount: targetAgencies?.length || 0,
+      isPaidSource: source === 'paid_existing',
+    }).catch(() => {});
 
     console.log(`[Alerts] Saved alert profile for ${email}: ${expandedNaics.length} NAICS codes, ${targetAgencies?.length || 0} agencies`);
 
@@ -251,6 +283,8 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[Alerts] Error:', error);
+    // Log catch-all error
+    logSignupFailed('unknown', error, undefined).catch(() => {});
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
