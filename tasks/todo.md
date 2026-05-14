@@ -8,6 +8,41 @@
 
 *No critical items - security audit complete!*
 
+### Signup Health Monitoring System - Enterprise Grade
+**Status:** ✅ COMPLETE - Deployed May 14, 2026
+
+**Features Built:**
+- [x] Synthetic monitoring (automated tests against signup endpoints)
+- [x] Funnel analytics (track drop-offs at each wizard step)
+- [x] Error rate tracking by type (auth_failed, validation, api_error, etc.)
+- [x] Health score calculation (0-100) with degraded/critical states
+- [x] HTML dashboard view at `?format=html`
+- [x] Event logging in save-profile API
+
+**Admin Endpoints:**
+- Dashboard: `/api/admin/signup-health?password=xxx&format=html`
+- JSON: `/api/admin/signup-health?password=xxx`
+- Migration: `/api/admin/apply-signup-events-migration?password=xxx`
+
+**Database Tables (pending migration):**
+- `signup_events` — Individual funnel event tracking
+- `signup_health_metrics` — Daily aggregated health metrics
+
+**What It Tracks:**
+| Event | When Logged |
+|-------|-------------|
+| `signup_started` | When user hits save-profile API |
+| `signup_completed` | When profile successfully saved |
+| `signup_failed` | On auth/validation/database errors |
+
+**Health Scoring:**
+- 95%+ success rate → 100 (healthy)
+- 80-94% → 80 (healthy)
+- 50-79% → 50 (degraded)
+- <50% → 20 (critical)
+
+---
+
 ### SAM.gov Sync Pipeline - Production Grade
 **Status:** ✅ COMPLETE - Deployed May 14, 2026
 
