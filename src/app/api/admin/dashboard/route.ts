@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
-const EMAIL_OPERATIONS_COMPLETE_HOUR_UTC = 13; // After briefings (08:30 UTC) and daily alerts (12:30 UTC) are done
+const EMAIL_OPERATIONS_COMPLETE_HOUR_UTC = 9; // After briefings (08:30 UTC) are done - show today's data earlier
 const PAID_TIER_ACCESS_FLAGS = [
   'access_hunter_pro',
   'access_assassin_standard',
@@ -1940,36 +1940,65 @@ async function getAlertTrend(sinceDate: string) {
 }
 
 async function getBriefingTrend(sinceDate: string) {
-  const trend: Array<{ date: string; sent: number; failed: number; skipped: number }> = [];
+  const trend: Array<{
+    date: string;
+    sent: number;
+    failed: number;
+    skipped: number;
+    byType: { daily: number; weekly: number; pursuit: number };
+  }> = [];
 
   try {
     const data = await fetchAllRows<{
       briefing_date: string;
       email_sent_at?: string | null;
       delivery_status: string;
+      briefing_type?: string | null;
     }>((from, to) =>
       getSupabase()
         .from('briefing_log')
-        .select('briefing_date, email_sent_at, delivery_status')
+        .select('briefing_date, email_sent_at, delivery_status, briefing_type')
         .or(`briefing_date.gte.${sinceDate},email_sent_at.gte.${sinceDate}T00:00:00Z`)
         .order('briefing_date', { ascending: true })
         .range(from, to)
     );
 
-    const byDate: Record<string, { sent: number; failed: number; skipped: number }> = {};
+    const byDate: Record<string, {
+      sent: number;
+      failed: number;
+      skipped: number;
+      byType: { daily: number; weekly: number; pursuit: number };
+    }> = {};
 
     if (data) {
       for (const row of data) {
+        // Use email_sent_at date for sent emails (actual send date), otherwise use briefing_date
         const date = row.delivery_status === 'sent' && row.email_sent_at
           ? String(row.email_sent_at).split('T')[0]
           : row.briefing_date;
 
         if (!date) continue;
-        if (!byDate[date]) byDate[date] = { sent: 0, failed: 0, skipped: 0 };
+        if (!byDate[date]) {
+          byDate[date] = {
+            sent: 0,
+            failed: 0,
+            skipped: 0,
+            byType: { daily: 0, weekly: 0, pursuit: 0 }
+          };
+        }
 
-        if (row.delivery_status === 'sent') byDate[date].sent++;
-        else if (row.delivery_status === 'failed') byDate[date].failed++;
-        else if (row.delivery_status === 'skipped') byDate[date].skipped++;
+        if (row.delivery_status === 'sent') {
+          byDate[date].sent++;
+          // Track by type for sent only
+          const type = row.briefing_type || 'daily';
+          if (type === 'daily') byDate[date].byType.daily++;
+          else if (type === 'weekly') byDate[date].byType.weekly++;
+          else if (type === 'pursuit') byDate[date].byType.pursuit++;
+        } else if (row.delivery_status === 'failed') {
+          byDate[date].failed++;
+        } else if (row.delivery_status === 'skipped') {
+          byDate[date].skipped++;
+        }
       }
     }
 
@@ -1982,7 +2011,7 @@ async function getBriefingTrend(sinceDate: string) {
       const date = cursor.toISOString().split('T')[0];
       trend.push({
         date,
-        ...(byDate[date] || { sent: 0, failed: 0, skipped: 0 }),
+        ...(byDate[date] || { sent: 0, failed: 0, skipped: 0, byType: { daily: 0, weekly: 0, pursuit: 0 } }),
       });
     }
   } catch (e) {
@@ -2213,25 +2242,32 @@ async function getRevenueMetrics() {
       let product = isGenericDescription
         ? (charge.metadata?.product_name || 'Purchase')
         : (charge.description || 'Purchase');
-      let bundle = charge.metadata?.bundle || undefined;
-      let details: string | undefined;
+      let transactionType = 'one-time';
 
-      const invoice = typeof charge.invoice === 'object' ? charge.invoice : null;
-      if (invoice?.customer_email && !email) {
-        email = invoice.customer_email;
+      // Handle invoice - can be object (expanded) or string ID
+      const invoiceObj = typeof charge.invoice === 'object' ? charge.invoice : null;
+      const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : invoiceObj?.id;
+
+      if (invoiceObj?.customer_email && !email) {
+        email = invoiceObj.customer_email;
       }
 
       // Get subscription reference - could be object or string ID
-      const subscriptionRef = invoice?.subscription;
+      const subscriptionRef = invoiceObj?.subscription;
       let foundProductName = false;
+
+      // If there's an invoice with subscription, it's recurring
+      if (invoiceId || subscriptionRef) {
+        transactionType = 'subscription';
+      }
 
       // Try 1: If subscription is an object with items, use them
       if (subscriptionRef && typeof subscriptionRef === 'object' && subscriptionRef.items?.data?.[0]?.price) {
         const summary = await resolvePriceSummary(subscriptionRef.items.data[0].price);
-        if (summary.product && summary.product !== 'Subscription') {
-          product = summary.product;
-          bundle = summary.bundle || bundle;
-          details = summary.details || details;
+        // Accept the product name if it's not a generic fallback
+        if (summary.product && !['Subscription', 'Purchase'].includes(summary.product)) {
+          // Clean up product names like "Copy of PRO Member Group - Monthly"
+          product = summary.product.replace(/^Copy of /, '');
           foundProductName = true;
         }
       }
@@ -2246,10 +2282,8 @@ async function getRevenueMetrics() {
             const subscriptionPrice = fullSubscription.items?.data?.[0]?.price;
             if (subscriptionPrice) {
               const summary = await resolvePriceSummary(subscriptionPrice);
-              if (summary.product && summary.product !== 'Subscription') {
-                product = summary.product;
-                bundle = summary.bundle || bundle;
-                details = summary.details || details;
+              if (summary.product && !['Subscription', 'Purchase'].includes(summary.product)) {
+                product = summary.product.replace(/^Copy of /, '');
                 foundProductName = true;
               }
             }
@@ -2259,44 +2293,77 @@ async function getRevenueMetrics() {
         }
       }
 
-      // Try 3: For one-time purchases, fetch invoice line items
-      if (!foundProductName && invoice) {
-        const invoiceId = typeof invoice === 'object' ? invoice.id : invoice;
-        if (invoiceId) {
-          try {
-            const fullInvoice = await stripe.invoices.retrieve(invoiceId, {
-              expand: ['lines.data.price.product']
-            });
-            const lineItem = fullInvoice.lines?.data?.[0];
-            if (lineItem) {
-              // Get product name from line item description or price product
-              const lineDescription = lineItem.description;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const linePrice = (lineItem as any).price;
+      // Try 3: Use already-expanded invoice line item description (no API call needed)
+      // The charges.list() call expands data.invoice, which includes lines.data[].description
+      if (!foundProductName && invoiceObj) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const invoiceAny = invoiceObj as any;
+        const lineItem = invoiceAny.lines?.data?.[0];
+        if (lineItem?.description) {
+          // Clean up description like "1 × Product Name (at $X.XX / month)"
+          const cleanedDesc = lineItem.description
+            .replace(/^\d+\s*[×x]\s*/, '')  // Remove "1 × " prefix
+            .replace(/\s*\(at \$[\d.,]+\s*\/\s*\w+\)$/, '')  // Remove "(at $X / month)" suffix
+            .replace(/^Copy of /, '')  // Remove "Copy of " prefix
+            .trim();
 
-              if (linePrice && typeof linePrice === 'object') {
-                const summary = await resolvePriceSummary(linePrice);
-                if (summary.product && summary.product !== 'Subscription') {
-                  product = summary.product;
-                  bundle = summary.bundle || bundle;
-                  details = summary.details || details;
-                  foundProductName = true;
-                }
-              }
-
-              // Fall back to line item description if still no product name
-              if (!foundProductName && lineDescription && !lineDescription.toLowerCase().includes('subscription')) {
-                product = lineDescription;
-                foundProductName = true;
-              }
-            }
-          } catch {
-            // Invoice fetch failed, continue with fallback
+          if (cleanedDesc && !cleanedDesc.toLowerCase().includes('subscription')) {
+            product = cleanedDesc;
+            foundProductName = true;
           }
         }
       }
 
-      // Try 4: Last resort - look up customer's subscriptions directly
+      // Try 4: Fetch invoice with full expansion (fallback if line description missing)
+      if (!foundProductName && invoiceId) {
+        try {
+          const fullInvoice = await stripe.invoices.retrieve(invoiceId, {
+            expand: ['lines.data.price.product']
+          });
+          const lineItem = fullInvoice.lines?.data?.[0];
+          if (lineItem) {
+            // Get product name from line item price.product
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const linePrice = (lineItem as any).price;
+
+            if (linePrice && typeof linePrice === 'object') {
+              const productObj = linePrice.product;
+              // Get name from expanded product object
+              const productName = typeof productObj === 'object' ? productObj?.name : null;
+
+              if (productName && productName !== 'Subscription') {
+                // Clean up the product name (remove "Copy of " prefix if present)
+                product = productName.replace(/^Copy of /, '');
+                foundProductName = true;
+              } else if (linePrice.nickname) {
+                product = linePrice.nickname;
+                foundProductName = true;
+              }
+            }
+
+            // Fall back to cleaned line item description if still no product name
+            if (!foundProductName && lineItem.description) {
+              // Clean up description like "1 × Product Name (at $X.XX / month)"
+              const cleanedDesc = lineItem.description
+                .replace(/^\d+\s*[×x]\s*/, '')  // Remove "1 × " prefix
+                .replace(/\s*\(at \$[\d.,]+\s*\/\s*\w+\)$/, '')  // Remove "(at $X / month)" suffix
+                .replace(/^Copy of /, '')  // Remove "Copy of " prefix
+                .trim();
+
+              if (cleanedDesc && !cleanedDesc.toLowerCase().includes('subscription')) {
+                product = cleanedDesc;
+                foundProductName = true;
+              }
+            }
+          }
+        } catch {
+          // Invoice fetch failed, continue with fallback
+        }
+      }
+
+      // Try 5: Last resort - look up customer's subscriptions directly
+      // Note: Stripe has a 4-level expansion limit, so we can't use deep expansions
+      // Instead, get subscription and then resolve price/product separately
       if (!foundProductName && charge.customer) {
         const customerId = typeof charge.customer === 'string' ? charge.customer : charge.customer.id;
         if (customerId) {
@@ -2304,22 +2371,18 @@ async function getRevenueMetrics() {
             const subscriptions = await stripe.subscriptions.list({
               customer: customerId,
               limit: 1,
-              expand: ['data.items.data.price.product']
+              // Only expand to 4 levels max
+              expand: ['data.items.data.price']
             });
             const sub = subscriptions.data[0];
             const subItem = sub?.items?.data?.[0];
-            if (subItem) {
-              // Try to get product name directly from expanded price.product
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const priceObj = subItem.price as any;
-              const productObj = priceObj?.product;
-              const productName = typeof productObj === 'object' ? productObj?.name : null;
-
-              if (productName) {
-                product = productName;
-                foundProductName = true;
-              } else if (priceObj?.nickname) {
-                product = priceObj.nickname;
+            if (subItem?.price) {
+              // Found a subscription for this customer - mark as subscription type
+              transactionType = 'subscription';
+              // Use resolvePriceSummary to handle product lookup (with caching)
+              const summary = await resolvePriceSummary(subItem.price);
+              if (summary.product && !['Subscription', 'Purchase'].includes(summary.product)) {
+                product = summary.product.replace(/^Copy of /, '');
                 foundProductName = true;
               }
             }
@@ -2334,8 +2397,7 @@ async function getRevenueMetrics() {
         product,
         amount: charge.amount / 100,
         date: new Date(charge.created * 1000).toISOString(),
-        bundle,
-        details,
+        type: transactionType,
       };
     }
 
