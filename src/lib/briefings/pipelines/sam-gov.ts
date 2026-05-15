@@ -943,9 +943,12 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   );
 
   if (stateList.length > 0) {
-    // Location states should behave as a hard place-of-performance gate, not an optional OR signal.
-    filteredQuery = filteredQuery.in('pop_state', stateList);
-    console.log(`[SAM Cache] Using hard state filter: ${stateList.join(', ')}`);
+    // IMPORTANT: Many SAM.gov opportunities have NULL pop_state (place of performance not specified).
+    // We want to include: (1) opps matching user's states OR (2) opps with no state specified (NULL).
+    // Using .or() to combine both conditions ensures we don't filter out the majority of opps.
+    const stateOrConditions = stateList.map(s => `pop_state.eq.${s}`).join(',');
+    filteredQuery = filteredQuery.or(`${stateOrConditions},pop_state.is.null`);
+    console.log(`[SAM Cache] Using soft state filter (includes NULL): ${stateList.join(', ')}`);
   }
 
   return filteredQuery;
