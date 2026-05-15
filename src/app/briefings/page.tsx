@@ -1254,9 +1254,13 @@ function BriefingsDashboardContent() {
           </div>
 
           <p className="text-gray-500 text-sm mt-6 text-center">
-            Don&apos;t have access?{' '}
+            New here?{' '}
+            <Link href="/alerts/signup" className="text-emerald-400 hover:underline font-medium">
+              Sign up free
+            </Link>
+            {' · '}
             <Link href="/market-intelligence" className="text-purple-400 hover:underline">
-              View pricing
+              View Pro pricing
             </Link>
           </p>
         </div>
@@ -1293,14 +1297,22 @@ function BriefingsDashboardContent() {
             href="/market-intelligence"
             className="inline-block py-3 px-6 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors"
           >
-            View Access Options
+            View Pro Access Options
           </Link>
-          <button
-            onClick={() => { setStatus('gate'); setError(''); }}
-            className="block mx-auto mt-4 text-gray-500 text-sm hover:text-gray-300"
-          >
-            Try a different email
-          </button>
+          <div className="mt-4 space-y-2">
+            <Link
+              href="/alerts/signup"
+              className="block text-emerald-400 text-sm hover:text-emerald-300 font-medium"
+            >
+              Sign up free for daily alerts →
+            </Link>
+            <button
+              onClick={() => { setStatus('gate'); setError(''); }}
+              className="block mx-auto text-gray-500 text-sm hover:text-gray-300"
+            >
+              Try a different email
+            </button>
+          </div>
         </div>
       </div>
     );
