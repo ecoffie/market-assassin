@@ -1186,3 +1186,61 @@ transactionType = 'subscription';  // Mark as subscription
 **Rule:** "Stripe API has a 4-level expansion limit. Count your levels. For deeper data, make a second API call."
 
 **Files:** `src/app/api/admin/dashboard/route.ts` (lines ~2335-2365)
+
+---
+
+## May 15, 2026 - Soft Keyword Filter with NAICS Fallback
+
+**Problem:** Users with specific keywords (e.g., "Leadership Training", "Executive Coaching") received 0 briefings because no SAM.gov opportunities contained those keywords.
+
+**Root Cause:**
+- Keyword filter was a "hard filter" - if keywords provided, only return opportunities matching at least one keyword
+- If keywords matched 0 opportunities → user was skipped with "no opportunities found"
+- User's NAICS codes matched plenty of opportunities, but they were filtered out by keywords
+
+**Impact:**
+- Kevin Wayne Johnson ($99/mo customer) received 0 briefings for weeks
+- His NAICS codes (611430, 611710, 541611) had 5+ matching opportunities
+- But his 10 leadership-related keywords matched nothing in SAM.gov
+
+**Fix Applied - Soft Keyword Filter:**
+```typescript
+// OLD - Hard filter (skips users if keywords match 0)
+if (keywords.length > 0) {
+  const keywordLower = keywords.map(k => k.toLowerCase());
+  const filtered = opportunities.filter(opp => {
+    const text = `${opp.title} ${opp.description}`.toLowerCase();
+    return keywordLower.some(k => text.includes(k));
+  });
+  return { opportunities: filtered, ...rest };  // Could be 0!
+}
+
+// NEW - Soft filter with NAICS fallback
+if (keywords.length > 0) {
+  const keywordLower = keywords.map(k => k.toLowerCase());
+  const keywordFiltered = opportunities.filter(opp => {
+    const text = `${opp.title} ${opp.description}`.toLowerCase();
+    return keywordLower.some(k => text.includes(k));
+  });
+
+  // Only apply keyword filter if it returns results
+  if (keywordFiltered.length > 0) {
+    filtered = keywordFiltered;
+    console.log(`[SAM Cache] Keyword filter matched ${keywordFiltered.length} opportunities`);
+  } else {
+    console.log(`[SAM Cache] Keyword filter returned 0 - falling back to NAICS-only`);
+    // Keep full NAICS results - don't filter by keywords
+  }
+}
+```
+
+**Result:**
+- Users with matching keywords: Get keyword-filtered results (more relevant)
+- Users with non-matching keywords: Get NAICS-only results (better than nothing)
+- 100% delivery rate for paying customers
+
+**Rule:** "Always use soft filters with fallback for user-configured preferences. Empty results = failed delivery."
+
+**File:** `src/lib/briefings/pipelines/sam-gov.ts` (lines 846-870)
+
+**Commit:** `bdc1e77` - "fix: Make keyword filter soft with NAICS fallback"

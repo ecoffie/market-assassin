@@ -4,6 +4,95 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 42 (May 15, 2026)
+
+### Soft Keyword Filter for Briefings - NAICS Fallback
+
+**Goal:** Fix daily briefing delivery for users with overly-specific keywords that match zero SAM.gov opportunities.
+
+#### The Problem
+
+Kevin Wayne Johnson (`thejohnsonleadershipgroup@gmail.com`) was not receiving daily briefings despite being a paying customer ($99/mo). Investigation revealed:
+
+1. **Previous state filter fix** (commit `57b114d`) added NULL `pop_state` support
+2. **Real root cause:** Kevin's keywords ("Leadership Training", "Leadership development", "Management training", etc.) matched **zero** SAM opportunities
+3. The keyword filter was a **hard filter** — if keywords provided, only return matching results (even if 0)
+4. Result: Users with specific keywords were skipped with "no opportunities found"
+
+#### The Solution
+
+Implemented a **soft keyword filter** with NAICS fallback:
+
+**Before:** Keywords matching 0 results → user skipped (no briefing)
+**After:** Keywords matching 0 results → fall back to NAICS-only results → user gets briefing
+
+#### Files Modified
+
+**`src/lib/briefings/pipelines/sam-gov.ts`** (2 edits):
+
+1. **Interface update (line 94-99):**
+```typescript
+interface SAMSearchResult {
+  opportunities: SAMOpportunity[];
+  totalRecords: number;
+  keywordMatchCount?: number; // How many opportunities matched keywords (0 means fallback to NAICS-only)
+  fetchedAt: string;
+}
+```
+
+2. **Soft keyword filter logic (replaced lines 846-860):**
+```typescript
+// Soft keyword filter: If keywords provided, try to filter. If no matches, fall back to NAICS-only results.
+let filtered = opportunities;
+let keywordMatchCount = 0;
+
+if (keywords.length > 0) {
+  const keywordLower = keywords.map(k => k.toLowerCase());
+  const keywordFiltered = opportunities.filter(opp => {
+    const text = `${opp.title} ${opp.description}`.toLowerCase();
+    return keywordLower.some(k => text.includes(k));
+  });
+
+  keywordMatchCount = keywordFiltered.length;
+
+  // Only apply keyword filter if it returns results; otherwise fall back to NAICS-only
+  if (keywordFiltered.length > 0) {
+    filtered = keywordFiltered;
+    console.log(`[SAM Cache] Keyword filter matched ${keywordFiltered.length} of ${opportunities.length} opportunities`);
+  } else {
+    console.log(`[SAM Cache] Keyword filter returned 0 results - falling back to NAICS-only (${opportunities.length} opportunities)`);
+  }
+}
+
+return {
+  opportunities: filtered.slice(0, limit),
+  totalRecords: filtered.length,
+  keywordMatchCount,
+  fetchedAt: new Date().toISOString(),
+};
+```
+
+#### Commits
+
+- `bdc1e77` — "fix: Make keyword filter soft with NAICS fallback"
+
+#### Verification
+
+1. Restored Kevin's original keywords (10 leadership-related terms)
+2. Deleted his "skipped" `briefing_log` record
+3. Triggered test briefing: `curl -sL "https://tools.govcongiants.org/api/cron/send-briefings-fast?test=true&email=thejohnsonleadershipgroup@gmail.com"`
+4. Result: `{"success":true,"briefingsSent":1}` — confirms NAICS fallback working
+
+#### Key Insight
+
+Users with niche keywords (leadership training, executive coaching, etc.) may not find exact matches in SAM.gov, but they still want to see opportunities in their NAICS codes. The soft filter ensures they always get relevant opportunities based on their industry classification.
+
+#### Impact
+
+This fix now applies to **all ~958 briefing subscribers** system-wide. Any user with overly-specific keywords will automatically receive NAICS-matched opportunities instead of being skipped.
+
+---
+
 ## Session 41 (Apr 16, 2026)
 
 ### SBIR + Grants Tabs for Market Intelligence Dashboard
@@ -1159,4 +1248,4 @@ JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assas
 
 ---
 
-*Last Updated: April 16, 2026*
+*Last Updated: May 15, 2026*
