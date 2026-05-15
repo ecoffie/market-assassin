@@ -1138,4 +1138,51 @@ const usersToProcess = users
 
 ---
 
-*Last Updated: April 20, 2026*
+*Last Updated: May 14, 2026*
+
+---
+
+## May 14, 2026 - Stripe API 4-Level Expansion Limit
+
+**Problem:** Admin dashboard showing "Purchase" instead of actual product names like "PRO Member Group - Monthly".
+
+**Root Cause 1 - Checkout charges have no invoice:**
+- Stripe Checkout session charges have `invoice: null`
+- All invoice-based product resolution methods failed silently
+- Code had 4 "tries" that all depended on invoice existing
+
+**Root Cause 2 - 5-level expansion fails silently:**
+```typescript
+// BAD - 5 levels deep, silently fails in catch block
+expand: ['data.items.data.price.product']
+// Error: "You cannot expand more than 4 levels of a property"
+```
+
+**Fix Applied:**
+```typescript
+// GOOD - 4 levels max
+const subscriptions = await stripe.subscriptions.list({
+  customer: customerId,
+  expand: ['data.items.data.price']  // 4 levels OK
+});
+
+// Then use resolvePriceSummary() to lookup product name separately
+const summary = await resolvePriceSummary(subItem.price);
+product = summary.product.replace(/^Copy of /, '');  // Clean prefix
+transactionType = 'subscription';  // Mark as subscription
+```
+
+**What changed:**
+1. Fixed Try 5 in `resolveChargePurchase()` to use 4-level expansion
+2. Added separate product lookup via `resolvePriceSummary()`
+3. Added "Copy of " prefix cleanup for product names
+4. Added `transactionType = 'subscription'` when subscription found
+
+**Result:** Dashboard now shows:
+- "PRO Member Group - Monthly" (not "Purchase")
+- "MI Pro Monthly" (not "Subscription update")
+- type: "subscription" (not "one-time")
+
+**Rule:** "Stripe API has a 4-level expansion limit. Count your levels. For deeper data, make a second API call."
+
+**Files:** `src/app/api/admin/dashboard/route.ts` (lines ~2335-2365)

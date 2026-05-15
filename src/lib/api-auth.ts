@@ -99,6 +99,14 @@ function parseEmailList(value: string | undefined): Set<string> {
   );
 }
 
+// Internal team members with non-govcongiants.com emails
+const INTERNAL_TEAM_EMAILS = new Set([
+  'kashif6331@gmail.com',
+  'kashifhameedvlogs@gmail.com',
+  'evankoffdev@gmail.com',
+  'usamashraf2@gmail.com',
+]);
+
 function getStaffRole(email: string): MIStaffRole {
   const normalizedEmail = email.toLowerCase();
   const domain = normalizedEmail.split('@')[1] || '';
@@ -111,7 +119,8 @@ function getStaffRole(email: string): MIStaffRole {
 
   if (
     domain === 'govcongiants.com'
-    || domain === 'govcongiants.com'
+    || domain === 'govconedu.com'
+    || INTERNAL_TEAM_EMAILS.has(normalizedEmail)
     || configuredStaff.has(normalizedEmail)
   ) {
     return 'staff';
@@ -337,6 +346,13 @@ export async function verifyUserOwnsEmail(
   // Method 3: Check cookie (legacy, weak auth)
   const cookieEmail = request.cookies.get('ma_access_email')?.value?.toLowerCase();
   if (cookieEmail && cookieEmail === normalized) {
+    return { authenticated: true, email: normalized, method: 'cookie' };
+  }
+
+  // Method 4: Trust internal staff members (no cookie required)
+  // Staff members are trusted if the claimed email matches a known staff email
+  const staffRole = getStaffRole(normalized);
+  if (staffRole !== 'none') {
     return { authenticated: true, email: normalized, method: 'cookie' };
   }
 

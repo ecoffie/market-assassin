@@ -264,16 +264,15 @@ async function fetchBriefingEntitlements(supabase: SupabaseClient): Promise<Set<
 
   const entitled = new Set<string>();
   const now = Date.now();
-  const latestVersion = rows.reduce(
-    (max, row) => Math.max(max, Number(row.classification_version || 0)),
-    0
-  );
+  // NOTE: Removed classification_version filtering (May 15, 2026)
+  // The version system was causing orphan users when new classification batches ran.
+  // Now we trust briefings_access values regardless of which batch set them.
   const entitledAccess = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
 
   for (const row of rows) {
     const email = row.email?.toLowerCase().trim();
     if (!email) continue;
-    if (Number(row.classification_version || 0) !== latestVersion) continue;
+    // Allow internal users even if marked 'excluded'
     if (row.briefings_access === 'excluded' && isInternalBriefingRecipient(email)) {
       entitled.add(email);
       continue;

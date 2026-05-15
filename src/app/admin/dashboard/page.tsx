@@ -176,7 +176,13 @@ interface DashboardData {
   };
   trends: {
     alerts: Array<{ date: string; sent: number; failed: number; skipped: number }>;
-    briefings: Array<{ date: string; sent: number; failed: number; skipped: number }>;
+    briefings: Array<{
+      date: string;
+      sent: number;
+      failed: number;
+      skipped: number;
+      byType?: { daily: number; weekly: number; pursuit: number };
+    }>;
   };
   deadLetter: {
     total: number;
@@ -208,8 +214,7 @@ interface DashboardData {
       product: string;
       amount: number;
       date: string;
-      bundle?: string;
-      details?: string;
+      type?: string;
     }>;
   };
   bootcampRollout?: {
@@ -2263,7 +2268,7 @@ export default function AdminDashboard() {
           <div className="bg-gray-800 rounded-lg p-6">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-lg font-semibold text-white">7-Day Alert Delivery ($19/mo)</h2>
+                <h2 className="text-lg font-semibold text-white">7-Day Alert Delivery (MI Free)</h2>
                 <p className="text-sm text-gray-400 mt-1">
                   Sent emails by completed send date. This is delivery volume, not subscriber growth.
                 </p>
@@ -2322,29 +2327,83 @@ export default function AdminDashboard() {
 
           {/* 7-Day Briefing Trend */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">7-Day Briefing Trend ($149/mo)</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">7-Day Briefing Trend (MI Pro)</h2>
+            {/* Legend */}
+            <div className="flex gap-4 mb-3 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-emerald-500 rounded" />
+                <span className="text-gray-400">Daily</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-blue-500 rounded" />
+                <span className="text-gray-400">Weekly</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-amber-500 rounded" />
+                <span className="text-gray-400">Pursuit</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-red-600 rounded" />
+                <span className="text-gray-400">Failed</span>
+              </div>
+            </div>
             {data.trends.briefings.length > 0 ? (
               <div className="space-y-2">
-                {data.trends.briefings.map((day) => (
-                  <div key={day.date} className="flex items-center gap-4">
-                    <span className="text-gray-400 w-24 text-sm">{day.date}</span>
-                    <div className="flex-1 flex items-center gap-2">
-                      <div
-                        className="h-4 bg-purple-600 rounded"
-                        style={{ width: `${Math.max(day.sent / 10, 2)}%` }}
-                        title={`Sent: ${day.sent}`}
-                      />
-                      {day.failed > 0 && (
-                        <div
-                          className="h-4 bg-red-600 rounded"
-                          style={{ width: `${Math.max(day.failed / 10, 2)}%` }}
-                          title={`Failed: ${day.failed}`}
-                        />
-                      )}
+                {data.trends.briefings.map((day) => {
+                  const byType = day.byType || { daily: 0, weekly: 0, pursuit: 0 };
+                  const maxScale = 500; // Scale factor for bar widths
+                  return (
+                    <div key={day.date} className="flex items-center gap-4">
+                      <span className="text-gray-400 w-24 text-sm">{day.date}</span>
+                      <div className="flex-1 flex items-center gap-0.5">
+                        {/* Daily - Green */}
+                        {byType.daily > 0 && (
+                          <div
+                            className="h-4 bg-emerald-500 rounded-l"
+                            style={{ width: `${Math.max((byType.daily / maxScale) * 100, 1)}%` }}
+                            title={`Daily: ${byType.daily}`}
+                          />
+                        )}
+                        {/* Weekly - Blue */}
+                        {byType.weekly > 0 && (
+                          <div
+                            className={`h-4 bg-blue-500 ${byType.daily === 0 ? 'rounded-l' : ''}`}
+                            style={{ width: `${Math.max((byType.weekly / maxScale) * 100, 1)}%` }}
+                            title={`Weekly: ${byType.weekly}`}
+                          />
+                        )}
+                        {/* Pursuit - Amber */}
+                        {byType.pursuit > 0 && (
+                          <div
+                            className={`h-4 bg-amber-500 ${byType.daily === 0 && byType.weekly === 0 ? 'rounded-l' : ''}`}
+                            style={{ width: `${Math.max((byType.pursuit / maxScale) * 100, 1)}%` }}
+                            title={`Pursuit: ${byType.pursuit}`}
+                          />
+                        )}
+                        {/* Failed - Red */}
+                        {day.failed > 0 && (
+                          <div
+                            className={`h-4 bg-red-600 ${day.sent === 0 ? 'rounded-l' : ''} rounded-r`}
+                            style={{ width: `${Math.max((day.failed / maxScale) * 100, 1)}%` }}
+                            title={`Failed: ${day.failed}`}
+                          />
+                        )}
+                        {/* Show empty state if nothing */}
+                        {day.sent === 0 && day.failed === 0 && (
+                          <div className="h-4 bg-gray-700 rounded w-1" title="No data" />
+                        )}
+                      </div>
+                      <div className="w-32 text-right">
+                        <span className="text-white font-mono text-sm">{day.sent}</span>
+                        {day.byType && (
+                          <span className="text-[10px] text-gray-500 ml-1">
+                            ({byType.daily}d {byType.weekly}w {byType.pursuit}p)
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-white font-mono text-sm w-12 text-right">{day.sent}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-gray-500">No briefing data for this period</p>
@@ -2718,18 +2777,17 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Recent Purchases */}
+            {/* Recent Transactions - Shows ALL Stripe transactions for 1-1-1 strategy visibility */}
             {data.revenue.recentPurchases && data.revenue.recentPurchases.length > 0 && (
               <div className="pt-4 border-t border-gray-700">
-                <p className="text-gray-400 text-sm mb-3">Recent Purchases</p>
+                <p className="text-gray-400 text-sm mb-3">Recent Transactions</p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-gray-400 text-left">
                         <th className="pb-2">Email</th>
                         <th className="pb-2">Product</th>
-                        <th className="pb-2">Bundle</th>
-                        <th className="pb-2">Details</th>
+                        <th className="pb-2">Type</th>
                         <th className="pb-2 text-right">Amount</th>
                         <th className="pb-2 text-right">Date</th>
                       </tr>
@@ -2737,17 +2795,20 @@ export default function AdminDashboard() {
                     <tbody>
                       {data.revenue.recentPurchases.map((p, i) => (
                         <tr key={i} className="border-t border-gray-700">
-                          <td className="py-2 text-white truncate max-w-[150px]" title={p.email}>
+                          <td className="py-2 text-white truncate max-w-[180px]" title={p.email}>
                             {p.email}
                           </td>
-                          <td className="py-2 text-gray-300 truncate max-w-[150px]" title={p.product}>
+                          <td className="py-2 text-gray-300 truncate max-w-[200px]" title={p.product}>
                             {p.product}
                           </td>
-                          <td className="py-2 text-gray-400">
-                            {p.bundle || '-'}
-                          </td>
-                          <td className="py-2 text-gray-400 truncate max-w-[180px]" title={p.details}>
-                            {p.details || '-'}
+                          <td className="py-2">
+                            <span className={`px-2 py-0.5 rounded text-xs ${
+                              p.type === 'subscription'
+                                ? 'bg-purple-900/50 text-purple-300'
+                                : 'bg-blue-900/50 text-blue-300'
+                            }`}>
+                              {p.type === 'subscription' ? '🔄 recurring' : '💵 one-time'}
+                            </span>
                           </td>
                           <td className="py-2 text-green-400 text-right font-mono">
                             ${p.amount.toLocaleString()}

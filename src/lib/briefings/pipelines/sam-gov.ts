@@ -94,6 +94,7 @@ function extractDescriptionTerms(description?: string | null): string[] {
 interface SAMSearchResult {
   opportunities: SAMOpportunity[];
   totalRecords: number;
+  keywordMatchCount?: number; // How many opportunities matched keywords (0 means fallback to NAICS-only)
   fetchedAt: string;
 }
 
@@ -843,19 +844,33 @@ export async function fetchSamOpportunitiesFromCache(
       lastModifiedDate: row.last_modified || row.posted_date || '',
     }));
 
-    // If keywords provided, filter client-side (Supabase full-text search would be better but this works)
+    // Soft keyword filter: If keywords provided, try to filter. If no matches, fall back to NAICS-only results.
+    // This prevents users with overly-specific keywords from receiving 0 opportunities.
     let filtered = opportunities;
+    let keywordMatchCount = 0;
+
     if (keywords.length > 0) {
       const keywordLower = keywords.map(k => k.toLowerCase());
-      filtered = opportunities.filter(opp => {
+      const keywordFiltered = opportunities.filter(opp => {
         const text = `${opp.title} ${opp.description}`.toLowerCase();
         return keywordLower.some(k => text.includes(k));
       });
+
+      keywordMatchCount = keywordFiltered.length;
+
+      // Only apply keyword filter if it returns results; otherwise fall back to NAICS-only
+      if (keywordFiltered.length > 0) {
+        filtered = keywordFiltered;
+        console.log(`[SAM Cache] Keyword filter matched ${keywordFiltered.length} of ${opportunities.length} opportunities`);
+      } else {
+        console.log(`[SAM Cache] Keyword filter returned 0 results - falling back to NAICS-only (${opportunities.length} opportunities)`);
+      }
     }
 
     return {
       opportunities: filtered.slice(0, limit),
       totalRecords: filtered.length,
+      keywordMatchCount, // Track how many matched keywords for analytics
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {
