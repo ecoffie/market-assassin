@@ -436,12 +436,12 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           <p className="text-slate-400 mb-6 max-w-md mx-auto">
             Upgrade to unlock AI-prioritized opportunities, weekly deep dives, pursuit briefs, and full intelligence.
           </p>
-          <a
-            href="/market-intelligence"
+          <Link
+            href="/#pricing"
             className="inline-block px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors"
           >
             Upgrade to Pro
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -465,12 +465,6 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
               className="px-4 py-2 bg-purple-600/20 text-purple-200 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors"
             >
               Open SAM Dashboard
-            </Link>
-            <Link
-              href={`/briefings?email=${encodeURIComponent(email)}`}
-              className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
-            >
-              Full Briefings
             </Link>
             <button
               onClick={loadBriefings}

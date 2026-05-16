@@ -242,7 +242,7 @@ export default function UnifiedSidebarBeta({
       <div className="p-4 border-b border-slate-800">
         <div className="flex items-center justify-between">
           {!isCollapsed && (
-            <Link href="/mi-beta" className="flex items-center gap-2">
+            <Link href="/app" className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">M</span>
               </div>
@@ -357,27 +357,15 @@ export default function UnifiedSidebarBeta({
           <div className="space-y-2">
             {userTier === 'free' && (
               <Link
-                href="/market-intelligence"
+                href="/#pricing"
                 className="block w-full px-3 py-2 text-center text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
               >
                 Upgrade to Pro
               </Link>
             )}
-            <Link
-              href="/briefings"
-              className="block text-center text-xs text-slate-500 hover:text-slate-400 transition-colors"
-            >
-              ← Legacy View
-            </Link>
           </div>
         ) : (
-          <Link
-            href="/briefings"
-            className="block text-center text-slate-500 hover:text-slate-400"
-            title="Legacy View"
-          >
-            ←
-          </Link>
+          <div className="h-4" />
         )}
       </div>
     </aside>

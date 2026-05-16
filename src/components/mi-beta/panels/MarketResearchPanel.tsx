@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
 
@@ -1143,12 +1144,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <p className="text-slate-400 text-sm mb-4">
             Upgrade to see pain points, prime targets, teaming partners, and forecast detail.
           </p>
-          <a
-            href="/market-intelligence"
+          <Link
+            href="/#pricing"
             className="inline-block px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
             Upgrade to Pro
-          </a>
+          </Link>
         </div>
       )}
     </div>

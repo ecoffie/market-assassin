@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
 
@@ -277,12 +278,12 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
               Upgrade for AI briefings, win prioritization, pursuit guidance, forecasts, recompetes, and contractor intelligence.
             </p>
           </div>
-          <a
-            href="/market-intelligence"
+          <Link
+            href="/#pricing"
             className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors text-center"
           >
             Compare MI Access
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">

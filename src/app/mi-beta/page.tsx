@@ -686,12 +686,6 @@ function MIBetaDashboard() {
               </div>
             )}
 
-            <p className="text-center text-gray-500 text-sm mt-4">
-              Legacy dashboard:{' '}
-              <a href="/briefings" className="text-emerald-400 hover:text-emerald-300">
-                /briefings →
-              </a>
-            </p>
           </div>
 
           {/* Feature Preview */}
