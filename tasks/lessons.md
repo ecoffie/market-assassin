@@ -94,6 +94,44 @@ await kv.set(`tool:${email}`, 'true');
 
 ---
 
+## Auth Gates Must Redirect, Not Show Forms (May 15, 2026)
+
+**Lesson:** When an unauthenticated user lands on a gated page, redirect them to signup instead of showing an email verification form.
+
+**What went wrong:** `/briefings` page showed a gate asking for email → users entered email → "No Access Found". Users had no clear path to signup and got confused.
+
+**Pattern:**
+```typescript
+// BAD - Shows confusing gate to new users
+useEffect(() => {
+  const saved = localStorage.getItem('auth_email');
+  if (!saved) {
+    return;  // Shows gate form, users get stuck
+  }
+  verifyUser(saved);
+}, []);
+
+// GOOD - Redirect to signup if not authenticated
+useEffect(() => {
+  const saved = localStorage.getItem('auth_email');
+  if (!saved) {
+    window.location.href = '/signup';  // Clear path forward
+    return;
+  }
+  verifyUser(saved);
+}, []);
+```
+
+**Rule:** Unauthenticated users should never see a "verify your email" form. Redirect them to a signup wizard that can create their account.
+
+**Auth Gate Design Checklist:**
+1. [ ] Check localStorage/session for existing auth
+2. [ ] If no auth → redirect to signup (not show form)
+3. [ ] Signup creates records → redirects back to gated page
+4. [ ] Gated page loads with auth, shows content
+
+---
+
 ## Array Formatting
 
 **Lesson:** Arrays must be `.join(' ')` not interpolated.
@@ -1244,3 +1282,55 @@ if (keywords.length > 0) {
 **File:** `src/lib/briefings/pipelines/sam-gov.ts` (lines 846-870)
 
 **Commit:** `bdc1e77` - "fix: Make keyword filter soft with NAICS fallback"
+
+---
+
+## May 15, 2026 - Free Signup Links Must Be Visible in Auth Gates
+
+**Problem:** New users landing on `/briefings` had no path to free signup. The page showed "View Access Options" which led to paid pricing only.
+
+**Root Cause:**
+- `/briefings` is the main MI dashboard entry point
+- User enters email → `verifyAndLoadUser` fails for new users → "denied" state
+- Denied state only offered paid upgrade paths
+- Gate state only said "View pricing" with no free option
+- The free signup wizard exists at `/alerts/signup` but was undiscoverable
+
+**Impact:**
+- New users like Dominic got stuck in dead-end loop
+- "Unauthorized sign-in" perception when really there was just no account
+- Word-of-mouth referrals couldn't sign up easily
+
+**Fix:**
+```tsx
+// Gate state - Before entering email
+<p>
+  New here?{' '}
+  <Link href="/alerts/signup" className="text-emerald-400 hover:underline font-medium">
+    Sign up free
+  </Link>
+  {' · '}
+  <Link href="/market-intelligence" className="text-purple-400 hover:underline">
+    View Pro pricing
+  </Link>
+</p>
+
+// Denied state - After verification fails
+<Link href="/alerts/signup" className="text-emerald-400 text-sm font-medium">
+  Sign up free for daily alerts →
+</Link>
+```
+
+**Visual Hierarchy:**
+- **Emerald green** = Free signup (action users should take first)
+- **Purple** = Paid upgrade (secondary option)
+
+**Rule:** "Every auth gate MUST have a visible free signup path. If there's a 'View Pro pricing' link, there should be a matching 'Sign up free' link."
+
+**Checklist for auth gates:**
+1. [ ] Gate state has "Sign up free" link (not just pricing)
+2. [ ] Denied state has free signup option
+3. [ ] Free path links to proper signup wizard (not preferences page)
+4. [ ] Visual hierarchy makes free path obvious (different color, first in order)
+
+**File:** `src/app/briefings/page.tsx` (gate state ~line 1256, denied state ~line 1292)

@@ -4,6 +4,65 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 43 (May 15, 2026)
+
+### /briefings Redirect for Unauthenticated Users
+
+**Goal:** Ensure no one accidentally lands on the `/briefings` page without an account.
+
+#### The Problem (User Feedback)
+
+After the initial fix adding "Sign up free" links, user feedback was clear: **"no one should end up on the briefings page"** if they don't have an account. The gate/email form was still confusing for new users.
+
+#### The Solution (V2 - Redirect)
+
+Instead of showing a gate with signup links, **redirect unauthenticated users directly to `/alerts/signup`**.
+
+**Change in `src/app/briefings/page.tsx` (mount useEffect):**
+```typescript
+// BEFORE: If no saved email, stayed on gate showing email form
+useEffect(() => {
+  if (searchParams.get('email')) return;
+  const saved = localStorage.getItem('briefings_access_email');
+  if (!saved) {
+    return;  // Showed confusing gate
+  }
+  void verifyAndLoadUser(saved);
+}, [searchParams, verifyAndLoadUser]);
+
+// AFTER: Redirect to free signup
+useEffect(() => {
+  if (searchParams.get('email')) return;
+  const saved = localStorage.getItem('briefings_access_email');
+  if (!saved) {
+    window.location.href = '/alerts/signup';  // Clear path to signup
+    return;
+  }
+  void verifyAndLoadUser(saved);
+}, [searchParams, verifyAndLoadUser]);
+```
+
+#### Commits
+
+- `2d27496` — "Fix free signup flow - add 'Sign up free' link to /briefings gate and denied states"
+- `ffcc12e` — "Redirect unauthenticated /briefings visitors to /alerts/signup"
+
+#### User Flow (After Fix)
+
+1. User lands on `/briefings` (from any link)
+2. Page loads, checks localStorage for `briefings_access_email`
+3. **No saved email?** → Redirect to `/alerts/signup`
+4. User completes free signup wizard
+5. Account created, user returned to `/briefings` with access
+
+#### Impact
+
+- **No confusing gate** — new users go straight to signup
+- **Clear path** — complete the wizard, get access
+- **Emerald links still exist** as fallback if redirect fails
+
+---
+
 ## Session 42 (May 15, 2026)
 
 ### Soft Keyword Filter for Briefings - NAICS Fallback
