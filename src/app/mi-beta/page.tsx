@@ -6,6 +6,7 @@ import Link from 'next/link';
 import UnifiedSidebarBeta, { type MIBetaPanel, type MIBetaTier } from '@/components/mi-beta/UnifiedSidebarBeta';
 import PanelContainer from '@/components/mi-beta/panels';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
+import { getPlannerSupabase } from '@/lib/supabase/planner-client';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
@@ -56,6 +57,9 @@ function MIBetaDashboard() {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpSent, setSignUpSent] = useState(false);
   const activePanelRef = useRef<MIBetaPanel>('dashboard');
   const panelStartedAtRef = useRef<number>(Date.now());
   const sessionIdRef = useRef<string>(
@@ -98,11 +102,11 @@ function MIBetaDashboard() {
     });
 
     if (options.beacon && navigator.sendBeacon) {
-      navigator.sendBeacon('/api/mi-beta/engagement', new Blob([payload], { type: 'application/json' }));
+      navigator.sendBeacon('/api/mindy/engagement', new Blob([payload], { type: 'application/json' }));
       return;
     }
 
-    fetch('/api/mi-beta/engagement', {
+    fetch('/api/mindy/engagement', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: payload,
@@ -139,14 +143,14 @@ function MIBetaDashboard() {
           setEmail(null);
           setTier('free');
           setPendingEmail(userEmail);
-          setAuthError('Your MI session expired. Sign in again to restore Pro access.');
+          setAuthError('Your Mindy session expired. Sign in again to restore Pro access.');
           return;
         }
 
-        throw new Error(accessData?.error || 'Could not verify Market Intelligence access');
+        throw new Error(accessData?.error || 'Could not verify Mindy access');
       }
 
-      // Determine tier from the unified MI entitlement first.
+      // Determine tier from the unified Mindy entitlement first.
       let userTier: MIBetaTier = 'free';
       if (['free', 'pro', 'team', 'enterprise'].includes(accessData?.tier)) {
         userTier = accessData.tier as MIBetaTier;
@@ -176,6 +180,29 @@ function MIBetaDashboard() {
     }
   }, [getTwoFactorHeaders]);
 
+  const bootstrapFromSupabaseSession = useCallback(async () => {
+    const supabase = getPlannerSupabase();
+    if (!supabase) return false;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const sessionEmail = session?.user?.email?.toLowerCase().trim();
+    if (!session?.access_token || !sessionEmail) return false;
+
+    const res = await fetch('/api/auth/mindy-session', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success || !data.sessionToken) return false;
+
+    localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
+    localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt || new Date().toISOString());
+    await loadUserProfile(sessionEmail);
+    return true;
+  }, [loadUserProfile]);
+
   useEffect(() => {
     activePanelRef.current = activePanel;
   }, [activePanel]);
@@ -203,7 +230,7 @@ function MIBetaDashboard() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [email, tier, trackEngagement, flushPanelTime]);
+  }, [email, activePanel, tier, trackEngagement, flushPanelTime]);
 
   const handlePanelChange = useCallback((nextPanel: MIBetaPanel) => {
     if (nextPanel === activePanelRef.current) return;
@@ -226,7 +253,7 @@ function MIBetaDashboard() {
     setAuthMessage(null);
 
     try {
-      const res = await fetch('/api/auth/mi-login', {
+      const res = await fetch('/api/auth/mindy-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, password }),
@@ -381,11 +408,15 @@ function MIBetaDashboard() {
       if (storedEmail && verifiedRecently && hasStoredToken) {
         loadUserProfile(storedEmail);
       } else {
-        clearStoredMIBetaAuth();
-        setIsLoading(false);
+        bootstrapFromSupabaseSession().then((bootstrapped) => {
+          if (!bootstrapped) {
+            clearStoredMIBetaAuth();
+            setIsLoading(false);
+          }
+        });
       }
     }
-  }, [searchParams, loadUserProfile]);
+  }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession]);
 
   // Loading state
   if (isLoading) {
@@ -406,29 +437,137 @@ function MIBetaDashboard() {
               Meet Mindy
             </h1>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Your AI-powered GovCon intelligence partner. Daily briefings, market research,
+              Your AI-powered federal market intelligence partner. Daily briefings, market research,
               forecasts, pipeline tracking, and more.
             </p>
           </div>
 
           {/* Email Entry */}
           <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-8 max-w-md mx-auto">
+            {/* Sign-in / Sign-up toggle */}
+            {!signUpSent && authStep === 'credentials' && (
+              <div className="flex rounded-lg bg-gray-800 p-1 mb-6">
+                <button
+                  onClick={() => { setIsSignUpMode(false); setAuthError(null); setAuthMessage(null); }}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    !isSignUpMode ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Sign in
+                </button>
+                <button
+                  onClick={() => { setIsSignUpMode(true); setAuthError(null); setAuthMessage(null); }}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    isSignUpMode ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Create free account
+                </button>
+              </div>
+            )}
+
             <h2 className="text-lg font-semibold text-white mb-4 text-center">
-              {authStep === 'credentials' ? 'Sign in to Mindy' : 'Enter verification code'}
+              {signUpSent ? 'Check your email' : isSignUpMode ? 'Create your free account' : authStep === 'credentials' ? 'Sign in to Mindy' : 'Enter verification code'}
             </h2>
 
-            {resetSuccess && authStep === 'credentials' && (
+            {resetSuccess && authStep === 'credentials' && !isSignUpMode && (
               <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
                 Password updated. Sign in with your new password, then complete 2FA.
               </div>
             )}
-            {setupSuccess && authStep === 'credentials' && (
+            {setupSuccess && authStep === 'credentials' && !isSignUpMode && (
               <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
                 Account password created. Sign in, then complete 2FA.
               </div>
             )}
 
-            {authStep === 'credentials' ? (
+            {/* Sign-up success state */}
+            {signUpSent ? (
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-gray-300">
+                  We sent a setup link to <span className="text-white font-medium">{signUpEmail}</span>
+                </p>
+                <p className="text-gray-500 text-sm">
+                  Click the link in the email to set your password and start using Mindy.
+                </p>
+                <button
+                  onClick={() => {
+                    setSignUpSent(false);
+                    setSignUpEmail('');
+                    setIsSignUpMode(false);
+                  }}
+                  className="text-emerald-400 hover:text-emerald-300 text-sm font-medium"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            ) : isSignUpMode && authStep === 'credentials' ? (
+              /* Sign-up form */
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const emailValue = (formData.get('signup_email') as string).toLowerCase().trim();
+
+                  if (!emailValue) {
+                    setAuthError('Enter your email address');
+                    return;
+                  }
+
+                  setAuthLoading(true);
+                  setAuthError(null);
+
+                  try {
+                    const res = await fetch('/api/auth/mindy-signup', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: emailValue }),
+                    });
+                    const data = await res.json();
+
+                    if (!res.ok || !data.success) {
+                      setAuthError(data.error || 'Unable to create account');
+                      return;
+                    }
+
+                    setSignUpEmail(emailValue);
+                    setSignUpSent(true);
+                  } catch {
+                    setAuthError('Unable to create account');
+                  } finally {
+                    setAuthLoading(false);
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div className="text-center text-gray-400 text-sm mb-4">
+                  Get started with a free Mindy account. No credit card required.
+                </div>
+                <input
+                  type="email"
+                  name="signup_email"
+                  placeholder="your@email.com"
+                  required
+                  autoComplete="email"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {authLoading ? 'Creating account...' : 'Create free account'}
+                </button>
+                <div className="text-center text-gray-500 text-xs">
+                  Free includes: Daily alerts, market research (4 reports), opportunity search
+                </div>
+              </form>
+            ) : authStep === 'credentials' ? (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -460,10 +599,10 @@ function MIBetaDashboard() {
                   className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                 />
                 <div className="flex items-center justify-between text-sm">
-                  <Link href="/mi-beta/setup-account" className="font-medium text-slate-400 hover:text-slate-200">
+                  <Link href="/setup-account" className="font-medium text-slate-400 hover:text-slate-200">
                     Set up account
                   </Link>
-                  <Link href="/mi-beta/forgot-password" className="text-sm font-medium text-emerald-400 hover:text-emerald-300">
+                  <Link href="/forgot-password" className="text-sm font-medium text-emerald-400 hover:text-emerald-300">
                     Forgot password?
                   </Link>
                 </div>

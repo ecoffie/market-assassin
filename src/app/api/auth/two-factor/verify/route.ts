@@ -22,7 +22,7 @@ function normalizeEmail(email: string) {
 }
 
 function hashCode(email: string, code: string) {
-  const secret = process.env.TWO_FACTOR_SECRET || process.env.ADMIN_PASSWORD || process.env.SUPABASE_SERVICE_ROLE_KEY || 'mi-beta-2fa';
+  const secret = process.env.TWO_FACTOR_SECRET || process.env.ADMIN_PASSWORD || process.env.SUPABASE_SERVICE_ROLE_KEY || 'mindy-2fa';
   return createHash('sha256').update(`${normalizeEmail(email)}:${code}:${secret}`).digest('hex');
 }
 

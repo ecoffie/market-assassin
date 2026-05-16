@@ -36,7 +36,7 @@ function normalizeEmail(email: string) {
 }
 
 function hashCode(email: string, code: string) {
-  const secret = process.env.TWO_FACTOR_SECRET || process.env.ADMIN_PASSWORD || process.env.SUPABASE_SERVICE_ROLE_KEY || 'mi-beta-2fa';
+  const secret = process.env.TWO_FACTOR_SECRET || process.env.ADMIN_PASSWORD || process.env.SUPABASE_SERVICE_ROLE_KEY || 'mindy-2fa';
   return createHash('sha256').update(`${normalizeEmail(email)}:${code}:${secret}`).digest('hex');
 }
 
@@ -72,7 +72,7 @@ function buildEmailHtml(code: string) {
   return `
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a;">
       <div style="background:#020617;color:white;border-radius:14px;padding:24px;">
-        <div style="font-size:13px;color:#34d399;text-transform:uppercase;letter-spacing:.08em;">Market Intelligence Beta</div>
+        <div style="font-size:13px;color:#34d399;text-transform:uppercase;letter-spacing:.08em;">Mindy</div>
         <h1 style="margin:10px 0 8px;font-size:24px;">Your verification code</h1>
         <p style="color:#cbd5e1;margin:0 0 22px;">Enter this code to finish signing in. It expires in ${CODE_TTL_MINUTES} minutes.</p>
         <div style="font-size:36px;letter-spacing:10px;font-weight:700;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:18px 20px;text-align:center;">
@@ -160,12 +160,12 @@ export async function POST(request: NextRequest) {
 
     await sendEmail({
       to: email,
-      subject: `${code} is your GovCon Giants verification code`,
+      subject: `${code} is your Mindy verification code`,
       html: buildEmailHtml(code),
-      text: `Your GovCon Giants verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes.`,
+      text: `Your Mindy verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes.`,
       emailType: 'two_factor_code',
-      eventSource: 'mi_beta_login',
-      tags: { product: 'mi_beta', type: '2fa' },
+      eventSource: 'mindy_login',
+      tags: { product: 'mindy', type: '2fa' },
       metadata: { expiresAt },
     });
 

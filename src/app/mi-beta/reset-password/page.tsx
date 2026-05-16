@@ -15,8 +15,8 @@ export default function MIResetPasswordPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (window.location.hostname === 'tools.govcongiants.org') {
-      window.location.replace(`https://mi.govcongiants.com${window.location.pathname}${window.location.search}${window.location.hash}`);
+    if (window.location.hostname !== 'getmindy.ai' && window.location.hostname !== 'localhost') {
+      window.location.replace(`https://getmindy.ai/reset-password${window.location.search}${window.location.hash}`);
       return;
     }
 
@@ -75,7 +75,7 @@ export default function MIResetPasswordPage() {
       localStorage.removeItem('mi_beta_2fa_token');
 
       setSuccess(true);
-      setTimeout(() => router.push('/mi-beta?reset=success'), 1800);
+      setTimeout(() => router.push('/app?reset=success'), 1800);
     } catch {
       setError('Unable to update password. Please request a new reset link.');
     } finally {
@@ -111,7 +111,7 @@ export default function MIResetPasswordPage() {
             <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100">
               Loading your reset session. If this does not change, request a new reset link.
             </div>
-            <Link href="/mi-beta/forgot-password" className="font-medium text-emerald-400 hover:text-emerald-300">
+            <Link href="/forgot-password" className="font-medium text-emerald-400 hover:text-emerald-300">
               Request new reset link
             </Link>
           </div>

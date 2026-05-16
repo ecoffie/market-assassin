@@ -21,7 +21,7 @@ export default function MIForgotPasswordPage() {
 
     setIsLoading(true);
     try {
-      await fetch('/api/auth/mi-password-reset/request', {
+      await fetch('/api/auth/mindy-password-reset/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail }),
@@ -60,7 +60,7 @@ export default function MIForgotPasswordPage() {
             <div className="mb-6 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
               If a Mindy account exists for that email, a reset link is on the way.
             </div>
-            <Link href="/mi-beta" className="font-medium text-emerald-400 hover:text-emerald-300">
+            <Link href="/app" className="font-medium text-emerald-400 hover:text-emerald-300">
               Back to sign in
             </Link>
           </div>
@@ -83,7 +83,7 @@ export default function MIForgotPasswordPage() {
               {isLoading ? 'Sending reset link...' : 'Send reset link'}
             </button>
             <div className="text-center">
-              <Link href="/mi-beta" className="text-sm font-medium text-slate-400 hover:text-slate-200">
+              <Link href="/app" className="text-sm font-medium text-slate-400 hover:text-slate-200">
                 Back to sign in
               </Link>
             </div>

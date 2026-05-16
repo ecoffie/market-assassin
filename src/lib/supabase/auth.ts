@@ -35,7 +35,7 @@ export async function signUp(email: string, password: string): Promise<AuthResul
       user: data.user ?? undefined,
       session: data.session ?? undefined,
     };
-  } catch (err) {
+  } catch {
     return { success: false, error: 'An unexpected error occurred' };
   }
 }
@@ -65,7 +65,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
       user: data.user,
       session: data.session,
     };
-  } catch (err) {
+  } catch {
     return { success: false, error: 'An unexpected error occurred' };
   }
 }
@@ -88,7 +88,7 @@ export async function signOut(): Promise<{ success: boolean; error?: string }> {
     }
 
     return { success: true };
-  } catch (err) {
+  } catch {
     return { success: false, error: 'An unexpected error occurred' };
   }
 }
@@ -106,7 +106,7 @@ export async function getCurrentUser(): Promise<User | null> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     return user;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -124,7 +124,7 @@ export async function getSession(): Promise<Session | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     return session;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -149,7 +149,80 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
     }
 
     return { success: true };
-  } catch (err) {
+  } catch {
     return { success: false, error: 'An unexpected error occurred' };
   }
+}
+
+/**
+ * Sign in with Google OAuth
+ */
+export async function signInWithGoogle(redirectTo?: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = getSupabase();
+
+  if (!supabase) {
+    return { success: false, error: 'Supabase not configured' };
+  }
+
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectTo || `${window.location.origin}/onboarding`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch {
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Sign in with Microsoft/Azure OAuth
+ */
+export async function signInWithMicrosoft(redirectTo?: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = getSupabase();
+
+  if (!supabase) {
+    return { success: false, error: 'Supabase not configured' };
+  }
+
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        redirectTo: redirectTo || `${window.location.origin}/onboarding`,
+        scopes: 'email profile openid',
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch {
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Check if user needs onboarding (no NAICS codes set or only defaults)
+ */
+export function needsOnboarding(naicsCodes: string[] | null | undefined): boolean {
+  if (!naicsCodes || naicsCodes.length === 0) return true;
+
+  const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
+  const hasOnlyDefaults = naicsCodes.every(code => DEFAULT_NAICS.includes(code));
+
+  return hasOnlyDefaults;
 }

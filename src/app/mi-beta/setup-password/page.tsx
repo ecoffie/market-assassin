@@ -15,8 +15,8 @@ export default function MISetupPasswordPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (window.location.hostname === 'tools.govcongiants.org') {
-      window.location.replace(`https://mi.govcongiants.com${window.location.pathname}${window.location.search}${window.location.hash}`);
+    if (window.location.hostname !== 'getmindy.ai' && window.location.hostname !== 'localhost') {
+      window.location.replace(`https://getmindy.ai/setup-password${window.location.search}${window.location.hash}`);
       return;
     }
 
@@ -69,13 +69,30 @@ export default function MISetupPasswordPage() {
         return;
       }
 
-      await supabase.auth.signOut();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setError('Password created, but we could not verify your session. Please sign in to continue.');
+        return;
+      }
+
+      const completeRes = await fetch('/api/auth/mindy-complete-signup', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!completeRes.ok) {
+        setError('Password created, but we could not finish account setup. Please sign in to continue.');
+        return;
+      }
+
       localStorage.removeItem('mi_beta_email');
       localStorage.removeItem('mi_beta_2fa_verified_at');
       localStorage.removeItem('mi_beta_2fa_token');
 
       setSuccess(true);
-      setTimeout(() => router.push('/mi-beta?setup=success'), 1800);
+      setTimeout(() => router.push('/onboarding?setup=success'), 1000);
     } catch {
       setError('Unable to set password. Please request a new setup link.');
     } finally {
@@ -92,7 +109,7 @@ export default function MISetupPasswordPage() {
           </div>
           <h1 className="text-2xl font-bold text-white">Create your Mindy password</h1>
           <p className="mt-2 text-sm text-slate-400">
-            After this, sign in with your password and complete 2FA.
+            After this, finish your profile so Mindy can tailor your opportunities.
           </p>
         </div>
 
@@ -104,14 +121,14 @@ export default function MISetupPasswordPage() {
 
         {success ? (
           <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-center text-sm text-emerald-200">
-            Password created. Returning you to sign in...
+            Password created. Taking you to onboarding...
           </div>
         ) : !hasSetupSession ? (
           <div className="text-center">
             <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100">
               Loading your setup session. If this does not change, request a new setup link.
             </div>
-            <Link href="/mi-beta/setup-account" className="font-medium text-emerald-400 hover:text-emerald-300">
+            <Link href="/setup-account" className="font-medium text-emerald-400 hover:text-emerald-300">
               Request new setup link
             </Link>
           </div>

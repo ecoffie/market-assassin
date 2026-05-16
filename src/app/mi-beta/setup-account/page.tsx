@@ -21,7 +21,7 @@ export default function MISetupAccountRequestPage() {
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/mi-account-setup/request', {
+      const response = await fetch('/api/auth/mindy-account-setup/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail }),
@@ -65,7 +65,7 @@ export default function MISetupAccountRequestPage() {
             <div className="mb-6 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
               If that email has Mindy access, a setup link is on the way.
             </div>
-            <Link href="/mi-beta" className="font-medium text-emerald-400 hover:text-emerald-300">
+            <Link href="/app" className="font-medium text-emerald-400 hover:text-emerald-300">
               Back to sign in
             </Link>
           </div>
@@ -88,10 +88,10 @@ export default function MISetupAccountRequestPage() {
               {isLoading ? 'Sending setup link...' : 'Send setup link'}
             </button>
             <div className="flex items-center justify-between text-sm">
-              <Link href="/mi-beta/forgot-password" className="font-medium text-slate-400 hover:text-slate-200">
+              <Link href="/forgot-password" className="font-medium text-slate-400 hover:text-slate-200">
                 Forgot password?
               </Link>
-              <Link href="/mi-beta" className="font-medium text-slate-400 hover:text-slate-200">
+              <Link href="/app" className="font-medium text-slate-400 hover:text-slate-200">
                 Back to sign in
               </Link>
             </div>
