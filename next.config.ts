@@ -196,12 +196,6 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/:path*',
-        has: [{ type: 'host', value: 'mi.govcongiants.com' }],
-        destination: 'https://getmindy.ai/:path*',
-        permanent: false,
-      },
-      {
-        source: '/:path*',
         has: [
           {
             type: 'host',
