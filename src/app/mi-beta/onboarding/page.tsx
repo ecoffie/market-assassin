@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getPlannerSupabase } from '@/lib/supabase/planner-client';
+import { getSupabase } from '@/lib/supabase/client';
 
 // Common NAICS codes for federal contractors
 const NAICS_OPTIONS = [
@@ -57,7 +57,7 @@ export default function OnboardingPage() {
   // Check authentication
   useEffect(() => {
     async function checkAuth() {
-      const supabase = getPlannerSupabase();
+      const supabase = getSupabase();
       if (!supabase) {
         router.push('/signup');
         return;
@@ -110,7 +110,7 @@ export default function OnboardingPage() {
     setSaving(true);
 
     try {
-      const supabase = getPlannerSupabase();
+      const supabase = getSupabase();
       const { data: { session } } = supabase
         ? await supabase.auth.getSession()
         : { data: { session: null } };

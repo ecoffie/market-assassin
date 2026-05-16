@@ -6,7 +6,7 @@ import Link from 'next/link';
 import UnifiedSidebarBeta, { type MIBetaPanel, type MIBetaTier } from '@/components/mi-beta/UnifiedSidebarBeta';
 import PanelContainer from '@/components/mi-beta/panels';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
-import { getPlannerSupabase } from '@/lib/supabase/planner-client';
+import { getSupabase } from '@/lib/supabase/client';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
 const TWO_FACTOR_TOKEN_KEY = 'mi_beta_2fa_token';
@@ -181,7 +181,7 @@ function MIBetaDashboard() {
   }, [getTwoFactorHeaders]);
 
   const bootstrapFromSupabaseSession = useCallback(async () => {
-    const supabase = getPlannerSupabase();
+    const supabase = getSupabase();
     if (!supabase) return false;
 
     const { data: { session } } = await supabase.auth.getSession();
