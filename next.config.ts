@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
         {
           source: '/app',
           has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/briefings',
+          destination: '/mi-beta',
         },
         {
           source: '/signin',
@@ -101,7 +101,7 @@ const nextConfig: NextConfig = {
       {
         source: '/mi-beta',
         has: [{ type: 'host', value: 'getmindy.ai' }],
-        destination: 'https://getmindy.ai/briefings',
+        destination: 'https://getmindy.ai/app',
         permanent: false,
       },
       {
@@ -144,12 +144,6 @@ const nextConfig: NextConfig = {
         source: '/mi-beta/auth/callback',
         has: [{ type: 'host', value: 'getmindy.ai' }],
         destination: 'https://getmindy.ai/auth/callback',
-        permanent: false,
-      },
-      {
-        source: '/mi-beta',
-        has: [{ type: 'host', value: 'mi.govcongiants.com' }],
-        destination: 'https://mi.govcongiants.com/briefings',
         permanent: false,
       },
       {
