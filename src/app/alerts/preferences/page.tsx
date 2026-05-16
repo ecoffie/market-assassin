@@ -52,6 +52,8 @@ function parseList(value: string): string[] {
 
 function AlertPreferencesContent() {
   const searchParams = useSearchParams();
+  const authToken = searchParams.get('token');
+  const authTimestamp = searchParams.get('ts');
   const [email, setEmail] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [businessDescription, setBusinessDescription] = useState('');
@@ -72,12 +74,17 @@ function AlertPreferencesContent() {
   const loadPreferences = useCallback(async (targetEmail: string) => {
     if (!targetEmail.trim()) return;
     const normalizedEmail = targetEmail.trim().toLowerCase();
+    const params = new URLSearchParams({ email: normalizedEmail });
+    if (authToken && authTimestamp) {
+      params.set('token', authToken);
+      params.set('ts', authTimestamp);
+    }
     setLoading(true);
     setError('');
     setMessage('');
 
     try {
-      const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(normalizedEmail)}`);
+      const res = await fetch(`/api/alerts/preferences?${params.toString()}`);
       const data: PreferencesResponse = await res.json();
 
       if (!data.success) {
@@ -107,7 +114,7 @@ function AlertPreferencesContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authTimestamp, authToken]);
 
   useEffect(() => {
     const queryEmail = searchParams.get('email');
@@ -141,7 +148,13 @@ function AlertPreferencesContent() {
     }
 
     try {
-      const res = await fetch('/api/alerts/preferences', {
+      const params = new URLSearchParams();
+      if (authToken && authTimestamp) {
+        params.set('token', authToken);
+        params.set('ts', authTimestamp);
+      }
+
+      const res = await fetch(`/api/alerts/preferences${params.size ? `?${params.toString()}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

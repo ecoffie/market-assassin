@@ -20,11 +20,11 @@ import {
   CircuitBreaker,
   postSendValidation,
 } from '@/lib/intelligence';
-import { createSecureAccessUrl } from '@/lib/access-links';
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
+import { generateEmailToken } from '@/lib/api-auth';
 
 export const maxDuration = 300;
 
@@ -1101,8 +1101,10 @@ async function sendDailyAlertEmail(
     return trackingToken ? generateTrackedLink(trackingToken, urlWithUtm, label) : urlWithUtm;
   };
 
-  const unsubscribeUrl = `https://mi.govcongiants.com/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
-  const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
+  const encodedEmail = encodeURIComponent(email.toLowerCase().trim());
+  const preferencesAuth = generateEmailToken(email);
+  const unsubscribeUrl = `https://mi.govcongiants.com/api/alerts/unsubscribe?email=${encodedEmail}`;
+  const preferencesUrl = `https://mi.govcongiants.com/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const dailyBriefingsUrl = 'https://shop.govcongiants.com/market-intelligence';
   const totalCount = opportunities.length + grants.length;
 
