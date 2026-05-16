@@ -215,7 +215,7 @@ export default function MindySignupPage() {
           <div className="mt-6 pt-6 border-t border-slate-800 text-center">
             <p className="text-slate-400 text-sm">
               Already have an account?{' '}
-              <Link href="/app" className="text-purple-400 hover:text-purple-300 font-medium">
+              <Link href="/briefings" className="text-purple-400 hover:text-purple-300 font-medium">
                 Sign in
               </Link>
             </p>

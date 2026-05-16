@@ -75,7 +75,7 @@ export default function MIResetPasswordPage() {
       localStorage.removeItem('mi_beta_2fa_token');
 
       setSuccess(true);
-      setTimeout(() => router.push('/app?reset=success'), 1800);
+      setTimeout(() => router.push('/briefings?reset=success'), 1800);
     } catch {
       setError('Unable to update password. Please request a new reset link.');
     } finally {

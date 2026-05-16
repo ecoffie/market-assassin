@@ -158,7 +158,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      router.push('/app?onboarding=complete');
+      router.push(`/briefings?email=${encodeURIComponent(email)}`);
     } catch {
       setError('Something went wrong saving your profile. Please try again.');
     } finally {

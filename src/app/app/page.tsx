@@ -1,1 +1,5 @@
-export { default } from '../mi-beta/page';
+import { redirect } from 'next/navigation';
+
+export default function AppPage() {
+  redirect('/briefings');
+}

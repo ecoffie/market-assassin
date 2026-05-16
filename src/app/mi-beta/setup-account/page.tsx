@@ -65,7 +65,7 @@ export default function MISetupAccountRequestPage() {
             <div className="mb-6 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
               If that email has Mindy access, a setup link is on the way.
             </div>
-            <Link href="/app" className="font-medium text-emerald-400 hover:text-emerald-300">
+            <Link href="/briefings" className="font-medium text-emerald-400 hover:text-emerald-300">
               Back to sign in
             </Link>
           </div>
@@ -91,7 +91,7 @@ export default function MISetupAccountRequestPage() {
               <Link href="/forgot-password" className="font-medium text-slate-400 hover:text-slate-200">
                 Forgot password?
               </Link>
-              <Link href="/app" className="font-medium text-slate-400 hover:text-slate-200">
+              <Link href="/briefings" className="font-medium text-slate-400 hover:text-slate-200">
                 Back to sign in
               </Link>
             </div>
