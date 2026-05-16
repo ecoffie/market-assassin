@@ -928,7 +928,7 @@ function BriefingsDashboardContent() {
     void verifyAndLoadUser(emailParam);
   }, [searchParams, verifyAndLoadUser]);
 
-  // On mount, check localStorage
+  // On mount, check localStorage. If no saved email and no URL param, redirect to signup.
   useEffect(() => {
     if (searchParams.get('email')) {
       return;
@@ -936,6 +936,8 @@ function BriefingsDashboardContent() {
 
     const saved = localStorage.getItem('briefings_access_email');
     if (!saved) {
+      // No authenticated user - redirect to free signup instead of showing gate
+      window.location.href = '/alerts/signup';
       return;
     }
     void verifyAndLoadUser(saved);
