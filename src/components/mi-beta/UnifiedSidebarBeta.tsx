@@ -242,7 +242,7 @@ export default function UnifiedSidebarBeta({
       <div className="p-4 border-b border-slate-800">
         <div className="flex items-center justify-between">
           {!isCollapsed && (
-            <Link href="/mi-beta" className="flex items-center gap-2">
+            <Link href="/app" className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">M</span>
               </div>

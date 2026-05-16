@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-const MI_ORIGIN = 'https://mi.govcongiants.com';
+const MINDY_ORIGIN = 'https://getmindy.ai';
 
 function getRecoveryDestination(hash: string): string | null {
   if (!hash.startsWith('#')) return null;
@@ -14,11 +14,11 @@ function getRecoveryDestination(hash: string): string | null {
   if (!accessToken) return null;
 
   if (type === 'recovery') {
-    return `${MI_ORIGIN}/mi-beta/reset-password${hash}`;
+    return `${MINDY_ORIGIN}/app/reset-password${hash}`;
   }
 
   if (type === 'invite' || type === 'signup') {
-    return `${MI_ORIGIN}/mi-beta/setup-password${hash}`;
+    return `${MINDY_ORIGIN}/app/setup-password${hash}`;
   }
 
   return null;

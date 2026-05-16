@@ -168,7 +168,7 @@ export async function signInWithGoogle(redirectTo?: string): Promise<{ success: 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectTo || `${window.location.origin}/onboarding`,
+        redirectTo: redirectTo || `${window.location.origin}/app/onboarding`,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
@@ -200,7 +200,7 @@ export async function signInWithMicrosoft(redirectTo?: string): Promise<{ succes
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: {
-        redirectTo: redirectTo || `${window.location.origin}/onboarding`,
+        redirectTo: redirectTo || `${window.location.origin}/app/onboarding`,
         scopes: 'email profile openid',
       },
     });

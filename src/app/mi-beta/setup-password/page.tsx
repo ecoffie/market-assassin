@@ -16,7 +16,7 @@ export default function MISetupPasswordPage() {
 
   useEffect(() => {
     if (window.location.hostname !== 'getmindy.ai' && window.location.hostname !== 'localhost') {
-      window.location.replace(`https://getmindy.ai/setup-password${window.location.search}${window.location.hash}`);
+      window.location.replace(`https://getmindy.ai/app/setup-password${window.location.search}${window.location.hash}`);
       return;
     }
 
@@ -92,7 +92,7 @@ export default function MISetupPasswordPage() {
       localStorage.removeItem('mi_beta_2fa_token');
 
       setSuccess(true);
-      setTimeout(() => router.push('/onboarding?setup=success'), 1000);
+      setTimeout(() => router.push('/app/onboarding?setup=success'), 1000);
     } catch {
       setError('Unable to set password. Please request a new setup link.');
     } finally {

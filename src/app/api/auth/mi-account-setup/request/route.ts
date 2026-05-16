@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: SETUP_SUCCESS_MESSAGE });
     }
 
-    const setupUrl = getSupabaseAuthRedirectUrl('/setup-password');
+    const setupUrl = getSupabaseAuthRedirectUrl('/app/setup-password');
     const link = await generateSetupLink(email, setupUrl);
 
     await sendEmail({

@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
     }
 
-    const redirectTo = getSupabaseAuthRedirectUrl('/reset-password');
+    const redirectTo = getSupabaseAuthRedirectUrl('/app/reset-password');
     const resetUrl = await generatePasswordResetLink(email, redirectTo);
 
     if (resetUrl) {

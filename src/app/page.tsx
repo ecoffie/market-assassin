@@ -14,9 +14,9 @@ export default function Home() {
             if (!params.get('access_token')) return;
             var type = params.get('type');
             var path = type === 'recovery'
-              ? '/mi-beta/reset-password'
-              : (type === 'invite' || type === 'signup' ? '/mi-beta/setup-password' : null);
-            if (path) window.location.replace('https://mi.govcongiants.com' + path + hash);
+              ? '/app/reset-password'
+              : (type === 'invite' || type === 'signup' ? '/app/setup-password' : null);
+            if (path) window.location.replace('https://getmindy.ai' + path + hash);
           })();
         `}
       </Script>

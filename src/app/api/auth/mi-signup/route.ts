@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate setup link
-    const setupUrl = getSupabaseAuthRedirectUrl('/setup-password');
+    const setupUrl = getSupabaseAuthRedirectUrl('/app/setup-password');
     const link = await generateSetupLink(email, setupUrl);
 
     // Send welcome email
