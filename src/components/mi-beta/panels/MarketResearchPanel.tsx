@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
+import type { Agency } from '@/types/federal-market-assassin';
 
 interface MarketResearchPanelProps {
   email: string | null;
@@ -240,6 +241,63 @@ function extractNaicsCode(value?: string | null): string {
   return (value || '').match(/\d{2,6}/)?.[0] || '';
 }
 
+function splitCodeList(value: string): string[] {
+  return value
+    .split(/[,;\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeMatchText(value?: string | null): string {
+  return (value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function agencyMatchesTarget(agency: Agency, target: string): boolean {
+  const targetText = normalizeMatchText(target);
+  if (!targetText) return false;
+
+  return [
+    agency.name,
+    agency.contractingOffice,
+    agency.subAgency,
+    agency.parentAgency,
+    agency.command,
+  ].some((value) => {
+    const agencyText = normalizeMatchText(value);
+    return agencyText.includes(targetText) || targetText.includes(agencyText);
+  });
+}
+
+async function lookupAgencyData(formData: FormData, selectedAgencies: string[]): Promise<Agency[]> {
+  const naicsCodes = splitCodeList(formData.naicsCode);
+  const pscCodes = splitCodeList(formData.pscCode);
+  if (naicsCodes.length === 0 && pscCodes.length === 0) return [];
+
+  try {
+    const res = await fetch('/api/agencies/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        naicsCodes,
+        pscCodes,
+        businessFormation: formData.businessType || 'Small Business',
+      }),
+    });
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.agencies)) return [];
+
+    const agencies = data.agencies as Agency[];
+    const targetFiltered = selectedAgencies.length > 0
+      ? agencies.filter((agency) => selectedAgencies.some((target) => agencyMatchesTarget(agency, target)))
+      : [];
+
+    return (targetFiltered.length > 0 ? targetFiltered : agencies).slice(0, 25);
+  } catch (err) {
+    console.error('Failed to lookup agency data for market research:', err);
+    return [];
+  }
+}
+
 function normalizeBusinessType(value?: string | null, certifications: string[] = []): BusinessType {
   const combined = [value || '', ...certifications].join(' ').toLowerCase();
   if (combined.includes('women') || combined.includes('wosb') || combined.includes('edwosb')) return 'Women Owned';
@@ -394,6 +452,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         .split(',')
         .map(agency => agency.trim())
         .filter(Boolean);
+      const selectedAgencyData = await lookupAgencyData(activeFormData, selectedAgencies);
+      const reportAgencyNames = selectedAgencies.length > 0
+        ? selectedAgencies
+        : selectedAgencyData.length > 0
+          ? uniqueStrings(selectedAgencyData.map((agency) => agency.parentAgency || agency.subAgency || agency.name)).slice(0, 10)
+          : ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration'];
 
       const res = await fetch('/api/reports/generate-all', {
         method: 'POST',
@@ -409,9 +473,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             excludeDOD: activeFormData.excludeDOD,
             goodsOrServices: 'services',
           },
-          selectedAgencies: selectedAgencies.length > 0
-            ? selectedAgencies
-            : ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration'],
+          selectedAgencies: reportAgencyNames,
+          selectedAgencyData,
           userEmail: email,
         }),
       });
