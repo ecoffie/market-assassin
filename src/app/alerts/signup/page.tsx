@@ -520,7 +520,7 @@ function AlertSignupContent() {
               </div>
               <span className="text-white font-semibold">GovCon Giants</span>
             </Link>
-            <Link href="/briefings" className="text-slate-400 hover:text-white text-sm">
+            <Link href="/briefings?recover=1" className="text-slate-400 hover:text-white text-sm">
               Already signed up?
             </Link>
           </div>

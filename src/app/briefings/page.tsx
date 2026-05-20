@@ -928,19 +928,27 @@ function BriefingsDashboardContent() {
     void verifyAndLoadUser(emailParam);
   }, [searchParams, verifyAndLoadUser]);
 
-  // On mount, check localStorage. If no saved email and no URL param, redirect to signup.
+  // On mount, check localStorage. If no saved email and no URL param, redirect to signup —
+  // UNLESS the user came here via "Already signed up?" (?recover=1), in which case show the
+  // email gate so they can self-recover without bouncing back to the signup form.
   useEffect(() => {
     if (searchParams.get('email')) {
       return;
     }
 
     const saved = localStorage.getItem('briefings_access_email');
-    if (!saved) {
-      // No authenticated user - redirect to free signup instead of showing gate
-      window.location.href = '/alerts/signup';
+    if (saved) {
+      void verifyAndLoadUser(saved);
       return;
     }
-    void verifyAndLoadUser(saved);
+
+    if (searchParams.get('recover') === '1') {
+      // Stay on the gate — handleSubmit / handleSendSecureLink will recover access.
+      return;
+    }
+
+    // No authenticated user - redirect to free signup instead of showing gate
+    window.location.href = '/alerts/signup';
   }, [searchParams, verifyAndLoadUser]);
 
   // Capture ?setup=true or ?setup=free intent early and clean up URL
