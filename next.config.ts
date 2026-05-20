@@ -110,36 +110,12 @@ const nextConfig: NextConfig = {
         destination: 'https://getmindy.ai/app/:path*',
         permanent: false,
       },
-      {
-        source: '/mi-beta',
-        has: [{ type: 'host', value: 'mi.govcongiants.com' }],
-        destination: 'https://getmindy.ai/app',
-        permanent: false,
-      },
-      {
-        source: '/mi-beta/:path*',
-        has: [{ type: 'host', value: 'mi.govcongiants.com' }],
-        destination: 'https://getmindy.ai/app/:path*',
-        permanent: false,
-      },
-      {
-        source: '/admin/launch-command-center',
-        has: [{ type: 'host', value: 'mi.govcongiants.com' }],
-        destination: 'https://getmindy.ai/command-center',
-        permanent: false,
-      },
-      {
-        source: '/admin/dashboard',
-        has: [{ type: 'host', value: 'mi.govcongiants.com' }],
-        destination: 'https://getmindy.ai/command-center/dashboard',
-        permanent: false,
-      },
-      {
-        source: '/admin/mi-accounts',
-        has: [{ type: 'host', value: 'mi.govcongiants.com' }],
-        destination: 'https://getmindy.ai/command-center/accounts',
-        permanent: false,
-      },
+      // NOTE: While Mindy is in beta, ALL user-facing traffic stays on
+      // mi.govcongiants.com. Previously these redirects pushed
+      // mi.govcongiants.com/mi-beta/* and /admin/* to getmindy.ai, which
+      // forced email recipients onto a login wall. Disabled until
+      // getmindy.ai is out of beta. The reverse direction (getmindy.ai →
+      // local /mi-beta) is still wired in the rewrites() block above.
       {
         source: '/:path*',
         has: [
