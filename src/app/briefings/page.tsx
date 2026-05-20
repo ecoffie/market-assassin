@@ -15,6 +15,7 @@ import ShareButton from '@/components/briefings/ShareButton';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import PipelineBoard from '@/components/bd-assist/PipelineBoard';
 import ContactsPanel from '@/components/bd-assist/ContactsPanel';
+import { persistAccessEmail, reconcileAccessEmail, clearAccessEmail } from '@/lib/access-cookie';
 
 // Client-specific types for briefing display
 // Note: These are intentionally separate from server-side types in @/lib/briefings/delivery/types.ts
@@ -807,11 +808,36 @@ function BriefingsDashboardContent() {
 
   // Check profile setup state for smart-skip onboarding.
   // Users with only default NAICS codes (from batch enrollment) should still go through onboarding.
-  const checkProfileSetupState = useCallback(async (userEmail: string): Promise<ProfileSetupState> => {
-    try {
+  // Returns { authFailed: true } if the API can't authenticate — caller should NOT force onboarding
+  // in that case (it would wipe a real saved profile).
+  const checkProfileSetupState = useCallback(async (userEmail: string): Promise<ProfileSetupState & { authFailed?: boolean }> => {
+    const fetchOnce = async () => {
       const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`);
-      const data = await res.json();
-      if (data.success && data.data) {
+      return { status: res.status, body: await res.json().catch(() => null) };
+    };
+
+    const empty: ProfileSetupState = { hasNaics: false, hasCustomNaics: false, hasBusinessDescription: false, businessDescription: '' };
+
+    try {
+      let result = await fetchOnce();
+
+      // If unauthorized, defensively re-persist the cookie and retry once.
+      // This fixes the class of bug where localStorage has the email but the
+      // ma_access_email cookie was missing (incognito, expired, browser cleared).
+      if (result.status === 401) {
+        persistAccessEmail(userEmail);
+        result = await fetchOnce();
+      }
+
+      if (result.status === 401) {
+        // Still unauthorized after the cookie restore — surface the failure so
+        // the caller can leave the user on the gate instead of pushing them
+        // through onboarding and overwriting their saved profile.
+        return { ...empty, authFailed: true };
+      }
+
+      const data = result.body;
+      if (data?.success && data.data) {
         const naicsCodes: string[] = data.data.naicsCodes || [];
         const businessDescription = String(data.data.businessDescription || '').trim();
         const hasNaics = naicsCodes.length > 0;
@@ -825,16 +851,16 @@ function BriefingsDashboardContent() {
           businessDescription,
         };
       }
-      return { hasNaics: false, hasCustomNaics: false, hasBusinessDescription: false, businessDescription: '' };
+      return empty;
     } catch {
-      return { hasNaics: false, hasCustomNaics: false, hasBusinessDescription: false, businessDescription: '' };
+      return { ...empty, authFailed: true };
     }
   }, []);
 
   const fetchBriefings = useCallback(async (userEmail: string) => {
     const res = await fetch(`/api/briefings/latest?email=${encodeURIComponent(userEmail)}&days=30`);
     if (res.status === 403) {
-      localStorage.removeItem('briefings_access_email');
+      clearAccessEmail();
       setStatus('denied');
       return;
     }
@@ -873,7 +899,7 @@ function BriefingsDashboardContent() {
       setSelectedBriefingKey(getBriefingKey(entries[0]));
     }
     setEmail(userEmail);
-    localStorage.setItem('briefings_access_email', userEmail);
+    persistAccessEmail(userEmail);
     setStatus('ready');
   }, []);
 
@@ -890,21 +916,29 @@ function BriefingsDashboardContent() {
       const data = await response.json();
 
       if (!data.hasAccess) {
-        localStorage.removeItem('briefings_access_email');
+        clearAccessEmail();
         setStatus('denied');
         return;
       }
 
-      // Persist access locally + set the auth cookie that downstream APIs
-      // (/api/alerts/preferences etc.) rely on. Without this, an existing
-      // Pro user signing in from a fresh browser hits 401 on the
-      // preferences fetch, falls back to onboarding, and is forced to
-      // re-enter NAICS/agencies from scratch.
+      // Persist BOTH localStorage and the auth cookie. Without the cookie,
+      // downstream APIs (/api/alerts/preferences etc.) return 401, which the
+      // profile-state check used to swallow — that bounced existing Pro users
+      // back through onboarding and forced them to re-enter NAICS/agencies.
       setEmail(userEmail);
-      localStorage.setItem('briefings_access_email', userEmail);
-      document.cookie = `ma_access_email=${userEmail}; path=/; max-age=604800; SameSite=Lax`;
+      persistAccessEmail(userEmail);
 
       const profileSetup = await checkProfileSetupState(userEmail);
+
+      // If auth genuinely fails after cookie restore + retry, leave the user on
+      // the gate with an error message rather than wiping their saved profile
+      // by forcing them through onboarding.
+      if (profileSetup.authFailed) {
+        setError('We could not verify your saved profile. Please try the secure access link below.');
+        setStatus('gate');
+        return;
+      }
+
       setProfileSetupState(profileSetup);
 
       // Show onboarding if user has no NAICS or only default NAICS (from batch enrollment)
@@ -929,9 +963,7 @@ function BriefingsDashboardContent() {
 
     setInputEmail(emailParam);
     setEmail(emailParam);
-    localStorage.setItem('briefings_access_email', emailParam);
-    // Also set the auth cookie so API calls can verify ownership
-    document.cookie = `ma_access_email=${emailParam}; path=/; max-age=604800; SameSite=Lax`;
+    persistAccessEmail(emailParam);
     void verifyAndLoadUser(emailParam);
   }, [searchParams, verifyAndLoadUser]);
 
@@ -943,7 +975,11 @@ function BriefingsDashboardContent() {
       return;
     }
 
-    const saved = localStorage.getItem('briefings_access_email');
+    // Reconcile localStorage + cookie before doing anything else. If a returning
+    // user has the email in localStorage but their cookie expired or was cleared,
+    // this restores the cookie so the very first API call this page makes will
+    // succeed instead of returning 401 and dumping the user into onboarding.
+    const saved = reconcileAccessEmail();
     if (saved) {
       void verifyAndLoadUser(saved);
       return;
@@ -1148,7 +1184,7 @@ function BriefingsDashboardContent() {
 
       // Set email and go to onboarding
       setEmail(trimmed);
-      localStorage.setItem('briefings_access_email', trimmed);
+      persistAccessEmail(trimmed);
       trackEngagement('onboarding_step', {
         step: 'free_signup_created',
         source: 'briefings_page',
@@ -1161,7 +1197,7 @@ function BriefingsDashboardContent() {
   };
 
   const handleSwitchAccount = () => {
-    localStorage.removeItem('briefings_access_email');
+    clearAccessEmail();
     setStatus('gate');
     setEmail('');
     setBriefings([]);

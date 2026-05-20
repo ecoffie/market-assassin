@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { persistAccessEmail } from '@/lib/access-cookie';
 
 // Public pricing (anchor price)
 const CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
@@ -69,8 +70,8 @@ function MarketIntelligenceContent() {
             body: JSON.stringify({ token: inviteToken }),
           });
 
-          // Store email for briefings dashboard
-          localStorage.setItem('briefings_access_email', email);
+          // Store email + auth cookie for briefings dashboard
+          persistAccessEmail(email);
 
           // Redirect to briefings with setup flag
           setRedirecting(true);
@@ -108,7 +109,7 @@ function MarketIntelligenceContent() {
       const data = await response.json();
 
       if (data.hasAccess) {
-        localStorage.setItem('briefings_access_email', email);
+        persistAccessEmail(email);
         setRedirecting(true);
         await new Promise((resolve) => setTimeout(resolve, 120));
         window.location.href = '/briefings';

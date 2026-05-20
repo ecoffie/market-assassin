@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { persistAccessEmail } from '@/lib/access-cookie';
 
 export default function AccessClient() {
   const searchParams = useSearchParams();
@@ -30,7 +31,11 @@ export default function AccessClient() {
         }
 
         if (data.destination === 'briefings') {
-          localStorage.setItem('briefings_access_email', data.email);
+          // Sets both localStorage AND the ma_access_email cookie so the
+          // /briefings page can authenticate downstream API calls. Without
+          // the cookie, /api/alerts/preferences returns 401 and users get
+          // bounced to onboarding.
+          persistAccessEmail(data.email);
         } else {
           localStorage.setItem('preferences_access_email', data.email);
         }
