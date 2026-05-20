@@ -327,7 +327,7 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
       {/* Header with Stats */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Contacts &amp; CRM</h1>
+          <h1 className="text-2xl font-bold text-white">Relationships</h1>
           <p className="text-slate-400 mt-1">
             {activeTab === 'network'
               ? 'Your saved buyers, partners, and pursuit contacts.'
