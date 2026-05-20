@@ -320,7 +320,7 @@ export default function OnboardingPage() {
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
   const [customAgencies, setCustomAgencies] = useState('');
   const [selectedSetAsides, setSelectedSetAsides] = useState<string[]>([]);
-  const [frequency, setFrequency] = useState<'daily' | 'weekly'>('daily');
+  const [frequency, setFrequency] = useState<'daily' | 'weekdays' | 'weekends' | 'weekly' | 'paused'>('daily');
   const [profileSuggestions, setProfileSuggestions] = useState<ProfileSuggestions | null>(null);
   const [showSamplePicker, setShowSamplePicker] = useState(false);
   const [calibratedFromSamples, setCalibratedFromSamples] = useState(false);
@@ -841,14 +841,17 @@ export default function OnboardingPage() {
                 Choose your preferred delivery frequency. You can change this later.
               </p>
               <div className="space-y-3">
-                {[
+                {([
                   { value: 'daily', title: 'Daily', detail: 'Every morning with fresh matching opportunities' },
+                  { value: 'weekdays', title: 'Weekdays only', detail: 'Mon–Fri mornings, skip weekends' },
+                  { value: 'weekends', title: 'Weekends only', detail: 'Sat & Sun mornings' },
                   { value: 'weekly', title: 'Weekly', detail: 'A weekly digest of the best matches' },
-                ].map(option => (
+                  { value: 'paused', title: 'Paused', detail: 'Save my settings but hold the emails for now' },
+                ] as const).map(option => (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setFrequency(option.value as 'daily' | 'weekly')}
+                    onClick={() => setFrequency(option.value)}
                     className={`w-full rounded-xl border p-4 text-left transition-colors ${
                       frequency === option.value
                         ? 'border-purple-500 bg-purple-600/20 ring-2 ring-purple-500/25'

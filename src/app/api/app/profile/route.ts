@@ -97,8 +97,19 @@ export async function POST(request: NextRequest) {
       updateData.location_zip = locationZip.trim() || null;
     }
 
-    if (alertFrequency === 'daily' || alertFrequency === 'weekly') {
+    if (
+      alertFrequency === 'daily' ||
+      alertFrequency === 'weekdays' ||
+      alertFrequency === 'weekends' ||
+      alertFrequency === 'weekly' ||
+      alertFrequency === 'paused'
+    ) {
       updateData.alert_frequency = alertFrequency;
+      // Keep alerts_enabled in sync with paused so the daily-alerts cron
+      // doesn't keep emailing users who chose Paused at onboarding.
+      if (alertFrequency === 'paused') {
+        updateData.alerts_enabled = false;
+      }
     }
 
     const { data: existingSettings } = await supabase
@@ -126,8 +137,20 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await settingsWrite;
 
     if (updateError) {
-      console.error('[MI Beta Profile] Update error:', updateError.message);
-      return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+      console.error('[Mindy Profile] Update error:', updateError);
+      // Surface the Supabase error message so the client can show a useful
+      // hint instead of just a red "Failed to update profile" banner. The
+      // generic copy made it impossible for affected users (and support) to
+      // know whether the failure was auth, RLS, schema mismatch, etc.
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Could not save profile: ${updateError.message || 'unknown database error'}`,
+          code: updateError.code,
+          details: updateError.details || undefined,
+        },
+        { status: 500 }
+      );
     }
 
     // Also update user_business_profiles if it exists
