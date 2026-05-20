@@ -895,13 +895,20 @@ function BriefingsDashboardContent() {
         return;
       }
 
+      // Persist access locally + set the auth cookie that downstream APIs
+      // (/api/alerts/preferences etc.) rely on. Without this, an existing
+      // Pro user signing in from a fresh browser hits 401 on the
+      // preferences fetch, falls back to onboarding, and is forced to
+      // re-enter NAICS/agencies from scratch.
+      setEmail(userEmail);
+      localStorage.setItem('briefings_access_email', userEmail);
+      document.cookie = `ma_access_email=${userEmail}; path=/; max-age=604800; SameSite=Lax`;
+
       const profileSetup = await checkProfileSetupState(userEmail);
       setProfileSetupState(profileSetup);
 
       // Show onboarding if user has no NAICS or only default NAICS (from batch enrollment)
       if (!profileSetup.hasCustomNaics) {
-        setEmail(userEmail);
-        localStorage.setItem('briefings_access_email', userEmail);
         setStatus('onboarding');
         return;
       }
