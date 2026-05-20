@@ -92,14 +92,14 @@ export default function MindyLandingPage() {
 
           {/* Inline Signup Form */}
           {!submitted ? (
-            <div className="max-w-xl mx-auto mb-8">
+            <div className="max-w-md mx-auto mb-8 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-6 sm:p-8 shadow-2xl shadow-purple-900/20">
               {/* OAuth — faster path for new users with Google or Microsoft accounts */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="space-y-3">
                 <button
                   type="button"
                   onClick={handleGoogleSignup}
                   disabled={oauthLoading !== null || isSubmitting}
-                  className="flex-1 inline-flex items-center justify-center gap-3 px-5 py-4 bg-white hover:bg-slate-100 text-slate-800 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-3 px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-800 rounded-xl font-medium text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
                   {oauthLoading === 'google' ? (
                     <span className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
@@ -117,7 +117,7 @@ export default function MindyLandingPage() {
                   type="button"
                   onClick={handleMicrosoftSignup}
                   disabled={oauthLoading !== null || isSubmitting}
-                  className="flex-1 inline-flex items-center justify-center gap-3 px-5 py-4 bg-[#2F2F2F] hover:bg-[#3F3F3F] text-white rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-3 px-5 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700"
                 >
                   {oauthLoading === 'microsoft' ? (
                     <span className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
@@ -134,37 +134,38 @@ export default function MindyLandingPage() {
               </div>
 
               {/* Divider */}
-              <div className="relative my-4">
+              <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-purple-400/20"></div>
+                  <div className="w-full border-t border-white/10"></div>
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="px-3 bg-slate-950 text-slate-500 text-xs uppercase tracking-wider">or with email</span>
+                  <span className="px-3 bg-transparent text-slate-500 text-xs">or</span>
                 </div>
               </div>
 
-              <form onSubmit={handleFreeSignup}>
-                <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    required
-                    className="flex-1 px-5 py-4 bg-white/10 border border-purple-400/30 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-lg"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || oauthLoading !== null}
-                    className="px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/25 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                  >
-                    {isSubmitting ? 'Creating...' : 'Get Your First Briefing Free'}
-                  </button>
-                </div>
+              <form onSubmit={handleFreeSignup} className="space-y-3">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  required
+                  aria-label="Email address"
+                  className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500/50 text-base"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmitting || oauthLoading !== null}
+                  className="w-full px-5 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-semibold text-base shadow-lg shadow-purple-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? 'Creating your briefing…' : 'Get Your First Briefing Free'}
+                </button>
                 {error && (
-                  <p className="text-red-400 text-sm">{error}</p>
+                  <p className="text-red-400 text-sm pt-1">{error}</p>
                 )}
-                <p className="text-slate-500 text-sm">Free forever. No credit card required.</p>
+                <p className="text-slate-500 text-xs text-center pt-2">
+                  Free forever · No credit card required
+                </p>
               </form>
             </div>
           ) : (
