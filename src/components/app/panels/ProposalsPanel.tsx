@@ -81,8 +81,8 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
     return (
       <div className="p-6">
         <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center">
-          <div className="text-4xl mb-4">Proposal Prep</div>
-          <h1 className="text-2xl font-bold text-white mb-3">Proposal Prep Pack</h1>
+          <div className="text-4xl mb-4">📝</div>
+          <h1 className="text-2xl font-bold text-white mb-3">Proposal Assist</h1>
           <p className="text-slate-400 mb-6 max-w-md mx-auto">
             Upgrade to turn saved pursuits into bid/no-bid risks, win themes, compliance prompts, and a first proposal outline.
           </p>
@@ -103,7 +103,7 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Proposal Prep Pack</h1>
+          <h1 className="text-2xl font-bold text-white">Proposal Assist</h1>
           <p className="text-slate-400 mt-1">Turn a saved pursuit into the first capture/proposal workspace.</p>
         </div>
         <button
