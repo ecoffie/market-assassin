@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 
 export default function MindySignupPage() {
@@ -74,9 +75,7 @@ export default function MindySignupPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-xl shadow-purple-500/30 mx-auto mb-4">
-              <span className="text-white font-bold text-3xl">M</span>
-            </div>
+            <MindyLogo size={64} className="mx-auto mb-4" />
           </Link>
           <h1 className="text-2xl font-bold text-white">Create your Mindy account</h1>
           <p className="text-slate-400 mt-2">Start getting federal market intelligence</p>
@@ -215,7 +214,7 @@ export default function MindySignupPage() {
           <div className="mt-6 pt-6 border-t border-slate-800 text-center">
             <p className="text-slate-400 text-sm">
               Already have an account?{' '}
-              <Link href="/briefings" className="text-purple-400 hover:text-purple-300 font-medium">
+              <Link href="/app" className="text-purple-400 hover:text-purple-300 font-medium">
                 Sign in
               </Link>
             </p>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import UnifiedSidebarBeta, { type MIBetaPanel, type MIBetaTier } from '@/components/mi-beta/UnifiedSidebarBeta';
 import PanelContainer from '@/components/mi-beta/panels';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
+import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
@@ -202,6 +203,40 @@ function MIBetaDashboard() {
     await loadUserProfile(sessionEmail);
     return true;
   }, [loadUserProfile]);
+
+  const handleSignOut = useCallback(async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    setAuthMessage(null);
+
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (error) {
+      console.warn('Failed to sign out of Supabase session:', error);
+    } finally {
+      clearStoredMIBetaAuth();
+      setEmail(null);
+      setTier('free');
+      setCurrentWorkspaceId(null);
+      setPendingEmail('');
+      setSignInPassword('');
+      setVerificationCode('');
+      setAuthStep('credentials');
+      setIsSignUpMode(false);
+      setSignUpEmail('');
+      setSignUpSent(false);
+      setIsSettingsOpen(false);
+      setIsLoading(false);
+      setAuthLoading(false);
+
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/app');
+      }
+    }
+  }, []);
 
   useEffect(() => {
     activePanelRef.current = activePanel;
@@ -430,9 +465,7 @@ function MIBetaDashboard() {
         <div className="max-w-4xl mx-auto px-6 py-16">
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mx-auto mb-6">
-              <span className="text-white font-bold text-2xl">M</span>
-            </div>
+            <MindyLogo size={64} className="mx-auto mb-6" />
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
               Meet Mindy
             </h1>
@@ -687,9 +720,9 @@ function MIBetaDashboard() {
             )}
 
             <p className="text-center text-gray-500 text-sm mt-4">
-              Legacy dashboard:{' '}
-              <a href="/briefings" className="text-emerald-400 hover:text-emerald-300">
-                /briefings →
+              Mindy dashboard:{' '}
+              <a href="/app" className="text-emerald-400 hover:text-emerald-300">
+                /app →
               </a>
             </p>
           </div>
@@ -761,7 +794,7 @@ function MIBetaDashboard() {
                 px-2 py-1 text-xs rounded
                 ${tier === 'free' ? 'bg-slate-700 text-slate-300' : 'bg-emerald-500/20 text-emerald-400'}
               `}>
-                {tier === 'free' ? 'Free' : 'Pro'} Plan
+                {tier === 'free' ? 'Free' : tier === 'team' ? 'Team' : tier === 'enterprise' ? 'Enterprise' : 'Pro'} Plan
               </span>
               <button
                 onClick={() => setIsSettingsOpen(true)}
@@ -774,17 +807,18 @@ function MIBetaDashboard() {
                 </svg>
               </button>
               <button
-                onClick={() => {
-                  clearStoredMIBetaAuth();
-                  setEmail(null);
-                  setPendingEmail('');
-                  setSignInPassword('');
-                  setVerificationCode('');
-                  setAuthStep('credentials');
-                }}
+                onClick={handleSignOut}
+                disabled={authLoading}
                 className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
               >
                 Switch Account
+              </button>
+              <button
+                onClick={handleSignOut}
+                disabled={authLoading}
+                className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-red-400/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Sign out
               </button>
             </div>
           </div>

@@ -5,6 +5,8 @@
  * how well they match the user's profile, capabilities, and certifications.
  */
 
+import { MICRO_PURCHASE_THRESHOLD, SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
+import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import { BriefingUserProfile } from '../smart-profile/types';
 
 export interface WinProbabilityResult {
@@ -549,10 +551,7 @@ function parseContractSize(sizeStr: string): number | null {
  * Format currency for display
  */
 function formatCurrency(amount: number): string {
-  if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)}B`;
-  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `$${(amount / 1_000).toFixed(0)}K`;
-  return `$${amount.toFixed(0)}`;
+  return formatMindyCurrency(amount);
 }
 
 /**
@@ -753,8 +752,8 @@ function scoreBidNaicsMatch(
  *
  * This is KEY for SMBs who often start with micro-purchase and SAP to build past performance.
  *
- * - Micro-purchase (<$10K) = 30 pts (easiest entry, minimal competition)
- * - SAP (<$250K) = 25 pts (simplified procedures, faster award)
+ * - Micro-purchase (<$15K) = 30 pts (easiest entry, minimal competition)
+ * - SAP (<$350K) = 25 pts (simplified procedures, faster award)
  * - Set-aside (user qualifies) = 20 pts (limited competition pool)
  * - Full & Open = 10 pts (maximum competition)
  * - Set-aside (user lacks cert) = 5 pts (may not qualify)
@@ -764,27 +763,24 @@ function scoreBidAccessibility(
   setAside: string | undefined,
   profile: BriefingUserProfile
 ): BidFactor {
-  const MICRO_PURCHASE_THRESHOLD = 10_000; // $10K
-  const SAP_THRESHOLD = 250_000; // $250K
-
   // Micro-purchase: easiest entry point
   if (amount && amount > 0 && amount <= MICRO_PURCHASE_THRESHOLD) {
     return {
       name: 'Accessibility',
       points: 30,
       maxPoints: 30,
-      description: `Micro-purchase under $10K — minimal competition`,
+      description: `Micro-purchase under $15K — minimal competition`,
       isPositive: true,
     };
   }
 
   // SAP (Simplified Acquisition Procedures): still favorable
-  if (amount && amount > MICRO_PURCHASE_THRESHOLD && amount <= SAP_THRESHOLD) {
+  if (amount && amount > MICRO_PURCHASE_THRESHOLD && amount <= SIMPLIFIED_ACQUISITION_THRESHOLD) {
     return {
       name: 'Accessibility',
       points: 25,
       maxPoints: 30,
-      description: `SAP threshold — simplified procedures`,
+      description: `SAP threshold under $350K — simplified procedures`,
       isPositive: true,
     };
   }

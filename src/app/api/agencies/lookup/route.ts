@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { expandGenericDoDAgency, ExpandedDoDAgency } from '@/lib/utils/command-info';
+import { expandGenericDoDAgency } from '@/lib/utils/command-info';
+import {
+  MICRO_PURCHASE_THRESHOLD,
+  SIMPLIFIED_ACQUISITION_THRESHOLD,
+  scoreAgencyPriority,
+  sortAgenciesForSmallBusiness,
+  type AgencyPriorityBreakdown,
+} from '@/lib/utils/agency-priority';
 
 // Agency type that combines both regular and expanded DoD agencies
 interface Agency {
@@ -16,6 +23,8 @@ interface Agency {
   satContractCount?: number;
   microSpending?: number;
   microContractCount?: number;
+  priorityScore?: number;
+  priorityBreakdown?: AgencyPriorityBreakdown;
   agencyId?: string;
   agencyCode?: string;
   subAgencyCode?: string;
@@ -190,20 +199,18 @@ export async function POST(request: NextRequest) {
       officeSpending[officeKey].setAsideSpending += amount;
       officeSpending[officeKey].contractCount += 1;
 
-      if (amount > 0 && amount <= 250000) {
+      if (amount > 0 && amount <= SIMPLIFIED_ACQUISITION_THRESHOLD) {
         officeSpending[officeKey].satSpending = (officeSpending[officeKey].satSpending || 0) + amount;
         officeSpending[officeKey].satContractCount = (officeSpending[officeKey].satContractCount || 0) + 1;
       }
-      if (amount > 0 && amount <= 10000) {
+      if (amount > 0 && amount <= MICRO_PURCHASE_THRESHOLD) {
         officeSpending[officeKey].microSpending = (officeSpending[officeKey].microSpending || 0) + amount;
         officeSpending[officeKey].microContractCount = (officeSpending[officeKey].microContractCount || 0) + 1;
       }
     }
 
-    // Convert to array and sort
-    let agencies: Agency[] = Object.values(officeSpending).sort(
-      (a, b) => b.setAsideSpending - a.setAsideSpending
-    );
+    // Convert to array and sort for small-business entry points.
+    let agencies: Agency[] = sortAgenciesForSmallBusiness(Object.values(officeSpending));
 
     // Expand generic DoD agencies
     const dodParentAgencies = ['DEPARTMENT OF DEFENSE', 'DEPT OF DEFENSE', 'DOD'];
@@ -246,9 +253,18 @@ export async function POST(request: NextRequest) {
       if (expandedAgencies.length > 0) {
         const nonExpandedAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
         agencies = [...nonExpandedAgencies, ...expandedAgencies];
-        agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+        agencies = sortAgenciesForSmallBusiness(agencies);
       }
     }
+
+    agencies = agencies.map((agency) => {
+      const priority = scoreAgencyPriority(agency);
+      return {
+        ...agency,
+        priorityScore: priority.score,
+        priorityBreakdown: priority,
+      };
+    });
 
     const totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
 

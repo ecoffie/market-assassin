@@ -29,7 +29,7 @@ function buildFallbackUrl(email: string, destination: AccessDestination): string
     return `${baseUrl}/alerts/preferences?email=${encodeURIComponent(normalizedEmail)}`;
   }
 
-  return `${baseUrl}/briefings?email=${encodeURIComponent(normalizedEmail)}`;
+  return `${baseUrl}/app?email=${encodeURIComponent(normalizedEmail)}`;
 }
 
 function getTransporter() {
@@ -104,7 +104,7 @@ export async function sendAccessLinkEmail(email: string, destination: AccessDest
   const actionLabel = destination === 'briefings' ? 'Open Market Intelligence' : 'Manage Preferences';
 
   await getTransporter().sendMail({
-    from: `"GovCon Giants AI" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
     to: normalizeEmail(email),
     subject: `${destinationLabel} secure access link | GovCon Giants`,
     html: `

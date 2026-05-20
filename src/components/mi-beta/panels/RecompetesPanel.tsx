@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
+import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -79,10 +80,7 @@ interface SavedProfileDefaults {
 }
 
 function formatCurrency(value: number): string {
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${value.toLocaleString()}`;
+  return formatMindyCurrency(value);
 }
 
 function formatDate(dateStr: string): string {

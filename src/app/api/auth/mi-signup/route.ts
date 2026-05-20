@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { resolveMx } from 'dns/promises';
+import { renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import { sendEmail } from '@/lib/send-email';
 
 export const runtime = 'nodejs';
@@ -138,7 +139,8 @@ function buildWelcomeEmailHtml(setupUrl: string): string {
       </div>
       <div style="font-family: Arial, Helvetica, sans-serif; max-width:680px; margin:0 auto; padding:32px 18px; color:#0f172a;">
         <div style="background:#07111f; border-radius:18px; overflow:hidden; box-shadow:0 18px 45px rgba(15,23,42,0.16);">
-          <div style="padding:34px 34px 30px; background:linear-gradient(135deg,#7c3aed 0%,#a855f7 55%,#c084fc 100%); color:#ffffff;">
+          <div style="padding:34px 34px 30px; background:linear-gradient(135deg,#7c3aed 0%,#a855f7 55%,#c084fc 100%); color:#ffffff; text-align:center;">
+            ${renderMindyEmailLogo(58)}
             <div style="font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; opacity:0.82;">Welcome to</div>
             <h1 style="font-size:36px; line-height:1.12; margin:12px 0 8px; font-weight:800;">Mindy</h1>
             <p style="font-size:16px; line-height:1.5; margin:0; color:#e9d5ff;">

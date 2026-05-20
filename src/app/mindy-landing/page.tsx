@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
-// Keep users on the stable briefings dashboard until the Mindy app is ready.
+// Send Mindy users into the new app experience.
 const CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
 const CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';  // $1,490/yr
 const FREE_SIGNUP_URL = '/signup';
-const DASHBOARD_URL = '/briefings';
+const DASHBOARD_URL = '/app';
 
 export default function MindyLandingPage() {
   const [email, setEmail] = useState('');

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 import { sendEmail } from '@/lib/send-email';
+import { MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -112,7 +113,7 @@ async function markInvitationsSent(supabase: ReturnType<typeof getSupabase>, ema
 }
 
 function generateEmailHtml(email: string) {
-  const setupUrl = `https://mi.govcongiants.com/alerts/signup?email=${encodeURIComponent(email)}`;
+  const setupUrl = `${MINDY_SITE_URL}/alerts/signup?email=${encodeURIComponent(email)}`;
 
   return `
 <!DOCTYPE html>
@@ -121,12 +122,13 @@ function generateEmailHtml(email: string) {
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background-color:#f4f4f5;">
   <div style="max-width:600px;margin:0 auto;padding:20px;">
     <div style="background:linear-gradient(135deg,#1e3a8a 0%,#7c3aed 100%);border-radius:12px 12px 0 0;padding:30px;text-align:center;">
+      ${renderMindyEmailLogo(52)}
       <h1 style="color:white;margin:0;font-size:24px;">Your Free Gift from the Bootcamp</h1>
     </div>
     <div style="background:white;padding:30px;border-radius:0 0 12px 12px;">
       <p style="color:#374151;font-size:16px;line-height:1.6;">Hey Giant,</p>
       <p style="color:#374151;font-size:16px;line-height:1.6;">It's Eric from GovCon Giants.</p>
-      <p style="color:#374151;font-size:16px;line-height:1.6;">Because you attended one of our bootcamps, I'm giving you <strong>FREE access to our new Market Intelligence platform</strong> - specifically the Daily Opportunity Alerts.</p>
+      <p style="color:#374151;font-size:16px;line-height:1.6;">Because you attended one of our bootcamps, I'm giving you <strong>FREE access to Mindy</strong> - specifically the Daily Opportunity Alerts.</p>
       <p style="color:#374151;font-size:16px;line-height:1.6;"><strong>What you'll get:</strong></p>
       <ul style="color:#374151;font-size:16px;line-height:1.8;">
         <li>Daily emails with federal contract opportunities matching YOUR business</li>
@@ -135,7 +137,7 @@ function generateEmailHtml(email: string) {
       </ul>
       <div style="background:#f3f4f6;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
         <p style="color:#374151;font-size:14px;margin:0 0 12px 0;"><strong>Want to see it in action?</strong></p>
-        <a href="https://www.youtube.com/watch?v=aq-_4bbODNQ" style="color:#7c3aed;font-weight:bold;text-decoration:none;">Watch Eric explain the new Market Intelligence platform</a>
+        <a href="https://www.youtube.com/watch?v=aq-_4bbODNQ" style="color:#7c3aed;font-weight:bold;text-decoration:none;">Watch Eric explain Mindy</a>
       </div>
       <p style="color:#374151;font-size:16px;line-height:1.6;">But I need you to <strong>set up your profile first</strong> so we know what opportunities to send you. Takes 60 seconds:</p>
       <div style="text-align:center;margin:30px 0;">
@@ -200,8 +202,8 @@ export async function GET(request: NextRequest) {
       try {
         const delivered = await sendEmail({
           to: email,
-          from: '"GovCon Giants" <alerts@govcongiants.com>',
-          subject: 'Set Up Your GovCon Alerts Profile',
+          from: `"${MINDY_FROM_NAME}" <alerts@govcongiants.com>`,
+          subject: 'Set Up Your Mindy Alerts Profile',
           html: generateEmailHtml(email),
           emailType: 'bootcamp_profile_setup',
           eventSource: 'bootcamp-rollout-cron',

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
 
 export default function MISetupPasswordPage() {
@@ -104,9 +105,7 @@ export default function MISetupPasswordPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 text-xl font-bold text-white">
-            M
-          </div>
+          <MindyLogo size={56} className="mx-auto mb-5" />
           <h1 className="text-2xl font-bold text-white">Create your Mindy password</h1>
           <p className="mt-2 text-sm text-slate-400">
             After this, finish your profile so Mindy can tailor your opportunities.

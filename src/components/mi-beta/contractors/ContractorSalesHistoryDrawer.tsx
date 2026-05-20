@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getMIApiHeaders } from '../authHeaders';
 import type { ContractorSalesHistory } from '@/lib/contractor-sales-history';
+import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 interface ContractorSummary {
   company: string;
@@ -19,10 +20,7 @@ interface ContractorSalesHistoryDrawerProps {
 }
 
 function formatCurrency(value: number) {
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${Math.round(value).toLocaleString()}`;
+  return formatMindyCurrency(value);
 }
 
 function formatDate(value: string | null) {

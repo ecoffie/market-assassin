@@ -18,12 +18,12 @@ import {
   UserBriefingProfile,
 } from '../diff-engine';
 import { WebSignal } from '../web-intel/types';
-import { SAMOpportunity } from '../pipelines/sam-gov';
 import { RecompeteContract } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
-import { calculateWinProbability, WinProbabilityResult } from '../win-probability';
-import { getBriefingProfile, BriefingUserProfile } from '../../smart-profile';
+import { calculateWinProbability } from '../win-probability';
+import { getBriefingProfile } from '../../smart-profile';
+import { getMindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '../../mindy/feedback-scoring';
 
 const MAX_TOP_ITEMS = 5;
 const MAX_PER_CATEGORY = 3;
@@ -243,7 +243,22 @@ export async function generateBriefing(
       }
     }
 
-    // Re-sort after urgency boost (urgent items bubble up)
+    const feedbackSignals = await getMindyFeedbackSignals(userEmail);
+    for (const item of filteredItems) {
+      const feedbackScore = scoreOpportunityWithMindyFeedback({
+        opportunityId: item.id,
+        title: item.title,
+        agency: item.agency,
+        naicsCode: item.naicsCode,
+      }, feedbackSignals);
+
+      if (feedbackScore.adjustment !== 0) {
+        item.overallScore += feedbackScore.adjustment;
+        item.signals.push(...feedbackScore.reasons.map(reason => `mindy_feedback:${reason}`));
+      }
+    }
+
+    // Re-sort after urgency and feedback boosts.
     filteredItems.sort((a, b) => b.overallScore - a.overallScore);
 
     const maxItems = options.maxItems || 15;
@@ -561,7 +576,6 @@ function organizeSnapshots(
   snapshots: Array<{ tool: string; raw_data: unknown; snapshot_date: string }>
 ): Record<string, { today: unknown[]; yesterday: unknown[] }> {
   const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
   const organized: Record<string, { today: unknown[]; yesterday: unknown[] }> = {
     opportunities: { today: [], yesterday: [] },

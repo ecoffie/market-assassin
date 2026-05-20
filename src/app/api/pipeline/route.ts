@@ -307,6 +307,20 @@ export async function DELETE(request: NextRequest) {
     if (!authSession.ok) return authSession.response;
     const { workspaceId } = await ensureWorkspaceMember(user_email);
 
+    const { data: existing } = await getSupabase()
+      .from('user_pipeline')
+      .select('id,title,stage')
+      .eq('id', id)
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Opportunity not found or access denied' },
+        { status: 404 }
+      );
+    }
+
     const { error } = await getSupabase()
       .from('user_pipeline')
       .delete()
@@ -314,6 +328,17 @@ export async function DELETE(request: NextRequest) {
       .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`);
 
     if (error) throw error;
+
+    await recordMIBetaActivity({
+      workspaceId,
+      userEmail: user_email,
+      actorEmail: user_email,
+      entityType: 'pipeline',
+      entityId: id,
+      action: 'deleted',
+      summary: `Removed ${existing.title} from pipeline`,
+      metadata: { stage: existing.stage },
+    });
 
     return NextResponse.json({
       success: true,

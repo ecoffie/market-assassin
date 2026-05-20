@@ -8,6 +8,7 @@ import { searchIDVContracts } from '@/lib/idv-search';
 import { getEnhancedAgencyInfo, isDoDAgency } from '@/lib/utils/command-info';
 import { ComprehensiveReport, CoreInputs, Agency, SimplifiedAcquisitionReport, SimplifiedAcquisitionAgency } from '@/types/federal-market-assassin';
 import { buildCachedBudgetCheckup, getBudgetForAgency } from '@/lib/utils/budget-authority';
+import { MICRO_PURCHASE_THRESHOLD, SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
 import { fetchPricingIntel } from '@/lib/utils/calc-rates';
 import { checkReportRateLimit, checkUnauthenticatedIPRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/api-auth';
@@ -18,6 +19,50 @@ import { getMarketAssassinTier } from '@/lib/access-codes';
 // Free reports available to all users (4 reports)
 const FREE_REPORT_KEYS = ['simplifiedAcquisition', 'budgetCheckup', 'governmentBuyers'];
 // Note: 'osbp' uses same key as governmentBuyers but different view
+
+function agencySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'agency';
+}
+
+function buildFallbackAgencyData(selectedAgencies: string[]): Agency[] {
+  const uniqueAgencies = [...new Set(selectedAgencies.map((agency) => agency.trim()).filter(Boolean))];
+
+  return uniqueAgencies.map((agencyName) => {
+    const budget = getBudgetForAgency(agencyName);
+    const estimatedSpending =
+      budget?.fy2025?.obligated ||
+      budget?.fy2026?.obligated ||
+      budget?.fy2025?.budgetAuthority ||
+      budget?.fy2026?.budgetAuthority ||
+      0;
+    const enhancedInfo = getEnhancedAgencyInfo(agencyName, agencyName, agencyName);
+
+    return {
+      id: `fallback-${agencySlug(agencyName)}`,
+      name: agencyName,
+      contractingOffice: agencyName,
+      subAgency: agencyName,
+      parentAgency: agencyName,
+      setAsideSpending: estimatedSpending,
+      contractCount: 0,
+      satSpending: 0,
+      satContractCount: 0,
+      microSpending: 0,
+      microContractCount: 0,
+      location: 'Nationwide',
+      hasSpecificOffice: false,
+      isEstimated: true,
+      command: enhancedInfo?.command || undefined,
+      website: enhancedInfo?.website || null,
+      forecastUrl: enhancedInfo?.forecastUrl || null,
+      samForecastUrl: enhancedInfo?.samForecastUrl || undefined,
+      osbp: enhancedInfo?.smallBusinessContact || null,
+    };
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -414,10 +459,17 @@ export async function POST(request: NextRequest) {
       ],
     };
 
-    // Generate Government Buyers Report using real USAspending data with enhanced command info
-    const governmentBuyersReport = selectedAgencyData && selectedAgencyData.length > 0
+    const buyerAgencyData = selectedAgencyData && selectedAgencyData.length > 0
+      ? selectedAgencyData
+      : buildFallbackAgencyData(selectedAgencies);
+    const usingEstimatedBuyerData = (!selectedAgencyData || selectedAgencyData.length === 0) && buyerAgencyData.length > 0;
+
+    // Generate Government Buyers Report using real USAspending data with enhanced command info.
+    // If USAspending lookup is unavailable/empty, fall back to target agencies so the dashboard
+    // still has a useful buyer map instead of showing zero agencies.
+    const governmentBuyersReport = buyerAgencyData.length > 0
       ? (() => {
-          const agenciesWithCommandInfo = selectedAgencyData.map((agency) => {
+          const agenciesWithCommandInfo = buyerAgencyData.map((agency) => {
             // Get enhanced command info for all agencies (DoD and Civilian)
             const commandInfo = getEnhancedAgencyInfo(
               agency.contractingOffice || agency.name,
@@ -462,12 +514,16 @@ export async function POST(request: NextRequest) {
           return {
             agencies: agenciesWithCommandInfo,
             summary: {
-              totalAgencies: selectedAgencyData.length,
-              totalSpending: selectedAgencyData.reduce((sum, a) => sum + a.setAsideSpending, 0),
-              totalContracts: selectedAgencyData.reduce((sum, a) => sum + a.contractCount, 0),
+              totalAgencies: buyerAgencyData.length,
+              totalSpending: buyerAgencyData.reduce((sum, a) => sum + a.setAsideSpending, 0),
+              totalContracts: buyerAgencyData.reduce((sum, a) => sum + a.contractCount, 0),
               commandEnhancedAgencies: commandEnhancedCount,
+              isEstimated: usingEstimatedBuyerData,
             },
             recommendations: [
+              ...(usingEstimatedBuyerData
+                ? ['Live buyer lookup returned no agency rows, so Mindy used your target agencies and cached budget data as an estimated buyer map']
+                : []),
               commandEnhancedCount > 0
                 ? `${commandEnhancedCount} agencies have command-specific OSBP contacts - use these direct lines`
                 : 'Contact the Office of Small Business Programs (OSBP) at each agency',
@@ -607,7 +663,9 @@ export async function POST(request: NextRequest) {
         const matchRate = totalNeeds > 0 ? Math.round((matchedNeeds / totalNeeds) * 100) : 0;
 
         // Count how many have command-level pain points
-        const commandLevelNeeds = needs.filter((n: any) => n.painPointSource && n.painPointSource !== n.agency).length;
+        const commandLevelNeeds = needs.filter((n) =>
+          'painPointSource' in n && n.painPointSource && n.painPointSource !== n.agency
+        ).length;
 
         return {
           needs: needs.slice(0, 20), // Top 20 needs
@@ -802,7 +860,7 @@ export async function POST(request: NextRequest) {
         }
         if (totalMicroContracts > 0) {
           recommendations.push(
-            `${totalMicroContracts} micro-purchases (under $10K) found — these require minimal paperwork and use government purchase cards. Consider these for quick wins.`
+            `${totalMicroContracts} micro-purchases (under $${(MICRO_PURCHASE_THRESHOLD / 1000).toFixed(0)}K) found — these require minimal paperwork and use government purchase cards. Consider these for quick wins.`
           );
         }
         const highScoreAgencies = satAgencies.filter(a => a.satFriendlinessScore >= 60).slice(0, 3);
@@ -813,7 +871,7 @@ export async function POST(request: NextRequest) {
         }
         if (avgSATPercent < 25) {
           recommendations.push(
-            'Most agencies in your search use larger contracts. Consider expanding your search or positioning for subcontracting on larger awards.'
+            `Most agencies in your search use larger contracts above the $${(SIMPLIFIED_ACQUISITION_THRESHOLD / 1000).toFixed(0)}K simplified acquisition threshold. Consider expanding your search or positioning for subcontracting on larger awards.`
           );
         }
 

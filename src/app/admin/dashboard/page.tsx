@@ -768,6 +768,67 @@ export default function AdminDashboard() {
   const opportunitiesSaved = data.outcomeMetrics?.findContracts.savedOpportunities || 0;
   const pipelineAdds = data.outcomeMetrics?.winContracts.pipelineItemsCreated || 0;
   const whiteGloveSignals = data.outcomeMetrics?.winContracts.whiteGloveHelpRequests || 0;
+  const briefingTrend = data.trends.briefings || [];
+  const latestBriefingDay = briefingTrend[briefingTrend.length - 1];
+  const latestBriefingByType = latestBriefingDay?.byType || { daily: 0, weekly: 0, pursuit: 0 };
+  const baselineBriefingDays = briefingTrend
+    .slice(0, Math.min(4, Math.max(briefingTrend.length - 1, 0)))
+    .filter(day => ((day.byType?.daily || day.sent) > 0));
+  const baselineDailyAverage = baselineBriefingDays.length > 0
+    ? Math.round(
+        baselineBriefingDays.reduce((sum, day) => sum + (day.byType?.daily || day.sent), 0) /
+        baselineBriefingDays.length
+      )
+    : 0;
+  const latestDailyBriefings = latestBriefingByType.daily || latestBriefingDay?.sent || 0;
+  const estimatedNewEligibleBriefings = baselineDailyAverage > 0
+    ? Math.max(latestDailyBriefings - baselineDailyAverage, 0)
+    : 0;
+  const briefingEnabledNotEligible = Math.max(data.userHealth.briefingsEnabled - briefingAudience, 0);
+  const briefingMovement = [
+    {
+      label: 'Current eligible',
+      value: briefingAudience.toLocaleString(),
+      detail: 'active, enabled, unexpired entitlement',
+      tone: 'text-green-300',
+    },
+    {
+      label: 'New eligible estimate',
+      value: `+${estimatedNewEligibleBriefings.toLocaleString()}`,
+      detail: baselineDailyAverage > 0 ? `vs ${baselineDailyAverage.toLocaleString()} baseline` : 'needs more history',
+      tone: 'text-purple-300',
+    },
+    {
+      label: 'Profile incomplete',
+      value: data.userHealth.briefingsProfileIncomplete.toLocaleString(),
+      detail: 'eligible users who still need setup',
+      tone: 'text-orange-300',
+    },
+    {
+      label: 'Expired',
+      value: data.userHealth.briefingsExpired.toLocaleString(),
+      detail: 'entitlement expired',
+      tone: 'text-yellow-300',
+    },
+    {
+      label: 'Enabled not eligible',
+      value: briefingEnabledNotEligible.toLocaleString(),
+      detail: 'enabled, but blocked by access/status',
+      tone: 'text-gray-300',
+    },
+    {
+      label: 'Pursuit sends',
+      value: latestBriefingByType.pursuit.toLocaleString(),
+      detail: latestBriefingDay ? `on ${latestBriefingDay.date}` : 'latest day',
+      tone: 'text-amber-300',
+    },
+    {
+      label: 'Failed/skipped',
+      value: `${(latestBriefingDay?.failed || 0).toLocaleString()} / ${(latestBriefingDay?.skipped || 0).toLocaleString()}`,
+      detail: latestBriefingDay ? `failed / skipped on ${latestBriefingDay.date}` : 'latest day',
+      tone: 'text-red-300',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -2404,6 +2465,31 @@ export default function AdminDashboard() {
                     </div>
                   );
                 })}
+                <div className="mt-5 rounded-lg border border-gray-700 bg-gray-900/50 p-4">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">Why This Changed</h3>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Delivery volume moves when eligibility, profiles, failures, or pursuit sends change.
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Latest: {latestBriefingDay?.date || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {briefingMovement.map((item) => (
+                      <div key={item.label} className="rounded-lg border border-gray-700 bg-gray-800/70 p-3">
+                        <div className="text-[11px] uppercase tracking-wide text-gray-500">{item.label}</div>
+                        <div className={`mt-1 font-mono text-xl font-semibold ${item.tone}`}>{item.value}</div>
+                        <div className="mt-1 text-xs text-gray-500">{item.detail}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs text-gray-500">
+                    This panel explains send volume, not pure subscriber growth.
+                  </p>
+                </div>
               </div>
             ) : (
               <p className="text-gray-500">No briefing data for this period</p>

@@ -17,6 +17,12 @@ import {
 import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
 import { expandGenericDoDAgency } from '@/lib/utils/command-info';
 import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
+import {
+  MICRO_PURCHASE_THRESHOLD,
+  SIMPLIFIED_ACQUISITION_THRESHOLD,
+  scoreAgencyPriority,
+  sortAgenciesForSmallBusiness,
+} from '@/lib/utils/agency-priority';
 
 export async function POST(request: NextRequest) {
   try {
@@ -748,20 +754,18 @@ export async function POST(request: NextRequest) {
       officeSpending[officeKey].contractCount += 1;
 
       // Track Simplified Acquisition Threshold (SAT) and micro-purchase metrics
-      if (amount > 0 && amount <= 250000) {
+      if (amount > 0 && amount <= SIMPLIFIED_ACQUISITION_THRESHOLD) {
         officeSpending[officeKey].satSpending += amount;
         officeSpending[officeKey].satContractCount += 1;
       }
-      if (amount > 0 && amount <= 10000) {
+      if (amount > 0 && amount <= MICRO_PURCHASE_THRESHOLD) {
         officeSpending[officeKey].microSpending += amount;
         officeSpending[officeKey].microContractCount += 1;
       }
     });
 
-    // Convert to array and sort by spending
-    let agencies = Object.values(officeSpending).sort(
-      (a, b) => b.setAsideSpending - a.setAsideSpending
-    );
+    // Convert to array and sort for small-business entry points.
+    let agencies = sortAgenciesForSmallBusiness(Object.values(officeSpending));
 
     let totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
 
@@ -888,8 +892,7 @@ export async function POST(request: NextRequest) {
                 })),
               ];
 
-              // Re-sort by spending
-              agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+              agencies = sortAgenciesForSmallBusiness(agencies);
 
               // Recalculate total spending
               totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
@@ -921,8 +924,7 @@ export async function POST(request: NextRequest) {
                 // Merge: non-expanded agencies + expanded DoD commands
                 agencies = [...nonExpandedAgencies, ...expandedAgencies];
 
-                // Re-sort by spending
-                agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+                agencies = sortAgenciesForSmallBusiness(agencies);
 
                 // Recalculate total spending
                 totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
@@ -953,7 +955,7 @@ export async function POST(request: NextRequest) {
             if (expandedAgencies.length > 0) {
               const nonExpandedAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
               agencies = [...nonExpandedAgencies, ...expandedAgencies];
-              agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+              agencies = sortAgenciesForSmallBusiness(agencies);
               totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
               console.log(`   ✅ Expanded to ${expandedAgencies.length} specific DoD commands`);
             }
@@ -979,7 +981,7 @@ export async function POST(request: NextRequest) {
         if (expandedAgencies.length > 0) {
           const nonExpandedAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
           agencies = [...nonExpandedAgencies, ...expandedAgencies];
-          agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+          agencies = sortAgenciesForSmallBusiness(agencies);
           totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
           console.log(`   ✅ Expanded to ${expandedAgencies.length} specific DoD commands`);
         }
@@ -1004,7 +1006,7 @@ export async function POST(request: NextRequest) {
       if (expandedAgencies.length > 0) {
         const nonExpandedAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
         agencies = [...nonExpandedAgencies, ...expandedAgencies];
-        agencies.sort((a, b) => b.setAsideSpending - a.setAsideSpending);
+        agencies = sortAgenciesForSmallBusiness(agencies);
         totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);
         console.log(`   ✅ Expanded to ${expandedAgencies.length} specific DoD commands`);
       }
@@ -1049,6 +1051,15 @@ export async function POST(request: NextRequest) {
       console.log(`🚫 DOD exclusion: Filtered from ${beforeCount} to ${agencies.length} civilian agencies`);
       console.log(`   Civilian agency spending: $${totalSpending.toLocaleString()}`);
     }
+
+    agencies = sortAgenciesForSmallBusiness(agencies).map((agency: any) => {
+      const priority = scoreAgencyPriority(agency);
+      return {
+        ...agency,
+        priorityScore: priority.score,
+        priorityBreakdown: priority,
+      };
+    });
 
     // If still no results after fallback, generate alternative search options
     let alternativeSearches;

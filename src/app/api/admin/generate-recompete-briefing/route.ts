@@ -132,7 +132,7 @@ async function sendBriefingEmail(
     });
 
     await transporter.sendMail({
-      from: `"GovCon Giants AI" <${smtpUser}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${smtpUser}>`,
       to,
       subject: template.subject,
       text: template.textBody,

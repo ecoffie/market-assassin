@@ -138,10 +138,10 @@ function ProfileCompleteContent() {
             <h3 className="font-semibold text-gray-700 mb-4">What&apos;s Next?</h3>
             <div className="grid grid-cols-1 gap-3">
               <Link
-                href="/briefings"
+                href="/app"
                 className="block px-4 py-3 bg-gradient-to-r from-[#1e3a8a] to-[#7c3aed] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
               >
-                View Your Briefings
+                Open Mindy Dashboard
               </Link>
               <Link
                 href="/opportunity-hunter"

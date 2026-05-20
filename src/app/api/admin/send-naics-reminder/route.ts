@@ -408,7 +408,7 @@ export async function POST(request: NextRequest) {
         const template = await generateReminderEmail(email);
 
         await transporter.sendMail({
-          from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
           to: email,
           subject: template.subject,
           html: template.html,

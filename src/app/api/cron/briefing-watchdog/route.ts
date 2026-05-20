@@ -396,7 +396,7 @@ async function sendHealthAlert(metrics: HealthMetrics, date: string): Promise<vo
     to: ALERT_EMAIL,
     subject,
     html,
-    from: 'GovCon Giants System <hello@govconedu.com>',
+        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govconedu.com>`,
   });
 }
 
@@ -422,7 +422,7 @@ async function sendExhaustedAlert(count: number): Promise<void> {
     to: ALERT_EMAIL,
     subject,
     html,
-    from: 'GovCon Giants System <hello@govconedu.com>',
+        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govconedu.com>`,
   });
 }
 
@@ -448,6 +448,6 @@ async function sendWatchdogFailureAlert(error: unknown): Promise<void> {
     to: ALERT_EMAIL,
     subject,
     html,
-    from: 'GovCon Giants System <hello@govconedu.com>',
+        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govconedu.com>`,
   });
 }

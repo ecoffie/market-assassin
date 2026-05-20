@@ -455,7 +455,7 @@ Traffic → Free Tools → MI SaaS ($149/mo) → Enterprise expansion
 | Exclusive Feature | Description |
 |-------------------|-------------|
 | **Agency Pain Points** | 307 agencies, 3,045 pain points |
-| **SAT Entry Point Analysis** | Find $250K contracts big firms ignore |
+| **SAT Entry Point Analysis** | Find $350K contracts big firms ignore |
 | **One-Time Payment** | $497-$1,497 lifetime (vs subscription only) |
 | **AI Content Generation** | LinkedIn posts from GovCon intel |
 | **Action Planner** | 5-phase guided workflow |

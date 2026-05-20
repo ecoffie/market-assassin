@@ -70,7 +70,7 @@ You've already built 80% of what Deltek offers. The gaps are fixable in 2-4 week
 | Feature | Description | Deltek Has? |
 |---------|-------------|-------------|
 | **Agency Pain Points Database** | 307 agencies, 3,045 pain points, 2,611 priorities | **NO** |
-| **SAT Entry Point Analysis** | Find $250K contracts big firms ignore | **NO** |
+| **SAT Entry Point Analysis** | Find $350K contracts big firms ignore | **NO** |
 | **One-Time Payment Option** | $497-$1,497 lifetime access | **NO** (subscription only) |
 | **AI-Powered Content Generation** | LinkedIn posts from GovCon intel | **NO** |
 | **Action Planner** | 5-phase, 36-task guided workflow | **NO** |

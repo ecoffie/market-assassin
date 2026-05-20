@@ -653,10 +653,11 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
       {viewMode === 'list' && opportunities.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+            <table className="w-full min-w-[980px]">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-900/50">
                   <SortHeader field="title">Opportunity</SortHeader>
+                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Owner</th>
                   <SortHeader field="value">Value</SortHeader>
                   <SortHeader field="stage">Stage</SortHeader>
                   <SortHeader field="deadline">Deadline</SortHeader>
@@ -694,6 +695,11 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
                             )}
                           </div>
                         )}
+                      </td>
+
+                      {/* Owner */}
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-slate-400">{opp.owner_email || 'Unassigned'}</span>
                       </td>
 
                       {/* Value */}

@@ -25,6 +25,7 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
+import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 export const maxDuration = 300;
 
@@ -1103,9 +1104,9 @@ async function sendDailyAlertEmail(
 
   const encodedEmail = encodeURIComponent(email.toLowerCase().trim());
   const preferencesAuth = generateEmailToken(email);
-  const unsubscribeUrl = `https://mi.govcongiants.com/api/alerts/unsubscribe?email=${encodedEmail}`;
-  const preferencesUrl = `https://mi.govcongiants.com/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
-  const dailyBriefingsUrl = 'https://shop.govcongiants.com/market-intelligence';
+  const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
+  const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
+  const mindyDashboardUrl = MINDY_APP_URL;
   const totalCount = opportunities.length + grants.length;
 
   const opportunitiesHtml = opportunities.slice(0, 20).map((opp, i) => {
@@ -1172,20 +1173,26 @@ async function sendDailyAlertEmail(
   <!-- FREE PREVIEW Banner -->
   <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
     <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
-      🎁 FREE PREVIEW • You're testing our daily alerts — no charge during beta!
+      🎁 FREE PREVIEW • You're testing Mindy daily alerts — no charge during beta!
     </p>
   </div>
 
   <!-- Header -->
   <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center;">
+    ${renderMindyEmailLogo(52)}
     <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">
-      🎯 Saved Search Alert
+      🎯 Mindy Saved Search Alert
     </h1>
     <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 14px;">
       ${formatDate(new Date().toISOString())} • ${totalCount} matches found
     </p>
     <p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 440px;">
-      New matches from your saved filters. Daily Briefings prioritize the best opportunities and show the full market view.
+      New matches from your saved filters. Mindy prioritizes the best opportunities and keeps your full market view in one dashboard.
+    </p>
+    <p style="margin: 16px 0 0 0;">
+      <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'header_dashboard')}" style="background: #10b981; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">
+        Open Mindy Dashboard →
+      </a>
     </p>
   </div>
 
@@ -1275,10 +1282,10 @@ async function sendDailyAlertEmail(
       Was this alert helpful?
     </p>
     <div style="display: inline-block;">
-      <a href="${trackedUrl(`https://mi.govcongiants.com/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+      <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=daily_alert`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
         👍 Yes
       </a>
-      <a href="${trackedUrl(`https://mi.govcongiants.com/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+      <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=daily_alert`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
         👎 No
       </a>
     </div>
@@ -1286,13 +1293,13 @@ async function sendDailyAlertEmail(
 
   <div style="background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
     <h3 style="color: white; margin: 0 0 8px 0; font-size: 17px; font-weight: 700;">
-      Want the Daily Briefing?
+      Want Mindy to rank these for you?
     </h3>
     <p style="color: #ddd6fe; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
-      Alerts tell you what matched. <strong>Daily Briefings</strong> rank your top priorities, explain why they matter, and link you to the full opportunity dashboard.
+      Alerts tell you what matched. <strong>Mindy Pro</strong> ranks your top priorities, explains why they matter, and links you to the full opportunity dashboard.
     </p>
-    <a href="${trackedUrl(dailyBriefingsUrl, 'upgrade_market_intelligence')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
-      Upgrade to Daily Briefings →
+    <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'ranked_dashboard')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
+      Open Mindy Dashboard →
     </a>
     <p style="color: #c4b5fd; font-size: 11px; margin: 10px 0 0 0;">
       Top priorities in your inbox + browse all matching opportunities
@@ -1304,10 +1311,12 @@ async function sendDailyAlertEmail(
     <p style="color: #64748b; font-size: 12px; margin: 0;">
       <a href="${trackedUrl(preferencesUrl, 'manage_preferences')}" style="color: #475569; text-decoration: none;">Manage Preferences</a>
       &nbsp;•&nbsp;
+      <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'footer_dashboard')}" style="color: #475569; text-decoration: none;">Mindy Dashboard</a>
+      &nbsp;•&nbsp;
       <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #475569; text-decoration: none;">Unsubscribe</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
-      © ${new Date().getFullYear()} GovCon Giants • mi.govcongiants.com
+      © ${new Date().getFullYear()} Mindy • getmindy.ai
     </p>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}
@@ -1316,9 +1325,9 @@ async function sendDailyAlertEmail(
 `;
 
   await sendEmail({
-    from: `"Alerts" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+    from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
-    subject: `🎯 ${totalCount} New Opportunities${grants.length > 0 ? ' + Grants' : ''} - ${formatDate(new Date().toISOString())}`,
+    subject: `Mindy Alert: ${totalCount} New Opportunities${grants.length > 0 ? ' + Grants' : ''} - ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     emailType: 'daily_alert',
     eventSource: 'daily_alert',

@@ -70,7 +70,7 @@ Track competitors, their features, gaps we can exploit, and user pain points we 
 
 | Feature | Tool | Competitor Gap | Marketing Angle |
 |---------|------|----------------|-----------------|
-| **SAT Entry Point Analysis** | MA Premium | Nobody shows simplified acquisition paths | "Find the $250K contracts big firms ignore" |
+| **SAT Entry Point Analysis** | MA Premium | Nobody shows simplified acquisition paths | "Find the $350K contracts big firms ignore" |
 | **Agency Pain Points DB** | All tools | Generic search, no context | "Know what keeps agency PMs up at night" |
 | **One-time pricing** | All tools | Everyone does subscriptions | "Pay once, own forever. No annual ransom." |
 | **AI Daily Briefings** | Briefings | Manual alerts or expensive analysts | "Your AI BD analyst for $19/mo" |

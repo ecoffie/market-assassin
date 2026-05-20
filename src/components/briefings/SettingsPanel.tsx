@@ -22,7 +22,6 @@ const INDUSTRY_PRESETS = [
 ];
 
 const BUSINESS_TYPES = [
-  { value: '', label: 'Any Small Business' },
   { value: 'Small Business', label: 'Small Business (General)' },
   { value: 'SDVOSB', label: 'SDVOSB - Service-Disabled Veteran-Owned' },
   { value: 'VOSB', label: 'VOSB - Veteran-Owned Small Business' },
@@ -30,6 +29,7 @@ const BUSINESS_TYPES = [
   { value: 'WOSB', label: 'WOSB - Women-Owned Small Business' },
   { value: 'EDWOSB', label: 'EDWOSB - Economically Disadvantaged WOSB' },
   { value: 'HUBZone', label: 'HUBZone' },
+  { value: 'Native American/Tribal', label: 'Native American / Tribal / ISBEE' },
 ];
 
 const REGION_PRESETS = [
@@ -76,6 +76,7 @@ interface AlertSettings {
   keywords: string[];
   businessDescription?: string | null;
   businessType: string;
+  setAsides?: string[];
   targetAgencies: string[];
   locationStates: string[];
   frequency: string;
@@ -93,6 +94,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
   const [naicsInput, setNaicsInput] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
+  const [selectedSetAsides, setSelectedSetAsides] = useState<string[]>([]);
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
   const [customAgencies, setCustomAgencies] = useState('');
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
@@ -134,8 +136,13 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
         setBusinessDescription(description);
         setShowDescriptionPrompt(!description);
 
-        // Load business type
-        setBusinessType(settings.businessType || '');
+        // Load set-aside eligibility. Older profiles may only have businessType.
+        const setAsideValues = Array.from(new Set([
+          ...(settings.setAsides || []),
+          settings.businessType || '',
+        ].map(value => String(value).trim()).filter(Boolean)));
+        setSelectedSetAsides(setAsideValues);
+        setBusinessType(setAsideValues[0] || settings.businessType || '');
 
         // Load agencies
         const agencies = settings.targetAgencies || [];
@@ -204,7 +211,8 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
           naicsCodes,
           keywords,
           businessDescription: businessDescription.trim() || null,
-          businessType: businessType || null,
+          businessType: selectedSetAsides[0] || businessType || null,
+          setAsides: selectedSetAsides,
           targetAgencies: getAllAgencies(),
           locationStates: selectedStates,
           locationState: selectedStates[0] || null,
@@ -245,6 +253,16 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
         ? prev.filter(s => s !== state)
         : [...prev, state]
     );
+  };
+
+  const toggleSetAside = (value: string) => {
+    setSelectedSetAsides(prev => {
+      const next = prev.includes(value)
+        ? prev.filter(item => item !== value)
+        : [...prev, value];
+      setBusinessType(next[0] || '');
+      return next;
+    });
   };
 
   // Get industry match for visual feedback
@@ -688,19 +706,39 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
             {/* Business Type / Set-Aside */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Set-Aside Type
+                Set-Aside Eligibility
               </label>
-              <select
-                value={businessType}
-                onChange={e => setBusinessType(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-purple-500 focus:outline-none text-sm"
-              >
-                {BUSINESS_TYPES.map(type => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
+              <p className="text-xs text-gray-500 mb-3">
+                Select every status your company can actually claim. Mindy will downrank set-asides you do not hold.
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {BUSINESS_TYPES.map(type => {
+                  const checked = selectedSetAsides.includes(type.value);
+                  return (
+                    <label
+                      key={type.value}
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                        checked
+                          ? 'border-purple-500/40 bg-purple-600/20 text-white'
+                          : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:border-gray-600 hover:text-white'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleSetAside(type.value)}
+                        className="h-4 w-4 rounded border-gray-600 bg-gray-900 text-purple-600 focus:ring-purple-500"
+                      />
+                      <span>{type.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {selectedSetAsides.length === 0 && (
+                <p className="mt-2 text-xs text-amber-300/80">
+                  No set-asides selected. Mindy will favor Sources Sought/RFIs and downrank certified set-asides.
+                </p>
+              )}
             </div>
 
             {/* Target Agencies */}

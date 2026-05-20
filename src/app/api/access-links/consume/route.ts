@@ -13,11 +13,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'This secure link is invalid or has expired.' }, { status: 404 });
     }
 
+    const emailParam = encodeURIComponent(payload.email);
+    const redirectTo =
+      payload.destination === 'briefings'
+        ? `/app?email=${emailParam}`
+        : `/alerts/preferences?email=${emailParam}`;
+
     return NextResponse.json({
       success: true,
       email: payload.email,
       destination: payload.destination,
-      redirectTo: payload.destination === 'briefings' ? '/briefings' : '/alerts/preferences',
+      redirectTo,
     });
   } catch (error) {
     console.error('[AccessLinks] Consume failed:', error);

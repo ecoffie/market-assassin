@@ -162,7 +162,7 @@ async function sendVerificationEmail(email: string, code: string): Promise<boole
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+    from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
       to: email,
       subject: `Your GovCon Briefing Bot Code: ${code}`,
       text: `Your verification code is: ${code}\n\nText this code back to the GovCon Giants number to link your account.\n\nThis code expires in 15 minutes.\n\nIf you didn't request this, ignore this email.`,

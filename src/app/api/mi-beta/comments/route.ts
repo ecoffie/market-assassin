@@ -16,16 +16,6 @@ import {
   recordMIBetaActivity,
 } from '@/lib/mi-beta/workspace';
 
-interface Comment {
-  id: string;
-  pipeline_id: string;
-  workspace_id: string;
-  user_email: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
   const pipelineId = request.nextUrl.searchParams.get('pipeline_id');
@@ -180,7 +170,7 @@ export async function DELETE(request: NextRequest) {
   // Get comment to verify ownership
   const { data: comment } = await supabase
     .from('mi_beta_comments')
-    .select('id, user_email')
+    .select('id, user_email, workspace_id, pipeline_id, content')
     .eq('id', commentId)
     .maybeSingle();
 
@@ -193,6 +183,12 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'You can only delete your own comments' }, { status: 403 });
   }
 
+  const { data: pipelineItem } = await supabase
+    .from('user_pipeline')
+    .select('id, title')
+    .eq('id', comment.pipeline_id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from('mi_beta_comments')
     .delete()
@@ -201,6 +197,17 @@ export async function DELETE(request: NextRequest) {
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+
+  await recordMIBetaActivity({
+    workspaceId: comment.workspace_id,
+    userEmail: email,
+    actorEmail: email,
+    entityType: 'comment',
+    entityId: commentId,
+    action: 'deleted',
+    summary: `Deleted a comment${pipelineItem?.title ? ` on "${pipelineItem.title}"` : ''}`,
+    metadata: { pipeline_id: comment.pipeline_id, preview: String(comment.content || '').slice(0, 100) },
+  });
 
   return NextResponse.json({ success: true, deleted: true });
 }

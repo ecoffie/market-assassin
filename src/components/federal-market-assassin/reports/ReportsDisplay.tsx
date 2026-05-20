@@ -105,12 +105,15 @@ type ReportTab =
 function formatCurrency(value: number): string {
   const abs = Math.abs(value);
   const sign = value < 0 ? '-' : '';
-  if (abs >= 1000000000) {
-    return `${sign}$${(abs / 1000000000).toFixed(1)}B`;
+  const compact = (divisor: number, suffix: string) => `${sign}$${(abs / divisor).toFixed(1).replace(/\.0$/, '')}${suffix}`;
+  if (abs >= 1000000000000) {
+    return compact(1000000000000, 'T');
+  } else if (abs >= 1000000000) {
+    return compact(1000000000, 'B');
   } else if (abs >= 1000000) {
-    return `${sign}$${(abs / 1000000).toFixed(1)}M`;
+    return compact(1000000, 'M');
   } else if (abs >= 1000) {
-    return `${sign}$${(abs / 1000).toFixed(1)}K`;
+    return compact(1000, 'K');
   } else {
     return `${sign}$${abs.toFixed(0)}`;
   }
@@ -4079,8 +4082,9 @@ function BudgetCheckupTab({ report }: { report: ComprehensiveReport }) {
   const fmtCurrency = (value: number): string => {
     const abs = Math.abs(value);
     const sign = value < 0 ? '-' : '';
-    if (abs >= 1_000_000_000_000) return `${sign}$${(abs / 1_000_000_000_000).toFixed(2)}T`;
-    if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`;
+    const compact = (divisor: number, suffix: string) => `${sign}$${(abs / divisor).toFixed(1).replace(/\.0$/, '')}${suffix}`;
+    if (abs >= 1_000_000_000_000) return compact(1_000_000_000_000, 'T');
+    if (abs >= 1_000_000_000) return compact(1_000_000_000, 'B');
     if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(0)}M`;
     if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(0)}K`;
     return `${sign}$${abs.toFixed(0)}`;
@@ -4344,8 +4348,8 @@ function EntryPointsTab({ report }: { report: ComprehensiveReport }) {
       <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl p-6">
         <h3 className="text-xl font-bold text-amber-400 mb-2">Simplified Acquisition Entry Points</h3>
         <p className="text-slate-400 text-sm">
-          Contracts under $250K use simplified acquisition procedures — faster timelines, less paperwork, and easier for small businesses to win.
-          Micro-purchases under $10K use government purchase cards with minimal competition.
+          Contracts under $350K use simplified acquisition procedures — faster timelines, less paperwork, and easier for small businesses to win.
+          Micro-purchases under $15K use government purchase cards with minimal competition.
         </p>
       </div>
 
@@ -4476,7 +4480,7 @@ function EntryPointsTab({ report }: { report: ComprehensiveReport }) {
             Low (&lt;25% SAT)
           </div>
           <div className="ml-auto">
-            SAT = Simplified Acquisition Threshold ($250K) | Micro = Government Purchase Card ($10K)
+            SAT = Simplified Acquisition Threshold ($350K) | Micro = Government Purchase Card ($15K)
           </div>
         </div>
       </div>

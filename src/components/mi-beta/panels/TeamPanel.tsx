@@ -44,12 +44,13 @@ interface WorkspaceSettings {
   default_agencies?: string[];
 }
 
+const TEAM_SEAT_LIMIT = 5;
+
 export default function TeamPanel({ email, tier }: TeamPanelProps) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [workspaceName, setWorkspaceName] = useState('Workspace');
-  const [workspaceId, setWorkspaceId] = useState('');
   const [currentRole, setCurrentRole] = useState('member');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
@@ -80,7 +81,6 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
       setActivity(data.activity || []);
       setReminders(data.reminders || []);
       setWorkspaceName(data.workspace?.name || 'Workspace');
-      setWorkspaceId(data.workspace?.id || '');
       setCurrentRole(data.currentMember?.role || 'member');
       // Load workspace settings from settings if available
       if (data.settings) {
@@ -135,7 +135,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     }
   };
 
-  const canInvite = ['owner', 'admin'].includes(currentRole);
+  const seatsUsed = members.filter(member => member.status === 'active' || member.status === 'invited').length;
+  const hasSeatCapacity = seatsUsed < TEAM_SEAT_LIMIT || tier === 'enterprise';
+  const canInvite = ['owner', 'admin'].includes(currentRole) && hasSeatCapacity;
   const canEditSettings = ['owner', 'admin'].includes(currentRole);
 
   const saveWorkspaceSettings = async () => {
@@ -203,7 +205,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Seats" value={members.length} />
+        <StatCard label="Seats" value={tier === 'enterprise' ? `${seatsUsed}` : `${seatsUsed}/${TEAM_SEAT_LIMIT}`} />
         <StatCard label="Open Reminders" value={reminders.length} />
         <StatCard label="Your Role" value={currentRole} />
       </div>
@@ -268,7 +270,10 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
               >
                 {saving ? 'Inviting...' : 'Invite Teammate'}
               </button>
-              {!canInvite && <p className="text-xs text-slate-500">Only owners and admins can invite teammates.</p>}
+              {!['owner', 'admin'].includes(currentRole) && <p className="text-xs text-slate-500">Only owners and admins can invite teammates.</p>}
+              {['owner', 'admin'].includes(currentRole) && !hasSeatCapacity && (
+                <p className="text-xs text-amber-300">MI Team includes {TEAM_SEAT_LIMIT} seats. Upgrade to Enterprise for more users.</p>
+              )}
             </div>
           </div>
 

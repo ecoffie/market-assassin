@@ -119,8 +119,8 @@
     }
   },
   "thresholds": {
-    "satThreshold": 250000,
-    "microThreshold": 10000,
+    "satThreshold": 350000,
+    "microThreshold": 15000,
     "high": "SAT% >= 50",
     "moderate": "SAT% >= 35 and < 50",
     "low": "SAT% < 35"

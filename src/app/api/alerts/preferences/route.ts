@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
         naicsCodes: data.naics_codes || [],
         keywords: data.keywords || [],
         businessType: data.business_type,
+        setAsides: data.set_aside_preferences || (data.business_type ? [data.business_type] : []),
         targetAgencies: data.agencies || [],
         locationState: data.location_state,
         locationStates: data.location_states || (data.location_state ? [data.location_state] : []),
@@ -156,6 +157,7 @@ export async function POST(request: NextRequest) {
       keywords,
       businessDescription,
       businessType,
+      setAsides,
       targetAgencies,
       locationState,
       locationStates, // Multi-state support
@@ -274,6 +276,12 @@ export async function POST(request: NextRequest) {
 
     if (businessType !== undefined) {
       record.business_type = businessType || null;
+    }
+
+    if (setAsides !== undefined) {
+      record.set_aside_preferences = Array.isArray(setAsides)
+        ? Array.from(new Set(setAsides.map((value: string) => String(value).trim()).filter(Boolean)))
+        : [];
     }
 
     if (targetAgencies !== undefined) {

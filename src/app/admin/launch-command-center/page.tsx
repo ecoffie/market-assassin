@@ -344,7 +344,7 @@ function LoadingState() {
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
       <div className="w-full max-w-md rounded-lg border border-slate-800 bg-slate-900 p-8 shadow-2xl">
         <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Checking access</p>
-        <h1 className="mt-3 text-3xl font-bold">MI Command Center</h1>
+        <h1 className="mt-3 text-3xl font-bold">Mindy Command Center</h1>
         <div className="mt-8 h-2 overflow-hidden rounded-full bg-slate-800">
           <div className="command-center-loader h-full w-1/3 rounded-full bg-gradient-to-r from-emerald-400 via-blue-400 to-purple-400" />
         </div>
@@ -607,7 +607,7 @@ export default function LaunchCommandCenterPage() {
       <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
         <section className="w-full max-w-md rounded-lg border border-slate-800 bg-slate-900 p-8 shadow-2xl">
           <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Private workspace</p>
-          <h1 className="mt-3 text-3xl font-bold">MI Command Center</h1>
+          <h1 className="mt-3 text-3xl font-bold">Mindy Command Center</h1>
           <p className="mt-3 text-slate-400">
             One internal link for launch priorities, owners, outreach, coach signals, enterprise sales, and social distribution.
           </p>
@@ -649,7 +649,7 @@ export default function LaunchCommandCenterPage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-lg bg-emerald-500 px-3 py-2 text-lg font-black text-slate-950">MI</span>
+              <span className="rounded-lg bg-purple-500 px-3 py-2 text-lg font-black text-white">M</span>
               <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-sm font-semibold text-amber-200">
                 Internal V1
               </span>
@@ -657,7 +657,7 @@ export default function LaunchCommandCenterPage() {
                 Customer first. Advisory second.
               </span>
             </div>
-            <h1 className="mt-5 text-4xl font-bold tracking-tight md:text-5xl">MI Launch Command Center</h1>
+            <h1 className="mt-5 text-4xl font-bold tracking-tight md:text-5xl">Mindy Command Center</h1>
             <p className="mt-3 max-w-3xl text-lg text-slate-300">
               One private operating page for launch execution, customer learning, coach alignment, enterprise selling, and social distribution.
             </p>
@@ -666,11 +666,11 @@ export default function LaunchCommandCenterPage() {
             <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Today</p>
             <p className="mt-1 text-lg font-semibold text-slate-100">{currentDate}</p>
             <div className="mt-4 flex justify-end gap-2">
-              <a className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500" href="/admin/dashboard">
+              <a className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500" href="/command-center/dashboard">
                 Admin Dashboard
               </a>
-              <a className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500" href="/admin/mi-accounts">
-                MI Accounts
+              <a className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500" href="/command-center/accounts">
+                Mindy Accounts
               </a>
               <button
                 className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500"

@@ -14,6 +14,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { getMindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '@/lib/mindy/feedback-scoring';
+import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -36,8 +38,244 @@ interface SAMOpportunity {
   active?: boolean;
   pop_state?: string;
   pop_city?: string;
+  pop_zip?: string;
+  pop_country?: string;
   ui_link?: string;
   description?: string;
+  description_url?: string;
+  notice_desc_url?: string;
+}
+
+interface UserOpportunityProfile {
+  naics_codes?: string[] | null;
+  business_type?: string | null;
+  set_aside_preferences?: string[] | null;
+}
+
+interface SetAsideFit {
+  eligible: boolean;
+  adjustment: number;
+  reason?: string;
+}
+
+interface AgencyFit {
+  adjustment: number;
+  reason?: string;
+}
+
+function normalizeText(value: string | null | undefined) {
+  return String(value || '').toLowerCase();
+}
+
+function isHttpUrl(value: string | null | undefined) {
+  if (!value) return false;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function getOpportunitySummary(opp: SAMOpportunity) {
+  const description = opp.description?.trim();
+  if (!description || isHttpUrl(description)) return null;
+  return description;
+}
+
+function getOpportunityDescriptionUrl(opp: SAMOpportunity) {
+  const candidates = [opp.description_url, opp.notice_desc_url, opp.description];
+  return candidates.find(isHttpUrl)?.trim() || null;
+}
+
+function getSamOpportunityUrl(opp: SAMOpportunity) {
+  if (opp.ui_link && isHttpUrl(opp.ui_link) && !opp.ui_link.includes('api.sam.gov')) {
+    return opp.ui_link;
+  }
+  return `https://sam.gov/workspace/contract/opp/${opp.notice_id}/view`;
+}
+
+function normalizeProfileCertifications(profile: UserOpportunityProfile | null): string[] {
+  const values = [
+    profile?.business_type || '',
+    ...(Array.isArray(profile?.set_aside_preferences) ? profile.set_aside_preferences : []),
+  ];
+
+  return values.map(normalizeText).filter(Boolean);
+}
+
+function isMarketResearchNotice(noticeType?: string | null) {
+  const value = normalizeText(noticeType);
+  return value.includes('sources sought')
+    || value.includes('source sought')
+    || value === 'ss'
+    || value.includes('request for information')
+    || value.includes('rfi')
+    || value.includes('special notice');
+}
+
+function hasAnyCertification(certifications: string[], patterns: string[]) {
+  return certifications.some(cert => patterns.some(pattern => cert.includes(pattern)));
+}
+
+function hasSmallBusinessEligibility(certifications: string[]) {
+  return hasAnyCertification(certifications, [
+    'small',
+    'sdvosb',
+    'vosb',
+    'veteran',
+    '8(a)',
+    '8a',
+    'wosb',
+    'edwosb',
+    'women-owned',
+    'women owned',
+    'hubzone',
+    'hub zone',
+  ]);
+}
+
+function hasVeteranEligibility(profile: UserOpportunityProfile | null) {
+  return hasAnyCertification(normalizeProfileCertifications(profile), [
+    'sdvosb',
+    'vosb',
+    'veteran',
+    'service-disabled',
+    'service disabled',
+  ]);
+}
+
+function isVeteransAffairsAgency(opp: SAMOpportunity) {
+  const agencyText = normalizeText(`${opp.department || ''} ${opp.sub_tier || ''} ${opp.office || ''}`);
+  return agencyText.includes('veterans affairs')
+    || agencyText.includes('department of veterans')
+    || agencyText.includes('veterans health administration')
+    || agencyText.includes('vha ')
+    || agencyText === 'vha';
+}
+
+function getAgencyFit(opp: SAMOpportunity, profile: UserOpportunityProfile | null): AgencyFit {
+  if (!isVeteransAffairsAgency(opp) || hasVeteranEligibility(profile)) {
+    return { adjustment: 0 };
+  }
+
+  if (isMarketResearchNotice(opp.notice_type)) {
+    return {
+      adjustment: -8,
+      reason: 'VA research notice, but veteran-owned firms usually fit VA best',
+    };
+  }
+
+  return {
+    adjustment: -60,
+    reason: 'VA is veteran-first; rank lower without veteran-owned status',
+  };
+}
+
+function getSetAsideFit(opp: SAMOpportunity, profile: UserOpportunityProfile | null): SetAsideFit {
+  const setAside = `${opp.set_aside || ''} ${opp.set_aside_description || ''}`;
+  const normalizedSetAside = normalizeText(setAside);
+  const certifications = normalizeProfileCertifications(profile);
+
+  if (isMarketResearchNotice(opp.notice_type)) {
+    return { eligible: true, adjustment: 6, reason: 'market research notice' };
+  }
+
+  if (!normalizedSetAside.trim()) {
+    return {
+      eligible: true,
+      adjustment: -20,
+      reason: 'full-and-open work ranks behind small-business matches',
+    };
+  }
+
+  if (
+    normalizedSetAside.includes('no set aside')
+    || normalizedSetAside.includes('no set-aside')
+    || normalizedSetAside.includes('unrestricted')
+    || normalizedSetAside.includes('full and open')
+  ) {
+    return {
+      eligible: true,
+      adjustment: -20,
+      reason: 'full-and-open work ranks behind small-business matches',
+    };
+  }
+
+  const isVeteranSetAside = normalizedSetAside.includes('sdvosb')
+    || normalizedSetAside.includes('service-disabled veteran')
+    || normalizedSetAside.includes('service disabled veteran')
+    || normalizedSetAside.includes('vosb')
+    || normalizedSetAside.includes('veteran-owned')
+    || normalizedSetAside.includes('veteran owned');
+  const is8aSetAside = normalizedSetAside.includes('8(a)') || normalizedSetAside.includes('8a');
+  const isWosbSetAside = normalizedSetAside.includes('wosb') || normalizedSetAside.includes('women-owned') || normalizedSetAside.includes('women owned');
+  const isHubZoneSetAside = normalizedSetAside.includes('hubzone') || normalizedSetAside.includes('hub zone');
+  const isIndianSmallBusinessSetAside = normalizedSetAside.includes('indian small business')
+    || normalizedSetAside.includes('isbee')
+    || normalizedSetAside.includes('indian economic enterprise')
+    || normalizedSetAside.includes('native american');
+  const isSmallBusinessSetAside = normalizedSetAside.includes('small business')
+    || normalizedSetAside.includes('total small')
+    || normalizedSetAside.includes('sba')
+    || normalizedSetAside.includes('far 19.5');
+
+  if (isVeteranSetAside && !hasAnyCertification(certifications, ['sdvosb', 'vosb', 'veteran', 'service-disabled', 'service disabled'])) {
+    return {
+      eligible: false,
+      adjustment: -90,
+      reason: 'requires veteran-owned status',
+    };
+  }
+
+  if (is8aSetAside && !hasAnyCertification(certifications, ['8(a)', '8a'])) {
+    return {
+      eligible: false,
+      adjustment: -70,
+      reason: 'requires 8(a) certification',
+    };
+  }
+
+  if (isWosbSetAside && !hasAnyCertification(certifications, ['wosb', 'edwosb', 'women-owned', 'women owned'])) {
+    return {
+      eligible: false,
+      adjustment: -70,
+      reason: 'requires women-owned certification',
+    };
+  }
+
+  if (isHubZoneSetAside && !hasAnyCertification(certifications, ['hubzone', 'hub zone'])) {
+    return {
+      eligible: false,
+      adjustment: -70,
+      reason: 'requires HUBZone certification',
+    };
+  }
+
+  if (isIndianSmallBusinessSetAside && !hasAnyCertification(certifications, ['isbee', 'indian', 'native american', 'native-owned', 'native owned'])) {
+    return {
+      eligible: false,
+      adjustment: -70,
+      reason: 'requires Indian Small Business status',
+    };
+  }
+
+  if (isSmallBusinessSetAside) {
+    return hasSmallBusinessEligibility(certifications)
+      ? { eligible: true, adjustment: 30, reason: 'small-business set-aside match' }
+      : { eligible: false, adjustment: -50, reason: 'requires small-business status' };
+  }
+
+  const hasKnownSetAside = isVeteranSetAside || is8aSetAside || isWosbSetAside || isHubZoneSetAside || isIndianSmallBusinessSetAside || isSmallBusinessSetAside;
+  if (!hasKnownSetAside) {
+    return {
+      eligible: false,
+      adjustment: -35,
+      reason: 'set-aside status is not in your profile',
+    };
+  }
+
+  return { eligible: true, adjustment: 18, reason: 'matches your set-aside profile' };
 }
 
 export async function GET(request: NextRequest) {
@@ -59,13 +297,16 @@ export async function GET(request: NextRequest) {
 
   // Get user's NAICS codes from their profile
   let naicsCodes: string[] = [];
+  let userProfile: UserOpportunityProfile | null = null;
 
   if (email) {
     const { data: profile } = await supabase
       .from('user_notification_settings')
-      .select('naics_codes')
+      .select('naics_codes,business_type,set_aside_preferences')
       .eq('user_email', email)
       .single();
+
+    userProfile = profile || null;
 
     if (profile?.naics_codes?.length) {
       naicsCodes = profile.naics_codes;
@@ -84,13 +325,14 @@ export async function GET(request: NextRequest) {
 
   try {
     // Build query for opportunities from cache
+    const fetchLimit = Math.min(Math.max(limit * 3, limit), 150);
     let query = supabase
       .from('sam_opportunities')
       .select('*')
       .eq('active', true)
       .gte('response_deadline', new Date().toISOString().split('T')[0])
       .order('response_deadline', { ascending: true })
-      .limit(limit);
+      .limit(fetchLimit);
 
     // Filter by NAICS (using OR for any match)
     const naicsFilters = naicsCodes.map(code => `naics_code.like.${code}%`);
@@ -111,12 +353,31 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
+    const feedbackSignals = email ? await getMindyFeedbackSignals(email) : undefined;
+
     // Transform to consistent format
     const alerts = (opportunities || []).map((opp: SAMOpportunity) => {
       // Calculate days until deadline
       const deadline = opp.response_deadline ? new Date(opp.response_deadline) : null;
       const now = new Date();
       const daysLeft = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const feedbackScore = scoreOpportunityWithMindyFeedback({
+        opportunityId: opp.notice_id,
+        title: opp.title,
+        agency: opp.department || opp.sub_tier || opp.office,
+        naicsCode: opp.naics_code,
+      }, feedbackSignals);
+      const setAsideFit = getSetAsideFit(opp, userProfile);
+      const agencyFit = getAgencyFit(opp, userProfile);
+      const recommendationScore = feedbackScore.adjustment + setAsideFit.adjustment + agencyFit.adjustment;
+      const feedbackReasons = [...feedbackScore.reasons];
+      const buyer = getBuyerAgencyParts({
+        department: opp.department,
+        sub_tier: opp.sub_tier,
+        office: opp.office,
+      });
+      if (setAsideFit.reason && setAsideFit.adjustment > 0) feedbackReasons.push(setAsideFit.reason);
+      if (agencyFit.reason) feedbackReasons.push(agencyFit.reason);
 
       return {
         id: opp.notice_id,
@@ -127,24 +388,59 @@ export async function GET(request: NextRequest) {
         department: opp.department,
         subTier: opp.sub_tier,
         office: opp.office,
+        buyerName: buyer.primary,
+        buyerOffice: buyer.secondary,
+        parentAgency: buyer.parent,
+        buyerDisplay: buyer.full,
         postedDate: opp.posted_date,
         responseDeadline: opp.response_deadline,
         setAside: opp.set_aside,
         setAsideDescription: opp.set_aside_description,
         noticeType: opp.notice_type,
+        description: getOpportunitySummary(opp),
+        descriptionUrl: getOpportunityDescriptionUrl(opp),
         popState: opp.pop_state,
         popCity: opp.pop_city,
-        url: opp.ui_link || `https://sam.gov/opp/${opp.notice_id}/view`,
+        popZip: opp.pop_zip,
+        popCountry: opp.pop_country,
+        url: getSamOpportunityUrl(opp),
         daysLeft,
         isUrgent: daysLeft !== null && daysLeft <= 7 && daysLeft >= 0,
         isClosingSoon: daysLeft !== null && daysLeft <= 14 && daysLeft > 7,
+        setAsideEligible: setAsideFit.eligible,
+        setAsideMismatchReason: setAsideFit.eligible ? null : setAsideFit.reason,
+        eligibilityScoreAdjustment: setAsideFit.adjustment,
+        agencyScoreAdjustment: agencyFit.adjustment,
+        agencyMismatchReason: agencyFit.reason || null,
+        feedbackScoreAdjustment: feedbackScore.adjustment,
+        recommendationScore,
+        feedbackReasons: Array.from(new Set(feedbackReasons)).slice(0, 3),
       };
+    }).sort((a, b) => {
+      if (b.recommendationScore !== a.recommendationScore) {
+        return b.recommendationScore - a.recommendationScore;
+      }
+      const aDeadline = a.responseDeadline ? new Date(a.responseDeadline).getTime() : Number.MAX_SAFE_INTEGER;
+      const bDeadline = b.responseDeadline ? new Date(b.responseDeadline).getTime() : Number.MAX_SAFE_INTEGER;
+      return aDeadline - bDeadline;
     });
+
+    const seenOpportunityKeys = new Set<string>();
+    const dedupedAlerts = alerts.filter((alert) => {
+      const key = [
+        String(alert.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+        String(alert.department || alert.subTier || '').toLowerCase().trim(),
+      ].join('|');
+
+      if (seenOpportunityKeys.has(key)) return false;
+      seenOpportunityKeys.add(key);
+      return true;
+    }).slice(0, limit);
 
     return NextResponse.json({
       success: true,
-      count: alerts.length,
-      opportunities: alerts,
+      count: dedupedAlerts.length,
+      opportunities: dedupedAlerts,
       searchCriteria: { naicsCodes, limit, noticeType },
     });
 

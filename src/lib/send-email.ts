@@ -115,7 +115,7 @@ export async function sendEmail({
 }: SendEmailParams): Promise<boolean> {
   // Use alerts@govcongiants.com (verified in Resend)
   const fromEmail = process.env.EMAIL_FROM || 'alerts@govcongiants.com';
-  const fromName = 'GovCon Giants AI';
+  const fromName = process.env.MINDY_FROM_NAME || "Mindy";
   const fromAddress = from || `${fromName} <${fromEmail}>`;
 
   // Try Resend first (primary)
@@ -287,7 +287,7 @@ export async function sendDatabaseAccessEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: 'Your Federal Contractor Database Access | GovCon Giants',
       html: htmlContent,
@@ -422,7 +422,7 @@ export async function sendAccessCodeEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: 'Your Federal Market Assassin Report Access | GovCon Giants',
       html: htmlContent,
@@ -520,7 +520,7 @@ export async function sendOpportunityHunterProEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: 'Your Opportunity Hunter Pro Access is Ready! | GovCon Giants',
       html: htmlContent,
@@ -653,7 +653,7 @@ export async function sendFreeResourceEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: `Your Free Download: ${resourceName} | GovCon Giants`,
       html: htmlContent,
@@ -768,7 +768,7 @@ export async function sendLicenseKeyEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: `Your ${productName} License Key | GovCon Giants`,
       html: htmlContent,
@@ -895,7 +895,7 @@ export async function sendContentReaperEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: `Your Content Reaper${isFullFix ? ' Full Fix' : ''} Access is Ready! | GovCon Giants`,
       html: htmlContent,
@@ -1024,7 +1024,7 @@ export async function sendRecompeteEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: 'Your Recompete Tracker Access is Ready! | GovCon Giants',
       html: htmlContent,
@@ -1228,7 +1228,7 @@ export async function sendBundleEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: `Your ${bundleInfo.name} is Ready! | GovCon Giants`,
       html: htmlContent,
@@ -1399,7 +1399,7 @@ export async function sendFHCWelcomeEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
       to,
       subject: 'Welcome to Federal Help Center! Your Membership is Active | GovCon Giants',
       html: htmlContent,
@@ -1517,7 +1517,7 @@ export async function sendAlertProWelcomeEmail({
 
   try {
     await transporter.sendMail({
-      from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
       to,
       subject: '🎯 Alert Pro Activated - Daily Opportunities Start Tomorrow!',
       html: htmlContent,

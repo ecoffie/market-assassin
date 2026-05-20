@@ -5,9 +5,31 @@
 > Your 24/7 Federal Market Intelligence Analyst
 
 **URL:** getmindy.ai
+**Canonical App URL:** https://getmindy.ai/app
 **Tagline:** "The big contractors have armies. You have Mindy."
+**Primary Dashboard CTA:** `Open Mindy Dashboard`
 
 ---
+
+## Logo Status
+
+The selected Mindy logo is the blue `M` mark with a white chat-bubble center and three purple dots, plus the horizontal `Mindy Ai` lockup. Use:
+- **Icon-only mark** for favicon, app avatar, email sender avatar, mobile surfaces, and compact navigation.
+- **Horizontal lockup** for email headers, onboarding, command center, landing pages, and presentation assets.
+- **Dark-background version** inside the Mindy app shell.
+- **Light-background version** inside email headers and public marketing pages.
+
+Do not continue using the black triangle GovCon Giants mark as the primary Mindy identity.
+
+---
+
+## Email Branding Rules
+
+- Sender/display name should be `Mindy` or `Mindy Ai`, not `GovCon Giants`, `MI`, or `Alerts`.
+- Primary CTA in every alert, briefing, and onboarding email: `Open Mindy Dashboard` -> `https://getmindy.ai/app`.
+- Upgrade CTAs should say `Upgrade to Mindy Pro` or `Upgrade to Mindy Teams`.
+- Do not use discontinued labels such as `OH Pro`, `MI Pro`, or old GovCon Giants upgrade offers in customer-facing Mindy emails.
+- Email footer should reinforce `Mindy Ai` and `getmindy.ai`; GovCon Giants may appear only as a support/company reference where legally or operationally required.
 
 ## Pricing
 
@@ -194,7 +216,7 @@ Now you do too.
 
 **Subject:** Hey, it's Mindy. Let's find you some contracts.
 
-**From:** Mindy from GovCon Giants <mindy@govcongiants.com>
+**From:** Mindy <alerts@getmindy.ai>
 
 ---
 
@@ -228,7 +250,7 @@ Let's go win some contracts.
 
 — Mindy
 
-*P.S. - Hit reply if you have questions. A real human (the GovCon Giants team) reads every message.*
+*P.S. - Hit reply if you have questions. A real human reads every message and helps me get better.*
 
 ---
 
@@ -392,7 +414,7 @@ You've been getting briefings for a week now. Quick check-in:
 
 If you're finding value, I'd love for you to [tell a friend]({{referralLink}}). The more small businesses winning federal work, the better.
 
-If something's off, just reply. The GovCon Giants team reads every message and they'll make sure I get better for you.
+If something's off, just reply. A real human reads every message and will make sure I get better for you.
 
 Here's to week two,
 Mindy
@@ -425,7 +447,7 @@ Two weeks in. Let's look at the scoreboard:
 
 That's less than two hours of a consultant's time. I work 24/7.
 
-→ [Upgrade to Pro]({{upgradeLink}})
+→ [Upgrade to Mindy Pro]({{upgradeLink}})
 
 **Still not sure?**
 
@@ -670,7 +692,7 @@ These are all small business set-asides that posted TODAY. How many did you know
 
 ### Executive Summary
 
-**Company:** Mindy (by GovCon Giants)
+**Company:** Mindy Ai
 **Product:** AI-powered federal market intelligence platform
 **Market:** 400,000+ small businesses pursuing $750B in annual federal contracts
 **Model:** Freemium SaaS (Free / $149/mo Pro / $499/mo Teams)

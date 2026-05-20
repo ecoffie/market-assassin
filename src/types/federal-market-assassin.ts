@@ -44,10 +44,20 @@ export interface Agency {
   command?: string;             // Specific DoD command (e.g., "NAVFAC", "NAVSEA") for pain points matching
   hasSpecificOffice?: boolean;  // True if we have distinct contracting office data
   isEstimated?: boolean;        // True if spending was distributed by formula (not from FPDS/USASpending)
-  satSpending?: number;         // Spending on awards <= $250K (Simplified Acquisition Threshold)
-  satContractCount?: number;    // Count of awards <= $250K
-  microSpending?: number;       // Spending on awards <= $10K (micro-purchases)
-  microContractCount?: number;  // Count of awards <= $10K
+  satSpending?: number;         // Spending on awards <= current Simplified Acquisition Threshold
+  satContractCount?: number;    // Count of awards <= current Simplified Acquisition Threshold
+  microSpending?: number;       // Spending on awards <= current micro-purchase threshold
+  microContractCount?: number;  // Count of awards <= current micro-purchase threshold
+  priorityScore?: number;       // Mindy small-business agency priority score
+  priorityBreakdown?: {         // Signals used to rank agency fit for small businesses
+    satScore: number;
+    microScore: number;
+    volumeScore: number;
+    spendScore: number;
+    budgetScore: number;
+    budgetTrend?: string;
+    budgetChangePercent?: number;
+  };
   website?: string | null;      // Command/agency website URL
   forecastUrl?: string | null;  // Forecast opportunities URL
   samForecastUrl?: string;      // SAM.gov forecast search URL
@@ -167,6 +177,7 @@ export interface GovernmentBuyersReport {
     totalSpending: number;
     totalContracts: number;
     commandEnhancedAgencies?: number;  // Count of agencies with command-level data
+    isEstimated?: boolean;             // True when built from target agencies rather than live award rows
   };
   recommendations: string[];
 }

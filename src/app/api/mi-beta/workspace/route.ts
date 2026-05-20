@@ -10,6 +10,8 @@ import {
   recordMIBetaActivity,
 } from '@/lib/mi-beta/workspace';
 
+const TEAM_SEAT_LIMIT = 5;
+
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
   if (!email) return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
@@ -104,6 +106,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Only owners and admins can invite teammates' }, { status: 403 });
   }
 
+  const { count: seatCount, error: seatCountError } = await getMIBetaSupabase()
+    .from('mi_beta_team_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+    .in('status', ['active', 'invited']);
+
+  if (seatCountError) {
+    return NextResponse.json({ success: false, error: seatCountError.message }, { status: 500 });
+  }
+
+  if ((seatCount || 0) >= TEAM_SEAT_LIMIT) {
+    return NextResponse.json(
+      { success: false, error: `MI Team includes ${TEAM_SEAT_LIMIT} seats. Upgrade to Enterprise for more users.` },
+      { status: 403 }
+    );
+  }
+
   const { data, error } = await getMIBetaSupabase()
     .from('mi_beta_team_members')
     .upsert({
@@ -132,7 +151,7 @@ export async function POST(request: NextRequest) {
 
   // Send invite email to the invited user
   const workspaceName = workspaceId.includes('@') ? 'a personal workspace' : formatWorkspaceName(workspaceId);
-  const inviteUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tools.govcongiants.org'}/mi-beta`;
+  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/app`;
 
   await sendEmail({
     to: invitedEmail,

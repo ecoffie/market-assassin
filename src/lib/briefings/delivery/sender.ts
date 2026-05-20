@@ -16,9 +16,10 @@ import {
 } from './types';
 import { generateEmailTemplate } from './email-template';
 import { createEmailTrackingToken } from '@/lib/engagement';
+import { MINDY_FROM_NAME } from '@/lib/mindy/email-branding';
 
 const FROM_EMAIL = process.env.EMAIL_FROM || process.env.SMTP_USER || 'alerts@govcongiants.com';
-const FROM_NAME = 'GovCon Giants';
+const FROM_NAME = MINDY_FROM_NAME;
 
 /**
  * Get Twilio client

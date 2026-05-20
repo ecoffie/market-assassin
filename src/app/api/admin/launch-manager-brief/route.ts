@@ -14,14 +14,15 @@ export const revalidate = 0;
 
 const domainPolicy = {
   publicSite: 'https://govcongiants.com',
-  miPlatform: 'https://mi.govcongiants.com',
+  miPlatform: 'https://getmindy.ai',
+  commandCenter: 'https://getmindy.ai/command-center',
   transitionSurfaces: ['.org', 'tools.govcongiants.org', 'shop URLs'],
-  rule: 'New public/sales/SEO links go to govcongiants.com. New product/account/app links go to mi.govcongiants.com.',
+  rule: 'New public/sales/SEO links go to govcongiants.com. New Mindy product/account/app links go to getmindy.ai.',
   warnings: [
     {
-      label: 'Legacy .org/tool links',
+      label: 'Legacy .org/tool/MI links',
       occurrences: 3,
-      note: 'Audit customer-facing links and redirect old surfaces to the right .com or MI destination.',
+      note: 'Audit customer-facing links and redirect old surfaces to the right .com or Mindy destination.',
     },
   ],
 };

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
+import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 interface ForecastsPanelProps {
   email: string | null;
@@ -78,11 +79,7 @@ const AGENCY_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 function formatCurrency(value: number | undefined): string {
-  if (!value) return 'TBD';
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${value.toLocaleString()}`;
+  return formatMindyCurrency(value, 'TBD');
 }
 
 function formatDate(dateStr: string | undefined): string {
@@ -751,9 +748,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
               <h4 className="text-white font-medium mb-1">Missing forecast data?</h4>
               <p className="text-slate-400 text-sm mb-3">
                 {forecasts.length === 0
-                  ? `We don't have forecast data matching your search yet.`
+                  ? `We do not have forecast data matching your search yet.`
                   : `Only ${forecasts.length} forecasts found for this search.`
-                } Request this data and we'll research it for you.
+                } Request this data and we will research it for you.
               </p>
               <button
                 onClick={() => openRequestModal()}
@@ -784,7 +781,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
               <div className="text-center py-8">
                 <div className="text-5xl mb-4">✅</div>
                 <p className="text-emerald-400 font-medium">Request submitted!</p>
-                <p className="text-slate-400 text-sm mt-2">We'll notify you when this data is available.</p>
+                <p className="text-slate-400 text-sm mt-2">We will notify you when this data is available.</p>
               </div>
             ) : (
               <>

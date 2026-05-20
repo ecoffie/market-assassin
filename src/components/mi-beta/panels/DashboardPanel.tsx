@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
+import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
+import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import { getMIApiHeaders } from '../authHeaders';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -26,14 +29,34 @@ interface BriefingItem {
   description: string;
   detailLine?: string;
   category: string;
+  buyerName?: string;
+  buyerOffice?: string;
+  parentAgency?: string;
   amount?: string;
   deadline?: string;
+  location?: string;
   actionUrl?: string;
   actionLabel?: string;
   signals: string[];
 }
 
 type BriefingFilter = 'all' | 'urgent' | 'opportunity' | 'teaming';
+type FeedbackType =
+  | 'good_match'
+  | 'bad_match'
+  | 'not_my_industry'
+  | 'too_big_small'
+  | 'already_knew'
+  | 'want_more_like_this';
+
+const FEEDBACK_OPTIONS: Array<{ type: FeedbackType; label: string }> = [
+  { type: 'good_match', label: 'Good match' },
+  { type: 'bad_match', label: 'Bad match' },
+  { type: 'not_my_industry', label: 'Not my industry' },
+  { type: 'too_big_small', label: 'Too big/small' },
+  { type: 'already_knew', label: 'Already knew' },
+  { type: 'want_more_like_this', label: 'More like this' },
+];
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {};
@@ -57,6 +80,95 @@ function numberValue(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function normalizeLookupKey(value?: string | null) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function getLocationFromRecord(item: Record<string, unknown>) {
+  const placeOfPerformance = asRecord(item.placeOfPerformance);
+  return formatOpportunityLocation({
+    location: text(item.location),
+    popCity: text(item.popCity, text(item.pop_city, text(placeOfPerformance.city))),
+    popState: text(item.popState, text(item.pop_state, text(placeOfPerformance.state))),
+    popZip: text(item.popZip, text(item.pop_zip, text(placeOfPerformance.zip))),
+    popCountry: text(item.popCountry, text(item.pop_country, text(placeOfPerformance.country))),
+  });
+}
+
+function getBuyerFromRecord(item: Record<string, unknown>) {
+  return getBuyerAgencyParts({
+    agency: text(item.buyerName, text(item.agency)),
+    department: text(item.parentAgency, text(item.department)),
+    subTier: text(item.subTier, text(item.sub_tier, text(item.subAgency))),
+    office: text(item.buyerOffice, text(item.office)),
+  });
+}
+
+function getSolicitationFromSignals(signals: string[]) {
+  const signal = signals.find(item => item.toLowerCase().startsWith('sol#'));
+  return signal ? signal.replace(/^Sol#\s*/i, '').trim() : '';
+}
+
+function getBriefingItemLocation(item: BriefingItem, liveLocations: Record<string, string>) {
+  if (item.location) return item.location;
+
+  const solicitation = getSolicitationFromSignals(item.signals);
+  const lookupKeys = [
+    item.id,
+    solicitation,
+    normalizeLookupKey(item.title),
+  ].filter(Boolean);
+
+  for (const key of lookupKeys) {
+    const location = liveLocations[key] || liveLocations[normalizeLookupKey(key)];
+    if (location) return location;
+  }
+
+  return '';
+}
+
+function getBriefingItemBuyer(item: BriefingItem, liveBuyers: Record<string, ReturnType<typeof getBuyerAgencyParts>>) {
+  if (item.buyerName) {
+    return getBuyerAgencyParts({
+      agency: item.buyerName,
+      department: item.parentAgency,
+      office: item.buyerOffice,
+    });
+  }
+
+  const solicitation = getSolicitationFromSignals(item.signals);
+  const lookupKeys = [
+    item.id,
+    solicitation,
+    normalizeLookupKey(item.title),
+  ].filter(Boolean);
+
+  for (const key of lookupKeys) {
+    const buyer = liveBuyers[key] || liveBuyers[normalizeLookupKey(key)];
+    if (buyer) return buyer;
+  }
+
+  return getBuyerAgencyParts({ agency: item.subtitle?.split(' • ')[0] || '' });
+}
+
+function getBriefingMetaLine(item: BriefingItem, buyer: ReturnType<typeof getBuyerAgencyParts>) {
+  if (!item.subtitle) return '';
+  const parts = item.subtitle.split(' • ').map(part => part.trim()).filter(Boolean);
+  if (!parts.length) return '';
+
+  const first = normalizeLookupKey(parts[0]);
+  const buyerKeys = [
+    buyer.primary,
+    buyer.secondary,
+    buyer.parent,
+  ].map(normalizeLookupKey).filter(Boolean);
+
+  if (!buyerKeys.includes(first)) return parts.join(' • ');
+
+  const nonBuyerParts = parts.filter(part => !buyerKeys.includes(normalizeLookupKey(part)));
+  return nonBuyerParts.join(' • ');
 }
 
 function buildOpportunityNarrative(item: Record<string, unknown>) {
@@ -155,6 +267,7 @@ function collectGeneratedItems(content: Record<string, unknown>): BriefingItem[]
     const sectionRecord = asRecord(section);
     return asArray(sectionRecord.items).map((raw, index) => {
       const item = asRecord(raw);
+      const buyer = getBuyerFromRecord(item);
       return {
         id: text(item.id, `${text(sectionRecord.title, 'section')}-${index}`),
         title: text(item.title, 'Untitled opportunity'),
@@ -162,8 +275,12 @@ function collectGeneratedItems(content: Record<string, unknown>): BriefingItem[]
         description: text(item.description, text(item.detailLine, text(item.amount))),
         detailLine: text(item.detailLine),
         category: text(item.category, text(sectionRecord.title, 'Opportunity')),
+        buyerName: buyer.primary,
+        buyerOffice: buyer.secondary,
+        parentAgency: buyer.parent,
         amount: text(item.amount),
         deadline: text(item.deadline),
+        location: getLocationFromRecord(item),
         actionUrl: text(item.actionUrl),
         actionLabel: text(item.actionLabel, 'View details'),
         signals: asArray(item.signals).map(signal => text(signal)).filter(Boolean),
@@ -176,15 +293,20 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
   const opportunities = asArray(content.opportunities).map((raw, index) => {
     const item = asRecord(raw);
     const narrative = buildOpportunityNarrative(item);
+    const buyer = getBuyerFromRecord(item);
     return {
       id: `opp-${text(item.solicitationNumber, String(index))}`,
       title: text(item.title, 'Untitled opportunity'),
-      subtitle: [text(item.agency), text(item.naicsCode), text(item.setAside)].filter(Boolean).join(' • '),
+      subtitle: buyer.full,
       description: narrative.description,
       detailLine: narrative.detailLine,
       category: 'Opportunity',
+      buyerName: buyer.primary,
+      buyerOffice: buyer.secondary,
+      parentAgency: buyer.parent,
       amount: narrative.quickWinAssessment,
       deadline: text(item.responseDeadline),
+      location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: 'View on SAM.gov',
       signals: [
@@ -201,23 +323,29 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
   const deadlines = asArray(content.deadlinesThisWeek).map((raw, index) => {
     const item = asRecord(raw);
     const daysRemaining = numberValue(item.daysRemaining);
+    const buyer = getBuyerFromRecord(item);
     return {
       id: `deadline-${text(item.noticeId, String(index))}`,
       title: text(item.title, text(item.fullTitle, 'Upcoming deadline')),
-      subtitle: [text(item.agency), text(item.naicsCode), text(item.setAside)].filter(Boolean).join(' • '),
+      subtitle: buyer.full,
       description: [
-        text(item.agency),
+        buyer.full,
         text(item.noticeType),
         text(item.setAside),
+        getLocationFromRecord(item) ? `Place of performance: ${getLocationFromRecord(item)}` : '',
         daysRemaining !== null
           ? `Response due in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}.`
           : 'Upcoming response deadline.',
       ].filter(Boolean).join(' • '),
       category: 'Urgent',
+      buyerName: buyer.primary,
+      buyerOffice: buyer.secondary,
+      parentAgency: buyer.parent,
       amount: daysRemaining !== null
         ? `Due in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`
         : 'Upcoming deadline',
       deadline: text(item.deadline),
+      location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: 'View on SAM.gov',
       signals: [text(item.noticeType), text(item.daysRemaining) ? `${text(item.daysRemaining)} days left` : 'Urgent'].filter(Boolean),
@@ -230,14 +358,19 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
 function collectLegacyItems(content: Record<string, unknown>): BriefingItem[] {
   const opportunities = asArray(content.opportunities).map((raw, index) => {
     const item = asRecord(raw);
+    const buyer = getBuyerFromRecord(item);
     return {
       id: `legacy-${index}`,
       title: text(item.contractName, text(item.title, 'Briefing item')),
-      subtitle: [text(item.agency), text(item.incumbent) ? `Incumbent: ${text(item.incumbent)}` : ''].filter(Boolean).join(' • '),
+      subtitle: [buyer.full, text(item.incumbent) ? `Incumbent: ${text(item.incumbent)}` : ''].filter(Boolean).join(' • '),
       description: text(item.displacementAngle, text(item.quickWinAssessment, 'Market intelligence item from your briefing.')),
       category: 'Opportunity',
+      buyerName: buyer.primary,
+      buyerOffice: buyer.secondary,
+      parentAgency: buyer.parent,
       amount: text(item.value),
       deadline: text(item.window),
+      location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: text(item.samLink) ? 'View on SAM.gov' : 'View details',
       signals: [text(item.noticeType), text(item.setAside)].filter(Boolean),
@@ -293,6 +426,34 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [savingPipeline, setSavingPipeline] = useState<Set<string>>(new Set());
   const [pipelineSaved, setPipelineSaved] = useState<Set<string>>(new Set());
+  const [feedbackByItem, setFeedbackByItem] = useState<Record<string, FeedbackType>>({});
+  const [savingFeedback, setSavingFeedback] = useState<Set<string>>(new Set());
+  const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set());
+  const [liveLocations, setLiveLocations] = useState<Record<string, string>>({});
+  const [liveBuyers, setLiveBuyers] = useState<Record<string, ReturnType<typeof getBuyerAgencyParts>>>({});
+
+  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
+
+  const trackItemEvent = useCallback((eventType: 'link_click' | 'tool_use', item: BriefingItem, action: string) => {
+    if (!email) return;
+
+    fetch('/api/mindy/engagement', {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        email,
+        eventType,
+        eventSource: 'todays_intel',
+        metadata: {
+          action,
+          opportunity_id: item.id,
+          title: item.title,
+          agency: item.buyerName || item.subtitle?.split(' • ')[0] || '',
+        },
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  }, [email, getAuthHeaders]);
 
   const loadBriefings = useCallback(async () => {
     if (!email) return;
@@ -340,6 +501,62 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
     }
   }, [email, tier, loadBriefings]);
 
+  useEffect(() => {
+    if (!email || tier === 'free') return;
+
+    let cancelled = false;
+    const userEmail = email;
+
+    async function loadLiveLocations() {
+      try {
+        const params = new URLSearchParams({ email: userEmail, limit: '100' });
+        const res = await fetch(`/api/mi-beta/opportunities?${params.toString()}`, {
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success || cancelled) return;
+
+        const next: Record<string, string> = {};
+        const nextBuyers: Record<string, ReturnType<typeof getBuyerAgencyParts>> = {};
+        for (const raw of asArray(data.opportunities)) {
+          const opportunity = asRecord(raw);
+          const location = formatOpportunityLocation({
+            popCity: text(opportunity.popCity),
+            popState: text(opportunity.popState),
+            popZip: text(opportunity.popZip),
+            popCountry: text(opportunity.popCountry),
+          });
+          const buyer = getBuyerAgencyParts({
+            agency: text(opportunity.buyerName),
+            department: text(opportunity.parentAgency, text(opportunity.department)),
+            subTier: text(opportunity.subTier),
+            office: text(opportunity.buyerOffice, text(opportunity.office)),
+          });
+
+          [
+            text(opportunity.id),
+            text(opportunity.solicitationNumber),
+            normalizeLookupKey(text(opportunity.title)),
+          ].filter(Boolean).forEach(key => {
+            if (location) next[key] = location;
+            if (buyer.primary && buyer.primary !== 'Unknown agency') nextBuyers[key] = buyer;
+          });
+        }
+
+        setLiveLocations(next);
+        setLiveBuyers(nextBuyers);
+      } catch (err) {
+        console.warn('Failed to load live opportunity locations:', err);
+      }
+    }
+
+    void loadLiveLocations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [email, getAuthHeaders, tier]);
+
   const selectedBriefing = useMemo(() => (
     briefings.find(entry => getBriefingKey(entry) === selectedKey) || briefings[0] || null
   ), [briefings, selectedKey]);
@@ -350,11 +567,15 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const filteredItems = useMemo(() => {
     const query = searchTerm.toLowerCase().trim();
     return briefingItems.filter(item => {
+      if (dismissedItems.has(item.id)) return false;
       const matchesSearch = !query || [
         item.title,
         item.subtitle,
+        getBriefingItemBuyer(item, liveBuyers).full,
         item.description,
         item.category,
+        item.location,
+        getBriefingItemLocation(item, liveLocations),
         ...item.signals,
       ].join(' ').toLowerCase().includes(query);
 
@@ -367,7 +588,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
       return matchesSearch && matchesFilter;
     });
-  }, [activeFilter, briefingItems, searchTerm]);
+  }, [activeFilter, briefingItems, dismissedItems, liveBuyers, liveLocations, searchTerm]);
 
   const counts = useMemo(() => ({
     all: briefingItems.length,
@@ -401,7 +622,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           user_email: email,
           notice_id: item.id,
           title: item.title,
-          agency: item.subtitle?.split(' • ')[0] || '',
+          agency: item.buyerName || item.subtitle?.split(' • ')[0] || '',
           naics_code: item.signals.find(s => s.startsWith('NAICS'))?.replace('NAICS ', '') || '',
           set_aside: item.signals.find(s => ['8(a)', 'WOSB', 'SDVOSB', 'HUBZone', 'SBA', 'Small Business'].some(sa => s.includes(sa))) || '',
           response_deadline: item.deadline || null,
@@ -415,6 +636,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
       if (res.ok) {
         setPipelineSaved(prev => new Set(prev).add(item.id));
+        trackItemEvent('tool_use', item, 'track_in_pipeline');
       }
     } catch (err) {
       console.error('Failed to add to pipeline:', err);
@@ -425,7 +647,47 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         return next;
       });
     }
-  }, [email]);
+  }, [email, trackItemEvent]);
+
+  const handleOpportunityFeedback = useCallback(async (item: BriefingItem, feedbackType: FeedbackType) => {
+    if (!email) return;
+
+    setSavingFeedback(prev => new Set(prev).add(item.id));
+
+    try {
+      const res = await fetch('/api/mindy/opportunity-feedback', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          email,
+          opportunityId: item.id,
+          feedbackType,
+          title: item.title,
+          agency: item.buyerName || item.subtitle?.split(' • ')[0] || '',
+          url: item.actionUrl || '',
+          source: 'todays_intel',
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success) {
+        setFeedbackByItem(prev => ({ ...prev, [item.id]: feedbackType }));
+      }
+    } catch (err) {
+      console.error('Failed to save opportunity feedback:', err);
+    } finally {
+      setSavingFeedback(prev => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }, [email, getAuthHeaders]);
+
+  const dismissItem = useCallback((item: BriefingItem) => {
+    setDismissedItems(prev => new Set(prev).add(item.id));
+    trackItemEvent('tool_use', item, 'dismiss');
+  }, [trackItemEvent]);
 
   if (tier === 'free') {
     return (
@@ -578,6 +840,9 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
               <div className="space-y-3">
                 {filteredItems.map(item => {
                   const isExpanded = expandedItems.has(item.id);
+                  const itemLocation = getBriefingItemLocation(item, liveLocations);
+                  const itemBuyer = getBriefingItemBuyer(item, liveBuyers);
+                  const itemMetaLine = getBriefingMetaLine(item, itemBuyer);
 
                   return (
                     <article
@@ -597,7 +862,19 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <h4 className="font-semibold text-white">{item.title}</h4>
-                          {item.subtitle && <p className="text-sm text-slate-500 mt-1">{item.subtitle}</p>}
+                          {itemBuyer.primary && itemBuyer.primary !== 'Unknown agency' && (
+                            <p className="text-sm text-slate-400 mt-1">
+                              {itemBuyer.primary}
+                              {itemBuyer.secondary && <span className="text-slate-500"> • {itemBuyer.secondary}</span>}
+                              {itemBuyer.parent && <span className="text-slate-600"> • {itemBuyer.parent}</span>}
+                            </p>
+                          )}
+                          {itemMetaLine && <p className="text-sm text-slate-500 mt-1">{itemMetaLine}</p>}
+                          {itemLocation && (
+                            <p className="mt-2 inline-flex items-center rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
+                              📍 Place of performance: {itemLocation}
+                            </p>
+                          )}
                           {item.detailLine && <p className="text-sm text-slate-400 mt-2">{item.detailLine}</p>}
                         </div>
                         <div className="max-w-md text-right">
@@ -613,6 +890,16 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                           >
                             {isExpanded ? 'Hide Fit' : 'Review Fit'}
                           </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              dismissItem(item);
+                            }}
+                            className="ml-2 mt-3 rounded bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                          >
+                            Dismiss
+                          </button>
                         </div>
                       </div>
 
@@ -622,6 +909,14 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                         {item.description && <p className="text-sm leading-relaxed text-slate-300">{item.description}</p>}
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">{item.category}</span>
+                          {itemBuyer.primary && itemBuyer.primary !== 'Unknown agency' && (
+                            <span className="rounded bg-slate-800/80 px-2 py-1 text-xs text-slate-300">
+                              Buyer: {itemBuyer.primary}
+                            </span>
+                          )}
+                          {itemLocation && (
+                            <span className="rounded bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">📍 {itemLocation}</span>
+                          )}
                           {item.signals.slice(0, 4).map(signal => (
                             <span key={signal} className="rounded bg-slate-800/80 px-2 py-1 text-xs text-slate-400">{signal}</span>
                           ))}
@@ -649,12 +944,42 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               href={item.actionUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                trackItemEvent('link_click', item, 'open_source');
+                              }}
                               className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                             >
                               {item.actionLabel || 'View on SAM.gov'} →
                             </a>
                           )}
+                        </div>
+                        <div className="mt-4 border-t border-slate-800 pt-4">
+                          <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Tune Mindy</p>
+                          <div className="flex flex-wrap gap-2">
+                            {FEEDBACK_OPTIONS.map(option => {
+                              const selected = feedbackByItem[item.id] === option.type;
+                              const saving = savingFeedback.has(item.id);
+                              return (
+                                <button
+                                  key={option.type}
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleOpportunityFeedback(item, option.type);
+                                  }}
+                                  disabled={saving}
+                                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                                    selected
+                                      ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                                      : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {selected ? '✓ ' : ''}{option.label}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     </article>

@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
+import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
+import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -16,6 +18,10 @@ interface Alert {
   department?: string;
   subTier?: string;
   office?: string;
+  buyerName?: string;
+  buyerOffice?: string;
+  parentAgency?: string;
+  buyerDisplay?: string;
   postedDate?: string;
   responseDeadline?: string;
   noticeType?: string;
@@ -25,6 +31,8 @@ interface Alert {
   setAsideDescription?: string;
   popState?: string;
   popCity?: string;
+  popZip?: string;
+  popCountry?: string;
   url: string;
   daysLeft?: number | null;
   isUrgent?: boolean;
@@ -33,6 +41,40 @@ interface Alert {
 
 type AlertFilter = 'all' | 'solicitation' | 'sources' | 'setaside' | 'urgent';
 type SortMode = 'deadline' | 'posted' | 'agency';
+type FeedbackType =
+  | 'good_match'
+  | 'bad_match'
+  | 'not_my_industry'
+  | 'too_big_small'
+  | 'already_knew'
+  | 'want_more_like_this';
+
+const FEEDBACK_OPTIONS: Array<{ type: FeedbackType; label: string }> = [
+  { type: 'good_match', label: 'Good match' },
+  { type: 'bad_match', label: 'Bad match' },
+  { type: 'not_my_industry', label: 'Not my industry' },
+  { type: 'too_big_small', label: 'Too big/small' },
+  { type: 'already_knew', label: 'Already knew' },
+  { type: 'want_more_like_this', label: 'More like this' },
+];
+
+function getAlertLocation(alert: Alert) {
+  return formatOpportunityLocation({
+    popCity: alert.popCity,
+    popState: alert.popState,
+    popZip: alert.popZip,
+    popCountry: alert.popCountry,
+  });
+}
+
+function getAlertBuyer(alert: Alert) {
+  return getBuyerAgencyParts({
+    agency: alert.buyerName,
+    department: alert.department,
+    subTier: alert.subTier,
+    office: alert.buyerOffice || alert.office,
+  });
+}
 
 export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -45,11 +87,35 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
   const [savingAlertIds, setSavingAlertIds] = useState<Set<string>>(new Set());
   const [savedAlertIds, setSavedAlertIds] = useState<Set<string>>(new Set());
+  const [feedbackByAlert, setFeedbackByAlert] = useState<Record<string, FeedbackType>>({});
+  const [savingFeedbackIds, setSavingFeedbackIds] = useState<Set<string>>(new Set());
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState(0);
 
   const canUsePipeline = tier !== 'free';
   const isFreeTier = tier === 'free';
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
+
+  const trackAlertEvent = useCallback((eventType: 'link_click' | 'tool_use', alert: Alert, action: string) => {
+    if (!email) return;
+
+    fetch('/api/mindy/engagement', {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        email,
+        eventType,
+        eventSource: isFreeTier ? 'daily_alerts' : 'source_feed',
+        metadata: {
+          action,
+          opportunity_id: alert.id,
+          title: alert.title,
+          agency: getAlertBuyer(alert).primary,
+        },
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  }, [email, getAuthHeaders, isFreeTier]);
 
   const loadAlerts = useCallback(async () => {
     setIsLoading(true);
@@ -109,7 +175,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           source: 'mi_beta_alerts',
           external_url: alert.url,
           title: alert.title,
-          agency: alert.department || alert.office || 'Unknown Agency',
+          agency: getAlertBuyer(alert).primary,
           naics_code: alert.naicsCode,
           set_aside: alert.setAside,
           response_deadline: alert.responseDeadline,
@@ -118,7 +184,8 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           notes: [
             alert.noticeType ? `Notice type: ${alert.noticeType}` : null,
             alert.solicitationNumber ? `Solicitation: ${alert.solicitationNumber}` : null,
-            alert.office ? `Office: ${alert.office}` : null,
+            getAlertBuyer(alert).parent ? `Parent agency: ${getAlertBuyer(alert).parent}` : null,
+            getAlertBuyer(alert).secondary ? `Office: ${getAlertBuyer(alert).secondary}` : null,
           ].filter(Boolean).join('\n'),
         }),
       });
@@ -127,6 +194,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       if (res.ok && data.success) {
         setSavedAlertIds(prev => new Set(prev).add(alert.id));
         setNotice('Saved to Pipeline Tracker.');
+        trackAlertEvent('tool_use', alert, 'save_to_pipeline');
         return;
       }
 
@@ -142,6 +210,56 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       setError('Failed to save opportunity to pipeline.');
     } finally {
       setSavingAlertIds(prev => {
+        const next = new Set(prev);
+        next.delete(alert.id);
+        return next;
+      });
+    }
+  };
+
+  const dismissAlert = (alert: Alert) => {
+    setDismissedAlertIds(prev => new Set(prev).add(alert.id));
+    trackAlertEvent('tool_use', alert, 'dismiss');
+    if (selectedAlert?.id === alert.id) setSelectedAlert(null);
+  };
+
+  const saveFeedback = async (alert: Alert, feedbackType: FeedbackType) => {
+    if (!email) {
+      setError('Sign in before tuning Mindy matches.');
+      return;
+    }
+
+    setSavingFeedbackIds(prev => new Set(prev).add(alert.id));
+    setError(null);
+
+    try {
+      const res = await fetch('/api/mindy/opportunity-feedback', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          email,
+          opportunityId: alert.id,
+          feedbackType,
+          title: alert.title,
+          agency: getAlertBuyer(alert).primary,
+          url: alert.url,
+          source: isFreeTier ? 'daily_alerts' : 'source_feed',
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success) {
+        setFeedbackByAlert(prev => ({ ...prev, [alert.id]: feedbackType }));
+        setNotice('Saved. Mindy will use this signal to tune future matches.');
+        return;
+      }
+
+      setError(data?.error || 'Failed to save match feedback.');
+    } catch (err) {
+      console.error('Failed to save feedback:', err);
+      setError('Failed to save match feedback.');
+    } finally {
+      setSavingFeedbackIds(prev => {
         const next = new Set(prev);
         next.delete(alert.id);
         return next;
@@ -207,6 +325,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
     return alerts
+      .filter(alert => !dismissedAlertIds.has(alert.id))
       .filter(alert => matchesFilter(alert, filter))
       .filter(alert => {
         if (!normalizedSearch) return true;
@@ -219,6 +338,8 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           alert.solicitationNumber,
           alert.popCity,
           alert.popState,
+          alert.popZip,
+          alert.popCountry,
         ].some(value => value?.toLowerCase().includes(normalizedSearch));
       })
       .sort((a, b) => {
@@ -230,7 +351,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         }
         return new Date(a.responseDeadline || 8640000000000000).getTime() - new Date(b.responseDeadline || 8640000000000000).getTime();
       });
-  }, [alerts, filter, searchQuery, sortMode]);
+  }, [alerts, dismissedAlertIds, filter, searchQuery, sortMode]);
 
   const filterOptions: Array<{ key: AlertFilter; label: string }> = [
     { key: 'all', label: 'All' },
@@ -425,10 +546,11 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                   {/* Title */}
                   <h3 className="font-medium text-white mb-1 line-clamp-2">{alert.title}</h3>
 
-                  {/* Agency */}
+                  {/* Buyer */}
                   <p className="text-sm text-slate-400">
-                    {alert.department || 'Unknown Agency'}
-                    {alert.office && <span className="text-slate-500"> • {alert.office}</span>}
+                    {getAlertBuyer(alert).primary}
+                    {getAlertBuyer(alert).secondary && <span className="text-slate-500"> • {getAlertBuyer(alert).secondary}</span>}
+                    {getAlertBuyer(alert).parent && <span className="text-slate-600"> • {getAlertBuyer(alert).parent}</span>}
                   </p>
 
                   {/* Meta */}
@@ -436,8 +558,8 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     {alert.naicsCode && (
                       <span>NAICS: {alert.naicsCode}</span>
                     )}
-                    {alert.popState && (
-                      <span>📍 {alert.popCity ? `${alert.popCity}, ` : ''}{alert.popState}</span>
+                    {getAlertLocation(alert) && (
+                      <span>📍 {getAlertLocation(alert)}</span>
                     )}
                     {alert.solicitationNumber && (
                       <span>#{alert.solicitationNumber}</span>
@@ -478,6 +600,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
+                        trackAlertEvent('tool_use', alert, 'open_details');
                         setSelectedAlert(alert);
                       }}
                       className="text-xs text-slate-300 hover:text-white mr-3"
@@ -489,10 +612,21 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(event) => event.stopPropagation()}
+                      onMouseDown={() => trackAlertEvent('link_click', alert, 'open_sam')}
                       className="text-xs text-emerald-400 hover:text-emerald-300"
                     >
                       SAM.gov →
                     </a>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        dismissAlert(alert);
+                      }}
+                      className="ml-3 text-xs text-slate-500 hover:text-slate-300"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
               </div>
@@ -596,13 +730,19 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
 
               <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 space-y-3">
                 <div>
-                  <div className="text-xs text-slate-500">Agency</div>
-                  <div className="text-slate-200">{selectedAlert.department || 'Unknown Agency'}</div>
+                  <div className="text-xs text-slate-500">Buyer</div>
+                  <div className="text-slate-200">{getAlertBuyer(selectedAlert).primary}</div>
                 </div>
-                {selectedAlert.office && (
+                {getAlertBuyer(selectedAlert).secondary && (
                   <div>
                     <div className="text-xs text-slate-500">Office</div>
-                    <div className="text-slate-200">{selectedAlert.office}</div>
+                    <div className="text-slate-200">{getAlertBuyer(selectedAlert).secondary}</div>
+                  </div>
+                )}
+                {getAlertBuyer(selectedAlert).parent && (
+                  <div>
+                    <div className="text-xs text-slate-500">Parent Agency</div>
+                    <div className="text-slate-200">{getAlertBuyer(selectedAlert).parent}</div>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
@@ -621,12 +761,10 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     <div className="text-slate-200">{selectedAlert.solicitationNumber}</div>
                   </div>
                 )}
-                {(selectedAlert.popCity || selectedAlert.popState) && (
+                {getAlertLocation(selectedAlert) && (
                   <div>
                     <div className="text-xs text-slate-500">Place of Performance</div>
-                    <div className="text-slate-200">
-                      {selectedAlert.popCity ? `${selectedAlert.popCity}, ` : ''}{selectedAlert.popState}
-                    </div>
+                    <div className="text-slate-200">{getAlertLocation(selectedAlert)}</div>
                   </div>
                 )}
               </div>
@@ -649,16 +787,48 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                   href={selectedAlert.url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackAlertEvent('link_click', selectedAlert, 'open_sam')}
                   className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-center font-medium rounded-lg transition-colors"
                 >
                   Open on SAM.gov
                 </a>
+                <button
+                  onClick={() => dismissAlert(selectedAlert)}
+                  className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                >
+                  Dismiss
+                </button>
                 <button
                   onClick={() => setSelectedAlert(null)}
                   className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
                 >
                   Close
                 </button>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">Tune Mindy</div>
+                <div className="flex flex-wrap gap-2">
+                  {FEEDBACK_OPTIONS.map(option => {
+                    const selected = feedbackByAlert[selectedAlert.id] === option.type;
+                    const saving = savingFeedbackIds.has(selectedAlert.id);
+                    return (
+                      <button
+                        key={option.type}
+                        type="button"
+                        onClick={() => saveFeedback(selectedAlert, option.type)}
+                        disabled={saving}
+                        className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                          selected
+                            ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                            : 'border-slate-700 bg-slate-950 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                        }`}
+                      >
+                        {selected ? '✓ ' : ''}{option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </aside>

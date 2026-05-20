@@ -4,6 +4,7 @@ import {
   searchContractors,
   type Contractor,
 } from '@/lib/contractor-database';
+import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -148,10 +149,7 @@ function amountToNumber(value: number | string | null | undefined) {
 }
 
 export function formatCompactCurrency(value: number) {
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${Math.round(value).toLocaleString()}`;
+  return formatMindyCurrency(value);
 }
 
 function getFiscalYear(dateValue: string | null) {

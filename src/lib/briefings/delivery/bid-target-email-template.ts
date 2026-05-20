@@ -5,6 +5,8 @@
  * Format: THE ONE bid target + "Why You Can Win" + "Also on Radar"
  */
 
+import { MINDY_APP_URL, MINDY_SITE_URL } from '@/lib/mindy/email-branding';
+
 const BRAND_COLOR = '#1e3a8a'; // Navy blue
 const ACCENT_COLOR = '#7c3aed'; // Purple
 const SUCCESS_COLOR = '#10b981'; // Green
@@ -66,7 +68,7 @@ export function generateBidTargetEmail(data: BidTargetEmailData): BidTargetEmail
  */
 function generateHtmlBody(data: BidTargetEmailData, date: string): string {
   const bt = data.bidTarget;
-  const feedbackBaseUrl = 'https://mi.govcongiants.com/api/briefings/feedback';
+  const feedbackBaseUrl = `${MINDY_SITE_URL}/api/briefings/feedback`;
   const feedbackParams = `?email=${encodeURIComponent(data.userEmail)}&date=${data.briefingDate}&type=daily`;
   const helpfulUrl = `${feedbackBaseUrl}${feedbackParams}&rating=helpful`;
   const notHelpfulUrl = `${feedbackBaseUrl}${feedbackParams}&rating=not_helpful`;
@@ -242,13 +244,13 @@ function generateHtmlBody(data: BidTargetEmailData, date: string): string {
     <!-- Footer -->
     <div class="footer">
       <p>
-        <strong>GovCon Giants AI</strong> • Daily Bid Target<br>
-        <a href="https://mi.govcongiants.com/briefings">View Dashboard</a> |
-        <a href="https://mi.govcongiants.com/briefings">Manage Preferences</a> |
-        <a href="https://mi.govcongiants.com/unsubscribe?email=${encodeURIComponent(data.userEmail)}">Unsubscribe</a>
+        <strong>Mindy</strong> • Daily Bid Target<br>
+        <a href="${MINDY_APP_URL}">Open Mindy Dashboard</a> |
+        <a href="${MINDY_APP_URL}">Manage Preferences</a> |
+        <a href="${MINDY_SITE_URL}/unsubscribe?email=${encodeURIComponent(data.userEmail)}">Unsubscribe</a>
       </p>
       <p style="margin-top: 12px;">
-        © ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+        © ${new Date().getFullYear()} Mindy. All rights reserved.
       </p>
     </div>
   </div>
@@ -262,7 +264,7 @@ function generateHtmlBody(data: BidTargetEmailData, date: string): string {
  */
 function generateTextBody(data: BidTargetEmailData, date: string): string {
   const bt = data.bidTarget;
-  const feedbackBaseUrl = 'https://mi.govcongiants.com/api/briefings/feedback';
+  const feedbackBaseUrl = `${MINDY_SITE_URL}/api/briefings/feedback`;
   const feedbackParams = `?email=${encodeURIComponent(data.userEmail)}&date=${data.briefingDate}&type=daily`;
 
   let text = `
@@ -314,11 +316,11 @@ Needs work: ${feedbackBaseUrl}${feedbackParams}&rating=not_helpful
 
 ========================================
 
-GovCon Giants AI • Daily Bid Target
-View Dashboard: https://mi.govcongiants.com/briefings
-Manage Preferences: https://mi.govcongiants.com/briefings
+Mindy • Daily Bid Target
+Open Mindy Dashboard: ${MINDY_APP_URL}
+Manage Preferences: ${MINDY_APP_URL}
 
-© ${new Date().getFullYear()} GovCon Giants. All rights reserved.
+© ${new Date().getFullYear()} Mindy. All rights reserved.
 `;
 
   return text;

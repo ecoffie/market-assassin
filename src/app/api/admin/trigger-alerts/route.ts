@@ -13,6 +13,7 @@ import { fetchSamOpportunities, scoreOpportunity } from '@/lib/briefings/pipelin
 import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
+import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 const SHOP_ADMIN_PASSWORD = 'admin123';
@@ -287,9 +288,9 @@ async function sendAlertEmail(
   tier: string,
   totalAvailable: number
 ) {
-  const unsubscribeUrl = `https://mi.govcongiants.com/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `${MINDY_SITE_URL}/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const ohProUpgradeUrl = 'https://buy.stripe.com/7sIaGqevYeIcdri147';
+  const mindyDashboardUrl = MINDY_APP_URL;
 
   const showUpgrade = tier === 'free' && totalAvailable > 5;
 
@@ -325,10 +326,10 @@ async function sendAlertEmail(
     <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
       <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">You're Missing ${totalAvailable - 5} More Opportunities!</h3>
       <p style="color: #d1fae5; margin: 0 0 16px 0; font-size: 14px;">
-        Upgrade to Pro for <strong>15 opps/week</strong> instead of 5.
+        Open Mindy Pro for <strong>15 opps/week</strong> and priority ranking.
       </p>
-      <a href="${ohProUpgradeUrl}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        Upgrade to Pro - $99
+      <a href="${mindyDashboardUrl}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+        Open Mindy Dashboard
       </a>
     </div>
   ` : '';
@@ -339,8 +340,10 @@ async function sendAlertEmail(
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 20px; background: #f3f4f6;">
   <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">GovCon Giants</h1>
+    ${renderMindyEmailLogo(52)}
+    <h1 style="color: white; margin: 0; font-size: 24px;">Mindy</h1>
     <p style="color: #c4b5fd; margin: 8px 0 0 0; font-size: 16px;">Weekly SAM.gov Opportunities</p>
+    <p style="margin: 16px 0 0 0;"><a href="${mindyDashboardUrl}" style="background: #10b981; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">Open Mindy Dashboard →</a></p>
   </div>
 
   <div style="background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none;">
@@ -359,10 +362,12 @@ async function sendAlertEmail(
     <p style="color: #6b7280; font-size: 12px; margin: 0;">
       <a href="${preferencesUrl}" style="color: #1e40af;">Manage Preferences</a>
       &nbsp;|&nbsp;
+      <a href="${mindyDashboardUrl}" style="color: #1e40af;">Mindy Dashboard</a>
+      &nbsp;|&nbsp;
       <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
-      &copy; ${new Date().getFullYear()} GovCon Giants | mi.govcongiants.com
+      &copy; ${new Date().getFullYear()} Mindy | getmindy.ai
     </p>
   </div>
 </body>
@@ -370,9 +375,9 @@ async function sendAlertEmail(
 `;
 
   await transporter.sendMail({
-    from: `"GovCon Giants" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+    from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
     to: email,
-    subject: `${opportunities.length} New SAM.gov Opportunities - Week of ${formatDate(new Date().toISOString())}`,
+    subject: `Mindy Weekly Alert: ${opportunities.length} New SAM.gov Opportunities - Week of ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
   });
 }

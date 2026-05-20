@@ -643,7 +643,7 @@ export async function GET(request: NextRequest) {
       `;
 
       await getTransporter().sendMail({
-        from: '"GovCon Giants" <hello@govconedu.com>',
+        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govconedu.com>`,
         to: 'service@govcongiants.com',
         subject: `🚨 Health Check: ${failed} tests failed (${report.passRate} pass rate)`,
         html: emailHtml,

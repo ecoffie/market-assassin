@@ -11,6 +11,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import agencySatData from '@/data/agency-sat-friendliness.json';
 import { generateTrackingPixel, generateTrackedLink } from '@/lib/engagement';
+import { MindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '@/lib/mindy/feedback-scoring';
+import { MINDY_APP_URL, MINDY_SITE_URL } from '@/lib/mindy/email-branding';
+import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 
 // ============ INTERFACES ============
 
@@ -18,8 +21,14 @@ export interface SamDailyOpportunity {
   rank: number;
   title: string;
   agency: string;
+  parentAgency?: string;
+  buyerOffice?: string;
   naicsCode: string;
   setAside: string | null;
+  popCity?: string;
+  popState?: string;
+  popZip?: string;
+  popCountry?: string;
   responseDeadline: string;
   daysRemaining: number;
   noticeType: string;
@@ -41,8 +50,14 @@ export interface SamDailyBriefing {
     noticeType: string;
     noticeId: string;
     agency: string;
+    parentAgency?: string;
+    buyerOffice?: string;
     naicsCode: string;
     setAside: string;
+    popCity?: string;
+    popState?: string;
+    popZip?: string;
+    popCountry?: string;
   }[];
   actionTips: string[];
   noticeSummary: {
@@ -62,6 +77,7 @@ export interface SamStrategicRankingContext {
   keywords?: string[];
   businessType?: string;
   businessDescription?: string;
+  feedbackSignals?: MindyFeedbackSignals;
 }
 
 export interface NoticeSummary {
@@ -396,6 +412,12 @@ function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStra
   const descriptionFactor = scoreBusinessDescriptionFit(opportunity, descriptionTerms);
   const setAsideFactor = scoreSetAside(opportunity.setAsideDescription || opportunity.setAside, businessType);
   const timingFactor = scoreTiming(opportunity.responseDeadline);
+  const feedbackFactor = scoreOpportunityWithMindyFeedback({
+    opportunityId: opportunity.noticeId,
+    title: opportunity.title,
+    agency: opportunity.department || opportunity.subTier,
+    naicsCode: opportunity.naicsCode,
+  }, context?.feedbackSignals);
 
   const totalScore =
     noticeTypeFactor.score +
@@ -404,7 +426,8 @@ function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStra
     keywordFactor.score +
     descriptionFactor.score +
     setAsideFactor.score +
-    timingFactor.score;
+    timingFactor.score +
+    feedbackFactor.adjustment;
 
   const topReasons = [
     noticeTypeFactor,
@@ -414,6 +437,9 @@ function buildStrategicAssessment(opportunity: SAMOpportunity, context?: SamStra
     descriptionFactor,
     setAsideFactor,
     timingFactor,
+    ...(feedbackFactor.adjustment > 0
+      ? feedbackFactor.reasons.map(label => ({ score: feedbackFactor.adjustment, label }))
+      : []),
   ]
     .filter(factor => factor.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -546,37 +572,63 @@ Return ONLY valid JSON.`;
   }
 
   // Build the briefing
-  const opportunities: SamDailyOpportunity[] = sorted.slice(0, 5).map((opp, idx) => ({
-    rank: idx + 1,
-    title: opp.title,
-    agency: opp.department || opp.subTier || 'Federal',
-    naicsCode: opp.naicsCode,
-    setAside: opp.setAsideDescription || opp.setAside,
-    responseDeadline: formatSamDate(opp.responseDeadline),
-    daysRemaining: getDaysUntil(opp.responseDeadline),
-    noticeType: opp.noticeType,
-    solicitationNumber: opp.solicitationNumber,
-    samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
-    quickWinAssessment: assessmentsMap[opp.title] || 'Active opportunity matching your NAICS - review requirements and deadline.',
-    postedDate: formatSamDate(opp.postedDate),
-  }));
+  const opportunities: SamDailyOpportunity[] = sorted.slice(0, 5).map((opp, idx) => {
+    const buyer = getBuyerAgencyParts({
+      department: opp.department,
+      subTier: opp.subTier,
+      office: opp.office,
+    });
+    return {
+      rank: idx + 1,
+      title: opp.title,
+      agency: buyer.primary || 'Federal',
+      parentAgency: buyer.parent,
+      buyerOffice: buyer.secondary,
+      naicsCode: opp.naicsCode,
+      setAside: opp.setAsideDescription || opp.setAside,
+      popCity: opp.placeOfPerformance?.city,
+      popState: opp.placeOfPerformance?.state,
+      popZip: opp.placeOfPerformance?.zip,
+      popCountry: opp.placeOfPerformance?.country,
+      responseDeadline: formatSamDate(opp.responseDeadline),
+      daysRemaining: getDaysUntil(opp.responseDeadline),
+      noticeType: opp.noticeType,
+      solicitationNumber: opp.solicitationNumber,
+      samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
+      quickWinAssessment: assessmentsMap[opp.title] || 'Active opportunity matching your NAICS - review requirements and deadline.',
+      postedDate: formatSamDate(opp.postedDate),
+    };
+  });
 
   // Deadlines this week
   const weekFromNow = 7;
   const deadlinesThisWeek = sorted
     .filter(o => getDaysUntil(o.responseDeadline) <= weekFromNow && getDaysUntil(o.responseDeadline) >= 0)
-    .map(o => ({
-      title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
-      fullTitle: o.title,
-      deadline: o.responseDeadline,
-      daysRemaining: getDaysUntil(o.responseDeadline),
-      samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
-      noticeType: o.noticeType || 'Notice',
-      noticeId: o.solicitationNumber || o.noticeId || '',
-      agency: o.department || o.subTier || '',
-      naicsCode: o.naicsCode || '',
-      setAside: o.setAside || '',
-    }));
+    .map(o => {
+      const buyer = getBuyerAgencyParts({
+        department: o.department,
+        subTier: o.subTier,
+        office: o.office,
+      });
+      return {
+        title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
+        fullTitle: o.title,
+        deadline: o.responseDeadline,
+        daysRemaining: getDaysUntil(o.responseDeadline),
+        samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
+        noticeType: o.noticeType || 'Notice',
+        noticeId: o.solicitationNumber || o.noticeId || '',
+        agency: buyer.primary,
+        parentAgency: buyer.parent,
+        buyerOffice: buyer.secondary,
+        naicsCode: o.naicsCode || '',
+        setAside: o.setAside || '',
+        popCity: o.placeOfPerformance?.city,
+        popState: o.placeOfPerformance?.state,
+        popZip: o.placeOfPerformance?.zip,
+        popCountry: o.placeOfPerformance?.country,
+      };
+    });
 
   // Count notice types for summary
   const noticeSummary = buildNoticeSummary(sorted);
@@ -619,36 +671,62 @@ export function buildSamGreenBriefing(
 
   const sorted = ranked.map(entry => entry.opportunity);
 
-  const briefingOpportunities: SamDailyOpportunity[] = ranked.slice(0, 5).map(({ opportunity: opp, strategic }, idx) => ({
-    rank: idx + 1,
-    title: opp.title,
-    agency: opp.department || opp.subTier || 'Federal',
-    naicsCode: opp.naicsCode,
-    setAside: opp.setAsideDescription || opp.setAside,
-    responseDeadline: formatSamDate(opp.responseDeadline),
-    daysRemaining: getDaysUntil(opp.responseDeadline),
-    noticeType: opp.noticeType,
-    solicitationNumber: opp.solicitationNumber,
-    samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
-    quickWinAssessment: strategic.summary,
-    postedDate: formatSamDate(opp.postedDate),
-  }));
+  const briefingOpportunities: SamDailyOpportunity[] = ranked.slice(0, 5).map(({ opportunity: opp, strategic }, idx) => {
+    const buyer = getBuyerAgencyParts({
+      department: opp.department,
+      subTier: opp.subTier,
+      office: opp.office,
+    });
+    return {
+      rank: idx + 1,
+      title: opp.title,
+      agency: buyer.primary || 'Federal',
+      parentAgency: buyer.parent,
+      buyerOffice: buyer.secondary,
+      naicsCode: opp.naicsCode,
+      setAside: opp.setAsideDescription || opp.setAside,
+      popCity: opp.placeOfPerformance?.city,
+      popState: opp.placeOfPerformance?.state,
+      popZip: opp.placeOfPerformance?.zip,
+      popCountry: opp.placeOfPerformance?.country,
+      responseDeadline: formatSamDate(opp.responseDeadline),
+      daysRemaining: getDaysUntil(opp.responseDeadline),
+      noticeType: opp.noticeType,
+      solicitationNumber: opp.solicitationNumber,
+      samLink: opp.uiLink || `https://sam.gov/opp/${opp.noticeId}/view`,
+      quickWinAssessment: strategic.summary,
+      postedDate: formatSamDate(opp.postedDate),
+    };
+  });
 
   const weekFromNow = 7;
   const deadlinesThisWeek = sorted
     .filter(o => getDaysUntil(o.responseDeadline) <= weekFromNow && getDaysUntil(o.responseDeadline) >= 0)
-    .map(o => ({
-      title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
-      fullTitle: o.title,
-      deadline: o.responseDeadline,
-      daysRemaining: getDaysUntil(o.responseDeadline),
-      samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
-      noticeType: o.noticeType || 'Notice',
-      noticeId: o.solicitationNumber || o.noticeId || '',
-      agency: o.department || o.subTier || '',
-      naicsCode: o.naicsCode || '',
-      setAside: o.setAside || '',
-    }));
+    .map(o => {
+      const buyer = getBuyerAgencyParts({
+        department: o.department,
+        subTier: o.subTier,
+        office: o.office,
+      });
+      return {
+        title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
+        fullTitle: o.title,
+        deadline: o.responseDeadline,
+        daysRemaining: getDaysUntil(o.responseDeadline),
+        samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
+        noticeType: o.noticeType || 'Notice',
+        noticeId: o.solicitationNumber || o.noticeId || '',
+        agency: buyer.primary,
+        parentAgency: buyer.parent,
+        buyerOffice: buyer.secondary,
+        naicsCode: o.naicsCode || '',
+        setAside: o.setAside || '',
+        popCity: o.placeOfPerformance?.city,
+        popState: o.placeOfPerformance?.state,
+        popZip: o.placeOfPerformance?.zip,
+        popCountry: o.placeOfPerformance?.country,
+      };
+    });
 
   const noticeSummary = noticeSummaryOverride || buildNoticeSummary(
     ranked.map(entry => entry.opportunity)
@@ -746,7 +824,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
     const oppTypeInfo = getNoticeTypeInfo(opp.noticeType);
     const satInfo = getSatBadgeForAgency(opp.agency);
     const samHref = trackingToken ? generateTrackedLink(trackingToken, opp.samLink, 'view_sam_gov') : opp.samLink;
-    const muteHref = `https://mi.govcongiants.com/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}`;
+    const muteHref = `${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}`;
     const badges = [
       renderBadge(oppTypeInfo.label, getBadgeStyle(oppTypeInfo.cssClass)),
       satInfo.badge ? renderBadge(satInfo.badge, getSatBadgeStyle(satInfo.level)) : '',
@@ -768,7 +846,9 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
         </table>
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 12px 0;">
-          ${renderMetaRow('Agency', opp.agency)}
+          ${renderMetaRow('Buyer', opp.agency)}
+          ${opp.buyerOffice ? renderMetaRow('Office', opp.buyerOffice) : ''}
+          ${opp.parentAgency ? renderMetaRow('Parent', opp.parentAgency) : ''}
           ${renderMetaRow('Posted', opp.postedDate)}
           ${renderMetaRow('Response Due', opp.responseDeadline)}
           ${renderMetaRow('NAICS', opp.naicsCode)}
@@ -792,7 +872,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
     const typeInfo = getNoticeTypeInfo(d.noticeType);
     const satInfo = getSatBadgeForAgency(d.agency);
     const samHref = trackingToken ? generateTrackedLink(trackingToken, d.samLink, 'view_deadline') : d.samLink;
-    const muteHref = `https://mi.govcongiants.com/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(d.fullTitle)}&notice_id=${encodeURIComponent(d.noticeId)}`;
+    const muteHref = `${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail || '')}&title=${encodeURIComponent(d.fullTitle)}&notice_id=${encodeURIComponent(d.noticeId)}`;
     const daysLabel = d.daysRemaining === 0 ? 'TODAY' : d.daysRemaining === 1 ? 'TOMORROW' : `${d.daysRemaining} days`;
     const badges = [
       renderBadge(typeInfo.label, getBadgeStyle(typeInfo.cssClass)),
@@ -944,12 +1024,12 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
     </div>
 
     <div style="text-align: center; margin: 24px 0;">
-      <a href="${trackingToken ? generateTrackedLink(trackingToken, 'https://mi.govcongiants.com/briefings/dashboard', 'browse_all_opportunities') : 'https://mi.govcongiants.com/briefings/dashboard'}" style="display: inline-block; background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Browse All ${briefing.noticeSummary.totalMatched} Opportunities →</a>
+      <a href="${trackingToken ? generateTrackedLink(trackingToken, MINDY_APP_URL, 'browse_all_opportunities') : MINDY_APP_URL}" style="display: inline-block; background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Open Mindy Dashboard →</a>
     </div>
     <div class="footer">
       <p>Generated by <strong>Mindy</strong> | Your Market Intelligence Analyst</p>
       <span class="source-badge">Data Source: SAM.gov Opportunities API</span>
-      <p style="margin-top: 12px;"><a href="${trackingToken ? generateTrackedLink(trackingToken, 'https://mi.govcongiants.com/alerts/preferences', 'manage_preferences') : 'https://mi.govcongiants.com/alerts/preferences'}">Manage Preferences</a> | <a href="${trackingToken ? generateTrackedLink(trackingToken, 'https://mi.govcongiants.com/briefings/dashboard', 'view_dashboard') : 'https://mi.govcongiants.com/briefings/dashboard'}">View Dashboard</a></p>
+      <p style="margin-top: 12px;"><a href="${trackingToken ? generateTrackedLink(trackingToken, MINDY_APP_URL, 'manage_preferences') : MINDY_APP_URL}">Manage Preferences</a> | <a href="${trackingToken ? generateTrackedLink(trackingToken, MINDY_APP_URL, 'view_dashboard') : MINDY_APP_URL}">Open Mindy Dashboard</a></p>
     </div>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}
@@ -969,7 +1049,7 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
     textBody += `   Assessment: ${opp.quickWinAssessment}\n`;
     textBody += `   SAM.gov: ${opp.samLink}\n`;
     if (userEmail) {
-      textBody += `   → Not Interested: https://mi.govcongiants.com/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}\n`;
+      textBody += `   → Not Interested: ${MINDY_SITE_URL}/api/actions/mute-opportunity?email=${encodeURIComponent(userEmail)}&title=${encodeURIComponent(opp.title)}&notice_id=${encodeURIComponent(opp.solicitationNumber || '')}\n`;
     }
     textBody += `\n`;
   }

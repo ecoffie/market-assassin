@@ -19,6 +19,7 @@ import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import agencySatData from '@/data/agency-sat-friendliness.json';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
+import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 // SAT Badge helper
 interface SatAgencyInfo {
@@ -198,7 +199,7 @@ async function sendAlertEmail(
   opportunities: (SAMOpportunity & { score: number })[]
 ): Promise<void> {
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const unsubscribeUrl = `https://mi.govcongiants.com/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
 
   const opportunitiesHtml = opportunities.slice(0, 15).map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
@@ -236,8 +237,10 @@ async function sendAlertEmail(
   </div>
 
   <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 24px; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 20px;">🎯 ${opportunities.length} New Opportunities</h1>
+    ${renderMindyEmailLogo(48)}
+    <h1 style="color: white; margin: 0; font-size: 20px;">Mindy Alert: ${opportunities.length} New Opportunities</h1>
     <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">${formatDate(new Date().toISOString())}</p>
+    <p style="margin: 14px 0 0 0;"><a href="${MINDY_APP_URL}" style="background: #10b981; color: white; padding: 9px 16px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 12px; display: inline-block;">Open Mindy Dashboard →</a></p>
   </div>
 
   <div style="background: white; border: 1px solid #e2e8f0;">
@@ -249,16 +252,16 @@ async function sendAlertEmail(
 
   <div style="background: #f1f5f9; padding: 16px; border-radius: 0 0 8px 8px; text-align: center;">
     <p style="color: #64748b; font-size: 11px; margin: 0;">
-      <a href="${preferencesUrl}" style="color: #475569;">Preferences</a> • <a href="${unsubscribeUrl}" style="color: #475569;">Unsubscribe</a>
+      <a href="${preferencesUrl}" style="color: #475569;">Preferences</a> • <a href="${MINDY_APP_URL}" style="color: #475569;">Mindy Dashboard</a> • <a href="${unsubscribeUrl}" style="color: #475569;">Unsubscribe</a>
     </p>
   </div>
 </body>
 </html>`;
 
   await getTransporter().sendMail({
-    from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+    from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
-    subject: `🎯 ${opportunities.length} New Opportunities - ${formatDate(new Date().toISOString())}`,
+    subject: `Mindy Alert: ${opportunities.length} New Opportunities - ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
   });
 }

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
 import type { Agency } from '@/types/federal-market-assassin';
+import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 interface MarketResearchPanelProps {
   email: string | null;
@@ -11,7 +12,7 @@ interface MarketResearchPanelProps {
   onNavigate?: (panel: string, context?: Record<string, unknown>) => void;
 }
 
-type BusinessType = 'Women Owned' | 'HUBZone' | '8(a) Certified' | 'Small Business' | 'Native American/Tribal' | '';
+type BusinessType = 'SDVOSB' | 'VOSB' | 'Women Owned' | 'HUBZone' | '8(a) Certified' | 'Small Business' | 'Native American/Tribal' | '';
 type VeteranStatus = 'Not Applicable' | 'Veteran Owned' | 'Service Disabled Veteran';
 
 interface FormData {
@@ -43,6 +44,8 @@ interface WorkspaceProfileRow {
     psc_codes?: string[] | null;
     business_type?: string | null;
     company_name?: string | null;
+    certifications?: string[] | null;
+    set_aside_preferences?: string[] | null;
   } | null;
 }
 
@@ -62,6 +65,7 @@ interface AlertPreferencesData {
   locationState?: string;
   locationStates?: string[];
   businessType?: string;
+  setAsides?: string[];
   companyName?: string;
 }
 
@@ -73,6 +77,43 @@ interface SavedResearchProfile {
   zipCode: string;
   companyName: string;
   source: string;
+}
+
+type FeedbackType = 'good_match' | 'bad_match' | 'not_my_industry' | 'too_big_small' | 'already_knew' | 'want_more_like_this';
+
+interface RecommendedOpportunity {
+  id: string;
+  title: string;
+  department?: string | null;
+  subTier?: string | null;
+  office?: string | null;
+  solicitationNumber?: string | null;
+  naicsCode?: string | null;
+  pscCode?: string | null;
+  responseDeadline?: string | null;
+  noticeType?: string | null;
+  description?: string | null;
+  descriptionUrl?: string | null;
+  setAsideDescription?: string | null;
+  popCity?: string | null;
+  popState?: string | null;
+  popZip?: string | null;
+  popCountry?: string | null;
+  buyerName?: string | null;
+  buyerOffice?: string | null;
+  parentAgency?: string | null;
+  buyerDisplay?: string | null;
+  daysLeft?: number | null;
+  isUrgent?: boolean;
+  url?: string | null;
+  feedbackScoreAdjustment?: number;
+  recommendationScore?: number;
+  feedbackReasons?: string[];
+  setAsideEligible?: boolean;
+  setAsideMismatchReason?: string | null;
+  eligibilityScoreAdjustment?: number;
+  agencyScoreAdjustment?: number;
+  agencyMismatchReason?: string | null;
 }
 
 interface MarketFocus {
@@ -220,7 +261,7 @@ const RESEARCH_LENSES = [
 
 type ResearchLensId = typeof RESEARCH_LENSES[number]['id'];
 
-const BUSINESS_TYPES: BusinessType[] = ['Women Owned', 'HUBZone', '8(a) Certified', 'Small Business', 'Native American/Tribal'];
+const BUSINESS_TYPES: BusinessType[] = ['SDVOSB', 'VOSB', 'Women Owned', 'HUBZone', '8(a) Certified', 'Small Business', 'Native American/Tribal'];
 
 function firstArray(...values: Array<string[] | null | undefined>): string[] {
   for (const value of values) {
@@ -248,8 +289,64 @@ function splitCodeList(value: string): string[] {
     .filter(Boolean);
 }
 
+function opportunityAgencyName(opportunity: RecommendedOpportunity): string {
+  return (opportunity.department || opportunity.subTier || opportunity.office || '').trim();
+}
+
+function isVeteranProfileForm(formData: FormData): boolean {
+  const value = `${formData.businessType || ''} ${formData.veteranStatus || ''}`.toLowerCase();
+  return value.includes('sdvosb')
+    || value.includes('vosb')
+    || value.includes('veteran')
+    || value.includes('service disabled')
+    || value.includes('service-disabled');
+}
+
+function isVeteransAffairsName(value?: string | null): boolean {
+  const text = normalizeMatchText(value);
+  return text.includes('veterans affairs')
+    || text.includes('department of veterans')
+    || text.includes('veterans health administration')
+    || text === 'vha';
+}
+
+function defaultBuyerAgenciesForProfile(formData: FormData): string[] {
+  const broadAgencies = [
+    'Department of Defense',
+    'General Services Administration',
+    'Department of Homeland Security',
+    'Department of Health and Human Services',
+    'Department of the Interior',
+  ];
+
+  return isVeteranProfileForm(formData)
+    ? ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration']
+    : broadAgencies;
+}
+
+function filterAgenciesForProfile(agencies: string[], formData: FormData): string[] {
+  if (isVeteranProfileForm(formData)) return agencies;
+  return agencies.filter((agency) => !isVeteransAffairsName(agency));
+}
+
 function normalizeMatchText(value?: string | null): string {
   return (value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function isHttpUrl(value?: string | null): value is string {
+  if (!value) return false;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function cleanOpportunitySummary(value?: string | null): string | null {
+  const text = value?.trim();
+  if (!text || isHttpUrl(text)) return null;
+  return text;
 }
 
 function agencyMatchesTarget(agency: Agency, target: string): boolean {
@@ -266,6 +363,17 @@ function agencyMatchesTarget(agency: Agency, target: string): boolean {
     const agencyText = normalizeMatchText(value);
     return agencyText.includes(targetText) || targetText.includes(agencyText);
   });
+}
+
+function agencyDataAllowedForProfile(agency: Agency, formData: FormData): boolean {
+  if (isVeteranProfileForm(formData)) return true;
+  return ![
+    agency.name,
+    agency.contractingOffice,
+    agency.subAgency,
+    agency.parentAgency,
+    agency.command,
+  ].some(isVeteransAffairsName);
 }
 
 async function lookupAgencyData(formData: FormData, selectedAgencies: string[]): Promise<Agency[]> {
@@ -298,8 +406,35 @@ async function lookupAgencyData(formData: FormData, selectedAgencies: string[]):
   }
 }
 
+async function fetchRecommendedAgencyNames(
+  email: string,
+  getAuthHeaders: (headers?: HeadersInit) => HeadersInit,
+  formData: FormData,
+  limit = 50
+): Promise<string[]> {
+  try {
+    const res = await fetch(`/api/mi-beta/opportunities?email=${encodeURIComponent(email)}&limit=${limit}`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.opportunities)) return [];
+
+    return uniqueStrings(
+      (data.opportunities as RecommendedOpportunity[])
+        .map(opportunityAgencyName)
+    )
+      .filter((agency) => isVeteranProfileForm(formData) || !isVeteransAffairsName(agency))
+      .slice(0, 25);
+  } catch (err) {
+    console.error('Failed to load recommended agency names:', err);
+    return [];
+  }
+}
+
 function normalizeBusinessType(value?: string | null, certifications: string[] = []): BusinessType {
   const combined = [value || '', ...certifications].join(' ').toLowerCase();
+  if (combined.includes('sdvosb') || combined.includes('service-disabled') || combined.includes('service disabled')) return 'SDVOSB';
+  if (combined.includes('vosb') || combined.includes('veteran')) return 'VOSB';
   if (combined.includes('women') || combined.includes('wosb') || combined.includes('edwosb')) return 'Women Owned';
   if (combined.includes('hubzone')) return 'HUBZone';
   if (combined.includes('8(a)') || combined.includes('8a')) return '8(a) Certified';
@@ -332,7 +467,18 @@ function buildSavedResearchProfile(data: WorkspaceData | null): SavedResearchPro
     briefingAggregated.agencies,
     briefing.agencies
   );
-  const certifications = firstArray(briefing.certifications, briefing.set_aside_preferences);
+  const certifications = firstArray(
+    settings.set_aside_preferences,
+    settings.certifications,
+    notification.set_aside_preferences,
+    notification.certifications,
+    notificationAggregated.set_aside_preferences,
+    notificationAggregated.certifications,
+    briefing.set_aside_preferences,
+    briefing.certifications,
+    briefingAggregated.set_aside_preferences,
+    briefingAggregated.certifications
+  );
   const businessType = normalizeBusinessType(
     notification.business_type || notificationAggregated.business_type || briefingAggregated.business_type,
     certifications
@@ -389,6 +535,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   const [showSaveFocus, setShowSaveFocus] = useState(false);
   const [newFocusName, setNewFocusName] = useState('');
   const [focusSaving, setFocusSaving] = useState(false);
+  const [recommendedOpportunities, setRecommendedOpportunities] = useState<RecommendedOpportunity[]>([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [feedbackByOpportunity, setFeedbackByOpportunity] = useState<Record<string, FeedbackType>>({});
+  const [savingFeedback, setSavingFeedback] = useState<Set<string>>(new Set());
+  const [selectedOpportunity, setSelectedOpportunity] = useState<RecommendedOpportunity | null>(null);
   const autoGeneratedRef = useRef(false);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
@@ -428,6 +579,35 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     }
   }, [email, getAuthHeaders, tier]);
 
+  const loadRecommendedOpportunities = useCallback(async () => {
+    if (!email) return;
+
+    setRecommendationsLoading(true);
+    try {
+      const res = await fetch(`/api/mi-beta/opportunities?email=${encodeURIComponent(email)}&limit=6`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const seen = new Set<string>();
+        const uniqueOpportunities = (data.opportunities || []).filter((opportunity: RecommendedOpportunity) => {
+          const key = [
+            String(opportunity.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+            String(opportunity.department || opportunity.subTier || '').toLowerCase().trim(),
+          ].join('|');
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setRecommendedOpportunities(uniqueOpportunities);
+      }
+    } catch (err) {
+      console.error('Failed to load recommended opportunities:', err);
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  }, [email, getAuthHeaders]);
+
   const getCurrentFocusFilters = useCallback(() => ({
     businessType: formData.businessType,
     naicsCodes: formData.naicsCode.split(',').map((item) => item.trim()).filter(Boolean),
@@ -452,12 +632,22 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         .split(',')
         .map(agency => agency.trim())
         .filter(Boolean);
-      const selectedAgencyData = await lookupAgencyData(activeFormData, selectedAgencies);
-      const reportAgencyNames = selectedAgencies.length > 0
+      const selectedAgencyData = (await lookupAgencyData(activeFormData, selectedAgencies))
+        .filter((agency) => agencyDataAllowedForProfile(agency, activeFormData));
+      const recommendedAgencyNames = selectedAgencyData.length === 0
+        ? await fetchRecommendedAgencyNames(email, getAuthHeaders, activeFormData)
+        : [];
+      const rawReportAgencyNames = selectedAgencies.length > 0 && selectedAgencyData.length > 0
         ? selectedAgencies
         : selectedAgencyData.length > 0
           ? uniqueStrings(selectedAgencyData.map((agency) => agency.parentAgency || agency.subAgency || agency.name)).slice(0, 10)
-          : ['Department of Defense', 'Department of Veterans Affairs', 'General Services Administration'];
+          : recommendedAgencyNames.length > 0
+            ? recommendedAgencyNames
+          : defaultBuyerAgenciesForProfile(activeFormData);
+      const reportAgencyNames = filterAgenciesForProfile(rawReportAgencyNames, activeFormData);
+      const finalReportAgencyNames = reportAgencyNames.length > 0
+        ? reportAgencyNames
+        : defaultBuyerAgenciesForProfile(activeFormData);
 
       const res = await fetch('/api/reports/generate-all', {
         method: 'POST',
@@ -473,7 +663,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             excludeDOD: activeFormData.excludeDOD,
             goodsOrServices: 'services',
           },
-          selectedAgencies: reportAgencyNames,
+          selectedAgencies: finalReportAgencyNames,
           selectedAgencyData,
           userEmail: email,
         }),
@@ -483,6 +673,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
       if (data.success && data.report) {
         setReportData(data.report);
+        loadRecommendedOpportunities();
         // Mark all free reports as generated, and pro reports if user has access
         const generated = new Set<string>();
         REPORTS.forEach(r => {
@@ -503,7 +694,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     } finally {
       setIsGenerating(false);
     }
-  }, [canAccessReport, email, formData, selectedAgency, validateForm]);
+  }, [canAccessReport, email, formData, getAuthHeaders, loadRecommendedOpportunities, selectedAgency, validateForm]);
 
   const applySavedProfile = useCallback((profile: SavedResearchProfile) => {
     setFormData((current) => ({
@@ -645,7 +836,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         const profile: SavedResearchProfile | null = (
           workspaceProfile || naicsCodes.length > 0 || pscCodes.length > 0 || agencies.length > 0 || prefsData.businessType || prefsData.companyName
         ) ? {
-          businessType: workspaceProfile?.businessType || normalizeBusinessType(prefsData.businessType),
+          businessType: workspaceProfile?.businessType || normalizeBusinessType(prefsData.businessType, prefsData.setAsides || []),
           naicsCodes,
           pscCodes,
           agencies,
@@ -677,6 +868,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   }, [loadMarketFocuses]);
 
   useEffect(() => {
+    loadRecommendedOpportunities();
+  }, [loadRecommendedOpportunities]);
+
+  useEffect(() => {
     if (autoGeneratedRef.current || profileLoading || !profileApplied || !email) return;
     // Auto-generate if user has NAICS, PSC, or target agencies - businessType is optional
     const hasInputs = Boolean(
@@ -700,6 +895,22 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     setActiveReportId(report.id);
   };
 
+  const handleLensClick = (lens: typeof RESEARCH_LENSES[number]) => {
+    setActiveLens(lens.id);
+    const lensReports: readonly string[] = lens.reports;
+    const firstReport = REPORTS.find(report => lensReports.includes(report.id) && canAccessReport(report.tier));
+
+    if (!firstReport) {
+      setActiveReportId(null);
+      return;
+    }
+
+    if (!generatedReports.has(firstReport.id)) {
+      handleGenerateAll();
+    }
+    setActiveReportId(firstReport.id);
+  };
+
   const getReportContent = (reportId: string): ReportData[keyof ReportData] | null => {
     if (!reportData) return null;
     const report = REPORTS.find(r => r.id === reportId);
@@ -707,13 +918,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     return reportData[report.reportKey];
   };
 
-  const formatCurrency = (value?: number) => {
-    if (!value) return '$0';
-    if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-    if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-    return `$${value.toLocaleString()}`;
-  };
+  const formatCurrency = formatMindyCurrency;
 
   // === SAVE ACTIONS ===
   const [savingContact, setSavingContact] = useState<string | null>(null);
@@ -853,6 +1058,40 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     }
   }, [onNavigate]);
 
+  const handleRecommendedFeedback = useCallback(async (opportunity: RecommendedOpportunity, feedbackType: FeedbackType) => {
+    if (!email) return;
+
+    setSavingFeedback((current) => new Set(current).add(opportunity.id));
+    try {
+      const res = await fetch('/api/mindy/opportunity-feedback', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          email,
+          opportunityId: opportunity.id,
+          feedbackType,
+          title: opportunity.title,
+          agency: opportunity.department || opportunity.subTier || opportunity.office || '',
+          url: opportunity.url || '',
+          source: 'market_research',
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        setFeedbackByOpportunity((current) => ({ ...current, [opportunity.id]: feedbackType }));
+        loadRecommendedOpportunities();
+      }
+    } catch (err) {
+      console.error('Failed to save opportunity feedback:', err);
+    } finally {
+      setSavingFeedback((current) => {
+        const next = new Set(current);
+        next.delete(opportunity.id);
+        return next;
+      });
+    }
+  }, [email, getAuthHeaders, loadRecommendedOpportunities]);
+
   const buyers = reportData?.governmentBuyers?.agencies || [];
   const buyerSummary = reportData?.governmentBuyers?.summary;
   const painSummary = reportData?.agencyPainPoints?.summary;
@@ -923,7 +1162,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             </div>
           )}
           <button
-            onClick={() => handleGenerateAll()}
+            onClick={() => {
+              handleGenerateAll();
+              loadRecommendedOpportunities();
+            }}
             disabled={isGenerating || profileLoading}
             className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700"
           >
@@ -1118,6 +1360,45 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             </div>
           </section>
 
+          <section className="rounded-xl border border-purple-500/30 bg-purple-950/10 p-5">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Recommended Opportunities</h2>
+                <p className="text-sm text-slate-500">Ranked from your profile and the feedback you give Mindy.</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadRecommendedOpportunities}
+                className="self-start rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700"
+              >
+                Refresh recommendations
+              </button>
+            </div>
+
+            {recommendationsLoading ? (
+              <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
+                Loading recommended opportunities...
+              </div>
+            ) : recommendedOpportunities.length > 0 ? (
+              <div className="grid gap-3 lg:grid-cols-3">
+                {recommendedOpportunities.slice(0, 3).map((opportunity) => (
+                  <RecommendedOpportunityCard
+                    key={opportunity.id}
+                    opportunity={opportunity}
+                    selectedFeedback={feedbackByOpportunity[opportunity.id]}
+                    savingFeedback={savingFeedback.has(opportunity.id)}
+                    onFeedback={handleRecommendedFeedback}
+                    onOpen={setSelectedOpportunity}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
+                No recommendations loaded yet. Refresh once after your profile is saved.
+              </div>
+            )}
+          </section>
+
           <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
             <h2 className="mb-4 text-xl font-semibold text-white">Choose What You Need</h2>
             <div className="grid gap-3 md:grid-cols-5">
@@ -1125,7 +1406,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 <button
                   key={lens.id}
                   type="button"
-                  onClick={() => setActiveLens(lens.id)}
+                  onClick={() => handleLensClick(lens)}
                   className={`rounded-lg border p-4 text-left transition-colors ${
                     activeLens === lens.id
                       ? 'border-emerald-500 bg-emerald-500/10'
@@ -1186,6 +1467,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         <ReportViewer
           reportId={activeReportId}
           reportData={getReportContent(activeReportId)}
+          recommendedOpportunities={recommendedOpportunities}
           onClose={() => setActiveReportId(null)}
           formatCurrency={formatCurrency}
           onSaveBuyer={handleSaveBuyer}
@@ -1196,6 +1478,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           savingOpportunity={savingOpportunity}
           savedOpportunities={savedOpportunities}
           tier={tier}
+        />
+      )}
+
+      {selectedOpportunity && (
+        <RecommendedOpportunityDrawer
+          opportunity={selectedOpportunity}
+          selectedFeedback={feedbackByOpportunity[selectedOpportunity.id]}
+          savingFeedback={savingFeedback.has(selectedOpportunity.id)}
+          onFeedback={handleRecommendedFeedback}
+          onClose={() => setSelectedOpportunity(null)}
         />
       )}
 
@@ -1214,6 +1506,277 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           </a>
         </div>
       )}
+    </div>
+  );
+}
+
+function RecommendedOpportunityCard({
+  opportunity,
+  selectedFeedback,
+  savingFeedback,
+  onFeedback,
+  onOpen,
+}: {
+  opportunity: RecommendedOpportunity;
+  selectedFeedback?: FeedbackType;
+  savingFeedback: boolean;
+  onFeedback: (opportunity: RecommendedOpportunity, feedbackType: FeedbackType) => void;
+  onOpen: (opportunity: RecommendedOpportunity) => void;
+}) {
+  const agency = opportunity.department || opportunity.subTier || opportunity.office || 'Agency not listed';
+  const deadline = opportunity.responseDeadline
+    ? new Date(opportunity.responseDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : 'No deadline';
+  const reasons = opportunity.feedbackReasons || [];
+  const mindyScore = opportunity.recommendationScore ?? opportunity.feedbackScoreAdjustment ?? 0;
+
+  return (
+    <article className="flex min-h-[260px] flex-col rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <span className={`rounded px-2 py-1 text-xs font-medium ${
+          opportunity.isUrgent ? 'bg-red-500/15 text-red-200' : 'bg-emerald-500/15 text-emerald-200'
+        }`}>
+          {opportunity.daysLeft != null ? `${Math.max(opportunity.daysLeft, 0)} days left` : deadline}
+        </span>
+        {mindyScore !== 0 && (
+          <span className="rounded bg-purple-500/15 px-2 py-1 text-xs text-purple-200">
+            Mindy {mindyScore > 0 ? '+' : ''}{mindyScore}
+          </span>
+        )}
+      </div>
+
+      <button type="button" onClick={() => onOpen(opportunity)} className="text-left">
+        <h3 className="line-clamp-3 text-base font-semibold text-white hover:text-emerald-200">{opportunity.title}</h3>
+      </button>
+      <p className="mt-2 line-clamp-2 text-sm text-slate-400">{agency}</p>
+
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+        {opportunity.naicsCode && <span className="rounded bg-slate-900 px-2 py-1">NAICS {opportunity.naicsCode}</span>}
+        {opportunity.noticeType && <span className="rounded bg-slate-900 px-2 py-1">{opportunity.noticeType}</span>}
+        <span className="rounded bg-slate-900 px-2 py-1">Due {deadline}</span>
+      </div>
+
+      {reasons.length > 0 && (
+        <div className="mt-3 rounded border border-purple-500/20 bg-purple-500/10 px-3 py-2 text-xs text-purple-100">
+          {reasons[0]}
+        </div>
+      )}
+
+      {opportunity.setAsideEligible === false && opportunity.setAsideMismatchReason && (
+        <div className="mt-3 rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          {opportunity.setAsideMismatchReason}
+        </div>
+      )}
+
+      <div className="mt-auto pt-4">
+        <div className="mb-3 flex gap-2">
+          <button
+            type="button"
+            onClick={() => onFeedback(opportunity, 'want_more_like_this')}
+            disabled={savingFeedback}
+            className={`rounded border px-3 py-1.5 text-xs ${
+              selectedFeedback === 'want_more_like_this'
+                ? 'border-emerald-400 bg-emerald-500/20 text-emerald-100'
+                : 'border-slate-700 text-slate-300 hover:border-emerald-500/60'
+            }`}
+          >
+            More like this
+          </button>
+          <button
+            type="button"
+            onClick={() => onFeedback(opportunity, 'bad_match')}
+            disabled={savingFeedback}
+            className={`rounded border px-3 py-1.5 text-xs ${
+              selectedFeedback === 'bad_match'
+                ? 'border-red-400 bg-red-500/20 text-red-100'
+                : 'border-slate-700 text-slate-300 hover:border-red-500/60'
+            }`}
+          >
+            Bad match
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => onOpen(opportunity)}
+            className="flex-1 rounded bg-slate-800 px-3 py-2 text-center text-sm font-medium text-slate-100 hover:bg-slate-700"
+          >
+            Details
+          </button>
+          {opportunity.url && (
+            <a
+              href={opportunity.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 rounded bg-emerald-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500"
+            >
+              Open SAM.gov
+            </a>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function RecommendedOpportunityDrawer({
+  opportunity,
+  selectedFeedback,
+  savingFeedback,
+  onFeedback,
+  onClose,
+}: {
+  opportunity: RecommendedOpportunity;
+  selectedFeedback?: FeedbackType;
+  savingFeedback: boolean;
+  onFeedback: (opportunity: RecommendedOpportunity, feedbackType: FeedbackType) => void;
+  onClose: () => void;
+}) {
+  const agency = opportunity.buyerDisplay || opportunity.buyerName || opportunity.office || opportunity.subTier || opportunity.department || 'Agency not listed';
+  const parentAgency = opportunity.parentAgency || opportunity.department || null;
+  const deadline = opportunity.responseDeadline
+    ? new Date(opportunity.responseDeadline).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : 'No deadline listed';
+  const location = [opportunity.popCity, opportunity.popState].filter(Boolean).join(', ');
+  const locationDetail = [location, opportunity.popZip, opportunity.popCountry].filter(Boolean).join(' ');
+  const summary = cleanOpportunitySummary(opportunity.description);
+  const sourceLinks = [
+    opportunity.url ? { label: 'SAM.gov record', href: opportunity.url } : null,
+    opportunity.descriptionUrl ? { label: 'SAM notice description', href: opportunity.descriptionUrl } : null,
+  ].filter((link): link is { label: string; href: string } => Boolean(link && isHttpUrl(link.href)));
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm">
+      <aside className="ml-auto flex h-full w-full max-w-xl flex-col border-l border-slate-800 bg-slate-950 shadow-2xl">
+        <div className="border-b border-slate-800 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-purple-300">Recommended opportunity</div>
+              <h2 className="mt-2 text-xl font-semibold text-white">{opportunity.title}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-slate-800 px-3 py-2 text-slate-300 hover:bg-slate-900"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          <section className="grid grid-cols-2 gap-3">
+            <DetailTile label="Buyer / Office" value={agency} />
+            <DetailTile label="Parent Agency" value={parentAgency || '-'} />
+            <DetailTile label="Due" value={deadline} />
+            <DetailTile label="Solicitation" value={opportunity.solicitationNumber || '-'} />
+            <DetailTile label="Notice Type" value={opportunity.noticeType || '-'} />
+            <DetailTile label="NAICS" value={opportunity.naicsCode || '-'} />
+            <DetailTile label="Place" value={locationDetail || '-'} />
+          </section>
+
+          {(opportunity.feedbackReasons || []).length > 0 && (
+            <section className="rounded-lg border border-purple-500/20 bg-purple-500/10 p-4">
+              <h3 className="text-sm font-semibold text-purple-100">Why Mindy ranked this</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(opportunity.feedbackReasons || []).map((reason) => (
+                  <span key={reason} className="rounded bg-purple-500/15 px-2 py-1 text-xs text-purple-100">
+                    {reason}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {summary && (
+            <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+              <h3 className="text-sm font-semibold text-white">Summary</h3>
+              <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{summary}</p>
+            </section>
+          )}
+
+          {sourceLinks.length > 0 && (
+            <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+              <h3 className="text-sm font-semibold text-white">Links</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {sourceLinks.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-100 hover:border-emerald-400 hover:bg-emerald-500/20"
+                  >
+                    {link.label} →
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {opportunity.setAsideDescription && (
+            <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+              <h3 className="text-sm font-semibold text-white">Set-aside</h3>
+              <p className="mt-2 text-sm text-slate-300">{opportunity.setAsideDescription}</p>
+              {opportunity.setAsideEligible === false && opportunity.setAsideMismatchReason && (
+                <p className="mt-3 rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                  Mindy down-ranked this because it {opportunity.setAsideMismatchReason}.
+                </p>
+              )}
+            </section>
+          )}
+
+          <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+            <h3 className="text-sm font-semibold text-white">Tune Mindy</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                ['want_more_like_this', 'More like this'],
+                ['good_match', 'Good match'],
+                ['bad_match', 'Bad match'],
+                ['not_my_industry', 'Not my industry'],
+                ['too_big_small', 'Too big/small'],
+                ['already_knew', 'Already knew'],
+              ].map(([type, label]) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => onFeedback(opportunity, type as FeedbackType)}
+                  disabled={savingFeedback}
+                  className={`rounded-full border px-3 py-1.5 text-xs ${
+                    selectedFeedback === type
+                      ? 'border-emerald-400 bg-emerald-500/20 text-emerald-100'
+                      : 'border-slate-700 text-slate-300 hover:border-emerald-500/60'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="border-t border-slate-800 p-5">
+          {opportunity.url && (
+            <a
+              href={opportunity.url}
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-500"
+            >
+              Open on SAM.gov
+            </a>
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function DetailTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+      <div className="text-xs uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="mt-1 text-sm font-medium text-slate-100">{value}</div>
     </div>
   );
 }
@@ -1259,6 +1822,7 @@ function InsightCard({
 interface ReportViewerProps {
   reportId: string;
   reportData: ReportData[keyof ReportData] | null;
+  recommendedOpportunities: RecommendedOpportunity[];
   onClose: () => void;
   formatCurrency: (value?: number) => string;
   onSaveBuyer: (buyer: {
@@ -1290,9 +1854,75 @@ interface ReportViewerProps {
   tier: MIBetaTier;
 }
 
+function getOpportunityPlace(opportunity: RecommendedOpportunity): string | null {
+  const cityState = [opportunity.popCity, opportunity.popState].filter(Boolean).join(', ');
+  return cityState || opportunity.popState || opportunity.popCountry || null;
+}
+
+function getOpportunityDueDate(opportunity: RecommendedOpportunity): string | null {
+  if (!opportunity.responseDeadline) return null;
+  const date = new Date(opportunity.responseDeadline);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function LiveOpportunityFallback({
+  title,
+  emptyCopy,
+  opportunities,
+}: {
+  title: string;
+  emptyCopy: string;
+  opportunities: RecommendedOpportunity[];
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+        <div className="text-sm font-semibold text-amber-200">{title}</div>
+        <div className="mt-1 text-sm text-amber-100/80">{emptyCopy}</div>
+      </div>
+      {opportunities.slice(0, 6).map((opportunity) => {
+        const dueDate = getOpportunityDueDate(opportunity);
+        const place = getOpportunityPlace(opportunity);
+        const samUrl = isHttpUrl(opportunity.url) ? opportunity.url : null;
+        return (
+          <div key={opportunity.id} className="rounded-lg bg-slate-800/50 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-white">{opportunity.title}</div>
+                <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+                  {opportunity.buyerDisplay || opportunity.office || opportunity.subTier || opportunity.department || 'Agency not provided'}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
+                  {opportunity.naicsCode && <span className="rounded bg-slate-700/70 px-2 py-1">NAICS {opportunity.naicsCode}</span>}
+                  {opportunity.noticeType && <span className="rounded bg-slate-700/70 px-2 py-1">{opportunity.noticeType}</span>}
+                  {opportunity.setAsideDescription && <span className="rounded bg-slate-700/70 px-2 py-1">{opportunity.setAsideDescription}</span>}
+                  {place && <span className="rounded bg-slate-700/70 px-2 py-1">{place}</span>}
+                  {dueDate && <span className="rounded bg-slate-700/70 px-2 py-1">Due {dueDate}</span>}
+                </div>
+              </div>
+              {samUrl && (
+                <a
+                  href={samUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                >
+                  SAM.gov
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ReportViewer({
   reportId,
   reportData,
+  recommendedOpportunities,
   onClose,
   formatCurrency,
   onSaveBuyer,
@@ -1317,6 +1947,11 @@ function ReportViewer({
   }
 
   const report = REPORTS.find(r => r.id === reportId);
+  const liveOpportunities = recommendedOpportunities.slice(0, 10);
+  const hasLiveOpportunities = liveOpportunities.length > 0;
+  const liveAgencyNames = uniqueStrings(
+    liveOpportunities.map((opportunity) => opportunity.buyerDisplay || opportunity.office || opportunity.subTier || opportunity.department)
+  );
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -1380,6 +2015,13 @@ function ReportViewer({
               </div>
             );
           })}
+          {((reportData as ReportData['governmentBuyers'])?.agencies?.length || 0) === 0 && hasLiveOpportunities && (
+            <LiveOpportunityFallback
+              title={`${liveAgencyNames.length} live buyer signals found from your recommendations`}
+              emptyCopy="The buyer report did not return agency rows, so Mindy is showing buyer offices from current matching opportunities."
+              opportunities={liveOpportunities}
+            />
+          )}
         </div>
       )}
 
@@ -1423,6 +2065,13 @@ function ReportViewer({
               </div>
             );
           })}
+          {((reportData as ReportData['governmentBuyers'])?.agencies?.filter(a => a.osbp).length || 0) === 0 && hasLiveOpportunities && (
+            <LiveOpportunityFallback
+              title="No OSBP contact rows came back for this market yet"
+              emptyCopy="Use these live buyer offices first, then open SAM.gov for the contracting office contact details."
+              opportunities={liveOpportunities}
+            />
+          )}
         </div>
       )}
 
@@ -1452,6 +2101,13 @@ function ReportViewer({
               <div className="text-sm text-slate-400 mt-1">{pp.painPoint}</div>
             </div>
           ))}
+          {((reportData as ReportData['agencyPainPoints'])?.painPoints?.length || 0) === 0 && hasLiveOpportunities && (
+            <LiveOpportunityFallback
+              title="Live demand signals from your recommended opportunities"
+              emptyCopy="The static pain-point library did not return matches for this profile, so Mindy is using current notices as the signal source."
+              opportunities={liveOpportunities}
+            />
+          )}
         </div>
       )}
 
@@ -1493,6 +2149,13 @@ function ReportViewer({
               </div>
             );
           })}
+          {((reportData as ReportData['primeContractor'])?.suggestedPrimes?.length || 0) === 0 && hasLiveOpportunities && (
+            <LiveOpportunityFallback
+              title="No prime-contractor matches came back yet"
+              emptyCopy="Mindy is showing current competitive opportunities instead. Open the notices and check interested vendors or incumbent clues."
+              opportunities={liveOpportunities}
+            />
+          )}
         </div>
       )}
 
@@ -1539,6 +2202,13 @@ function ReportViewer({
               </div>
             );
           })}
+          {((reportData as ReportData['forecastList'])?.forecasts?.length || 0) === 0 && hasLiveOpportunities && (
+            <LiveOpportunityFallback
+              title="Upcoming demand from live notices"
+              emptyCopy="The agency forecast feed did not return future forecast rows, so Mindy is showing open opportunities ordered from your recommendation feed."
+              opportunities={liveOpportunities}
+            />
+          )}
         </div>
       )}
 
@@ -1565,6 +2235,13 @@ function ReportViewer({
               </div>
             </div>
           ))}
+          {((reportData as ReportData['idvContracts'])?.contracts?.length || 0) === 0 && hasLiveOpportunities && (
+            <LiveOpportunityFallback
+              title="No matching IDV vehicles found yet"
+              emptyCopy="Mindy is showing active opportunity vehicles and notice types from your market while the IDV dataset has no match."
+              opportunities={liveOpportunities}
+            />
+          )}
         </div>
       )}
 
@@ -1691,6 +2368,13 @@ function ReportViewer({
               )}
             </div>
           ))}
+          {((reportData as ReportData['agencyNeeds'])?.needs?.length || 0) === 0 && hasLiveOpportunities && (
+            <LiveOpportunityFallback
+              title="Agency needs inferred from live notices"
+              emptyCopy="The needs library did not return structured matches, so Mindy is showing current demand signals from your recommendations."
+              opportunities={liveOpportunities}
+            />
+          )}
         </div>
       )}
     </div>

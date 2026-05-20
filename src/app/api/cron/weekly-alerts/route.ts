@@ -6,6 +6,7 @@ import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
+import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -584,12 +585,11 @@ async function sendAlertEmail(
     return trackingToken ? generateTrackedLink(trackingToken, urlWithUtm, label) : urlWithUtm;
   };
 
-  const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://shop.govcongiants.com'}/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
+  const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
-  const briefingsUpgradeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com'}/market-intelligence`;
-  const ohProUpgradeUrl = 'https://buy.stripe.com/7sIaGqevYeIcdri147'; // OH Pro payment link
+  const mindyDashboardUrl = MINDY_APP_URL;
 
-  const showUpgradeToOHPro = tier === 'free' && totalAvailable > 5;
+  const showUpgradeToMindyPro = tier === 'free' && totalAvailable > 5;
 
   const opportunitiesHtml = opportunities.map((opp, i) => {
     const daysUntil = getDaysUntil(opp.responseDeadline);
@@ -628,9 +628,15 @@ async function sendAlertEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 20px; background: #f3f4f6;">
-  <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Market Intelligence</h1>
+  <div style="background: linear-gradient(135deg, #020617 0%, #4c1d95 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    ${renderMindyEmailLogo(52)}
+    <h1 style="color: white; margin: 0; font-size: 24px;">Mindy</h1>
     <p style="color: #c4b5fd; margin: 8px 0 0 0; font-size: 16px;">Weekly SAM.gov Opportunity Alert</p>
+    <p style="margin: 16px 0 0 0;">
+      <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'header_dashboard')}" style="background: rgba(255,255,255,0.14); color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; display: inline-block; font-size: 13px;">
+        Open Mindy Dashboard →
+      </a>
+    </p>
   </div>
 
   <div style="background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none;">
@@ -649,29 +655,29 @@ async function sendAlertEmail(
       ${opportunitiesHtml}
     </table>
 
-    ${showUpgradeToOHPro ? `
-    <!-- OH Pro Upgrade CTA (for free tier with more opps available) -->
+    ${showUpgradeToMindyPro ? `
+    <!-- Mindy Pro Upgrade CTA (for free tier with more opps available) -->
     <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
       <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">You're Missing ${totalAvailable - 5} More Opportunities!</h3>
       <p style="color: #d1fae5; margin: 0 0 16px 0; font-size: 14px;">
         Free tier shows 5 opps/week. We found <strong>${totalAvailable}</strong> matches for your profile.<br>
-        Upgrade to Pro for <strong>15 opps/week</strong> + priority ranking.
+        Mindy Pro gives you <strong>15 opps/week</strong>, priority ranking, and richer recommendations.
       </p>
-      <a href="${trackedUrl(ohProUpgradeUrl, 'upgrade_opportunity_hunter_pro')}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        Upgrade to OH Pro - $99 one-time
+      <a href="${trackedUrl(mindyDashboardUrl, 'upgrade_mindy_pro')}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+        Upgrade to Mindy Pro
       </a>
     </div>
     ` : ''}
 
-    <!-- Briefings Upsell CTA -->
+    <!-- Dashboard CTA -->
     <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
       <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">Want AI-Ranked Daily Intel?</h3>
       <p style="color: #e9d5ff; margin: 0 0 16px 0; font-size: 14px;">
-        Daily Briefings gives you AI-ranked opportunities with win probability,<br>
-        competitor intel, and specific action steps. Every morning.
+        Mindy ranks your best opportunities, explains why they matter,<br>
+        and keeps your dashboard, pipeline, and preferences in one place.
       </p>
-      <a href="${trackedUrl(briefingsUpgradeUrl, 'upgrade_market_intelligence')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        Upgrade to Market Intelligence - $149/mo
+      <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+        Open Mindy Dashboard →
       </a>
     </div>
 
@@ -681,10 +687,10 @@ async function sendAlertEmail(
         Was this weekly digest helpful?
       </p>
       <div>
-        <a href="${trackedUrl(`https://mi.govcongiants.com/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=weekly_digest`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+        <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=helpful&source=weekly_digest`, 'feedback_helpful')}" style="background: #22c55e; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
           👍 Yes
         </a>
-        <a href="${trackedUrl(`https://mi.govcongiants.com/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=weekly_digest`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
+        <a href="${trackedUrl(`${MINDY_SITE_URL}/api/feedback?email=${encodeURIComponent(email)}&type=not_helpful&source=weekly_digest`, 'feedback_not_helpful')}" style="background: #ef4444; color: white; padding: 8px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px; display: inline-block; margin: 0 6px;">
           👎 No
         </a>
       </div>
@@ -694,10 +700,11 @@ async function sendAlertEmail(
   <div style="background: #f8fafc; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; text-align: center;">
     <p style="color: #6b7280; font-size: 12px; margin: 0;">
       <a href="${trackedUrl(preferencesUrl, 'manage_preferences')}" style="color: #6b7280;">Manage Preferences</a> &nbsp;|&nbsp;
+      <a href="${trackedUrl(mindyDashboardUrl, 'view_dashboard')}" style="color: #6b7280;">Mindy Dashboard</a> &nbsp;|&nbsp;
       <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
-      &copy; ${new Date().getFullYear()} GovCon Giants | shop.govcongiants.com
+      &copy; ${new Date().getFullYear()} Mindy | getmindy.ai
     </p>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}
@@ -706,9 +713,9 @@ async function sendAlertEmail(
 `;
 
   await sendEmail({
-    from: `"GovCon Giants" <${process.env.EMAIL_FROM || 'alerts@govcongiants.com'}>`,
+    from: `"${MINDY_FROM_NAME}" <${process.env.EMAIL_FROM || 'alerts@govcongiants.com'}>`,
     to: email,
-    subject: `MI Weekly Alert: ${opportunities.length} New SAM.gov Matches - Week of ${formatDate(new Date().toISOString())}`,
+    subject: `Mindy Weekly Alert: ${opportunities.length} New SAM.gov Matches - Week of ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     text: `${opportunities.length} new opportunities matched your profile this week. Manage preferences: ${preferencesUrl}`,
     emailType: 'weekly_alert',

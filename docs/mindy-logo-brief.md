@@ -10,6 +10,25 @@ Mindy is an AI-powered market intelligence assistant for federal contractors. Sh
 
 ---
 
+## Final Direction Selected
+
+The selected identity combines the chat-bubble assistant idea with a bold abstract `M` lettermark:
+- Blue `M` outer shape.
+- White chat-bubble interior.
+- Three purple dots as the "thinking / briefing / conversation" signal.
+- Horizontal `Mindy Ai` lockup for brand moments.
+
+Use the icon-only mark anywhere space is tight, including the app sidebar, favicon, email avatar, OAuth/auth surfaces, and compact mobile UI. Use the horizontal lockup in email headers, onboarding, landing pages, command center, and sales materials.
+
+Implementation priority:
+1. Replace app placeholder `M` tile and legacy triangle avatar.
+2. Replace alert/briefing email header and sender imagery.
+3. Replace onboarding and auth page branding.
+4. Replace command-center branding.
+5. Export final favicon, social avatar, transparent PNG, and SVG assets.
+
+---
+
 ## Brand Personality
 
 | Trait | Not This | This |
@@ -130,13 +149,13 @@ Mindy is an AI-powered market intelligence assistant for federal contractors. Sh
 
 ---
 
-## Optional: "Powered by" Lockup
+## Legacy / Partner Lockup
 
-For when Mindy appears alongside GovCon Giants:
+Mindy should stand on its own in primary product, email, onboarding, and command-center surfaces. A partner or company attribution lockup is optional only where legal, support, or partnership context requires it.
 
 ```
 [Mindy logo]
-by GovCon Giants
+by [partner/company name]
 ```
 
 ---

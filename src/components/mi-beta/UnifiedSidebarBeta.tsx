@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 
 // Panel types for the unified MI platform
@@ -243,18 +244,14 @@ export default function UnifiedSidebarBeta({
         <div className="flex items-center justify-between">
           {!isCollapsed && (
             <Link href="/app" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">M</span>
-              </div>
+              <MindyLogo size={32} />
               <div>
                 <span className="font-semibold text-white text-sm">Mindy</span>
               </div>
             </Link>
           )}
           {isCollapsed && (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mx-auto">
-              <span className="text-white font-bold text-sm">M</span>
-            </div>
+            <MindyLogo size={32} className="mx-auto" />
           )}
           {onToggleCollapse && (
             <button

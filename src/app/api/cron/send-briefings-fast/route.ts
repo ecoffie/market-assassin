@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache, fetchSamOpportunityNoticeSummaryFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { buildSamGreenBriefing, generateSamGreenEmailHtml } from '@/lib/briefings/delivery/sam-green-email-template';
+import { getMindyFeedbackSignals } from '@/lib/mindy/feedback-scoring';
 import {
   recordBriefingProgramDelivery,
   resolveBriefingAudience,
@@ -193,12 +194,15 @@ export async function GET(request: NextRequest) {
 
         // Build GREEN briefing from SAM opportunities (NO AI - fast path)
         // Uses buildSamGreenBriefing (instant) instead of generateDailyBriefFromSam (4s/user)
+        const feedbackSignals = await getMindyFeedbackSignals(user.email);
+
         const greenBriefing = buildSamGreenBriefing(samResult.opportunities, {
           naicsCodes: userNaics,
           agencies: user.agencies || [],
           keywords: userKeywords,
           businessType: user.business_type,
           businessDescription: user.business_description,
+          feedbackSignals,
         }, noticeSummary);
 
         // Log briefing attempt

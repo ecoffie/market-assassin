@@ -299,7 +299,7 @@ async function sendWelcomeOnlyEmail(email: string, user: AlertUser) {
 `;
 
   await transporter.sendMail({
-    from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
     subject: `🎯 Welcome to Market Assassin Alerts - Set Up Your Preferences`,
     html: htmlContent,
@@ -406,7 +406,7 @@ async function sendCatchUpEmail(
 `;
 
   await transporter.sendMail({
-    from: `"GovCon Giants" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
     subject: `🎯 Welcome! ${opportunities.length} Opportunities Match Your Profile`,
     html: htmlContent,

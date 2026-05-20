@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         });
 
         await transporter.sendMail({
-          from: `"GovCon Giants AI" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
           to: email,
           subject: emailTemplate.subject,
           html: emailTemplate.htmlBody,

@@ -3,10 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return url && key ? createClient(url, key, { auth: { persistSession: false } }) : null;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -15,6 +16,14 @@ export async function GET(request: NextRequest) {
 
   if (password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return NextResponse.json(
+      { success: false, error: 'Supabase is not configured' },
+      { status: 500 }
+    );
   }
 
   // List of all tables that need RLS enabled
@@ -59,16 +68,6 @@ export async function GET(request: NextRequest) {
     // Multisite aggregation
     'aggregated_opportunities', 'multisite_sources', 'scrape_log',
   ];
-
-  // Check which tables exist and their RLS status
-  const { data: tableStatus, error: statusError } = await supabase
-    .from('pg_tables')
-    .select('tablename')
-    .eq('schemaname', 'public');
-
-  // Get RLS status using raw SQL via a simple check
-  // Note: We can't directly query pg_tables via REST API
-  // Instead, we'll try to enable RLS and see what happens
 
   const results: { table: string; status: string; error?: string }[] = [];
 

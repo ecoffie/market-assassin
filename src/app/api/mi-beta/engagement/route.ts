@@ -6,12 +6,14 @@ export const dynamic = 'force-dynamic';
 
 const ALLOWED_EVENT_TYPES = new Set<string>([
   EventTypes.PAGE_VIEW,
+  EventTypes.LINK_CLICK,
   EventTypes.TOOL_USE,
   EventTypes.LOGIN,
   EventTypes.PROFILE_UPDATE,
   EventTypes.ONBOARDING_STEP,
   EventTypes.REPORT_GENERATE,
   EventTypes.EXPORT,
+  EventTypes.FEEDBACK,
 ]);
 
 function getClientIp(request: NextRequest): string | undefined {
