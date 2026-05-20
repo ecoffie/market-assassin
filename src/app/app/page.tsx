@@ -183,23 +183,39 @@ function AppDashboard() {
 
   const bootstrapFromSupabaseSession = useCallback(async () => {
     const supabase = getSupabase();
-    if (!supabase) return false;
+    if (!supabase) {
+      console.warn('[Mindy bootstrap] Supabase client not configured');
+      return false;
+    }
 
     const { data: { session } } = await supabase.auth.getSession();
     const sessionEmail = session?.user?.email?.toLowerCase().trim();
-    if (!session?.access_token || !sessionEmail) return false;
+    if (!session?.access_token || !sessionEmail) {
+      console.info('[Mindy bootstrap] No Supabase session in storage');
+      return false;
+    }
 
-    const res = await fetch('/api/auth/mindy-session', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
+    let res: Response;
+    try {
+      res = await fetch('/api/auth/mindy-session', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+    } catch (err) {
+      console.error('[Mindy bootstrap] /api/auth/mindy-session fetch failed:', err);
+      return false;
+    }
     const data = await res.json().catch(() => null);
-    if (!res.ok || !data?.success || !data.sessionToken) return false;
+    if (!res.ok || !data?.success || !data.sessionToken) {
+      console.error('[Mindy bootstrap] mindy-session returned non-success:', res.status, data);
+      return false;
+    }
 
     localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
     localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt || new Date().toISOString());
+    localStorage.setItem('mi_beta_email', sessionEmail);
     await loadUserProfile(sessionEmail);
     return true;
   }, [loadUserProfile]);
