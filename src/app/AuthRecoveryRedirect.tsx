@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-const MINDY_ORIGIN = 'https://getmindy.ai';
+const MINDY_ORIGIN = 'https://mi.govcongiants.com';
 
 function getRecoveryDestination(hash: string): string | null {
   if (!hash.startsWith('#')) return null;

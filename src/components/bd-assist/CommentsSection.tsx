@@ -24,7 +24,7 @@ export default function CommentsSection({ pipelineId, email }: CommentsSectionPr
   const loadComments = useCallback(async () => {
     try {
       const res = await fetch(
-        `/api/mi-beta/comments?pipeline_id=${pipelineId}&email=${encodeURIComponent(email)}`
+        `/api/app/comments?pipeline_id=${pipelineId}&email=${encodeURIComponent(email)}`
       );
       const data = await res.json();
       if (data.success) {
@@ -50,7 +50,7 @@ export default function CommentsSection({ pipelineId, email }: CommentsSectionPr
     setError(null);
 
     try {
-      const res = await fetch('/api/mi-beta/comments', {
+      const res = await fetch('/api/app/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -78,7 +78,7 @@ export default function CommentsSection({ pipelineId, email }: CommentsSectionPr
     if (!confirm('Delete this comment?')) return;
 
     try {
-      const res = await fetch('/api/mi-beta/comments', {
+      const res = await fetch('/api/app/comments', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, comment_id: commentId }),

@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import {
   ensureWorkspaceMember,
-  getMIBetaSupabase,
+  getAppSupabase,
   normalizeEmail,
-  recordMIBetaActivity,
-} from '@/lib/mi-beta/workspace';
+  recordAppActivity,
+} from '@/lib/app/workspace';
 import { EventTypes, logEngagement } from '@/lib/engagement';
 
 const FEEDBACK_LABELS: Record<string, string> = {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       recorded_at: new Date().toISOString(),
     };
 
-    const { data, error } = await getMIBetaSupabase()
+    const { data, error } = await getAppSupabase()
       .from('user_feedback')
       .insert({
         user_email: email,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    await recordMIBetaActivity({
+    await recordAppActivity({
       workspaceId,
       userEmail: email,
       actorEmail: email,
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     const authSession = requireMIAuthSession(request, email);
     if (!authSession.ok) return authSession.response;
 
-    const { data, error } = await getMIBetaSupabase()
+    const { data, error } = await getAppSupabase()
       .from('user_feedback')
       .select('opportunity_id,feedback_type,is_positive,created_at')
       .eq('user_email', email)

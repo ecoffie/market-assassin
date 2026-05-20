@@ -1,1 +1,1 @@
-export { default } from '../mi-beta/forgot-password/page';
+export { default } from '../app/forgot-password/page';

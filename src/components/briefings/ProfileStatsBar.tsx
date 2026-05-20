@@ -8,7 +8,7 @@ interface ProfileStatsBarProps {
   onTabChange?: (tab: string) => void;
   refreshKey?: number;
   // When provided, headline + weekly stat call this instead of routing to
-  // /briefings/dashboard. Used in mi-beta to switch panels in-app instead
+  // /briefings/dashboard. Used in app to switch panels in-app instead
   // of navigating off the /app surface.
   onOpenOpportunities?: () => void;
 }

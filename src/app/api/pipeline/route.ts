@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { ensureWorkspaceMember, recordMIBetaActivity } from '@/lib/mi-beta/workspace';
+import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    await recordMIBetaActivity({
+    await recordAppActivity({
       workspaceId,
       userEmail: body.user_email,
       actorEmail: body.user_email,
@@ -263,7 +263,7 @@ export async function PATCH(request: NextRequest) {
       console.log(`Pipeline stage change: ${oldStage} → ${newStage} for ${id}`);
     }
 
-    await recordMIBetaActivity({
+    await recordAppActivity({
       workspaceId,
       userEmail: user_email,
       actorEmail: user_email,
@@ -329,7 +329,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) throw error;
 
-    await recordMIBetaActivity({
+    await recordAppActivity({
       workspaceId,
       userEmail: user_email,
       actorEmail: user_email,

@@ -10,7 +10,7 @@ function normalizeEmail(email: unknown): string {
 }
 
 function getSupabaseAuthRedirectUrl(path: string): string {
-  const authRedirectOrigin = process.env.MINDY_AUTH_REDIRECT_ORIGIN || process.env.SUPABASE_AUTH_REDIRECT_ORIGIN || 'https://getmindy.ai';
+  const authRedirectOrigin = process.env.MINDY_AUTH_REDIRECT_ORIGIN || process.env.SUPABASE_AUTH_REDIRECT_ORIGIN || 'https://mi.govcongiants.com';
   return `${authRedirectOrigin.replace(/\/$/, '')}${path}`;
 }
 
@@ -98,7 +98,7 @@ function buildResetEmailHtml(resetUrl: string): string {
                     </table>
 
                     <p style="font-size:14px; line-height:1.6; margin:24px 0 16px; color:#64748b;">
-                      After resetting, return to <strong style="color:#334155;">getmindy.ai/app</strong> and sign in with your email and new password.
+                      After resetting, return to <strong style="color:#334155;">mi.govcongiants.com/app</strong> and sign in with your email and new password.
                     </p>
 
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%; border-top:1px solid #e2e8f0; margin-top:24px;">

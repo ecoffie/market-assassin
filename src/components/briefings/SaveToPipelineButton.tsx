@@ -32,7 +32,7 @@ export function SaveToPipelineButton({
   const trackNextAction = (nextAction: string) => {
     if (!email || !email.includes('@')) return;
 
-    fetch('/api/mi-beta/engagement', {
+    fetch('/api/app/engagement', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -1,1 +1,1 @@
-export { GET } from '../../mi-beta/auth/callback/route';
+export { GET } from '../../app/auth/callback/route';

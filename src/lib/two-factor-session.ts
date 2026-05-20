@@ -18,7 +18,7 @@ function getSecret() {
   return process.env.TWO_FACTOR_SECRET
     || process.env.ADMIN_PASSWORD
     || process.env.SUPABASE_SERVICE_ROLE_KEY
-    || 'mi-beta-2fa';
+    || 'app-2fa';
 }
 
 function toBase64Url(value: string) {

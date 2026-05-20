@@ -662,11 +662,11 @@ function BriefingsDashboardContent() {
 
     if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
       const blob = new Blob([payload], { type: 'application/json' });
-      navigator.sendBeacon('/api/mi-beta/engagement', blob);
+      navigator.sendBeacon('/api/app/engagement', blob);
       return;
     }
 
-    fetch('/api/mi-beta/engagement', {
+    fetch('/api/app/engagement', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: payload,

@@ -1,1 +1,1 @@
-export { POST } from '../../mi-beta/engagement/route';
+export { POST } from '../../app/engagement/route';

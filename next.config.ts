@@ -34,11 +34,6 @@ const nextConfig: NextConfig = {
           ],
           destination: '/mindy-landing',
         },
-        {
-          source: '/app/:path*',
-          has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/mi-beta/:path*',
-        },
       {
         source: '/signin',
         has: [{ type: 'host', value: 'getmindy.ai' }],
@@ -47,37 +42,37 @@ const nextConfig: NextConfig = {
         {
           source: '/signup',
           has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/mi-beta/signup',
+          destination: '/app/signup',
         },
         {
           source: '/onboarding',
           has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/mi-beta/onboarding',
+          destination: '/app/onboarding',
         },
         {
           source: '/setup-password',
           has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/mi-beta/setup-password',
+          destination: '/app/setup-password',
         },
         {
           source: '/setup-account',
           has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/mi-beta/setup-account',
+          destination: '/app/setup-account',
         },
         {
           source: '/forgot-password',
           has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/mi-beta/forgot-password',
+          destination: '/app/forgot-password',
         },
         {
           source: '/reset-password',
           has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/mi-beta/reset-password',
+          destination: '/app/reset-password',
         },
         {
           source: '/auth/callback',
           has: [{ type: 'host', value: 'getmindy.ai' }],
-          destination: '/mi-beta/auth/callback',
+          destination: '/app/auth/callback',
         },
       ],
       afterFiles: [],
@@ -98,24 +93,6 @@ const nextConfig: NextConfig = {
         destination: 'https://getmindy.ai/:path*',
         permanent: true,
       },
-      {
-        source: '/mi-beta',
-        has: [{ type: 'host', value: 'getmindy.ai' }],
-        destination: 'https://getmindy.ai/app',
-        permanent: false,
-      },
-      {
-        source: '/mi-beta/:path*',
-        has: [{ type: 'host', value: 'getmindy.ai' }],
-        destination: 'https://getmindy.ai/app/:path*',
-        permanent: false,
-      },
-      // NOTE: While Mindy is in beta, ALL user-facing traffic stays on
-      // mi.govcongiants.com. Previously these redirects pushed
-      // mi.govcongiants.com/mi-beta/* and /admin/* to getmindy.ai, which
-      // forced email recipients onto a login wall. Disabled until
-      // getmindy.ai is out of beta. The reverse direction (getmindy.ai →
-      // local /mi-beta) is still wired in the rewrites() block above.
       {
         source: '/:path*',
         has: [

@@ -1,1 +1,1 @@
-export { default } from '../mi-beta/onboarding/page';
+export { default } from '../app/onboarding/page';

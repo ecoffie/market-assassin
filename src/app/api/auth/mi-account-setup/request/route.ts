@@ -11,7 +11,7 @@ function normalizeEmail(email: unknown): string {
 }
 
 function getSupabaseAuthRedirectUrl(path: string): string {
-  const authRedirectOrigin = process.env.MINDY_AUTH_REDIRECT_ORIGIN || process.env.SUPABASE_AUTH_REDIRECT_ORIGIN || 'https://getmindy.ai';
+  const authRedirectOrigin = process.env.MINDY_AUTH_REDIRECT_ORIGIN || process.env.SUPABASE_AUTH_REDIRECT_ORIGIN || 'https://mi.govcongiants.com';
   return `${authRedirectOrigin.replace(/\/$/, '')}${path}`;
 }
 
@@ -98,7 +98,7 @@ function buildSetupEmailHtml(setupUrl: string): string {
             </div>
 
             <p style="font-size:14px; line-height:1.6; margin:0 0 16px; color:#64748b;">
-              Two-factor verification is optional after setup. Your workspace lives at <strong style="color:#334155;">getmindy.ai/app</strong>.
+              Two-factor verification is optional after setup. Your workspace lives at <strong style="color:#334155;">mi.govcongiants.com/app</strong>.
             </p>
 
             <div style="border-top:1px solid #e2e8f0; padding-top:20px; margin-top:24px;">

@@ -1,1 +1,1 @@
-export { GET, POST } from '../../mi-beta/profile/route';
+export { GET, POST } from '../../app/profile/route';
