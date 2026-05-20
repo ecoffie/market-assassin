@@ -27,10 +27,14 @@ FAIL=0
 WARN=0
 
 # Config
+# Production lives at mi.govcongiants.com. tools.govcongiants.org is a
+# legacy hostname that 308-redirects to mi — testing it without -L makes
+# every endpoint look like it's "failing" when it's healthy after the
+# redirect. Use the live host directly.
 if [ "$1" == "--local" ]; then
   BASE_URL="http://localhost:3000"
 else
-  BASE_URL="https://tools.govcongiants.org"
+  BASE_URL="${PREDEPLOY_BASE_URL:-https://mi.govcongiants.com}"
 fi
 
 ADMIN_PASSWORD="galata-assassin-2026"
@@ -94,12 +98,18 @@ else
   test_result "SAM date format converter" "fail" "Missing date format functions in sam-gov.ts"
 fi
 
-# Check that SAM.gov API calls use proper date format (exclude grants-gov which uses ISO)
-WRONG_DATE=$(grep -rn "postedFrom.*toISOString\|postedTo.*toISOString" "$PROJECT_DIR/src" 2>/dev/null | grep -v ".next" | grep -v "grants-gov" | wc -l | tr -d ' ')
+# Check that SAM.gov API calls use proper date format (exclude grants-gov which uses ISO,
+# and the multisite/NIH pipeline which also uses ISO dates correctly — only SAM requires MM/dd/yyyy).
+# Restrict the search to files inside src/lib/sam/ or src/lib/briefings/pipelines/sam-gov.ts where
+# the SAM.gov API is actually called.
+WRONG_DATE=$(grep -rn "postedFrom.*toISOString\|postedTo.*toISOString" \
+  "$PROJECT_DIR/src/lib/sam" \
+  "$PROJECT_DIR/src/lib/briefings/pipelines/sam-gov.ts" \
+  2>/dev/null | wc -l | tr -d ' ')
 if [ "$WRONG_DATE" == "0" ]; then
   test_result "No ISO dates passed to SAM.gov" "pass"
 else
-  test_result "SAM.gov date format" "fail" "$WRONG_DATE files use wrong date format"
+  test_result "SAM.gov date format" "fail" "$WRONG_DATE SAM.gov call sites use wrong date format"
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -124,9 +134,11 @@ else
   test_result "Daily alerts endpoint" "fail" "HTTP $ALERTS"
 fi
 
-# Alert preferences endpoint
+# Alert preferences endpoint — 401 is a healthy response for an unauthenticated request
+# (endpoint is up, just correctly refusing to leak data). 200 is also fine if the route
+# allows public reads. Anything else (404/500/etc.) means the route is broken.
 PREFS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/alerts/preferences?email=test@test.com" 2>/dev/null)
-if [ "$PREFS" == "200" ]; then
+if [ "$PREFS" == "200" ] || [ "$PREFS" == "401" ]; then
   test_result "Alert preferences endpoint" "pass"
 else
   test_result "Alert preferences endpoint" "fail" "HTTP $PREFS"
