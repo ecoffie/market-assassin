@@ -106,10 +106,10 @@ Mindy Pro is in polish, QA, and migration work. The core value loop is present: 
 
 ## 6. Full Proposal Assist Later
 
-- [ ] Add RFP upload/parsing.
-- [ ] Generate compliance matrix from source docs.
-- [ ] Draft proposal sections.
-- [ ] Add review checklist and export workflow.
+- [x] Add RFP upload/parsing. (PDF, DOCX, TXT — `/api/app/proposal/upload`)
+- [x] Generate compliance matrix from source docs. (Groq llama-3.3-70b — `/api/app/proposal/compliance`)
+- [x] Draft proposal sections. (5 sections, profile-grounded — `/api/app/proposal/draft`)
+- [x] Add review checklist and export workflow. (11-item checklist + .docx package — `/api/app/proposal/export`)
 
 ## 7. Verification Checklist
 

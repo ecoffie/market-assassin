@@ -89,6 +89,26 @@ interface SectionDraft {
   profileGrounded?: boolean;
 }
 
+interface ChecklistItemState {
+  id: string;
+  label: string;
+  checked: boolean;
+}
+
+const DEFAULT_CHECKLIST: ChecklistItemState[] = [
+  { id: 'compliance-coverage', label: 'Every shall / must / required from the solicitation is addressed somewhere in the response.', checked: false },
+  { id: 'evaluation-factors', label: 'Each Section M evaluation factor is explicitly addressed in the proposal.', checked: false },
+  { id: 'page-limits', label: 'Each volume respects the page, font, and margin limits stated in Section L.', checked: false },
+  { id: 'submission-format', label: 'Submission format matches Section L (file types, file names, portal, encryption).', checked: false },
+  { id: 'reps-certs', label: 'Required representations, certifications, and small-business size certifications are filled in.', checked: false },
+  { id: 'past-performance-filled', label: 'Past performance placeholders ([Contract title], [Agency], [Period], [Value]) have real data filled in.', checked: false },
+  { id: 'pricing-filled', label: 'Pricing [TBD]/[INSERT RATE] placeholders are replaced with real numbers and tied to the cost volume.', checked: false },
+  { id: 'placeholders-removed', label: 'No [CONFIRM], [TBD], or [Company name] placeholders remain in the body text.', checked: false },
+  { id: 'signed-dated', label: 'Cover letter and authorized representative pages are signed and dated.', checked: false },
+  { id: 'red-team', label: 'Red team / second-reader review is complete and findings are incorporated.', checked: false },
+  { id: 'submission-time', label: 'Submission is ready at least 24 hours before the deadline (portal upload buffer + amendment check).', checked: false },
+];
+
 export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -165,6 +185,8 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
       pricing: undefined,
     });
     setDraftError(null);
+    setChecklist(DEFAULT_CHECKLIST.map(item => ({ ...item, checked: false })));
+    setExportError(null);
   }, []);
 
   // Compliance matrix
@@ -302,6 +324,80 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
     link.click();
     URL.revokeObjectURL(url);
   }, [drafts, uploadedRfp]);
+
+  // Review checklist (Step 4)
+  const [checklist, setChecklist] = useState<ChecklistItemState[]>(DEFAULT_CHECKLIST);
+  const checklistChecked = useMemo(() => checklist.filter(c => c.checked).length, [checklist]);
+  const toggleChecklistItem = useCallback((id: string) => {
+    setChecklist(prev => prev.map(c => (c.id === id ? { ...c, checked: !c.checked } : c)));
+  }, []);
+
+  // Final package export
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const hasAnyDraft = useMemo(
+    () => SECTION_TABS.some(t => !!drafts[t.id]?.draft),
+    [drafts]
+  );
+
+  const exportProposalPackage = useCallback(async () => {
+    if (!email || !uploadedRfp) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const draftsForExport: Record<string, { label: string; draft: string; wordCount?: number }> = {};
+      for (const tab of SECTION_TABS) {
+        const d = drafts[tab.id];
+        if (d?.draft) {
+          draftsForExport[tab.id] = { label: tab.label, draft: d.draft, wordCount: d.wordCount };
+        }
+      }
+
+      const res = await fetch(`/api/app/proposal/export?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          fileName: (uploadedRfp.fileName.replace(/\.(pdf|docx|txt)$/i, '') || 'proposal') + '-package',
+          rfpFileName: uploadedRfp.fileName,
+          compliance: compliance.map(c => ({
+            id: c.id,
+            requirement: c.requirement,
+            category: CATEGORY_LABELS[c.category]?.label || c.category,
+            section: c.section,
+            owner: c.owner,
+            status: STATUS_LABELS[c.status],
+            source_quote: c.source_quote,
+          })),
+          drafts: draftsForExport,
+          checklist: checklist.map(c => ({ label: c.label, checked: c.checked })),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setExportError(data?.error || 'Export failed. Try again.');
+        return;
+      }
+
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') || '';
+      const match = /filename="([^"]+)"/.exec(cd);
+      const fallback = `${uploadedRfp.fileName.replace(/\.(pdf|docx|txt)$/i, '') || 'proposal'}-package-${new Date().toISOString().split('T')[0]}.docx`;
+      const fileName = match?.[1] || fallback;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Proposal export failed:', err);
+      setExportError('Request failed. Try again.');
+    } finally {
+      setExporting(false);
+    }
+  }, [email, uploadedRfp, compliance, drafts, checklist, getAuthHeaders]);
 
   const exportComplianceCsv = useCallback(() => {
     if (compliance.length === 0) return;
@@ -784,8 +880,93 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
           })()}
 
           <p className="text-xs text-slate-500 mt-3">
-            Edits live in this session only. Persistence + DOCX/PDF export coming next.
+            Edits live in this session only. Use Step 4 below to bundle the package as a Word doc.
           </p>
+        </section>
+      )}
+
+      {/* Step 4 · Review Checklist + Export */}
+      {uploadedRfp && (
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 4 · Review &amp; Export</p>
+              <h2 className="text-lg font-semibold text-white">Final compliance review + Word export</h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Walk the checklist before you ship. Then export a single .docx containing the compliance matrix, drafted sections, and the checklist appendix.
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-white">{checklistChecked}<span className="text-slate-500 text-base font-normal">/{checklist.length}</span></div>
+              <div className="text-xs text-slate-500">items confirmed</div>
+            </div>
+          </div>
+
+          <ul className="space-y-2 mb-4">
+            {checklist.map(item => (
+              <li key={item.id}>
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    onChange={() => toggleChecklistItem(item.id)}
+                    className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-900 accent-purple-500 cursor-pointer"
+                  />
+                  <span className={`text-sm leading-relaxed ${item.checked ? 'text-slate-500 line-through' : 'text-slate-200 group-hover:text-white'}`}>
+                    {item.label}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+
+          <div className="border-t border-slate-800 pt-4 mt-4">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <div className="text-sm text-slate-400">
+                <p className="text-slate-300 font-medium mb-1">Package will include:</p>
+                <ul className="space-y-0.5 text-xs">
+                  <li>• Title page + table of contents</li>
+                  <li className={compliance.length > 0 ? 'text-emerald-400' : 'text-slate-600'}>
+                    {compliance.length > 0 ? '✓' : '○'} Compliance Matrix ({compliance.length} requirements)
+                  </li>
+                  {SECTION_TABS.map(tab => {
+                    const has = !!drafts[tab.id]?.draft;
+                    return (
+                      <li key={tab.id} className={has ? 'text-emerald-400' : 'text-slate-600'}>
+                        {has ? '✓' : '○'} {tab.label}{has && drafts[tab.id]?.wordCount ? ` (${drafts[tab.id]!.wordCount} words)` : ''}
+                      </li>
+                    );
+                  })}
+                  <li className="text-emerald-400">
+                    ✓ Review Checklist ({checklistChecked}/{checklist.length} complete)
+                  </li>
+                </ul>
+              </div>
+              <button
+                type="button"
+                onClick={exportProposalPackage}
+                disabled={exporting || (!hasAnyDraft && compliance.length === 0)}
+                className="px-5 py-2.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium flex items-center gap-2 transition-colors"
+              >
+                {exporting && (
+                  <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {exporting ? 'Assembling…' : 'Export Word (.docx)'}
+              </button>
+            </div>
+
+            {exportError && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 mb-2">
+                {exportError}
+              </div>
+            )}
+
+            {!hasAnyDraft && compliance.length === 0 && !exporting && (
+              <p className="text-xs text-slate-500">
+                Generate at least the compliance matrix or one section before exporting.
+              </p>
+            )}
+          </div>
         </section>
       )}
 
