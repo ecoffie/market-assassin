@@ -71,6 +71,24 @@ const STATUS_LABELS: Record<ComplianceStatus, string> = {
   n_a: 'N/A',
 };
 
+type SectionType = 'exec_summary' | 'technical' | 'management' | 'past_performance' | 'pricing';
+
+const SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: number }> = [
+  { id: 'exec_summary', label: 'Exec Summary', targetWords: 350 },
+  { id: 'technical', label: 'Technical', targetWords: 600 },
+  { id: 'management', label: 'Management', targetWords: 450 },
+  { id: 'past_performance', label: 'Past Performance', targetWords: 400 },
+  { id: 'pricing', label: 'Pricing', targetWords: 300 },
+];
+
+interface SectionDraft {
+  draft: string;
+  wordCount: number;
+  targetWords: number;
+  generatedAt: number;
+  profileGrounded?: boolean;
+}
+
 export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -139,6 +157,14 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
     setUploadError(null);
     setCompliance([]);
     setComplianceError(null);
+    setDrafts({
+      exec_summary: undefined,
+      technical: undefined,
+      management: undefined,
+      past_performance: undefined,
+      pricing: undefined,
+    });
+    setDraftError(null);
   }, []);
 
   // Compliance matrix
@@ -194,6 +220,88 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
       return true;
     });
   }, [compliance, statusFilter, categoryFilter]);
+
+  // Section drafts (Step 3)
+  const [drafts, setDrafts] = useState<Record<SectionType, SectionDraft | undefined>>({
+    exec_summary: undefined,
+    technical: undefined,
+    management: undefined,
+    past_performance: undefined,
+    pricing: undefined,
+  });
+  const [activeSection, setActiveSection] = useState<SectionType>('exec_summary');
+  const [draftLoading, setDraftLoading] = useState<SectionType | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  const generateDraft = useCallback(async (sectionType: SectionType) => {
+    if (!email || !uploadedRfp) return;
+    setDraftLoading(sectionType);
+    setDraftError(null);
+    try {
+      const res = await fetch(`/api/app/proposal/draft?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName, sectionType }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDraftError(data.error || 'Could not generate the draft.');
+        return;
+      }
+      setDrafts(prev => ({
+        ...prev,
+        [sectionType]: {
+          draft: data.draft,
+          wordCount: data.wordCount,
+          targetWords: data.targetWords,
+          profileGrounded: data.meta?.profileGrounded,
+          generatedAt: Date.now(),
+        },
+      }));
+      setActiveSection(sectionType);
+    } catch (err) {
+      console.error('Section draft failed:', err);
+      setDraftError('Request failed. Try again.');
+    } finally {
+      setDraftLoading(null);
+    }
+  }, [email, uploadedRfp, getAuthHeaders]);
+
+  const updateDraftText = useCallback((sectionType: SectionType, text: string) => {
+    setDrafts(prev => {
+      const existing = prev[sectionType];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [sectionType]: {
+          ...existing,
+          draft: text,
+          wordCount: text.split(/\s+/).filter(Boolean).length,
+        },
+      };
+    });
+  }, []);
+
+  const copyDraftToClipboard = useCallback((sectionType: SectionType) => {
+    const d = drafts[sectionType];
+    if (!d || typeof navigator === 'undefined' || !navigator.clipboard) return;
+    navigator.clipboard.writeText(d.draft).catch(() => {});
+  }, [drafts]);
+
+  const downloadDraft = useCallback((sectionType: SectionType) => {
+    const d = drafts[sectionType];
+    if (!d) return;
+    const meta = SECTION_TABS.find(t => t.id === sectionType);
+    const label = meta?.label || sectionType;
+    const safeName = (uploadedRfp?.fileName || 'proposal').replace(/[^a-z0-9-_.]/gi, '_');
+    const blob = new Blob([d.draft], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${safeName}-${label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [drafts, uploadedRfp]);
 
   const exportComplianceCsv = useCallback(() => {
     if (compliance.length === 0) return;
@@ -555,6 +663,129 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
               Click <strong className="text-slate-300">Generate Compliance Matrix</strong> to pull every shall / must / required from the uploaded document.
             </p>
           )}
+        </section>
+      )}
+
+      {/* Step 3 · Draft Sections */}
+      {uploadedRfp && (
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 3 · Draft Sections</p>
+              <h2 className="text-lg font-semibold text-white">First drafts grounded in the RFP + your profile</h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Pick a section. Mindy uses the source doc and your saved profile (NAICS, set-asides, target agencies) to write a first pass with [placeholders] for facts it shouldn&apos;t invent.
+              </p>
+            </div>
+          </div>
+
+          {draftError && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 mb-3">
+              {draftError}
+            </div>
+          )}
+
+          {/* Section tabs */}
+          <div className="flex flex-wrap items-center gap-1 border-b border-slate-800 mb-4 -mx-1 px-1">
+            {SECTION_TABS.map(tab => {
+              const hasDraft = !!drafts[tab.id];
+              const isActive = activeSection === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveSection(tab.id)}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    isActive
+                      ? 'border-purple-500 text-white'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                  {hasDraft && <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active section pane */}
+          {(() => {
+            const meta = SECTION_TABS.find(t => t.id === activeSection)!;
+            const current = drafts[activeSection];
+            const isLoading = draftLoading === activeSection;
+
+            return (
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div className="text-xs text-slate-500">
+                    Target ≈ {meta.targetWords} words
+                    {current && (
+                      <>
+                        <span className="mx-2 text-slate-700">·</span>
+                        <span className={current.wordCount > meta.targetWords * 1.5 ? 'text-amber-400' : 'text-slate-400'}>
+                          {current.wordCount} words written
+                        </span>
+                        {current.profileGrounded === false && (
+                          <>
+                            <span className="mx-2 text-slate-700">·</span>
+                            <span className="text-amber-400">No profile saved — placeholders used</span>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {current && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => copyDraftToClipboard(activeSection)}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                          Copy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => downloadDraft(activeSection)}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                          Download .md
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => generateDraft(activeSection)}
+                      disabled={isLoading}
+                      className="px-4 py-1.5 text-xs rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white flex items-center gap-2"
+                    >
+                      {isLoading && (
+                        <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      )}
+                      {isLoading ? 'Drafting…' : current ? 'Regenerate' : `Draft ${meta.label}`}
+                    </button>
+                  </div>
+                </div>
+
+                {current ? (
+                  <textarea
+                    value={current.draft}
+                    onChange={e => updateDraftText(activeSection, e.target.value)}
+                    spellCheck
+                    className="w-full min-h-[400px] bg-slate-950 border border-slate-800 rounded-lg p-4 text-sm text-slate-200 font-mono leading-relaxed focus:border-purple-500 focus:outline-none whitespace-pre-wrap"
+                  />
+                ) : (
+                  <div className="bg-slate-950/40 border border-dashed border-slate-700 rounded-lg p-8 text-center text-sm text-slate-400">
+                    No draft yet. Click <strong className="text-slate-300">Draft {meta.label}</strong> to generate a first pass.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          <p className="text-xs text-slate-500 mt-3">
+            Edits live in this session only. Persistence + DOCX/PDF export coming next.
+          </p>
         </section>
       )}
 
