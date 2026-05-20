@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import Link from 'next/link';
 import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
 import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
-import type { MIBetaTier } from '../UnifiedSidebarBeta';
+import type { MIBetaPanel, MIBetaTier } from '../UnifiedSidebarBeta';
 import { getMIApiHeaders } from '../authHeaders';
 
 interface DashboardPanelProps {
   email: string | null;
   tier: MIBetaTier;
+  onPanelChange?: (panel: MIBetaPanel) => void;
 }
 
 interface BriefingEntry {
@@ -416,7 +416,7 @@ function getBriefingSummary(entry: BriefingEntry | null) {
   };
 }
 
-export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
+export default function DashboardPanel({ email, tier, onPanelChange }: DashboardPanelProps) {
   const [briefings, setBriefings] = useState<BriefingEntry[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -722,18 +722,14 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
             <p className="text-sm text-slate-400 mt-1">Best-fit opportunities, summaries, and next actions from your saved profile.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
-              className="px-4 py-2 bg-purple-600/20 text-purple-200 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors"
-            >
-              Open SAM Dashboard
-            </Link>
-            <Link
-              href={`/briefings?email=${encodeURIComponent(email)}`}
-              className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
-            >
-              Full Briefings
-            </Link>
+            {onPanelChange && (
+              <button
+                onClick={() => onPanelChange('alerts')}
+                className="px-4 py-2 bg-purple-600/20 text-purple-200 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors"
+              >
+                Open SAM Dashboard
+              </button>
+            )}
             <button
               onClick={loadBriefings}
               className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"

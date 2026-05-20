@@ -21,6 +21,7 @@ interface PanelContainerProps {
   activePanel: MIBetaPanel;
   email: string | null;
   tier: MIBetaTier;
+  onPanelChange?: (panel: MIBetaPanel) => void;
 }
 
 function PanelLoading() {
@@ -34,11 +35,11 @@ function PanelLoading() {
   );
 }
 
-export default function PanelContainer({ activePanel, email, tier }: PanelContainerProps) {
+export default function PanelContainer({ activePanel, email, tier, onPanelChange }: PanelContainerProps) {
   const renderPanel = () => {
     switch (activePanel) {
       case 'dashboard':
-        return <DashboardPanel email={email} tier={tier} />;
+        return <DashboardPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'alerts':
         return <AlertsPanel email={email} tier={tier} />;
       case 'research':
@@ -62,7 +63,7 @@ export default function PanelContainer({ activePanel, email, tier }: PanelContai
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
       default:
-        return <DashboardPanel email={email} tier={tier} />;
+        return <DashboardPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
     }
   };
 

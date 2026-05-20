@@ -829,6 +829,7 @@ function MIBetaDashboard() {
           activePanel={activePanel}
           email={email}
           tier={tier}
+          onPanelChange={handlePanelChange}
         />
       </main>
     </div>
