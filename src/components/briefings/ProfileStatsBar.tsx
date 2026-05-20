@@ -7,6 +7,10 @@ interface ProfileStatsBarProps {
   email: string;
   onTabChange?: (tab: string) => void;
   refreshKey?: number;
+  // When provided, headline + weekly stat call this instead of routing to
+  // /briefings/dashboard. Used in mi-beta to switch panels in-app instead
+  // of navigating off the /app surface.
+  onOpenOpportunities?: () => void;
 }
 
 interface ProfileStats {
@@ -30,7 +34,7 @@ interface ProfileStatsResponse {
   };
 }
 
-export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0 }: ProfileStatsBarProps) {
+export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0, onOpenOpportunities }: ProfileStatsBarProps) {
   const [stats, setStats] = useState<ProfileStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -100,18 +104,34 @@ export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0 }: 
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           {/* Main headline stat - clickable to dashboard with profile filter */}
-          <Link
-            href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
-            className="flex items-center gap-2 hover:bg-purple-500/10 rounded-lg px-2 py-1 -mx-2 transition-colors group"
-          >
-            <span className="text-lg">🎯</span>
-            <span className="text-white font-semibold group-hover:text-purple-300">
-              {profileStats.totalActiveMatching.toLocaleString()}
-            </span>
-            <span className="text-gray-300 text-sm group-hover:text-purple-200">opportunities match your profile</span>
-            {getTrendIcon()}
-            <span className="text-gray-500 group-hover:text-purple-400 text-xs">→</span>
-          </Link>
+          {onOpenOpportunities ? (
+            <button
+              type="button"
+              onClick={onOpenOpportunities}
+              className="flex items-center gap-2 hover:bg-purple-500/10 rounded-lg px-2 py-1 -mx-2 transition-colors group text-left"
+            >
+              <span className="text-lg">🎯</span>
+              <span className="text-white font-semibold group-hover:text-purple-300">
+                {profileStats.totalActiveMatching.toLocaleString()}
+              </span>
+              <span className="text-gray-300 text-sm group-hover:text-purple-200">opportunities match your profile</span>
+              {getTrendIcon()}
+              <span className="text-gray-500 group-hover:text-purple-400 text-xs">→</span>
+            </button>
+          ) : (
+            <Link
+              href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
+              className="flex items-center gap-2 hover:bg-purple-500/10 rounded-lg px-2 py-1 -mx-2 transition-colors group"
+            >
+              <span className="text-lg">🎯</span>
+              <span className="text-white font-semibold group-hover:text-purple-300">
+                {profileStats.totalActiveMatching.toLocaleString()}
+              </span>
+              <span className="text-gray-300 text-sm group-hover:text-purple-200">opportunities match your profile</span>
+              {getTrendIcon()}
+              <span className="text-gray-500 group-hover:text-purple-400 text-xs">→</span>
+            </Link>
+          )}
 
           {/* Divider */}
           <div className="hidden sm:block w-px h-4 bg-gray-700"></div>
@@ -125,13 +145,24 @@ export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0 }: 
               </div>
             )}
 
-            <Link
-              href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
-              className="flex items-center gap-1.5 text-gray-400 hover:text-purple-300 transition-colors"
-            >
-              <span>📅</span>
-              <span>{profileStats.matchesThisWeek} this week</span>
-            </Link>
+            {onOpenOpportunities ? (
+              <button
+                type="button"
+                onClick={onOpenOpportunities}
+                className="flex items-center gap-1.5 text-gray-400 hover:text-purple-300 transition-colors"
+              >
+                <span>📅</span>
+                <span>{profileStats.matchesThisWeek} this week</span>
+              </button>
+            ) : (
+              <Link
+                href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
+                className="flex items-center gap-1.5 text-gray-400 hover:text-purple-300 transition-colors"
+              >
+                <span>📅</span>
+                <span>{profileStats.matchesThisWeek} this week</span>
+              </Link>
+            )}
 
             {profileStats.forecastsMatching > 0 && (
               <button

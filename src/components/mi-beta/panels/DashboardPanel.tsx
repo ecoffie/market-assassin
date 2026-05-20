@@ -713,7 +713,10 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
 
   return (
     <div className="min-h-[calc(100vh-73px)] text-white">
-      <ProfileStatsBar email={email} />
+      <ProfileStatsBar
+        email={email}
+        onOpenOpportunities={onPanelChange ? () => onPanelChange('alerts') : undefined}
+      />
 
       <div className="px-6 py-5 border-b border-slate-800 bg-slate-950">
         <div className="flex flex-wrap items-center justify-between gap-4">
