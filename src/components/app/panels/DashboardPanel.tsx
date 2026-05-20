@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
 import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
@@ -416,7 +418,11 @@ function getBriefingSummary(entry: BriefingEntry | null) {
   };
 }
 
-export default function DashboardPanel({ email, tier, onPanelChange }: DashboardPanelProps) {
+export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
+  const router = useRouter();
+  const marketIntelHref = email
+    ? `/app/market-intel?email=${encodeURIComponent(email)}`
+    : '/app/market-intel';
   const [briefings, setBriefings] = useState<BriefingEntry[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -715,7 +721,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
     <div className="min-h-[calc(100vh-73px)] text-white">
       <ProfileStatsBar
         email={email}
-        onOpenOpportunities={onPanelChange ? () => onPanelChange('alerts') : undefined}
+        onOpenOpportunities={() => router.push(marketIntelHref)}
       />
 
       <div className="px-6 py-5 border-b border-slate-800 bg-slate-950">
@@ -725,14 +731,12 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             <p className="text-sm text-slate-400 mt-1">Best-fit opportunities, summaries, and next actions from your saved profile.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {onPanelChange && (
-              <button
-                onClick={() => onPanelChange('alerts')}
-                className="px-4 py-2 bg-purple-600/20 text-purple-200 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors"
-              >
-                Open SAM Dashboard
-              </button>
-            )}
+            <Link
+              href={marketIntelHref}
+              className="px-4 py-2 bg-purple-600/20 text-purple-200 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors"
+            >
+              Open SAM Dashboard
+            </Link>
             <button
               onClick={loadBriefings}
               className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
