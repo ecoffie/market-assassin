@@ -44,6 +44,7 @@ export const ToolNames = {
   MARKET_SCANNER: 'market_scanner',
   OPPORTUNITY_HUNTER: 'opportunity_hunter',
   REPORTS: 'reports',
+  PROPOSAL_ASSIST: 'proposal_assist', // RFP parsing, compliance matrix, section drafting
 } as const;
 
 export type ToolName = (typeof ToolNames)[keyof typeof ToolNames];

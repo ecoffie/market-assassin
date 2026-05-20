@@ -41,6 +41,36 @@ interface UploadedRfp {
   text: string;
 }
 
+type ComplianceCategory = 'submission' | 'evaluation' | 'technical' | 'past_performance' | 'pricing' | 'admin' | 'other';
+type ComplianceStatus = 'open' | 'in_progress' | 'done' | 'n_a';
+
+interface ComplianceRequirementRow {
+  id: string;
+  requirement: string;
+  category: ComplianceCategory;
+  section?: string;
+  source_quote?: string;
+  owner: string;     // user-editable
+  status: ComplianceStatus; // user-editable
+}
+
+const CATEGORY_LABELS: Record<ComplianceCategory, { label: string; color: string }> = {
+  submission: { label: 'Submission', color: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
+  evaluation: { label: 'Evaluation', color: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
+  technical: { label: 'Technical', color: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  past_performance: { label: 'Past Perf', color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  pricing: { label: 'Pricing', color: 'bg-pink-500/15 text-pink-300 border-pink-500/30' },
+  admin: { label: 'Admin', color: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
+  other: { label: 'Other', color: 'bg-slate-700/30 text-slate-400 border-slate-600/40' },
+};
+
+const STATUS_LABELS: Record<ComplianceStatus, string> = {
+  open: 'Open',
+  in_progress: 'In progress',
+  done: 'Done',
+  n_a: 'N/A',
+};
+
 export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -107,7 +137,88 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
   const clearRfp = useCallback(() => {
     setUploadedRfp(null);
     setUploadError(null);
+    setCompliance([]);
+    setComplianceError(null);
   }, []);
+
+  // Compliance matrix
+  const [compliance, setCompliance] = useState<ComplianceRequirementRow[]>([]);
+  const [complianceLoading, setComplianceLoading] = useState(false);
+  const [complianceError, setComplianceError] = useState<string | null>(null);
+  const [complianceMeta, setComplianceMeta] = useState<{ truncated?: boolean; originalChars?: number; inputChars?: number } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | ComplianceStatus>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | ComplianceCategory>('all');
+
+  const generateCompliance = useCallback(async () => {
+    if (!email || !uploadedRfp) return;
+    setComplianceLoading(true);
+    setComplianceError(null);
+    try {
+      const res = await fetch(`/api/app/proposal/compliance?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setComplianceError(data.error || 'Could not generate the matrix.');
+        return;
+      }
+      const rows: ComplianceRequirementRow[] = (data.requirements || []).map((r: Partial<ComplianceRequirementRow> & { id?: string }, idx: number) => ({
+        id: r.id || `REQ-${String(idx + 1).padStart(3, '0')}`,
+        requirement: r.requirement || '',
+        category: (r.category as ComplianceCategory) || 'other',
+        section: r.section,
+        source_quote: r.source_quote,
+        owner: '',
+        status: 'open',
+      }));
+      setCompliance(rows);
+      setComplianceMeta(data.meta || null);
+    } catch (err) {
+      console.error('Compliance generation failed:', err);
+      setComplianceError('Request failed. Try again.');
+    } finally {
+      setComplianceLoading(false);
+    }
+  }, [email, uploadedRfp, getAuthHeaders]);
+
+  const updateRequirement = useCallback((id: string, patch: Partial<ComplianceRequirementRow>) => {
+    setCompliance(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
+  }, []);
+
+  const filteredCompliance = useMemo(() => {
+    return compliance.filter(r => {
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+      if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
+      return true;
+    });
+  }, [compliance, statusFilter, categoryFilter]);
+
+  const exportComplianceCsv = useCallback(() => {
+    if (compliance.length === 0) return;
+    const headers = ['ID', 'Requirement', 'Category', 'Section', 'Owner', 'Status', 'Source'];
+    const rows = compliance.map(r => [
+      r.id,
+      r.requirement,
+      CATEGORY_LABELS[r.category]?.label || r.category,
+      r.section || '',
+      r.owner,
+      STATUS_LABELS[r.status],
+      r.source_quote || '',
+    ]);
+    const csv = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeName = (uploadedRfp?.fileName || 'rfp').replace(/[^a-z0-9-_.]/gi, '_');
+    link.download = `compliance-${safeName}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [compliance, uploadedRfp]);
 
   const selectedOpportunity = useMemo(
     () => opportunities.find(opp => opp.id === selectedId) || opportunities[0] || null,
@@ -291,6 +402,161 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
           </div>
         )}
       </section>
+
+      {/* Step 2 · Compliance Matrix */}
+      {uploadedRfp && (
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 2 · Compliance Matrix</p>
+              <h2 className="text-lg font-semibold text-white">Extract every shall / must / required</h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Mindy reads the source doc and lists each obligation so you can assign owners and track status before drafting.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {compliance.length > 0 && (
+                <button
+                  type="button"
+                  onClick={exportComplianceCsv}
+                  className="px-3 py-2 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                >
+                  Export CSV
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={generateCompliance}
+                disabled={complianceLoading}
+                className="px-4 py-2 text-sm rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white transition-colors flex items-center gap-2"
+              >
+                {complianceLoading && (
+                  <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {complianceLoading
+                  ? 'Extracting…'
+                  : compliance.length > 0
+                  ? 'Regenerate'
+                  : 'Generate Compliance Matrix'}
+              </button>
+            </div>
+          </div>
+
+          {complianceError && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 mb-3">
+              {complianceError}
+            </div>
+          )}
+
+          {complianceMeta?.truncated && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 mb-3">
+              Source doc was truncated to {complianceMeta.inputChars?.toLocaleString()} chars of {complianceMeta.originalChars?.toLocaleString()} for this pass. Long documents may miss late-section requirements — split big PDFs by volume if you need full coverage.
+            </div>
+          )}
+
+          {compliance.length > 0 && (
+            <>
+              <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
+                <span className="text-slate-500">{compliance.length} requirements</span>
+                <span className="text-slate-700">·</span>
+                <select
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value as 'all' | ComplianceCategory)}
+                  className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-300"
+                >
+                  <option value="all">All categories</option>
+                  {(Object.keys(CATEGORY_LABELS) as ComplianceCategory[]).map(c => (
+                    <option key={c} value={c}>{CATEGORY_LABELS[c].label}</option>
+                  ))}
+                </select>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as 'all' | ComplianceStatus)}
+                  className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-300"
+                >
+                  <option value="all">All statuses</option>
+                  {(Object.keys(STATUS_LABELS) as ComplianceStatus[]).map(s => (
+                    <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+                <span className="text-slate-500 ml-auto">
+                  Showing {filteredCompliance.length} of {compliance.length}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-800 rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase tracking-wider">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium w-20">ID</th>
+                      <th className="text-left px-3 py-2 font-medium">Requirement</th>
+                      <th className="text-left px-3 py-2 font-medium w-28">Category</th>
+                      <th className="text-left px-3 py-2 font-medium w-24">Section</th>
+                      <th className="text-left px-3 py-2 font-medium w-40">Owner</th>
+                      <th className="text-left px-3 py-2 font-medium w-32">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCompliance.map(r => {
+                      const cat = CATEGORY_LABELS[r.category] || CATEGORY_LABELS.other;
+                      return (
+                        <tr key={r.id} className="border-t border-slate-800 hover:bg-slate-800/30 align-top">
+                          <td className="px-3 py-2 font-mono text-xs text-slate-500">{r.id}</td>
+                          <td className="px-3 py-2 text-slate-200">
+                            {r.requirement}
+                            {r.source_quote && (
+                              <details className="mt-1">
+                                <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-300">Source quote</summary>
+                                <p className="text-xs text-slate-400 mt-1 italic border-l-2 border-slate-700 pl-2">{r.source_quote}</p>
+                              </details>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded border ${cat.color}`}>
+                              {cat.label}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-slate-400 font-mono">{r.section || '—'}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={r.owner}
+                              onChange={e => updateRequirement(r.id, { owner: e.target.value })}
+                              placeholder="Assign…"
+                              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={r.status}
+                              onChange={e => updateRequirement(r.id, { status: e.target.value as ComplianceStatus })}
+                              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-purple-500 focus:outline-none"
+                            >
+                              {(Object.keys(STATUS_LABELS) as ComplianceStatus[]).map(s => (
+                                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-xs text-slate-500 mt-3">
+                Owner and status edits live in this session only. CSV export captures the full table.
+              </p>
+            </>
+          )}
+
+          {!complianceLoading && compliance.length === 0 && !complianceError && (
+            <p className="text-sm text-slate-500">
+              Click <strong className="text-slate-300">Generate Compliance Matrix</strong> to pull every shall / must / required from the uploaded document.
+            </p>
+          )}
+        </section>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">
