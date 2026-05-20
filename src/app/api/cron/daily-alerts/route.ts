@@ -87,6 +87,7 @@ interface AlertUser {
   keywords: string[] | null;
   business_type: string | null;
   business_description?: string | null;
+  set_aside_preferences?: string[] | null;
   agencies: string[];  // renamed from target_agencies
   location_state: string | null;
   location_states: string[] | null; // Multi-state support
@@ -622,6 +623,7 @@ async function runDailyAlertJob(options?: {
             keywords: userKeywords,
             business_description: user.business_description || null,
             business_type: user.business_type || null,
+            setAsides: user.set_aside_preferences || undefined,
           }),
         })).sort((a, b) => b.score - a.score);
 
@@ -676,6 +678,7 @@ async function runDailyAlertJob(options?: {
                 keywords: userKeywords,
                 business_description: user.business_description || null,
                 business_type: user.business_type || null,
+                setAsides: user.set_aside_preferences || undefined,
               }),
             }))
             .filter(opp => getDaysUntil(opp.responseDeadline) <= 14)

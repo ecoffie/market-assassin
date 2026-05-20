@@ -264,7 +264,7 @@ function MarketIntelligenceContent() {
                 <span className="text-xl">🆓</span>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">MI Free</h3>
+                <h3 className="text-lg font-bold text-white">Mindy Free</h3>
                 <p className="text-slate-400 font-semibold">$0/month</p>
               </div>
             </div>
@@ -306,7 +306,7 @@ function MarketIntelligenceContent() {
                 <span className="text-xl">🚀</span>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">MI Pro</h3>
+                <h3 className="text-lg font-bold text-white">Mindy Pro</h3>
                 <p className="text-purple-400 font-semibold text-xl">$149/mo</p>
               </div>
             </div>
@@ -356,7 +356,7 @@ function MarketIntelligenceContent() {
                 <span className="text-xl">👥</span>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">MI Team</h3>
+                <h3 className="text-lg font-bold text-white">Mindy Team</h3>
                 <p className="text-blue-400 font-semibold text-xl">$499/mo</p>
               </div>
             </div>
@@ -594,11 +594,11 @@ function MarketIntelligenceContent() {
         <div className="mt-10 bg-slate-800/30 border border-slate-700 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-2xl">💡</span>
-            <h3 className="text-lg font-bold text-white">Why MI Pro vs. Deltek GovWin?</h3>
+            <h3 className="text-lg font-bold text-white">Why Mindy Pro vs. Deltek GovWin?</h3>
           </div>
           <div className="grid md:grid-cols-3 gap-6 text-sm">
             <div>
-              <p className="text-purple-400 font-semibold mb-1">MI Pro: $149/mo</p>
+              <p className="text-purple-400 font-semibold mb-1">Mindy Pro: $149/mo</p>
               <p className="text-slate-400">AI-powered briefings, personalized by your NAICS + geography. Daily, weekly, and pursuit briefs with win probability scoring. Includes FHC training access.</p>
             </div>
             <div>

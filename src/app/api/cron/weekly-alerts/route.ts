@@ -111,6 +111,7 @@ interface AlertUser {
   naics_codes: string[];
   business_type: string | null;
   business_description?: string | null;
+  set_aside_preferences?: string[] | null;
   agencies: string[];
   location_state: string | null;
   alert_frequency: string;
@@ -352,6 +353,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
             keywords: [],
             business_description: user.business_description || null,
             business_type: user.business_type || null,
+            setAsides: user.set_aside_preferences || undefined,
           }),
         })).sort((a, b) => b.score - a.score);
 

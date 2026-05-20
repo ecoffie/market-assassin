@@ -46,6 +46,7 @@ interface AlertUser {
   user_email: string;
   naics_codes: string[];
   business_type: string | null;
+  set_aside_preferences?: string[] | null;
   target_agencies: string[];
   location_state: string | null;
   alert_frequency: string;
@@ -142,6 +143,8 @@ export async function GET(request: NextRequest) {
           naics_codes: user.naics_codes || [],
           agencies: user.target_agencies || [],
           keywords: [],
+          business_type: user.business_type || null,
+          setAsides: user.set_aside_preferences || undefined,
         }),
       })).sort((a, b) => b.score - a.score);
 

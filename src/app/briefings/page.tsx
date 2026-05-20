@@ -1329,10 +1329,10 @@ function BriefingsDashboardContent() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-3 mb-4">
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <span className="text-white font-bold text-2xl">MI</span>
+                <span className="text-white font-bold text-2xl">M</span>
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">MI Free</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Mindy Free</h1>
             <p className="text-emerald-400">Start your GovCon intelligence journey</p>
           </div>
 
@@ -1396,7 +1396,7 @@ function BriefingsDashboardContent() {
           <p className="text-gray-500 text-sm mt-2 text-center">
             Want AI briefings?{' '}
             <Link href="/market-intelligence" className="text-purple-400 hover:underline">
-              See MI Pro — $149/mo
+              See Mindy Pro — $149/mo
             </Link>
           </p>
         </div>
@@ -1418,13 +1418,13 @@ function BriefingsDashboardContent() {
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">You&apos;re All Set!</h1>
             <p className="text-gray-400">
-              Your MI Free account is ready. You&apos;ll start receiving daily opportunity alerts at <span className="text-emerald-400">{email}</span>
+              Your Mindy Free account is ready. You&apos;ll start receiving daily opportunity alerts at <span className="text-emerald-400">{email}</span>
             </p>
           </div>
 
           {/* What's included */}
           <div className="p-6 bg-gray-900 border border-gray-800 rounded-2xl mb-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Your MI Free Benefits</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">Your Mindy Free Benefits</h2>
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-gray-300">
                 <span className="w-6 h-6 rounded-full bg-emerald-600/20 flex items-center justify-center text-emerald-400 text-sm">✓</span>
@@ -1461,13 +1461,13 @@ function BriefingsDashboardContent() {
           <div className="mt-8 p-6 bg-gradient-to-r from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl">
             <h3 className="text-lg font-semibold text-white mb-2">Want More Intelligence?</h3>
             <p className="text-gray-400 text-sm mb-4">
-              Upgrade to MI Pro for AI-powered daily briefings, forecasts, SBIR/STTR intel, and pipeline tracking.
+              Upgrade to Mindy Pro for AI-powered daily briefings, forecasts, SBIR/STTR intel, and pipeline tracking.
             </p>
             <Link
               href="/market-intelligence"
               className="inline-block py-2 px-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg transition-colors"
             >
-              See MI Pro — $149/mo
+              See Mindy Pro — $149/mo
             </Link>
           </div>
 

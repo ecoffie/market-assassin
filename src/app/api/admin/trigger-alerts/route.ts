@@ -60,6 +60,7 @@ interface AlertUser {
   user_email: string;
   naics_codes: string[] | null;
   business_type: string | null;
+  set_aside_preferences?: string[] | null;
   agencies: string[];  // unified table uses 'agencies' not 'target_agencies'
   location_state: string | null;
   is_active: boolean;
@@ -246,6 +247,7 @@ export async function GET(request: NextRequest) {
           agencies: user.agencies || [],
           keywords: [],
           business_type: user.business_type || null,
+          setAsides: user.set_aside_preferences || undefined,
         }),
       })).sort((a, b) => b.score - a.score);
 

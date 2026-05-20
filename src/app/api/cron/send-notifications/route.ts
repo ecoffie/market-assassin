@@ -100,6 +100,7 @@ interface NotificationUser {
   naics_codes: string[];
   keywords: string[] | null;
   business_type: string | null;
+  set_aside_preferences?: string[] | null;
   agencies: string[];
   location_state: string | null; // State code for place of performance filter (e.g., 'FL', 'VA')
   alerts_enabled: boolean;
@@ -158,6 +159,7 @@ async function fetchDataForUser(
       agencies: user.agencies || [],
       keywords: userKeywords,
       business_type: user.business_type || null,
+      setAsides: user.set_aside_preferences || undefined,
     }),
   })).sort((a, b) => b.score - a.score);
 
