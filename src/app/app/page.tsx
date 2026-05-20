@@ -421,36 +421,45 @@ function AppDashboard() {
 
   // Load user profile on mount
   useEffect(() => {
-    const emailParam = searchParams.get('email');
-    if (emailParam) {
-      setPendingEmail(emailParam.toLowerCase().trim());
-      setIsLoading(false);
-    } else {
-      // Check localStorage
-      const storedEmail = typeof window !== 'undefined'
-        ? localStorage.getItem('mi_beta_email')
-        : null;
-      const verifiedAt = typeof window !== 'undefined'
-        ? localStorage.getItem('mi_beta_authenticated_at') || localStorage.getItem('mi_beta_2fa_verified_at')
-        : null;
-      const verifiedRecently = verifiedAt
-        ? Date.now() - new Date(verifiedAt).getTime() < TWO_FACTOR_SESSION_MS
-        : false;
-      const hasStoredToken = typeof window !== 'undefined'
-        ? Boolean(localStorage.getItem(MI_AUTH_TOKEN_KEY) || localStorage.getItem(TWO_FACTOR_TOKEN_KEY))
-        : false;
+    const emailParam = searchParams.get('email')?.toLowerCase().trim() || null;
 
-      if (storedEmail && verifiedRecently && hasStoredToken) {
-        loadUserProfile(storedEmail);
-      } else {
-        bootstrapFromSupabaseSession().then((bootstrapped) => {
-          if (!bootstrapped) {
-            clearStoredAppAuth();
-            setIsLoading(false);
-          }
-        });
-      }
+    // Pre-fill the sign-in form regardless — if we end up needing to show it,
+    // the email field will already be populated.
+    if (emailParam) {
+      setPendingEmail(emailParam);
     }
+
+    // Check localStorage for an existing 2FA-verified session first.
+    const storedEmail = typeof window !== 'undefined'
+      ? localStorage.getItem('mi_beta_email')
+      : null;
+    const verifiedAt = typeof window !== 'undefined'
+      ? localStorage.getItem('mi_beta_authenticated_at') || localStorage.getItem('mi_beta_2fa_verified_at')
+      : null;
+    const verifiedRecently = verifiedAt
+      ? Date.now() - new Date(verifiedAt).getTime() < TWO_FACTOR_SESSION_MS
+      : false;
+    const hasStoredToken = typeof window !== 'undefined'
+      ? Boolean(localStorage.getItem(MI_AUTH_TOKEN_KEY) || localStorage.getItem(TWO_FACTOR_TOKEN_KEY))
+      : false;
+
+    if (storedEmail && verifiedRecently && hasStoredToken) {
+      loadUserProfile(storedEmail);
+      return;
+    }
+
+    // Always try to bootstrap from the Supabase session — covers the OAuth
+    // sign-up → onboarding → /app flow where the user has a valid Supabase
+    // session but no stored MI auth token yet. Without this, the post-
+    // onboarding redirect (which carries ?email= in the URL) used to drop
+    // the user on the sign-in screen even though they just finished signing
+    // up.
+    bootstrapFromSupabaseSession().then((bootstrapped) => {
+      if (!bootstrapped) {
+        clearStoredAppAuth();
+        setIsLoading(false);
+      }
+    });
   }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession]);
 
   // Loading state
