@@ -363,13 +363,15 @@ async function runDailyAlertJob(options?: {
       console.log(`[Daily Alerts] Retried ${retryResults.retried} failed alerts, ${retryResults.succeeded} succeeded`);
     }
 
-    // Build query for daily alert users (unified table)
+    // Build query for daily alert users (unified table).
+    // 'daily' = every day; 'weekdays' = Mon-Fri; 'weekends' = Sat-Sun.
+    // Per-user day check happens inside the loop below.
     let query = getSupabase()
       .from('user_notification_settings')
       .select('*')
       .eq('is_active', true)
       .eq('alerts_enabled', true)
-      .eq('alert_frequency', 'daily');
+      .in('alert_frequency', ['daily', 'weekdays', 'weekends']);
 
     // If test email specified, only process that user
     if (options?.testEmail) {
@@ -471,6 +473,19 @@ async function runDailyAlertJob(options?: {
         // if (!options?.skipTimezoneCheck && !isDeliveryTimeForTimezone(user.timezone)) {
         //   continue;
         // }
+
+        // Day-of-week skip for weekdays-only / weekends-only users.
+        // 0 = Sun, 1-5 = Mon-Fri, 6 = Sat.
+        if (!options?.testEmail) {
+          const dayOfWeek = new Date().getUTCDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          if (user.alert_frequency === 'weekdays' && isWeekend) {
+            continue;
+          }
+          if (user.alert_frequency === 'weekends' && !isWeekend) {
+            continue;
+          }
+        }
 
         // BETA MODE: Skip tier check for users with alert_frequency='daily' (Apr 19, 2026)
         // Note: This route ONLY processes users where alert_frequency='daily' (line 327 query filter)

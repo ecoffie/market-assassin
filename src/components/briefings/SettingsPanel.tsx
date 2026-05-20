@@ -98,7 +98,8 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
   const [customAgencies, setCustomAgencies] = useState('');
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
-  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'paused'>('daily');
+  type AlertFrequency = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'paused';
+  const [frequency, setFrequency] = useState<AlertFrequency>('daily');
   const [briefingsEnabled, setBriefingsEnabled] = useState(true);
   const [showStateSelector, setShowStateSelector] = useState(false);
   const [showIndustrySelector, setShowIndustrySelector] = useState(false);
@@ -154,15 +155,20 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
         // Load states
         setSelectedStates(settings.locationStates || []);
 
-        // Load frequency
+        // Load frequency — accept any of the 5 valid values, default to 'daily'.
+        const validFreqs: AlertFrequency[] = ['daily', 'weekdays', 'weekends', 'weekly', 'paused'];
+        const incomingFreq: AlertFrequency = validFreqs.includes(settings.frequency as AlertFrequency)
+          ? (settings.frequency as AlertFrequency)
+          : 'daily';
+
         if (mode === 'alerts') {
-          setFrequency(settings.alertsEnabled === false ? 'paused' : settings.frequency === 'weekly' ? 'weekly' : 'daily');
+          setFrequency(settings.alertsEnabled === false ? 'paused' : incomingFreq);
           setBriefingsEnabled(false);
         } else if (!settings.alertsEnabled || !settings.briefingsEnabled) {
           setFrequency('paused');
           setBriefingsEnabled(settings.briefingsEnabled ?? true);
         } else {
-          setFrequency(settings.frequency === 'weekly' ? 'weekly' : 'daily');
+          setFrequency(incomingFreq);
           setBriefingsEnabled(settings.briefingsEnabled ?? true);
         }
       }
@@ -869,7 +875,13 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
                 Delivery Frequency
               </label>
               <div className="space-y-2">
-                {(['daily', 'weekly', 'paused'] as const).map(opt => (
+                {([
+                  { opt: 'daily', label: 'Daily', desc: 'Every morning at 7 AM' },
+                  { opt: 'weekdays', label: 'Weekdays only', desc: 'Mon–Fri at 7 AM, skip weekends' },
+                  { opt: 'weekends', label: 'Weekends only', desc: 'Sat & Sun at 7 AM' },
+                  { opt: 'weekly', label: 'Weekly', desc: 'Sunday digest' },
+                  { opt: 'paused', label: 'Paused', desc: 'Keep settings but pause emails' },
+                ] as const).map(({ opt, label, desc }) => (
                   <label
                     key={opt}
                     className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
@@ -887,12 +899,8 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
                       className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 bg-gray-700"
                     />
                     <div>
-                      <span className="text-white font-medium capitalize">{opt}</span>
-                      <p className="text-xs text-gray-500">
-                        {opt === 'daily' && 'Every morning at 7 AM'}
-                        {opt === 'weekly' && 'Sunday digest'}
-                        {opt === 'paused' && 'Keep settings but pause emails'}
-                      </p>
+                      <span className="text-white font-medium">{label}</span>
+                      <p className="text-xs text-gray-500">{desc}</p>
                     </div>
                   </label>
                 ))}

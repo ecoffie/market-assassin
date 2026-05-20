@@ -1,7 +1,10 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+// 30-day Mindy session. Previously 12h, which forced Pro users to sign in
+// every morning and produced "unauthorized" errors that masqueraded as
+// account problems. Industry-standard SaaS session length.
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface TwoFactorPayload {
   email: string;

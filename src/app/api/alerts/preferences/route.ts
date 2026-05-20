@@ -198,11 +198,12 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    // Alert frequency
+    // Alert frequency: daily, weekdays (Mon-Fri only), weekends (Sat-Sun only), weekly, paused.
     if (frequency !== undefined) {
-      if (!['daily', 'weekly', 'paused'].includes(frequency)) {
+      const valid = ['daily', 'weekdays', 'weekends', 'weekly', 'paused'];
+      if (!valid.includes(frequency)) {
         return NextResponse.json(
-          { success: false, error: 'Invalid frequency. Use "daily", "weekly", or "paused"' },
+          { success: false, error: `Invalid frequency. Use one of: ${valid.join(', ')}` },
           { status: 400 }
         );
       }
