@@ -32,17 +32,25 @@ interface DashboardStats {
 interface Opportunity {
   id: string;
   notice_id: string;
+  solicitation_number: string | null;
   title: string;
+  description: string | null;
   department: string;
+  sub_tier: string | null;
   office: string | null;
+  agency_hierarchy: string | null;
   naics_code: string | null;
+  psc_code: string | null;
   notice_type: string | null;
   notice_type_code: string | null;
   set_aside_code: string | null;
   set_aside_description: string | null;
   posted_date: string | null;
   response_deadline: string | null;
+  archive_date: string | null;
+  pop_city: string | null;
   pop_state: string | null;
+  pop_zip: string | null;
   ui_link: string | null;
   days_until_deadline: number | null;
   urgency_level: 'critical' | 'urgent' | 'normal' | 'upcoming';
@@ -692,25 +700,81 @@ function MIDashboardContent() {
 
                   {/* Expanded Details */}
                   {isExpanded && (
-                    <div className="px-4 pb-4 pt-2 border-t border-gray-800 bg-gray-900/50">
+                    <div className="px-4 pb-4 pt-3 border-t border-gray-800 bg-gray-900/50 space-y-4">
+                      {/* Description */}
+                      {opp.description && (
+                        <div>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">Description</span>
+                          <p className="text-gray-300 text-sm mt-1 whitespace-pre-wrap leading-relaxed">
+                            {opp.description.length > 800
+                              ? `${opp.description.slice(0, 800).trim()}…`
+                              : opp.description}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Identifiers + Classification */}
+                      <div className="grid md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500 text-xs">Solicitation #</span>
+                          <p className="text-gray-300 font-mono text-xs mt-0.5">{opp.solicitation_number || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Notice ID</span>
+                          <p className="text-gray-300 font-mono text-xs mt-0.5 break-all">{opp.notice_id}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Notice Type</span>
+                          <p className="text-gray-300 mt-0.5">{opp.notice_type || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">NAICS</span>
+                          <p className="text-gray-300 mt-0.5">{opp.naics_code || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">PSC</span>
+                          <p className="text-gray-300 mt-0.5">{opp.psc_code || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Set-Aside</span>
+                          <p className="text-gray-300 mt-0.5">{opp.set_aside_description || opp.set_aside_code || '—'}</p>
+                        </div>
+                      </div>
+
+                      {/* Dates + Agency + Place of Performance */}
                       <div className="grid md:grid-cols-3 gap-4 text-sm">
                         <div>
                           <span className="text-gray-500 text-xs">Posted</span>
-                          <p className="text-gray-300">{formatDate(opp.posted_date)}</p>
+                          <p className="text-gray-300 mt-0.5">{formatDate(opp.posted_date)}</p>
                         </div>
                         <div>
                           <span className="text-gray-500 text-xs">Deadline</span>
-                          <p className={opp.urgency_level === 'critical' ? 'text-red-400 font-semibold' : 'text-gray-300'}>
+                          <p className={opp.urgency_level === 'critical' ? 'text-red-400 font-semibold mt-0.5' : 'text-gray-300 mt-0.5'}>
                             {formatDate(opp.response_deadline)}
                           </p>
                         </div>
                         <div>
+                          <span className="text-gray-500 text-xs">Archive</span>
+                          <p className="text-gray-300 mt-0.5">{formatDate(opp.archive_date)}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Sub-Agency</span>
+                          <p className="text-gray-300 mt-0.5">{opp.sub_tier || '—'}</p>
+                        </div>
+                        <div>
                           <span className="text-gray-500 text-xs">Office</span>
-                          <p className="text-gray-300">{opp.office || '—'}</p>
+                          <p className="text-gray-300 mt-0.5">{opp.office || '—'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Place of Performance</span>
+                          <p className="text-gray-300 mt-0.5">
+                            {[opp.pop_city, opp.pop_state, opp.pop_zip].filter(Boolean).join(', ') || '—'}
+                          </p>
                         </div>
                       </div>
+
                       {opp.ui_link && (
-                        <div className="mt-4 flex gap-2">
+                        <div className="flex gap-2 pt-1">
                           <a
                             href={opp.ui_link}
                             target="_blank"

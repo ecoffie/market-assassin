@@ -47,34 +47,50 @@ const NOTICE_TYPE_INFO: Record<string, { label: string; color: string; bgColor: 
 interface RawOpportunity {
   id: string;
   notice_id: string;
+  solicitation_number: string | null;
   title: string;
+  description: string | null;
   department: string | null;
+  sub_tier: string | null;
   office: string | null;
+  agency_hierarchy: string | null;
   naics_code: string | null;
+  psc_code: string | null;
   notice_type: string | null;
   notice_type_code: string | null;
   set_aside_code: string | null;
   set_aside_description: string | null;
   posted_date: string | null;
   response_deadline: string | null;
+  archive_date: string | null;
+  pop_city: string | null;
   pop_state: string | null;
+  pop_zip: string | null;
   ui_link: string | null;
 }
 
 interface DashboardOpportunity {
   id: string;
   notice_id: string;
+  solicitation_number: string | null;
   title: string;
+  description: string | null;
   department: string;
+  sub_tier: string | null;
   office: string | null;
+  agency_hierarchy: string | null;
   naics_code: string | null;
+  psc_code: string | null;
   notice_type: string | null;
   notice_type_code: string | null;
   set_aside_code: string | null;
   set_aside_description: string | null;
   posted_date: string | null;
   response_deadline: string | null;
+  archive_date: string | null;
+  pop_city: string | null;
   pop_state: string | null;
+  pop_zip: string | null;
   ui_link: string | null;
   days_until_deadline: number | null;
   urgency_level: 'critical' | 'urgent' | 'normal' | 'upcoming';
@@ -444,17 +460,25 @@ export async function GET(request: NextRequest) {
       return {
         id: opp.id,
         notice_id: opp.notice_id,
+        solicitation_number: opp.solicitation_number,
         title: opp.title,
+        description: opp.description,
         department: opp.department || 'Unknown Agency',
+        sub_tier: opp.sub_tier,
         office: opp.office,
+        agency_hierarchy: opp.agency_hierarchy,
         naics_code: opp.naics_code,
+        psc_code: opp.psc_code,
         notice_type: opp.notice_type,
         notice_type_code: opp.notice_type_code,
         set_aside_code: opp.set_aside_code,
         set_aside_description: opp.set_aside_description,
         posted_date: opp.posted_date,
         response_deadline: opp.response_deadline,
+        archive_date: opp.archive_date,
+        pop_city: opp.pop_city,
         pop_state: opp.pop_state,
+        pop_zip: opp.pop_zip,
         ui_link: opp.ui_link,
         days_until_deadline: daysUntil,
         urgency_level: getUrgencyLevel(deadline),
