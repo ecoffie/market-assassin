@@ -272,7 +272,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
               </button>
               {!['owner', 'admin'].includes(currentRole) && <p className="text-xs text-slate-500">Only owners and admins can invite teammates.</p>}
               {['owner', 'admin'].includes(currentRole) && !hasSeatCapacity && (
-                <p className="text-xs text-amber-300">MI Team includes {TEAM_SEAT_LIMIT} seats. Upgrade to Enterprise for more users.</p>
+                <p className="text-xs text-amber-300">Mindy Team includes {TEAM_SEAT_LIMIT} seats. Upgrade to Enterprise for more users.</p>
               )}
             </div>
           </div>

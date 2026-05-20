@@ -209,7 +209,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <h2 className="font-semibold text-white mb-2">Session</h2>
             <p className="text-sm text-slate-400">
-              Your beta session is protected by a signed two-factor token and expires after 12 hours.
+              Your session is protected by a signed two-factor token and expires after 12 hours.
             </p>
           </div>
         </div>

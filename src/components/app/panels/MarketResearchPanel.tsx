@@ -1450,7 +1450,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         <section className="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center">
           <h2 className="text-xl font-semibold text-white">Your market map is ready to build</h2>
           <p className="mx-auto mt-2 max-w-xl text-slate-400">
-            MI will use your saved profile to find target agencies, buyers, budgets, competition, vehicles, and partner signals.
+            Mindy will use your saved profile to find target agencies, buyers, budgets, competition, vehicles, and partner signals.
           </p>
           <button
             type="button"
