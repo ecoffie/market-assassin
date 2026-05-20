@@ -130,7 +130,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   return (
     <div className="p-6 space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Unified Settings</h1>
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
         <p className="text-slate-400 mt-1">{workspaceName} • {tierLabel(tier)}</p>
       </div>
 
