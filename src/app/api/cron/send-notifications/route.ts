@@ -157,6 +157,7 @@ async function fetchDataForUser(
       naics_codes: userNaics,
       agencies: user.agencies || [],
       keywords: userKeywords,
+      business_type: user.business_type || null,
     }),
   })).sort((a, b) => b.score - a.score);
 

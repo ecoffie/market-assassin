@@ -351,6 +351,7 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
             agencies: user.agencies || [],
             keywords: [],
             business_description: user.business_description || null,
+            business_type: user.business_type || null,
           }),
         })).sort((a, b) => b.score - a.score);
 
@@ -704,7 +705,7 @@ async function sendAlertEmail(
       <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
-      &copy; ${new Date().getFullYear()} Mindy | getmindy.ai
+      &copy; ${new Date().getFullYear()} Mindy | mi.govcongiants.com
     </p>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}

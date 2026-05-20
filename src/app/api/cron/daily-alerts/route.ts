@@ -621,6 +621,7 @@ async function runDailyAlertJob(options?: {
             agencies: user.agencies || [],
             keywords: userKeywords,
             business_description: user.business_description || null,
+            business_type: user.business_type || null,
           }),
         })).sort((a, b) => b.score - a.score);
 
@@ -674,6 +675,7 @@ async function runDailyAlertJob(options?: {
                 agencies: user.agencies || [],
                 keywords: userKeywords,
                 business_description: user.business_description || null,
+                business_type: user.business_type || null,
               }),
             }))
             .filter(opp => getDaysUntil(opp.responseDeadline) <= 14)
@@ -1316,7 +1318,7 @@ async function sendDailyAlertEmail(
       <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #475569; text-decoration: none;">Unsubscribe</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
-      © ${new Date().getFullYear()} Mindy • getmindy.ai
+      © ${new Date().getFullYear()} Mindy • mi.govcongiants.com
     </p>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}

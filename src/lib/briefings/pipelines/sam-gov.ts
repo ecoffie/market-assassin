@@ -505,8 +505,78 @@ export function diffOpportunities(
   return { new: newOpps, modified, closed };
 }
 
+// Set-aside categories that require a specific certification on the user's profile.
+// Keys are normalized profile tokens (uppercase, no parens/spaces); values are
+// substrings to look for in opportunity.setAside or opportunity.setAsideDescription.
+const CERT_REQUIRED_SET_ASIDES: Record<string, string[]> = {
+  SDVOSB: ['SDVOSB', 'SERVICE-DISABLED VETERAN'],
+  VOSB: ['VOSB', 'VETERAN-OWNED', 'VETERAN OWNED'],
+  '8A': ['8(A)', '8A'],
+  WOSB: ['WOSB', 'WOMEN-OWNED', 'WOMEN OWNED'],
+  EDWOSB: ['EDWOSB', 'ECONOMICALLY DISADVANTAGED WOMEN'],
+  HUBZONE: ['HUBZONE', 'HZC'],
+  TRIBAL: ['TRIBAL', 'INDIAN-OWNED', 'NATIVE-OWNED'],
+};
+
+// Notice types that should stay visible as research signals even when set-aside fit is weak.
+// Matches noticeType strings used by SAM.gov (sources sought, RFI, special notice).
+function isResearchNotice(noticeType: string | null | undefined): boolean {
+  if (!noticeType) return false;
+  const t = noticeType.toLowerCase();
+  return t.includes('sources sought') || t.includes('rfi') || t.includes('special notice');
+}
+
+function normalizeSetAsideToken(value: string): string {
+  return value.toUpperCase().replace(/[()\s.-]/g, '');
+}
+
+// Returns the set of normalized certification tokens the user holds.
+function getUserCertifications(profile: { setAsides?: string[]; business_type?: string | null }): Set<string> {
+  const tokens = new Set<string>();
+  for (const raw of profile.setAsides ?? []) {
+    if (raw) tokens.add(normalizeSetAsideToken(raw));
+  }
+  if (profile.business_type) tokens.add(normalizeSetAsideToken(profile.business_type));
+  return tokens;
+}
+
+// Returns the cert tokens an opportunity *requires* (e.g. ['WOSB'] for a WOSB set-aside).
+// Empty array means full-and-open / Total Small Business / unknown — no cert needed.
+function getOpportunityRequiredCerts(opportunity: SAMOpportunity): string[] {
+  const haystack = `${opportunity.setAside ?? ''} ${opportunity.setAsideDescription ?? ''}`.toUpperCase();
+  const required: string[] = [];
+  for (const [cert, needles] of Object.entries(CERT_REQUIRED_SET_ASIDES)) {
+    if (needles.some(n => haystack.includes(n))) required.push(cert);
+  }
+  return required;
+}
+
+function isTotalSmallBusiness(opportunity: SAMOpportunity): boolean {
+  const haystack = `${opportunity.setAside ?? ''} ${opportunity.setAsideDescription ?? ''}`.toUpperCase();
+  return /TOTAL SMALL BUSINESS|SBA\b|SBP\b|SMALL BUSINESS SET-?ASIDE/.test(haystack);
+}
+
+const VETERAN_CERTS = new Set(['SDVOSB', 'VOSB', 'VETERAN', 'VETERANOWNED', 'SERVICEDISABLEDVETERAN']);
+function isVeteranProfile(certs: Set<string>): boolean {
+  for (const c of certs) if (VETERAN_CERTS.has(c)) return true;
+  return false;
+}
+
+function isVAOpportunity(opportunity: SAMOpportunity): boolean {
+  const agency = `${opportunity.department ?? ''} ${opportunity.subTier ?? ''}`.toUpperCase();
+  return /VETERANS AFFAIRS|\bVA\b/.test(agency);
+}
+
 /**
- * Score an opportunity for relevance to user's profile
+ * Score an opportunity for relevance to user's profile.
+ *
+ * Set-aside and agency ranking follow the rules in
+ * docs/TODO-mindy-app-completion.md §5 ("Profile And Ranking Quality"):
+ * - Boost Total Small Business / SB-friendly matches for users with any cert
+ * - Penalize special set-asides (SDVOSB/VOSB/8a/WOSB/EDWOSB/HUBZone/Tribal)
+ *   when the user doesn't hold that certification
+ * - Downrank VA opportunities for non-veteran profiles (Sources Sought/RFI/
+ *   Special Notice exempt — they stay visible as research signals)
  */
 export function scoreOpportunity(
   opportunity: SAMOpportunity,
@@ -515,6 +585,8 @@ export function scoreOpportunity(
     agencies: string[];
     keywords: string[];
     business_description?: string | null;
+    setAsides?: string[];
+    business_type?: string | null;
   }
 ): number {
   let score = 0;
@@ -561,12 +633,35 @@ export function scoreOpportunity(
     }
   }
 
-  // Set-aside bonus (small business opportunities)
-  if (opportunity.setAside) {
-    score += 10;
+  // Set-aside scoring — replaces the old flat +10 "any set-aside" bonus.
+  const userCerts = getUserCertifications(userProfile);
+  const requiredCerts = getOpportunityRequiredCerts(opportunity);
+  const research = isResearchNotice(opportunity.noticeType);
+
+  if (requiredCerts.length === 0) {
+    // No specific cert required — small Total Small Business / SBA / SBP bonus
+    if (isTotalSmallBusiness(opportunity) && userCerts.size > 0) {
+      score += 15;
+    } else if (opportunity.setAside) {
+      // Generic set-aside (e.g. Full and Open with preference) — small nudge
+      score += 5;
+    }
+  } else {
+    const userHasMatchingCert = requiredCerts.some(c => userCerts.has(c));
+    if (userHasMatchingCert) {
+      score += 20; // Direct cert match — strong boost
+    } else if (!research) {
+      score -= 25; // Cert required, user doesn't have it — strong penalty
+    }
+    // Research notices with mismatched set-asides: no change (stay visible)
   }
 
-  return Math.min(score, 100); // Cap at 100
+  // VA downrank for non-veteran profiles (research notices exempt).
+  if (isVAOpportunity(opportunity) && !isVeteranProfile(userCerts) && !research) {
+    score -= 15;
+  }
+
+  return Math.max(0, Math.min(score, 100)); // Clamp to [0, 100]
 }
 
 // Helper functions

@@ -69,6 +69,9 @@ interface UserBriefingProfile {
   zip_codes: string[];
   watched_companies: string[];
   watched_contracts: string[];
+  setAsides?: string[];
+  business_type?: string | null;
+  business_description?: string | null;
 }
 
 interface DiffResult {
