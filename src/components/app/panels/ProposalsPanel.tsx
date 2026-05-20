@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 
@@ -33,12 +33,81 @@ const QUESTION_PROMPTS = [
   'What assumptions need customer clarification before we commit bid resources?',
 ];
 
+interface UploadedRfp {
+  fileName: string;
+  fileSize: number;
+  charCount: number;
+  pageCount?: number;
+  text: string;
+}
+
 export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadedRfp, setUploadedRfp] = useState<UploadedRfp | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
+
+  const handleRfpFile = useCallback(async (file: File) => {
+    if (!email) {
+      setUploadError('Sign in required.');
+      return;
+    }
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch(`/api/app/proposal/upload?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setUploadError(data.error || 'Could not parse the file.');
+        return;
+      }
+      setUploadedRfp({
+        fileName: data.file?.name || file.name,
+        fileSize: data.file?.size ?? file.size,
+        charCount: data.charCount || 0,
+        pageCount: data.pageCount,
+        text: data.text || '',
+      });
+    } catch (err) {
+      console.error('RFP upload failed:', err);
+      setUploadError('Upload failed. Try again.');
+    } finally {
+      setUploading(false);
+    }
+  }, [email, getAuthHeaders]);
+
+  const onFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleRfpFile(file);
+    e.target.value = '';
+  }, [handleRfpFile]);
+
+  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleRfpFile(file);
+  }, [handleRfpFile]);
+
+  const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  }, []);
+
+  const clearRfp = useCallback(() => {
+    setUploadedRfp(null);
+    setUploadError(null);
+  }, []);
 
   const selectedOpportunity = useMemo(
     () => opportunities.find(opp => opp.id === selectedId) || opportunities[0] || null,
@@ -114,6 +183,114 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
           {loading ? 'Refreshing...' : 'Refresh Pursuits'}
         </button>
       </div>
+
+      {/* RFP Upload */}
+      <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 1 · Source Document</p>
+            <h2 className="text-lg font-semibold text-white">Upload an RFP / Sources Sought / Solicitation</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              PDF, DOCX, or TXT, up to 10 MB. Mindy extracts the text so future steps can pull compliance requirements and draft sections.
+            </p>
+          </div>
+        </div>
+
+        {!uploadedRfp ? (
+          <div
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            className="border border-dashed border-slate-700 rounded-lg p-8 text-center hover:border-purple-500/60 transition-colors"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={onFileInputChange}
+              className="hidden"
+            />
+            <p className="text-slate-300">
+              Drop a file here, or{' '}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="text-purple-300 hover:text-purple-200 underline disabled:opacity-50"
+              >
+                browse
+              </button>
+            </p>
+            <p className="text-xs text-slate-500 mt-2">PDF · DOCX · TXT · max 10 MB</p>
+            {uploading && (
+              <p className="text-xs text-purple-300 mt-3 flex items-center justify-center gap-2">
+                <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                Extracting text…
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/50 border border-slate-800 rounded-lg p-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl">📄</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{uploadedRfp.fileName}</p>
+                  <p className="text-xs text-slate-500">
+                    {(uploadedRfp.fileSize / 1024).toFixed(1)} KB · {uploadedRfp.charCount.toLocaleString()} chars
+                    {uploadedRfp.pageCount ? ` · ${uploadedRfp.pageCount} page${uploadedRfp.pageCount === 1 ? '' : 's'}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={clearRfp}
+                  disabled={uploading}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-400 hover:text-red-300 hover:bg-slate-700 disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+
+            <details className="bg-slate-950/40 border border-slate-800 rounded-lg">
+              <summary className="cursor-pointer px-3 py-2 text-sm text-slate-300 hover:text-white">
+                Preview extracted text ({uploadedRfp.text.length.toLocaleString()} chars)
+              </summary>
+              <pre className="px-3 pb-3 pt-1 text-xs text-slate-400 whitespace-pre-wrap break-words max-h-96 overflow-y-auto">
+                {uploadedRfp.text.slice(0, 5000)}
+                {uploadedRfp.text.length > 5000 ? '\n\n…' : ''}
+              </pre>
+            </details>
+
+            <p className="text-xs text-slate-500">
+              Compliance matrix and section drafting coming next — for now this text is held in your session.
+            </p>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={onFileInputChange}
+              className="hidden"
+            />
+          </div>
+        )}
+
+        {uploadError && (
+          <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+            {uploadError}
+          </div>
+        )}
+      </section>
 
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">
