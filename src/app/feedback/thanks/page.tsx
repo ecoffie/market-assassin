@@ -65,8 +65,8 @@ function ThankYouContent() {
 
         <p className="text-slate-500 text-sm mt-6">
           Questions? Email{' '}
-          <a href="mailto:service@govcongiants.com" className="text-blue-400 hover:underline">
-            service@govcongiants.com
+          <a href="mailto:hello@govconedu.com" className="text-blue-400 hover:underline">
+            hello@govconedu.com
           </a>
         </p>
       </div>

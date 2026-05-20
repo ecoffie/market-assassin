@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     // Check if user is blocked for abuse
     if (email && await isUserBlocked(email)) {
       return NextResponse.json(
-        { success: false, error: 'Account suspended due to unusual activity. Contact support at service@govcongiants.com' },
+        { success: false, error: 'Account suspended due to unusual activity. Contact support at hello@govconedu.com' },
         { status: 403 }
       );
     }

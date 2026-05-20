@@ -162,8 +162,8 @@ function ProfileCompleteContent() {
         {/* Footer */}
         <p className="text-center text-white/60 text-sm mt-6">
           Questions? Contact{' '}
-          <a href="mailto:service@govcongiants.com" className="underline hover:text-white">
-            service@govcongiants.com
+          <a href="mailto:hello@govconedu.com" className="underline hover:text-white">
+            hello@govconedu.com
           </a>
         </p>
       </div>

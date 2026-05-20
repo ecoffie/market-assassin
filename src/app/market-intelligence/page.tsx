@@ -389,7 +389,7 @@ function MarketIntelligenceContent() {
             </div>
 
             <a
-              href="mailto:service@govcongiants.com?subject=MI%20Team%20Inquiry"
+              href="mailto:hello@govconedu.com?subject=MI%20Team%20Inquiry"
               className="block w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-center rounded-lg font-semibold transition-colors text-sm"
             >
               Contact Sales →
@@ -412,7 +412,7 @@ function MarketIntelligenceContent() {
             <div className="text-center md:text-right">
               <p className="text-slate-400 text-sm mb-2">Unlimited seats • SSO • Dedicated support • Custom integrations</p>
               <a
-                href="mailto:service@govcongiants.com?subject=MI%20Enterprise%20Inquiry"
+                href="mailto:hello@govconedu.com?subject=MI%20Enterprise%20Inquiry"
                 className="inline-block px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold transition-colors text-sm"
               >
                 Talk to Sales →
@@ -571,7 +571,7 @@ function MarketIntelligenceContent() {
                 </td>
                 <td className="py-4 px-3 text-center bg-blue-900/10">
                   <a
-                    href="mailto:service@govcongiants.com?subject=MI%20Team%20Inquiry"
+                    href="mailto:hello@govconedu.com?subject=MI%20Team%20Inquiry"
                     className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Contact Sales
@@ -579,7 +579,7 @@ function MarketIntelligenceContent() {
                 </td>
                 <td className="py-4 px-3 text-center bg-amber-900/10">
                   <a
-                    href="mailto:service@govcongiants.com?subject=MI%20Enterprise%20Inquiry"
+                    href="mailto:hello@govconedu.com?subject=MI%20Enterprise%20Inquiry"
                     className="inline-block px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Contact Sales
@@ -721,7 +721,7 @@ function MarketIntelligenceContent() {
               View Dashboard
             </Link>
             <span className="mx-4">•</span>
-            <a href="mailto:service@govcongiants.com" className="text-slate-400 hover:text-white">
+            <a href="mailto:hello@govconedu.com" className="text-slate-400 hover:text-white">
               Support
             </a>
           </p>

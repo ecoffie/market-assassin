@@ -1505,7 +1505,7 @@ export async function sendAlertProWelcomeEmail({
 
   <div style="background: #f1f5f9; padding: 18px; border-radius: 0 0 12px 12px; text-align: center;">
     <p style="color: #64748b; font-size: 12px; margin: 0;">
-      Questions? Reply to this email or contact <a href="mailto:service@govcongiants.com" style="color: #059669;">service@govcongiants.com</a>
+      Questions? Reply to this email or contact <a href="mailto:hello@govconedu.com" style="color: #059669;">hello@govconedu.com</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
       © ${new Date().getFullYear()} GovCon Giants • mi.govcongiants.com
@@ -1542,7 +1542,7 @@ ${maLink}
 Your email: ${to}
 Subscription: $19/month • Cancel anytime
 
-Questions? Reply to this email or contact service@govcongiants.com
+Questions? Reply to this email or contact hello@govconedu.com
 
 - GovCon Giants Team`,
     });

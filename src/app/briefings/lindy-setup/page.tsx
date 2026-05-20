@@ -123,8 +123,8 @@ export default function LindySetupPage() {
         <section className="border-t border-gray-800 pt-8">
           <p className="text-gray-400">
             Need help setting this up? Email{' '}
-            <a href="mailto:service@govcongiants.com" className="text-amber-400 hover:underline">
-              service@govcongiants.com
+            <a href="mailto:hello@govconedu.com" className="text-amber-400 hover:underline">
+              hello@govconedu.com
             </a>{' '}
             and we&apos;ll walk you through it.
           </p>
