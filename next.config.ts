@@ -171,14 +171,6 @@ const nextConfig: NextConfig = {
         destination: 'https://shop.govcongiants.com',
         permanent: false,
       },
-      // Stale /briefings/dashboard page (May 11, pre-redesign) replaced by
-      // the unified /briefings dashboard. Preserve email param so the
-      // canonical page can still pick up the user context.
-      {
-        source: '/briefings/dashboard',
-        destination: '/briefings',
-        permanent: false,
-      },
     ];
   },
 };

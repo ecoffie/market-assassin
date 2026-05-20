@@ -101,7 +101,7 @@ export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0 }: 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           {/* Main headline stat - clickable to dashboard with profile filter */}
           <Link
-            href={`/briefings?email=${encodeURIComponent(email)}`}
+            href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
             className="flex items-center gap-2 hover:bg-purple-500/10 rounded-lg px-2 py-1 -mx-2 transition-colors group"
           >
             <span className="text-lg">🎯</span>
@@ -126,7 +126,7 @@ export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0 }: 
             )}
 
             <Link
-              href={`/briefings?email=${encodeURIComponent(email)}`}
+              href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
               className="flex items-center gap-1.5 text-gray-400 hover:text-purple-300 transition-colors"
             >
               <span>📅</span>

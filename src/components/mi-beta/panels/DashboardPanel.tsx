@@ -723,7 +723,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/briefings?email=${encodeURIComponent(email)}`}
+              href={`/briefings/dashboard?email=${encodeURIComponent(email)}`}
               className="px-4 py-2 bg-purple-600/20 text-purple-200 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors"
             >
               Open SAM Dashboard
