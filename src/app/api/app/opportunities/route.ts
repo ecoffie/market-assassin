@@ -325,7 +325,12 @@ export async function GET(request: NextRequest) {
 
   try {
     // Build query for opportunities from cache
-    const fetchLimit = Math.min(Math.max(limit * 3, limit), 150);
+    // Cap how much we pull from Supabase for one feed request. 2,000 is
+    // well above what any matched-profile user actually has (most have
+    // hundreds at most) and keeps memory + sort cost bounded. limit*3
+    // gives the dedupe + scoring step room to filter without truncating
+    // good results.
+    const fetchLimit = Math.min(Math.max(limit * 3, limit), 2000);
     let query = supabase
       .from('sam_opportunities')
       .select('*')

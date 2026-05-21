@@ -9,6 +9,7 @@ import WorkspaceSwitcher from './WorkspaceSwitcher';
 export type AppPanel =
   | 'dashboard'      // AI Briefings - Daily/Weekly/Pursuit
   | 'alerts'         // Daily Alerts - opportunity list
+  | 'market-intel'   // /app/market-intel — full-bleed dashboard route (not a panel)
   | 'research'       // Market Research (Federal Market Assassin)
   | 'forecasts'      // 7,700+ upcoming procurements
   | 'recompetes'     // Expiring contracts
@@ -30,6 +31,10 @@ interface NavItem {
   description: string;
   tier: AppTier[];
   badge?: string;
+  // When set, clicking this item navigates to a route instead of
+  // switching the active panel. Used for full-bleed pages like
+  // /app/market-intel that aren't part of the panel container.
+  href?: string;
 }
 
 interface NavSection {
@@ -55,6 +60,14 @@ const NAV_SECTIONS: NavSection[] = [
         icon: '🔔',
         description: 'Raw SAM.gov matches',
         tier: ['free', 'pro', 'team', 'enterprise'],
+      },
+      {
+        id: 'market-intel',
+        label: 'Market Dashboard',
+        icon: '🧭',
+        description: 'Charts, full SAM, CSV export',
+        tier: ['free', 'pro', 'team', 'enterprise'],
+        href: '/app/market-intel',
       },
     ],
   },
@@ -307,27 +320,19 @@ export default function UnifiedSidebar({
                 const canAccess = hasAccess(item.tier);
                 const isHovered = hoveredItem === item.id;
                 const display = getItemDisplay(item);
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => canAccess && onPanelChange(item.id)}
-                    onMouseEnter={() => setHoveredItem(item.id)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    disabled={!canAccess}
-                    className={`
-                      w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                      transition-all duration-150
-                      ${isActive
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : canAccess
-                          ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                          : 'text-slate-600 cursor-not-allowed opacity-50'
-                      }
-                      ${isCollapsed ? 'justify-center' : ''}
-                    `}
-                    title={isCollapsed ? display.label : undefined}
-                  >
+                const sharedClassName = `
+                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+                  transition-all duration-150
+                  ${isActive
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : canAccess
+                      ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      : 'text-slate-600 cursor-not-allowed opacity-50'
+                  }
+                  ${isCollapsed ? 'justify-center' : ''}
+                `;
+                const innerContent = (
+                  <>
                     <span className="text-lg">{item.icon}</span>
                     {!isCollapsed && (
                       <>
@@ -351,6 +356,38 @@ export default function UnifiedSidebar({
                         )}
                       </>
                     )}
+                  </>
+                );
+
+                // Route-based items render as <Link>. Tier-gated routes
+                // still respect canAccess by falling through to the
+                // disabled <button> branch below.
+                if (item.href && canAccess) {
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      onMouseEnter={() => setHoveredItem(item.id)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      className={sharedClassName}
+                      title={isCollapsed ? display.label : undefined}
+                    >
+                      {innerContent}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => canAccess && onPanelChange(item.id)}
+                    onMouseEnter={() => setHoveredItem(item.id)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    disabled={!canAccess}
+                    className={sharedClassName}
+                    title={isCollapsed ? display.label : undefined}
+                  >
+                    {innerContent}
                   </button>
                 );
               })}

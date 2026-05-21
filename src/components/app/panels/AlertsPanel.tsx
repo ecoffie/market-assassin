@@ -131,10 +131,11 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     try {
       const params = new URLSearchParams();
       if (email) params.set('email', email);
-      // 200 is the soft cap for the feed view. Users who want the full
-      // ~11K SAM opportunity universe should use /app/market-intel,
-      // which is also surfaced as a banner below the filter row.
-      params.set('limit', '200');
+      // Show every matching opportunity for the user's profile. The
+      // marketing promise is "never go to SAM.gov again" — capping the
+      // feed contradicts that. The API itself protects against runaway
+      // queries via its internal fetchLimit (2000).
+      params.set('limit', '1000');
 
       const res = await fetch(`/api/app/opportunities?${params.toString()}`, {
         headers: getAuthHeaders(),
@@ -564,22 +565,6 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         )}
       </div>
 
-      {/* Full dashboard hint — the feed is capped at 200 opps; users who
-          want the complete ~11K SAM universe should use /app/market-intel. */}
-      {!isLoading && alerts.length > 0 && (
-        <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-300">
-            <span className="text-purple-300 font-medium">Feed shows up to 200 opportunities.</span>{' '}
-            The full SAM dashboard has every active opportunity (~11,000+) with deeper filters and CSV export.
-          </p>
-          <Link
-            href="/app/market-intel"
-            className="px-4 py-2 text-sm rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors whitespace-nowrap"
-          >
-            Open full dashboard →
-          </Link>
-        </div>
-      )}
 
       {!isLoading && alerts.length > 0 && (
         <div className="text-sm text-slate-500">
