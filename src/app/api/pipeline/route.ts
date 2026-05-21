@@ -280,16 +280,48 @@ export async function PATCH(request: NextRequest) {
     const authSession = requireMIAuthSession(request, user_email);
     if (!authSession.ok) return authSession.response;
     const { workspaceId } = await ensureWorkspaceMember(user_email);
-    updates.updated_by = user_email.toLowerCase();
-    updates.workspace_id = updates.workspace_id || workspaceId;
 
-    // Verify ownership
-    const { data: existing } = await getSupabase()
-      .from('user_pipeline')
-      .select('id, stage')
-      .eq('id', id)
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
-      .single();
+    // Schema may not have workspace_id / updated_by columns (see POST
+    // handler for the full backstory). Build the ownership filter and
+    // update payload tolerant of either schema.
+    const normalizedEmail = user_email.toLowerCase();
+    const supabase = getSupabase();
+
+    // Verify ownership. Try the workspace-aware filter first; if
+    // PostgREST rejects the workspace_id column we fall back to
+    // user_email only. The user_email check is what's actually
+    // doing the work on the current schema.
+    let existing: { id: string; stage: string } | null = null;
+    let ownershipError: { message?: string } | null = null;
+    {
+      const res = await supabase
+        .from('user_pipeline')
+        .select('id, stage')
+        .eq('id', id)
+        .or(`workspace_id.eq.${workspaceId},user_email.eq.${normalizedEmail}`)
+        .maybeSingle();
+      existing = res.data;
+      ownershipError = res.error;
+    }
+    if (!existing && ownershipError && /column .* does not exist|Could not find/i.test(ownershipError.message || '')) {
+      const retry = await supabase
+        .from('user_pipeline')
+        .select('id, stage')
+        .eq('id', id)
+        .eq('user_email', normalizedEmail)
+        .maybeSingle();
+      existing = retry.data;
+    } else if (!existing) {
+      // Could be that the row exists under user_email only (workspace
+      // filter excluded it). Try a user_email-only lookup as a fallback.
+      const retry = await supabase
+        .from('user_pipeline')
+        .select('id, stage')
+        .eq('id', id)
+        .eq('user_email', normalizedEmail)
+        .maybeSingle();
+      existing = retry.data;
+    }
 
     if (!existing) {
       return NextResponse.json(
@@ -302,15 +334,52 @@ export async function PATCH(request: NextRequest) {
     const oldStage = existing.stage;
     const newStage = updates.stage;
 
-    const { data, error } = await getSupabase()
+    // Build update payload — try with workspace columns, retry without
+    // if the schema lacks them. Same pattern as the POST handler.
+    const updatePayload: Record<string, unknown> = { ...updates };
+    updatePayload.updated_by = normalizedEmail;
+    updatePayload.workspace_id = updatePayload.workspace_id || workspaceId;
+
+    let { data, error } = await supabase
       .from('user_pipeline')
-      .update(updates)
+      .update(updatePayload)
       .eq('id', id)
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
+      .eq('user_email', normalizedEmail)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error && /Could not find the '([^']+)' column/.test(error.message || '')) {
+      for (const col of ['workspace_id', 'updated_by']) {
+        delete updatePayload[col];
+      }
+      const retry = await supabase
+        .from('user_pipeline')
+        .update(updatePayload)
+        .eq('id', id)
+        .eq('user_email', normalizedEmail)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      console.error('Pipeline PATCH Postgres error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      return NextResponse.json(
+        {
+          error: error.message || 'Failed to update pipeline item',
+          details: error.details || null,
+          hint: error.hint || null,
+          code: error.code || null,
+        },
+        { status: 500 }
+      );
+    }
 
     // Record stage change in history (trigger handles this, but log for debugging)
     if (newStage && oldStage !== newStage) {
