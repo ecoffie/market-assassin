@@ -192,6 +192,15 @@ function AppDashboard() {
       setEmail(userEmail);
       setTier(userTier);
 
+      // If the currently-active panel is gated for this tier, swap to the
+      // first accessible one. Default panel is 'dashboard' (AI briefings) —
+      // gated to Pro+, so free users would otherwise land on a locked screen.
+      // For free users we surface 'alerts' (Source Feed = their Daily Alerts).
+      if (userTier === 'free' && activePanelRef.current === 'dashboard') {
+        activePanelRef.current = 'alerts';
+        setActivePanel('alerts');
+      }
+
       // Store email in localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('mi_beta_email', userEmail);

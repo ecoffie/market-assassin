@@ -702,9 +702,7 @@ function MarketIntelDashboard() {
                         <div>
                           <span className="text-gray-500 text-xs uppercase tracking-wide">Description</span>
                           <p className="text-gray-300 text-sm mt-1 whitespace-pre-wrap leading-relaxed">
-                            {opp.description.length > 800
-                              ? `${opp.description.slice(0, 800).trim()}…`
-                              : opp.description}
+                            {opp.description}
                           </p>
                         </div>
                       )}

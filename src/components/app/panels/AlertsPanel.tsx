@@ -163,7 +163,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     }
 
     if (!canUsePipeline) {
-      setNotice('Pipeline tracking is included with MI Pro. Upgrade to save opportunities.');
+      setNotice('Pipeline tracking is included with Mindy Pro. Upgrade to save opportunities.');
       return;
     }
 
@@ -417,7 +417,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
             href="/market-intelligence"
             className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors text-center"
           >
-            Compare MI Access
+            Upgrade to Mindy Pro
           </a>
         </div>
       ) : (

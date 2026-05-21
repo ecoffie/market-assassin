@@ -283,7 +283,18 @@ export default function UnifiedSidebar({
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4">
-        {NAV_SECTIONS.map((section) => (
+        {NAV_SECTIONS.map((section) => {
+          // SaaS-standard ordering (Linear / Notion pattern): items the
+          // current user can actually use come first, locked items after.
+          // Prevents the "I land on Mindy and my #1 nav item is locked"
+          // confusion that free users hit when Today's Intel sits above
+          // Source Feed.
+          const orderedItems = [...section.items].sort((a, b) => {
+            const aAccess = hasAccess(a.tier) ? 0 : 1;
+            const bAccess = hasAccess(b.tier) ? 0 : 1;
+            return aAccess - bAccess;
+          });
+          return (
           <div key={section.title} className="mb-6">
             {!isCollapsed && (
               <div className="px-4 mb-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -291,7 +302,7 @@ export default function UnifiedSidebar({
               </div>
             )}
             <div className="space-y-1 px-2">
-              {section.items.map((item) => {
+              {orderedItems.map((item) => {
                 const isActive = activePanel === item.id;
                 const canAccess = hasAccess(item.tier);
                 const isHovered = hoveredItem === item.id;
@@ -345,7 +356,8 @@ export default function UnifiedSidebar({
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Footer */}
