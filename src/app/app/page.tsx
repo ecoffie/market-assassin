@@ -757,14 +757,6 @@ function AppDashboard() {
                 >
                   {authLoading ? 'Signing in...' : 'Sign in'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => requestTwoFactorCode(pendingEmail, signInPassword)}
-                  disabled={authLoading || !pendingEmail.trim() || !signInPassword}
-                  className="w-full px-4 py-3 border border-slate-700 text-slate-300 hover:border-emerald-500 hover:text-emerald-300 disabled:border-slate-800 disabled:text-slate-600 font-medium rounded-lg transition-colors"
-                >
-                  Use optional 2FA instead
-                </button>
               </form>
             ) : (
               <form
@@ -829,13 +821,6 @@ function AppDashboard() {
                 {authError}
               </div>
             )}
-
-            <p className="text-center text-gray-500 text-sm mt-4">
-              Mindy dashboard:{' '}
-              <a href="/app" className="text-emerald-400 hover:text-emerald-300">
-                /app →
-              </a>
-            </p>
           </div>
 
           {/* Feature Preview */}
