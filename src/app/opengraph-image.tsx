@@ -4,50 +4,41 @@
  * Next.js App Router convention: a default-exported component in
  * src/app/opengraph-image.tsx is rendered at build time into a 1200×630
  * PNG and automatically wired to <meta property="og:image"> on every
- * page that doesn't define its own. Replaces the square logo we were
- * using as a stopgap in layout.tsx metadata.
+ * page that doesn't define its own.
  *
  * Branding anchored to src/app/mindy-landing/page.tsx:
  *   headline: "Meet Mindy."
  *   subhead:  "Your 24/7 Federal Market Intelligence Analyst."
  *   tagline:  "The big contractors have armies. You have Mindy."
  *
- * The Mindy logo is inlined as SVG so the OG card has zero runtime
- * font/image dependencies — Vercel's edge OG renderer doesn't have
- * filesystem access at request time.
+ * Logo strategy: read the PNG off the filesystem at build time and
+ * inline it as a base64 data URI. This is the canonical brand asset
+ * the rest of the app uses (src/components/mindy/MindyLogo.tsx points
+ * at the same file). Building the data URI at module-load means the
+ * OG endpoint stays static (rendered at build time, not request) and
+ * we never depend on edge fetch.
  */
 import { ImageResponse } from 'next/og';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 // Next.js metadata-route hooks for the convention file.
 export const alt = 'Mindy — Your 24/7 Federal Market Intelligence Analyst';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-// Inline SVG mark so we don't have to fetch the brand asset at render
-// time (Vercel's OG renderer runs at the edge and can't read /public).
-function MindyMark() {
-  return (
-    <svg
-      width="200"
-      height="160"
-      viewBox="0 0 1024 820"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fill="#253f91"
-        d="M0 820V206C0 91 91 0 206 0c46 0 91 14 130 40l321 209c20 13 46 13 66 0l321-209c39-26 84-40 130-40 115 0 206 91 206 206v614H0Z"
-        transform="scale(.742)"
-      />
-      <path
-        fill="#fff"
-        d="M257 234c0-34 28-62 62-62 17 0 32 7 44 18l78 78c89 88 209 138 335 138 126 0 247-50 336-139l104-104c12-12 28-18 45-18 35 0 63 28 63 63v406c0 42-34 76-76 76H518L257 820V234Z"
-        transform="translate(35 0) scale(.72)"
-      />
-      <circle cx="334" cy="487" r="62" fill="#8b5cf6" />
-      <circle cx="512" cy="487" r="62" fill="#a78bfa" />
-      <circle cx="690" cy="487" r="62" fill="#c4b5fd" />
-    </svg>
-  );
+// Load the canonical Mindy logo PNG at module-load time (build time).
+// process.cwd() points at the project root when Next is generating
+// static pages, so /public/brand/mindy-logo-icon.png is reachable.
+// If the file ever goes missing, fall back to an empty data URI so
+// the build doesn't break — the card renders without the logo
+// (regrettable, but loud failure here would block deploys).
+let logoDataUri = '';
+try {
+  const buffer = readFileSync(join(process.cwd(), 'public', 'brand', 'mindy-logo-icon.png'));
+  logoDataUri = `data:image/png;base64,${buffer.toString('base64')}`;
+} catch (err) {
+  console.warn('[opengraph-image] Could not load Mindy logo:', err);
 }
 
 export default async function Image() {
@@ -66,9 +57,15 @@ export default async function Image() {
           fontFamily: 'system-ui, -apple-system, sans-serif',
         }}
       >
-        {/* Top row: mark + small wordmark */}
+        {/* Top row: mark + wordmark. Logo is the same PNG asset
+            MindyLogo.tsx uses in the app, so the OG card matches what
+            visitors see when they land. Source PNG is 3104×2480
+            (1.25:1); render at 200×160 to match. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <MindyMark />
+          {logoDataUri ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoDataUri} alt="" width={200} height={160} style={{ display: 'block' }} />
+          ) : null}
           <div
             style={{
               fontSize: '40px',
