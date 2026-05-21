@@ -893,6 +893,28 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                           >
                             {isExpanded ? 'Hide Fit' : 'Review Fit'}
                           </button>
+                          {/* Track in Pipeline — promoted from inside the
+                              expanded Review Fit section to the always-
+                              visible action row. Legacy /briefings showed
+                              "+ Track" inline on the card; hiding it
+                              behind a Review Fit click was a regression. */}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleTrackInPipeline(item);
+                            }}
+                            disabled={savingPipeline.has(item.id) || pipelineSaved.has(item.id)}
+                            className={`ml-2 mt-3 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                              pipelineSaved.has(item.id)
+                                ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
+                                : savingPipeline.has(item.id)
+                                  ? 'bg-slate-800 text-slate-400 cursor-wait'
+                                  : 'bg-purple-600 text-white hover:bg-purple-500'
+                            }`}
+                          >
+                            {pipelineSaved.has(item.id) ? '✓ Tracking' : savingPipeline.has(item.id) ? 'Adding…' : '+ Track'}
+                          </button>
                           <button
                             type="button"
                             onClick={(event) => {
@@ -924,24 +946,11 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                             <span key={signal} className="rounded bg-slate-800/80 px-2 py-1 text-xs text-slate-400">{signal}</span>
                           ))}
                         </div>
+                        {/* Action row inside Review Fit: was the only home
+                            for Track in Pipeline, now duplicated. Track
+                            promoted to the always-visible row above, so
+                            only "View on SAM.gov" remains here. */}
                         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleTrackInPipeline(item);
-                            }}
-                            disabled={savingPipeline.has(item.id) || pipelineSaved.has(item.id)}
-                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                              pipelineSaved.has(item.id)
-                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-default'
-                                : savingPipeline.has(item.id)
-                                  ? 'bg-slate-800 text-slate-400 cursor-wait'
-                                  : 'bg-purple-600 text-white hover:bg-purple-500'
-                            }`}
-                          >
-                            {pipelineSaved.has(item.id) ? '✓ Tracking' : savingPipeline.has(item.id) ? 'Adding...' : '📈 Track in Pipeline'}
-                          </button>
                           {item.actionUrl && (
                             <a
                               href={item.actionUrl}
