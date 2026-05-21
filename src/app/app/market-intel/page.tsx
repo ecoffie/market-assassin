@@ -200,6 +200,50 @@ function MarketIntelDashboard() {
   const [loadingDescriptionFor, setLoadingDescriptionFor] = useState<string | null>(null);
   const [descriptionErrorFor, setDescriptionErrorFor] = useState<{ id: string; error: string } | null>(null);
 
+  // Mindy Analyst — AI bid/no-bid per opportunity. Pro feature; free
+  // users get a teaser block. PRD-ai-bd-department.md Agent #2.
+  interface AnalystAnalysis {
+    recommendation: 'pursue' | 'watch' | 'skip';
+    score: number;
+    why_pursue: string[];
+    concerns: string[];
+    competitors_likely: string[];
+    effort_estimate: string;
+    next_step: string;
+  }
+  const [analystByOpp, setAnalystByOpp] = useState<Record<string, AnalystAnalysis>>({});
+  const [analystLoadingFor, setAnalystLoadingFor] = useState<string | null>(null);
+  const [analystErrorFor, setAnalystErrorFor] = useState<{ id: string; teaser: boolean; message: string } | null>(null);
+
+  const loadAnalyst = useCallback(async (noticeId: string) => {
+    if (!email) return;
+    if (analystByOpp[noticeId]) return;
+    setAnalystLoadingFor(noticeId);
+    setAnalystErrorFor(null);
+    try {
+      const res = await fetch('/api/analyst/bid-no-bid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noticeId, email }),
+      });
+      const data = await res.json();
+      if (res.status === 402 || data.teaser) {
+        setAnalystErrorFor({ id: noticeId, teaser: true, message: data.error || 'Mindy Pro required' });
+        return;
+      }
+      if (!res.ok || !data.success || !data.analysis) {
+        setAnalystErrorFor({ id: noticeId, teaser: false, message: data.error || 'Analyst unavailable' });
+        return;
+      }
+      setAnalystByOpp((prev) => ({ ...prev, [noticeId]: data.analysis }));
+    } catch (err) {
+      console.error('Failed to fetch Analyst:', err);
+      setAnalystErrorFor({ id: noticeId, teaser: false, message: 'Network error' });
+    } finally {
+      setAnalystLoadingFor(null);
+    }
+  }, [email, analystByOpp]);
+
   const loadFullDescription = useCallback(async (noticeId: string) => {
     setLoadingDescriptionFor(noticeId);
     setDescriptionErrorFor(null);
@@ -773,6 +817,12 @@ function MarketIntelDashboard() {
                       ) {
                         void loadFullDescription(opp.notice_id);
                       }
+                      // Also kick off Mindy Analyst on expand. Returns
+                      // a 402 teaser for free users (renders the
+                      // upgrade card); cached pro responses are instant.
+                      if (opening) {
+                        void loadAnalyst(opp.notice_id);
+                      }
                     }}
                     className="w-full text-left p-4"
                   >
@@ -811,6 +861,74 @@ function MarketIntelDashboard() {
 
                   {isExpanded && (
                     <div className="px-4 pb-4 pt-3 border-t border-gray-800 bg-gray-900/50 space-y-4">
+                      {/* Mindy Analyst — AI bid/no-bid. Same logic as the
+                          Source Feed drawer. Pro gated; free shows
+                          teaser. PRD-ai-bd-department.md Agent #2. */}
+                      {(() => {
+                        const a = analystByOpp[opp.notice_id];
+                        const loading = analystLoadingFor === opp.notice_id;
+                        const err = analystErrorFor?.id === opp.notice_id ? analystErrorFor : null;
+                        if (a) {
+                          const tone = a.recommendation === 'pursue'
+                            ? { ring: 'border-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-300' }
+                            : a.recommendation === 'watch'
+                            ? { ring: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-300' }
+                            : { ring: 'border-gray-600/40', bg: 'bg-gray-700/30', text: 'text-gray-400' };
+                          const label = a.recommendation === 'pursue' ? 'PURSUE' : a.recommendation === 'watch' ? 'WATCH' : 'SKIP';
+                          return (
+                            <div className={`rounded-lg border ${tone.ring} ${tone.bg} p-3 space-y-2`}>
+                              <div className="flex items-center justify-between">
+                                <p className={`text-sm font-bold ${tone.text}`}>
+                                  ★ Mindy Analyst: {label}
+                                  <span className="text-xs font-medium text-gray-400 ml-2">{a.score}/100</span>
+                                </p>
+                              </div>
+                              {a.why_pursue.length > 0 && (
+                                <div className="text-xs">
+                                  <span className="text-emerald-400 font-semibold">Why:</span>
+                                  <span className="text-gray-200 ml-1">{a.why_pursue.slice(0, 3).join(' • ')}</span>
+                                </div>
+                              )}
+                              {a.concerns.length > 0 && (
+                                <div className="text-xs">
+                                  <span className="text-amber-400 font-semibold">Concerns:</span>
+                                  <span className="text-gray-200 ml-1">{a.concerns.slice(0, 3).join(' • ')}</span>
+                                </div>
+                              )}
+                              <div className="text-xs text-gray-300 pt-1 border-t border-gray-800/50">
+                                <span className="text-gray-500 font-semibold uppercase tracking-wider mr-1">Next:</span>
+                                {a.next_step}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (loading) {
+                          return (
+                            <div className="rounded-lg border border-gray-800 bg-gray-900 p-3 flex items-center gap-2 text-xs text-gray-400">
+                              <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                              Mindy Analyst is reading the RFP…
+                            </div>
+                          );
+                        }
+                        if (err?.teaser) {
+                          return (
+                            <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-3 flex items-center justify-between gap-3">
+                              <p className="text-xs text-gray-200">
+                                <span className="text-purple-300 font-semibold">Mindy Analyst</span> — AI
+                                bid/no-bid analysis for this opportunity. Included with Mindy Pro.
+                              </p>
+                              <a
+                                href="/market-intelligence"
+                                className="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-colors"
+                              >
+                                Upgrade
+                              </a>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       {/* Description: inline text if SAM gave us one, else a
                           Load button that lazy-fetches from SAM's noticedesc
                           endpoint and caches the result. */}

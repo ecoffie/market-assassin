@@ -105,6 +105,22 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [lazyDescriptions, setLazyDescriptions] = useState<Record<string, string>>({});
   const [loadingDescription, setLoadingDescription] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
+
+  // Mindy Analyst (AI bid/no-bid) — Pro feature. Cached per
+  // (notice_id, user) server-side; we also cache in-memory so flipping
+  // between drawer-open/close doesn't refetch.
+  interface AnalystAnalysis {
+    recommendation: 'pursue' | 'watch' | 'skip';
+    score: number;
+    why_pursue: string[];
+    concerns: string[];
+    competitors_likely: string[];
+    effort_estimate: string;
+    next_step: string;
+  }
+  const [analystByOpp, setAnalystByOpp] = useState<Record<string, AnalystAnalysis>>({});
+  const [analystLoading, setAnalystLoading] = useState<string | null>(null);
+  const [analystError, setAnalystError] = useState<{ id: string; teaser: boolean; message: string } | null>(null);
   const [savingAlertIds, setSavingAlertIds] = useState<Set<string>>(new Set());
   const [savedAlertIds, setSavedAlertIds] = useState<Set<string>>(new Set());
   const [feedbackByAlert, setFeedbackByAlert] = useState<Record<string, FeedbackType>>({});
@@ -276,6 +292,36 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     }
   }, [lazyDescriptions]);
 
+  const loadAnalyst = useCallback(async (noticeId: string) => {
+    if (!email) return;
+    if (analystByOpp[noticeId]) return; // already cached in memory
+    setAnalystLoading(noticeId);
+    setAnalystError(null);
+    try {
+      const res = await fetch('/api/analyst/bid-no-bid', {
+        method: 'POST',
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ noticeId, email }),
+      });
+      const data = await res.json();
+      // 402 = pro-gated teaser, render the upgrade card.
+      if (res.status === 402 || data.teaser) {
+        setAnalystError({ id: noticeId, teaser: true, message: data.error || 'Mindy Pro required' });
+        return;
+      }
+      if (!res.ok || !data.success || !data.analysis) {
+        setAnalystError({ id: noticeId, teaser: false, message: data.error || 'Analyst unavailable' });
+        return;
+      }
+      setAnalystByOpp((prev) => ({ ...prev, [noticeId]: data.analysis }));
+    } catch (err) {
+      console.error('Failed to fetch Analyst:', err);
+      setAnalystError({ id: noticeId, teaser: false, message: 'Network error' });
+    } finally {
+      setAnalystLoading(null);
+    }
+  }, [email, analystByOpp]);
+
   // When the drawer opens (selectedAlert changes), auto-fetch the full
   // description if we don't have inline text. Cache hit returns
   // instantly; cache miss shows a spinner inside the drawer.
@@ -285,6 +331,14 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     if (lazyDescriptions[selectedAlert.id]) return;
     void loadFullDescription(selectedAlert.id);
   }, [selectedAlert, lazyDescriptions, loadFullDescription]);
+
+  // Auto-fetch Mindy Analyst on drawer open. Pro tier gets the real
+  // analysis; free tier hits the 402 teaser path and renders the
+  // upgrade card. Either way, fire-and-forget on open.
+  useEffect(() => {
+    if (!selectedAlert) return;
+    void loadAnalyst(selectedAlert.id);
+  }, [selectedAlert, loadAnalyst]);
 
   const dismissAlert = (alert: Alert) => {
     setDismissedAlertIds(prev => new Set(prev).add(alert.id));
@@ -992,6 +1046,141 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                   </div>
                 )}
               </div>
+
+              {/* Mindy Analyst — AI bid/no-bid recommendation. Pro
+                  feature; free tier gets the upgrade teaser. PRD-ai-bd-
+                  department.md Agent #2. */}
+              {(() => {
+                const analysis = analystByOpp[selectedAlert.id];
+                const isLoading = analystLoading === selectedAlert.id;
+                const err = analystError?.id === selectedAlert.id ? analystError : null;
+
+                if (analysis) {
+                  const recColor =
+                    analysis.recommendation === 'pursue'
+                      ? { ring: 'border-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-300' }
+                      : analysis.recommendation === 'watch'
+                      ? { ring: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-300' }
+                      : { ring: 'border-slate-600/40', bg: 'bg-slate-700/30', text: 'text-slate-400' };
+                  const label = analysis.recommendation === 'pursue'
+                    ? 'PURSUE'
+                    : analysis.recommendation === 'watch'
+                    ? 'WATCH'
+                    : 'SKIP';
+                  return (
+                    <div className={`rounded-xl border ${recColor.ring} ${recColor.bg} p-4 space-y-3`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">★</span>
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase tracking-wider">Mindy Analyst</p>
+                            <p className={`text-lg font-bold ${recColor.text}`}>
+                              {label}
+                              <span className="text-sm font-medium text-slate-400 ml-2">
+                                Score: {analysis.score}/100
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {analysis.why_pursue.length > 0 && (
+                        <div>
+                          <p className="text-xs text-emerald-400 font-semibold mb-1">WHY PURSUE</p>
+                          <ul className="text-sm text-slate-200 space-y-1">
+                            {analysis.why_pursue.slice(0, 5).map((reason, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-emerald-400 mt-0.5">✓</span>
+                                <span>{reason}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {analysis.concerns.length > 0 && (
+                        <div>
+                          <p className="text-xs text-amber-400 font-semibold mb-1">CONCERNS</p>
+                          <ul className="text-sm text-slate-200 space-y-1">
+                            {analysis.concerns.slice(0, 4).map((concern, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-amber-400 mt-0.5">⚠</span>
+                                <span>{concern}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {analysis.competitors_likely.length > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 font-semibold mb-1">COMPETITORS LIKELY</p>
+                          <p className="text-sm text-slate-300">{analysis.competitors_likely.join(' • ')}</p>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-slate-800/50 space-y-1.5">
+                        <p className="text-sm text-slate-300">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider mr-2">Effort</span>
+                          {analysis.effort_estimate}
+                        </p>
+                        <p className="text-sm text-slate-200 font-medium">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider mr-2">Next step</span>
+                          {analysis.next_step}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isLoading) {
+                  return (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 flex items-center gap-3 text-sm text-slate-400">
+                      <span className="inline-block w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                      Mindy Analyst is reading the RFP…
+                    </div>
+                  );
+                }
+
+                if (err?.teaser) {
+                  // Free tier: upgrade hook. Mirrors the Source Feed
+                  // header's "Upgrade to Mindy Pro" treatment so the
+                  // CTA feels consistent across surfaces.
+                  return (
+                    <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-4">
+                      <p className="text-xs text-purple-300 uppercase tracking-wider mb-1">Mindy Analyst</p>
+                      <p className="text-sm text-slate-200 mb-3">
+                        Get an AI bid/no-bid analysis for this opportunity — score, why-pursue reasons,
+                        concerns, likely competitors, and the next step. Included with Mindy Pro.
+                      </p>
+                      <a
+                        href="/market-intelligence"
+                        className="inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        Upgrade to Mindy Pro
+                      </a>
+                    </div>
+                  );
+                }
+
+                if (err) {
+                  return (
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm">
+                      <p className="text-red-300">Analyst unavailable: {err.message}</p>
+                      <button
+                        type="button"
+                        onClick={() => loadAnalyst(selectedAlert.id)}
+                        className="mt-2 text-xs text-purple-300 hover:text-purple-200 underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  );
+                }
+
+                // No state yet (component just mounted) — render nothing.
+                return null;
+              })()}
 
               {/* Description — inline if SAM gave us text; lazy-fetched
                   from /api/sam-description when only a URL is on file.

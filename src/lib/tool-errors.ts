@@ -45,6 +45,7 @@ export const ToolNames = {
   OPPORTUNITY_HUNTER: 'opportunity_hunter',
   REPORTS: 'reports',
   PROPOSAL_ASSIST: 'proposal_assist', // RFP parsing, compliance matrix, section drafting
+  ANALYST: 'analyst', // AI bid/no-bid recommendation per opportunity (PRD-ai-bd-department.md Agent #2)
 } as const;
 
 export type ToolName = (typeof ToolNames)[keyof typeof ToolNames];
