@@ -505,9 +505,26 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // SAM.gov regularly publishes the same procurement as two or more
+    // notices (amendments, re-posts, duplicate uploads). The notice_id
+    // differs but the title + department are identical. Dedupe by a
+    // normalized title+department key so users don't see the same opp
+    // listed twice in a row. Keep the first occurrence (highest in the
+    // server-side ordering, e.g. soonest response_deadline).
+    const seenOpportunityKeys = new Set<string>();
+    const dedupedOpps = dashboardOpps.filter((opp) => {
+      const key = [
+        String(opp.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
+        String(opp.department || opp.sub_tier || '').toLowerCase().trim(),
+      ].join('|');
+      if (seenOpportunityKeys.has(key)) return false;
+      seenOpportunityKeys.add(key);
+      return true;
+    });
+
     return NextResponse.json({
       success: true,
-      opportunities: dashboardOpps,
+      opportunities: dedupedOpps,
       pagination: {
         page,
         limit,
