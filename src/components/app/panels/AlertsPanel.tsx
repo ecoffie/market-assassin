@@ -1059,10 +1059,16 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                           } catch { /* fall through */ }
                         }
                         if (!url) return null;
+                        // SAM file URLs need our SAM_API_KEY; route
+                        // through the Mindy proxy so the user gets a
+                        // real file download instead of UNAUTHORIZED.
+                        const downloadHref = /(^|\.)sam\.gov\//i.test(url)
+                          ? `/api/sam-attachment?url=${encodeURIComponent(url)}`
+                          : url;
                         return (
                           <li key={idx}>
                             <a
-                              href={url}
+                              href={downloadHref}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"

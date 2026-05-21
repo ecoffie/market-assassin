@@ -910,10 +910,17 @@ function MarketIntelDashboard() {
                                 }
                                 const name = derivedName || `Document ${idx + 1}`;
                                 if (!url) return null;
+                                // SAM file URLs require our SAM_API_KEY
+                                // to download. Route through the proxy so
+                                // the user sees a normal file download
+                                // instead of an UNAUTHORIZED JSON error.
+                                const downloadHref = /(^|\.)sam\.gov\//i.test(url)
+                                  ? `/api/sam-attachment?url=${encodeURIComponent(url)}`
+                                  : url;
                                 return (
                                   <li key={idx}>
                                     <a
-                                      href={url}
+                                      href={downloadHref}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
