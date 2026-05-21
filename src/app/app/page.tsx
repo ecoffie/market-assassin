@@ -7,6 +7,7 @@ import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/Un
 import PanelContainer from '@/components/app/panels';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
+import { ToastHost } from '@/components/app/Toast';
 import { getSupabase } from '@/lib/supabase/client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 
@@ -39,7 +40,13 @@ function DashboardLoading() {
 export default function AppPage() {
   return (
     <Suspense fallback={<DashboardLoading />}>
-      <AppDashboard />
+      {/* Wraps the whole /app tree so any panel can call useToast() to
+          surface action confirmations (Track in Pipeline, Saved, etc).
+          Same pattern Linear / Vercel / Notion use — fixed-position
+          bottom-right stack with auto-dismiss + optional Undo. */}
+      <ToastHost>
+        <AppDashboard />
+      </ToastHost>
     </Suspense>
   );
 }

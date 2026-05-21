@@ -8,6 +8,7 @@ import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { useToast } from '../Toast';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -432,6 +433,11 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [savingPipeline, setSavingPipeline] = useState<Set<string>>(new Set());
   const [pipelineSaved, setPipelineSaved] = useState<Set<string>>(new Set());
+  // briefing item id -> pipeline row id, so the toast's Undo action
+  // can DELETE the row that was just inserted. Populated only after
+  // the API returns success.
+  const [pipelineRowByItem, setPipelineRowByItem] = useState<Record<string, string>>({});
+  const { showToast } = useToast();
   const [feedbackByItem, setFeedbackByItem] = useState<Record<string, FeedbackType>>({});
   const [savingFeedback, setSavingFeedback] = useState<Set<string>>(new Set());
   const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set());
@@ -617,8 +623,12 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
   const handleTrackInPipeline = useCallback(async (item: BriefingItem) => {
     if (!email) return;
+    if (pipelineSaved.has(item.id)) return; // already tracked
 
-    setSavingPipeline(prev => new Set(prev).add(item.id));
+    // Optimistic: flip button to "✓ Tracking" BEFORE the network call
+    // settles. Linear / Notion pattern — the user sees the action took
+    // immediately. If the server rejects, we roll back below.
+    setPipelineSaved(prev => new Set(prev).add(item.id));
 
     try {
       const res = await fetch('/api/pipeline', {
@@ -639,13 +649,77 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           source: 'briefing',
         }),
       });
+      const data = await res.json().catch(() => null);
 
-      if (res.ok) {
-        setPipelineSaved(prev => new Set(prev).add(item.id));
-        trackItemEvent('tool_use', item, 'track_in_pipeline');
+      if (!res.ok || !data?.success) {
+        // Roll back optimistic state and show error toast. 409 means
+        // the opp was already in the pipeline — keep optimistic state
+        // since the outcome the user wanted is true.
+        if (res.status === 409) {
+          showToast({ message: 'Already in your Pipeline', variant: 'info' });
+        } else {
+          setPipelineSaved(prev => {
+            const next = new Set(prev);
+            next.delete(item.id);
+            return next;
+          });
+          showToast({
+            message: data?.error || 'Could not add to Pipeline',
+            variant: 'error',
+          });
+        }
+        return;
       }
+
+      // Success. Remember the row id so Undo can delete it. Then show
+      // the toast with an Undo action.
+      const pipelineRowId = data.opportunity?.id as string | undefined;
+      if (pipelineRowId) {
+        setPipelineRowByItem(prev => ({ ...prev, [item.id]: pipelineRowId }));
+      }
+      trackItemEvent('tool_use', item, 'track_in_pipeline');
+      showToast({
+        message: 'Added to Pipeline',
+        variant: 'success',
+        action: pipelineRowId
+          ? {
+              label: 'Undo',
+              onClick: () => {
+                // Roll back UI first (optimistic undo).
+                setPipelineSaved(prev => {
+                  const next = new Set(prev);
+                  next.delete(item.id);
+                  return next;
+                });
+                setPipelineRowByItem(prev => {
+                  const next = { ...prev };
+                  delete next[item.id];
+                  return next;
+                });
+                // Fire DELETE without awaiting — if it fails the row
+                // stays in Pipeline; the user can clean it up there.
+                // Logging error is enough for our debugging.
+                fetch('/api/pipeline', {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id: pipelineRowId, user_email: email }),
+                }).catch((err) => console.warn('[DashboardPanel] Undo DELETE failed:', err));
+              },
+            }
+          : undefined,
+      });
     } catch (err) {
       console.error('Failed to add to pipeline:', err);
+      // Network error — roll back and tell the user.
+      setPipelineSaved(prev => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+      showToast({
+        message: 'Network error — could not add to Pipeline',
+        variant: 'error',
+      });
     } finally {
       setSavingPipeline(prev => {
         const next = new Set(prev);
@@ -653,7 +727,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         return next;
       });
     }
-  }, [email, trackItemEvent]);
+  }, [email, trackItemEvent, pipelineSaved, showToast]);
 
   const handleOpportunityFeedback = useCallback(async (item: BriefingItem, feedbackType: FeedbackType) => {
     if (!email) return;
