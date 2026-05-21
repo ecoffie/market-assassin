@@ -106,6 +106,9 @@ const INTERNAL_TEAM_EMAILS = new Set([
   'evankoffdev@gmail.com',
   'usamashraf2@gmail.com',
   'muneebamehmood07@gmail.com',
+  // I lowercase on read but normalize on write too so future copy-paste
+  // adds (mixed case from email signatures) match the set.
+  'sikandarphulpoto35@gmail.com',
 ]);
 
 function getStaffRole(email: string): MIStaffRole {
