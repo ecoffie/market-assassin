@@ -813,11 +813,19 @@ function MarketIntelDashboard() {
                         </div>
                         <div>
                           <span className="text-gray-500 text-xs">Sub-Agency</span>
-                          <p className="text-gray-300 mt-0.5">{opp.sub_tier || '—'}</p>
+                          <p className="text-gray-300 mt-0.5">
+                            {opp.sub_tier
+                              || (opp.agency_hierarchy && opp.agency_hierarchy.split('.').slice(1, 2).join('') )
+                              || '—'}
+                          </p>
                         </div>
                         <div>
                           <span className="text-gray-500 text-xs">Office</span>
-                          <p className="text-gray-300 mt-0.5">{opp.office || '—'}</p>
+                          <p className="text-gray-300 mt-0.5">
+                            {opp.office
+                              || (opp.agency_hierarchy && opp.agency_hierarchy.split('.').slice(2).join(' · ') )
+                              || '—'}
+                          </p>
                         </div>
                         <div>
                           <span className="text-gray-500 text-xs">Place of Performance</span>
