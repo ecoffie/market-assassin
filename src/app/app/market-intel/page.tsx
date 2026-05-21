@@ -867,42 +867,49 @@ function MarketIntelDashboard() {
                         </div>
                       </div>
 
-                      {/* Attachments — SAM's resourceLinks. Each entry has
-                          a file URL plus metadata; we extract whichever
-                          field SAM populated for the filename. */}
-                      {opp.attachments && opp.attachments.length > 0 && (
-                        <div>
-                          <span className="text-gray-500 text-xs uppercase tracking-wide">
-                            Attachments ({opp.attachments.length})
-                          </span>
-                          <ul className="mt-2 space-y-1.5">
-                            {opp.attachments.map((att, idx) => {
-                              const url = typeof att === 'string'
-                                ? att
-                                : (att?.url || att?.link || att?.resourceLink) as string | undefined;
-                              const name = (att?.name || att?.fileName || att?.title) as string | undefined
-                                || (url ? url.split('/').pop() : undefined)
-                                || `Attachment ${idx + 1}`;
-                              if (!url) return null;
-                              return (
-                                <li key={idx}>
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
-                                  >
-                                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                    </svg>
-                                    <span className="truncate">{name}</span>
-                                  </a>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      )}
+                      {/* Attachments — SAM's resourceLinks (populated by
+                          the per-opp detail fetch cron). Sentinel entries
+                          like { _no_attachments: true } are filtered out
+                          so empty results don't render as "Attachments (1)". */}
+                      {(() => {
+                        const realAttachments = (opp.attachments || []).filter(
+                          (a) => a && !(a as Record<string, unknown>)._no_attachments
+                        );
+                        if (realAttachments.length === 0) return null;
+                        return (
+                          <div>
+                            <span className="text-gray-500 text-xs uppercase tracking-wide">
+                              Attachments ({realAttachments.length})
+                            </span>
+                            <ul className="mt-2 space-y-1.5">
+                              {realAttachments.map((att, idx) => {
+                                const url = typeof att === 'string'
+                                  ? att
+                                  : (att?.url || att?.link || att?.resourceLink) as string | undefined;
+                                const name = (att?.name || att?.fileName || att?.title) as string | undefined
+                                  || (url ? url.split('/').pop() : undefined)
+                                  || `Attachment ${idx + 1}`;
+                                if (!url) return null;
+                                return (
+                                  <li key={idx}>
+                                    <a
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
+                                    >
+                                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                      </svg>
+                                      <span className="truncate">{name}</span>
+                                    </a>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        );
+                      })()}
 
                       {/* Points of Contact — usually contracting officer +
                           specialist. SAM's pointOfContact entries vary

@@ -41,8 +41,13 @@ function getSupabase() {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractFromRaw(raw: any) {
   if (!raw || typeof raw !== 'object') return null;
+  // Attachments NOT extracted here — SAM's list endpoint returns
+  // resourceLinks: null on every row (verified via /api/admin/sam-
+  // raw-sample). The actual attachment URLs only come from the per-
+  // opportunity detail endpoint, fetched separately by the attachment
+  // backfill cron. Leave attachments column untouched so that cron
+  // can populate it without trampling.
   return {
-    attachments: Array.isArray(raw.resourceLinks) ? raw.resourceLinks : [],
     points_of_contact: Array.isArray(raw.pointOfContact) ? raw.pointOfContact : [],
     office_address: raw.officeAddress ?? null,
     fair_opportunity: raw.fairOpportunity ?? null,
@@ -69,15 +74,17 @@ export async function GET(request: NextRequest) {
     .from('sam_opportunities')
     .select('id', { count: 'exact', head: true });
 
-  // Count rows whose raw_data still has resourceLinks / pointOfContact
-  // that haven't been copied into the columns. This uses the JSONB
-  // path operator to look inside raw_data.
+  // Diagnostic revealed SAM's list endpoint returns resourceLinks as
+  // null (only the per-opportunity detail endpoint includes the file
+  // URLs). pointOfContact IS populated on the list endpoint, so we
+  // use that as the backfill signal — it's the most reliable indicator
+  // that a row has not yet been extracted into the new columns.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { count: needsBackfillRaw } = await (supabase
     .from('sam_opportunities')
     .select('id', { count: 'exact', head: true }) as any)
-    .eq('attachments', '[]')
-    .not('raw_data->resourceLinks', 'is', null);
+    .eq('points_of_contact', '[]')
+    .not('raw_data->pointOfContact', 'is', null);
 
   return NextResponse.json({
     mode: 'dry-run',
@@ -97,23 +104,18 @@ export async function POST(request: NextRequest) {
 
   const supabase = getSupabase();
 
-  // Pull a batch of rows whose raw_data has extractable fields that
-  // the columns don't reflect yet. Migration default left attachments
-  // and points_of_contact as '[]', so we look for rows where the JSON
-  // path inside raw_data has the original arrays but the columns are
-  // still empty. Once extracted, attachments will be '[]' OR the real
-  // array — either way different from the dry-run filter — so the
-  // backfill is naturally idempotent. We also catch rows where SAM
-  // genuinely returned [] but we want to mark them processed; for
-  // those, an additional sentinel via fair_opportunity or office_
-  // address being null vs set would help, but the simplest correct
-  // behavior is: only re-process rows that have something to copy.
+  // Filter: rows where points_of_contact is still '[]' (default) AND
+  // raw_data has a pointOfContact value. SAM's list endpoint always
+  // includes pointOfContact when an opp has contacts, so this is the
+  // canonical "needs backfill" signal. Once we update the columns,
+  // points_of_contact becomes the real POC array and the filter no
+  // longer matches that row — naturally idempotent.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: rows, error } = await (supabase
     .from('sam_opportunities')
     .select('id, raw_data') as any)
-    .eq('attachments', '[]')
-    .not('raw_data->resourceLinks', 'is', null)
+    .eq('points_of_contact', '[]')
+    .not('raw_data->pointOfContact', 'is', null)
     .limit(limit);
 
   if (error) {
@@ -138,11 +140,13 @@ export async function POST(request: NextRequest) {
   for (const row of rows) {
     const extracted = extractFromRaw(row.raw_data);
     if (!extracted) {
-      // No raw_data to extract from — set attachments to [] so we don't
-      // re-pick the row next run.
+      // No raw_data on the row — mark points_of_contact done so the
+      // filter (eq '[]' AND raw_data->pointOfContact NOT NULL) no
+      // longer matches and we don't re-pick it. We use a sentinel
+      // single-entry array so the eq '[]' filter excludes it.
       const { error: updateError } = await supabase
         .from('sam_opportunities')
-        .update({ attachments: [], points_of_contact: [] })
+        .update({ points_of_contact: [{ skipped: 'no_raw_data' }] })
         .eq('id', row.id);
       if (updateError) {
         errors.push({ id: row.id, error: updateError.message });
@@ -164,10 +168,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { count: remaining } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: remaining } = await (supabase
     .from('sam_opportunities')
-    .select('id', { count: 'exact', head: true })
-    .is('attachments', null);
+    .select('id', { count: 'exact', head: true }) as any)
+    .eq('points_of_contact', '[]')
+    .not('raw_data->pointOfContact', 'is', null);
 
   return NextResponse.json({
     success: errors.length === 0,
