@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
+import { useToast } from '../Toast';
 
 interface ContactsPanelProps {
   email: string | null;
@@ -76,6 +77,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
   const tierLabel = tier === 'free' ? 'Free CRM' : tier === 'pro' ? 'Pro CRM' : 'Full CRM';
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
   const track = useAppTracker(email);
+  const { showToast } = useToast();
 
   const loadPipeline = useCallback(async () => {
     if (!email) return;
@@ -176,12 +178,16 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
           // the user is building — sub, prime, mentor, etc.
           partner_type: partnerData.partner_type,
         });
+        showToast({
+          message: `${partnerData.partner_name || 'Partner'} added`,
+          variant: 'success',
+        });
       } else {
-        setError(data.error || 'Failed to add partner');
+        showToast({ message: data.error || 'Could not add partner', variant: 'error' });
       }
     } catch (err) {
       console.error('Failed to add partner:', err);
-      setError('Failed to add partner');
+      showToast({ message: 'Network error — partner not added', variant: 'error' });
     }
   };
 
@@ -208,17 +214,24 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
           partner_id: id,
           updated_fields: Object.keys(updates),
         });
+        showToast({ message: 'Partner updated', variant: 'success' });
       } else {
-        setError(data.error || 'Failed to update partner');
+        showToast({ message: data.error || 'Could not update partner', variant: 'error' });
       }
     } catch (err) {
       console.error('Failed to update partner:', err);
-      setError('Failed to update partner');
+      showToast({ message: 'Network error — update not saved', variant: 'error' });
     }
   };
 
   const handleDeletePartner = async (id: string) => {
     if (!email || !confirm('Remove this partner?')) return;
+
+    // Capture the row so Undo can re-create it. Partial best-effort —
+    // /api/teaming POST regenerates an id, so the new row has a
+    // different id than the deleted one (no FK issues with that
+    // since teaming partners aren't referenced elsewhere by id).
+    const partnerToRestore = partners.find(p => p.id === id);
 
     try {
       const res = await fetch('/api/teaming', {
@@ -232,12 +245,33 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
         setSelectedPartner(null);
         loadPartners();
         track('tool_use', 'contacts', { action: 'delete_partner', partner_id: id });
+        showToast({
+          message: `${partnerToRestore?.partner_name || 'Partner'} removed`,
+          variant: 'info',
+          action: partnerToRestore
+            ? {
+                label: 'Undo',
+                onClick: () => {
+                  // Re-post the captured row. Don't await — fire-and-
+                  // forget keeps the toast snappy. loadPartners will
+                  // refresh the list once the server replies.
+                  fetch('/api/teaming', {
+                    method: 'POST',
+                    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ ...partnerToRestore, user_email: email }),
+                  })
+                    .then(() => loadPartners())
+                    .catch((err) => console.warn('[ContactsPanel] Undo POST failed:', err));
+                },
+              }
+            : undefined,
+        });
       } else {
-        setError(data.error || 'Failed to remove partner');
+        showToast({ message: data.error || 'Could not remove partner', variant: 'error' });
       }
     } catch (err) {
       console.error('Failed to delete partner:', err);
-      setError('Failed to remove partner');
+      showToast({ message: 'Network error — partner not removed', variant: 'error' });
     }
   };
 
@@ -275,12 +309,21 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
           // power-users who team multiple partners per opp.
           partner_count_after: nextPartners.length,
         });
+        showToast({
+          message: isAttached
+            ? `${partnerName} detached from pursuit`
+            : `${partnerName} attached to pursuit`,
+          variant: 'success',
+        });
       } else {
-        setError(data.error || 'Failed to update pursuit partners');
+        showToast({
+          message: data.error || 'Could not update pursuit partners',
+          variant: 'error',
+        });
       }
     } catch (err) {
       console.error('Failed to attach pursuit:', err);
-      setError('Failed to update pursuit partners');
+      showToast({ message: 'Network error — pursuit not updated', variant: 'error' });
     }
   };
 

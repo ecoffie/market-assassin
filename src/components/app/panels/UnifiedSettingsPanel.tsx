@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
+import { useToast } from '../Toast';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
@@ -42,6 +43,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [error, setError] = useState<string | null>(null);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
   const track = useAppTracker(email);
+  const { showToast } = useToast();
 
   const loadSettings = useCallback(async () => {
     if (!email) return;
@@ -145,7 +147,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       const data = await workspaceRes.json();
 
       if (!data.success) {
-        setError(data.error || 'Failed to save settings');
+        showToast({ message: data.error || 'Could not save settings', variant: 'error' });
         return;
       }
 
@@ -155,10 +157,18 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       if (!prefsRes.ok) {
         const prefsErr = await prefsRes.json().catch(() => null);
         console.warn('Email frequency save failed:', prefsErr);
+        showToast({
+          message: 'Saved, but email frequency may not have updated',
+          variant: 'info',
+        });
+      } else {
+        showToast({
+          message: markComplete ? 'Onboarding marked complete' : 'Settings saved',
+          variant: 'success',
+        });
       }
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
-      setMessage(markComplete ? 'Onboarding marked complete.' : 'Settings saved.');
       // profile_update is an activation signal — users tweaking their
       // profile are engaged. Capture which fields are non-empty so the
       // Launch Command Center can see what's being tuned.
@@ -174,7 +184,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       });
     } catch (err) {
       console.error('Failed to save settings:', err);
-      setError('Failed to save settings');
+      showToast({ message: 'Network error — settings not saved', variant: 'error' });
     } finally {
       setSaving(false);
     }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { useToast } from '../Toast';
 import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 
@@ -123,6 +124,10 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [analystError, setAnalystError] = useState<{ id: string; teaser: boolean; message: string } | null>(null);
   const [savingAlertIds, setSavingAlertIds] = useState<Set<string>>(new Set());
   const [savedAlertIds, setSavedAlertIds] = useState<Set<string>>(new Set());
+  // alert.id → pipeline row id, so the toast's Undo action can DELETE
+  // the row that was just inserted. Mirrors the DashboardPanel pattern.
+  const [pipelineRowByAlert, setPipelineRowByAlert] = useState<Record<string, string>>({});
+  const { showToast } = useToast();
   const [feedbackByAlert, setFeedbackByAlert] = useState<Record<string, FeedbackType>>({});
   const [savingFeedbackIds, setSavingFeedbackIds] = useState<Set<string>>(new Set());
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
@@ -207,17 +212,22 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
 
   const saveToPipeline = async (alert: Alert) => {
     if (!email) {
-      setError('Enter an email before saving opportunities.');
+      showToast({ message: 'Sign in before saving opportunities', variant: 'error' });
       return;
     }
 
     if (!canUsePipeline) {
-      setNotice('Pipeline tracking is included with Mindy Pro. Upgrade to save opportunities.');
+      showToast({
+        message: 'Pipeline tracking is included with Mindy Pro',
+        variant: 'info',
+        action: { label: 'Upgrade', onClick: () => { window.location.href = '/market-intelligence'; } },
+      });
       return;
     }
 
-    setError(null);
-    setNotice(null);
+    // Optimistic: flip the button to "Saved" before the network call
+    // settles. Matches DashboardPanel's Track-in-Pipeline pattern.
+    setSavedAlertIds(prev => new Set(prev).add(alert.id));
     setSavingAlertIds(prev => new Set(prev).add(alert.id));
 
     try {
@@ -247,22 +257,65 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setSavedAlertIds(prev => new Set(prev).add(alert.id));
-        setNotice('Saved to Pipeline Tracker.');
+        const pipelineRowId = data.opportunity?.id as string | undefined;
+        if (pipelineRowId) {
+          setPipelineRowByAlert(prev => ({ ...prev, [alert.id]: pipelineRowId }));
+        }
         trackAlertEvent('tool_use', alert, 'save_to_pipeline');
+        showToast({
+          message: 'Saved to Pipeline',
+          variant: 'success',
+          action: pipelineRowId
+            ? {
+                label: 'Undo',
+                onClick: () => {
+                  setSavedAlertIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(alert.id);
+                    return next;
+                  });
+                  setPipelineRowByAlert(prev => {
+                    const next = { ...prev };
+                    delete next[alert.id];
+                    return next;
+                  });
+                  fetch('/api/pipeline', {
+                    method: 'DELETE',
+                    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ id: pipelineRowId, user_email: email }),
+                  }).catch((err) => console.warn('[AlertsPanel] Undo DELETE failed:', err));
+                },
+              }
+            : undefined,
+        });
         return;
       }
 
       if (res.status === 409) {
-        setSavedAlertIds(prev => new Set(prev).add(alert.id));
-        setNotice('This opportunity is already in your pipeline.');
+        // Already saved — keep optimistic state, but no Undo since we
+        // didn't insert anything just now.
+        showToast({ message: 'Already in your Pipeline', variant: 'info' });
         return;
       }
 
-      setError(data.error || 'Failed to save opportunity to pipeline.');
+      // Server rejected — roll back.
+      setSavedAlertIds(prev => {
+        const next = new Set(prev);
+        next.delete(alert.id);
+        return next;
+      });
+      showToast({
+        message: data.error || 'Could not save to Pipeline',
+        variant: 'error',
+      });
     } catch (err) {
       console.error('Failed to save opportunity:', err);
-      setError('Failed to save opportunity to pipeline.');
+      setSavedAlertIds(prev => {
+        const next = new Set(prev);
+        next.delete(alert.id);
+        return next;
+      });
+      showToast({ message: 'Network error — could not save', variant: 'error' });
     } finally {
       setSavingAlertIds(prev => {
         const next = new Set(prev);
@@ -344,16 +397,35 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     setDismissedAlertIds(prev => new Set(prev).add(alert.id));
     trackAlertEvent('tool_use', alert, 'dismiss');
     if (selectedAlert?.id === alert.id) setSelectedAlert(null);
+    // Dismiss is purely client-side (we just add to a Set), so the
+    // Undo just removes the id again. No server call to reverse.
+    showToast({
+      message: 'Dismissed',
+      variant: 'info',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setDismissedAlertIds(prev => {
+            const next = new Set(prev);
+            next.delete(alert.id);
+            return next;
+          });
+        },
+      },
+    });
   };
 
   const saveFeedback = async (alert: Alert, feedbackType: FeedbackType) => {
     if (!email) {
-      setError('Sign in before tuning Mindy matches.');
+      showToast({ message: 'Sign in before tuning Mindy matches', variant: 'error' });
       return;
     }
 
+    // Optimistic: stash the selection before the network call so the
+    // chip flips immediately.
+    const previousFeedback = feedbackByAlert[alert.id];
+    setFeedbackByAlert(prev => ({ ...prev, [alert.id]: feedbackType }));
     setSavingFeedbackIds(prev => new Set(prev).add(alert.id));
-    setError(null);
 
     try {
       const res = await fetch('/api/mindy/opportunity-feedback', {
@@ -372,15 +444,30 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       const data = await res.json().catch(() => null);
 
       if (res.ok && data?.success) {
-        setFeedbackByAlert(prev => ({ ...prev, [alert.id]: feedbackType }));
-        setNotice('Saved. Mindy will use this signal to tune future matches.');
+        showToast({ message: 'Feedback saved — Mindy is learning', variant: 'success' });
         return;
       }
 
-      setError(data?.error || 'Failed to save match feedback.');
+      // Roll back optimistic chip selection.
+      setFeedbackByAlert(prev => {
+        const next = { ...prev };
+        if (previousFeedback) next[alert.id] = previousFeedback;
+        else delete next[alert.id];
+        return next;
+      });
+      showToast({
+        message: data?.error || 'Could not save feedback',
+        variant: 'error',
+      });
     } catch (err) {
       console.error('Failed to save feedback:', err);
-      setError('Failed to save match feedback.');
+      setFeedbackByAlert(prev => {
+        const next = { ...prev };
+        if (previousFeedback) next[alert.id] = previousFeedback;
+        else delete next[alert.id];
+        return next;
+      });
+      showToast({ message: 'Network error — feedback not saved', variant: 'error' });
     } finally {
       setSavingFeedbackIds(prev => {
         const next = new Set(prev);
