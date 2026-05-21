@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { useAppTracker } from '../track';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
@@ -40,6 +41,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
+  const track = useAppTracker(email);
 
   const loadSettings = useCallback(async () => {
     if (!email) return;
@@ -157,6 +159,19 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
       setMessage(markComplete ? 'Onboarding marked complete.' : 'Settings saved.');
+      // profile_update is an activation signal — users tweaking their
+      // profile are engaged. Capture which fields are non-empty so the
+      // Launch Command Center can see what's being tuned.
+      track('profile_update', 'settings', {
+        has_company: !!form.company_name,
+        has_display_name: !!form.display_name,
+        has_role: !!form.role_title,
+        naics_count: parseList(form.naics_codes).length,
+        agency_count: parseList(form.target_agencies).length,
+        state_count: form.location_states.length,
+        email_frequency: form.email_frequency,
+        marked_onboarding_complete: markComplete,
+      });
     } catch (err) {
       console.error('Failed to save settings:', err);
       setError('Failed to save settings');

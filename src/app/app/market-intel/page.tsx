@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAppTracker } from '@/components/app/track';
 
 interface NoticeTypeInfo {
   code: string;
@@ -172,6 +173,11 @@ function MarketIntelDashboard() {
   const [profileFilterActive, setProfileFilterActive] = useState(initialScope !== 'all');
   const isProfileFiltered = !!email && profileFilterActive;
 
+  // Engagement tracker — fires page_view on mount + tool_use on filter
+  // changes / attachment downloads / SAM link clicks. All fire-and-
+  // forget; failures do not surface to the user.
+  const track = useAppTracker(email);
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -280,10 +286,38 @@ function MarketIntelDashboard() {
     fetchOpportunities();
   }, [fetchOpportunities]);
 
+  // page_view fires once per email resolution. Profile-filter mode and
+  // initial scope are included so we can see how users land on the
+  // dashboard (from a "your profile" link vs an "all SAM" link).
+  useEffect(() => {
+    if (!email) return;
+    track('page_view', 'market_intel_dashboard', {
+      scope: isProfileFiltered ? 'profile' : 'all',
+      initial_scope: initialScope || null,
+    });
+    // Only the first time email lands — don't refire on every
+    // filter change. fetchOpportunities effect handles that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
     fetchOpportunities();
+    track('tool_use', 'market_intel_dashboard', {
+      action: 'search',
+      query: search,
+      // Capture active filter state so we can see what combinations
+      // users actually use.
+      filters: {
+        notice_type: noticeType || null,
+        urgency: urgency || null,
+        set_aside: setAside || null,
+        naics: naicsFilter || null,
+        state: stateFilter || null,
+        agency: agencyFilter || null,
+      },
+    });
   };
 
   const clearFilters = () => {
@@ -721,6 +755,12 @@ function MarketIntelDashboard() {
                     onClick={() => {
                       const opening = !isExpanded;
                       setExpandedId(opening ? opp.id : null);
+                      if (opening) {
+                        track('tool_use', 'market_intel_dashboard', {
+                          action: 'expand_opportunity',
+                          notice_id: opp.notice_id,
+                        });
+                      }
                       // Auto-fetch the SAM description text on expand if we
                       // don't have it inline and haven't already loaded it.
                       // Cache hit (DB or in-memory) returns instantly; cache
@@ -923,6 +963,11 @@ function MarketIntelDashboard() {
                                       href={downloadHref}
                                       target="_blank"
                                       rel="noopener noreferrer"
+                                      onMouseDown={() => track('link_click', 'market_intel_dashboard', {
+                                        action: 'download_attachment',
+                                        notice_id: opp.notice_id,
+                                        attachment_index: idx,
+                                      })}
                                       className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
                                     >
                                       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1038,6 +1083,10 @@ function MarketIntelDashboard() {
                             href={opp.ui_link}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onMouseDown={() => track('link_click', 'market_intel_dashboard', {
+                              action: 'open_sam',
+                              notice_id: opp.notice_id,
+                            })}
                             className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-2"
                           >
                             View on SAM.gov

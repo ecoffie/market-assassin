@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitiesPicker';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
+import { useAppTracker } from '@/components/app/track';
 
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], description: 'Building, heavy civil, specialty trades' },
@@ -308,6 +309,10 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
+  // Tracker: fires onboarding_step on each goToStep + a final
+  // onboarding_step with completed=true on successful save. Critical
+  // funnel signal for activation queues.
+  const track = useAppTracker(email);
   const [accessToken, setAccessToken] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -404,6 +409,7 @@ export default function OnboardingPage() {
   function goToStep(nextStep: number) {
     setError('');
     setStep(nextStep);
+    track('onboarding_step', 'onboarding', { from_step: step, to_step: nextStep });
   }
 
   function applyProfileSuggestions(suggestions: ProfileSuggestions) {
@@ -505,9 +511,24 @@ export default function OnboardingPage() {
 
       if (!res.ok || !data.success) {
         setError(data.error || 'Failed to save your profile. Please try again.');
+        track('onboarding_step', 'onboarding', {
+          step: 'completion',
+          status: 'failure',
+          error: data.error || 'unknown',
+        });
         return;
       }
 
+      track('onboarding_step', 'onboarding', {
+        step: 'completion',
+        status: 'success',
+        naics_count: (allNaicsCodes || []).length,
+        agency_count: (allAgencies || []).length,
+        state_count: (selectedStates || []).length,
+        set_aside_count: (selectedSetAsides || []).length,
+        alert_frequency: frequency,
+        has_business_description: !!businessDescription.trim(),
+      });
       router.push(`/app?email=${encodeURIComponent(email)}`);
     } catch {
       setError('Something went wrong saving your profile. Please try again.');
