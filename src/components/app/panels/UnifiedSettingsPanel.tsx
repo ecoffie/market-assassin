@@ -44,14 +44,28 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setError(null);
 
     try {
-      const res = await fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
-        headers: getAuthHeaders(),
-      });
-      const data = await res.json();
+      // Workspace endpoint has Profile fields (display_name, company, role,
+      // naics, agencies). The canonical email frequency lives on
+      // user_notification_settings.alert_frequency, surfaced via the alerts
+      // preferences endpoint — read it there too so the dropdown reflects
+      // the value that actually controls the daily-alerts cron.
+      const [workspaceRes, prefsRes] = await Promise.all([
+        fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
+          headers: getAuthHeaders(),
+        }),
+        fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`, {
+          headers: getAuthHeaders(),
+        }),
+      ]);
+
+      const data = await workspaceRes.json();
       if (!data.success) {
         setError(data.error || 'Failed to load settings');
         return;
       }
+
+      const prefs = prefsRes.ok ? await prefsRes.json().catch(() => null) : null;
+      const realAlertFrequency: string | undefined = prefs?.data?.frequency;
 
       const settings = data.settings || {};
       setWorkspaceName(data.workspace?.name || 'Workspace');
@@ -61,7 +75,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         role_title: settings.role_title || '',
         naics_codes: (settings.naics_codes || []).join(', '),
         target_agencies: (settings.target_agencies || []).join(', '),
-        email_frequency: settings.email_frequency || 'daily',
+        // Prefer the canonical alert_frequency (drives actual emails)
+        // over the legacy mi_beta_user_settings.email_frequency value.
+        email_frequency: realAlertFrequency || settings.email_frequency || 'daily',
         onboarding_completed: Boolean(settings.onboarding_completed),
         two_factor_required: settings.two_factor_required !== false,
       });
@@ -84,26 +100,49 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setMessage(null);
 
     try {
-      const res = await fetch('/api/app/workspace', {
-        method: 'PATCH',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          email,
-          company_name: form.company_name,
-          display_name: form.display_name,
-          role_title: form.role_title,
-          naics_codes: parseList(form.naics_codes),
-          target_agencies: parseList(form.target_agencies),
-          email_frequency: form.email_frequency,
-          onboarding_completed: markComplete,
-          two_factor_required: form.two_factor_required,
+      // Profile fields → mi_beta_user_settings via workspace endpoint
+      // Email frequency → user_notification_settings.alert_frequency via
+      //   alerts preferences endpoint (this is what the daily-alerts cron
+      //   actually reads, so it has to land there to take effect).
+      const [workspaceRes, prefsRes] = await Promise.all([
+        fetch('/api/app/workspace', {
+          method: 'PATCH',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            email,
+            company_name: form.company_name,
+            display_name: form.display_name,
+            role_title: form.role_title,
+            naics_codes: parseList(form.naics_codes),
+            target_agencies: parseList(form.target_agencies),
+            email_frequency: form.email_frequency,
+            onboarding_completed: markComplete,
+            two_factor_required: form.two_factor_required,
+          }),
         }),
-      });
-      const data = await res.json();
+        fetch('/api/alerts/preferences', {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            email,
+            frequency: form.email_frequency,
+          }),
+        }),
+      ]);
+
+      const data = await workspaceRes.json();
 
       if (!data.success) {
         setError(data.error || 'Failed to save settings');
         return;
+      }
+
+      // Frequency-save failures aren't fatal — workspace succeeded — but
+      // surface them so the user knows the email frequency may not have
+      // updated.
+      if (!prefsRes.ok) {
+        const prefsErr = await prefsRes.json().catch(() => null);
+        console.warn('Email frequency save failed:', prefsErr);
       }
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
@@ -141,7 +180,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
           <SectionTitle title="Profile" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Display Name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="Eric Coffie" />
+            <Field label="Display Name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="John Doe" />
             <Field label="Role / Title" value={form.role_title} onChange={(value) => setForm({ ...form, role_title: value })} placeholder="Founder, BD Lead..." />
             <Field label="Company" value={form.company_name} onChange={(value) => setForm({ ...form, company_name: value })} placeholder="Company name" />
             <label className="block">
@@ -152,8 +191,10 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500"
               >
                 <option value="daily">Daily</option>
+                <option value="weekdays">Weekdays only</option>
+                <option value="weekends">Weekends only</option>
                 <option value="weekly">Weekly</option>
-                <option value="critical_only">Critical only</option>
+                <option value="paused">Paused</option>
               </select>
             </label>
           </div>
