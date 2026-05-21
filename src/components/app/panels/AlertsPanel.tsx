@@ -858,23 +858,28 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     Posted {formatDate(alert.postedDate)}
                   </div>
                   <div className="mt-2">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        saveToPipeline(alert);
-                      }}
-                      disabled={savingAlertIds.has(alert.id) || savedAlertIds.has(alert.id)}
-                      className="text-xs text-blue-300 hover:text-blue-200 disabled:text-slate-500 disabled:cursor-default mr-3"
-                    >
-                      {savedAlertIds.has(alert.id)
-                        ? 'Saved'
-                        : savingAlertIds.has(alert.id)
-                          ? 'Saving...'
-                          : canUsePipeline
-                            ? 'Save'
-                            : 'Upgrade to Save'}
-                    </button>
+                    {/* Save button only renders for users who can actually
+                        save. Free tier gets nothing here — the upgrade
+                        pitch lives in the drawer (Mindy Analyst card),
+                        not on every card row. Per-card "Upgrade to Save"
+                        was noise. */}
+                    {canUsePipeline && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          saveToPipeline(alert);
+                        }}
+                        disabled={savingAlertIds.has(alert.id) || savedAlertIds.has(alert.id)}
+                        className="text-xs text-blue-300 hover:text-blue-200 disabled:text-slate-500 disabled:cursor-default mr-3"
+                      >
+                        {savedAlertIds.has(alert.id)
+                          ? 'Saved'
+                          : savingAlertIds.has(alert.id)
+                            ? 'Saving...'
+                            : 'Save'}
+                      </button>
+                    )}
                     <a
                       href={alert.url}
                       target="_blank"
