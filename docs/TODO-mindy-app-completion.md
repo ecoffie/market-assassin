@@ -1,13 +1,13 @@
 # Mindy App Completion TODO
 
-Source of truth: `getmindy.ai/app` is the active Mindy workbench. The old `/mi-beta` route is discontinued publicly and may remain as an internal implementation path until the app is stable.
+Source of truth: `getmindy.ai/app` is the active Mindy workbench. The old `/mi-beta` internal route is fully renamed and no longer exists in the codebase.
 
-Last updated: May 18, 2026.
+Last updated: May 20, 2026.
 
 ## Current Status
 
 - [x] `getmindy.ai/app` is the canonical user-facing Mindy app.
-- [x] `/app` and `/mi-beta` share the same implementation while Mindy is being finished.
+- [x] `mi-beta → app` rename complete — folders, types, imports, redirect URIs all migrated (commit `cbadcac`).
 - [x] Keep legacy users on `/briefings` until the Mindy app is complete enough for migration.
 - [x] Google OAuth and Microsoft/Azure OAuth are configured in Supabase and verified to reach Mindy onboarding.
 - [x] OAuth signup lands on `/onboarding` so the browser can persist the Supabase session.
@@ -18,7 +18,11 @@ Last updated: May 18, 2026.
 - [x] Empty Market Research report panels now fall back to live recommended-opportunity cards instead of dead `0` sections.
 - [x] Money formatting has been normalized so trillion-scale values display as `$1.1T` instead of `$1057.7B`.
 - [x] Production deploy for the latest Market Research fixes completed on May 18, 2026.
-- [ ] Rename remaining internal `mi-beta` implementation paths once `/app` is stable and deployed.
+- [x] OAuth custom domain — `auth.getmindy.ai` is the production OAuth surface (May 20, 2026). Consent screens show "Sign in to auth.getmindy.ai" instead of the raw Supabase project subdomain.
+- [x] OAuth available on the `getmindy.ai` landing hero AND the `/app` sign-in card (Continue with Google / Continue with Microsoft).
+- [x] Returning OAuth users skip the onboarding wizard when they already have a saved profile (commit `c60b710`).
+- [x] Session TTL extended from 12 hours to 30 days — eliminates the "your Mindy session expired" friction (commit `12c1f81`).
+- [x] Alert-frequency options now include Weekdays only, Weekends only, Paused — alongside Daily and Weekly. Onboarding wizard, /app Settings, and SettingsPanel slide-out all expose the 5 options.
 
 ## Pro Finish Line
 
@@ -123,3 +127,31 @@ Mindy Pro is in polish, QA, and migration work. The core value loop is present: 
 - [ ] Browser check: remove veteran/SDVOSB/VOSB status, refresh recommendations, and confirm VA is not chosen as a buyer agency unless the notice is a lower-priority research signal.
 - [ ] Browser check: open several recommendation details and confirm place of performance, sub-agency/office, useful summary, clickable source links, and working close behavior.
 - [ ] Browser check: validate all major money cards display `$M`, `$B`, or `$T` consistently across Mindy.
+
+## 8. May 20 Stability Sprint (shipped)
+
+Bug-class fixes from a single day of OAuth + onboarding hardening — all in production behind `getmindy.ai`:
+
+- [x] **OAuth custom domain** `auth.getmindy.ai` cut over (DNS, Supabase, Google Cloud, Azure all updated). Runbook at `tasks/oauth-branding-runbook.md`.
+- [x] **Google OAuth Consent Screen** branded — app name "Mindy", `getmindy.ai/privacy` and `getmindy.ai/terms` pages added (200 OK, not redirects, so Google's verification crawler accepts them).
+- [x] **OAuth on landing + `/app` sign-in** — Continue with Google / Continue with Microsoft buttons on both surfaces.
+- [x] **Pro users no longer re-onboard on sign-in** — `verifyAndLoadUser` now sets the `ma_access_email` cookie defensively; `persistAccessEmail()` helper keeps localStorage + cookie in sync across 8+ call sites; `checkProfileSetupState` retries on 401 + surfaces `authFailed` so the UI never destructively forces re-onboarding (commits `c0b4187`, `3dc5fce`).
+- [x] **Session TTL 12 h → 30 d** — eliminates the morning "your Mindy session expired" prompts (commit `12c1f81`).
+- [x] **Already-signed-up users can sign in from anywhere** — `/alerts/signup` "Already signed up?" + landing-page "Already have access?" + `/mi` page all route through `/briefings?recover=1` which renders the email gate instead of redirect-looping.
+- [x] **Onboarding writes complete profile** — schema migration `20260520_user_notification_settings_missing_columns.sql` added `set_aside_preferences TEXT[]` + `location_zip TEXT` columns. Profile API now validates the full 5-option `alertFrequency` set and returns Supabase error details on failure instead of generic "Failed to update profile".
+- [x] **Returning OAuth users skip the onboarding wizard** — `/app/onboarding` now checks `/api/alerts/preferences` on mount; if the user has saved NAICS it routes to `/app` directly (commit `c60b710`).
+- [x] **OAuth handoff to `/app`** — `bootstrapFromSupabaseSession()` runs on every mount, regardless of `?email=` URL param. Stores email + auth token + verifiedAt in localStorage so subsequent mounts skip the round-trip (commit `7422ab1`, `64e1b66`).
+- [x] **MI 2FA token accepted across cookie-auth routes** — `verifyUserOwnsEmail` (10+ endpoints) now accepts `x-mi-auth-token` / `x-mi-2fa-token` as a third auth method. Settings panels and Market Research panel pass these headers (commits `54ab3eb`, `611cc65`).
+- [x] **/app Settings persists `alert_frequency` to the cron-driving column** — was writing to `mi_beta_user_settings.email_frequency` (legacy table the daily-alerts cron never reads). Now also writes to `user_notification_settings.alert_frequency` so picking "Weekdays only" actually changes email behavior (commit `dbd3314`).
+- [x] **Admin endpoints for support work**:
+  - `GET /api/admin/debug-profile?password=...&email=...` — dump the full user_notification_settings + user_business_profiles row for diagnosing onboarding bugs
+  - `POST /api/admin/delete-mindy-user?password=...&email=...` — hard-delete a Mindy account (every user_email-keyed table + Supabase Auth user) so the same address can sign up fresh
+  - `POST /api/admin/apply-notification-settings-columns?password=...` — applies missing-column migrations idempotently via exec_sql RPC, fallback to manual SQL if RPC isn't available
+
+## Completed feature: Full Proposal Assist (Section 6)
+
+All four items shipped May 20, 2026:
+1. RFP upload + text extraction (`a3905ca`) — pdf-parse + mammoth, max 10 MB
+2. Compliance matrix (`ce32310`) — Groq llama-3.3-70b extracts every shall/must with category, section, owner, status
+3. Drafted sections (`90394c9`) — 5 sections (Exec / Technical / Management / Past Performance / Pricing), grounded in user profile, output to editable textarea
+4. Review checklist + .docx export (`87ed30d`) — 11-item compliance review + Word document with title page, TOC, compliance table, drafted sections, checklist appendix

@@ -68,11 +68,21 @@ No decision fatigue. Clear upgrade path.
 - $49/mo exists but NOT promoted (loyalty/grandfather only)
 - $149/mo includes FHC training (replaces separate $99/mo product)
 
-**Domain Structure (May 2026):**
+**Domain Structure (May 20, 2026):**
 - `govcongiants.com` → Marketing/SEO (govcon-funnels)
-- `mi.govcongiants.com` → SaaS app (market-assassin) — **migrating to `getmindy.ai`**
+- `getmindy.ai` → **Primary SaaS app** — Mindy. Hosted by the market-assassin Vercel project via host-based rewrites in `next.config.ts`. New users sign up here.
+- `mi.govcongiants.com` → SaaS app, legacy domain, same code as `getmindy.ai`. Kept for in-flight users and email links; do not promote.
+- `auth.getmindy.ai` → Supabase custom domain for OAuth. Google + Microsoft consent screens show "Sign in to auth.getmindy.ai" instead of the raw Supabase project subdomain.
 - `shop.govcongiants.com` → KILLED (redirect to /pricing)
 - See `docs/strategy/DOMAIN-BRAND-CONSOLIDATION.md` for full plan
+- Custom-domain cutover runbook (Supabase + DNS + Google + Azure): `tasks/oauth-branding-runbook.md`
+
+**Folder structure (May 20, 2026):**
+- `src/app/app/` — the `/app` user surface (renamed from `mi-beta/`, commit `cbadcac`). Contains onboarding, signup, sign-in, password flows.
+- `src/app/api/app/` — API routes consumed by `/app` (renamed from `api/mi-beta/`).
+- `src/components/app/` — `/app` UI components including all `panels/*.tsx`.
+- `src/lib/app/workspace.ts` — workspace utilities (renamed from `lib/mi-beta/`).
+- Old `mi-beta` paths no longer exist in the codebase.
 
 ### MITier Type
 
@@ -1331,4 +1341,4 @@ done
 
 ---
 
-*Last Updated: May 13, 2026 — Command Center V2 (live data wiring with Customer Qualification + Growth Brief queues)*
+*Last Updated: May 20, 2026 — Mindy OAuth custom domain cutover (auth.getmindy.ai), Proposal Assist V2 complete, mi-beta → app folder rename, session TTL 30d, onboarding/profile-persistence bug class fixed*

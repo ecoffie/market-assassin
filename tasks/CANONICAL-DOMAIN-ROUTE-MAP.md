@@ -1,19 +1,20 @@
 # Canonical Domain Route Map
 
 Status: Draft operating rule
-Last updated: May 13, 2026
+Last updated: May 20, 2026
 
 ## Core Rule
 
-GovCon Giants now has three primary surfaces:
+GovCon Giants now has four primary surfaces:
 
 | Surface | Domain | Job |
 | --- | --- | --- |
 | Public website | `https://govcongiants.com` | SEO, sales pages, pricing, content, public contractor pages, launch pages, and conversion CTAs |
 | Mindy platform | `https://getmindy.ai` | **Primary** Mindy SaaS app — standalone brand for exit-ready positioning |
-| MI platform (legacy) | `https://mi.govcongiants.com` | **Redirects to getmindy.ai** — kept for backwards compatibility |
+| Mindy OAuth | `https://auth.getmindy.ai` | Supabase custom domain — Google + Microsoft consent screens point here, not at the raw Supabase subdomain |
+| MI platform (legacy) | `https://mi.govcongiants.com` | Same code as `getmindy.ai` via Vercel host rewrites — kept for in-flight users / email links, do not promote |
 
-> **Update (May 13, 2026):** The MI platform is rebranding to "Mindy" with its own domain `getmindy.ai`. This positions Mindy as a standalone product for potential acquisition. The `mi.govcongiants.com` subdomain will redirect to `getmindy.ai`.
+> **Update (May 20, 2026):** OAuth cutover complete. `auth.getmindy.ai` is now the canonical OAuth callback. The internal `mi-beta` folder layout has been renamed to `app` (commit `cbadcac`), so all routes use `/app/*` paths going forward.
 
 Everything new should use `govcongiants.com` (public/marketing) or `getmindy.ai` (product/app). The `.org`, `tools.govcongiants.org`, `mi.govcongiants.com`, and old shop links are transition/redirect surfaces only.
 
@@ -44,11 +45,14 @@ These should live on `mi.govcongiants.com`.
 | --- | --- | --- |
 | `/` | MI app entry / redirect | Should route logged-in users to the app and logged-out users to sign in |
 | `/briefings` | MI Pro briefings dashboard | Primary paid intelligence surface |
-| `/mi-beta` | Current unified MI app shell | Transition path until stable route names replace beta wording |
-| `/mi-beta/setup-account` | Account setup | Product/account flow |
-| `/mi-beta/setup-password` | Password creation | Product/account flow |
-| `/mi-beta/forgot-password` | Password reset request | Product/account flow |
-| `/mi-beta/reset-password` | Password reset completion | Product/account flow |
+| `/app` | Mindy app shell (renamed from `/mi-beta` on May 20, 2026) | Primary user surface for both `getmindy.ai/app` and `mi.govcongiants.com/app` |
+| `/app/onboarding` | Onboarding wizard | Reached after fresh OAuth signup; returning users are routed straight to `/app` instead |
+| `/app/signup` | Email + OAuth signup | Continue with Google / Continue with Microsoft + email |
+| `/app/setup-account` | Account setup | Product/account flow |
+| `/app/setup-password` | Password creation | Product/account flow |
+| `/app/forgot-password` | Password reset request | Product/account flow |
+| `/app/reset-password` | Password reset completion | Product/account flow |
+| `/app/market-intel` | Full-bleed Market Intelligence dashboard | Reached from "Open SAM Dashboard" CTA on Today's Intel |
 | `/alerts/preferences` | Alert preferences | Product/account flow |
 | `/profile/setup` | MI Free profile setup | Product/account flow |
 | `/profile/complete` | Profile completion | Product/account flow |
