@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
+import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -63,8 +64,26 @@ export async function GET(request: NextRequest) {
 
   const cached = typeof row.description === 'string' ? row.description.trim() : '';
 
-  // Already real text in the cache — return without hitting SAM.
+  // Already real text in the cache — return without hitting SAM. But
+  // an earlier fetch may have stored the raw HTML; clean it on read
+  // (and write the cleaned form back so we only do this once per row).
   if (cached && !isHttpUrl(cached)) {
+    if (looksLikeHtml(cached)) {
+      const cleaned = samHtmlToText(cached).slice(0, MAX_DESCRIPTION_LENGTH);
+      void supabase
+        .from('sam_opportunities')
+        .update({ description: cleaned })
+        .eq('notice_id', noticeId)
+        .then((res) => {
+          if (res.error) console.warn('[sam-description] cache rewrite failed:', res.error.message);
+        });
+      return NextResponse.json({
+        success: true,
+        noticeId,
+        description: cleaned,
+        source: 'cache+cleaned',
+      });
+    }
     return NextResponse.json({
       success: true,
       noticeId,
@@ -154,7 +173,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const cleaned = descriptionText.trim().slice(0, MAX_DESCRIPTION_LENGTH);
+  // SAM's noticedesc endpoint returns HTML markup (<p>, <ul>, <li>,
+  // <strong>, &nbsp;, etc.). Convert to readable plain text before
+  // storing so the UI doesn't render raw tags.
+  const cleaned = samHtmlToText(descriptionText).slice(0, MAX_DESCRIPTION_LENGTH);
 
   // Cache the resolved text back into the row so future requests hit
   // the cache path. Fire-and-forget — if the update fails (RLS, etc.)

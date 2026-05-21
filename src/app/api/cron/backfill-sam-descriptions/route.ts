@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
+import { samHtmlToText } from '@/lib/sam/description-text';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -94,11 +95,11 @@ async function resolveDescription(url: string, apiKey: string): Promise<string |
         : typeof p.text === 'string'
         ? p.text
         : null;
-      if (text) return text.trim().slice(0, MAX_DESCRIPTION_LENGTH);
+      if (text) return samHtmlToText(text).slice(0, MAX_DESCRIPTION_LENGTH);
     }
   }
   const text = await res.text().catch(() => '');
-  return text ? text.trim().slice(0, MAX_DESCRIPTION_LENGTH) : null;
+  return text ? samHtmlToText(text).slice(0, MAX_DESCRIPTION_LENGTH) : null;
 }
 
 export async function GET(request: NextRequest) {
