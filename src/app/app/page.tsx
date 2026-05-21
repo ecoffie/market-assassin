@@ -54,6 +54,7 @@ function AppDashboard() {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [authStep, setAuthStep] = useState<'credentials' | 'code'>('credentials');
   const [authMessage, setAuthMessage] = useState<string | null>(null);
@@ -732,16 +733,26 @@ function AppDashboard() {
                   autoComplete="email"
                   className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                 />
-                <input
-                  type="password"
-                  name="password"
-                  value={signInPassword}
-                  onChange={(e) => setSignInPassword(e.target.value)}
-                  placeholder="Password"
-                  required
-                  autoComplete="current-password"
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showSignInPassword ? 'text' : 'password'}
+                    name="password"
+                    value={signInPassword}
+                    onChange={(e) => setSignInPassword(e.target.value)}
+                    placeholder="Password"
+                    required
+                    autoComplete="current-password"
+                    className="w-full px-4 py-3 pr-16 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignInPassword(v => !v)}
+                    className="absolute inset-y-0 right-0 px-3 text-xs font-medium text-gray-400 hover:text-gray-200"
+                    aria-label={showSignInPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showSignInPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
                 <div className="flex items-center justify-between text-sm">
                   <Link href="/setup-account" className="font-medium text-slate-400 hover:text-slate-200">
                     Set up account

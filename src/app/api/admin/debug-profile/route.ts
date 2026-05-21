@@ -51,8 +51,44 @@ export async function GET(request: NextRequest) {
     business = { data: null, error: err instanceof Error ? err.message : 'table missing or query failed' };
   }
 
+  // Look up the Supabase Auth user so we can tell whether the account
+  // exists, what providers it has (oauth vs email), and whether it has
+  // a password set — covers the "invalid email or password" mystery.
+  let supabaseAuth: {
+    exists: boolean;
+    userId?: string;
+    providers?: string[];
+    hasEmailIdentity?: boolean;
+    lastSignInAt?: string | null;
+    error?: string;
+  } = { exists: false };
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: list, error: listError } = await (supabase.auth.admin as any).listUsers();
+    if (listError) {
+      supabaseAuth = { exists: false, error: listError.message };
+    } else {
+      const user = list?.users?.find((u: { email?: string }) => u.email?.toLowerCase() === email);
+      if (user) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const u = user as any;
+        const identities = Array.isArray(u.identities) ? u.identities : [];
+        supabaseAuth = {
+          exists: true,
+          userId: u.id,
+          providers: identities.map((id: { provider?: string }) => id.provider || 'unknown'),
+          hasEmailIdentity: identities.some((id: { provider?: string }) => id.provider === 'email'),
+          lastSignInAt: u.last_sign_in_at || null,
+        };
+      }
+    }
+  } catch (err) {
+    supabaseAuth = { exists: false, error: err instanceof Error ? err.message : 'auth lookup failed' };
+  }
+
   return NextResponse.json({
     email,
+    supabaseAuth,
     user_notification_settings: notification.data
       ? {
           present: true,
