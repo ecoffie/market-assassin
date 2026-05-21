@@ -740,10 +740,14 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
               key={alert.id}
               role="button"
               tabIndex={0}
-              onClick={() => setSelectedAlert(alert)}
+              onClick={() => {
+                trackAlertEvent('tool_use', alert, 'open_details');
+                setSelectedAlert(alert);
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
+                  trackAlertEvent('tool_use', alert, 'open_details');
                   setSelectedAlert(alert);
                 }
               }}
