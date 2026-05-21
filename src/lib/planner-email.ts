@@ -149,7 +149,7 @@ Continue your plan: ${plannerUrl}
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
       to: data.email,
       subject: `You're ${data.overallProgress}% done — Weekly Action Plan Update`,
       html: htmlContent,
