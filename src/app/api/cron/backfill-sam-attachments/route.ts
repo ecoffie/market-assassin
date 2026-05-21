@@ -63,6 +63,54 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Pull the real filename from SAM's file-download endpoint by doing a
+ * HEAD request and parsing Content-Disposition. SAM responds with a
+ * header like:
+ *   Content-Disposition: attachment; filename="RFP_Parking_Lifts.pdf"
+ * Returns the filename or null on any failure.
+ */
+async function fetchAttachmentFilename(fileUrl: string, apiKey: string): Promise<string | null> {
+  let target: URL;
+  try {
+    target = new URL(fileUrl);
+  } catch {
+    return null;
+  }
+  if (!target.searchParams.has('api_key')) {
+    target.searchParams.set('api_key', apiKey);
+  }
+
+  let res: Response;
+  try {
+    // HEAD avoids downloading the full file body just to read headers.
+    // Some SAM endpoints reject HEAD with 405; fall back to GET if so.
+    res = await fetch(target.toString(), { method: 'HEAD' });
+    if (res.status === 405) {
+      res = await fetch(target.toString(), { method: 'GET' });
+    }
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  const cd = res.headers.get('content-disposition');
+  if (!cd) return null;
+
+  // Match RFC 5987 filename* first (UTF-8 encoded), then plain filename=.
+  const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ''));
+    } catch { /* fall through */ }
+  }
+  const plainMatch = cd.match(/filename="([^"]+)"/i) || cd.match(/filename=([^;]+)/i);
+  if (plainMatch?.[1]) {
+    return plainMatch[1].trim();
+  }
+  return null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchAttachments(noticeId: string, apiKey: string): Promise<any[] | null> {
   // SAM requires postedFrom/postedTo on every opportunities search.
@@ -100,27 +148,31 @@ async function fetchAttachments(noticeId: string, apiKey: string): Promise<any[]
   if (Array.isArray(opp.resourceLinks) && opp.resourceLinks.length > 0) {
     // SAM URLs look like
     //   https://sam.gov/api/prod/opps/v3/opportunities/resources/files/{fileId}/download
-    // so url.split('/').pop() is always "download" — useless as a
-    // label. Pull the {fileId} segment (the one before "download") and
-    // fall back to a numbered "Document N" label so users see something
-    // distinct per file.
-    return opp.resourceLinks.map((url: string, i: number) => {
-      let fileId: string | undefined;
-      try {
-        const parts = new URL(url).pathname.split('/').filter(Boolean);
-        // Last segment is usually "download"; the one before is the file id.
-        const last = parts[parts.length - 1];
-        if (last && last.toLowerCase() !== 'download') {
-          fileId = last;
-        } else if (parts.length >= 2) {
-          fileId = parts[parts.length - 2];
-        }
-      } catch { /* leave fileId undefined if URL parse fails */ }
-      const label = fileId && fileId.length <= 24
-        ? `Document ${i + 1} (${fileId})`
-        : `Document ${i + 1}`;
-      return { url, name: label, fileId: fileId || null };
-    });
+    // and the bare URL doesn't include a filename. To get the real
+    // name (e.g. RFP_Parking_Lifts_v2.pdf) we do a HEAD on each file
+    // through SAM with the API key and parse Content-Disposition.
+    // We do these in parallel per opp; the outer for-loop in GET()
+    // still rate-limits between opps so we don't burst SAM's quota.
+    return await Promise.all(
+      opp.resourceLinks.map(async (url: string, i: number) => {
+        let fileId: string | undefined;
+        try {
+          const parts = new URL(url).pathname.split('/').filter(Boolean);
+          const last = parts[parts.length - 1];
+          if (last && last.toLowerCase() !== 'download') {
+            fileId = last;
+          } else if (parts.length >= 2) {
+            fileId = parts[parts.length - 2];
+          }
+        } catch { /* leave fileId undefined if URL parse fails */ }
+
+        const realName = await fetchAttachmentFilename(url, apiKey);
+
+        const name = realName
+          || (fileId && fileId.length <= 24 ? `Document ${i + 1} (${fileId})` : `Document ${i + 1}`);
+        return { url, name, fileId: fileId || null };
+      })
+    );
   }
   if (Array.isArray(opp.attachments) && opp.attachments.length > 0) {
     return opp.attachments;
@@ -148,6 +200,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // ?retry-names=1 picks up rows we already populated but with the
+  // "Document N" auto-numbered fallback (before the HEAD-for-filename
+  // fix landed). Lets us refresh those once without re-doing all
+  // attachment fetches.
+  const retryNames = new URL(request.url).searchParams.get('retry-names') === '1';
+
   const supabase = getSupabase();
 
   // Pull rows we haven't yet attempted. Filter: attachments is the
@@ -155,14 +213,23 @@ export async function GET(request: NextRequest) {
   // a notice_id so the SAM detail fetch can scope. Order newest first
   // — those are most likely to be browsed by users.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: rows, error } = await (supabase
+  let queryBuilder: any = supabase
     .from('sam_opportunities')
-    .select('id, notice_id') as any)
-    .eq('attachments', '[]')
+    .select('id, notice_id')
     .eq('active', true)
     .not('notice_id', 'is', null)
     .order('posted_date', { ascending: false })
     .limit(limit);
+
+  if (retryNames) {
+    // Match the first attachment's name starting with "Document " —
+    // the auto-numbered fallback shape. JSONB path: attachments->0->>name
+    queryBuilder = queryBuilder.like('attachments->0->>name', 'Document %');
+  } else {
+    queryBuilder = queryBuilder.eq('attachments', '[]');
+  }
+
+  const { data: rows, error } = await queryBuilder;
 
   if (error) {
     return NextResponse.json(
