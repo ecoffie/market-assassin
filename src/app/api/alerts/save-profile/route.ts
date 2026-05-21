@@ -425,7 +425,7 @@ async function sendWelcomeEmailWithOpportunities(
         You're receiving this because you signed up for Daily Alerts.
       </p>
       <p style="margin:0;color:#9ca3af;font-size:11px;">
-        GovCon Giants AI • <a href="mailto:hello@govconedu.com" style="color:#7c3aed;">hello@govconedu.com</a>
+        GovCon Giants AI • <a href="mailto:hello@govcongiants.com" style="color:#7c3aed;">hello@govcongiants.com</a>
       </p>
     </div>
   </div>

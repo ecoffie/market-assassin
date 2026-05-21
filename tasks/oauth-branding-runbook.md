@@ -59,7 +59,7 @@ Once active, the Supabase project responds at **both**:
 While in Google Cloud Console:
 1. APIs & Services → **OAuth consent screen**
 2. **App name:** Mindy
-3. **User support email:** hello@govconedu.com
+3. **User support email:** hello@govcongiants.com
 4. **App logo:** upload Mindy logo (PNG, 120 × 120 px)
 5. **Application home page:** https://getmindy.ai
 6. **Application privacy policy:** https://getmindy.ai/privacy

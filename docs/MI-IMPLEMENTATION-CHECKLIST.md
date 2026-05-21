@@ -135,7 +135,7 @@ This checklist tracks all work needed to consolidate to the unified MI product m
 - [ ] Purchase confirmation emails
 
 ### GovConEdu Phase-Out
-- [ ] Set up email forward: `hello@govconedu.com` → `hello@govcongiants.com`
+- [ ] Set up email forward: `hello@govcongiants.com` → `hello@govcongiants.com`
 - [ ] Update Stripe receipts to show @govcongiants.com
 - [ ] Update GHL automations to use new sender
 

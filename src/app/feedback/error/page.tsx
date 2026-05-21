@@ -25,8 +25,8 @@ export default function FeedbackErrorPage() {
 
         <p className="text-slate-500 text-sm mt-6">
           Need help? Email{' '}
-          <a href="mailto:hello@govconedu.com" className="text-blue-400 hover:underline">
-            hello@govconedu.com
+          <a href="mailto:hello@govcongiants.com" className="text-blue-400 hover:underline">
+            hello@govcongiants.com
           </a>
         </p>
       </div>

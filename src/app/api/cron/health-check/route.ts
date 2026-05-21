@@ -40,7 +40,7 @@ function getTransporter() {
     port: 587,
     secure: false,
     auth: {
-      user: process.env.SMTP_USER || 'hello@govconedu.com',
+      user: process.env.SMTP_USER || 'hello@govcongiants.com',
       pass: process.env.SMTP_PASSWORD,
     },
   });
@@ -643,8 +643,8 @@ export async function GET(request: NextRequest) {
       `;
 
       await getTransporter().sendMail({
-        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govconedu.com>`,
-        to: 'hello@govconedu.com',
+        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govcongiants.com>`,
+        to: 'hello@govcongiants.com',
         subject: `🚨 Health Check: ${failed} tests failed (${report.passRate} pass rate)`,
         html: emailHtml,
       });

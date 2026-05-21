@@ -42,7 +42,7 @@ vercel --prod --force
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role | Supabase Dashboard → Settings |
 | `OPENAI_API_KEY` | OpenAI API key | OpenAI Dashboard |
 | `GROQ_API_KEY` | Groq API key | Groq Console |
-| `SMTP_USER` | Email sender address | hello@govconedu.com |
+| `SMTP_USER` | Email sender address | hello@govcongiants.com |
 | `SMTP_PASSWORD` | Email SMTP password | Email provider |
 | `CRON_SECRET` | Cron job authentication | Generate: `openssl rand -hex 32` |
 | `ADMIN_PASSWORD` | Admin endpoint auth | Default: galata-assassin-2026 |

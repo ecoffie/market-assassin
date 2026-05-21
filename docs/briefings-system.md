@@ -314,7 +314,7 @@ Items are filtered by relevance score:
 ```env
 SMTP_HOST=smtp.office365.com
 SMTP_PORT=587
-SMTP_USER=hello@govconedu.com  # or alerts@govcongiants.com
+SMTP_USER=hello@govcongiants.com  # or alerts@govcongiants.com
 SMTP_PASSWORD=***
 ```
 

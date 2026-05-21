@@ -95,7 +95,7 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc pl-6 space-y-1">
             <li>Replying STOP to any message you receive from us</li>
             <li>Updating your preferences in your account settings</li>
-            <li>Contacting us at hello@govconedu.com</li>
+            <li>Contacting us at hello@govcongiants.com</li>
           </ul>
           <p>
             After opting out, you will receive one final confirmation message. You will no longer receive
@@ -148,7 +148,7 @@ export default function PrivacyPolicyPage() {
             <li>Opt out of marketing communications</li>
             <li>Opt out of SMS communications</li>
           </ul>
-          <p>To exercise these rights, contact us at hello@govconedu.com.</p>
+          <p>To exercise these rights, contact us at hello@govcongiants.com.</p>
 
           <h2 className="text-2xl font-semibold text-white pt-6">8. Children&apos;s Privacy</h2>
           <p>
@@ -168,7 +168,7 @@ export default function PrivacyPolicyPage() {
             <li>
               <strong className="text-white">GovConEdu LLC</strong>
             </li>
-            <li>Email: hello@govconedu.com</li>
+            <li>Email: hello@govcongiants.com</li>
           </ul>
         </div>
 

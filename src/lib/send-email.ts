@@ -287,7 +287,7 @@ export async function sendDatabaseAccessEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: 'Your Federal Contractor Database Access | GovCon Giants',
       html: htmlContent,
@@ -407,7 +407,7 @@ export async function sendAccessCodeEmail({
     </div>
 
     <p style="text-align: center; color: #64748b;">
-      Questions? Reply to this email or contact us at hello@govconedu.com
+      Questions? Reply to this email or contact us at hello@govcongiants.com
     </p>
 
     <div class="footer">
@@ -422,7 +422,7 @@ export async function sendAccessCodeEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: 'Your Federal Market Assassin Report Access | GovCon Giants',
       html: htmlContent,
@@ -520,7 +520,7 @@ export async function sendOpportunityHunterProEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: 'Your Opportunity Hunter Pro Access is Ready! | GovCon Giants',
       html: htmlContent,
@@ -653,7 +653,7 @@ export async function sendFreeResourceEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: `Your Free Download: ${resourceName} | GovCon Giants`,
       html: htmlContent,
@@ -768,7 +768,7 @@ export async function sendLicenseKeyEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: `Your ${productName} License Key | GovCon Giants`,
       html: htmlContent,
@@ -895,7 +895,7 @@ export async function sendContentReaperEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: `Your Content Reaper${isFullFix ? ' Full Fix' : ''} Access is Ready! | GovCon Giants`,
       html: htmlContent,
@@ -1024,7 +1024,7 @@ export async function sendRecompeteEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: 'Your Recompete Tracker Access is Ready! | GovCon Giants',
       html: htmlContent,
@@ -1228,7 +1228,7 @@ export async function sendBundleEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: `Your ${bundleInfo.name} is Ready! | GovCon Giants`,
       html: htmlContent,
@@ -1399,7 +1399,7 @@ export async function sendFHCWelcomeEmail({
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
       to,
       subject: 'Welcome to Federal Help Center! Your Membership is Active | GovCon Giants',
       html: htmlContent,
@@ -1505,7 +1505,7 @@ export async function sendAlertProWelcomeEmail({
 
   <div style="background: #f1f5f9; padding: 18px; border-radius: 0 0 12px 12px; text-align: center;">
     <p style="color: #64748b; font-size: 12px; margin: 0;">
-      Questions? Reply to this email or contact <a href="mailto:hello@govconedu.com" style="color: #059669;">hello@govconedu.com</a>
+      Questions? Reply to this email or contact <a href="mailto:hello@govcongiants.com" style="color: #059669;">hello@govcongiants.com</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
       © ${new Date().getFullYear()} GovCon Giants • mi.govcongiants.com
@@ -1542,7 +1542,7 @@ ${maLink}
 Your email: ${to}
 Subscription: $19/month • Cancel anytime
 
-Questions? Reply to this email or contact hello@govconedu.com
+Questions? Reply to this email or contact hello@govcongiants.com
 
 - GovCon Giants Team`,
     });

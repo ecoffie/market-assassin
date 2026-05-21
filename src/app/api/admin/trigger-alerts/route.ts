@@ -378,7 +378,7 @@ async function sendAlertEmail(
 `;
 
   await transporter.sendMail({
-    from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'hello@govconedu.com'}>`,
+    from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
     to: email,
     subject: `Mindy Weekly Alert: ${opportunities.length} New SAM.gov Opportunities - Week of ${formatDate(new Date().toISOString())}`,
     html: htmlContent,

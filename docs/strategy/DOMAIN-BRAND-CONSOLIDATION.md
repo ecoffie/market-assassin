@@ -19,7 +19,7 @@ Consolidate all GovCon Giants properties under the `.com` brand with a unified M
 | Tools/App | tools.govcongiants.org | Separate subdomain |
 | Shop | shop.govcongiants.org | Unnecessary with SaaS model |
 | Team emails | @govcongiants.com | Different TLD from site |
-| Transactional email | hello@govconedu.com | Third brand |
+| Transactional email | hello@govcongiants.com | Third brand |
 | Some team | @govcongiants.org | Inconsistent |
 
 **Legal structure:**

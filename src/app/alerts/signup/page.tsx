@@ -420,7 +420,7 @@ function AlertSignupContent() {
 
             <p className="text-slate-500 text-sm">
               Your first briefing will arrive tomorrow morning. Questions?{' '}
-              <a href="mailto:hello@govconedu.com" className="text-emerald-400 hover:text-emerald-300">
+              <a href="mailto:hello@govcongiants.com" className="text-emerald-400 hover:text-emerald-300">
                 Reply to any email
               </a>
             </p>
@@ -672,8 +672,8 @@ function AlertSignupContent() {
           <div className="mt-12 text-center">
             <p className="text-slate-500 text-sm">
               Questions?{' '}
-              <a href="mailto:hello@govconedu.com" className="text-purple-400 hover:text-purple-300">
-                hello@govconedu.com
+              <a href="mailto:hello@govcongiants.com" className="text-purple-400 hover:text-purple-300">
+                hello@govcongiants.com
               </a>
             </p>
           </div>

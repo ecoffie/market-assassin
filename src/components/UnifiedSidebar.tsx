@@ -365,8 +365,8 @@ export default function UnifiedSidebar({
             <div className="px-3 py-2 bg-gradient-to-r from-emerald-900/30 to-emerald-800/20 rounded-lg">
               <p className="text-xs text-emerald-400 font-medium">GovCon Giants</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                <a href="mailto:hello@govconedu.com" className="hover:text-gray-300">
-                  hello@govconedu.com
+                <a href="mailto:hello@govcongiants.com" className="hover:text-gray-300">
+                  hello@govcongiants.com
                 </a>
               </p>
             </div>
