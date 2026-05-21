@@ -164,47 +164,16 @@ export async function POST(request: NextRequest) {
     body.source = body.source || 'manual';
     body.is_prime = body.is_prime ?? true;
 
-    // Workspace columns (workspace_id / owner_email / created_by /
-    // updated_by) were added to the API contract but the matching
-    // migration was never applied to this Supabase instance — see
-    // supabase/migrations/20260410_pipeline_tracker.sql which only
-    // has id/user_email/notice_id/title/etc. Including these fields
-    // in the insert payload makes PostgREST throw "Could not find
-    // the 'created_by' column" 500s. Strip them out unless the
-    // schema actually has them so the insert succeeds today. When
-    // the workspace migration lands, swap this for the assignments
-    // again.
-    const insertPayload: Record<string, unknown> = { ...body };
-    insertPayload.workspace_id = workspaceId; // try with — will be ignored if column doesn't exist
-    insertPayload.owner_email = body.owner_email || body.user_email;
-    insertPayload.created_by = body.user_email;
-    insertPayload.updated_by = body.user_email;
+    body.workspace_id = workspaceId;
+    body.owner_email = body.owner_email || body.user_email;
+    body.created_by = body.user_email;
+    body.updated_by = body.user_email;
 
-    const supabase = getSupabase();
-    let { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_pipeline')
-      .insert(insertPayload)
+      .insert(body)
       .select()
       .single();
-
-    // If the schema doesn't have the workspace columns, retry without
-    // them. Detect PostgREST's "Could not find the 'X' column" message
-    // and drop it from the payload, then re-insert. This keeps the
-    // route forward-compatible (works on both schemas) without
-    // requiring a migration step.
-    if (error && /Could not find the '([^']+)' column/.test(error.message || '')) {
-      const missingColumns = ['workspace_id', 'owner_email', 'created_by', 'updated_by'];
-      for (const col of missingColumns) {
-        delete insertPayload[col];
-      }
-      const retry = await supabase
-        .from('user_pipeline')
-        .insert(insertPayload)
-        .select()
-        .single();
-      data = retry.data;
-      error = retry.error;
-    }
 
     if (error) {
       // Check for duplicate
@@ -280,48 +249,17 @@ export async function PATCH(request: NextRequest) {
     const authSession = requireMIAuthSession(request, user_email);
     if (!authSession.ok) return authSession.response;
     const { workspaceId } = await ensureWorkspaceMember(user_email);
+    updates.updated_by = user_email.toLowerCase();
+    updates.workspace_id = updates.workspace_id || workspaceId;
 
-    // Schema may not have workspace_id / updated_by columns (see POST
-    // handler for the full backstory). Build the ownership filter and
-    // update payload tolerant of either schema.
-    const normalizedEmail = user_email.toLowerCase();
-    const supabase = getSupabase();
-
-    // Verify ownership. Try the workspace-aware filter first; if
-    // PostgREST rejects the workspace_id column we fall back to
-    // user_email only. The user_email check is what's actually
-    // doing the work on the current schema.
-    let existing: { id: string; stage: string } | null = null;
-    let ownershipError: { message?: string } | null = null;
-    {
-      const res = await supabase
-        .from('user_pipeline')
-        .select('id, stage')
-        .eq('id', id)
-        .or(`workspace_id.eq.${workspaceId},user_email.eq.${normalizedEmail}`)
-        .maybeSingle();
-      existing = res.data;
-      ownershipError = res.error;
-    }
-    if (!existing && ownershipError && /column .* does not exist|Could not find/i.test(ownershipError.message || '')) {
-      const retry = await supabase
-        .from('user_pipeline')
-        .select('id, stage')
-        .eq('id', id)
-        .eq('user_email', normalizedEmail)
-        .maybeSingle();
-      existing = retry.data;
-    } else if (!existing) {
-      // Could be that the row exists under user_email only (workspace
-      // filter excluded it). Try a user_email-only lookup as a fallback.
-      const retry = await supabase
-        .from('user_pipeline')
-        .select('id, stage')
-        .eq('id', id)
-        .eq('user_email', normalizedEmail)
-        .maybeSingle();
-      existing = retry.data;
-    }
+    // Verify ownership — caller must own the row by user_email OR the
+    // workspace it belongs to (team members can edit each other's rows).
+    const { data: existing } = await getSupabase()
+      .from('user_pipeline')
+      .select('id, stage')
+      .eq('id', id)
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
+      .single();
 
     if (!existing) {
       return NextResponse.json(
@@ -334,34 +272,13 @@ export async function PATCH(request: NextRequest) {
     const oldStage = existing.stage;
     const newStage = updates.stage;
 
-    // Build update payload — try with workspace columns, retry without
-    // if the schema lacks them. Same pattern as the POST handler.
-    const updatePayload: Record<string, unknown> = { ...updates };
-    updatePayload.updated_by = normalizedEmail;
-    updatePayload.workspace_id = updatePayload.workspace_id || workspaceId;
-
-    let { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_pipeline')
-      .update(updatePayload)
+      .update(updates)
       .eq('id', id)
-      .eq('user_email', normalizedEmail)
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
       .select()
       .single();
-
-    if (error && /Could not find the '([^']+)' column/.test(error.message || '')) {
-      for (const col of ['workspace_id', 'updated_by']) {
-        delete updatePayload[col];
-      }
-      const retry = await supabase
-        .from('user_pipeline')
-        .update(updatePayload)
-        .eq('id', id)
-        .eq('user_email', normalizedEmail)
-        .select()
-        .single();
-      data = retry.data;
-      error = retry.error;
-    }
 
     if (error) {
       console.error('Pipeline PATCH Postgres error:', {
