@@ -39,6 +39,8 @@ interface Alert {
   daysLeft?: number | null;
   isUrgent?: boolean;
   isClosingSoon?: boolean;
+  recommendationScore?: number;
+  feedbackReasons?: string[];
 }
 
 type AlertFilter = 'all' | 'solicitation' | 'sources' | 'setaside' | 'urgent';
@@ -658,9 +660,9 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                         {alert.noticeType}
                       </span>
                     )}
-                    {alert.setAside && (
+                    {(alert.setAsideDescription || alert.setAside) && (
                       <span className="px-2 py-0.5 text-xs bg-purple-500/20 text-purple-400 rounded">
-                        {alert.setAside}
+                        {alert.setAsideDescription || alert.setAside}
                       </span>
                     )}
                     {alert.isUrgent && (
@@ -671,6 +673,30 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     {alert.isClosingSoon && !alert.isUrgent && (
                       <span className="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
                         ⚡ {alert.daysLeft} days left
+                      </span>
+                    )}
+                    {/* Match-strength chip: surfaces the server-side
+                        recommendationScore (set-aside fit + agency fit +
+                        user feedback). Mirrors the percentage badge in
+                        the daily-alert email — same scoring, same visual
+                        weight, so the in-app feed and inbox agree about
+                        which opps are best fits. */}
+                    {typeof alert.recommendationScore === 'number' && alert.recommendationScore > 0 && (
+                      <span
+                        className={`px-2 py-0.5 text-xs rounded font-semibold ${
+                          alert.recommendationScore >= 50
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : alert.recommendationScore >= 25
+                            ? 'bg-emerald-500/10 text-emerald-400'
+                            : 'bg-slate-700/40 text-slate-300'
+                        }`}
+                        title={
+                          alert.feedbackReasons?.length
+                            ? `Match reasons: ${alert.feedbackReasons.join(' • ')}`
+                            : 'Match quality based on set-aside fit, agency fit, and your feedback'
+                        }
+                      >
+                        ★ {alert.recommendationScore >= 50 ? 'Top match' : alert.recommendationScore >= 25 ? 'Good fit' : 'Possible'}
                       </span>
                     )}
                   </div>
