@@ -441,7 +441,15 @@ export async function GET(request: NextRequest) {
       success: true,
       count: dedupedAlerts.length,
       opportunities: dedupedAlerts,
-      searchCriteria: { naicsCodes, limit, noticeType },
+      // Mirrors the data shown on the daily-alert email banner so the
+      // in-app Source Feed header can render the same "Filters:" line.
+      searchCriteria: {
+        naicsCodes,
+        limit,
+        noticeType,
+        businessType: userProfile?.business_type ?? null,
+        setAsidePreferences: userProfile?.set_aside_preferences ?? [],
+      },
     });
 
   } catch (error) {

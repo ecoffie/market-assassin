@@ -94,6 +94,11 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState(0);
   const [stateFilter, setStateFilter] = useState<string>('');
+  const [searchCriteria, setSearchCriteria] = useState<{
+    naicsCodes: string[];
+    businessType: string | null;
+    setAsidePreferences: string[];
+  }>({ naicsCodes: [], businessType: null, setAsidePreferences: [] });
 
   const canUsePipeline = tier !== 'free';
   const isFreeTier = tier === 'free';
@@ -139,6 +144,13 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       if (data.success) {
         setAlerts(data.opportunities || []);
         setTotalCount(data.count || 0);
+        if (data.searchCriteria) {
+          setSearchCriteria({
+            naicsCodes: data.searchCriteria.naicsCodes || [],
+            businessType: data.searchCriteria.businessType ?? null,
+            setAsidePreferences: data.searchCriteria.setAsidePreferences || [],
+          });
+        }
       } else {
         setError(data.error || 'Failed to load opportunities');
         setAlerts([]);
@@ -368,6 +380,41 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     return Array.from(set).sort();
   }, [alerts]);
 
+  // Mirror the daily-alert email's visual rhythm by chunking results into
+  // sections instead of one flat list. Each alert lands in the FIRST
+  // bucket it qualifies for so we don't double-count.
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const sectionedAlerts = useMemo(() => {
+    const now = Date.now();
+    const urgent: Alert[] = [];
+    const recentlyPosted: Alert[] = [];
+    const allOther: Alert[] = [];
+
+    for (const alert of filteredAlerts) {
+      if (alert.isUrgent) {
+        urgent.push(alert);
+        continue;
+      }
+      const posted = alert.postedDate ? new Date(alert.postedDate).getTime() : 0;
+      if (posted && now - posted <= SEVEN_DAYS_MS) {
+        recentlyPosted.push(alert);
+        continue;
+      }
+      allOther.push(alert);
+    }
+
+    return { urgent, recentlyPosted, allOther };
+  }, [filteredAlerts]);
+
+  const todayFormatted = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, []);
+
   const filterOptions: Array<{ key: AlertFilter; label: string }> = [
     { key: 'all', label: 'All' },
     { key: 'solicitation', label: 'Solicitations' },
@@ -378,49 +425,70 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">{isFreeTier ? 'Daily Alerts' : 'Source Feed'}</h1>
-            {isFreeTier && (
-              <span className="px-2 py-1 text-xs bg-slate-800 text-slate-300 rounded">
-                Free
+      {/* Branded header card — mirrors the daily-alert email banner so the
+          in-app feed has the same visual rhythm as what users see in
+          their inbox: title, date, match count, profile filter summary. */}
+      <div className="rounded-xl overflow-hidden border border-slate-800">
+        <div className="bg-gradient-to-br from-slate-950 to-slate-900 px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-2xl">🎯</span>
+                <h1 className="text-xl font-bold text-white">
+                  {isFreeTier ? 'Mindy Daily Alerts' : 'Mindy Saved Search Alert'}
+                </h1>
+                {isFreeTier && (
+                  <span className="px-2 py-0.5 text-xs bg-slate-800 text-slate-300 rounded">Free</span>
+                )}
+              </div>
+              <p className="text-sm text-slate-400 mt-1">
+                {todayFormatted}
+                {totalCount > 0 && <span className="text-emerald-400 ml-2">• {totalCount} matches found</span>}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={loadAlerts}
+                disabled={isLoading}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isLoading ? 'Refreshing…' : '🔄 Refresh'}
+              </button>
+              {isFreeTier && (
+                <a
+                  href="/market-intelligence"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  Upgrade to Mindy Pro
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Filter summary — mirrors the dark band under the email header */}
+        {(searchCriteria.naicsCodes.length > 0 || searchCriteria.businessType || searchCriteria.setAsidePreferences.length > 0) && (
+          <div className="bg-slate-900 border-t border-slate-800 px-6 py-3 text-xs text-slate-400">
+            <span className="font-semibold text-slate-300 mr-2">Filters:</span>
+            {searchCriteria.naicsCodes.length > 0 && (
+              <span className="mr-3">
+                NAICS {searchCriteria.naicsCodes.slice(0, 3).join(', ')}
+                {searchCriteria.naicsCodes.length > 3 && ` +${searchCriteria.naicsCodes.length - 3}`}
+              </span>
+            )}
+            {searchCriteria.businessType && (
+              <span className="mr-3">• {searchCriteria.businessType}</span>
+            )}
+            {searchCriteria.setAsidePreferences.length > 0 && (
+              <span className="mr-3">
+                • Set-asides: {searchCriteria.setAsidePreferences.slice(0, 3).join(', ')}
               </span>
             )}
           </div>
-          <p className="text-slate-400 mt-1">
-            {isFreeTier
-              ? 'SAM.gov opportunities matching your profile'
-              : 'Raw SAM.gov data layer behind Today\'s Intel'}
-            {totalCount > 0 && <span className="text-emerald-400 ml-2">({totalCount} found)</span>}
-          </p>
-        </div>
-        <button
-          onClick={loadAlerts}
-          disabled={isLoading}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors disabled:opacity-50"
-        >
-          {isLoading ? 'Refreshing...' : '🔄 Refresh'}
-        </button>
+        )}
       </div>
 
-      {isFreeTier ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-white">Daily Alerts is the free feed.</h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Upgrade for AI briefings, win prioritization, pursuit guidance, forecasts, recompetes, and contractor intelligence.
-            </p>
-          </div>
-          <a
-            href="/market-intelligence"
-            className="shrink-0 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors text-center"
-          >
-            Upgrade to Mindy Pro
-          </a>
-        </div>
-      ) : (
+      {!isFreeTier && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
           <h2 className="text-sm font-semibold text-emerald-200">Included raw feed for paid accounts</h2>
           <p className="text-sm text-emerald-100/80 mt-1">
@@ -542,10 +610,26 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         </div>
       )}
 
-      {/* Alert List */}
+      {/* Alert List — bucketed into Urgent / Recently Posted / All so the
+          page reads like the daily-alert email (header, sections, list)
+          instead of a flat scroll of cards. */}
       {!isLoading && filteredAlerts.length > 0 && (
-        <div className="space-y-3">
-          {filteredAlerts.map((alert) => (
+        <div className="space-y-8">
+          {/* Render each non-empty bucket as its own section. Inline the
+              same card markup three times via a fragment-returning IIFE so
+              we don't restructure the existing markup. */}
+          {([
+            { key: 'urgent', label: 'Urgent — Closing this week', items: sectionedAlerts.urgent, accent: 'text-red-300' },
+            { key: 'recent', label: 'Recently posted', items: sectionedAlerts.recentlyPosted, accent: 'text-emerald-300' },
+            { key: 'all', label: 'All matching opportunities', items: sectionedAlerts.allOther, accent: 'text-slate-300' },
+          ] as const).filter(s => s.items.length > 0).map(section => (
+            <section key={section.key}>
+              <h2 className={`text-sm font-semibold uppercase tracking-wider mb-3 ${section.accent}`}>
+                {section.label}
+                <span className="text-slate-500 font-normal normal-case ml-2">({section.items.length})</span>
+              </h2>
+              <div className="space-y-3">
+                {section.items.map((alert) => (
             <div
               key={alert.id}
               role="button"
@@ -692,6 +776,9 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 </div>
               </div>
             </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
