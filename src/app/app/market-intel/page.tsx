@@ -29,6 +29,32 @@ interface DashboardStats {
   bySetAside: SetAsideCount[];
 }
 
+// Loose shapes — SAM returns slightly different keys per notice.
+type SamAttachment = {
+  url?: string;
+  name?: string;
+  fileName?: string;
+  type?: string;
+  postedDate?: string;
+} & Record<string, unknown>;
+
+type SamPointOfContact = {
+  fullName?: string;
+  full_name?: string;
+  title?: string;
+  type?: string;
+  email?: string;
+  phone?: string;
+} & Record<string, unknown>;
+
+type SamOfficeAddress = {
+  city?: string;
+  state?: string;
+  zipcode?: string;
+  zip?: string;
+  countryCode?: string;
+} & Record<string, unknown>;
+
 interface Opportunity {
   id: string;
   notice_id: string;
@@ -36,6 +62,12 @@ interface Opportunity {
   title: string;
   description: string | null;
   description_url: string | null;
+  attachments: SamAttachment[];
+  points_of_contact: SamPointOfContact[];
+  office_address: SamOfficeAddress | null;
+  fair_opportunity: Record<string, unknown> | null;
+  additional_info_link: string | null;
+  additional_info_text: string | null;
   department: string;
   sub_tier: string | null;
   office: string | null;
@@ -834,6 +866,137 @@ function MarketIntelDashboard() {
                           </p>
                         </div>
                       </div>
+
+                      {/* Attachments — SAM's resourceLinks. Each entry has
+                          a file URL plus metadata; we extract whichever
+                          field SAM populated for the filename. */}
+                      {opp.attachments && opp.attachments.length > 0 && (
+                        <div>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">
+                            Attachments ({opp.attachments.length})
+                          </span>
+                          <ul className="mt-2 space-y-1.5">
+                            {opp.attachments.map((att, idx) => {
+                              const url = typeof att === 'string'
+                                ? att
+                                : (att?.url || att?.link || att?.resourceLink) as string | undefined;
+                              const name = (att?.name || att?.fileName || att?.title) as string | undefined
+                                || (url ? url.split('/').pop() : undefined)
+                                || `Attachment ${idx + 1}`;
+                              if (!url) return null;
+                              return (
+                                <li key={idx}>
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
+                                  >
+                                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                    </svg>
+                                    <span className="truncate">{name}</span>
+                                  </a>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Points of Contact — usually contracting officer +
+                          specialist. SAM's pointOfContact entries vary
+                          slightly, so we read whichever name/email/phone
+                          fields are populated. */}
+                      {opp.points_of_contact && opp.points_of_contact.length > 0 && (
+                        <div>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">
+                            Points of Contact
+                          </span>
+                          <div className="mt-2 grid md:grid-cols-2 gap-3">
+                            {opp.points_of_contact.map((poc, idx) => {
+                              const fullName = (poc?.fullName || poc?.full_name || poc?.name) as string | undefined;
+                              const title = (poc?.title || poc?.type) as string | undefined;
+                              const email = poc?.email as string | undefined;
+                              const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
+                              if (!fullName && !email && !phone) return null;
+                              return (
+                                <div key={idx} className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm">
+                                  {fullName && <p className="text-gray-200 font-medium">{fullName}</p>}
+                                  {title && <p className="text-xs text-gray-500">{title}</p>}
+                                  {email && (
+                                    <a href={`mailto:${email}`} className="block mt-1 text-purple-300 hover:text-purple-200 text-xs break-all">
+                                      {email}
+                                    </a>
+                                  )}
+                                  {phone && (
+                                    <a href={`tel:${phone}`} className="block text-gray-400 hover:text-gray-200 text-xs">
+                                      {phone}
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Contracting office address */}
+                      {opp.office_address && Object.values(opp.office_address).some(Boolean) && (
+                        <div>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">
+                            Contracting Office Address
+                          </span>
+                          <p className="text-gray-300 text-sm mt-1">
+                            {[
+                              opp.office_address.streetAddress,
+                              opp.office_address.streetAddress2,
+                              opp.office_address.city,
+                              [opp.office_address.state, (opp.office_address.zipcode || opp.office_address.zip)]
+                                .filter(Boolean).join(' '),
+                              opp.office_address.countryCode,
+                            ].filter(Boolean).join(', ') as string}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Fair opportunity / J&A — sole-source justification
+                          info, when present. SAM only populates this for
+                          sole-source / brand-name / 8(a) follow-on notices. */}
+                      {opp.fair_opportunity && Object.keys(opp.fair_opportunity).length > 0 && (
+                        <div>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">
+                            Fair Opportunity / J&amp;A
+                          </span>
+                          <pre className="mt-1 text-xs text-gray-400 whitespace-pre-wrap font-mono bg-gray-950/50 border border-gray-800 rounded p-3">
+                            {JSON.stringify(opp.fair_opportunity, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+
+                      {/* Additional info — inline text or external link */}
+                      {(opp.additional_info_text || opp.additional_info_link) && (
+                        <div>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">
+                            Additional Info
+                          </span>
+                          {opp.additional_info_text && (
+                            <p className="text-gray-300 text-sm mt-1 whitespace-pre-wrap">
+                              {opp.additional_info_text}
+                            </p>
+                          )}
+                          {opp.additional_info_link && (
+                            <a
+                              href={opp.additional_info_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block mt-1 text-sm text-purple-300 hover:text-purple-200 underline"
+                            >
+                              {opp.additional_info_link}
+                            </a>
+                          )}
+                        </div>
+                      )}
 
                       {opp.ui_link && (
                         <div className="flex gap-2 pt-1">

@@ -44,6 +44,14 @@ const NOTICE_TYPE_INFO: Record<string, { label: string; color: string; bgColor: 
   'Justification': { label: 'Justification', color: '#f59e0b', bgColor: '#fffbeb' },
 };
 
+// SAM attachment + POC shapes are loose — SAM returns slightly
+// different fields per notice, so we keep them as JSONB and let the
+// UI normalize at render time.
+type SamAttachment = Record<string, unknown>;
+type SamPointOfContact = Record<string, unknown>;
+type SamOfficeAddress = Record<string, unknown> | null;
+type SamFairOpportunity = Record<string, unknown> | null;
+
 interface RawOpportunity {
   id: string;
   notice_id: string;
@@ -52,6 +60,12 @@ interface RawOpportunity {
   description: string | null;
   description_url?: string | null;
   department: string | null;
+  attachments?: SamAttachment[] | null;
+  points_of_contact?: SamPointOfContact[] | null;
+  office_address?: SamOfficeAddress;
+  fair_opportunity?: SamFairOpportunity;
+  additional_info_link?: string | null;
+  additional_info_text?: string | null;
   sub_tier: string | null;
   office: string | null;
   agency_hierarchy: string | null;
@@ -81,6 +95,12 @@ interface DashboardOpportunity {
   // /api/sam-description?noticeId=... and cache it back.
   description_url: string | null;
   department: string;
+  attachments: SamAttachment[];
+  points_of_contact: SamPointOfContact[];
+  office_address: SamOfficeAddress;
+  fair_opportunity: SamFairOpportunity;
+  additional_info_link: string | null;
+  additional_info_text: string | null;
   sub_tier: string | null;
   office: string | null;
   agency_hierarchy: string | null;
@@ -500,6 +520,12 @@ export async function GET(request: NextRequest) {
         pop_state: opp.pop_state,
         pop_zip: opp.pop_zip,
         ui_link: opp.ui_link,
+        attachments: Array.isArray(opp.attachments) ? opp.attachments : [],
+        points_of_contact: Array.isArray(opp.points_of_contact) ? opp.points_of_contact : [],
+        office_address: opp.office_address ?? null,
+        fair_opportunity: opp.fair_opportunity ?? null,
+        additional_info_link: typeof opp.additional_info_link === 'string' ? opp.additional_info_link : null,
+        additional_info_text: typeof opp.additional_info_text === 'string' ? opp.additional_info_text : null,
         days_until_deadline: daysUntil,
         urgency_level: getUrgencyLevel(deadline),
       };

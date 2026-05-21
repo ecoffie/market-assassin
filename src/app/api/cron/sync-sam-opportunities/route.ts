@@ -82,6 +82,14 @@ interface SamOpportunity {
   };
   uiLink?: string;
   lastModifiedDate?: string;
+  // Additional fields the sync now extracts so users get the full SAM
+  // record without leaving Mindy.
+  resourceLinks?: string[] | unknown[];
+  pointOfContact?: unknown[];
+  officeAddress?: unknown;
+  fairOpportunity?: unknown;
+  additionalInfoLink?: string;
+  additionalInfoText?: string;
 }
 
 type SyncType = 'full' | 'resume' | 'delta' | 'recovery';
@@ -177,6 +185,15 @@ function mapToDbRecord(opp: SamOpportunity) {
     pop_zip: opp.placeOfPerformance?.zip || null,
     pop_country: opp.placeOfPerformance?.country?.code || 'USA',
     ui_link: opp.uiLink || null,
+    // Extra fields surfaced so users see everything SAM gives without
+    // leaving Mindy. All stored as JSONB so we don't have to flatten
+    // each nested array/object into separate columns.
+    attachments: Array.isArray(opp.resourceLinks) ? opp.resourceLinks : [],
+    points_of_contact: Array.isArray(opp.pointOfContact) ? opp.pointOfContact : [],
+    office_address: opp.officeAddress ?? null,
+    fair_opportunity: opp.fairOpportunity ?? null,
+    additional_info_link: opp.additionalInfoLink || null,
+    additional_info_text: opp.additionalInfoText || null,
     raw_data: opp,
     synced_at: new Date().toISOString(),
   };
