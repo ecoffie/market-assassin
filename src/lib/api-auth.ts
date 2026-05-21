@@ -105,6 +105,7 @@ const INTERNAL_TEAM_EMAILS = new Set([
   'kashifhameedvlogs@gmail.com',
   'evankoffdev@gmail.com',
   'usamashraf2@gmail.com',
+  'muneebamehmood07@gmail.com',
 ]);
 
 function getStaffRole(email: string): MIStaffRole {
