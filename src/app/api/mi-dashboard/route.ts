@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -491,7 +492,16 @@ export async function GET(request: NextRequest) {
       // populated) is honored too.
       const rawDescription = typeof opp.description === 'string' ? opp.description.trim() : null;
       const descriptionIsUrl = !!rawDescription && /^https?:\/\//i.test(rawDescription);
-      const description = rawDescription && !descriptionIsUrl ? rawDescription : null;
+      // Some rows were cached before the HTML→text helper landed and
+      // still hold raw SAM markup (<p>, <li>, &nbsp;, etc.). Clean
+      // on read so the UI never sees raw tags, regardless of when
+      // the row was synced.
+      const cleanedDescription = rawDescription && !descriptionIsUrl && looksLikeHtml(rawDescription)
+        ? samHtmlToText(rawDescription)
+        : rawDescription && !descriptionIsUrl
+        ? rawDescription
+        : null;
+      const description = cleanedDescription;
       const description_url = descriptionIsUrl
         ? rawDescription
         : (typeof opp.description_url === 'string' ? opp.description_url : null);

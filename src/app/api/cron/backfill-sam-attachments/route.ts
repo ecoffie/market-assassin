@@ -98,7 +98,29 @@ async function fetchAttachments(noticeId: string, apiKey: string): Promise<any[]
   // there are no attachments. Some notices instead use a nested
   // attachments array — handle both shapes.
   if (Array.isArray(opp.resourceLinks) && opp.resourceLinks.length > 0) {
-    return opp.resourceLinks.map((url: string) => ({ url, name: url.split('/').pop() }));
+    // SAM URLs look like
+    //   https://sam.gov/api/prod/opps/v3/opportunities/resources/files/{fileId}/download
+    // so url.split('/').pop() is always "download" — useless as a
+    // label. Pull the {fileId} segment (the one before "download") and
+    // fall back to a numbered "Document N" label so users see something
+    // distinct per file.
+    return opp.resourceLinks.map((url: string, i: number) => {
+      let fileId: string | undefined;
+      try {
+        const parts = new URL(url).pathname.split('/').filter(Boolean);
+        // Last segment is usually "download"; the one before is the file id.
+        const last = parts[parts.length - 1];
+        if (last && last.toLowerCase() !== 'download') {
+          fileId = last;
+        } else if (parts.length >= 2) {
+          fileId = parts[parts.length - 2];
+        }
+      } catch { /* leave fileId undefined if URL parse fails */ }
+      const label = fileId && fileId.length <= 24
+        ? `Document ${i + 1} (${fileId})`
+        : `Document ${i + 1}`;
+      return { url, name: label, fileId: fileId || null };
+    });
   }
   if (Array.isArray(opp.attachments) && opp.attachments.length > 0) {
     return opp.attachments;

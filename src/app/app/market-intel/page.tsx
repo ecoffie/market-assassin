@@ -886,9 +886,29 @@ function MarketIntelDashboard() {
                                 const url = typeof att === 'string'
                                   ? att
                                   : (att?.url || att?.link || att?.resourceLink) as string | undefined;
-                                const name = (att?.name || att?.fileName || att?.title) as string | undefined
-                                  || (url ? url.split('/').pop() : undefined)
-                                  || `Attachment ${idx + 1}`;
+                                // Derive a meaningful label. SAM URLs end in
+                                // /download, so url.split('/').pop() yields
+                                // "download" for every file — useless. Prefer
+                                // any name SAM gave us, then the file-id
+                                // segment from the URL, then a numbered
+                                // fallback.
+                                const givenName = (att?.name || att?.fileName || att?.title) as string | undefined;
+                                let derivedName: string | undefined = givenName && givenName.toLowerCase() !== 'download'
+                                  ? givenName
+                                  : undefined;
+                                if (!derivedName && url) {
+                                  try {
+                                    const parts = new URL(url).pathname.split('/').filter(Boolean);
+                                    const last = parts[parts.length - 1];
+                                    const fileId = last && last.toLowerCase() !== 'download'
+                                      ? last
+                                      : (parts.length >= 2 ? parts[parts.length - 2] : undefined);
+                                    derivedName = fileId && fileId.length <= 24
+                                      ? `Document ${idx + 1} (${fileId})`
+                                      : `Document ${idx + 1}`;
+                                  } catch { /* fall through */ }
+                                }
+                                const name = derivedName || `Document ${idx + 1}`;
                                 if (!url) return null;
                                 return (
                                   <li key={idx}>
