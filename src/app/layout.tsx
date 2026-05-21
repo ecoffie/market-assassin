@@ -30,22 +30,20 @@ export const metadata: Metadata = {
     description: "Your 24/7 Federal Market Intelligence Analyst. While you sleep, Mindy scans 24,000+ opportunities, scores your fit, and tells you what to bid on.",
     siteName: "Mindy",
     type: "website",
-    images: [
-      {
-        // Reuses the existing brand asset for now. A purpose-built 1200×630
-        // OG card would render better — todo when design has cycles.
-        url: "/brand/mindy-logo-icon.png",
-        width: 1200,
-        height: 1200,
-        alt: "Mindy",
-      },
-    ],
+    // og:image is auto-wired from src/app/opengraph-image.tsx — the
+    // programmatic 1200×630 card with the Mindy mark + brand gradient.
+    // Don't redeclare images here; Next.js will merge the convention
+    // file in, and overriding it would clobber the rendered card.
   },
   twitter: {
-    card: "summary",
+    // Upgraded to large card now that we have a proper 1200×630 image
+    // (the summary variant only shows a small thumbnail).
+    card: "summary_large_image",
     title: "Meet Mindy.",
     description: "Your 24/7 Federal Market Intelligence Analyst. The big contractors have armies. You have Mindy.",
-    images: ["/brand/mindy-logo-icon.png"],
+    // Twitter image is auto-wired from src/app/twitter-image.tsx if
+    // present, otherwise falls back to og-image. The opengraph-image
+    // convention file covers both.
   },
 };
 
