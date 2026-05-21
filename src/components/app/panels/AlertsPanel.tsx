@@ -98,7 +98,8 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     naicsCodes: string[];
     businessType: string | null;
     setAsidePreferences: string[];
-  }>({ naicsCodes: [], businessType: null, setAsidePreferences: [] });
+    locationStates: string[];
+  }>({ naicsCodes: [], businessType: null, setAsidePreferences: [], locationStates: [] });
 
   const canUsePipeline = tier !== 'free';
   const isFreeTier = tier === 'free';
@@ -150,6 +151,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
             naicsCodes: data.searchCriteria.naicsCodes || [],
             businessType: data.searchCriteria.businessType ?? null,
             setAsidePreferences: data.searchCriteria.setAsidePreferences || [],
+            locationStates: data.searchCriteria.locationStates || [],
           });
         }
       } else {
@@ -474,7 +476,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         </div>
 
         {/* Filter summary — mirrors the dark band under the email header */}
-        {(searchCriteria.naicsCodes.length > 0 || searchCriteria.businessType || searchCriteria.setAsidePreferences.length > 0) && (
+        {(searchCriteria.naicsCodes.length > 0 || searchCriteria.businessType || searchCriteria.setAsidePreferences.length > 0 || searchCriteria.locationStates.length > 0) && (
           <div className="bg-slate-900 border-t border-slate-800 px-6 py-3 text-xs text-slate-400">
             <span className="font-semibold text-slate-300 mr-2">Filters:</span>
             {searchCriteria.naicsCodes.length > 0 && (
@@ -490,6 +492,16 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
               <span className="mr-3">
                 • Set-asides: {searchCriteria.setAsidePreferences.slice(0, 3).join(', ')}
               </span>
+            )}
+            {searchCriteria.locationStates.length > 0 && (
+              <span className="mr-3">
+                • States: {searchCriteria.locationStates.length <= 4
+                  ? searchCriteria.locationStates.join(', ')
+                  : `${searchCriteria.locationStates.slice(0, 3).join(', ')} +${searchCriteria.locationStates.length - 3}`}
+              </span>
+            )}
+            {searchCriteria.locationStates.length === 0 && (
+              <span className="mr-3 text-slate-500">• States: all (national)</span>
             )}
           </div>
         )}

@@ -50,6 +50,7 @@ interface UserOpportunityProfile {
   naics_codes?: string[] | null;
   business_type?: string | null;
   set_aside_preferences?: string[] | null;
+  location_states?: string[] | null;
 }
 
 interface SetAsideFit {
@@ -302,7 +303,7 @@ export async function GET(request: NextRequest) {
   if (email) {
     const { data: profile } = await supabase
       .from('user_notification_settings')
-      .select('naics_codes,business_type,set_aside_preferences')
+      .select('naics_codes,business_type,set_aside_preferences,location_states')
       .eq('user_email', email)
       .single();
 
@@ -342,6 +343,19 @@ export async function GET(request: NextRequest) {
     // Filter by NAICS (using OR for any match)
     const naicsFilters = naicsCodes.map(code => `naics_code.like.${code}%`);
     query = query.or(naicsFilters.join(','));
+
+    // Filter by user's location states when set. Strict mode — we
+    // don't auto-expand to regions, so a user who selected FL sees
+    // only FL opps. Region selection happens via the Settings UI by
+    // expanding the preset into the underlying state array client-side
+    // before saving. If the array is empty/null, no state filter
+    // applies (national feed).
+    const locationStates = (userProfile?.location_states || [])
+      .map((s) => String(s || '').trim().toUpperCase())
+      .filter(Boolean);
+    if (locationStates.length > 0) {
+      query = query.in('pop_state', locationStates);
+    }
 
     // Optional notice type filter
     if (noticeType) {
@@ -454,6 +468,7 @@ export async function GET(request: NextRequest) {
         noticeType,
         businessType: userProfile?.business_type ?? null,
         setAsidePreferences: userProfile?.set_aside_preferences ?? [],
+        locationStates: locationStates,
       },
     });
 

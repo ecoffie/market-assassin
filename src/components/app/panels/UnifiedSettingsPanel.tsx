@@ -18,6 +18,8 @@ interface SettingsForm {
   email_frequency: string;
   onboarding_completed: boolean;
   two_factor_required: boolean;
+  // States the user wants opportunities scoped to. Empty = national.
+  location_states: string[];
 }
 
 export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPanelProps) {
@@ -30,6 +32,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     email_frequency: 'daily',
     onboarding_completed: false,
     two_factor_required: true,
+    location_states: [],
   });
   const [workspaceName, setWorkspaceName] = useState('Workspace');
   const [loading, setLoading] = useState(true);
@@ -66,6 +69,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
       const prefs = prefsRes.ok ? await prefsRes.json().catch(() => null) : null;
       const realAlertFrequency: string | undefined = prefs?.data?.frequency;
+      const realLocationStates: string[] = Array.isArray(prefs?.data?.locationStates)
+        ? prefs.data.locationStates
+        : [];
 
       const settings = data.settings || {};
       setWorkspaceName(data.workspace?.name || 'Workspace');
@@ -80,6 +86,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         email_frequency: realAlertFrequency || settings.email_frequency || 'daily',
         onboarding_completed: Boolean(settings.onboarding_completed),
         two_factor_required: settings.two_factor_required !== false,
+        // Canonical store for states is user_notification_settings,
+        // surfaced via the alerts preferences endpoint.
+        location_states: realLocationStates.map((s) => String(s || '').toUpperCase()),
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -126,6 +135,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
           body: JSON.stringify({
             email,
             frequency: form.email_frequency,
+            locationStates: form.location_states,
           }),
         }),
       ]);
@@ -203,6 +213,11 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
           <Field label="NAICS Codes" value={form.naics_codes} onChange={(value) => setForm({ ...form, naics_codes: value })} placeholder="541512, 541611, 541330" />
           <Field label="Target Agencies" value={form.target_agencies} onChange={(value) => setForm({ ...form, target_agencies: value })} placeholder="VA, DHS, Army, GSA" />
 
+          <StatesField
+            value={form.location_states}
+            onChange={(states) => setForm({ ...form, location_states: states })}
+          />
+
           <SectionTitle title="Security" />
           <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-800 bg-slate-800/40 p-4">
             <div>
@@ -274,6 +289,103 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
         className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 outline-none focus:border-emerald-500"
       />
     </label>
+  );
+}
+
+// Region presets — expand to underlying USPS state abbreviations.
+// Mirrors src/lib/utils/state-expansion.ts REGIONS. Kept inline here so
+// the panel doesn't need a server round-trip for the lookup.
+const REGION_PRESETS: Array<{ label: string; states: string[] }> = [
+  { label: 'Northeast', states: ['CT', 'MA', 'ME', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT'] },
+  { label: 'Southeast', states: ['AL', 'FL', 'GA', 'KY', 'MS', 'NC', 'SC', 'TN', 'VA', 'WV'] },
+  { label: 'Midwest',  states: ['IL', 'IN', 'IA', 'KS', 'MI', 'MN', 'MO', 'NE', 'ND', 'OH', 'SD', 'WI'] },
+  { label: 'Southwest', states: ['AZ', 'NM', 'OK', 'TX'] },
+  { label: 'Mountain',  states: ['CO', 'ID', 'MT', 'UT', 'WY'] },
+  { label: 'Pacific',   states: ['AK', 'CA', 'HI', 'OR', 'WA', 'NV'] },
+  { label: 'DC Metro',  states: ['DC', 'MD', 'VA'] },
+];
+
+const ALL_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS',
+  'KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY',
+  'NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV',
+  'WI','WY','DC','PR',
+];
+
+function StatesField({ value, onChange }: { value: string[]; onChange: (states: string[]) => void }) {
+  const selected = new Set(value.map((s) => s.toUpperCase()));
+  const toggleState = (state: string) => {
+    const next = new Set(selected);
+    if (next.has(state)) next.delete(state); else next.add(state);
+    onChange(Array.from(next).sort());
+  };
+  const applyRegion = (states: string[]) => {
+    const next = new Set(selected);
+    states.forEach((s) => next.add(s));
+    onChange(Array.from(next).sort());
+  };
+  const clearAll = () => onChange([]);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="block text-sm text-slate-400">
+          States{' '}
+          <span className="text-xs text-slate-500">
+            ({selected.size === 0 ? 'all states / national' : `${selected.size} selected`})
+          </span>
+        </span>
+        {selected.size > 0 && (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="text-xs text-slate-500 hover:text-slate-300 underline"
+          >
+            Clear (national)
+          </button>
+        )}
+      </div>
+
+      {/* Region presets — additive: clicking adds the region's states
+          to the current selection so users can build "Southeast + DC". */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {REGION_PRESETS.map((region) => (
+          <button
+            key={region.label}
+            type="button"
+            onClick={() => applyRegion(region.states)}
+            className="px-2.5 py-1 text-xs rounded-md border border-slate-700 bg-slate-800/60 text-slate-300 hover:border-emerald-500 hover:text-emerald-300 transition-colors"
+          >
+            + {region.label}
+            <span className="text-slate-500 ml-1">({region.states.length})</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Per-state toggle grid */}
+      <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-13 gap-1 rounded-lg border border-slate-800 bg-slate-900/60 p-2 max-h-48 overflow-y-auto">
+        {ALL_STATES.map((state) => {
+          const on = selected.has(state);
+          return (
+            <button
+              key={state}
+              type="button"
+              onClick={() => toggleState(state)}
+              className={`px-1.5 py-1 text-xs rounded font-medium transition-colors ${
+                on
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  : 'bg-slate-800/40 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
+              {state}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-xs text-slate-500 mt-2">
+        Opportunities will be scoped to selected states only. Leave empty for a national feed.
+      </p>
+    </div>
   );
 }
 
