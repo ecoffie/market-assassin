@@ -343,6 +343,28 @@ export async function verifyUserOwnsEmail(
     }
   }
 
+  // Method 2.5: Check the Mindy 2FA session token (set by /app sign-in flow).
+  // This lets OAuth users on getmindy.ai authenticate any route that's still
+  // on cookie-auth — without it, the Market Research panel (and similar
+  // /app components) get 401s on /api/alerts/preferences and the user
+  // sees an empty saved profile even though the DB has their data.
+  const miAuthHeader =
+    request.headers.get('x-mi-auth-token') ||
+    request.headers.get('x-mi-2fa-token');
+  if (miAuthHeader) {
+    try {
+      // Lazy import to avoid a hard dep cycle with two-factor-session,
+      // which imports from this file's siblings.
+      const { verifyTwoFactorSessionToken } = await import('@/lib/two-factor-session');
+      const tfaResult = verifyTwoFactorSessionToken(miAuthHeader, normalized);
+      if (tfaResult.valid) {
+        return { authenticated: true, email: normalized, method: 'session' };
+      }
+    } catch {
+      // fall through to remaining methods
+    }
+  }
+
   // Method 3: Check cookie (legacy, weak auth)
   const cookieEmail = request.cookies.get('ma_access_email')?.value?.toLowerCase();
   if (cookieEmail && cookieEmail === normalized) {

@@ -810,7 +810,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
         headers: getAuthHeaders(),
       }).then((res) => res.ok ? res.json() : null).catch(() => null),
-      fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`)
+      // Send the MI 2FA token here too — otherwise OAuth users on /app
+      // get a 401 (no ma_access_email cookie) and the saved profile
+      // loads as empty.
+      fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders(),
+      })
         .then((res) => res.ok ? res.json() : null)
         .catch(() => null),
     ])
