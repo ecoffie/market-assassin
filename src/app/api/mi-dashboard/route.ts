@@ -457,12 +457,22 @@ export async function GET(request: NextRequest) {
         ? Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         : null;
 
+      // SAM.gov stores most descriptions as a separate URL pointer
+      // (api.sam.gov/.../noticedesc?noticeid=...), so the raw
+      // description column often holds the URL itself. Filter those
+      // out so the UI doesn't render a URL string in a Description
+      // field. Real text comes through unchanged.
+      const rawDescription = typeof opp.description === 'string' ? opp.description.trim() : null;
+      const description = rawDescription && !/^https?:\/\//i.test(rawDescription)
+        ? rawDescription
+        : null;
+
       return {
         id: opp.id,
         notice_id: opp.notice_id,
         solicitation_number: opp.solicitation_number,
         title: opp.title,
-        description: opp.description,
+        description,
         department: opp.department || 'Unknown Agency',
         sub_tier: opp.sub_tier,
         office: opp.office,

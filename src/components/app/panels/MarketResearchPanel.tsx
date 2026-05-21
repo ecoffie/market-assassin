@@ -1472,6 +1472,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         <ReportViewer
           reportId={activeReportId}
           reportData={getReportContent(activeReportId)}
+          isGenerating={isGenerating}
           recommendedOpportunities={recommendedOpportunities}
           onClose={() => setActiveReportId(null)}
           formatCurrency={formatCurrency}
@@ -1827,6 +1828,7 @@ function InsightCard({
 interface ReportViewerProps {
   reportId: string;
   reportData: ReportData[keyof ReportData] | null;
+  isGenerating: boolean;
   recommendedOpportunities: RecommendedOpportunity[];
   onClose: () => void;
   formatCurrency: (value?: number) => string;
@@ -1927,6 +1929,7 @@ function LiveOpportunityFallback({
 function ReportViewer({
   reportId,
   reportData,
+  isGenerating,
   recommendedOpportunities,
   onClose,
   formatCurrency,
@@ -1943,10 +1946,22 @@ function ReportViewer({
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-white">Report Loading...</h3>
+          <h3 className="font-semibold text-white">
+            {isGenerating ? 'Building your market map…' : 'Report not ready'}
+          </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
-        <p className="text-slate-400">Generate reports to load this view.</p>
+        {isGenerating ? (
+          <div className="flex items-center gap-3 text-slate-400">
+            <span className="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            <p>Pulling agencies, buyers, partners, and forecasts for your profile. This takes 10–30 seconds.</p>
+          </div>
+        ) : (
+          <p className="text-slate-400">
+            Click <strong className="text-emerald-300">Build Market Map</strong> at the top to generate this report
+            from your saved profile.
+          </p>
+        )}
       </div>
     );
   }
