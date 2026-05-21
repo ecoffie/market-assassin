@@ -631,6 +631,18 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
     setPipelineSaved(prev => new Set(prev).add(item.id));
 
     try {
+      // Schema gotchas that caused the original "Failed to add to
+      // pipeline" 500:
+      //   - column is `value_estimate` NOT `estimated_value`
+      //   - column is `external_url` NOT `sam_link`
+      //   - `response_deadline` is TIMESTAMPTZ — item.deadline is a
+      //     human-formatted string ("May 21, 2026 9:00 PM ET") which
+      //     Postgres can't cast. Set to null when not parseable.
+      const parsedDeadline = (() => {
+        if (!item.deadline) return null;
+        const d = new Date(item.deadline);
+        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+      })();
       const res = await fetch('/api/pipeline', {
         method: 'POST',
         // /api/pipeline POST requires requireMIAuthSession — without
@@ -644,9 +656,9 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           agency: item.buyerName || item.subtitle?.split(' • ')[0] || '',
           naics_code: item.signals.find(s => s.startsWith('NAICS'))?.replace('NAICS ', '') || '',
           set_aside: item.signals.find(s => ['8(a)', 'WOSB', 'SDVOSB', 'HUBZone', 'SBA', 'Small Business'].some(sa => s.includes(sa))) || '',
-          response_deadline: item.deadline || null,
-          estimated_value: item.amount || null,
-          sam_link: item.actionUrl || '',
+          response_deadline: parsedDeadline,
+          value_estimate: item.amount || null,
+          external_url: item.actionUrl || '',
           stage: 'tracking',
           priority: 'medium',
           source: 'briefing',
