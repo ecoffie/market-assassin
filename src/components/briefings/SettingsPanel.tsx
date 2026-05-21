@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import SampleOpportunitiesPicker from './SampleOpportunitiesPicker';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 interface CodeSuggestion {
   code: string;
@@ -121,7 +122,9 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
     setError('');
 
     try {
-      const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`, {
+        headers: getMIApiHeaders(email),
+      });
       const data = await res.json();
 
       if (data.success && data.data) {
@@ -211,7 +214,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
 
       const res = await fetch('/api/alerts/preferences', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email,
           naicsCodes,
