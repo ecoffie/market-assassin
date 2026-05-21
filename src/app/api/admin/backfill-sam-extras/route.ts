@@ -56,21 +56,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const supabase = getSupabase();
-  // Rows where the new columns haven't been populated yet AND raw_data
-  // exists so we have something to extract from.
-  const { count: needsBackfill } = await supabase
-    .from('sam_opportunities')
-    .select('id', { count: 'exact', head: true })
-    .is('attachments', null);
+  // Migration set attachments DEFAULT '[]'::jsonb so IS NULL matches
+  // nothing. The real signal that a row hasn't been backfilled is
+  // points_of_contact = '[]' AND raw_data->'pointOfContact' is a non-
+  // empty array (or any of the other extractable fields is present in
+  // raw_data but absent in its column). Easier proxy: count rows where
+  // attachments and points_of_contact are both still the empty default
+  // — those are the candidates. Some genuinely have no attachments
+  // and POCs upstream and will stay as [], but the backfill will
+  // either confirm that (no-op) or fill them in.
   const { count: total } = await supabase
     .from('sam_opportunities')
     .select('id', { count: 'exact', head: true });
 
+  // Count rows whose raw_data still has resourceLinks / pointOfContact
+  // that haven't been copied into the columns. This uses the JSONB
+  // path operator to look inside raw_data.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: needsBackfillRaw } = await (supabase
+    .from('sam_opportunities')
+    .select('id', { count: 'exact', head: true }) as any)
+    .eq('attachments', '[]')
+    .not('raw_data->resourceLinks', 'is', null);
+
   return NextResponse.json({
     mode: 'dry-run',
     totalRows: total ?? 0,
-    needsBackfill: needsBackfill ?? 0,
-    note: 'POST to this endpoint to start backfilling. Each run processes up to ?limit= rows (default 500, max 2000).',
+    needsBackfill: needsBackfillRaw ?? 0,
+    note: 'POST to this endpoint to start backfilling. Each run processes up to ?limit= rows (default 500, max 2000). Migration default left attachments=[] on existing rows, so the backfill looks for rows where raw_data still has resourceLinks/pointOfContact not yet copied into columns.',
   });
 }
 
@@ -84,15 +97,23 @@ export async function POST(request: NextRequest) {
 
   const supabase = getSupabase();
 
-  // Pull a batch of rows that still need extraction. We key on
-  // attachments IS NULL so we know the migration default of '[]' has
-  // not been overwritten by extraction yet. (Rows that genuinely had
-  // no attachments will be set to '[]' after extraction, so subsequent
-  // runs correctly skip them.)
-  const { data: rows, error } = await supabase
+  // Pull a batch of rows whose raw_data has extractable fields that
+  // the columns don't reflect yet. Migration default left attachments
+  // and points_of_contact as '[]', so we look for rows where the JSON
+  // path inside raw_data has the original arrays but the columns are
+  // still empty. Once extracted, attachments will be '[]' OR the real
+  // array — either way different from the dry-run filter — so the
+  // backfill is naturally idempotent. We also catch rows where SAM
+  // genuinely returned [] but we want to mark them processed; for
+  // those, an additional sentinel via fair_opportunity or office_
+  // address being null vs set would help, but the simplest correct
+  // behavior is: only re-process rows that have something to copy.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rows, error } = await (supabase
     .from('sam_opportunities')
-    .select('id, raw_data')
-    .is('attachments', null)
+    .select('id, raw_data') as any)
+    .eq('attachments', '[]')
+    .not('raw_data->resourceLinks', 'is', null)
     .limit(limit);
 
   if (error) {
