@@ -41,6 +41,16 @@ interface Alert {
   isClosingSoon?: boolean;
   recommendationScore?: number;
   feedbackReasons?: string[];
+  descriptionUrl?: string | null;
+  // Extra SAM record fields populated by the static + per-opp
+  // backfill jobs. Used by the Details drawer to render the full
+  // opportunity in-app instead of bouncing to sam.gov.
+  attachments?: Array<Record<string, unknown> | string>;
+  pointsOfContact?: Array<Record<string, unknown>>;
+  officeAddress?: Record<string, unknown> | null;
+  fairOpportunity?: Record<string, unknown> | null;
+  additionalInfoLink?: string | null;
+  additionalInfoText?: string | null;
 }
 
 type AlertFilter = 'all' | 'solicitation' | 'sources' | 'setaside' | 'urgent';
@@ -89,6 +99,12 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recommendation');
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+  // Lazy-loaded full descriptions per notice_id. SAM stores most
+  // descriptions as URL pointers, so the drawer fetches the real
+  // text on open and caches it across drawer re-opens.
+  const [lazyDescriptions, setLazyDescriptions] = useState<Record<string, string>>({});
+  const [loadingDescription, setLoadingDescription] = useState<string | null>(null);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [savingAlertIds, setSavingAlertIds] = useState<Set<string>>(new Set());
   const [savedAlertIds, setSavedAlertIds] = useState<Set<string>>(new Set());
   const [feedbackByAlert, setFeedbackByAlert] = useState<Record<string, FeedbackType>>({});
@@ -239,6 +255,36 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       });
     }
   };
+
+  const loadFullDescription = useCallback(async (noticeId: string) => {
+    if (lazyDescriptions[noticeId]) return; // already cached
+    setLoadingDescription(noticeId);
+    setDescriptionError(null);
+    try {
+      const res = await fetch(`/api/sam-description?noticeId=${encodeURIComponent(noticeId)}`);
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.description) {
+        setDescriptionError(data.error || 'Could not load description');
+        return;
+      }
+      setLazyDescriptions((prev) => ({ ...prev, [noticeId]: data.description }));
+    } catch (err) {
+      console.error('Failed to fetch SAM description:', err);
+      setDescriptionError('Network error fetching description');
+    } finally {
+      setLoadingDescription(null);
+    }
+  }, [lazyDescriptions]);
+
+  // When the drawer opens (selectedAlert changes), auto-fetch the full
+  // description if we don't have inline text. Cache hit returns
+  // instantly; cache miss shows a spinner inside the drawer.
+  useEffect(() => {
+    if (!selectedAlert) return;
+    if (selectedAlert.description) return;
+    if (lazyDescriptions[selectedAlert.id]) return;
+    void loadFullDescription(selectedAlert.id);
+  }, [selectedAlert, lazyDescriptions, loadFullDescription]);
 
   const dismissAlert = (alert: Alert) => {
     setDismissedAlertIds(prev => new Set(prev).add(alert.id));
@@ -861,10 +907,10 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
             onClick={() => setSelectedAlert(null)}
           />
-          <aside className="fixed right-0 top-0 h-full w-full max-w-lg bg-slate-950 border-l border-slate-800 z-50 overflow-y-auto shadow-2xl">
+          <aside className="fixed right-0 top-0 h-full w-full max-w-2xl bg-slate-950 border-l border-slate-800 z-50 overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-slate-950/95 backdrop-blur border-b border-slate-800 p-5 flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Basic Opportunity Record</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Opportunity Details</p>
                 <h2 className="text-lg font-semibold text-white mt-1 line-clamp-2">{selectedAlert.title}</h2>
               </div>
               <button
@@ -883,9 +929,9 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     {selectedAlert.noticeType}
                   </span>
                 )}
-                {selectedAlert.setAside && (
+                {(selectedAlert.setAsideDescription || selectedAlert.setAside) && (
                   <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-400 rounded">
-                    {selectedAlert.setAside}
+                    {selectedAlert.setAsideDescription || selectedAlert.setAside}
                   </span>
                 )}
                 {(selectedAlert.isUrgent || selectedAlert.isClosingSoon) && (
@@ -946,6 +992,171 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                   </div>
                 )}
               </div>
+
+              {/* Description — inline if SAM gave us text; lazy-fetched
+                  from /api/sam-description when only a URL is on file.
+                  Cleaned (HTML → text) at the API layer so no raw tags
+                  leak into the drawer. */}
+              {(selectedAlert.description || lazyDescriptions[selectedAlert.id] || selectedAlert.descriptionUrl) && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Description</div>
+                  {(selectedAlert.description || lazyDescriptions[selectedAlert.id]) ? (
+                    <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                      {selectedAlert.description || lazyDescriptions[selectedAlert.id]}
+                    </p>
+                  ) : loadingDescription === selectedAlert.id ? (
+                    <p className="text-sm text-slate-500 flex items-center gap-2">
+                      <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                      Loading description from SAM.gov…
+                    </p>
+                  ) : descriptionError ? (
+                    <div>
+                      <p className="text-xs text-red-400">{descriptionError}</p>
+                      <button
+                        type="button"
+                        onClick={() => loadFullDescription(selectedAlert.id)}
+                        className="mt-1 text-xs text-purple-300 hover:text-purple-200 underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Attachments — file URLs from SAM resourceLinks. Sentinel
+                  entries with _no_attachments are filtered out. Labels
+                  fall back to "Document N (fileId)" if no real name. */}
+              {(() => {
+                const realAttachments = (selectedAlert.attachments || []).filter(
+                  (a) => a && !(a as Record<string, unknown>)._no_attachments,
+                );
+                if (realAttachments.length === 0) return null;
+                return (
+                  <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                      Attachments ({realAttachments.length})
+                    </div>
+                    <ul className="space-y-1.5">
+                      {realAttachments.map((att, idx) => {
+                        const isObject = typeof att !== 'string' && att !== null;
+                        const obj = isObject ? (att as Record<string, unknown>) : null;
+                        const url = typeof att === 'string'
+                          ? att
+                          : (obj?.url || obj?.link || obj?.resourceLink) as string | undefined;
+                        const givenName = (obj?.name || obj?.fileName || obj?.title) as string | undefined;
+                        let name = givenName && givenName.toLowerCase() !== 'download' ? givenName : undefined;
+                        if (!name && url) {
+                          try {
+                            const parts = new URL(url).pathname.split('/').filter(Boolean);
+                            const last = parts[parts.length - 1];
+                            const fileId = last && last.toLowerCase() !== 'download'
+                              ? last
+                              : (parts.length >= 2 ? parts[parts.length - 2] : undefined);
+                            name = fileId && fileId.length <= 24
+                              ? `Document ${idx + 1} (${fileId})`
+                              : `Document ${idx + 1}`;
+                          } catch { /* fall through */ }
+                        }
+                        if (!url) return null;
+                        return (
+                          <li key={idx}>
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
+                            >
+                              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              </svg>
+                              <span className="truncate">{name || `Document ${idx + 1}`}</span>
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })()}
+
+              {/* Points of Contact — contracting officer + specialist.
+                  Mailto/tel links so users can act directly. */}
+              {selectedAlert.pointsOfContact && selectedAlert.pointsOfContact.length > 0 && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+                    Points of Contact
+                  </div>
+                  <div className="space-y-3">
+                    {selectedAlert.pointsOfContact.map((poc, idx) => {
+                      const fullName = (poc?.fullName || poc?.full_name || poc?.name) as string | undefined;
+                      const title = (poc?.title || poc?.type) as string | undefined;
+                      const pocEmail = poc?.email as string | undefined;
+                      const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
+                      if (!fullName && !pocEmail && !phone) return null;
+                      return (
+                        <div key={idx} className="border border-slate-800 rounded-lg p-3 text-sm">
+                          {fullName && <p className="text-slate-200 font-medium line-clamp-2">{fullName}</p>}
+                          {title && <p className="text-xs text-slate-500">{title}</p>}
+                          {pocEmail && (
+                            <a href={`mailto:${pocEmail}`} className="block mt-1 text-purple-300 hover:text-purple-200 text-xs break-all">
+                              {pocEmail}
+                            </a>
+                          )}
+                          {phone && (
+                            <a href={`tel:${phone}`} className="block text-slate-400 hover:text-slate-200 text-xs">
+                              {phone}
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Contracting office address */}
+              {selectedAlert.officeAddress && Object.values(selectedAlert.officeAddress).some(Boolean) && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                    Contracting Office Address
+                  </div>
+                  <p className="text-sm text-slate-200">
+                    {[
+                      selectedAlert.officeAddress.streetAddress,
+                      selectedAlert.officeAddress.streetAddress2,
+                      selectedAlert.officeAddress.city,
+                      [selectedAlert.officeAddress.state, (selectedAlert.officeAddress.zipcode || selectedAlert.officeAddress.zip)]
+                        .filter(Boolean).join(' '),
+                      selectedAlert.officeAddress.countryCode,
+                    ].filter(Boolean).join(', ') as string}
+                  </p>
+                </div>
+              )}
+
+              {/* Additional info — inline text or external link */}
+              {(selectedAlert.additionalInfoText || selectedAlert.additionalInfoLink) && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                    Additional Info
+                  </div>
+                  {selectedAlert.additionalInfoText && (
+                    <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                      {selectedAlert.additionalInfoText}
+                    </p>
+                  )}
+                  {selectedAlert.additionalInfoLink && (
+                    <a
+                      href={selectedAlert.additionalInfoLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-2 text-sm text-purple-300 hover:text-purple-200 underline break-all"
+                    >
+                      {selectedAlert.additionalInfoLink}
+                    </a>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <button

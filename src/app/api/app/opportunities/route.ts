@@ -44,6 +44,15 @@ interface SAMOpportunity {
   description?: string;
   description_url?: string;
   notice_desc_url?: string;
+  // Extra SAM fields surfaced via raw_data extraction. Same shape
+  // /api/mi-dashboard already returns; we include them here so the
+  // Source Feed Details drawer can render the full record.
+  attachments?: unknown[];
+  points_of_contact?: unknown[];
+  office_address?: Record<string, unknown> | null;
+  fair_opportunity?: Record<string, unknown> | null;
+  additional_info_link?: string | null;
+  additional_info_text?: string | null;
 }
 
 interface UserOpportunityProfile {
@@ -422,6 +431,15 @@ export async function GET(request: NextRequest) {
         popCity: opp.pop_city,
         popZip: opp.pop_zip,
         popCountry: opp.pop_country,
+        // Extra SAM record fields so the Source Feed Details drawer
+        // can render attachments / POCs / office / additional info
+        // without a second API call.
+        attachments: Array.isArray(opp.attachments) ? opp.attachments : [],
+        pointsOfContact: Array.isArray(opp.points_of_contact) ? opp.points_of_contact : [],
+        officeAddress: opp.office_address ?? null,
+        fairOpportunity: opp.fair_opportunity ?? null,
+        additionalInfoLink: typeof opp.additional_info_link === 'string' ? opp.additional_info_link : null,
+        additionalInfoText: typeof opp.additional_info_text === 'string' ? opp.additional_info_text : null,
         url: getSamOpportunityUrl(opp),
         daysLeft,
         isUrgent: daysLeft !== null && daysLeft <= 7 && daysLeft >= 0,
