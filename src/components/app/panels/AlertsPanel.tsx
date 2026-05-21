@@ -42,7 +42,7 @@ interface Alert {
 }
 
 type AlertFilter = 'all' | 'solicitation' | 'sources' | 'setaside' | 'urgent';
-type SortMode = 'deadline' | 'posted' | 'agency';
+type SortMode = 'recommendation' | 'deadline' | 'posted' | 'agency';
 type FeedbackType =
   | 'good_match'
   | 'bad_match'
@@ -85,7 +85,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState<AlertFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('deadline');
+  const [sortMode, setSortMode] = useState<SortMode>('recommendation');
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
   const [savingAlertIds, setSavingAlertIds] = useState<Set<string>>(new Set());
   const [savedAlertIds, setSavedAlertIds] = useState<Set<string>>(new Set());
@@ -362,6 +362,12 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         ].some(value => value?.toLowerCase().includes(normalizedSearch));
       })
       .sort((a, b) => {
+        if (sortMode === 'recommendation') {
+          // Server already sorted by recommendationScore (set-aside fit +
+          // agency fit + feedback). Preserve that order so the feed feels
+          // like the email which uses the same scoring.
+          return 0;
+        }
         if (sortMode === 'agency') {
           return (a.department || '').localeCompare(b.department || '');
         }
@@ -539,6 +545,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           onChange={(event) => setSortMode(event.target.value as SortMode)}
           className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
         >
+          <option value="recommendation">Best match (recommended)</option>
           <option value="deadline">Sort by response due</option>
           <option value="posted">Sort by newest posted</option>
           <option value="agency">Sort by agency</option>
