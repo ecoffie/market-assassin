@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
+import { useAppTracker } from '../track';
 
 interface GrantsPanelProps {
   email: string | null;
@@ -36,11 +37,18 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
   const [selectedStatus, setSelectedStatus] = useState('posted');
   const [error, setError] = useState<string | null>(null);
   const [totalHits, setTotalHits] = useState(0);
+  const track = useAppTracker(email);
 
   // Load metadata on mount
   useEffect(() => {
     loadMetadata();
   }, []);
+
+  // page_view once per email-resolution.
+  useEffect(() => {
+    if (!email) return;
+    track('page_view', 'grants');
+  }, [email, track]);
 
   const loadMetadata = async () => {
     try {
@@ -96,6 +104,15 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
 
   const handleSearch = () => {
     searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus);
+    track('tool_use', 'grants', {
+      action: 'search',
+      // Length signals (vs values) — captures intent without leaking
+      // the user's specific keywords.
+      has_keyword: !!searchKeyword,
+      has_agency: !!selectedAgency,
+      has_category: !!selectedCategory,
+      status: selectedStatus,
+    });
   };
 
   const formatDate = (dateStr?: string) => {

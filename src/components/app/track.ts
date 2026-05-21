@@ -38,6 +38,7 @@ export type AppEventSource =
   | 'market_research'
   | 'market_intel_dashboard'
   | 'forecasts'
+  | 'grants'
   | 'pipeline'
   | 'contacts'
   | 'settings'

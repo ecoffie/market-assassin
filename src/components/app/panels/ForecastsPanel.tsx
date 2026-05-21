@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { useAppTracker } from '../track';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
@@ -127,11 +128,19 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   const [requestDescription, setRequestDescription] = useState('');
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
+  const track = useAppTracker(email);
   const getForecastHeaders = useCallback(() => (
     getMIApiHeaders(email)
   ), [email]);
 
   // Fetch summary on mount
+  // page_view once per email-resolution. Separate effect so it
+  // doesn't refire when forecast filters change.
+  useEffect(() => {
+    if (!email) return;
+    track('page_view', 'forecasts');
+  }, [email, track]);
+
   useEffect(() => {
     async function fetchSummary() {
       try {
@@ -247,6 +256,14 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   const handleSearch = () => {
     setUsingProfileDefaults(false);
     handleSearchWithParams(naicsFilter, agencyFilter, searchQuery);
+    track('tool_use', 'forecasts', {
+      action: 'search',
+      // Length signals (vs values) so we capture intent without
+      // leaking the user's specific NAICS query.
+      has_naics: !!naicsFilter,
+      has_agency: !!agencyFilter,
+      has_query: !!searchQuery,
+    });
   };
 
   const useSavedProfile = () => {
@@ -257,6 +274,11 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
     setSearchQuery('');
     setUsingProfileDefaults(true);
     handleSearchWithParams(profileNaics, profileAgencies, '');
+    track('tool_use', 'forecasts', {
+      action: 'use_saved_profile',
+      naics_count: profileDefaults?.naicsCodes.length || 0,
+      agency_count: profileDefaults?.agencies.length || 0,
+    });
   };
 
   const getAgencyColors = (agency: string) => {
@@ -283,6 +305,15 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       const data = await res.json();
       if (data.success) {
         setRequestSuccess(true);
+        track('tool_use', 'forecasts', {
+          action: 'request_forecast',
+          // Which agency the user wants more visibility into — gives
+          // BD an "agencies people are asking us about" view.
+          agency: requestAgency,
+          has_office: !!requestOffice,
+          has_naics: !!requestNaics,
+          has_description: !!requestDescription,
+        });
         setTimeout(() => {
           setShowRequestModal(false);
           setRequestSuccess(false);

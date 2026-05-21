@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { useAppTracker } from '../track';
 
 interface ContactsPanelProps {
   email: string | null;
@@ -74,6 +75,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const tierLabel = tier === 'free' ? 'Free CRM' : tier === 'pro' ? 'Pro CRM' : 'Full CRM';
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
+  const track = useAppTracker(email);
 
   const loadPipeline = useCallback(async () => {
     if (!email) return;
@@ -145,6 +147,12 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     loadPipeline();
   }, [loadPipeline]);
 
+  // page_view once per email-resolution.
+  useEffect(() => {
+    if (!email) return;
+    track('page_view', 'contacts');
+  }, [email, track]);
+
   const handleAddPartner = async (partnerData: Partial<TeamingPartner>) => {
     if (!email) return;
 
@@ -162,6 +170,12 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       if (data.success) {
         setIsAdding(false);
         loadPartners();
+        track('tool_use', 'contacts', {
+          action: 'add_partner',
+          // partner_type tells the queue what kind of relationship
+          // the user is building — sub, prime, mentor, etc.
+          partner_type: partnerData.partner_type,
+        });
       } else {
         setError(data.error || 'Failed to add partner');
       }
@@ -189,6 +203,11 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       if (data.success) {
         setSelectedPartner(null);
         loadPartners();
+        track('tool_use', 'contacts', {
+          action: 'update_partner',
+          partner_id: id,
+          updated_fields: Object.keys(updates),
+        });
       } else {
         setError(data.error || 'Failed to update partner');
       }
@@ -212,6 +231,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       if (data.success) {
         setSelectedPartner(null);
         loadPartners();
+        track('tool_use', 'contacts', { action: 'delete_partner', partner_id: id });
       } else {
         setError(data.error || 'Failed to remove partner');
       }
@@ -248,6 +268,13 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
             ? { ...item, teaming_partners: data.opportunity.teaming_partners || [] }
             : item
         )));
+        track('tool_use', 'contacts', {
+          action: isAttached ? 'detach_pursuit' : 'attach_pursuit',
+          opportunity_id: opportunity.id,
+          // partner_count_after is the new total — useful for spotting
+          // power-users who team multiple partners per opp.
+          partner_count_after: nextPartners.length,
+        });
       } else {
         setError(data.error || 'Failed to update pursuit partners');
       }

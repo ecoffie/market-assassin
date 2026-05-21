@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { useAppTracker } from '../track';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -80,6 +81,7 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
   const [selectedOpportunity, setSelectedOpportunity] = useState<PipelineOpportunity | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
+  const track = useAppTracker(email);
 
   const loadPipeline = useCallback(async () => {
     if (!email) {
@@ -119,6 +121,15 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
   useEffect(() => {
     loadPipeline();
   }, [loadPipeline]);
+
+  // Fire page_view once per email-resolution. /app's sidebar already
+  // emits page_view on panel-switch, but this gives us a per-panel
+  // breadcrumb visible to the Pipeline-specific queries the Launch
+  // Command Center will run.
+  useEffect(() => {
+    if (!email) return;
+    track('page_view', 'pipeline');
+  }, [email, track]);
 
   const loadPartners = useCallback(async () => {
     if (!email) return;
@@ -263,6 +274,13 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
       )));
       setSelectedOpportunity(updatedOpportunity);
       setNotice('Pipeline item updated.');
+      track('tool_use', 'pipeline', {
+        action: 'update_opportunity',
+        opportunity_id: selectedOpportunity.id,
+        // Record which fields changed (keys only, not values) so we
+        // can see what people actually edit without storing PII.
+        updated_fields: Object.keys(updates),
+      });
       loadPipeline();
     } catch (err) {
       console.error('Failed to update opportunity:', err);
@@ -308,6 +326,16 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
       setOpportunities(prev => prev.map(opp => (
         opp.id === updatedOpportunity.id ? updatedOpportunity : opp
       )));
+      // Highest-intent signal in the product. Capture from/to so the
+      // Launch Command Center can see funnel progression
+      // (tracking→pursuing = qualifying, submitted→won = closing).
+      track('tool_use', 'pipeline', {
+        action: 'move_stage',
+        opportunity_id: opportunity.id,
+        from_stage: previousStage,
+        to_stage: nextStage,
+        next_stage_label: nextStageLabel,
+      });
       if (selectedOpportunity?.id === updatedOpportunity.id) {
         setSelectedOpportunity(updatedOpportunity);
       }
@@ -347,6 +375,14 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
       }
 
       setOpportunities(prev => prev.filter(opp => opp.id !== selectedOpportunity.id));
+      track('tool_use', 'pipeline', {
+        action: 'delete_opportunity',
+        opportunity_id: selectedOpportunity.id,
+        // The stage at delete-time tells us where in the funnel
+        // people abandon. A drop from "pursuing" is more meaningful
+        // than a drop from "tracking".
+        from_stage: selectedOpportunity.stage,
+      });
       setSelectedOpportunity(null);
       setNotice('Removed from pipeline.');
       loadPipeline();
