@@ -182,7 +182,24 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      throw error;
+      // Surface the actual Postgres error so the client toast / log
+      // tells us what column mismatched, what RLS rejected, etc.
+      // Previously this threw into the generic catch-all 500 below.
+      console.error('Pipeline POST Postgres error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      return NextResponse.json(
+        {
+          error: error.message || 'Failed to add to pipeline',
+          details: error.details || null,
+          hint: error.hint || null,
+          code: error.code || null,
+        },
+        { status: 500 }
+      );
     }
 
     await recordAppActivity({
@@ -202,9 +219,14 @@ export async function POST(request: NextRequest) {
       message: 'Added to pipeline'
     });
   } catch (error) {
+    // Non-Postgres exception (e.g. ensureWorkspaceMember threw, JSON
+    // parse failed, recordAppActivity blew up). Echo the message
+    // verbatim so the client toast shows it instead of a generic
+    // "Failed to add" that hides the cause.
+    const message = error instanceof Error ? error.message : String(error);
     console.error('Pipeline POST error:', error);
     return NextResponse.json(
-      { error: 'Failed to add to pipeline' },
+      { error: message || 'Failed to add to pipeline' },
       { status: 500 }
     );
   }

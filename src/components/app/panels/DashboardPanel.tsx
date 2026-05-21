@@ -678,9 +678,17 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
             next.delete(item.id);
             return next;
           });
+          // Log full error payload to the console so we can debug
+          // schema/RLS issues without the user having to forward a
+          // screenshot. Toast still keeps it short.
+          if (data) {
+            console.error('[DashboardPanel] /api/pipeline rejected:', data);
+          }
+          const detail = data?.details ? ` — ${data.details}` : '';
           showToast({
-            message: data?.error || 'Could not add to Pipeline',
+            message: (data?.error || 'Could not add to Pipeline') + detail,
             variant: 'error',
+            durationMs: 10000, // sticky-ish since the user may want to copy/read the message
           });
         }
         return;
