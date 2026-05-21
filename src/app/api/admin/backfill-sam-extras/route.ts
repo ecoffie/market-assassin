@@ -84,7 +84,11 @@ export async function GET(request: NextRequest) {
     .from('sam_opportunities')
     .select('id', { count: 'exact', head: true }) as any)
     .eq('points_of_contact', '[]')
-    .not('raw_data->pointOfContact', 'is', null);
+    .not('raw_data->pointOfContact', 'is', null)
+    // Exclude rows whose raw_data POC is an empty array — extracting
+    // them would write [] into points_of_contact (same as default),
+    // and the row would just match the filter again on the next run.
+    .not('raw_data->pointOfContact', 'eq', '[]');
 
   return NextResponse.json({
     mode: 'dry-run',
@@ -116,6 +120,9 @@ export async function POST(request: NextRequest) {
     .select('id, raw_data') as any)
     .eq('points_of_contact', '[]')
     .not('raw_data->pointOfContact', 'is', null)
+    // Skip rows whose raw POC is also an empty array — see GET handler
+    // for the rationale (avoids the never-shrinks-past-N loop).
+    .not('raw_data->pointOfContact', 'eq', '[]')
     .limit(limit);
 
   if (error) {
@@ -173,7 +180,8 @@ export async function POST(request: NextRequest) {
     .from('sam_opportunities')
     .select('id', { count: 'exact', head: true }) as any)
     .eq('points_of_contact', '[]')
-    .not('raw_data->pointOfContact', 'is', null);
+    .not('raw_data->pointOfContact', 'is', null)
+    .not('raw_data->pointOfContact', 'eq', '[]');
 
   return NextResponse.json({
     success: errors.length === 0,
