@@ -163,16 +163,48 @@ export async function POST(request: NextRequest) {
     body.priority = body.priority || 'medium';
     body.source = body.source || 'manual';
     body.is_prime = body.is_prime ?? true;
-    body.workspace_id = workspaceId;
-    body.owner_email = body.owner_email || body.user_email;
-    body.created_by = body.user_email;
-    body.updated_by = body.user_email;
 
-    const { data, error } = await getSupabase()
+    // Workspace columns (workspace_id / owner_email / created_by /
+    // updated_by) were added to the API contract but the matching
+    // migration was never applied to this Supabase instance — see
+    // supabase/migrations/20260410_pipeline_tracker.sql which only
+    // has id/user_email/notice_id/title/etc. Including these fields
+    // in the insert payload makes PostgREST throw "Could not find
+    // the 'created_by' column" 500s. Strip them out unless the
+    // schema actually has them so the insert succeeds today. When
+    // the workspace migration lands, swap this for the assignments
+    // again.
+    const insertPayload: Record<string, unknown> = { ...body };
+    insertPayload.workspace_id = workspaceId; // try with — will be ignored if column doesn't exist
+    insertPayload.owner_email = body.owner_email || body.user_email;
+    insertPayload.created_by = body.user_email;
+    insertPayload.updated_by = body.user_email;
+
+    const supabase = getSupabase();
+    let { data, error } = await supabase
       .from('user_pipeline')
-      .insert(body)
+      .insert(insertPayload)
       .select()
       .single();
+
+    // If the schema doesn't have the workspace columns, retry without
+    // them. Detect PostgREST's "Could not find the 'X' column" message
+    // and drop it from the payload, then re-insert. This keeps the
+    // route forward-compatible (works on both schemas) without
+    // requiring a migration step.
+    if (error && /Could not find the '([^']+)' column/.test(error.message || '')) {
+      const missingColumns = ['workspace_id', 'owner_email', 'created_by', 'updated_by'];
+      for (const col of missingColumns) {
+        delete insertPayload[col];
+      }
+      const retry = await supabase
+        .from('user_pipeline')
+        .insert(insertPayload)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       // Check for duplicate
