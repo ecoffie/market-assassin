@@ -437,6 +437,49 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Decorate each list entry with live outreach state so Sikander
+    // and Annelle see who's already invited / called / booked / etc
+    // instead of working from stale CSVs. One query, build a lookup
+    // by lowercased email. Best-effort: if the join fails (table not
+    // yet migrated, RLS hiccup), we still return the lists without
+    // the decoration.
+    type OutreachRow = {
+      email: string;
+      owner: string | null;
+      status: string | null;
+      last_contacted_at: string | null;
+      next_action: string | null;
+      call_booked_at: string | null;
+    };
+    const outreachByEmail = new Map<string, OutreachRow>();
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: outreachRows } = await (supabase as any)
+        .from('internal_outreach_contacts')
+        .select('email, owner, status, last_contacted_at, next_action, call_booked_at');
+      for (const row of (outreachRows || []) as OutreachRow[]) {
+        if (row.email) outreachByEmail.set(row.email.toLowerCase(), row);
+      }
+    } catch (err) {
+      console.warn('[qualify-customers] outreach decoration skipped:', err);
+    }
+
+    const decorateOutreach = <T extends { email: string }>(entry: T) => {
+      const o = outreachByEmail.get(entry.email.toLowerCase());
+      return {
+        ...entry,
+        outreach: o
+          ? {
+              owner: o.owner,
+              status: o.status,
+              lastContactedAt: o.last_contacted_at,
+              nextAction: o.next_action,
+              callBookedAt: o.call_booked_at,
+            }
+          : null,
+      };
+    };
+
     // JSON response
     return NextResponse.json({
       success: true,
@@ -455,7 +498,7 @@ export async function GET(request: NextRequest) {
         founderCalls: qualifiedCustomers
           .filter(c => c.segment === '10-10 Candidate')
           .slice(0, 10)
-          .map(c => ({
+          .map(c => decorateOutreach({
             email: c.email,
             score: c.score,
             why: c.signals.slice(0, 3).join(', '),
@@ -466,7 +509,7 @@ export async function GET(request: NextRequest) {
         salesOutreach: qualifiedCustomers
           .filter(c => ['10-10 Candidate', 'White-glove Candidate'].includes(c.segment))
           .slice(0, 25)
-          .map(c => ({
+          .map(c => decorateOutreach({
             email: c.email,
             segment: c.segment,
             score: c.score,
@@ -478,7 +521,7 @@ export async function GET(request: NextRequest) {
         upgradeTargets: qualifiedCustomers
           .filter(c => c.segment === 'MI Pro Upgrade')
           .slice(0, 25)
-          .map(c => ({
+          .map(c => decorateOutreach({
             email: c.email,
             score: c.score,
             why: c.signals.slice(0, 3).join(', '),
@@ -488,7 +531,7 @@ export async function GET(request: NextRequest) {
         rescueCandidates: qualifiedCustomers
           .filter(c => c.segment === 'Rescue Candidate')
           .slice(0, 25)
-          .map(c => ({
+          .map(c => decorateOutreach({
             email: c.email,
             totalSpent: c.totalSpent,
             products: c.productsOwned,
