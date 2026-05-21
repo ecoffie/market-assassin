@@ -50,6 +50,7 @@ interface RawOpportunity {
   solicitation_number: string | null;
   title: string;
   description: string | null;
+  description_url?: string | null;
   department: string | null;
   sub_tier: string | null;
   office: string | null;
@@ -75,6 +76,10 @@ interface DashboardOpportunity {
   solicitation_number: string | null;
   title: string;
   description: string | null;
+  // Present when SAM stored the description as a separate API URL
+  // instead of inline text. UI can fetch the text on demand via
+  // /api/sam-description?noticeId=... and cache it back.
+  description_url: string | null;
   department: string;
   sub_tier: string | null;
   office: string | null;
@@ -458,14 +463,18 @@ export async function GET(request: NextRequest) {
         : null;
 
       // SAM.gov stores most descriptions as a separate URL pointer
-      // (api.sam.gov/.../noticedesc?noticeid=...), so the raw
-      // description column often holds the URL itself. Filter those
-      // out so the UI doesn't render a URL string in a Description
-      // field. Real text comes through unchanged.
+      // (api.sam.gov/.../noticedesc?noticeid=...). When that's the
+      // case we surface it as description_url so the UI can offer a
+      // "Load full description" button that lazy-fetches the real
+      // text. When description is real inline text, we pass it
+      // through. description_url from the column (if separately
+      // populated) is honored too.
       const rawDescription = typeof opp.description === 'string' ? opp.description.trim() : null;
-      const description = rawDescription && !/^https?:\/\//i.test(rawDescription)
+      const descriptionIsUrl = !!rawDescription && /^https?:\/\//i.test(rawDescription);
+      const description = rawDescription && !descriptionIsUrl ? rawDescription : null;
+      const description_url = descriptionIsUrl
         ? rawDescription
-        : null;
+        : (typeof opp.description_url === 'string' ? opp.description_url : null);
 
       return {
         id: opp.id,
@@ -473,6 +482,7 @@ export async function GET(request: NextRequest) {
         solicitation_number: opp.solicitation_number,
         title: opp.title,
         description,
+        description_url,
         department: opp.department || 'Unknown Agency',
         sub_tier: opp.sub_tier,
         office: opp.office,

@@ -35,6 +35,7 @@ interface Opportunity {
   solicitation_number: string | null;
   title: string;
   description: string | null;
+  description_url: string | null;
   department: string;
   sub_tier: string | null;
   office: string | null;
@@ -154,6 +155,31 @@ function MarketIntelDashboard() {
   const [agencyFilter, setAgencyFilter] = useState('');
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Lazy-loaded full descriptions keyed by notice_id. SAM.gov stores
+  // most descriptions as a separate URL pointer; we resolve them on
+  // demand via /api/sam-description when the user expands a row.
+  const [lazyDescriptions, setLazyDescriptions] = useState<Record<string, string>>({});
+  const [loadingDescriptionFor, setLoadingDescriptionFor] = useState<string | null>(null);
+  const [descriptionErrorFor, setDescriptionErrorFor] = useState<{ id: string; error: string } | null>(null);
+
+  const loadFullDescription = useCallback(async (noticeId: string) => {
+    setLoadingDescriptionFor(noticeId);
+    setDescriptionErrorFor(null);
+    try {
+      const res = await fetch(`/api/sam-description?noticeId=${encodeURIComponent(noticeId)}`);
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.description) {
+        setDescriptionErrorFor({ id: noticeId, error: data.error || 'Could not load description' });
+        return;
+      }
+      setLazyDescriptions(prev => ({ ...prev, [noticeId]: data.description }));
+    } catch (err) {
+      console.error('Failed to fetch SAM description:', err);
+      setDescriptionErrorFor({ id: noticeId, error: 'Network error fetching description' });
+    } finally {
+      setLoadingDescriptionFor(null);
+    }
+  }, []);
 
   const hasLocalFilters = !!(search || noticeType || urgency || setAside || naicsFilter || stateFilter || agencyFilter);
   const hasAnyFilter = hasLocalFilters || isProfileFiltered;
@@ -698,12 +724,38 @@ function MarketIntelDashboard() {
 
                   {isExpanded && (
                     <div className="px-4 pb-4 pt-3 border-t border-gray-800 bg-gray-900/50 space-y-4">
-                      {opp.description && (
+                      {/* Description: inline text if SAM gave us one, else a
+                          Load button that lazy-fetches from SAM's noticedesc
+                          endpoint and caches the result. */}
+                      {(opp.description || lazyDescriptions[opp.notice_id] || opp.description_url) && (
                         <div>
                           <span className="text-gray-500 text-xs uppercase tracking-wide">Description</span>
-                          <p className="text-gray-300 text-sm mt-1 whitespace-pre-wrap leading-relaxed">
-                            {opp.description}
-                          </p>
+                          {(opp.description || lazyDescriptions[opp.notice_id]) ? (
+                            <p className="text-gray-300 text-sm mt-1 whitespace-pre-wrap leading-relaxed">
+                              {opp.description || lazyDescriptions[opp.notice_id]}
+                            </p>
+                          ) : (
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() => loadFullDescription(opp.notice_id)}
+                                disabled={loadingDescriptionFor === opp.notice_id}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg bg-purple-600/20 text-purple-200 border border-purple-500/30 hover:bg-purple-600/30 disabled:opacity-50 transition-colors"
+                              >
+                                {loadingDescriptionFor === opp.notice_id ? (
+                                  <>
+                                    <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                                    Loading description…
+                                  </>
+                                ) : (
+                                  <>Load full description from SAM.gov</>
+                                )}
+                              </button>
+                              {descriptionErrorFor?.id === opp.notice_id && (
+                                <p className="text-xs text-red-400 mt-2">{descriptionErrorFor.error}</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
 
