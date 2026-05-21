@@ -633,7 +633,10 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
     try {
       const res = await fetch('/api/pipeline', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // /api/pipeline POST requires requireMIAuthSession — without
+        // the MI 2FA auth header in getAuthHeaders, every request
+        // returns "Failed to add to pipeline" with no auth context.
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
           notice_id: item.id,
@@ -698,10 +701,11 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                 });
                 // Fire DELETE without awaiting — if it fails the row
                 // stays in Pipeline; the user can clean it up there.
-                // Logging error is enough for our debugging.
+                // Logging error is enough for our debugging. Auth
+                // headers required by /api/pipeline DELETE same as POST.
                 fetch('/api/pipeline', {
                   method: 'DELETE',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
                   body: JSON.stringify({ id: pipelineRowId, user_email: email }),
                 }).catch((err) => console.warn('[DashboardPanel] Undo DELETE failed:', err));
               },
@@ -727,7 +731,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         return next;
       });
     }
-  }, [email, trackItemEvent, pipelineSaved, showToast]);
+  }, [email, getAuthHeaders, trackItemEvent, pipelineSaved, showToast]);
 
   const handleOpportunityFeedback = useCallback(async (item: BriefingItem, feedbackType: FeedbackType) => {
     if (!email) return;
