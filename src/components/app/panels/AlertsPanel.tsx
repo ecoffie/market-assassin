@@ -871,17 +871,6 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                             ? 'Save'
                             : 'Upgrade to Save'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        trackAlertEvent('tool_use', alert, 'open_details');
-                        setSelectedAlert(alert);
-                      }}
-                      className="text-xs text-slate-300 hover:text-white mr-3"
-                    >
-                      Details
-                    </button>
                     <a
                       href={alert.url}
                       target="_blank"
