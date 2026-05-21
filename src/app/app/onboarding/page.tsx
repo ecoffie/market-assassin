@@ -341,7 +341,33 @@ export default function OnboardingPage() {
         return;
       }
 
-      setEmail(session.user.email.toLowerCase());
+      const userEmail = session.user.email.toLowerCase();
+
+      // OAuth's redirectTo always lands here, so returning users hit the
+      // onboarding wizard on every sign-in. Check whether they've already
+      // filled in a real profile — if so, skip the wizard and drop them
+      // straight on /app. The mount-time auth ladder on /app handles the
+      // rest (token mint, profile load).
+      try {
+        const res = await fetch(
+          `/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const codes: string[] = data?.data?.naicsCodes || [];
+          if (codes.length > 0) {
+            router.push(`/app?email=${encodeURIComponent(userEmail)}`);
+            return;
+          }
+        }
+      } catch {
+        // Network hiccup — fall through to the wizard rather than
+        // bouncing the user to an error state. They can re-save their
+        // profile harmlessly.
+      }
+
+      setEmail(userEmail);
       setAccessToken(session.access_token);
       setLoading(false);
     }
