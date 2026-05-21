@@ -686,7 +686,22 @@ function MarketIntelDashboard() {
                   }`}
                 >
                   <button
-                    onClick={() => setExpandedId(isExpanded ? null : opp.id)}
+                    onClick={() => {
+                      const opening = !isExpanded;
+                      setExpandedId(opening ? opp.id : null);
+                      // Auto-fetch the SAM description text on expand if we
+                      // don't have it inline and haven't already loaded it.
+                      // Cache hit (DB or in-memory) returns instantly; cache
+                      // miss shows a brief spinner inside the expanded area.
+                      if (
+                        opening
+                        && !opp.description
+                        && !lazyDescriptions[opp.notice_id]
+                        && loadingDescriptionFor !== opp.notice_id
+                      ) {
+                        void loadFullDescription(opp.notice_id);
+                      }
+                    }}
                     className="w-full text-left p-4"
                   >
                     <div className="flex items-start gap-3">
@@ -734,28 +749,23 @@ function MarketIntelDashboard() {
                             <p className="text-gray-300 text-sm mt-1 whitespace-pre-wrap leading-relaxed">
                               {opp.description || lazyDescriptions[opp.notice_id]}
                             </p>
-                          ) : (
+                          ) : loadingDescriptionFor === opp.notice_id ? (
+                            <p className="text-gray-500 text-sm mt-2 flex items-center gap-2">
+                              <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                              Loading description from SAM.gov…
+                            </p>
+                          ) : descriptionErrorFor?.id === opp.notice_id ? (
                             <div className="mt-2">
+                              <p className="text-xs text-red-400">{descriptionErrorFor.error}</p>
                               <button
                                 type="button"
                                 onClick={() => loadFullDescription(opp.notice_id)}
-                                disabled={loadingDescriptionFor === opp.notice_id}
-                                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg bg-purple-600/20 text-purple-200 border border-purple-500/30 hover:bg-purple-600/30 disabled:opacity-50 transition-colors"
+                                className="mt-1 text-xs text-purple-300 hover:text-purple-200 underline"
                               >
-                                {loadingDescriptionFor === opp.notice_id ? (
-                                  <>
-                                    <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                                    Loading description…
-                                  </>
-                                ) : (
-                                  <>Load full description from SAM.gov</>
-                                )}
+                                Retry
                               </button>
-                              {descriptionErrorFor?.id === opp.notice_id && (
-                                <p className="text-xs text-red-400 mt-2">{descriptionErrorFor.error}</p>
-                              )}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       )}
 
