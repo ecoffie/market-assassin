@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
@@ -15,6 +16,7 @@ interface Alert {
   id: string;
   title: string;
   solicitationNumber?: string;
+  description?: string;
   department?: string;
   subTier?: string;
   office?: string;
@@ -91,6 +93,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [savingFeedbackIds, setSavingFeedbackIds] = useState<Set<string>>(new Set());
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState(0);
+  const [stateFilter, setStateFilter] = useState<string>('');
 
   const canUsePipeline = tier !== 'free';
   const isFreeTier = tier === 'free';
@@ -123,7 +126,10 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     try {
       const params = new URLSearchParams();
       if (email) params.set('email', email);
-      params.set('limit', '50');
+      // 200 is the soft cap for the feed view. Users who want the full
+      // ~11K SAM opportunity universe should use /app/market-intel,
+      // which is also surfaced as a banner below the filter row.
+      params.set('limit', '200');
 
       const res = await fetch(`/api/app/opportunities?${params.toString()}`, {
         headers: getAuthHeaders(),
@@ -327,6 +333,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     return alerts
       .filter(alert => !dismissedAlertIds.has(alert.id))
       .filter(alert => matchesFilter(alert, filter))
+      .filter(alert => !stateFilter || alert.popState === stateFilter)
       .filter(alert => {
         if (!normalizedSearch) return true;
         return [
@@ -351,7 +358,15 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         }
         return new Date(a.responseDeadline || 8640000000000000).getTime() - new Date(b.responseDeadline || 8640000000000000).getTime();
       });
-  }, [alerts, dismissedAlertIds, filter, searchQuery, sortMode]);
+  }, [alerts, dismissedAlertIds, filter, searchQuery, sortMode, stateFilter]);
+
+  const availableStates = useMemo(() => {
+    const set = new Set<string>();
+    for (const alert of alerts) {
+      if (alert.popState) set.add(alert.popState);
+    }
+    return Array.from(set).sort();
+  }, [alerts]);
 
   const filterOptions: Array<{ key: AlertFilter; label: string }> = [
     { key: 'all', label: 'All' },
@@ -441,6 +456,17 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
         />
         <select
+          value={stateFilter}
+          onChange={(event) => setStateFilter(event.target.value)}
+          className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+          aria-label="Filter by state"
+        >
+          <option value="">All states</option>
+          {availableStates.map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select
           value={sortMode}
           onChange={(event) => setSortMode(event.target.value as SortMode)}
           className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
@@ -449,11 +475,12 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           <option value="posted">Sort by newest posted</option>
           <option value="agency">Sort by agency</option>
         </select>
-        {(filter !== 'all' || searchQuery) && (
+        {(filter !== 'all' || searchQuery || stateFilter) && (
           <button
             onClick={() => {
               setFilter('all');
               setSearchQuery('');
+              setStateFilter('');
             }}
             className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
           >
@@ -461,6 +488,23 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           </button>
         )}
       </div>
+
+      {/* Full dashboard hint — the feed is capped at 200 opps; users who
+          want the complete ~11K SAM universe should use /app/market-intel. */}
+      {!isLoading && alerts.length > 0 && (
+        <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-300">
+            <span className="text-purple-300 font-medium">Feed shows up to 200 opportunities.</span>{' '}
+            The full SAM dashboard has every active opportunity (~11,000+) with deeper filters and CSV export.
+          </p>
+          <Link
+            href="/app/market-intel"
+            className="px-4 py-2 text-sm rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors whitespace-nowrap"
+          >
+            Open full dashboard →
+          </Link>
+        </div>
+      )}
 
       {!isLoading && alerts.length > 0 && (
         <div className="text-sm text-slate-500">
@@ -553,10 +597,27 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     {getAlertBuyer(alert).parent && <span className="text-slate-600"> • {getAlertBuyer(alert).parent}</span>}
                   </p>
 
+                  {/* Office (more granular than the buyer line) */}
+                  {alert.office && alert.office !== getAlertBuyer(alert).secondary && (
+                    <p className="text-xs text-slate-500 mt-0.5">{alert.office}</p>
+                  )}
+
+                  {/* Description preview */}
+                  {alert.description && (
+                    <p className="text-xs text-slate-400 mt-2 line-clamp-2">
+                      {alert.description.length > 220
+                        ? `${alert.description.slice(0, 220).trim()}…`
+                        : alert.description}
+                    </p>
+                  )}
+
                   {/* Meta */}
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-500">
                     {alert.naicsCode && (
                       <span>NAICS: {alert.naicsCode}</span>
+                    )}
+                    {alert.pscCode && (
+                      <span>PSC: {alert.pscCode}</span>
                     )}
                     {getAlertLocation(alert) && (
                       <span>📍 {getAlertLocation(alert)}</span>

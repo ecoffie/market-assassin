@@ -350,30 +350,12 @@ export default function UnifiedSidebar({
 
       {/* Footer */}
       <div className="p-4 border-t border-slate-800">
-        {!isCollapsed ? (
-          <div className="space-y-2">
-            {userTier === 'free' && (
-              <Link
-                href="/market-intelligence"
-                className="block w-full px-3 py-2 text-center text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
-              >
-                Upgrade to Pro
-              </Link>
-            )}
-            <Link
-              href="/briefings"
-              className="block text-center text-xs text-slate-500 hover:text-slate-400 transition-colors"
-            >
-              ← Legacy View
-            </Link>
-          </div>
-        ) : (
+        {!isCollapsed && userTier === 'free' && (
           <Link
-            href="/briefings"
-            className="block text-center text-slate-500 hover:text-slate-400"
-            title="Legacy View"
+            href="/market-intelligence"
+            className="block w-full px-3 py-2 text-center text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
           >
-            ←
+            Upgrade to Pro
           </Link>
         )}
       </div>

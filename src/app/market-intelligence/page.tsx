@@ -255,47 +255,9 @@ function MarketIntelligenceContent() {
       {/* What's Included - Three Tier Cards */}
       <div className="max-w-6xl mx-auto px-4 py-16">
         <h2 className="text-2xl font-bold text-white text-center mb-4">Choose Your Plan</h2>
-        <p className="text-slate-400 text-center mb-10">Start free, upgrade when you need AI-powered intelligence</p>
+        <p className="text-slate-400 text-center mb-10">Choose the upgrade that fits your team.</p>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {/* MI Free Card */}
-          <div className="bg-slate-800/50 border-2 border-slate-600/50 rounded-2xl p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-slate-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-xl">🆓</span>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Mindy Free</h3>
-                <p className="text-slate-400 font-semibold">$0/month</p>
-              </div>
-            </div>
-
-            <div className="space-y-2 mb-6 text-sm">
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span><strong>4 Market Research</strong> reports</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span><strong>Daily Alerts</strong> — simple list</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span>5 reports/month limit</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-500">
-                <span className="mt-0.5">—</span>
-                <span>No AI briefings</span>
-              </div>
-            </div>
-
-            <a
-              href={FREE_SIGNUP_URL}
-              className="block w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-center rounded-lg font-semibold transition-colors text-sm"
-            >
-              Start Free →
-            </a>
-          </div>
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
 
           {/* MI Pro Card - Most Popular */}
           <div className="bg-slate-800/50 border-2 border-purple-500 rounded-2xl p-6 relative">
