@@ -97,6 +97,20 @@ const NAV_SECTIONS: NavSection[] = [
         tier: ['pro', 'team', 'enterprise'],
       },
       {
+        // Moved from its own "Opportunities" section (May 21, 2026).
+        // Per Command Center "Where Time Goes" data, Research +
+        // Dashboard dominate user time and Grants barely registers.
+        // A standalone "Opportunities" section containing only Grants
+        // wasn't a meaningful category — it was a single-item parking
+        // lot. Grants is intelligence about funding (same mental
+        // category as Forecasts + Recompetes), so it lives here now.
+        id: 'grants',
+        label: 'Federal Grants',
+        icon: '💰',
+        description: 'Grants.gov search',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
         id: 'contractors',
         label: 'Contractors',
         icon: '🏢',
@@ -154,18 +168,6 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'AI proposal help',
         tier: ['pro', 'team', 'enterprise'],
         badge: 'AI',
-      },
-    ],
-  },
-  {
-    title: 'Opportunities',
-    items: [
-      {
-        id: 'grants',
-        label: 'Federal Grants',
-        icon: '💰',
-        description: 'Grants.gov search',
-        tier: ['pro', 'team', 'enterprise'],
       },
     ],
   },
