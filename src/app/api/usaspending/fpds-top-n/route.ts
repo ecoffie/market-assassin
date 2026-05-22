@@ -26,6 +26,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 
 const USASPENDING_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -69,9 +70,14 @@ interface CategoryResult {
  * Build the USASpending filter shared by all 4 category calls.
  * Mirrors the FPDS-NG filter set: NAICS, optional state, optional
  * agency exclusion, fiscal year date range.
+ *
+ * IMPORTANT — naics_codes here is the FULL expanded list of 6-digit
+ * codes (e.g. ["236115", "236116", ...]) not a single prefix. See
+ * expandNaicsForFpds() at module bottom. Passing a short prefix
+ * like "236" returns zero rows from USAspending.
  */
 function buildFilters(opts: {
-  naics: string;
+  naicsCodes: string[];
   state?: string;
   fiscalYear: number;
   excludeDOD: boolean;
@@ -80,7 +86,7 @@ function buildFilters(opts: {
   const endDate = `${opts.fiscalYear}-09-30`;
 
   const filters: Record<string, unknown> = {
-    naics_codes: [opts.naics],
+    naics_codes: opts.naicsCodes,
     award_type_codes: CONTRACT_AWARD_TYPE_CODES,
     time_period: [{ start_date: startDate, end_date: endDate }],
   };
@@ -166,6 +172,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'fy out of range' }, { status: 400 });
   }
 
+  // Expand short prefixes to all matching 6-digit NAICS codes.
+  // USAspending's spending_by_category endpoint REQUIRES 6-digit
+  // codes; sending "236" returns zero rows. Sending all 6 expansions
+  // (236115, 236116, 236117, 236118, 236210, 236220) returns the
+  // construction-of-buildings market the user actually wants.
+  //
+  // The cache key uses the user's input (`naics`) so different
+  // prefixes ("236" vs "236220") cache separately — they ARE
+  // different views of the market. Keeps the cache predictable.
+  const expandedNaics = expandNAICSCodes([naics]);
+
   const cacheKey = {
     naics_code: naics,
     state_code: state,
@@ -187,15 +204,22 @@ export async function GET(request: NextRequest) {
 
     if (cached?.generated_at) {
       const age = Date.now() - new Date(cached.generated_at).getTime();
-      if (age < CACHE_TTL_MS) {
+      // Treat all-empty cached results as STALE regardless of age.
+      // This is the recovery path for cache rows written by buggy
+      // earlier code (e.g. before NAICS expansion was wired).
+      // Forces a live re-fetch + overwrite on next request.
+      const cachedDepartments = cached.top_departments || [];
+      const cachedVendors = cached.top_vendors || [];
+      const allEmpty = cachedDepartments.length === 0 && cachedVendors.length === 0;
+      if (age < CACHE_TTL_MS && !allEmpty) {
         return NextResponse.json({
           success: true,
           cached: true,
           cache_age_ms: age,
           fiscal_year: fiscalYear,
-          top_departments: cached.top_departments || [],
+          top_departments: cachedDepartments,
           top_contracting: cached.top_contracting || [],
-          top_vendors: cached.top_vendors || [],
+          top_vendors: cachedVendors,
           top_funding_agencies: cached.top_funding_agencies || [],
           total_obligation: cached.total_obligation,
           total_award_count: cached.total_award_count,
@@ -208,7 +232,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 2) Cache miss — 4 parallel USAspending calls
-  const filters = buildFilters({ naics, state: state || undefined, fiscalYear, excludeDOD });
+  const filters = buildFilters({ naicsCodes: expandedNaics, state: state || undefined, fiscalYear, excludeDOD });
 
   const [departments, contracting, vendors, funding] = await Promise.all([
     fetchCategory('awarding_agency', filters, DEFAULT_LIMIT * 2), // pull 20 so post-DOD-exclusion still has 10
@@ -257,6 +281,9 @@ export async function GET(request: NextRequest) {
     success: true,
     cached: false,
     fiscal_year: fiscalYear,
+    naics_requested: naics,
+    naics_expanded: expandedNaics,
+    naics_expansion_count: expandedNaics.length,
     top_departments: finalDepartments,
     top_contracting: finalContracting,
     top_vendors: vendors,
