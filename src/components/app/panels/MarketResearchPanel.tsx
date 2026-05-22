@@ -547,6 +547,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   const [profileApplied, setProfileApplied] = useState(false);
   const [showAdvancedProfile, setShowAdvancedProfile] = useState(false);
   const [activeLens, setActiveLens] = useState<ResearchLensId>('map');
+  // Phase 2 — Market Map flagship view. When 'map' (default), render
+  // the new MarketMapView with charts + AI narrative. When 'reports',
+  // show the legacy 7-report surface for power users. Toggle lives
+  // in the page header so the new presentation-grade view is the
+  // first impression but the raw data is always one click away.
+  const [viewMode, setViewMode] = useState<'map' | 'reports'>('map');
   const [marketFocuses, setMarketFocuses] = useState<MarketFocus[]>([]);
   const [activeFocusId, setActiveFocusId] = useState<string>('saved-profile');
   const [showSaveFocus, setShowSaveFocus] = useState(false);
@@ -1209,6 +1215,35 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               ))}
             </div>
           )}
+          {/* View mode toggle — Map (visual flagship) vs Reports
+              (legacy raw data). Only meaningful once reports have
+              been generated. */}
+          {reportData && (
+            <div className="inline-flex rounded-lg bg-slate-800/60 p-0.5 mr-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('map')}
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  viewMode === 'map'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Market Map
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('reports')}
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  viewMode === 'reports'
+                    ? 'bg-slate-700 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Reports →
+              </button>
+            </div>
+          )}
           <button
             onClick={() => {
               handleGenerateAll();
@@ -1360,7 +1395,52 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         </div>
       )}
 
-      {reportData && (
+      {/* Phase 2 Slice 1 — Market Map flagship view. Shows when
+          viewMode === 'map' AND reports have been generated. Slice 1
+          renders the 4 headline stat cards + 4 chart placeholder
+          tiles + Mindy Says placeholder. Slices 2-5 fill in the
+          real charts, AI narrative, and export. */}
+      {viewMode === 'map' && reportData && (
+        <div className="space-y-6">
+          {/* Headline stats — same 4 numbers as the reports view's
+              MetricCards but with stronger visual hierarchy here. */}
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <MetricCard label="Agencies to review" value={(buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
+            <MetricCard label="Relevant spending" value={formatCurrency(buyerSummary?.totalSpending)} tone="green" />
+            <MetricCard label="Competition signals" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} />
+            <MetricCard label="Upcoming signals" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" />
+          </section>
+
+          {/* Chart placeholders — Slice 2 fills these with Recharts
+              (Spending by Agency bar + Set-Aside donut), Slice 3
+              adds Trend line + Top 5 Primes. The slots are here
+              so the layout is visible/scannable from Slice 1. */}
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ChartPlaceholder title="Spending by Agency" subtitle="Top 10 by tracked spend" slice="2" />
+            <ChartPlaceholder title="Set-Aside Mix" subtitle="Where small business plays" slice="2" />
+            <ChartPlaceholder title="3-Year Spending Trend" subtitle="YoY growth in your NAICS" slice="3" />
+            <ChartPlaceholder title="Top 5 Primes" subtitle="Incumbents to track or team with" slice="3" />
+          </section>
+
+          {/* Mindy Says — Slice 4 wires this to Groq. Slice 1 ships
+              an empty box so the layout is anchored. */}
+          <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-900/20 to-purple-800/5 p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-purple-300 text-lg">★</span>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-purple-300">Mindy Says</h3>
+            </div>
+            <p className="text-sm text-slate-400 italic">
+              AI market narrative + 3 recommended actions coming in Slice 4.
+            </p>
+          </section>
+
+          <p className="text-xs text-slate-500 text-center">
+            Want the raw report data? <button onClick={() => setViewMode('reports')} className="text-emerald-400 hover:text-emerald-300 underline">View Reports →</button>
+          </p>
+        </div>
+      )}
+
+      {viewMode === 'reports' && reportData && (
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label="Agencies to review" value={(buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
@@ -1836,6 +1916,27 @@ function MetricCard({ label, value, tone = 'default' }: { label: string; value: 
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
       <div className="mt-1 text-sm text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+// Slice 1 placeholder for chart slots. Slices 2-3 replace each usage
+// with actual Recharts components. The `slice` label tells reviewers
+// which slice will fill which tile so the layout review is meaningful
+// even before the charts exist.
+function ChartPlaceholder({ title, subtitle, slice }: { title: string; subtitle: string; slice: string }) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 min-h-[280px] flex flex-col">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <p className="text-xs text-slate-500">{subtitle}</p>
+      </div>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-3xl mb-2 opacity-30">📊</div>
+          <p className="text-xs text-slate-600 uppercase tracking-wider">Chart ships in Slice {slice}</p>
+        </div>
+      </div>
     </div>
   );
 }
