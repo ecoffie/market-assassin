@@ -1462,6 +1462,17 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             <TopPrimesChart primes={reportData?.primeContractor?.suggestedPrimes || []} email={email} />
           </section>
 
+          {/* FPDS-style top-10 leaderboards (Departments / Contracting
+              Agencies / Vendors / Funding Agencies). Real award-
+              derived data via USAspending category aggregations —
+              the same view a BD person used to get from the FPDS-NG
+              search sidebar before FPDS retired in Feb 2026. */}
+          <FpdsLeaderboards
+            naicsCode={formData.naicsCode}
+            excludeDOD={formData.excludeDOD}
+            email={email}
+          />
+
           {/* Slice 1.5C — Agency table with sort lenses. Replaces the
               old "Start Here" 3-card black box with full transparency:
               all N offices, 4 sortable metrics, methodology you can
@@ -2277,6 +2288,216 @@ function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string 
         ))}
       </ul>
     </ChartShell>
+  );
+}
+
+// ---------------------------------------------------------------------
+// FpdsLeaderboards — FPDS-NG style top-10 sidebar
+// ---------------------------------------------------------------------
+//
+// Replicates the 4 "Top 10" lists that FPDS-NG used to show in its
+// search sidebar before SAM.gov absorbed FPDS in Feb 2026:
+//
+//   - Top 10 Departments        (awarding_agency)
+//   - Top 10 Contracting Agencies (awarding_subagency)
+//   - Top 10 Vendors            (recipient)
+//   - Top 10 Funding Agencies   (funding_agency — Treasury Acct Symbol replacement)
+//
+// Data comes from /api/usaspending/fpds-top-n which calls the
+// USAspending spending_by_category endpoint. Cached 24h server-side.
+//
+// Each row links to relevant deep pages where possible: vendors →
+// ContractorLink (sales history drawer), agencies → AgencyDrawer
+// in the AgencyTable below.
+
+interface FpdsRow {
+  name: string;
+  amount: number;
+  count?: number;
+  rank: number;
+}
+
+interface FpdsResponse {
+  success: boolean;
+  cached?: boolean;
+  fiscal_year?: number;
+  top_departments?: FpdsRow[];
+  top_contracting?: FpdsRow[];
+  top_vendors?: FpdsRow[];
+  top_funding_agencies?: FpdsRow[];
+  total_obligation?: number;
+}
+
+function FpdsLeaderboards({
+  naicsCode,
+  excludeDOD,
+  email,
+}: {
+  naicsCode: string;
+  excludeDOD: boolean;
+  email: string | null;
+}) {
+  const [data, setData] = useState<FpdsResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Use the first NAICS code from comma-separated input. The FPDS
+  // endpoint takes a single NAICS at a time (USAspending category
+  // queries don't accept OR'd NAICS lists). Future: fan out N calls.
+  const primaryNaics = (naicsCode || '').split(',')[0]?.trim() || '';
+
+  useEffect(() => {
+    if (!primaryNaics) {
+      setData(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    const params = new URLSearchParams({ naics: primaryNaics });
+    if (excludeDOD) params.set('excludeDOD', 'true');
+
+    fetch(`/api/usaspending/fpds-top-n?${params.toString()}`)
+      .then(async r => {
+        const json = await r.json().catch(() => null);
+        if (cancelled) return;
+        if (!r.ok || !json?.success) {
+          setError(json?.error || `HTTP ${r.status}`);
+          return;
+        }
+        setData(json as FpdsResponse);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn('[FpdsLeaderboards] fetch failed:', err);
+        setError('Network error loading leaderboards');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [primaryNaics, excludeDOD]);
+
+  if (!primaryNaics) return null;
+
+  return (
+    <section className="space-y-3">
+      <header className="flex items-baseline justify-between">
+        <div>
+          <h3 className="text-base font-bold text-white">FPDS Leaderboards</h3>
+          <p className="text-xs text-slate-500">
+            Top 10 by award $ in NAICS {primaryNaics}
+            {data?.fiscal_year ? ` · FY${data.fiscal_year}` : ''}
+            {data?.cached ? ' · cached' : ''}
+          </p>
+        </div>
+        {data?.total_obligation !== undefined && data.total_obligation > 0 && (
+          <div className="text-right">
+            <div className="text-xs text-slate-500">Tracked total</div>
+            <div className="text-sm font-bold text-emerald-400">{chartMoney(data.total_obligation)}</div>
+          </div>
+        )}
+      </header>
+
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-900/10 p-3 text-xs text-red-300">
+          {error}. Try Refresh.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <FpdsLeaderboardCard
+          title="Top 10 Departments"
+          subtitle="Parent agencies buying in this NAICS"
+          rows={data?.top_departments || []}
+          loading={loading}
+        />
+        <FpdsLeaderboardCard
+          title="Top 10 Contracting Agencies"
+          subtitle="Sub-agencies awarding the contracts"
+          rows={data?.top_contracting || []}
+          loading={loading}
+        />
+        <FpdsLeaderboardCard
+          title="Top 10 Vendors"
+          subtitle="Primes winning the awards (click for history)"
+          rows={data?.top_vendors || []}
+          loading={loading}
+          linkVendor
+          email={email}
+        />
+        <FpdsLeaderboardCard
+          title="Top 10 Funding Agencies"
+          subtitle="Agencies funding the contracts (FPDS Treasury Acct equivalent)"
+          rows={data?.top_funding_agencies || []}
+          loading={loading}
+        />
+      </div>
+    </section>
+  );
+}
+
+function FpdsLeaderboardCard({
+  title,
+  subtitle,
+  rows,
+  loading,
+  linkVendor,
+  email,
+}: {
+  title: string;
+  subtitle: string;
+  rows: FpdsRow[];
+  loading: boolean;
+  linkVendor?: boolean;
+  email?: string | null;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+      <div className="mb-2">
+        <h4 className="text-xs font-bold text-white uppercase tracking-wider">{title}</h4>
+        <p className="text-[10px] text-slate-500">{subtitle}</p>
+      </div>
+
+      {loading && rows.length === 0 && (
+        <div className="space-y-1.5 animate-pulse">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-4 bg-slate-800 rounded" />
+          ))}
+        </div>
+      )}
+
+      {!loading && rows.length === 0 && (
+        <p className="text-xs text-slate-500 italic">No data for this NAICS + filter.</p>
+      )}
+
+      {rows.length > 0 && (
+        <ol className="space-y-1">
+          {rows.slice(0, 10).map((row) => (
+            <li key={`${row.rank}-${row.name}`} className="flex items-center justify-between gap-2 text-xs">
+              <span className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="shrink-0 inline-flex w-5 h-5 rounded-full bg-slate-800 text-slate-400 text-[10px] items-center justify-center font-semibold">
+                  {row.rank}
+                </span>
+                {linkVendor && email ? (
+                  <ContractorLink name={row.name} email={email} variant="plain" className="truncate text-slate-200 hover:text-white">
+                    {row.name}
+                  </ContractorLink>
+                ) : (
+                  <span className="truncate text-slate-200">{row.name}</span>
+                )}
+              </span>
+              <span className="shrink-0 text-emerald-400 font-semibold tabular-nums">
+                {chartMoney(row.amount)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 
