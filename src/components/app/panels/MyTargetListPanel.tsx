@@ -67,6 +67,9 @@ export default function MyTargetListPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TargetRow['status'] | 'all'>('all');
+  // Slice 3D — which target row is expanded to show its outreach
+  // log. Only one expanded at a time keeps the UI focused.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { showToast } = useToast();
   const track = useAppTracker(email);
 
@@ -324,6 +327,17 @@ export default function MyTargetListPanel({
                           onSave={(value) => updateTarget(t.id, { notes: value || null })}
                         />
                       </div>
+
+                      {/* Slice 3D — toggle for the outreach log. Click
+                          to expand the activity timeline + log-new
+                          form inline beneath the card. */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                        className="mt-3 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                      >
+                        {expandedId === t.id ? '▼ Hide outreach log' : '▸ Show outreach log'}
+                      </button>
                     </div>
 
                     {/* Right rail: status dropdown + remove */}
@@ -346,18 +360,23 @@ export default function MyTargetListPanel({
                       </button>
                     </div>
                   </div>
+
+                  {/* Slice 3D — outreach timeline + log-new form,
+                      revealed when the row is expanded. Lazy: the
+                      OutreachLog component only fetches when mounted,
+                      so collapsed rows don't trigger API calls. */}
+                  {expandedId === t.id && email && (
+                    <OutreachLog
+                      targetId={t.id}
+                      targetName={t.office_name}
+                      email={email}
+                    />
+                  )}
                 </div>
               ))
             )}
           </div>
         </>
-      )}
-
-      {/* Slice 3D placeholder. Outreach log per target lives here. */}
-      {targets.length > 0 && (
-        <p className="text-[10px] text-slate-600 italic text-center pt-4">
-          Outreach log (email/call/event tracking per target) coming in a future release.
-        </p>
       )}
     </div>
   );
@@ -436,5 +455,361 @@ function NotesEditor({
       className="w-full text-xs bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
       placeholder="Notes (Esc to cancel, blur to save)"
     />
+  );
+}
+
+// ---------------------------------------------------------------------
+// OutreachLog — Slice 3D
+// ---------------------------------------------------------------------
+//
+// Inline activity timeline + "Log activity" form, revealed when a
+// target card is expanded. Self-contained: owns its own fetch, form
+// state, and optimistic updates. Mounting it kicks off the GET; we
+// don't pre-fetch for collapsed cards.
+//
+// Activity types map to common federal BD touchpoints. The vocabulary
+// rule applies: "email / call / event / rfi / meeting / note" — plain
+// language, not SaaS sales-team jargon.
+
+interface OutreachActivity {
+  id: string;
+  target_id: string;
+  user_email: string;
+  activity_type: 'email' | 'call' | 'event' | 'rfi' | 'meeting' | 'note';
+  contact_name: string | null;
+  contact_role: string | null;
+  subject: string | null;
+  body: string | null;
+  outcome: string | null;
+  follow_up_date: string | null;
+  created_at: string;
+}
+
+const ACTIVITY_TYPES: Array<{ id: OutreachActivity['activity_type']; label: string; icon: string }> = [
+  { id: 'email',   label: 'Email',   icon: '✉️' },
+  { id: 'call',    label: 'Call',    icon: '📞' },
+  { id: 'event',   label: 'Event',   icon: '🎤' },
+  { id: 'meeting', label: 'Meeting', icon: '🤝' },
+  { id: 'rfi',     label: 'RFI',     icon: '📄' },
+  { id: 'note',    label: 'Note',    icon: '📝' },
+];
+
+const OUTCOME_OPTIONS: Array<{ id: string; label: string; color: string }> = [
+  { id: 'replied',      label: 'Replied',       color: 'text-emerald-300' },
+  { id: 'meeting_set',  label: 'Meeting set',   color: 'text-emerald-400' },
+  { id: 'no_response',  label: 'No response',   color: 'text-slate-500' },
+  { id: 'pass',         label: 'Passed',        color: 'text-slate-400' },
+  { id: 'success',      label: 'Success',       color: 'text-emerald-400' },
+];
+
+function fmtRelative(iso: string): string {
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+  return d.toLocaleDateString();
+}
+
+function OutreachLog({
+  targetId,
+  targetName,
+  email,
+}: {
+  targetId: string;
+  targetName: string;
+  email: string;
+}) {
+  const [activities, setActivities] = useState<OutreachActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const { showToast } = useToast();
+  const track = useAppTracker(email);
+
+  // Form state — kept local so collapsing the row reset it cleanly.
+  const [formType, setFormType] = useState<OutreachActivity['activity_type']>('email');
+  const [formContact, setFormContact] = useState('');
+  const [formRole, setFormRole] = useState('');
+  const [formSubject, setFormSubject] = useState('');
+  const [formBody, setFormBody] = useState('');
+  const [formOutcome, setFormOutcome] = useState('');
+  const [formFollowUp, setFormFollowUp] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/app/target-outreach?target_id=${encodeURIComponent(targetId)}&email=${encodeURIComponent(email)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled || !data?.success) return;
+        setActivities(data.activities || []);
+      })
+      .catch(err => console.warn('[OutreachLog] load failed:', err))
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [targetId, email]);
+
+  const resetForm = () => {
+    setFormContact('');
+    setFormRole('');
+    setFormSubject('');
+    setFormBody('');
+    setFormOutcome('');
+    setFormFollowUp('');
+  };
+
+  const submitActivity = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/app/target-outreach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_id: targetId,
+          user_email: email,
+          activity_type: formType,
+          contact_name: formContact || null,
+          contact_role: formRole || null,
+          subject: formSubject || null,
+          body: formBody || null,
+          outcome: formOutcome || null,
+          follow_up_date: formFollowUp || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        showToast({ message: data?.error || 'Could not log activity', variant: 'error' });
+        return;
+      }
+      // Prepend the new activity to the timeline + close the form.
+      setActivities(prev => [data.activity, ...prev]);
+      resetForm();
+      setShowForm(false);
+      // Activation signal — logging outreach is a high-intent BD
+      // action, exactly the kind of behavior the Launch Command
+      // Center activation queues should see.
+      track('tool_use', 'pipeline', {
+        action: 'outreach_logged',
+        opportunity_id: targetId,
+      });
+      showToast({ message: `Logged ${formType} for ${targetName}`, variant: 'success' });
+    } catch (err) {
+      console.error('[OutreachLog] submit failed:', err);
+      showToast({ message: 'Network error — could not log activity', variant: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deleteActivity = async (id: string) => {
+    const original = activities.find(a => a.id === id);
+    if (!original) return;
+    setActivities(prev => prev.filter(a => a.id !== id));
+    try {
+      const res = await fetch('/api/app/target-outreach', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, user_email: email }),
+      });
+      if (!res.ok) {
+        setActivities(prev => [original, ...prev]);
+        showToast({ message: 'Could not delete activity', variant: 'error' });
+      }
+    } catch (err) {
+      console.error('[OutreachLog] delete failed:', err);
+      setActivities(prev => [original, ...prev]);
+    }
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-800">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          Outreach Log
+          {activities.length > 0 && (
+            <span className="ml-2 text-slate-500 font-normal normal-case">
+              ({activities.length} {activities.length === 1 ? 'entry' : 'entries'})
+            </span>
+          )}
+        </h4>
+        {!showForm && (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
+          >
+            + Log Activity
+          </button>
+        )}
+      </div>
+
+      {/* The form — only renders when toggled on. Fields are
+          all optional except activity_type. Submit clears + collapses. */}
+      {showForm && (
+        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-3 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Type</span>
+              <select
+                value={formType}
+                onChange={(e) => setFormType(e.target.value as OutreachActivity['activity_type'])}
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200"
+              >
+                {ACTIVITY_TYPES.map(at => (
+                  <option key={at.id} value={at.id}>{at.icon} {at.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Outcome</span>
+              <select
+                value={formOutcome}
+                onChange={(e) => setFormOutcome(e.target.value)}
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200"
+              >
+                <option value="">— None yet —</option>
+                {OUTCOME_OPTIONS.map(o => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Contact Name</span>
+              <input
+                type="text"
+                value={formContact}
+                onChange={(e) => setFormContact(e.target.value)}
+                placeholder="Lt Col Smith"
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Contact Role</span>
+              <input
+                type="text"
+                value={formRole}
+                onChange={(e) => setFormRole(e.target.value)}
+                placeholder="OSBP / Contracting Officer / SBA Liaison"
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+              />
+            </label>
+            <label className="block md:col-span-2">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Subject</span>
+              <input
+                type="text"
+                value={formSubject}
+                onChange={(e) => setFormSubject(e.target.value)}
+                placeholder="Intro email re: AFRL cybersecurity recompete"
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+              />
+            </label>
+            <label className="block md:col-span-2">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Notes</span>
+              <textarea
+                value={formBody}
+                onChange={(e) => setFormBody(e.target.value)}
+                rows={2}
+                placeholder="Mentioned upcoming SBIR Phase II, asked about teaming requirements"
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">Follow-up Date</span>
+              <input
+                type="date"
+                value={formFollowUp}
+                onChange={(e) => setFormFollowUp(e.target.value)}
+                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+              />
+            </label>
+          </div>
+          <div className="flex items-center gap-2 pt-2">
+            <button
+              type="button"
+              onClick={submitActivity}
+              disabled={submitting}
+              className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-semibold"
+            >
+              {submitting ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowForm(false); resetForm(); }}
+              className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Timeline */}
+      {loading ? (
+        <p className="text-xs text-slate-500 italic">Loading outreach...</p>
+      ) : activities.length === 0 ? (
+        <p className="text-xs text-slate-500 italic">
+          No outreach logged yet. Use &quot;+ Log Activity&quot; to record your first touchpoint.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {activities.map(a => {
+            const typeMeta = ACTIVITY_TYPES.find(t => t.id === a.activity_type);
+            const outcomeMeta = OUTCOME_OPTIONS.find(o => o.id === a.outcome);
+            return (
+              <li
+                key={a.id}
+                className="bg-slate-950/40 border border-slate-800 rounded-lg p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1 text-xs">
+                      <span>{typeMeta?.icon}</span>
+                      <span className="font-semibold text-slate-200">{typeMeta?.label}</span>
+                      {a.contact_name && (
+                        <span className="text-slate-400">
+                          · {a.contact_name}
+                          {a.contact_role && <span className="text-slate-500"> ({a.contact_role})</span>}
+                        </span>
+                      )}
+                      <span className="text-slate-600 ml-auto">{fmtRelative(a.created_at)}</span>
+                    </div>
+                    {a.subject && (
+                      <p className="text-xs text-slate-300 font-medium">{a.subject}</p>
+                    )}
+                    {a.body && (
+                      <p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">{a.body}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2 text-[10px]">
+                      {outcomeMeta && (
+                        <span className={`font-semibold ${outcomeMeta.color}`}>
+                          → {outcomeMeta.label}
+                        </span>
+                      )}
+                      {a.follow_up_date && (
+                        <span className="text-amber-300">
+                          ⏰ Follow up {new Date(a.follow_up_date).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteActivity(a.id)}
+                    className="text-[10px] text-slate-600 hover:text-red-400 transition-colors shrink-0"
+                    title="Delete entry"
+                  >
+                    ×
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
