@@ -682,7 +682,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
       const res = await fetch('/api/reports/generate-all', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Include MI auth headers so the endpoint passes the gate
+        // when it does verifyMIAccess() server-side. Without this,
+        // the request silently 401s and the Refresh button looks
+        // like it "doesn't work" with no visible error.
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           inputs: {
             naicsCode: activeFormData.naicsCode,
@@ -700,7 +704,20 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         }),
       });
 
-      const data = await res.json();
+      // Always parse — even on non-2xx the body usually carries the
+      // real reason. Wrap in try/catch since some 5xx pages return
+      // HTML instead of JSON.
+      const data = await res.json().catch(() => ({
+        success: false,
+        error: `HTTP ${res.status} ${res.statusText} — server returned non-JSON`,
+      }));
+
+      // Log HTTP non-2xx separately so devtools shows the status even
+      // when the response body is empty / malformed. The setError
+      // banner picks up data.error which now carries the status.
+      if (!res.ok) {
+        console.error(`[generate-all] HTTP ${res.status}`, data);
+      }
 
       if (data.success && data.report) {
         setReportData(data.report);
@@ -2003,9 +2020,17 @@ interface BuyerLike {
 function SpendingByAgencyChart({ buyers }: { buyers: BuyerLike[] }) {
   // Map to chart-friendly shape, sort, slice. Truncate the office
   // name for the Y axis so the chart bars don't get squeezed.
+  //
+  // IMPORTANT — earlier version filtered .spending > 0 which hid
+  // every row where the buyers report populated the name but not
+  // the spend (happens when the partial-data path of generate-all
+  // runs). Result was a single-bar chart that misrepresented the
+  // market. Now we keep ALL rows and sort spend desc; rows with
+  // 0 spend render as a thin "—" rather than disappearing. The
+  // chart trust-score depends on honesty about data gaps.
   const data = useMemo(() => {
     return [...(buyers || [])]
-      .filter(b => (b.spending || 0) > 0)
+      .filter(b => (b.contractingOffice || b.parentAgency || b.subAgency))
       .sort((a, b) => (b.spending || 0) - (a.spending || 0))
       .slice(0, 10)
       .map(b => ({
@@ -2025,10 +2050,19 @@ function SpendingByAgencyChart({ buyers }: { buyers: BuyerLike[] }) {
     );
   }
 
+  // Honesty footer — when most rows have $0 spend it's a data
+  // gap signal, not a market signal. Tell the user instead of
+  // letting them assume the market only has one buyer.
+  const withSpend = data.filter(d => d.spending > 0).length;
+  const footer = withSpend < data.length
+    ? `${withSpend} of ${data.length} agencies have tracked spend. Refresh to pull more.`
+    : undefined;
+
   return (
     <ChartShell
       title="Spending by Agency"
       subtitle={`Top ${data.length} by tracked spend in your NAICS`}
+      footer={footer ? <p className="text-[11px] text-amber-300/80">{footer}</p> : undefined}
     >
       <ResponsiveContainer width="100%" height={Math.max(200, data.length * 22)}>
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
@@ -2149,15 +2183,16 @@ function SetAsideMixChart({
 function TrendPlaceholderChart({ totalSpend, agencyCount }: { totalSpend: number; agencyCount: number }) {
   return (
     <ChartShell
-      title="3-Year Spending Trend"
-      subtitle="YoY growth in your NAICS"
+      title="Market Total"
+      subtitle="Combined tracked spend in your NAICS profile"
     >
       <div className="h-full flex flex-col items-center justify-center text-center px-4">
         <div className="text-3xl font-bold text-emerald-400 mb-1">{chartMoney(totalSpend)}</div>
-        <div className="text-xs text-slate-500 mb-3">tracked across {agencyCount.toLocaleString()} agencies</div>
+        <div className="text-xs text-slate-500 mb-3">across {agencyCount.toLocaleString()} {agencyCount === 1 ? 'agency' : 'agencies'}</div>
         <p className="text-[11px] text-slate-500 italic max-w-sm">
-          FY-broken trend line ships when we wire USASpending&apos;s annual breakdown.
-          Today we surface total, not delta.
+          Year-over-year trend line (FY 2022 → 2024 etc.) ships when
+          we wire USASpending&apos;s annual breakdown. Today this tile
+          shows the market&apos;s current total — a snapshot, not a delta.
         </p>
       </div>
     </ChartShell>
