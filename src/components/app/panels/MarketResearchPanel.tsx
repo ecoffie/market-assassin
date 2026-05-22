@@ -2171,7 +2171,7 @@ function SpendingByAgencyChart({ buyers }: { buyers: BuyerLike[] }) {
   );
 }
 
-// 2) Set-Aside Mix — donut. Splits total spend into SAT (<$250K
+// 2) Set-Aside Mix — donut. Splits total spend into SAT (<$350K
 // simplified-acquisition contracts, where small business wins easier)
 // vs the rest. This is the "is this market accessible?" signal.
 function SetAsideMixChart({
@@ -2201,22 +2201,46 @@ function SetAsideMixChart({
   }
 
   const data = [
-    { name: 'SAT (≤$250K — accessible)', value: satTotal, color: CHART_PALETTE.emerald },
+    { name: 'SAT (≤$350K — accessible)', value: satTotal, color: CHART_PALETTE.emerald },
     { name: 'Above SAT', value: nonSat, color: CHART_PALETTE.slateDim },
   ];
   const satPct = total > 0 ? (satTotal / total) * 100 : 0;
 
+  // Honest copy for the footer. Three meaningful states:
+  //
+  //   - satTotal === 0 AND total > 0   = this NAICS is dominated by
+  //     mega-contracts above the $350K SAT line. Real signal, not
+  //     missing data. Tell the user the market is hard to enter via
+  //     SAT, point them at teaming as the alternative.
+  //
+  //   - satTotal > 0  AND satPct < 5  = SAT exists but is thin.
+  //     Surface the % honestly without overselling addressability.
+  //
+  //   - satPct >= 5                    = normal copy.
+  let footerMessage;
+  if (satTotal === 0 && total > 0) {
+    footerMessage = (
+      <p className="text-[11px] text-amber-300/80">
+        No SAT-eligible spending tracked under $350K in this NAICS.
+        The market favors large contracts — consider teaming with a
+        prime as your entry path.
+      </p>
+    );
+  } else {
+    footerMessage = (
+      <p className="text-[11px] text-slate-400">
+        <span className="text-emerald-400 font-semibold">{satPct.toFixed(1)}%</span> of
+        {' '}{chartMoney(total)} total is SAT-eligible
+        ({chartMoney(satTotal)} addressable for first-contract wins).
+      </p>
+    );
+  }
+
   return (
     <ChartShell
       title="Set-Aside Mix"
-      subtitle="Where small business plays — % of spend under $250K"
-      footer={
-        <p className="text-[11px] text-slate-400">
-          <span className="text-emerald-400 font-semibold">{satPct.toFixed(1)}%</span> of
-          {' '}{chartMoney(total)} total is SAT-eligible
-          ({chartMoney(satTotal)} addressable for first-contract wins).
-        </p>
-      }
+      subtitle="Where small business plays — % of spend under $350K"
+      footer={footerMessage}
     >
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
@@ -2792,7 +2816,7 @@ const SORT_LENSES: Array<{ id: SortLens; label: string; hint: string }> = [
   // crowded vendor density, more SAT contracts. Toggle when
   // you're looking for first-contract candidates.
   { id: 'civilian_first', label: 'Civilian First',  hint: 'Non-DOD agencies first — often easier for new entrants' },
-  { id: 'easy_entry',    label: 'Easy Entry (SAT)', hint: 'Most contracts under $250K — easiest first wins' },
+  { id: 'easy_entry',    label: 'Easy Entry (SAT)', hint: 'Most contracts under $350K — easiest first wins' },
   { id: 'budget_growth', label: 'Budget Growth',    hint: 'Where the trend favors you (coming in Slice 2)' },
   { id: 'contracts',     label: 'Contracts',        hint: 'High-frequency buyers' },
   { id: 'a_z',           label: 'A-Z',              hint: 'Alphabetical (tie-breaker)' },
@@ -3458,7 +3482,7 @@ function AgencyDrawer({
               value={row.contractCount > 0 ? `${Math.round(row.satRatio * 100)}%` : '—'}
               tone="blue"
               hint={row.contractCount > 0
-                ? `${row.satContractCount} of ${row.contractCount} contracts under $250K`
+                ? `${row.satContractCount} of ${row.contractCount} contracts under $350K`
                 : undefined}
             />
             <DrawerStat

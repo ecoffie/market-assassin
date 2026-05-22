@@ -187,8 +187,17 @@ export async function POST(request: NextRequest) {
 
       if (cacheRow && cacheRow.generated_at) {
         const age = Date.now() - new Date(cacheRow.generated_at).getTime();
-        if (age < CACHE_TTL_MS) {
-          const rows = cacheRow.agencies as TargetMarketResearchRow[];
+        const rows = (cacheRow.agencies || []) as TargetMarketResearchRow[];
+
+        // Recovery check — treat cache rows with all-zero satSpending
+        // as stale regardless of age. This catches the case where an
+        // earlier broken code path wrote satSpending=0 for every
+        // agency; without this, the chart would show empty SAT data
+        // for 24h after we deploy a fix. Pattern mirrored from
+        // /api/usaspending/fpds-top-n.
+        const cacheHasSatData = rows.some((r) => (r.satSpending || 0) > 0);
+
+        if (age < CACHE_TTL_MS && cacheHasSatData) {
           const sliced = isFree ? rows.slice(0, FREE_TIER_ROW_LIMIT) : rows;
           return NextResponse.json({
             success: true,
