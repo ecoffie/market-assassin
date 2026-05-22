@@ -1,11 +1,19 @@
-# Target Accounts CRM + Event Radar — Roadmap
+# Target Market Research + Event Radar — Roadmap
 
 **Status:** Planning, May 22 2026
 **Owner:** Eric / Claude
 **Phase 2 reframe:** Mindy's "Market Research" surface evolves into a
-**Target Account List (TAL) builder** for federal BD. Not a research
-tool. A workspace for building, qualifying, and acting on the 30-ish
-offices a small BD person commits to working over 12-18 months.
+**Target Market Research workspace** for federal BD. Not just a one-time
+research tool — a workspace for building, qualifying, and acting on
+the 30-ish offices a BD person commits to working over 12-18 months.
+
+**Vocabulary note:** Per the project rule (see memory
+`mindy-vocabulary-rule`), we use plain federal-BD language. The phrase
+is "Target Market Research" — what BD people actually say. We do NOT
+use "Target Account List" / "TAL" / "account-based selling" / other
+enterprise-SaaS sales jargon. Elon-style: if someone has to look up
+the word, the word is wrong. Federal acronyms (NAICS, PSC, OSBP, etc.)
+remain in plain BD use and are fine.
 
 ---
 
@@ -46,9 +54,9 @@ That's the full BD funnel.
 
 - Remove Recommended Opportunities from Market Research (duplicates
   Today's Intel)
-- `/api/app/target-accounts` merging USAspending + SAM.gov so every
-  agency row carries BOTH historical spend AND current office contact
-  data
+- `/api/app/target-market-research` merging USAspending + SAM.gov so
+  every agency row carries BOTH historical spend AND current office
+  contact data
 - All-agencies table (66+ rows, paginated) with 4 sort lenses:
   Top Spending · Easy Entry (SAT) · Budget Growth · Contracts
 - Methodology dropdowns on BEST/STRONGEST/COMPETITION quick-picks so
@@ -56,7 +64,7 @@ That's the full BD funnel.
 - Drawer shows full office detail: sub-agency, office ID, contracting
   office, OSBP contact, SAM + USAspending deep links
 
-### Slice 2 — Charts on top of TAL (next session, ~3 hrs)
+### Slice 2 — Charts on top of the research workspace (next session, ~3 hrs)
 
 Now that the data is right, the original Phase 2 charts ship:
 - Spending by Agency (highlights user's saved targets vs. all)
@@ -85,7 +93,7 @@ CREATE TABLE user_target_accounts (
   office_code TEXT,                 -- 'BP01' — the leaf node
   office_name TEXT,                 -- 'Headquarters, EUSA'
 
-  -- TAL state
+  -- Target list state
   status TEXT DEFAULT 'targeting',  -- targeting / contacted / qualified / declined
   priority TEXT DEFAULT 'medium',   -- low / medium / high / critical
   notes TEXT,
@@ -143,7 +151,7 @@ demand, with better recall.
 
 Flow:
 
-1. User saves "Department of the Air Force" to their TAL.
+1. User saves "Department of the Air Force" to their target list.
 2. We query `sam_events` for AF-tagged events in next 90 days.
 3. If we have < 3 events, fire an event-discovery agent:
 
@@ -199,7 +207,7 @@ date" badges and we can audit accuracy over time.
 
 **Eric, May 22 2026:** "PSC codes are closer indicator of precise
 business offering versus NAICS or often times too broad. We need to
-allow for PSC code to do all the above in the TAL framework."
+allow for PSC code to do all the above in Target Market Research."
 
 He's right. NAICS 541512 = "Computer Systems Design" = 50,000-company
 bucket. PSC D316 = "IT and Telecom — Cyber Security and Data
@@ -218,7 +226,7 @@ Backup" = 500 companies. BD precision lives at the PSC layer.
 2. **Slice 1.5B endpoint** — already wired (just pass `pscCode`
    through). Cache key currently `(naics, business_type, veteran)` —
    add `psc_code` to the composite key.
-3. **TAL saved-targets table** (Slice 3) — store the PSC code that
+3. **Saved-targets table** (Slice 3) — store the PSC code that
    surfaced the target, not just NAICS. So a user with 5 saved
    targets can see "3 surfaced from PSC D316, 2 from NAICS 541512".
 4. **AI Analyst prompt** — when generating bid/no-bid analysis, weight
@@ -249,7 +257,7 @@ retrofit later.
   contacts, SBA programs. Salesforce/HubSpot don't have this data.
 - **Not an event-discovery tool for the general public.** The events
   matter only because they're attached to YOUR target list. GovEvents
-  has 1000+ events; we surface the 3 that matter to your TAL.
+  has 1000+ events; we surface the 3 that matter to your target list.
 - **Not an automated outreach tool.** No bulk emails. No fake
   personalization. We give users the data; they make the call.
 - **Not just market research with prettier charts.** Charts are
@@ -260,7 +268,7 @@ retrofit later.
 ## Why this is the right v2 direction
 
 Today's Mindy = "AI tells you what to bid on" (tactical, one-shot).
-Tomorrow's Mindy = "AI plus your TAL builds federal BD relationships
+Tomorrow's Mindy = "AI plus your Target Market Research workspace builds federal BD relationships
 over 12-18 months" (strategic, recurring).
 
 The first is replaceable by GovWin's $29K/yr product if they ever

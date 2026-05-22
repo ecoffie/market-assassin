@@ -2,7 +2,7 @@
 
 **Status:** Live in production (working subset), May 22 2026
 **Owner:** Eric / Claude
-**Related:** [`tasks/target-accounts-crm-roadmap.md`](./target-accounts-crm-roadmap.md) — Event Radar is Slices 4-5 of the TAL roadmap
+**Related:** [`tasks/target-market-research-roadmap.md`](./target-market-research-roadmap.md) — Event Radar is Slices 4-5 of the Target Market Research roadmap
 
 ---
 
@@ -14,7 +14,7 @@ We already have a working federal events database with three layers:
 2. **`src/data/federal-events-sources.json`** — static catalog of 30 event sources + 12 annual conferences
 3. **`/api/federal-events`** — read API consumed by Market Scanner Phase 3
 
-This PRD captures what exists, what's stale or thin, and what to keep populating so future product work (TAL Event Radar) builds on the existing foundation instead of duplicating it.
+This PRD captures what exists, what's stale or thin, and what to keep populating so future product work (Target Market Research Event Radar) builds on the existing foundation instead of duplicating it.
 
 ---
 
@@ -124,10 +124,10 @@ networking, innovation
 
 ---
 
-## What's THIN or STALE
+## What's THIN or STarget Market ResearchE
 
 ### Gap 1: Sub-agency / office-level tagging is missing
-`sam_events.agency` stores the parent agency name as a free-text field. When the TAL workflow lets a user save "AFRL — Wright-Patterson AFB" as a target, we can't match a SAM.gov event tagged `agency: Department of the Air Force` because the granularity is off by 2 levels.
+`sam_events.agency` stores the parent agency name as a free-text field. When the Target Market Research surface lets a user save "AFRL — Wright-Patterson AFB" as a target, we can't match a SAM.gov event tagged `agency: Department of the Air Force` because the granularity is off by 2 levels.
 
 **Fix:** Add columns to `sam_events`:
 - `sub_agency_name TEXT`
@@ -158,7 +158,7 @@ Backfill from `description` text using NER or a simple lookup against existing a
 **Fix:** Either (a) yearly Q4 manual refresh (cheapest), or (b) one-shot Claude run that takes the conference name + URL + scrapes the current year date.
 
 ### Gap 4: No event → target-account match logic
-The data is there but there's no `findEventsForUserTargets(email)` helper. Until the TAL is shipped (Slice 3 of the TAL roadmap), this isn't blocking — but the moment we ship saved target lists, we need this query.
+The data is there but there's no `findEventsForUserTargets(email)` helper. Until saved target lists ship (Slice 3 of the Target Market Research roadmap), this isn't blocking — but the moment they ship, we need this query.
 
 **Fix when needed:**
 ```typescript
@@ -206,11 +206,11 @@ Future-state Mindy could let users say "I'm going to AFCEA TechNet" and surface 
 - Market Scanner Phase 3 calls `/api/federal-events` to answer "What events are happening in this market?"
 - Returns combined dynamic (sam_events) + static (sources + conferences)
 
-### Near future (TAL roadmap Slice 3-4)
-- When user saves an office to their Target Account List, automatically attach next 3 upcoming events where they can meet someone from that office
+### Near future (Target Market Research roadmap Slice 3-4)
+- When user saves an office to their Target Market Research, automatically attach next 3 upcoming events where they can meet someone from that office
 - "Mindy says: AFCEA TechNet is in 6 weeks. Lt Col Smith from AFRL is likely attending. Buy your ticket now, then DM her on LinkedIn."
 
-### Far future (TAL roadmap Slice 5+)
+### Far future (Target Market Research roadmap Slice 5+)
 - Scrape AFCEA / ACT-IAC / NDIA / WID public calendars and merge into `sam_events`
 - "Who else from Mindy is going to GovCon Summit?" community layer
 - Auto-suggest 1-on-1 meeting requests
@@ -225,7 +225,7 @@ Federal BD is a relationship game. The actual product question that wins recompe
 
 GovWin doesn't answer this. SAM.gov doesn't answer this. The big primes have BD teams who manually track conferences. Small businesses don't — they go to SAM, see an opp posted today, write a proposal cold, and lose.
 
-The events DB is the layer that turns Mindy from "AI tells you what to bid on" into "AI plus your TAL builds federal BD relationships over 12-18 months." That's the durable moat.
+The events DB is the layer that turns Mindy from "AI tells you what to bid on" into "AI plus your Target Market Research builds federal BD relationships over 12-18 months." That's the durable moat.
 
 ---
 

@@ -1,13 +1,19 @@
 /**
- * /api/app/target-accounts
+ * /api/app/target-market-research
  *
- * POST endpoint that returns the merged "Target Account" data set for
- * Market Research. Replaces the 3-card "Start Here" black box with a
- * full agency table the user can sort, filter, and add to their
- * Target Account List.
+ * POST endpoint that returns the merged Target Market Research data
+ * set for the Mindy research workspace. Replaces the 3-card "Start
+ * Here" black box with a full agency table the user can sort, filter,
+ * and use to plan their BD outreach.
  *
- * Per the TAL roadmap (tasks/target-accounts-crm-roadmap.md), this
- * endpoint joins FOUR data sources per office row:
+ * Naming note: the original draft of this route used "target-accounts"
+ * but that's enterprise SaaS sales jargon. Mindy uses plain federal-BD
+ * language per the project vocabulary rule — "Target Market Research"
+ * is what BD people actually call it. See
+ * `tasks/target-market-research-roadmap.md` for the broader vision.
+ *
+ * Per the roadmap, this endpoint joins FOUR data sources per office
+ * row:
  *
  *   1. USASpending — via existing /api/usaspending/find-agencies
  *      → setAsideSpending, contractCount, satSpending, microSpending,
@@ -79,7 +85,7 @@ interface FindAgenciesAgency {
   priorityScore?: number;
 }
 
-interface TargetAccountRow {
+interface TargetMarketResearchRow {
   // Identity
   id: string;
   name: string;
@@ -182,7 +188,7 @@ export async function POST(request: NextRequest) {
       if (cacheRow && cacheRow.generated_at) {
         const age = Date.now() - new Date(cacheRow.generated_at).getTime();
         if (age < CACHE_TTL_MS) {
-          const rows = cacheRow.agencies as TargetAccountRow[];
+          const rows = cacheRow.agencies as TargetMarketResearchRow[];
           const sliced = isFree ? rows.slice(0, FREE_TIER_ROW_LIMIT) : rows;
           return NextResponse.json({
             success: true,
@@ -198,7 +204,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (cacheErr) {
       // Cache lookup is best-effort. Log and proceed to live merge.
-      console.warn('[target-accounts] cache lookup failed (proceeding live):', cacheErr);
+      console.warn('[target-market-research] cache lookup failed (proceeding live):', cacheErr);
     }
 
     // Cache miss / stale. Call /api/usaspending/find-agencies internally
@@ -247,7 +253,7 @@ export async function POST(request: NextRequest) {
         oppCounts[dept] = (oppCounts[dept] || 0) + 1;
       }
     } catch (oppErr) {
-      console.warn('[target-accounts] sam_opportunities count failed:', oppErr);
+      console.warn('[target-market-research] sam_opportunities count failed:', oppErr);
     }
     const oppsMs = Date.now() - oppsStart;
 
@@ -270,7 +276,7 @@ export async function POST(request: NextRequest) {
         eventCounts[ag] = (eventCounts[ag] || 0) + 1;
       }
     } catch (eventErr) {
-      console.warn('[target-accounts] sam_events count failed:', eventErr);
+      console.warn('[target-market-research] sam_events count failed:', eventErr);
     }
     const eventsMs = Date.now() - eventsStart;
 
@@ -284,9 +290,9 @@ export async function POST(request: NextRequest) {
     );
     const painMs = Date.now() - painStart;
 
-    // Build the merged target-account rows. Each row gets all 4 sort
+    // Build the merged research rows. Each row gets all 4 sort
     // metrics pre-computed so the UI can sort without re-fetching.
-    const rows: TargetAccountRow[] = findAgencies.map((a) => {
+    const rows: TargetMarketResearchRow[] = findAgencies.map((a) => {
       const lookupKey = a.subAgency || a.parentAgency || a.name;
       const painData = getPainPointsForAgency(lookupKey || '');
       // AgencyPainPoints exposes painPoints[] + priorities[]; we
@@ -362,7 +368,7 @@ export async function POST(request: NextRequest) {
           },
         }, { onConflict: 'naics_code,business_type,veteran_status' });
     } catch (cacheWriteErr) {
-      console.warn('[target-accounts] cache write failed:', cacheWriteErr);
+      console.warn('[target-market-research] cache write failed:', cacheWriteErr);
     }
 
     const sliced = isFree ? rows.slice(0, FREE_TIER_ROW_LIMIT) : rows;
@@ -385,7 +391,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[target-accounts] error:', err);
+    console.error('[target-market-research] error:', err);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

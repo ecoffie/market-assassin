@@ -2,7 +2,7 @@
 
 **Status:** Strategic direction, May 22 2026
 **Owner:** Eric / Claude
-**Time horizon:** v3+ (after TAL workspace ships)
+**Time horizon:** v3+ (after Target Market Research workspace ships)
 
 ---
 
@@ -191,7 +191,7 @@ The moat isn't the API — it's:
 
 | Phase | What | When |
 |---|---|---|
-| **Foundation** | TAL workspace (current Phase 2) | This month |
+| **Foundation** | Target Market Research workspace (current Phase 2) | This month |
 | **v3.0** | OpenAPI spec + `_ai_hint` on existing endpoints | 1 month |
 | **v3.1** | Public MCP server package | 2 months |
 | **v3.2** | Embeddings API | 3 months |
@@ -217,12 +217,12 @@ The moat isn't the API — it's:
 
 ## Connection to existing work
 
-This isn't a pivot. Everything we've already built (TAL workspace,
+This isn't a pivot. Everything we've already built (Target Market Research workspace,
 events DB, pain points, contractor DB, AI Analyst caching) directly
 maps to API endpoints. The data is there. We just expose it
 differently.
 
-The TAL workspace becomes "the example app showing what's possible
+The Target Market Research workspace becomes "the example app showing what's possible
 with the Mindy API." Like Vercel ships Next.js (the framework) AND
 runs Vercel.com (the example platform built on it). Two products,
 one infrastructure.

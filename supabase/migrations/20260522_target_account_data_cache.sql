@@ -1,10 +1,15 @@
--- Target Account Data cache
+-- Target Market Research data cache
 --
 -- Caches the merged USAspending + SAM + pain points + events response
--- per (naics, business_type) combination. Per the TAL roadmap
--- (tasks/target-accounts-crm-roadmap.md), Market Research's job is
--- to return all 60-100 offices for a NAICS so the user can build
--- their Target Account List from real data.
+-- per (naics, business_type) combination. Per the Target Market
+-- Research roadmap (tasks/target-market-research-roadmap.md), this
+-- surface's job is to return all 60-100 offices for a NAICS so the
+-- user can plan their BD outreach from real data.
+--
+-- Vocabulary note: the table name (agency_target_data_cache) is
+-- an internal DB identifier — fine to keep. The user-facing
+-- product surface is "Target Market Research", not "Target Account
+-- List" / "TAL" — per the project vocabulary rule.
 --
 -- The underlying data sources only refresh daily (USASpending) or
 -- daily-ish (sam_opportunities, sam_events), so caching this merge
@@ -40,6 +45,6 @@ CREATE INDEX IF NOT EXISTS idx_agency_target_data_generated_at
   ON agency_target_data_cache (generated_at);
 
 COMMENT ON TABLE agency_target_data_cache IS
-  'Cache for /api/app/target-accounts merged response (USASpending + SAM + pain points + events). 24h TTL. Keyed by (naics, business_type, veteran_status).';
+  'Cache for /api/app/target-market-research merged response (USASpending + SAM + pain points + events). 24h TTL. Keyed by (naics, business_type, veteran_status).';
 
 NOTIFY pgrst, 'reload schema';
