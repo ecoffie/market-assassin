@@ -188,25 +188,19 @@ function MarketIntelligenceContent() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-16 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-3 mb-6">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <span className="text-white font-bold text-2xl">M</span>
-            </div>
+      {/* Hero section removed May 22, 2026 per user: "do we need
+          a hero section". Right call — users hitting this page
+          from the in-app upgrade CTA already know what Mindy AI
+          is and that they're upgrading. The hero was selling them
+          on something they're already convinced of, costing them
+          the ability to see the price + CTA without scrolling.
+          A slim brand bar replaces it. */}
+      <div className="bg-gradient-to-r from-purple-900/40 to-slate-900 border-b border-purple-500/20 px-4 py-3">
+        <div className="max-w-4xl mx-auto flex items-center justify-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow shadow-purple-500/30">
+            <span className="text-white font-bold text-sm">M</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Mindy AI
-          </h1>
-          <p className="text-xl text-purple-200 mb-2">
-            Know what matters before your competitors do.
-          </p>
-          <p className="text-slate-400 max-w-2xl mx-auto">
-            Daily briefs that prioritize your opportunities. Weekly deep dives on market movement.
-            Pursuit briefs that turn targets into capture plans.
-          </p>
-
+          <span className="text-white font-semibold text-lg">Mindy AI</span>
         </div>
       </div>
 
@@ -225,10 +219,10 @@ function MarketIntelligenceContent() {
           equivalent, not total." Built as a single card + toggle
           (Stripe / Linear / Notion pattern) rather than two
           side-by-side cards. */}
-      <div className="max-w-2xl mx-auto px-4 pt-12 pb-8">
-        <h2 className="text-3xl font-bold text-white text-center mb-3">Choose Your Plan</h2>
-        <p className="text-slate-400 text-center mb-8">
-          Mindy Pro — full Mindy AI workspace + AI briefings + FHC training.
+      <div className="max-w-2xl mx-auto px-4 pt-6 pb-6">
+        <h2 className="text-2xl font-bold text-white text-center mb-1">Upgrade to Pro</h2>
+        <p className="text-slate-400 text-center text-sm mb-5">
+          Full Mindy AI workspace + AI briefings + FHC training.
         </p>
 
         {/* Monthly / Annual toggle. Annual is highlighted because
@@ -268,58 +262,58 @@ function MarketIntelligenceContent() {
             based on the toggle. Annual shows the monthly-equivalent
             number (~$124/mo) per Eric's spec, with "billed annually
             as $1,490/yr" as the secondary line. */}
-        <div className="bg-gradient-to-br from-purple-900/40 to-slate-800 border-2 border-purple-500 rounded-2xl p-8 shadow-2xl shadow-purple-500/10">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-300">Mindy Pro</span>
-            </div>
+        <div className="bg-gradient-to-br from-purple-900/40 to-slate-800 border-2 border-purple-500 rounded-2xl p-5 shadow-2xl shadow-purple-500/10">
+          <div className="text-center mb-4">
             {billingPeriod === 'monthly' ? (
               <>
                 <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold text-white">$149</span>
-                  <span className="text-slate-400 text-lg">/mo</span>
+                  <span className="text-4xl font-bold text-white">$149</span>
+                  <span className="text-slate-400">/mo</span>
                 </div>
-                <p className="text-slate-500 text-sm mt-2">Cancel anytime · Includes FHC training</p>
+                <p className="text-slate-500 text-xs mt-1">Cancel anytime · Includes FHC training</p>
               </>
             ) : (
               <>
                 <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold text-white">$124</span>
-                  <span className="text-slate-400 text-lg">/mo</span>
+                  <span className="text-4xl font-bold text-white">$124</span>
+                  <span className="text-slate-400">/mo</span>
                 </div>
-                <p className="text-emerald-400 text-sm mt-2 font-medium">
+                <p className="text-emerald-400 text-xs mt-1 font-medium">
                   Billed annually as $1,490 — 2 months free
                 </p>
               </>
             )}
           </div>
 
-          <ul className="space-y-3 mb-8">
-            <li className="flex items-center gap-2 text-slate-300 text-sm">
-              <span className="text-green-500">✓</span> Daily market intelligence briefs
+          {/* Tighter 2-col feature grid replaces vertical list \—
+              shows more features in less vertical space so the
+              CTA button stays above the fold. */}
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mb-5">
+            <li className="flex items-center gap-1.5 text-slate-300 text-xs">
+              <span className="text-green-500">✓</span> Daily market briefs
             </li>
-            <li className="flex items-center gap-2 text-slate-300 text-sm">
-              <span className="text-green-500">✓</span> Weekly deep dive analysis
+            <li className="flex items-center gap-1.5 text-slate-300 text-xs">
+              <span className="text-green-500">✓</span> Weekly deep dives
             </li>
-            <li className="flex items-center gap-2 text-slate-300 text-sm">
-              <span className="text-green-500">✓</span> Pursuit briefs with capture guidance
+            <li className="flex items-center gap-1.5 text-slate-300 text-xs">
+              <span className="text-green-500">✓</span> Pursuit briefs
             </li>
-            <li className="flex items-center gap-2 text-slate-300 text-sm">
-              <span className="text-green-500">✓</span> Full dashboard + saved target list + outreach log
+            <li className="flex items-center gap-1.5 text-slate-300 text-xs">
+              <span className="text-green-500">✓</span> Saved target list + outreach log
             </li>
-            <li className="flex items-center gap-2 text-slate-300 text-sm">
-              <span className="text-green-500">✓</span> Mindy Says AI market narrative
+            <li className="flex items-center gap-1.5 text-slate-300 text-xs">
+              <span className="text-green-500">✓</span> Mindy Says AI narrative
             </li>
-            <li className="flex items-center gap-2 text-slate-300 text-sm">
-              <span className="text-green-500">✓</span> FHC live training sessions
+            <li className="flex items-center gap-1.5 text-slate-300 text-xs">
+              <span className="text-green-500">✓</span> FHC live training
             </li>
             {billingPeriod === 'annual' && (
               <>
-                <li className="flex items-center gap-2 text-emerald-300 text-sm font-medium">
+                <li className="flex items-center gap-1.5 text-emerald-300 text-xs font-medium">
                   <span className="text-emerald-400">★</span> Priority support
                 </li>
-                <li className="flex items-center gap-2 text-emerald-300 text-sm font-medium">
-                  <span className="text-emerald-400">★</span> Locked-in pricing (no annual increases)
+                <li className="flex items-center gap-1.5 text-emerald-300 text-xs font-medium">
+                  <span className="text-emerald-400">★</span> Locked-in pricing
                 </li>
               </>
             )}
@@ -327,11 +321,11 @@ function MarketIntelligenceContent() {
 
           <a
             href={billingPeriod === 'monthly' ? CHECKOUT_MONTHLY : CHECKOUT_ANNUAL}
-            className="block w-full py-3.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-base rounded-xl text-center transition-colors shadow-lg"
+            className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold text-base rounded-xl text-center transition-colors shadow-lg"
           >
-            {billingPeriod === 'monthly' ? 'Start Monthly →' : 'Start Annual →'}
+            {billingPeriod === 'monthly' ? 'Upgrade to Pro — Monthly →' : 'Upgrade to Pro — Annual →'}
           </a>
-          <p className="text-center text-xs text-slate-500 mt-3">
+          <p className="text-center text-xs text-slate-500 mt-2">
             Secure checkout via Stripe · Cancel anytime
           </p>
         </div>
