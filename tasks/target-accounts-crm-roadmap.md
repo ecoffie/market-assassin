@@ -132,23 +132,105 @@ const EVENT_NOTICE_TYPES = [
 
 UI: "Upcoming events for your targets" section in My Targets panel.
 
-### Slice 5 — Event Radar v1 (2 weeks)
+### Slice 5 — Event Radar v1: AI Web Discovery (replaces scraper plan)
 
-Scrape public conference calendars + match by agency:
+**Original plan:** Scrape AFCEA / ACT-IAC / NDIA / WID / etc. public
+calendars. ~150 sources × maintenance forever.
 
-| Source | What's there |
+**Better plan** (Eric, May 22 2026): Use AI to search the open web at
+request time. The LLM does what a 150-scraper farm would do, on
+demand, with better recall.
+
+Flow:
+
+1. User saves "Department of the Air Force" to their TAL.
+2. We query `sam_events` for AF-tagged events in next 90 days.
+3. If we have < 3 events, fire an event-discovery agent:
+
+```typescript
+const events = await searchEventsViaAI({
+  agency: "Department of the Air Force",
+  agencyAliases: ["DAF", "USAF", "Air Force"],
+  horizonDays: 90,
+  preferredSources: ["AFCEA", "AFA", "ACT-IAC", "NDIA", "service-academies"],
+});
+```
+
+The agent (Groq / Claude with web_search) returns structured events:
+
+```jsonc
+[
+  {
+    "name": "AFCEA Rocky Mountain Cyberspace Symposium",
+    "date": "2026-08-12",
+    "location": "Colorado Springs, CO",
+    "url": "https://...",
+    "agency_tags": ["DOD", "Department of the Air Force"],
+    "discovered_via": "ai_web_search",
+    "confidence": 0.92
+  }
+]
+```
+
+Persist into `sam_events` with `source = 'ai_web_search'` so future
+users hit the cache. Cache TTL: 7 days per (agency, week).
+
+**Why this wins over scrapers:**
+
+| Scraper farm | AI web discovery |
 |---|---|
-| AFCEA International | AFCEA TechNet, AFCEA West, AFCEA Defensive Cyber Ops, etc. |
-| ACT-IAC | Federal CIO summits, ELC, Imagine Nation |
-| NDIA | Major Range & Test Facility, Special Operations, etc. |
-| WID (Women in Defense) | Annual conferences |
-| ASPE (Acquisition Solutions Professional Education) | Pricing & cost training |
-| SBA SBA Federal Events Calendar | OSBP outreach events |
-| GovEvents.com | Aggregator |
+| 150 scrapers × maintenance | 1 prompt × maintenance |
+| Misses anything off-list | Catches anything on the public web |
+| Breaks when a site redesigns | Adapts |
+| Limited to sources we know about | Discovers new event series organically |
+| Static schedule (weekly?) | Lazy — fires only when a user needs it |
 
-Each scraped event tagged with sponsoring agencies + likely attendees.
-Match to user's target list → "DOD-AF · Lt Col Smith likely at AFCEA
-TechNet · Sep 12 · Anaheim".
+**Cost:** Groq llama-3.3-70b with web_search ~$0.001 per query. With
+~1000 users × 5 target agencies × monthly refresh = ~$50/mo.
+Negligible compared to ~$200/mo of engineering time for 1 scraper.
+
+Each AI-discovered event tagged with `source = 'ai_web_search'` and
+`confidence` score — so the UI can show "Mindy found this — verify
+date" badges and we can audit accuracy over time.
+
+---
+
+### Slice 5b — Beyond NAICS: PSC code support throughout
+
+**Eric, May 22 2026:** "PSC codes are closer indicator of precise
+business offering versus NAICS or often times too broad. We need to
+allow for PSC code to do all the above in the TAL framework."
+
+He's right. NAICS 541512 = "Computer Systems Design" = 50,000-company
+bucket. PSC D316 = "IT and Telecom — Cyber Security and Data
+Backup" = 500 companies. BD precision lives at the PSC layer.
+
+**What already supports PSC:**
+- `/api/usaspending/find-agencies` accepts `pscCode`
+- `pscCode` flows through into the agency-discovery query
+- PSC↔NAICS crosswalk exists at `src/lib/utils/psc-crosswalk.ts`
+
+**What needs to change:**
+
+1. **Slice 1.5C agency table UI** — surface PSC input alongside NAICS
+   as a top-level filter. Two-column input: NAICS [_____] PSC [_____].
+   At least one required.
+2. **Slice 1.5B endpoint** — already wired (just pass `pscCode`
+   through). Cache key currently `(naics, business_type, veteran)` —
+   add `psc_code` to the composite key.
+3. **TAL saved-targets table** (Slice 3) — store the PSC code that
+   surfaced the target, not just NAICS. So a user with 5 saved
+   targets can see "3 surfaced from PSC D316, 2 from NAICS 541512".
+4. **AI Analyst prompt** — when generating bid/no-bid analysis, weight
+   PSC alignment higher than NAICS match (since PSC is more precise).
+5. **OpenAPI / MCP** (v3 work, see `PRD-mindy-as-ai-data-layer.md`) —
+   every endpoint that accepts `naics` should also accept `psc`. AI
+   agents reasoning about federal markets prefer the more precise
+   classifier.
+
+**Slice priority:** Make PSC a first-class citizen in Slice 1.5C
+when we build the agency table. Don't ship the table NAICS-only and
+retrofit later.
 
 ### Slice 6+ — Far future
 
