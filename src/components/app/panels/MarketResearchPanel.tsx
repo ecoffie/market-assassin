@@ -2012,6 +2012,11 @@ function AgencyTable({
   const [cached, setCached] = useState(false);
   const [freeTierLimited, setFreeTierLimited] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  // Slice 1.5D — drawer for office detail. Holds the row currently
+  // being inspected. Null = drawer closed. Persists between sort/lens
+  // changes so a user can browse the row list without losing their
+  // active selection.
+  const [selectedRow, setSelectedRow] = useState<AgencyTableRow | null>(null);
 
   // Fetch happens once per (naics, psc, businessType, veteran) combo.
   // The endpoint itself does the 24h cache layer — we just call it.
@@ -2233,7 +2238,11 @@ function AgencyTable({
             </thead>
             <tbody className="text-slate-300">
               {visibleRows.map(row => (
-                <tr key={row.id} className="border-t border-slate-800/60 hover:bg-slate-800/30">
+                <tr
+                  key={row.id}
+                  onClick={() => setSelectedRow(row)}
+                  className="border-t border-slate-800/60 hover:bg-slate-800/30 cursor-pointer"
+                >
                   <td className="px-4 py-2">
                     <div className="font-medium text-slate-200">{row.contractingOffice || row.name}</div>
                     {row.subAgency && (
@@ -2280,7 +2289,243 @@ function AgencyTable({
           </div>
         )}
       </div>
+
+      {/* Slice 1.5D — office detail drawer. Opens when a row is clicked,
+          matches the legacy /federal-market-assassin modal shape (4
+          stat tiles + Office Information + Engagement signals +
+          Market Research Links) so Mindy reaches parity with the
+          legacy product. */}
+      {selectedRow && (
+        <AgencyDrawer row={selectedRow} onClose={() => setSelectedRow(null)} />
+      )}
     </section>
+  );
+}
+
+// Slice 1.5D — office detail drawer. Rendered as a modal overlay so
+// the user can quickly compare offices without losing the table view
+// state (active sort lens, scroll position, quick-pick selections).
+//
+// Surfaces every piece of office-level intel the agency table row
+// already carries — no extra network call. Future-Slice 3 work
+// (saved targets / outreach log) will mount additional sections here
+// without re-architecting the drawer.
+function AgencyDrawer({ row, onClose }: { row: AgencyTableRow; onClose: () => void }) {
+  // SAM.gov agency search URL builder. The agency name is the most
+  // reliable handle since SAM's agency hierarchy uses sub-tier slugs
+  // that we don't always have. Encode + open in a new tab.
+  const samSearchUrl = `https://sam.gov/search/?index=opp&page=1&pageSize=25&sort=-modifiedDate&sfm[serviceClassifications][typeOfNotice][]=p&sfm[serviceClassifications][typeOfNotice][]=k&sfm[simpleSearch][keywords]=${encodeURIComponent(row.contractingOffice || row.name)}`;
+  // USAspending.gov agency hash search — we link to the keyword
+  // search since deep-linking to a specific agency_id requires the
+  // toptier_code lookup we don't have inline here.
+  const usaSpendingUrl = `https://www.usaspending.gov/search?keywords=${encodeURIComponent(row.parentAgency || row.contractingOffice || row.name)}`;
+
+  // Close on Escape key — accessibility nicety matching the legacy
+  // modal behavior. Cleanup on unmount + selection change so the
+  // listener doesn't leak.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-4xl w-full my-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header — sticky so the close button is always reachable */}
+        <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-start gap-4 rounded-t-xl">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-white truncate">{row.contractingOffice || row.name}</h2>
+            {row.subAgency && (
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                {row.subAgency}
+                {row.parentAgency && row.parentAgency !== row.subAgency && (
+                  <> · {row.parentAgency}</>
+                )}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-200 text-2xl leading-none shrink-0"
+            aria-label="Close drawer"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* 4 stat tiles — matches the legacy modal exactly */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <DrawerStat
+              label="Set-Aside Spending"
+              value={formatRowCurrency(row.setAsideSpending)}
+              tone="emerald"
+            />
+            <DrawerStat
+              label="Total Contracts"
+              value={row.contractCount.toLocaleString()}
+              tone="slate"
+            />
+            <DrawerStat
+              label="SAT %"
+              value={row.contractCount > 0 ? `${Math.round(row.satRatio * 100)}%` : '—'}
+              tone="blue"
+              hint={row.contractCount > 0
+                ? `${row.satContractCount} of ${row.contractCount} contracts under $250K`
+                : undefined}
+            />
+            <DrawerStat
+              label="Office ID"
+              value={row.officeId || '—'}
+              tone="purple"
+            />
+          </div>
+
+          {/* Office Information block — full hierarchy + location */}
+          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Office Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <DrawerField label="Contracting Office" value={row.contractingOffice || row.name} />
+              <DrawerField label="Sub-Agency" value={row.subAgency || '—'} />
+              <DrawerField label="Parent Agency" value={row.parentAgency || '—'} />
+              <DrawerField label="Location" value={row.location || '—'} />
+            </div>
+          </div>
+
+          {/* Engagement signals — pain points + open opps + events.
+              This is where Mindy adds value vs. raw USAspending data.
+              The numbers came from the merged endpoint; we just give
+              them a human-readable home. */}
+          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Engagement Signals</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <SignalCard
+                label="Pain Points Logged"
+                value={row.painPointCount}
+                tone="amber"
+                hint="Hand-curated from GAO reports + agency strategic plans"
+              />
+              <SignalCard
+                label="Open Opportunities"
+                value={row.openOppCount}
+                tone="emerald"
+                hint="Current SAM.gov solicitations at this agency"
+              />
+              <SignalCard
+                label="Upcoming Events (90 days)"
+                value={row.upcomingEventCount}
+                tone="purple"
+                hint="Industry days / RFIs / webinars from SAM Special Notices"
+              />
+            </div>
+          </div>
+
+          {/* Market Research Links — deep-link out to the source */}
+          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Market Research Links</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <a
+                href={samSearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg p-3 transition-colors"
+              >
+                <div>
+                  <div className="text-sm font-semibold text-white">SAM.gov Opportunities</div>
+                  <div className="text-xs text-slate-500">Search active contracts at this office</div>
+                </div>
+                <span className="text-slate-500">↗</span>
+              </a>
+              <a
+                href={usaSpendingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg p-3 transition-colors"
+              >
+                <div>
+                  <div className="text-sm font-semibold text-white">USAspending.gov</div>
+                  <div className="text-xs text-slate-500">View historical spending</div>
+                </div>
+                <span className="text-slate-500">↗</span>
+              </a>
+            </div>
+            {/* Slice 3 of the Target Market Research roadmap will add
+                an "Add to my target list" button here. Capturing the
+                placeholder so future-me sees the planned spot. */}
+            <p className="text-[10px] text-slate-600 mt-3 italic">
+              Saved target lists + outreach log coming in a future release.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DrawerStat({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: string;
+  tone: 'emerald' | 'slate' | 'blue' | 'purple';
+  hint?: string;
+}) {
+  const toneClass =
+    tone === 'emerald' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+    : tone === 'blue' ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+    : tone === 'purple' ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
+    : 'border-slate-700 bg-slate-800/40 text-slate-200';
+  return (
+    <div className={`rounded-lg border p-3 ${toneClass.split(' ')[0]} ${toneClass.split(' ')[1]}`}>
+      <div className="text-[10px] uppercase tracking-wider text-slate-400">{label}</div>
+      <div className={`text-xl font-bold mt-1 ${toneClass.split(' ').slice(2).join(' ')}`}>{value}</div>
+      {hint && <div className="text-[10px] text-slate-500 mt-1">{hint}</div>}
+    </div>
+  );
+}
+
+function DrawerField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="text-sm text-slate-200 mt-0.5 break-words">{value}</div>
+    </div>
+  );
+}
+
+function SignalCard({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: number;
+  tone: 'amber' | 'emerald' | 'purple';
+  hint?: string;
+}) {
+  const numColor =
+    tone === 'amber' ? 'text-amber-300'
+    : tone === 'emerald' ? 'text-emerald-400'
+    : 'text-purple-300';
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-3">
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className={`text-2xl font-bold mt-1 ${numColor}`}>{value.toLocaleString()}</div>
+      {hint && <div className="text-[10px] text-slate-500 mt-1.5">{hint}</div>}
+    </div>
   );
 }
 
