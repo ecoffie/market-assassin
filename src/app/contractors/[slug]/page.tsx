@@ -4,9 +4,50 @@ import {
   findContractorBySlug,
   formatCompactCurrency,
   getContractorSalesHistory,
+  getContractorSlug,
 } from '@/lib/contractor-sales-history';
+import contractorsData from '@/data/contractors.json';
 
-export const dynamic = 'force-dynamic';
+// Revalidate every 24h. USAspending data only refreshes weekly so
+// we could go longer, but daily keeps the pages fresh-ish and
+// matches our agency_target_data_cache TTL convention.
+export const revalidate = 86_400; // 24h in seconds
+
+// Pre-build the top contractors at build time so the highest-value
+// SEO pages are served from cache, not a cold DB hit. The rest
+// hydrate on first request and stick around for `revalidate`
+// seconds via Next.js ISR.
+const TOP_N_STATIC = 500;
+
+interface ContractorRow {
+  company: string;
+  contract_value_num?: number;
+}
+
+export async function generateStaticParams() {
+  const rows = (contractorsData as ContractorRow[])
+    .filter(c => c.company)
+    .sort((a, b) => (b.contract_value_num || 0) - (a.contract_value_num || 0))
+    .slice(0, TOP_N_STATIC);
+
+  // De-dupe by slug — contractors.json carries a few near-dupes
+  // ("OPTUM PUBLIC SECTOR SOLUTIONS INC" vs " INC.") that would
+  // throw "duplicate params" warnings at build.
+  const seen = new Set<string>();
+  const params: Array<{ slug: string }> = [];
+  for (const c of rows) {
+    const slug = getContractorSlug({ company: c.company });
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    params.push({ slug });
+  }
+  return params;
+}
+
+// Allow ISR for any slug not in the static set. First request to
+// a new slug hits the DB, generates the page, then it's cached
+// for `revalidate` seconds.
+export const dynamicParams = true;
 
 const SITE_URL = 'https://mi.govcongiants.com';
 const SITE_NAME = 'GovCon Giants';
