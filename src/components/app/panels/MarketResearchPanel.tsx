@@ -1443,17 +1443,20 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             excludeDOD={formData.excludeDOD}
           />
 
-          {/* Mindy Says — Slice 4 wires this to Groq. Slice 1 ships
-              an empty box so the layout is anchored. */}
-          <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-900/20 to-purple-800/5 p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-purple-300 text-lg">★</span>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-purple-300">Mindy Says</h3>
-            </div>
-            <p className="text-sm text-slate-400 italic">
-              AI market narrative + 3 recommended actions coming in Slice 4.
-            </p>
-          </section>
+          {/* Mindy Says — Groq-generated market narrative + 3
+              recommended next actions. Pro-gated (free users see
+              a teaser). Cached 7d server-side per (naics, btype,
+              email). See /api/app/market-narrative. */}
+          <MindyNarrative
+            email={email}
+            naicsCode={formData.naicsCode}
+            businessType={formData.businessType}
+            totalSpending={buyerSummary?.totalSpending || 0}
+            satTotal={reportData?.simplifiedAcquisition?.summary?.totalSATSpending || 0}
+            agencyCount={buyerSummary?.totalAgencies || buyers.length}
+            topAgencies={buyers}
+            topPrimes={reportData?.primeContractor?.suggestedPrimes || []}
+          />
 
           <p className="text-xs text-slate-500 text-center">
             Want the raw report data? <button onClick={() => setViewMode('reports')} className="text-emerald-400 hover:text-emerald-300 underline">View Reports →</button>
@@ -2211,6 +2214,200 @@ function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string 
         ))}
       </ul>
     </ChartShell>
+  );
+}
+
+// ---------------------------------------------------------------------
+// MindyNarrative — Slice Mindy Says
+// ---------------------------------------------------------------------
+//
+// Renders the Groq-generated market narrative + 3 recommended next
+// actions in the purple gradient card at the bottom of the Market
+// Map view. Self-contained: owns its own fetch state, caches via
+// the endpoint's 7d server-side cache.
+//
+// Sources its prompt data from the same buyers / primes /
+// satSummary the chart components already use — zero new data
+// fetching per render. The endpoint call is the only network hit.
+
+interface MindyNarrativeData {
+  summary: string;
+  actions: Array<{ label: string; link?: string }>;
+}
+
+function MindyNarrative({
+  email,
+  naicsCode,
+  businessType,
+  totalSpending,
+  satTotal,
+  agencyCount,
+  topAgencies,
+  topPrimes,
+}: {
+  email: string | null;
+  naicsCode: string;
+  businessType: string;
+  totalSpending: number;
+  satTotal: number;
+  agencyCount: number;
+  topAgencies: BuyerLike[];
+  topPrimes: PrimeLike[];
+}) {
+  const [narrative, setNarrative] = useState<MindyNarrativeData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [upgradeTeaser, setUpgradeTeaser] = useState<string | null>(null);
+  const [cached, setCached] = useState(false);
+
+  // Only fetch when we have enough data to be useful. No point
+  // asking the model to summarize an empty market.
+  useEffect(() => {
+    if (!email || !naicsCode || !naicsCode.trim()) return;
+    if (totalSpending === 0 && topAgencies.length === 0) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setUpgradeTeaser(null);
+
+    fetch('/api/app/market-narrative', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        naicsCode,
+        businessType,
+        totalSpending,
+        satTotal,
+        agencyCount,
+        // Trim down what we send. Don't blast the whole agency
+        // list — top 10 is what the prompt actually uses.
+        topAgencies: topAgencies.slice(0, 10).map(a => ({
+          contractingOffice: a.contractingOffice,
+          parentAgency: a.parentAgency,
+          subAgency: a.subAgency,
+          spending: a.spending,
+          contractCount: a.contractCount,
+        })),
+        topPrimes: topPrimes.slice(0, 5).map(p => ({ name: p.name, reason: p.reason })),
+      }),
+    })
+      .then(async r => {
+        const data = await r.json().catch(() => null);
+        if (cancelled) return;
+        if (r.status === 402 && data?.upgrade_required) {
+          setUpgradeTeaser(data?.teaser?.summary || data?.message || 'Mindy Says is a Mindy Pro feature.');
+          return;
+        }
+        if (!r.ok || !data?.success) {
+          setError(data?.error || 'Could not load market narrative');
+          return;
+        }
+        setNarrative(data.narrative);
+        setCached(!!data.cached);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn('[MindyNarrative] fetch failed:', err);
+        setError('Network error loading narrative');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  // We intentionally don't depend on topAgencies / topPrimes
+  // identity — only their summary signals (totalSpending,
+  // agencyCount) so we don't re-fetch every render. The endpoint
+  // is cached so worst case is one extra round trip per stat
+  // change, which is rare.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, naicsCode, businessType, totalSpending, satTotal, agencyCount]);
+
+  // Free-tier teaser. Lives in the same card so the layout doesn't
+  // shift between free and Pro users.
+  if (upgradeTeaser) {
+    return (
+      <section className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-900/30 to-purple-800/10 p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-purple-300 text-lg">★</span>
+          <h3 className="text-sm font-bold uppercase tracking-wider text-purple-300">Mindy Says</h3>
+          <span className="ml-auto text-[10px] uppercase tracking-wider text-purple-400/70">Pro feature</span>
+        </div>
+        <p className="text-sm text-slate-300 mb-3">{upgradeTeaser}</p>
+        <a
+          href="/market-intelligence"
+          className="inline-block px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold"
+        >
+          Upgrade to Mindy Pro
+        </a>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-900/20 to-purple-800/5 p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-purple-300 text-lg">★</span>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-purple-300">Mindy Says</h3>
+        {cached && (
+          <span className="ml-2 text-[10px] text-purple-400/60 uppercase tracking-wider">cached</span>
+        )}
+      </div>
+
+      {loading && (
+        <div className="space-y-2 animate-pulse">
+          <div className="h-3 bg-slate-700/60 rounded w-full" />
+          <div className="h-3 bg-slate-700/60 rounded w-11/12" />
+          <div className="h-3 bg-slate-700/60 rounded w-4/5" />
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-slate-400 italic">{error}</p>
+      )}
+
+      {!loading && !error && !narrative && (
+        <p className="text-sm text-slate-500 italic">
+          Build the report to load the AI market analysis.
+        </p>
+      )}
+
+      {narrative && (
+        <>
+          <p className="text-sm text-slate-200 leading-relaxed mb-4">
+            {narrative.summary}
+          </p>
+          {narrative.actions.length > 0 && (
+            <>
+              <p className="text-[10px] uppercase tracking-wider text-purple-400/80 mb-2">
+                Recommended next actions
+              </p>
+              <ul className="space-y-1.5">
+                {narrative.actions.map((action, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-slate-300">
+                    <span className="text-purple-400 text-xs mt-0.5 shrink-0">{idx + 1}.</span>
+                    {action.link ? (
+                      <a
+                        href={action.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-purple-200 underline-offset-2 hover:underline"
+                      >
+                        {action.label}
+                      </a>
+                    ) : (
+                      <span>{action.label}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 
