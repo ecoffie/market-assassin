@@ -30,6 +30,11 @@ export interface UserProfile {
   access_recompete: boolean;
   access_contractor_db: boolean;
   access_briefings: boolean;
+  // Mindy Team tier ($499/mo, 5 seats). Set by the Stripe webhook
+  // when a 'team_monthly' / 'team_annual' purchase comes in. Read
+  // by verifyMIAccess() so the dashboard tier resolves to 'team'.
+  // Implicitly grants Pro features too — Team is a superset of Pro.
+  access_team?: boolean;
 
   // Briefings-specific fields
   briefings_expires_at?: string; // For time-limited access (Pro Giant = 1 year)
@@ -51,7 +56,8 @@ export type ProductAccessFlag =
   | 'access_assassin_premium'
   | 'access_recompete'
   | 'access_contractor_db'
-  | 'access_briefings';
+  | 'access_briefings'
+  | 'access_team';
 
 // Tier types matching your purchases table
 export type ProductTier =
@@ -67,6 +73,9 @@ export type ProductTier =
   | 'briefings_annual'
   | 'briefings_lifetime'
   | 'fhc_membership'
+  // Mindy Team tier ($499/mo, 5 seats)
+  | 'team_monthly'
+  | 'team_annual'
   // Upgrade tiers
   | 'assassin_premium_upgrade'
   | 'content_full_fix_upgrade';
@@ -202,6 +211,11 @@ export function tierToAccessFlag(tier: ProductTier): ProductAccessFlag {
     'briefings_annual': 'access_briefings',
     'briefings_lifetime': 'access_briefings',
     'fhc_membership': 'access_assassin_standard', // FHC gets MA Standard + briefings separately
+    // Mindy Team — primary flag is access_team; access_briefings
+    // also gets set by the updateAccessFlags branch below since
+    // Team is a superset of Pro.
+    'team_monthly': 'access_team',
+    'team_annual': 'access_team',
     // Upgrade tiers map to their premium access flags
     'assassin_premium_upgrade': 'access_assassin_premium',
     'content_full_fix_upgrade': 'access_content_full_fix',
@@ -336,6 +350,17 @@ export async function updateAccessFlags(
     // FHC membership - grants MA Standard + Briefings
     if (tier === 'fhc_membership') {
       updates.access_assassin_standard = true;
+      updates.access_briefings = true;
+    }
+
+    // Mindy Team tier — superset of Pro. Sets both access_team
+    // (drives the 'team' tier label in verifyMIAccess() and the
+    // UnifiedSidebar) AND access_briefings (so Pro-tier feature
+    // gates still light up automatically). Per-seat invite flow
+    // is a separate workstream — see TODO-stripe-team-pricing.md
+    // Step 6.
+    if (tier === 'team_monthly' || tier === 'team_annual') {
+      updates.access_team = true;
       updates.access_briefings = true;
     }
 

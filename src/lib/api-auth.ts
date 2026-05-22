@@ -156,6 +156,7 @@ export async function verifyMIAccess(email: string | null): Promise<MIAuthResult
     hasContractorDb,
     hasBriefings,
     hasLegacyBriefing,
+    hasTeam,
   ] = await Promise.all([
     getMarketAssassinAccessResilient(normalizedEmail),
     hasContentGeneratorAccessResilient(normalizedEmail),
@@ -164,6 +165,10 @@ export async function verifyMIAccess(email: string | null): Promise<MIAuthResult
     hasContractorDbAccessResilient(normalizedEmail),
     hasBriefingsAccessResilient(email),
     hasBriefingAccess(normalizedEmail), // Legacy function still has its own fallback
+    // Mindy Team — direct Supabase check against user_profiles.access_team.
+    // Returns false on connection failure (graceful degrade — they'd just
+    // see Pro features which Team includes anyway).
+    hasMindyTeamAccess(normalizedEmail),
   ]);
 
   const staffRole = getStaffRole(normalizedEmail);
@@ -176,6 +181,19 @@ export async function verifyMIAccess(email: string | null): Promise<MIAuthResult
     contractorDb: hasContractorDb,
     briefings: hasBriefings || hasLegacyBriefing,
   };
+
+  // Team gate first — Team is a superset of Pro, so checking it
+  // before the Pro union avoids the user getting downgraded to
+  // 'pro' display when they actually paid for Team.
+  if (hasTeam) {
+    return {
+      tier: 'team',
+      email: normalizedEmail,
+      isStaff: staffRole !== 'none',
+      staffRole,
+      sources,
+    };
+  }
 
   const hasUnifiedProAccess = Object.values(sources).some(Boolean) || staffRole !== 'none';
 
@@ -197,6 +215,30 @@ export async function verifyMIAccess(email: string | null): Promise<MIAuthResult
     staffRole,
     sources,
   };
+}
+
+/**
+ * Direct check against user_profiles.access_team for Mindy Team
+ * subscribers. Used by verifyMIAccess() to upgrade the dashboard
+ * tier label from 'pro' to 'team' for Team buyers.
+ *
+ * Returns false on any Supabase failure — graceful degrade means
+ * the user falls through to 'pro' (which Team includes), losing
+ * only the Team-specific UI labels until the next request.
+ */
+async function hasMindyTeamAccess(email: string): Promise<boolean> {
+  const supabase = getSupabaseAuth();
+  if (!supabase) return false;
+  try {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('access_team')
+      .eq('email', email)
+      .maybeSingle();
+    return !!(data as { access_team?: boolean } | null)?.access_team;
+  } catch {
+    return false;
+  }
 }
 
 // ========================================================================

@@ -5,9 +5,15 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { persistAccessEmail } from '@/lib/access-cookie';
 
-// Public pricing (anchor price)
-const CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
-const CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';  // $1,490/yr
+// Public pricing — anchor prices for the upgrade page.
+//
+// Pro tier ($149/mo or $1,490/yr) is the default selection because
+// most upgrades are single-seat. Team tier ($499/mo or $4,990/yr,
+// 5 seats included) ships as a toggle option for small BD teams.
+const CHECKOUT_MONTHLY      = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // Pro $149/mo
+const CHECKOUT_ANNUAL       = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D'; // Pro $1,490/yr
+const CHECKOUT_TEAM_MONTHLY = 'https://buy.stripe.com/9B63cw0ke8388pfclafnO0E'; // Team $499/mo
+const CHECKOUT_TEAM_ANNUAL  = 'https://buy.stripe.com/4gM14oc2W97c20R3OEfnO0F'; // Team $4,990/yr
 
 // Private loyalty pricing (for email campaigns to past customers only - NOT shown on public page)
 // const CHECKOUT_LOYALTY_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z'; // $49/mo
@@ -30,6 +36,10 @@ function MarketIntelligenceContent() {
   // Pattern: Stripe, Linear, Notion all default-open to annual
   // to anchor on the lower number. Monthly is one click away.
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
+  // Tier toggle — Solo (Pro, default) vs Team. Solo is default
+  // because single-seat is the larger purchase population; Team
+  // (5 seats) is the upsell for small BD departments.
+  const [tier, setTier] = useState<'pro' | 'team'>('pro');
 
   // Handle invite token on mount
   useEffect(() => {
@@ -220,15 +230,53 @@ function MarketIntelligenceContent() {
           (Stripe / Linear / Notion pattern) rather than two
           side-by-side cards. */}
       <div className="max-w-2xl mx-auto px-4 pt-6 pb-6">
-        <h2 className="text-2xl font-bold text-white text-center mb-1">Upgrade to Pro</h2>
-        <p className="text-slate-400 text-center text-sm mb-5">
-          Full Mindy AI workspace + AI briefings + FHC training.
+        <h2 className="text-2xl font-bold text-white text-center mb-1">
+          {tier === 'pro' ? 'Upgrade to Pro' : 'Upgrade to Team'}
+        </h2>
+        <p className="text-slate-400 text-center text-sm mb-4">
+          {tier === 'pro'
+            ? 'Full Mindy AI workspace + AI briefings + FHC training.'
+            : '5 seats · shared pipeline · team admin dashboard · priority support.'}
         </p>
+
+        {/* Solo / Team toggle — picks which tier the price card
+            renders. Solo (Pro) is the default since single-seat
+            is the larger purchase population. Team upgrades for
+            small BD departments who need 5 seats. */}
+        <div className="flex justify-center mb-3">
+          <div className="inline-flex bg-slate-900 border border-slate-700 rounded-full p-1">
+            <button
+              type="button"
+              onClick={() => setTier('pro')}
+              className={`px-5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                tier === 'pro'
+                  ? 'bg-slate-700 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Solo
+            </button>
+            <button
+              type="button"
+              onClick={() => setTier('team')}
+              className={`px-5 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-2 ${
+                tier === 'team'
+                  ? 'bg-slate-700 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Team
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                tier === 'team' ? 'bg-blue-500 text-white' : 'bg-blue-500/20 text-blue-300'
+              }`}>5 SEATS</span>
+            </button>
+          </div>
+        </div>
 
         {/* Monthly / Annual toggle. Annual is highlighted because
             it's the cheaper-per-month option + we want to nudge
             toward longer commitment. */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-5">
           <div className="inline-flex bg-slate-800 border border-slate-700 rounded-full p-1">
             <button
               type="button"
@@ -259,36 +307,51 @@ function MarketIntelligenceContent() {
         </div>
 
         {/* Single price card whose price + CTA + footnote change
-            based on the toggle. Annual shows the monthly-equivalent
-            number (~$124/mo) per Eric's spec, with "billed annually
-            as $1,490/yr" as the secondary line. */}
-        <div className="bg-gradient-to-br from-purple-900/40 to-slate-800 border-2 border-purple-500 rounded-2xl p-5 shadow-2xl shadow-purple-500/10">
+            based on BOTH toggles. Annual rows show the monthly-
+            equivalent number (e.g. $124/mo for Pro, $416/mo for
+            Team) per Eric's spec, with "billed annually as $X" as
+            the secondary line. Team card uses a blue accent ring
+            instead of purple to differentiate visually. */}
+        <div className={`bg-gradient-to-br ${
+          tier === 'pro' ? 'from-purple-900/40 to-slate-800 border-purple-500' : 'from-blue-900/40 to-slate-800 border-blue-500'
+        } border-2 rounded-2xl p-5 shadow-2xl ${
+          tier === 'pro' ? 'shadow-purple-500/10' : 'shadow-blue-500/10'
+        }`}>
           <div className="text-center mb-4">
-            {billingPeriod === 'monthly' ? (
-              <>
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-4xl font-bold text-white">$149</span>
-                  <span className="text-slate-400">/mo</span>
-                </div>
-                <p className="text-slate-500 text-xs mt-1">Cancel anytime · Includes FHC training</p>
-              </>
-            ) : (
-              <>
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-4xl font-bold text-white">$124</span>
-                  <span className="text-slate-400">/mo</span>
-                </div>
-                <p className="text-emerald-400 text-xs mt-1 font-medium">
-                  Billed annually as $1,490 — 2 months free
-                </p>
-              </>
-            )}
+            {(() => {
+              // Pricing table — single source of truth so future
+              // price tweaks only touch this object.
+              const prices = {
+                pro:  { monthly: { headline: '$149', sub: 'Cancel anytime · Includes FHC training' },
+                        annual:  { headline: '$124', sub: 'Billed annually as $1,490 — 2 months free' } },
+                team: { monthly: { headline: '$499', sub: '5 seats · Cancel anytime · Includes FHC training' },
+                        annual:  { headline: '$416', sub: 'Billed annually as $4,990 — 2 months free' } },
+              } as const;
+              const p = prices[tier][billingPeriod];
+              return (
+                <>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-4xl font-bold text-white">{p.headline}</span>
+                    <span className="text-slate-400">/mo</span>
+                  </div>
+                  <p className={`text-xs mt-1 ${billingPeriod === 'annual' ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+                    {p.sub}
+                  </p>
+                </>
+              );
+            })()}
           </div>
 
           {/* Tighter 2-col feature grid replaces vertical list \—
               shows more features in less vertical space so the
-              CTA button stays above the fold. */}
+              CTA button stays above the fold. Team rows highlight
+              the seat-related features. */}
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mb-5">
+            {tier === 'team' && (
+              <li className="flex items-center gap-1.5 text-blue-300 text-xs font-medium sm:col-span-2">
+                <span className="text-blue-400">★</span> 5 user seats included
+              </li>
+            )}
             <li className="flex items-center gap-1.5 text-slate-300 text-xs">
               <span className="text-green-500">✓</span> Daily market briefs
             </li>
@@ -299,15 +362,20 @@ function MarketIntelligenceContent() {
               <span className="text-green-500">✓</span> Pursuit briefs
             </li>
             <li className="flex items-center gap-1.5 text-slate-300 text-xs">
-              <span className="text-green-500">✓</span> Saved target list + outreach log
+              <span className="text-green-500">✓</span> {tier === 'team' ? 'Shared pipeline + CRM' : 'Saved target list + outreach log'}
             </li>
             <li className="flex items-center gap-1.5 text-slate-300 text-xs">
               <span className="text-green-500">✓</span> Mindy Says AI narrative
             </li>
             <li className="flex items-center gap-1.5 text-slate-300 text-xs">
-              <span className="text-green-500">✓</span> FHC live training
+              <span className="text-green-500">✓</span> {tier === 'team' ? 'Team admin dashboard' : 'FHC live training'}
             </li>
-            {billingPeriod === 'annual' && (
+            {tier === 'team' && (
+              <li className="flex items-center gap-1.5 text-blue-300 text-xs font-medium">
+                <span className="text-blue-400">★</span> Priority support
+              </li>
+            )}
+            {tier === 'pro' && billingPeriod === 'annual' && (
               <>
                 <li className="flex items-center gap-1.5 text-emerald-300 text-xs font-medium">
                   <span className="text-emerald-400">★</span> Priority support
@@ -317,13 +385,28 @@ function MarketIntelligenceContent() {
                 </li>
               </>
             )}
+            {tier === 'team' && billingPeriod === 'annual' && (
+              <li className="flex items-center gap-1.5 text-emerald-300 text-xs font-medium">
+                <span className="text-emerald-400">★</span> Locked-in pricing
+              </li>
+            )}
           </ul>
 
           <a
-            href={billingPeriod === 'monthly' ? CHECKOUT_MONTHLY : CHECKOUT_ANNUAL}
-            className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold text-base rounded-xl text-center transition-colors shadow-lg"
+            href={
+              tier === 'pro'
+                ? (billingPeriod === 'monthly' ? CHECKOUT_MONTHLY : CHECKOUT_ANNUAL)
+                : (billingPeriod === 'monthly' ? CHECKOUT_TEAM_MONTHLY : CHECKOUT_TEAM_ANNUAL)
+            }
+            className={`block w-full py-3 ${
+              tier === 'pro'
+                ? 'bg-purple-600 hover:bg-purple-500'
+                : 'bg-blue-600 hover:bg-blue-500'
+            } text-white font-bold text-base rounded-xl text-center transition-colors shadow-lg`}
           >
-            {billingPeriod === 'monthly' ? 'Upgrade to Pro — Monthly →' : 'Upgrade to Pro — Annual →'}
+            {tier === 'pro'
+              ? (billingPeriod === 'monthly' ? 'Upgrade to Pro — Monthly →' : 'Upgrade to Pro — Annual →')
+              : (billingPeriod === 'monthly' ? 'Start Team — Monthly →' : 'Start Team — Annual →')}
           </a>
           <p className="text-center text-xs text-slate-500 mt-2">
             Secure checkout via Stripe · Cancel anytime
@@ -479,10 +562,10 @@ function MarketIntelligenceContent() {
                 </td>
                 <td className="py-4 px-3 text-center bg-blue-900/10">
                   <a
-                    href="mailto:hello@govcongiants.com?subject=MI%20Team%20Inquiry"
+                    href={CHECKOUT_TEAM_MONTHLY}
                     className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors text-xs"
                   >
-                    Contact Sales
+                    Start Team →
                   </a>
                 </td>
                 <td className="py-4 px-3 text-center bg-amber-900/10">

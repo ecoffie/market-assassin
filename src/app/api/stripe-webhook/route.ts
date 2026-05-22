@@ -119,10 +119,15 @@ export async function POST(request: NextRequest) {
     const lineItemDescription = lineItems.data[0]?.description || '';
     const normalizedDescription = lineItemDescription.toLowerCase();
 
-    // Payment links for standalone Market Intelligence may not inject session metadata.
-    // Fall back to the product description so the purchase still grants briefings access.
+    // Payment links for standalone Mindy AI may not inject session metadata.
+    // Fall back to the product description so the purchase still grants
+    // the right access. Order matters: check Team first because "Mindy AI
+    // Team" descriptions also match "market intelligence" / "mindy" if
+    // we ever rename the line items.
     if (!tier && !bundle) {
-      if (normalizedDescription.includes('market intelligence') || normalizedDescription.includes('daily briefings')) {
+      if (normalizedDescription.includes('team monthly') || normalizedDescription.includes('team annual')) {
+        tier = normalizedDescription.includes('annual') ? 'team_annual' : 'team_monthly';
+      } else if (normalizedDescription.includes('market intelligence') || normalizedDescription.includes('daily briefings') || normalizedDescription.includes('mindy ai')) {
         tier = 'briefings';
       }
     }
@@ -309,8 +314,14 @@ export async function POST(request: NextRequest) {
       tier === 'briefings' ||
       tier === 'briefings_monthly' ||
       tier === 'briefings_annual' ||
-      tier === 'briefings_lifetime'
+      tier === 'briefings_lifetime' ||
+      tier === 'team_monthly' ||
+      tier === 'team_annual'
     ) {
+      // Team uses the same welcome email as Pro for now — both
+      // unlock the same /app surface. A team-specific welcome
+      // (with "5 seats included" + "Invite teammates →" link)
+      // is a Phase 2 polish; not blocking for v1 launch.
       await sendMarketIntelligenceWelcomeEmail({ to: email, customerName });
     } else if (profile?.license_key) {
       // Fallback to generic license key email
