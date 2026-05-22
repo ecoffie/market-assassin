@@ -1,6 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import {
+  BarChart, Bar,
+  PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer,
+} from 'recharts';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
@@ -1416,10 +1421,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               adds Trend line + Top 5 Primes. The slots are here
               so the layout is visible/scannable from Slice 1. */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ChartPlaceholder title="Spending by Agency" subtitle="Top 10 by tracked spend" slice="2" />
-            <ChartPlaceholder title="Set-Aside Mix" subtitle="Where small business plays" slice="2" />
-            <ChartPlaceholder title="3-Year Spending Trend" subtitle="YoY growth in your NAICS" slice="3" />
-            <ChartPlaceholder title="Top 5 Primes" subtitle="Incumbents to track or team with" slice="3" />
+            <SpendingByAgencyChart buyers={buyers} />
+            <SetAsideMixChart buyers={buyers} satTotal={(reportData?.simplifiedAcquisition?.summary?.totalSATSpending) || 0} totalSpend={buyerSummary?.totalSpending || 0} />
+            <TrendPlaceholderChart totalSpend={buyerSummary?.totalSpending || 0} agencyCount={buyerSummary?.totalAgencies || buyers.length} />
+            <TopPrimesChart primes={reportData?.primeContractor?.suggestedPrimes || []} />
           </section>
 
           {/* Slice 1.5C — Agency table with sort lenses. Replaces the
@@ -1905,10 +1910,9 @@ function MetricCard({ label, value, tone = 'default' }: { label: string; value: 
   );
 }
 
-// Slice 1 placeholder for chart slots. Slices 2-3 replace each usage
-// with actual Recharts components. The `slice` label tells reviewers
-// which slice will fill which tile so the layout review is meaningful
-// even before the charts exist.
+// Slice 1 placeholder for chart slots. Kept around for the 3-Year
+// Trend tile that we can't honestly populate yet (we don't have
+// USAspending FY-broken data in reportData).
 function ChartPlaceholder({ title, subtitle, slice }: { title: string; subtitle: string; slice: string }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 min-h-[280px] flex flex-col">
@@ -1923,6 +1927,287 @@ function ChartPlaceholder({ title, subtitle, slice }: { title: string; subtitle:
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Slice 2 — Recharts visualizations
+// ---------------------------------------------------------------------
+//
+// 4 chart tiles wired to the existing reportData. Each is its own
+// component so we can swap in better data sources (USASpending FY
+// breakdown, BLS labor stats, etc.) without re-architecting the layout.
+//
+// Color palette pulled from the dark-mode brand tokens to match the
+// rest of Mindy. Recharts colors are passed via `fill` / `stroke` so
+// Tailwind doesn't need to know about them.
+
+const CHART_PALETTE = {
+  emerald: '#10b981',  // primary money signal
+  emeraldDim: '#065f46',
+  blue: '#3b82f6',     // SAT spend
+  amber: '#f59e0b',    // SAT competitor band
+  purple: '#a855f7',   // primes / events
+  slate: '#64748b',    // axis labels
+  slateDim: '#334155', // grid
+};
+
+// Money formatter — short form for chart labels where space is tight.
+function chartMoney(n: number): string {
+  if (!n || !Number.isFinite(n)) return '$0';
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${Math.round(n)}`;
+}
+
+// Shared chart-card shell — keeps the header consistent across all 4
+// tiles + sets the same min-height so the grid doesn't jump.
+function ChartShell({
+  title,
+  subtitle,
+  children,
+  footer,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 min-h-[280px] flex flex-col">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <p className="text-xs text-slate-500">{subtitle}</p>
+      </div>
+      <div className="flex-1 min-h-[200px]">
+        {children}
+      </div>
+      {footer && <div className="mt-2 pt-2 border-t border-slate-800/60">{footer}</div>}
+    </div>
+  );
+}
+
+// 1) Spending by Agency — horizontal bar, top 10 by spending.
+interface BuyerLike {
+  contractingOffice?: string;
+  parentAgency?: string;
+  subAgency?: string;
+  spending?: number;
+  contractCount?: number;
+}
+function SpendingByAgencyChart({ buyers }: { buyers: BuyerLike[] }) {
+  // Map to chart-friendly shape, sort, slice. Truncate the office
+  // name for the Y axis so the chart bars don't get squeezed.
+  const data = useMemo(() => {
+    return [...(buyers || [])]
+      .filter(b => (b.spending || 0) > 0)
+      .sort((a, b) => (b.spending || 0) - (a.spending || 0))
+      .slice(0, 10)
+      .map(b => ({
+        name: ((b.contractingOffice || b.subAgency || b.parentAgency || '').slice(0, 28) || 'Unknown'),
+        spending: b.spending || 0,
+      }))
+      .reverse();
+  }, [buyers]);
+
+  if (data.length === 0) {
+    return (
+      <ChartShell title="Spending by Agency" subtitle="Top 10 by tracked spend">
+        <div className="flex items-center justify-center h-full text-xs text-slate-500">
+          No agency spending data yet. Build the report to populate.
+        </div>
+      </ChartShell>
+    );
+  }
+
+  return (
+    <ChartShell
+      title="Spending by Agency"
+      subtitle={`Top ${data.length} by tracked spend in your NAICS`}
+    >
+      <ResponsiveContainer width="100%" height={Math.max(200, data.length * 22)}>
+        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+          <XAxis
+            type="number"
+            tick={{ fill: CHART_PALETTE.slate, fontSize: 10 }}
+            tickFormatter={chartMoney}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            tick={{ fill: CHART_PALETTE.slate, fontSize: 10 }}
+            width={120}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip
+            cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
+            contentStyle={{
+              backgroundColor: '#0f172a',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              fontSize: '11px',
+            }}
+            labelStyle={{ color: '#cbd5e1' }}
+            formatter={(value) => [chartMoney(Number(value) || 0), 'Spend'] as [string, string]}
+          />
+          <Bar dataKey="spending" fill={CHART_PALETTE.emerald} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartShell>
+  );
+}
+
+// 2) Set-Aside Mix — donut. Splits total spend into SAT (<$250K
+// simplified-acquisition contracts, where small business wins easier)
+// vs the rest. This is the "is this market accessible?" signal.
+function SetAsideMixChart({
+  buyers,
+  satTotal,
+  totalSpend,
+}: {
+  buyers: BuyerLike[];
+  satTotal: number;
+  totalSpend: number;
+}) {
+  const fallbackTotal = useMemo(
+    () => (buyers || []).reduce((sum, b) => sum + (b.spending || 0), 0),
+    [buyers]
+  );
+  const total = totalSpend || fallbackTotal;
+  const nonSat = Math.max(0, total - satTotal);
+
+  if (total === 0) {
+    return (
+      <ChartShell title="Set-Aside Mix" subtitle="Where small business plays">
+        <div className="flex items-center justify-center h-full text-xs text-slate-500">
+          No spending data yet to chart.
+        </div>
+      </ChartShell>
+    );
+  }
+
+  const data = [
+    { name: 'SAT (≤$250K — accessible)', value: satTotal, color: CHART_PALETTE.emerald },
+    { name: 'Above SAT', value: nonSat, color: CHART_PALETTE.slateDim },
+  ];
+  const satPct = total > 0 ? (satTotal / total) * 100 : 0;
+
+  return (
+    <ChartShell
+      title="Set-Aside Mix"
+      subtitle="Where small business plays — % of spend under $250K"
+      footer={
+        <p className="text-[11px] text-slate-400">
+          <span className="text-emerald-400 font-semibold">{satPct.toFixed(1)}%</span> of
+          {' '}{chartMoney(total)} total is SAT-eligible
+          ({chartMoney(satTotal)} addressable for first-contract wins).
+        </p>
+      }
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            innerRadius="55%"
+            outerRadius="80%"
+            paddingAngle={2}
+            dataKey="value"
+            stroke="none"
+          >
+            {data.map((entry, idx) => (
+              <Cell key={idx} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip
+            contentStyle={{
+              backgroundColor: '#0f172a',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              fontSize: '11px',
+            }}
+            labelStyle={{ color: '#cbd5e1' }}
+            formatter={(value, name) => [chartMoney(Number(value) || 0), String(name)] as [string, string]}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </ChartShell>
+  );
+}
+
+// 3) 3-Year Spending Trend — kept as an honest placeholder because
+// we don't carry USASpending FY-broken data in reportData yet. Shows
+// the total spend as a single anchor + explains what's missing so
+// reviewers know it's not a bug.
+function TrendPlaceholderChart({ totalSpend, agencyCount }: { totalSpend: number; agencyCount: number }) {
+  return (
+    <ChartShell
+      title="3-Year Spending Trend"
+      subtitle="YoY growth in your NAICS"
+    >
+      <div className="h-full flex flex-col items-center justify-center text-center px-4">
+        <div className="text-3xl font-bold text-emerald-400 mb-1">{chartMoney(totalSpend)}</div>
+        <div className="text-xs text-slate-500 mb-3">tracked across {agencyCount.toLocaleString()} agencies</div>
+        <p className="text-[11px] text-slate-500 italic max-w-sm">
+          FY-broken trend line ships when we wire USASpending&apos;s annual breakdown.
+          Today we surface total, not delta.
+        </p>
+      </div>
+    </ChartShell>
+  );
+}
+
+// 4) Top Primes — horizontal bar list of suggested primes. We don't
+// have per-prime spending or win count, so the chart is rank-only:
+// the bar length is uniform (signals "these are the top 5"), and the
+// row is labeled with the prime name + their stated reason for being
+// a suggestion. Future iteration adds win-count from USASpending.
+interface PrimeLike {
+  name: string;
+  reason?: string;
+}
+function TopPrimesChart({ primes }: { primes: PrimeLike[] }) {
+  const top = primes.slice(0, 5);
+
+  if (top.length === 0) {
+    return (
+      <ChartShell title="Top 5 Primes" subtitle="Incumbents to track or team with">
+        <div className="flex items-center justify-center h-full text-xs text-slate-500">
+          No prime data yet. Build the report to populate.
+        </div>
+      </ChartShell>
+    );
+  }
+
+  return (
+    <ChartShell
+      title="Top 5 Primes"
+      subtitle="Incumbents to track or team with"
+      footer={
+        <p className="text-[11px] text-slate-500">
+          Win-count weighting ships when we wire USASpending awards. Today: rank only.
+        </p>
+      }
+    >
+      <ul className="space-y-2">
+        {top.map((p, i) => (
+          <li key={`${p.name}-${i}`} className="flex items-start gap-3">
+            <div className="shrink-0 w-6 h-6 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-[10px] font-semibold text-purple-300">
+              {i + 1}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-slate-200 truncate">{p.name}</div>
+              {p.reason && (
+                <div className="text-[10px] text-slate-500 truncate">{p.reason}</div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </ChartShell>
   );
 }
 
