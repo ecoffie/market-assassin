@@ -20,6 +20,7 @@ export type AppPanel =
   | 'settings'       // Unified account settings
   | 'pricing'        // Pricing Intel — labor rates, GSA/SCA wages (Estimating section)
   | 'proposals'      // AI Proposal Assist (Estimating section)
+  | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
   | 'grants';        // Federal grants
 
 // Tier definitions
@@ -127,6 +128,17 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'My Pursuits',
         icon: '📈',
         description: 'Track opportunities',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        // Slice 3 of the Target Market Research roadmap. Saved BD
+        // targets sourced from the Market Research drawer. Sits with
+        // Pipeline because it's the "what am I working on?" mental
+        // mode — opps you're chasing + offices you're courting.
+        id: 'target-list',
+        label: 'My Target List',
+        icon: '🎯',
+        description: 'Saved offices to work',
         tier: ['pro', 'team', 'enterprise'],
       },
       {

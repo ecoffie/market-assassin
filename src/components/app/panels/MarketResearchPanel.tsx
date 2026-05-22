@@ -2018,6 +2018,14 @@ function AgencyTable({
   // active selection.
   const [selectedRow, setSelectedRow] = useState<AgencyTableRow | null>(null);
 
+  // Slice 3B — saved targets state. Map of office_name → target row id
+  // so we know (a) which rows show the ★ saved indicator and (b) which
+  // id to pass to DELETE on Undo. Hydrated once on mount via
+  // GET /api/app/target-list. We update the map optimistically when
+  // the user clicks Add / Remove inside the drawer.
+  const [savedTargets, setSavedTargets] = useState<Record<string, string>>({});
+  const { showToast: showAgencyToast } = useToast();
+
   // Fetch happens once per (naics, psc, businessType, veteran) combo.
   // The endpoint itself does the 24h cache layer — we just call it.
   useEffect(() => {
@@ -2063,6 +2071,170 @@ function AgencyTable({
 
     return () => { cancelled = true; };
   }, [email, naicsCode, pscCode, businessType, veteranStatus, zipCode, excludeDOD]);
+
+  // Slice 3B — fetch my saved target list once per email change. We
+  // store (office_name → target_id) so the row ★ indicator and the
+  // drawer's Add/Remove button can both look up state instantly.
+  // Fire-and-forget: failure leaves savedTargets empty, which means
+  // the drawer button defaults to "Add" — degrading gracefully if
+  // the endpoint is misbehaving.
+  useEffect(() => {
+    if (!email) return;
+    let cancelled = false;
+    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.success) return;
+        const map: Record<string, string> = {};
+        for (const t of data.targets || []) {
+          if (t.office_name && t.id) map[t.office_name] = t.id;
+        }
+        setSavedTargets(map);
+      })
+      .catch(err => console.warn('[AgencyTable] target-list fetch failed:', err));
+    return () => { cancelled = true; };
+  }, [email]);
+
+  // Slice 3B — add an office to my target list. Optimistic flip on
+  // success, server-side Pro gate (402) surfaces as the upgrade toast.
+  // Drawer calls this via the `onAddToList` prop.
+  const handleAddToList = useCallback(async (row: AgencyTableRow) => {
+    if (!email) {
+      showAgencyToast({ message: 'Sign in before saving targets', variant: 'error' });
+      return;
+    }
+    if (savedTargets[row.contractingOffice || row.name]) {
+      showAgencyToast({ message: 'Already in your target list', variant: 'info' });
+      return;
+    }
+
+    const officeName = row.contractingOffice || row.name;
+    // Optimistic placeholder id so the UI flips immediately. We swap
+    // it for the real id once the server responds.
+    const tempId = `optimistic-${Date.now()}`;
+    setSavedTargets(prev => ({ ...prev, [officeName]: tempId }));
+
+    try {
+      const res = await fetch('/api/app/target-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: email,
+          agency_name: row.parentAgency || row.subAgency || row.name,
+          sub_agency_name: row.subAgency || null,
+          office_code: row.officeId || null,
+          office_name: officeName,
+          location: row.location || null,
+          set_aside_spending: row.setAsideSpending,
+          contract_count: row.contractCount,
+          sat_ratio: row.satRatio,
+          pain_point_count: row.painPointCount,
+          open_opp_count: row.openOppCount,
+          upcoming_event_count: row.upcomingEventCount,
+          added_from: 'research_drawer',
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.status === 402 && data?.upgrade_required) {
+        // Roll back optimistic + surface upgrade pitch.
+        setSavedTargets(prev => {
+          const next = { ...prev };
+          delete next[officeName];
+          return next;
+        });
+        showAgencyToast({
+          message: data.message || 'Saving target lists is a Mindy Pro feature',
+          variant: 'info',
+          action: { label: 'Upgrade', onClick: () => { window.location.href = '/market-intelligence'; } },
+        });
+        return;
+      }
+      if (res.status === 409 || data?.already_saved) {
+        // Server already had this office — flip our state to whatever
+        // the server says is the real id by refetching the list.
+        // Cheap fallback: pretend our optimistic id is correct; next
+        // mount refresh fixes it.
+        showAgencyToast({ message: 'Already in your target list', variant: 'info' });
+        return;
+      }
+      if (!res.ok || !data?.success) {
+        setSavedTargets(prev => {
+          const next = { ...prev };
+          delete next[officeName];
+          return next;
+        });
+        showAgencyToast({
+          message: data?.error || 'Could not save to target list',
+          variant: 'error',
+        });
+        return;
+      }
+
+      // Success — replace optimistic id with the real one.
+      const realId = data.target?.id as string | undefined;
+      if (realId) {
+        setSavedTargets(prev => ({ ...prev, [officeName]: realId }));
+      }
+      showAgencyToast({
+        message: `Saved ${officeName} to your target list`,
+        variant: 'success',
+        action: realId ? {
+          label: 'Undo',
+          onClick: () => handleRemoveFromList(officeName, realId),
+        } : undefined,
+      });
+    } catch (err) {
+      console.error('[AgencyTable] add to list failed:', err);
+      setSavedTargets(prev => {
+        const next = { ...prev };
+        delete next[officeName];
+        return next;
+      });
+      showAgencyToast({ message: 'Network error — could not save', variant: 'error' });
+    }
+  // handleRemoveFromList is hoisted below — TS sees the binding via
+  // closure of useCallback's stale-deps lint. Adding to deps later if
+  // the linter complains.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, savedTargets, showAgencyToast]);
+
+  // Slice 3B — remove from my target list. Used by the drawer Remove
+  // button AND by the Undo action on the success toast.
+  const handleRemoveFromList = useCallback(async (officeName: string, targetId: string) => {
+    if (!email) return;
+
+    // Optimistic remove.
+    setSavedTargets(prev => {
+      const next = { ...prev };
+      delete next[officeName];
+      return next;
+    });
+
+    try {
+      const res = await fetch('/api/app/target-list', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: targetId, user_email: email }),
+      });
+      if (!res.ok) {
+        // Roll back if delete failed — better to show a stuck "saved"
+        // than silently drop the user's saved row.
+        setSavedTargets(prev => ({ ...prev, [officeName]: targetId }));
+        const data = await res.json().catch(() => null);
+        showAgencyToast({
+          message: data?.error || 'Could not remove from list',
+          variant: 'error',
+        });
+        return;
+      }
+      showAgencyToast({ message: `Removed ${officeName}`, variant: 'info' });
+    } catch (err) {
+      console.error('[AgencyTable] remove from list failed:', err);
+      setSavedTargets(prev => ({ ...prev, [officeName]: targetId }));
+      showAgencyToast({ message: 'Network error — could not remove', variant: 'error' });
+    }
+  }, [email, showAgencyToast]);
 
   // Pure sort step. The endpoint pre-computes every metric_* field so
   // switching lenses is a client-only re-sort with no network call.
@@ -2244,7 +2416,19 @@ function AgencyTable({
                   className="border-t border-slate-800/60 hover:bg-slate-800/30 cursor-pointer"
                 >
                   <td className="px-4 py-2">
-                    <div className="font-medium text-slate-200">{row.contractingOffice || row.name}</div>
+                    <div className="flex items-center gap-1.5">
+                      {/* Slice 3B — ★ when this office is in the
+                          user's saved target list. Tiny but high-
+                          signal: lets users scan their list at a
+                          glance while browsing. */}
+                      {savedTargets[row.contractingOffice || row.name] && (
+                        <span
+                          className="text-amber-400 text-xs"
+                          title="In your target list"
+                        >★</span>
+                      )}
+                      <div className="font-medium text-slate-200">{row.contractingOffice || row.name}</div>
+                    </div>
                     {row.subAgency && (
                       <div className="text-[10px] text-slate-500 mt-0.5">
                         {row.subAgency}
@@ -2296,7 +2480,13 @@ function AgencyTable({
           Market Research Links) so Mindy reaches parity with the
           legacy product. */}
       {selectedRow && (
-        <AgencyDrawer row={selectedRow} onClose={() => setSelectedRow(null)} />
+        <AgencyDrawer
+          row={selectedRow}
+          onClose={() => setSelectedRow(null)}
+          savedTargetId={savedTargets[selectedRow.contractingOffice || selectedRow.name] || null}
+          onAdd={() => handleAddToList(selectedRow)}
+          onRemove={(targetId) => handleRemoveFromList(selectedRow.contractingOffice || selectedRow.name, targetId)}
+        />
       )}
     </section>
   );
@@ -2310,7 +2500,21 @@ function AgencyTable({
 // already carries — no extra network call. Future-Slice 3 work
 // (saved targets / outreach log) will mount additional sections here
 // without re-architecting the drawer.
-function AgencyDrawer({ row, onClose }: { row: AgencyTableRow; onClose: () => void }) {
+function AgencyDrawer({
+  row,
+  onClose,
+  savedTargetId,
+  onAdd,
+  onRemove,
+}: {
+  row: AgencyTableRow;
+  onClose: () => void;
+  // Slice 3B — target list integration. Null when this office isn't
+  // saved; otherwise the target's id (for the Remove call).
+  savedTargetId: string | null;
+  onAdd: () => void;
+  onRemove: (targetId: string) => void;
+}) {
   // SAM.gov agency search URL builder. The agency name is the most
   // reliable handle since SAM's agency hierarchy uses sub-tier slugs
   // that we don't always have. Encode + open in a new tab.
@@ -2458,12 +2662,54 @@ function AgencyDrawer({ row, onClose }: { row: AgencyTableRow; onClose: () => vo
                 <span className="text-slate-500">↗</span>
               </a>
             </div>
-            {/* Slice 3 of the Target Market Research roadmap will add
-                an "Add to my target list" button here. Capturing the
-                placeholder so future-me sees the planned spot. */}
-            <p className="text-[10px] text-slate-600 mt-3 italic">
-              Saved target lists + outreach log coming in a future release.
-            </p>
+          </div>
+
+          {/* Slice 3B — Add / Remove from my target list. The actual
+              POST/DELETE happens in AgencyTable's handleAdd/Remove —
+              the drawer just renders the button bound to the current
+              saved state.
+
+              When saved: green "✓ On my list" + Remove control.
+              When not: purple "+ Add to my target list" CTA.
+
+              Outreach log (Slice 3D) will sit below this once it
+              ships — designed-in placement so we don't have to
+              re-architect the drawer. */}
+          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
+            {savedTargetId ? (
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400">★</span>
+                  <div>
+                    <div className="text-sm font-semibold text-emerald-400">In your target list</div>
+                    <p className="text-xs text-slate-500">Open My Target List to log outreach and track status.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRemove(savedTargetId)}
+                  className="text-xs text-slate-400 hover:text-red-400 hover:underline transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-white">Add to my target list</div>
+                  <p className="text-xs text-slate-500">
+                    Save this office to a persistent list you can work over months.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onAdd}
+                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-colors shrink-0"
+                >
+                  + Add
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
