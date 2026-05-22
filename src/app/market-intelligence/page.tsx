@@ -13,7 +13,8 @@ const CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';  // $1
 // const CHECKOUT_LOYALTY_MONTHLY = 'https://buy.stripe.com/00wfZigjc97ceND3OEfnO0z'; // $49/mo
 // const CHECKOUT_LOYALTY_ANNUAL = 'https://buy.stripe.com/aFa6oI6ICdns0WN5WMfnO0A';  // $497/yr
 
-const FREE_SIGNUP_URL = '/alerts/signup'; // MI Free tier setup flow (alerts only)
+// Free signup URL removed May 2026 — this is now an upgrade page,
+// not an entry page. Sign-up CTAs live on the marketing pages.
 
 function MarketIntelligenceContent() {
   const searchParams = useSearchParams();
@@ -24,6 +25,10 @@ function MarketIntelligenceContent() {
   const [success, setSuccess] = useState('');
   const [redirecting, setRedirecting] = useState(false);
   const [verifyingInvite, setVerifyingInvite] = useState(false);
+  // Pricing toggle — Monthly is default. Annual shows monthly-equivalent
+  // pricing ($124/mo billed annually) instead of the full annual total,
+  // which is the modern SaaS pattern (Stripe / Linear / Notion all do this).
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
 
   // Handle invite token on mount
   useEffect(() => {
@@ -148,7 +153,7 @@ function MarketIntelligenceContent() {
         return;
       }
 
-      setSuccess('Secure link sent. Check your email to open Market Intelligence.');
+      setSuccess('Secure link sent. Check your email to open Mindy AI.');
     } catch {
       setError('Could not send secure link. Please try again.');
     } finally {
@@ -187,11 +192,11 @@ function MarketIntelligenceContent() {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-3 mb-6">
             <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <span className="text-white font-bold text-2xl">MI</span>
+              <span className="text-white font-bold text-2xl">M</span>
             </div>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Market Intelligence
+            Mindy AI
           </h1>
           <p className="text-xl text-purple-200 mb-2">
             Know what matters before your competitors do.
@@ -201,19 +206,6 @@ function MarketIntelligenceContent() {
             Pursuit briefs that turn targets into capture plans.
           </p>
 
-          {/* Free Tier CTA */}
-          <div className="mt-8 inline-flex items-center gap-4 bg-slate-800/50 border border-slate-700 rounded-xl px-6 py-4">
-            <div className="text-left">
-              <p className="text-white font-semibold">Start Free — No Credit Card Required</p>
-              <p className="text-slate-400 text-sm">Market Research (4 reports, 5/mo) + Daily Alerts</p>
-            </div>
-            <a
-              href={FREE_SIGNUP_URL}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold whitespace-nowrap transition-colors"
-            >
-              Start Free →
-            </a>
-          </div>
         </div>
       </div>
 
@@ -252,14 +244,147 @@ function MarketIntelligenceContent() {
         </div>
       </div>
 
+      {/* PRICING-TOGGLE — first thing the user sees after the hero.
+          User flagged: "This is an upgrade page, choose your plan
+          should be first thing they see. Annual shown as monthly
+          equivalent, not total." Built as a single card + toggle
+          (Stripe / Linear / Notion pattern) rather than two
+          side-by-side cards. */}
+      <div className="max-w-2xl mx-auto px-4 pt-12 pb-8">
+        <h2 className="text-3xl font-bold text-white text-center mb-3">Choose Your Plan</h2>
+        <p className="text-slate-400 text-center mb-8">
+          Mindy Pro — full Mindy AI workspace + AI briefings + FHC training.
+        </p>
+
+        {/* Monthly / Annual toggle. Annual is highlighted because
+            it's the cheaper-per-month option + we want to nudge
+            toward longer commitment. */}
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex bg-slate-800 border border-slate-700 rounded-full p-1">
+            <button
+              type="button"
+              onClick={() => setBillingPeriod('monthly')}
+              className={`px-6 py-2 rounded-full text-sm font-semibold transition-colors ${
+                billingPeriod === 'monthly'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillingPeriod('annual')}
+              className={`px-6 py-2 rounded-full text-sm font-semibold transition-colors flex items-center gap-2 ${
+                billingPeriod === 'annual'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Annual
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                billingPeriod === 'annual' ? 'bg-emerald-500 text-white' : 'bg-emerald-500/20 text-emerald-300'
+              }`}>SAVE 17%</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Single price card whose price + CTA + footnote change
+            based on the toggle. Annual shows the monthly-equivalent
+            number (~$124/mo) per Eric's spec, with "billed annually
+            as $1,490/yr" as the secondary line. */}
+        <div className="bg-gradient-to-br from-purple-900/40 to-slate-800 border-2 border-purple-500 rounded-2xl p-8 shadow-2xl shadow-purple-500/10">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 mb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-purple-300">Mindy Pro</span>
+            </div>
+            {billingPeriod === 'monthly' ? (
+              <>
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-5xl font-bold text-white">$149</span>
+                  <span className="text-slate-400 text-lg">/mo</span>
+                </div>
+                <p className="text-slate-500 text-sm mt-2">Cancel anytime · Includes FHC training</p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-5xl font-bold text-white">$124</span>
+                  <span className="text-slate-400 text-lg">/mo</span>
+                </div>
+                <p className="text-emerald-400 text-sm mt-2 font-medium">
+                  Billed annually as $1,490 — 2 months free
+                </p>
+              </>
+            )}
+          </div>
+
+          <ul className="space-y-3 mb-8">
+            <li className="flex items-center gap-2 text-slate-300 text-sm">
+              <span className="text-green-500">✓</span> Daily market intelligence briefs
+            </li>
+            <li className="flex items-center gap-2 text-slate-300 text-sm">
+              <span className="text-green-500">✓</span> Weekly deep dive analysis
+            </li>
+            <li className="flex items-center gap-2 text-slate-300 text-sm">
+              <span className="text-green-500">✓</span> Pursuit briefs with capture guidance
+            </li>
+            <li className="flex items-center gap-2 text-slate-300 text-sm">
+              <span className="text-green-500">✓</span> Full dashboard + saved target list + outreach log
+            </li>
+            <li className="flex items-center gap-2 text-slate-300 text-sm">
+              <span className="text-green-500">✓</span> Mindy Says AI market narrative
+            </li>
+            <li className="flex items-center gap-2 text-slate-300 text-sm">
+              <span className="text-green-500">✓</span> FHC live training sessions
+            </li>
+            {billingPeriod === 'annual' && (
+              <>
+                <li className="flex items-center gap-2 text-emerald-300 text-sm font-medium">
+                  <span className="text-emerald-400">★</span> Priority support
+                </li>
+                <li className="flex items-center gap-2 text-emerald-300 text-sm font-medium">
+                  <span className="text-emerald-400">★</span> Locked-in pricing (no annual increases)
+                </li>
+              </>
+            )}
+          </ul>
+
+          <a
+            href={billingPeriod === 'monthly' ? CHECKOUT_MONTHLY : CHECKOUT_ANNUAL}
+            className="block w-full py-3.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-base rounded-xl text-center transition-colors shadow-lg"
+          >
+            {billingPeriod === 'monthly' ? 'Start Monthly →' : 'Start Annual →'}
+          </a>
+          <p className="text-center text-xs text-slate-500 mt-3">
+            Secure checkout via Stripe · Cancel anytime
+          </p>
+        </div>
+
+        {/* Ultimate Bundle callout — keeps the existing copy
+            but moves it under the new pricing card. */}
+        <div className="mt-6 bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center">
+          <p className="text-slate-400 text-xs mb-1">Planning to go all-in?</p>
+          <p className="text-white text-sm mb-2">
+            The <span className="text-purple-400 font-medium">Ultimate Bundle ($1,497)</span> includes lifetime Mindy AI access.
+          </p>
+          <Link
+            href="/bundles/ultimate"
+            className="text-purple-400 hover:text-purple-300 text-xs font-medium"
+          >
+            Compare with Ultimate →
+          </Link>
+        </div>
+      </div>
+
       {/* What's Included - Three Tier Cards */}
       <div className="max-w-6xl mx-auto px-4 py-16">
-        <h2 className="text-2xl font-bold text-white text-center mb-4">Choose Your Plan</h2>
-        <p className="text-slate-400 text-center mb-10">Choose the upgrade that fits your team.</p>
+        <h2 className="text-2xl font-bold text-white text-center mb-4">Pro vs. Team vs. Enterprise</h2>
+        <p className="text-slate-400 text-center mb-10">Compare the tiers that fit your team size.</p>
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
 
-          {/* MI Pro Card - Most Popular */}
+          {/* Mindy Pro Card - Most Popular */}
           <div className="bg-slate-800/50 border-2 border-purple-500 rounded-2xl p-6 relative">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
               MOST POPULAR
@@ -309,7 +434,7 @@ function MarketIntelligenceContent() {
             </a>
           </div>
 
-          {/* MI Team Card */}
+          {/* Mindy Team Card */}
           <div className="bg-slate-800/50 border-2 border-blue-500/50 rounded-2xl p-6 relative">
             <div className="absolute -top-3 right-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
               MID-SIZE FIRMS
@@ -389,7 +514,7 @@ function MarketIntelligenceContent() {
       <div className="max-w-6xl mx-auto px-4 pb-16">
         <h2 className="text-2xl font-bold text-white text-center mb-4">Compare Plans</h2>
         <p className="text-slate-400 text-center mb-10 max-w-2xl mx-auto">
-          Start free and upgrade when you need AI-powered intelligence. Save $700+/month vs. Deltek GovWin.
+          Pick the tier that fits your team. Save $700+/month vs. Deltek GovWin at every tier.
         </p>
 
         <div className="overflow-x-auto">
@@ -397,10 +522,6 @@ function MarketIntelligenceContent() {
             <thead>
               <tr>
                 <th className="text-left py-3 px-3 text-slate-400 font-medium border-b border-slate-700">Feature</th>
-                <th className="py-3 px-3 text-center border-b border-slate-700">
-                  <div className="text-white font-bold">Free</div>
-                  <div className="text-slate-400 text-xs">$0/mo</div>
-                </th>
                 <th className="py-3 px-3 text-center border-b border-slate-700 bg-purple-900/20">
                   <div className="text-white font-bold">Pro</div>
                   <div className="text-purple-400 text-xs">$149/mo</div>
@@ -419,7 +540,6 @@ function MarketIntelligenceContent() {
               {/* User Seats */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">User Seats</td>
-                <td className="py-2.5 px-3 text-center text-slate-400">1</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">1</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">5</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">Unlimited</td>
@@ -427,7 +547,6 @@ function MarketIntelligenceContent() {
               {/* Market Research */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">Market Research Reports</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400">4 • 5/mo</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">10 • Unlimited</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">10 • Unlimited</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">10 • Unlimited</td>
@@ -435,7 +554,6 @@ function MarketIntelligenceContent() {
               {/* Daily Alerts */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">Daily Alerts</td>
-                <td className="py-2.5 px-3 text-center text-emerald-400">✓ Basic</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓ + AI</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ + AI</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ + AI</td>
@@ -443,7 +561,6 @@ function MarketIntelligenceContent() {
               {/* AI Briefings */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">AI Briefings</td>
-                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
@@ -451,7 +568,6 @@ function MarketIntelligenceContent() {
               {/* Forecasts + SBIR + Grants */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">Forecasts, SBIR, Grants</td>
-                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
@@ -459,7 +575,6 @@ function MarketIntelligenceContent() {
               {/* Pipeline & CRM */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">Pipeline + CRM</td>
-                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ Shared</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ Shared</td>
@@ -467,7 +582,6 @@ function MarketIntelligenceContent() {
               {/* Content Reaper */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">Content Reaper</td>
-                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
@@ -475,7 +589,6 @@ function MarketIntelligenceContent() {
               {/* FHC Training */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">FHC Training</td>
-                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-purple-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓ All seats</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓ All seats</td>
@@ -483,7 +596,6 @@ function MarketIntelligenceContent() {
               {/* Team Admin */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">Team Admin Dashboard</td>
-                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
                 <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">✓</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
@@ -491,7 +603,6 @@ function MarketIntelligenceContent() {
               {/* SSO */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">SSO / SAML</td>
-                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
                 <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
                 <td className="py-2.5 px-3 text-center text-slate-600 bg-blue-900/10">—</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
@@ -499,7 +610,6 @@ function MarketIntelligenceContent() {
               {/* Custom Integrations */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">Custom Integrations</td>
-                <td className="py-2.5 px-3 text-center text-slate-600">—</td>
                 <td className="py-2.5 px-3 text-center text-slate-600 bg-purple-900/10">—</td>
                 <td className="py-2.5 px-3 text-center text-slate-600 bg-blue-900/10">—</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">✓</td>
@@ -507,7 +617,6 @@ function MarketIntelligenceContent() {
               {/* Support */}
               <tr className="border-b border-slate-800 hover:bg-slate-800/30">
                 <td className="py-2.5 px-3 text-slate-300">Support</td>
-                <td className="py-2.5 px-3 text-center text-slate-400">Email</td>
                 <td className="py-2.5 px-3 text-center text-slate-300 bg-purple-900/10">Email</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-blue-900/10">Priority</td>
                 <td className="py-2.5 px-3 text-center text-emerald-400 bg-amber-900/10">Dedicated</td>
@@ -516,14 +625,6 @@ function MarketIntelligenceContent() {
             <tfoot>
               <tr>
                 <td className="py-4 px-3"></td>
-                <td className="py-4 px-3 text-center">
-                  <a
-                    href={FREE_SIGNUP_URL}
-                    className="inline-block px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors text-xs"
-                  >
-                    Start Free
-                  </a>
-                </td>
                 <td className="py-4 px-3 text-center bg-purple-900/10">
                   <a
                     href={CHECKOUT_MONTHLY}
@@ -576,101 +677,10 @@ function MarketIntelligenceContent() {
         </div>
       </div>
 
-      {/* Pricing Section */}
-      <div className="max-w-4xl mx-auto px-4 pb-16">
-        <h2 className="text-2xl font-bold text-white text-center mb-10">Choose Your Plan</h2>
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Monthly */}
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 hover:border-purple-500/50 transition-colors">
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-bold text-white mb-2">Monthly</h3>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-white">$149</span>
-                <span className="text-slate-400">/mo</span>
-              </div>
-              <p className="text-slate-500 text-sm mt-1">Includes FHC training access</p>
-            </div>
-            <ul className="space-y-3 mb-8">
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Daily market intelligence brief
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Weekly deep dive analysis
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Pursuit briefs with capture guidance
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Full dashboard access
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> FHC live training sessions
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Cancel anytime
-              </li>
-            </ul>
-            <a
-              href={CHECKOUT_MONTHLY}
-              className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl text-center transition-colors"
-            >
-              Start Monthly →
-            </a>
-          </div>
-
-          {/* Annual */}
-          <div className="bg-gradient-to-br from-purple-900/50 to-slate-800 border-2 border-purple-500 rounded-2xl p-8 relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="bg-purple-500 text-white text-xs font-bold px-4 py-1 rounded-full">BEST VALUE</span>
-            </div>
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-bold text-white mb-2">Annual</h3>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-white">$1,490</span>
-                <span className="text-slate-400">/yr</span>
-              </div>
-              <p className="text-green-400 text-sm mt-1 font-medium">Save $298 vs monthly (2 months free)</p>
-            </div>
-            <ul className="space-y-3 mb-8">
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Everything in Monthly
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> 2 months free
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Priority support
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Locked-in pricing
-              </li>
-              <li className="flex items-center gap-2 text-slate-300 text-sm">
-                <span className="text-green-500">✓</span> Best for serious capture teams
-              </li>
-            </ul>
-            <a
-              href={CHECKOUT_ANNUAL}
-              className="block w-full py-3 bg-white hover:bg-slate-100 text-purple-700 font-semibold rounded-xl text-center transition-colors"
-            >
-              Start Annual →
-            </a>
-          </div>
-        </div>
-
-        {/* Ultimate Bundle Callout */}
-        <div className="mt-8 bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-center">
-          <p className="text-slate-400 text-sm mb-2">Planning to go all-in?</p>
-          <p className="text-white font-medium mb-3">
-            The <span className="text-purple-400">Ultimate Bundle ($1,497)</span> includes lifetime Market Intelligence access.
-          </p>
-          <Link
-            href="/bundles/ultimate"
-            className="text-purple-400 hover:text-purple-300 text-sm font-medium"
-          >
-            Compare with Ultimate →
-          </Link>
-        </div>
-      </div>
+      {/* Pricing block moved above the comparison table —
+          search "PRICING-TOGGLE" below the hero. This is the
+          old footer, kept empty so the rest of the page flow
+          isn't disturbed. */}
 
       {/* Footer */}
       <div className="border-t border-slate-800 py-8">
