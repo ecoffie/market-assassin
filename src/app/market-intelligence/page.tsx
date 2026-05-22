@@ -25,10 +25,11 @@ function MarketIntelligenceContent() {
   const [success, setSuccess] = useState('');
   const [redirecting, setRedirecting] = useState(false);
   const [verifyingInvite, setVerifyingInvite] = useState(false);
-  // Pricing toggle — Monthly is default. Annual shows monthly-equivalent
-  // pricing ($124/mo billed annually) instead of the full annual total,
-  // which is the modern SaaS pattern (Stripe / Linear / Notion all do this).
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
+  // Pricing toggle — Annual is default so users see the cheaper
+  // per-month rate first ($124/mo billed annually vs. $149/mo).
+  // Pattern: Stripe, Linear, Notion all default-open to annual
+  // to anchor on the lower number. Monthly is one click away.
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('annual');
 
   // Handle invite token on mount
   useEffect(() => {
@@ -209,15 +210,14 @@ function MarketIntelligenceContent() {
         </div>
       </div>
 
-      {/* Access-check block removed May 22, 2026.
+      {/* Access-check block above the fold removed May 22, 2026.
           User: "this is an upgrade plan there is no need for
-          enter your email if they need access". Users on this
-          page are already signed in via the app sidebar's
-          upgrade CTA — they don't need a second auth surface.
-          The handleVerifyAccess / handleSendSecureLink handlers
-          remain in scope but are now dead callers; leave them
-          for now so we can re-introduce a quieter "already a
-          customer? sign in" link in the footer if needed. */}
+          enter your email if they need access". Users hitting
+          this page from the in-app upgrade CTA are already
+          signed in. A quieter version of the access form lives
+          at the bottom of the page (search "Already a Mindy Pro
+          customer") for existing customers who land here from
+          a search engine or old email link. */}
 
       {/* PRICING-TOGGLE — first thing the user sees after the hero.
           User flagged: "This is an upgrade page, choose your plan
@@ -352,138 +352,13 @@ function MarketIntelligenceContent() {
         </div>
       </div>
 
-      {/* What's Included - Three Tier Cards */}
-      <div className="max-w-6xl mx-auto px-4 py-16">
-        <h2 className="text-2xl font-bold text-white text-center mb-4">Pro vs. Team vs. Enterprise</h2>
-        <p className="text-slate-400 text-center mb-10">Compare the tiers that fit your team size.</p>
-
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-
-          {/* Mindy Pro Card - Most Popular */}
-          <div className="bg-slate-800/50 border-2 border-purple-500 rounded-2xl p-6 relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-              MOST POPULAR
-            </div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-xl">🚀</span>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Mindy Pro</h3>
-                <p className="text-purple-400 font-semibold text-xl">$149/mo</p>
-              </div>
-            </div>
-
-            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-3 py-1.5 mb-4 text-center">
-              <p className="text-purple-400 text-xs font-medium">+ FHC training included</p>
-            </div>
-
-            <div className="space-y-2 mb-6 text-sm">
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span><strong>All 10 reports</strong> unlimited</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span><strong>AI Briefings</strong> — Daily + Weekly + Pursuit</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span>Forecasts, SBIR, Grants</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span>Pipeline + CRM + Content</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span>1 user seat</span>
-              </div>
-            </div>
-
-            <a
-              href={CHECKOUT_MONTHLY}
-              className="block w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-center rounded-lg font-semibold transition-all shadow-lg shadow-purple-500/25 text-sm"
-            >
-              Get Pro — $149/mo
-            </a>
-          </div>
-
-          {/* Mindy Team Card */}
-          <div className="bg-slate-800/50 border-2 border-blue-500/50 rounded-2xl p-6 relative">
-            <div className="absolute -top-3 right-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-              MID-SIZE FIRMS
-            </div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-xl">👥</span>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Mindy Team</h3>
-                <p className="text-blue-400 font-semibold text-xl">$499/mo</p>
-              </div>
-            </div>
-
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-1.5 mb-4 text-center">
-              <p className="text-blue-400 text-xs font-medium">5 team members included</p>
-            </div>
-
-            <div className="space-y-2 mb-6 text-sm">
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span><strong>Everything in Pro</strong></span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span><strong>5 user seats</strong></span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span>Shared pipeline & CRM</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span>Team admin dashboard</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-300">
-                <span className="text-emerald-400 mt-0.5">✓</span>
-                <span>Priority support</span>
-              </div>
-            </div>
-
-            <a
-              href="mailto:hello@govcongiants.com?subject=MI%20Team%20Inquiry"
-              className="block w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-center rounded-lg font-semibold transition-colors text-sm"
-            >
-              Contact Sales →
-            </a>
-          </div>
-        </div>
-
-        {/* Enterprise Callout */}
-        <div className="mt-8 bg-gradient-to-r from-amber-900/30 to-amber-800/20 border border-amber-500/30 rounded-xl p-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">🏢</span>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">MI Enterprise</h3>
-                <p className="text-amber-400 text-sm">Custom solutions for large contractors</p>
-              </div>
-            </div>
-            <div className="text-center md:text-right">
-              <p className="text-slate-400 text-sm mb-2">Unlimited seats • SSO • Dedicated support • Custom integrations</p>
-              <a
-                href="mailto:hello@govcongiants.com?subject=MI%20Enterprise%20Inquiry"
-                className="inline-block px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold transition-colors text-sm"
-              >
-                Talk to Sales →
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Pro vs. Team vs. Enterprise tier-card section removed
+          May 22, 2026 per user. It duplicated the pricing toggle
+          (Mindy Pro $149/mo) directly above and the Compare Plans
+          table directly below — two pricing surfaces for the
+          same tier created decision fatigue. Compare Plans table
+          handles Pro / Team / Enterprise comparison; the toggle
+          handles the Pro monthly/annual choice. Cleaner. */}
 
       {/* Tier Comparison Table */}
       <div className="max-w-6xl mx-auto px-4 pb-16">
@@ -657,6 +532,49 @@ function MarketIntelligenceContent() {
           old footer, kept empty so the rest of the page flow
           isn't disturbed. */}
 
+      {/* "Already have access" footer block — quieter version
+          of the hero access form we removed. Existing customers
+          who land here from a search engine or old email link
+          still need a path to sign in; this puts that path at
+          the bottom so it doesn't dilute the upgrade pitch. */}
+      <div className="border-t border-slate-800 bg-slate-900/30">
+        <div className="max-w-3xl mx-auto px-4 py-10">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+            <p className="text-slate-300 text-center text-sm mb-3">
+              Already a Mindy Pro customer? Enter your purchase email to access your account.
+            </p>
+            <form onSubmit={handleVerifyAccess} className="flex gap-2 max-w-md mx-auto">
+              <input
+                ref={emailRef}
+                type="email"
+                placeholder="you@example.com"
+                className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold disabled:opacity-50 text-sm transition-colors"
+              >
+                {loading ? '...' : 'Access'}
+              </button>
+            </form>
+            <div className="mt-2 text-center">
+              <button
+                type="button"
+                onClick={handleSendSecureLink}
+                disabled={sendingLink}
+                className="text-xs text-purple-400 hover:text-purple-300 disabled:opacity-50"
+              >
+                {sendingLink ? 'Sending secure link...' : 'Email me a secure access link instead'}
+              </button>
+            </div>
+            {error && <p className="text-red-400 text-xs mt-2 text-center">{error}</p>}
+            {success && <p className="text-green-400 text-xs mt-2 text-center">{success}</p>}
+            {redirecting && <p className="text-green-400 text-xs mt-2 text-center">Access verified! Redirecting...</p>}
+          </div>
+        </div>
+      </div>
+
       {/* Footer */}
       <div className="border-t border-slate-800 py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
@@ -674,7 +592,7 @@ function MarketIntelligenceContent() {
             </a>
           </p>
           <p className="text-slate-600 text-xs mt-4">
-            © {new Date().getFullYear()} GovCon Giants • mi.govcongiants.com
+            © {new Date().getFullYear()} GovCon Giants • getmindy.ai
           </p>
         </div>
       </div>
