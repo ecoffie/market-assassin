@@ -418,11 +418,20 @@ async function lookupAgencyData(formData: FormData, selectedAgencies: string[]):
     if (!data.success || !Array.isArray(data.agencies)) return [];
 
     const agencies = data.agencies as Agency[];
-    const targetFiltered = selectedAgencies.length > 0
-      ? agencies.filter((agency) => selectedAgencies.some((target) => agencyMatchesTarget(agency, target)))
-      : [];
 
-    return (targetFiltered.length > 0 ? targetFiltered : agencies).slice(0, 25);
+    // Previously this filtered by `selectedAgencies` (a hardcoded
+    // 5-agency fallback) AND capped at .slice(0, 25). The filter
+    // alone dropped 50-60 real agencies down to ~7 because the broad
+    // targets ("Department of Defense") rarely match fuzzy against
+    // sub-agency names ("DOD Air Force Materiel Command"). That's
+    // why Mindy showed "7 agencies" while MA's full view showed 66.
+    //
+    // Mental model: the agencies endpoint ALREADY filters by NAICS
+    // upstream, so what comes back IS the user's market. Showing
+    // less of it is a regression, not a feature. Use the full list,
+    // sorted by spend, no cap. Agency table handles its own
+    // pagination if N grows past ~100.
+    return [...agencies].sort((a, b) => (b.setAsideSpending || 0) - (a.setAsideSpending || 0));
   } catch (err) {
     console.error('Failed to lookup agency data for market research:', err);
     return [];
@@ -668,10 +677,18 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       const recommendedAgencyNames = selectedAgencyData.length === 0
         ? await fetchRecommendedAgencyNames(email, getAuthHeaders, activeFormData)
         : [];
+      // Build the agency name list passed to generate-all.
+      //
+      // Cap was 10 — too small. The "Spending by Agency" chart, the
+      // SAT mix chart, and the AgencyTable all want the full market
+      // view. Bumped to 100 so we don't artificially truncate large
+      // NAICS markets (DOD IT services has 60-80 distinct
+      // contracting offices). Generate-all already caps per-report
+      // work internally; the chart limits handle slicing for visuals.
       const rawReportAgencyNames = selectedAgencies.length > 0 && selectedAgencyData.length > 0
         ? selectedAgencies
         : selectedAgencyData.length > 0
-          ? uniqueStrings(selectedAgencyData.map((agency) => agency.parentAgency || agency.subAgency || agency.name)).slice(0, 10)
+          ? uniqueStrings(selectedAgencyData.map((agency) => agency.parentAgency || agency.subAgency || agency.name)).slice(0, 100)
           : recommendedAgencyNames.length > 0
             ? recommendedAgencyNames
           : defaultBuyerAgenciesForProfile(activeFormData);
@@ -2209,11 +2226,22 @@ interface PrimeLike {
   reason?: string;
 }
 function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string | null }) {
+  // Reframed May 22, 2026 per user: "The top 5 primes data is that
+  // useful for SMBs?" Not as a 'who's dominant' chart \— SMBs
+  // already know Booz Allen + Leidos exist. Reframed as TEAMING
+  // CANDIDATES \— these are active primes in your NAICS who you
+  // can pursue as subcontracting partners. Each click opens their
+  // sales history so the user can judge: are they growing? do
+  // they have recompetes coming up? do they sub at all?
+  //
+  // Future v2: filter the upstream suggestPrimesForAgencies() to
+  // skip primes with >25% market share (those don't need subs)
+  // and rank by mid-tier teaming viability instead of dominance.
   const top = primes.slice(0, 5);
 
   if (top.length === 0) {
     return (
-      <ChartShell title="Top 5 Primes" subtitle="Incumbents to track or team with">
+      <ChartShell title="Teaming Candidates" subtitle="Primes in your NAICS who actively sub work out">
         <div className="flex items-center justify-center h-full text-xs text-slate-500">
           No prime data yet. Build the report to populate.
         </div>
@@ -2223,11 +2251,11 @@ function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string 
 
   return (
     <ChartShell
-      title="Top 5 Primes"
-      subtitle="Click a prime to see their federal award history"
+      title="Teaming Candidates"
+      subtitle="Primes in your NAICS — click for sales history + recompete signals"
       footer={
         <p className="text-[11px] text-slate-500">
-          Win-count weighting ships when we wire USASpending awards. Today: rank only.
+          Teaming viability score (market share + sub-history) ships in v2. Today: surfaced by NAICS overlap only.
         </p>
       }
     >
