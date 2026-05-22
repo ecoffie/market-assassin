@@ -45,6 +45,14 @@ export const metadata: Metadata = {
     // present, otherwise falls back to og-image. The opengraph-image
     // convention file covers both.
   },
+  // Google Search Console ownership verification for getmindy.ai.
+  // Renders as: <meta name="google-site-verification" content="..." />
+  // in every page's <head>. Belt + suspenders with the DNS TXT record
+  // (https://search.google.com/search-console will accept whichever
+  // it sees first). Token issued 2026-05-22.
+  verification: {
+    google: "o8EjTTk2Io-QglKyr7PPSveCYG6HrWOt0U56jsXhXRA",
+  },
 };
 
 export default function RootLayout({
