@@ -38,6 +38,10 @@ export default function ContractorSalesHistoryDrawer({
   const [history, setHistory] = useState<ContractorSalesHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Year-bar drill-down. Click a year → shows the agencyBreakdown
+  // for that FY beneath. One year expanded at a time keeps the
+  // drawer scannable.
+  const [expandedYear, setExpandedYear] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,21 +184,75 @@ export default function ContractorSalesHistoryDrawer({
                 </div>
 
                 {history.series.length > 0 ? (
-                  <div className="space-y-3">
-                    {history.series.map((year) => (
-                      <div key={year.fiscalYear} className="grid grid-cols-[4rem_1fr_6rem] items-center gap-3">
-                        <div className="text-sm font-medium text-slate-300">FY {year.fiscalYear}</div>
-                        <div className="h-4 overflow-hidden rounded-full bg-slate-800">
-                          <div
-                            className="h-full rounded-full bg-emerald-500"
-                            style={{ width: `${Math.max(4, (year.totalObligations / maxYearAmount) * 100)}%` }}
-                          />
+                  <div className="space-y-2">
+                    {history.series.map((year) => {
+                      const isExpanded = expandedYear === year.fiscalYear;
+                      const breakdown = year.agencyBreakdown || [];
+                      return (
+                        <div key={year.fiscalYear} className="rounded-lg border border-transparent hover:border-slate-800 transition-colors">
+                          {/* Clickable row — click to expand the per-
+                              agency breakdown for that fiscal year.
+                              Matches HigherGov's drill-down pattern. */}
+                          <button
+                            type="button"
+                            onClick={() => setExpandedYear(isExpanded ? null : year.fiscalYear)}
+                            disabled={breakdown.length === 0}
+                            className={`w-full grid grid-cols-[1.5rem_4rem_1fr_6rem] items-center gap-3 px-2 py-1.5 rounded-md text-left transition-colors ${
+                              breakdown.length > 0 ? 'hover:bg-slate-800/40 cursor-pointer' : 'cursor-default'
+                            }`}
+                          >
+                            <span className="text-slate-500 text-xs">
+                              {breakdown.length > 0 ? (isExpanded ? '▼' : '▸') : ' '}
+                            </span>
+                            <div className="text-sm font-medium text-slate-300">FY {year.fiscalYear}</div>
+                            <div className="h-4 overflow-hidden rounded-full bg-slate-800">
+                              <div
+                                className={`h-full rounded-full transition-colors ${
+                                  isExpanded ? 'bg-emerald-400' : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${Math.max(4, (year.totalObligations / maxYearAmount) * 100)}%` }}
+                              />
+                            </div>
+                            <div className="text-right text-sm font-semibold text-white">
+                              {formatCurrency(year.totalObligations)}
+                            </div>
+                          </button>
+
+                          {/* Per-year agency breakdown — only renders
+                              when this year is the active expansion.
+                              Limited to top 8 agencies for legibility;
+                              users can click "See all" to expand
+                              further (future iteration). */}
+                          {isExpanded && breakdown.length > 0 && (
+                            <div className="ml-10 mr-2 mt-2 mb-3 space-y-1.5 border-l border-slate-800 pl-3">
+                              <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                                Agencies awarding in FY {year.fiscalYear}
+                              </p>
+                              {[...breakdown]
+                                .sort((a, b) => b.amount - a.amount)
+                                .slice(0, 8)
+                                .map((row) => (
+                                  <div key={`${year.fiscalYear}-${row.agency}`} className="flex items-center justify-between gap-3 text-xs">
+                                    <span className="text-slate-300 truncate flex-1">{row.agency}</span>
+                                    <span className="text-slate-500 shrink-0">{row.count} {row.count === 1 ? 'award' : 'awards'}</span>
+                                    <span className="text-emerald-400 font-semibold shrink-0 w-20 text-right">
+                                      {formatCurrency(row.amount)}
+                                    </span>
+                                  </div>
+                                ))}
+                              {breakdown.length > 8 && (
+                                <p className="text-[10px] text-slate-600 italic pt-1">
+                                  +{breakdown.length - 8} more agencies in FY {year.fiscalYear}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-right text-sm font-semibold text-white">
-                          {formatCurrency(year.totalObligations)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
+                    <p className="text-[10px] text-slate-500 italic pt-2 text-center">
+                      Click any year to see which agencies awarded.
+                    </p>
                   </div>
                 ) : (
                   <div className="rounded-lg border border-slate-800 bg-slate-950 p-5 text-sm text-slate-400">

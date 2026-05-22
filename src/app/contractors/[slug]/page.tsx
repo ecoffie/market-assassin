@@ -207,21 +207,71 @@ export default async function ContractorPage({ params }: ContractorPageProps) {
           </div>
 
           {history?.series.length ? (
-            <div className="mt-6 space-y-4">
-              {history.series.map((year) => (
-                <div key={year.fiscalYear} className="grid grid-cols-[4.5rem_1fr_7rem] items-center gap-3">
-                  <div className="text-sm font-semibold text-slate-300">FY {year.fiscalYear}</div>
-                  <div className="h-5 overflow-hidden rounded-full bg-slate-800">
-                    <div
-                      className="h-full rounded-full bg-emerald-500"
-                      style={{ width: `${Math.max(4, (year.totalObligations / maxYearAmount) * 100)}%` }}
-                    />
-                  </div>
-                  <div className="text-right text-sm font-bold text-white">
-                    {formatCompactCurrency(year.totalObligations)}
-                  </div>
-                </div>
-              ))}
+            <div className="mt-6 space-y-2">
+              {history.series.map((year) => {
+                const breakdown = year.agencyBreakdown || [];
+                // Use native <details> so this drill-down works
+                // without client JS and Googlebot can crawl the
+                // expanded content. Defaults open on the most
+                // recent FY to give first-time visitors immediate
+                // signal without a click.
+                const isMostRecent = year.fiscalYear === history.series[0].fiscalYear;
+                return (
+                  <details
+                    key={year.fiscalYear}
+                    open={isMostRecent}
+                    className="group rounded-lg border border-transparent hover:border-slate-800 open:border-slate-800 open:bg-slate-950/40 transition-colors"
+                  >
+                    <summary className={`grid grid-cols-[1.5rem_4.5rem_1fr_7rem] items-center gap-3 px-2 py-2 list-none ${breakdown.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}>
+                      <span className="text-slate-500 text-sm select-none">
+                        {breakdown.length > 0 ? (
+                          <>
+                            <span className="group-open:hidden">▸</span>
+                            <span className="hidden group-open:inline">▼</span>
+                          </>
+                        ) : null}
+                      </span>
+                      <div className="text-sm font-semibold text-slate-300">FY {year.fiscalYear}</div>
+                      <div className="h-5 overflow-hidden rounded-full bg-slate-800">
+                        <div
+                          className="h-full rounded-full bg-emerald-500"
+                          style={{ width: `${Math.max(4, (year.totalObligations / maxYearAmount) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="text-right text-sm font-bold text-white">
+                        {formatCompactCurrency(year.totalObligations)}
+                      </div>
+                    </summary>
+                    {breakdown.length > 0 && (
+                      <div className="ml-10 mr-2 mb-3 mt-1 space-y-1.5 border-l border-slate-800 pl-3">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                          Agencies awarding in FY {year.fiscalYear}
+                        </p>
+                        {[...breakdown]
+                          .sort((a, b) => b.amount - a.amount)
+                          .slice(0, 8)
+                          .map((row) => (
+                            <div key={`${year.fiscalYear}-${row.agency}`} className="flex items-center justify-between gap-3 text-xs">
+                              <span className="text-slate-300 truncate flex-1">{row.agency}</span>
+                              <span className="text-slate-500 shrink-0">{row.count} {row.count === 1 ? 'award' : 'awards'}</span>
+                              <span className="text-emerald-400 font-semibold shrink-0 w-24 text-right">
+                                {formatCompactCurrency(row.amount)}
+                              </span>
+                            </div>
+                          ))}
+                        {breakdown.length > 8 && (
+                          <p className="text-[10px] text-slate-600 italic pt-1">
+                            +{breakdown.length - 8} more agencies in FY {year.fiscalYear}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </details>
+                );
+              })}
+              <p className="text-[11px] text-slate-500 italic pt-2 text-center">
+                Click any year to expand the per-agency breakdown.
+              </p>
             </div>
           ) : (
             <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950 p-5 text-slate-400">
