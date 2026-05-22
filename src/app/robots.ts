@@ -16,7 +16,9 @@
  */
 import type { MetadataRoute } from 'next';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://mi.govcongiants.com';
+// Canonical SEO domain — see src/app/sitemap.ts header note.
+// getmindy.ai is the Google-facing hostname.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 
 export default function robots(): MetadataRoute.Robots {
   return {

@@ -49,7 +49,10 @@ export async function generateStaticParams() {
 // for `revalidate` seconds.
 export const dynamicParams = true;
 
-const SITE_URL = 'https://mi.govcongiants.com';
+// Canonical SEO hostname — getmindy.ai is the Google-facing domain
+// per the May 2026 SEO canonicalization. mi.govcongiants.com still
+// works for in-flight users via host rewrite. See sitemap.ts.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 const SITE_NAME = 'GovCon Giants';
 
 /**

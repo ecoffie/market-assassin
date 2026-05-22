@@ -20,7 +20,12 @@ import type { MetadataRoute } from 'next';
 import contractorsData from '@/data/contractors.json';
 import { getContractorSlug } from '@/lib/contractor-sales-history';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://mi.govcongiants.com';
+// Canonical SEO domain. Per [memory: mindy-domain-routing] updated
+// May 22, 2026: getmindy.ai is the indexable face of the product.
+// Email + in-flight users still hit mi.govcongiants.com via host
+// rewrite, but every Google-facing URL points at getmindy.ai so we
+// don't fragment domain authority across two hostnames.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 
 interface ContractorRow {
   company: string;
