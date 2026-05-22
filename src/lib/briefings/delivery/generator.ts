@@ -61,7 +61,7 @@ const CATEGORY_TITLES: Record<string, string> = {
   sblo_update: 'SBLO Contact Updates',
   certification_change: 'Certification Changes',
   // Web Intelligence
-  web_signal: 'Market Intelligence',
+  web_signal: 'Mindy AI Signal',
   // Legacy
   new_opportunity: 'New Opportunities',
   deadline_alert: 'Deadline Alerts',

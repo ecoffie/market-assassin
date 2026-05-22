@@ -368,7 +368,7 @@ function AlertSignupContent() {
             </div>
             <h1 className="text-3xl font-bold text-white mb-4">You&apos;re All Set!</h1>
             <p className="text-slate-400 text-lg mb-8">
-              Your Market Intelligence profile is saved for <span className="text-white font-medium">{email}</span>.
+              Your Mindy AI profile is saved for <span className="text-white font-medium">{email}</span>.
             </p>
 
             <div className="bg-gradient-to-br from-slate-900 to-emerald-950/30 border border-emerald-500/40 rounded-xl p-6 mb-8 text-left">
@@ -467,13 +467,13 @@ function AlertSignupContent() {
                 Want More Than Just Alerts?
               </h3>
               <p className="text-slate-400 text-sm mb-4">
-                <strong className="text-white">Market Intelligence</strong> turns your matches into ranked priorities, weekly market analysis, and pursuit guidance.
+                <strong className="text-white">Mindy AI</strong> turns your matches into ranked priorities, weekly market analysis, and pursuit guidance.
               </p>
               <Link
                 href="/market-intelligence"
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-700 hover:from-purple-500 hover:to-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all text-sm"
               >
-                Upgrade to Market Intelligence
+                Upgrade to Mindy AI
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -567,7 +567,7 @@ function AlertSignupContent() {
                     Welcome back{inviteData.firstName ? `, ${inviteData.firstName}` : ''}!
                   </h3>
                   <p className="text-emerald-400/80 text-sm mb-2">
-                    Your <span className="text-white font-medium">{inviteData.productName || 'GovCon subscription'}</span> includes full Market Intelligence access.
+                    Your <span className="text-white font-medium">{inviteData.productName || 'GovCon subscription'}</span> includes full Mindy AI access.
                   </p>
                   <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 rounded-full text-emerald-300 text-sm">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -586,7 +586,7 @@ function AlertSignupContent() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {inviteData ? 'Market Intelligence' : 'Daily Alerts'}
+              {inviteData ? 'Mindy AI' : 'Daily Alerts'}
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
               {inviteData ? 'Activate Your Briefings' : 'Get SAM.gov Opportunities Delivered'}
@@ -694,7 +694,7 @@ function AlertSignupContent() {
             </div>
             <div className="text-left">
               <h1 className="text-2xl font-bold text-white">
-                {inviteData ? 'Market Intelligence' : 'Daily Alerts'}
+                {inviteData ? 'Mindy AI' : 'Daily Alerts'}
               </h1>
               <p className="text-purple-400 text-sm">Configure your profile</p>
             </div>

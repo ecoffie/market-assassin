@@ -1238,7 +1238,7 @@ function BriefingsDashboardContent() {
     );
   }
 
-  // --- Email Gate with Market Intelligence Branding ---
+  // --- Email Gate with Mindy AI Branding ---
   if (status === 'gate') {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
@@ -1250,7 +1250,7 @@ function BriefingsDashboardContent() {
                 <span className="text-white font-bold text-2xl">MI</span>
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Market Intelligence</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">Mindy AI</h1>
             <p className="text-purple-400">Your personalized GovCon briefings</p>
           </div>
 
@@ -1343,7 +1343,7 @@ function BriefingsDashboardContent() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">No Access Found</h1>
           <p className="text-gray-400 mb-6">
-            Market Intelligence includes daily briefs, weekly deep dives, and pursuit briefs.
+            Mindy AI includes daily briefs, weekly deep dives, and pursuit briefs.
             Purchase access to unlock your personalized GovCon intelligence.
           </p>
           <Link
@@ -1542,7 +1542,7 @@ function BriefingsDashboardContent() {
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0">
-        {/* Header with Market Intelligence branding */}
+        {/* Header with Mindy AI branding */}
         <MarketIntelligenceHeader
           email={email}
           onSettingsClick={() => setSettingsPanelOpen(true)}
@@ -2175,7 +2175,7 @@ export default function BriefingsDashboard() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-gray-400">Loading Market Intelligence...</div>
+        <div className="text-gray-400">Loading Mindy AI...</div>
       </div>
     }>
       <BriefingsDashboardContent />

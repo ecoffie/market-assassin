@@ -1104,7 +1104,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Standard', link: 'https://mi.govcongiants.com/market-assassin', description: 'Strategic market intelligence reports' },
         { name: 'Content Reaper', link: 'https://mi.govcongiants.com/content-generator', description: 'AI-powered LinkedIn content generator' },
-        { name: 'Market Intelligence - 1 Year Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
+        { name: 'Mindy AI - 1 Year Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'pro-giant-bundle': {
@@ -1114,7 +1114,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Standard', link: 'https://mi.govcongiants.com/market-assassin', description: 'Strategic market intelligence reports' },
         { name: 'Content Reaper', link: 'https://mi.govcongiants.com/content-generator', description: 'AI-powered LinkedIn content generator' },
-        { name: 'Market Intelligence - 1 Year Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
+        { name: 'Mindy AI - 1 Year Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'ultimate': {
@@ -1125,7 +1125,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: 'https://mi.govcongiants.com/market-assassin', description: 'All 8 strategic intelligence reports' },
         { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Market Intelligence - Lifetime Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
+        { name: 'Mindy AI - Lifetime Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
     'ultimate-govcon-bundle': {
@@ -1136,7 +1136,7 @@ export async function sendBundleEmail({
         { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
         { name: 'Market Assassin Premium', link: 'https://mi.govcongiants.com/market-assassin', description: 'All 8 strategic intelligence reports' },
         { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Market Intelligence - Lifetime Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
+        { name: 'Mindy AI - Lifetime Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
   };
@@ -1273,7 +1273,7 @@ export async function sendMarketIntelligenceWelcomeEmail({
 
   return sendEmail({
     to,
-    subject: 'Your Market Intelligence Access is Ready | GovCon Giants',
+    subject: 'Your Mindy AI Access is Ready | GovCon Giants',
     emailType: 'market_intelligence_welcome',
     eventSource: 'stripe_purchase',
     tags: {
@@ -1285,11 +1285,11 @@ export async function sendMarketIntelligenceWelcomeEmail({
     },
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 620px; margin: 0 auto; padding: 24px;">
-        <h1 style="color: #1e3a8a; margin-bottom: 8px;">Your Market Intelligence access is ready</h1>
+        <h1 style="color: #1e3a8a; margin-bottom: 8px;">Your Mindy AI access is ready</h1>
         <p>Hi${customerName ? ` ${customerName}` : ''},</p>
-        <p>Your GovCon Giants Market Intelligence purchase is active. Use your purchase email, <strong>${to}</strong>, to access your dashboard and briefings.</p>
+        <p>Your GovCon Giants Mindy AI purchase is active. Use your purchase email, <strong>${to}</strong>, to access your dashboard and briefings.</p>
         <p style="margin: 28px 0;">
-          <a href="https://mi.govcongiants.com/market-intelligence" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Market Intelligence</a>
+          <a href="https://mi.govcongiants.com/market-intelligence" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Mindy AI</a>
         </p>
         <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 18px; margin: 24px 0;">
           <strong>Set up your briefing preferences</strong>
@@ -1299,13 +1299,13 @@ export async function sendMarketIntelligenceWelcomeEmail({
         <p style="color: #6b7280; font-size: 13px;">Questions? Reply to this email for support.</p>
       </div>
     `,
-    text: `Your Market Intelligence access is ready.
+    text: `Your Mindy AI access is ready.
 
 Hi${customerName ? ` ${customerName}` : ''},
 
-Your GovCon Giants Market Intelligence purchase is active.
+Your GovCon Giants Mindy AI purchase is active.
 
-Access Market Intelligence:
+Access Mindy AI:
 https://mi.govcongiants.com/market-intelligence
 
 Set up briefing preferences:

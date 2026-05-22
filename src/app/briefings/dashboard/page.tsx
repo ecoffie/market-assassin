@@ -328,7 +328,7 @@ function MIDashboardContent() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">MI</span>
               </div>
-              <span className="font-semibold">Market Intelligence Dashboard</span>
+              <span className="font-semibold">Mindy AI Dashboard</span>
               {isProfileFiltered && (
                 <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   🎯 Your Profile

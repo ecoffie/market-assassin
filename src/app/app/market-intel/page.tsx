@@ -593,7 +593,7 @@ function MarketIntelDashboard() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center mx-auto mb-4 animate-pulse">
             <span className="text-white font-bold text-xl">M</span>
           </div>
-          <p className="text-gray-400">Loading Market Intelligence…</p>
+          <p className="text-gray-400">Loading Mindy AI…</p>
         </div>
       </div>
     );
@@ -613,7 +613,7 @@ function MarketIntelDashboard() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">M</span>
               </div>
-              <span className="font-semibold">Market Intelligence</span>
+              <span className="font-semibold">Mindy AI</span>
               {isProfileFiltered && (
                 <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   🎯 Your Profile
@@ -1453,7 +1453,7 @@ export default function MarketIntelPage() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center mx-auto mb-4 animate-pulse">
             <span className="text-white font-bold text-xl">M</span>
           </div>
-          <p className="text-gray-400">Loading Market Intelligence…</p>
+          <p className="text-gray-400">Loading Mindy AI…</p>
         </div>
       </div>
     }>
