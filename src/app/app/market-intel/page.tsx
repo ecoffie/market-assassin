@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppTracker } from '@/components/app/track';
+import { useToast, ToastHost } from '@/components/app/Toast';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 interface NoticeTypeInfo {
   code: string;
@@ -177,6 +179,14 @@ function MarketIntelDashboard() {
   // changes / attachment downloads / SAM link clicks. All fire-and-
   // forget; failures do not surface to the user.
   const track = useAppTracker(email);
+  const { showToast } = useToast();
+
+  // Inline Track button state. Mirrors DashboardPanel's pattern:
+  // optimistic state set on click, rolled back on failure. notice_id
+  // is the source of truth (server dedupes by notice_id + email).
+  const [savedNoticeIds, setSavedNoticeIds] = useState<Set<string>>(new Set());
+  const [savingNoticeIds, setSavingNoticeIds] = useState<Set<string>>(new Set());
+  const [dismissedNoticeIds, setDismissedNoticeIds] = useState<Set<string>>(new Set());
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -277,6 +287,135 @@ function MarketIntelDashboard() {
     }
     window.history.replaceState({}, '', url.toString());
   }, [email]);
+
+  // Inline Track in Pipeline — same handler shape as DashboardPanel's
+  // handleTrackInPipeline. Optimistic state flip + toast + Undo.
+  // Schema gotchas (value_estimate vs estimated_value, external_url vs
+  // sam_link, ISO date conversion) match the dashboard version.
+  const handleTrackOpportunity = useCallback(async (opp: Opportunity) => {
+    if (!email) {
+      showToast({ message: 'Sign in before saving opportunities', variant: 'error' });
+      return;
+    }
+    if (savedNoticeIds.has(opp.notice_id)) return;
+
+    setSavedNoticeIds(prev => new Set(prev).add(opp.notice_id));
+    setSavingNoticeIds(prev => new Set(prev).add(opp.notice_id));
+
+    // SAM response deadline is ISO from the cache, so it can go through
+    // directly. Guard with a sanity Date parse anyway.
+    const parsedDeadline = (() => {
+      if (!opp.response_deadline) return null;
+      const d = new Date(opp.response_deadline);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    })();
+
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          user_email: email,
+          notice_id: opp.notice_id,
+          title: opp.title,
+          agency: opp.department || '',
+          naics_code: opp.naics_code || '',
+          set_aside: opp.set_aside_code || '',
+          response_deadline: parsedDeadline,
+          value_estimate: null, // market-intel rows don't carry a value range
+          external_url: `https://sam.gov/opp/${opp.notice_id}/view`,
+          stage: 'tracking',
+          priority: opp.urgency_level === 'critical' ? 'critical'
+            : opp.urgency_level === 'urgent' ? 'high'
+            : 'medium',
+          source: 'market_intel_dashboard',
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        if (res.status === 409) {
+          showToast({ message: 'Already in your Pipeline', variant: 'info' });
+        } else {
+          setSavedNoticeIds(prev => {
+            const next = new Set(prev);
+            next.delete(opp.notice_id);
+            return next;
+          });
+          showToast({
+            message: data?.error || 'Could not add to Pipeline',
+            variant: 'error',
+          });
+        }
+        return;
+      }
+
+      const pipelineRowId = data.opportunity?.id as string | undefined;
+      track('tool_use', 'market_intel_dashboard', {
+        action: 'track_in_pipeline',
+        notice_id: opp.notice_id,
+      });
+      showToast({
+        message: 'Added to Pipeline',
+        variant: 'success',
+        action: pipelineRowId
+          ? {
+              label: 'Undo',
+              onClick: () => {
+                setSavedNoticeIds(prev => {
+                  const next = new Set(prev);
+                  next.delete(opp.notice_id);
+                  return next;
+                });
+                fetch('/api/pipeline', {
+                  method: 'DELETE',
+                  headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+                  body: JSON.stringify({ id: pipelineRowId, user_email: email }),
+                }).catch((err) => console.warn('[MarketIntel] Undo DELETE failed:', err));
+              },
+            }
+          : undefined,
+      });
+    } catch (err) {
+      console.error('Failed to track from market-intel:', err);
+      setSavedNoticeIds(prev => {
+        const next = new Set(prev);
+        next.delete(opp.notice_id);
+        return next;
+      });
+      showToast({ message: 'Network error — could not save', variant: 'error' });
+    } finally {
+      setSavingNoticeIds(prev => {
+        const next = new Set(prev);
+        next.delete(opp.notice_id);
+        return next;
+      });
+    }
+  }, [email, savedNoticeIds, showToast, track]);
+
+  // Client-side dismiss (hide from view). Pure UI state — server has
+  // no opinion on dismissed opps from market-intel.
+  const handleDismissOpportunity = useCallback((opp: Opportunity) => {
+    setDismissedNoticeIds(prev => new Set(prev).add(opp.notice_id));
+    track('tool_use', 'market_intel_dashboard', {
+      action: 'dismiss',
+      notice_id: opp.notice_id,
+    });
+    showToast({
+      message: 'Dismissed',
+      variant: 'info',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setDismissedNoticeIds(prev => {
+            const next = new Set(prev);
+            next.delete(opp.notice_id);
+            return next;
+          });
+        },
+      },
+    });
+  }, [showToast, track]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -782,9 +921,13 @@ function MarketIntelDashboard() {
               </button>
             </div>
           ) : (
-            opportunities.map(opp => {
+            opportunities
+              .filter(opp => !dismissedNoticeIds.has(opp.notice_id))
+              .map(opp => {
               const colors = NOTICE_TYPE_COLORS[opp.notice_type || ''] || { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/30' };
               const isExpanded = expandedId === opp.id;
+              const isSaved = savedNoticeIds.has(opp.notice_id);
+              const isSaving = savingNoticeIds.has(opp.notice_id);
 
               return (
                 <div
@@ -858,6 +1001,51 @@ function MarketIntelDashboard() {
                       </div>
                     </div>
                   </button>
+
+                  {/* Inline action row — always visible regardless of
+                      expand state. Matches DashboardPanel's Track/SAM/
+                      Dismiss treatment so the muscle memory is the
+                      same across surfaces. Wrapped in stopPropagation
+                      so clicking a button doesn't toggle the parent
+                      card's expand. */}
+                  <div
+                    className="flex items-center gap-2 px-4 pb-3 -mt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleTrackOpportunity(opp)}
+                      disabled={isSaving || isSaved}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                        isSaved
+                          ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
+                          : isSaving
+                            ? 'bg-gray-800 text-gray-400 cursor-wait'
+                            : 'bg-purple-600 text-white hover:bg-purple-500'
+                      }`}
+                    >
+                      {isSaved ? '✓ Tracking' : isSaving ? 'Adding…' : '+ Track'}
+                    </button>
+                    <a
+                      href={`https://sam.gov/opp/${opp.notice_id}/view`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => track('link_click', 'market_intel_dashboard', {
+                        action: 'open_sam',
+                        notice_id: opp.notice_id,
+                      })}
+                      className="px-3 py-1.5 rounded text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors"
+                    >
+                      SAM.gov →
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleDismissOpportunity(opp)}
+                      className="ml-auto px-3 py-1.5 rounded text-xs font-medium text-gray-400 bg-gray-800/60 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
 
                   {isExpanded && (
                     <div className="px-4 pb-4 pt-3 border-t border-gray-800 bg-gray-900/50 space-y-4">
@@ -1269,7 +1457,13 @@ export default function MarketIntelPage() {
         </div>
       </div>
     }>
-      <MarketIntelDashboard />
+      {/* /app/market-intel is a standalone route (not under /app's
+          ToastHost). Mount our own so the new Track / Dismiss action
+          buttons inside row cards can showToast() like every other
+          panel. Same pattern as src/app/app/page.tsx wrap. */}
+      <ToastHost>
+        <MarketIntelDashboard />
+      </ToastHost>
     </Suspense>
   );
 }
