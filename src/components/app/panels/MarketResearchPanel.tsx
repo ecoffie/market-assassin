@@ -1488,44 +1488,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             </div>
           </section>
 
-          <section className="rounded-xl border border-purple-500/30 bg-purple-950/10 p-5">
-            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Recommended Opportunities</h2>
-                <p className="text-sm text-slate-500">Ranked from your profile and the feedback you give Mindy.</p>
-              </div>
-              <button
-                type="button"
-                onClick={loadRecommendedOpportunities}
-                className="self-start rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700"
-              >
-                Refresh recommendations
-              </button>
-            </div>
-
-            {recommendationsLoading ? (
-              <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                Loading recommended opportunities...
-              </div>
-            ) : recommendedOpportunities.length > 0 ? (
-              <div className="grid gap-3 lg:grid-cols-3">
-                {recommendedOpportunities.slice(0, 3).map((opportunity) => (
-                  <RecommendedOpportunityCard
-                    key={opportunity.id}
-                    opportunity={opportunity}
-                    selectedFeedback={feedbackByOpportunity[opportunity.id]}
-                    savingFeedback={savingFeedback.has(opportunity.id)}
-                    onFeedback={handleRecommendedFeedback}
-                    onOpen={setSelectedOpportunity}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                No recommendations loaded yet. Refresh once after your profile is saved.
-              </div>
-            )}
-          </section>
+          {/* Recommended Opportunities section removed May 22, 2026.
+              It duplicated Today's Intel and Source Feed (3 surfaces
+              showing opps competed for the same user attention).
+              Research's job is "where do I play strategically" not
+              "what do I bid on today." Opportunity actions now live
+              only in Today's Intel / Source Feed / Market Dashboard.
+              See tasks/target-accounts-crm-roadmap.md for the v2
+              vision (TAL builder) this carves space for. */}
 
           <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
             <h2 className="mb-4 text-xl font-semibold text-white">Choose What You Need</h2>
