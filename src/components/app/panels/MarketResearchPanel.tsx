@@ -2427,7 +2427,7 @@ function MindyNarrative({
 // let users override which metric drives each card. Per the Tesla
 // steering-wheel feedback: every "best by" call has a Why? tooltip
 // + a metric dropdown so power users can drive.
-type SortLens = 'top_spending' | 'easy_entry' | 'budget_growth' | 'contracts' | 'a_z';
+type SortLens = 'top_spending' | 'civilian_first' | 'easy_entry' | 'budget_growth' | 'contracts' | 'a_z';
 type QuickPickKind = 'biggest_spender' | 'strongest_signal' | 'low_competition';
 
 interface AgencyTableRow {
@@ -2455,11 +2455,44 @@ interface AgencyTableRow {
 
 const SORT_LENSES: Array<{ id: SortLens; label: string; hint: string }> = [
   { id: 'top_spending',  label: 'Top Spending',     hint: 'Biggest pie in your NAICS' },
+  // "Civilian First" surfaces non-DOD agencies at the top, sorted
+  // by spend within the civilian group. DOD agencies still appear
+  // (sorted by spend among themselves) but at the bottom of the
+  // list. Mental model per Eric: DOD is always #1 by total spend,
+  // but for new entrants civilian agencies (HHS, GSA, VA, etc.)
+  // are often easier to break into — simpler procurement, less
+  // crowded vendor density, more SAT contracts. Toggle when
+  // you're looking for first-contract candidates.
+  { id: 'civilian_first', label: 'Civilian First',  hint: 'Non-DOD agencies first — often easier for new entrants' },
   { id: 'easy_entry',    label: 'Easy Entry (SAT)', hint: 'Most contracts under $250K — easiest first wins' },
   { id: 'budget_growth', label: 'Budget Growth',    hint: 'Where the trend favors you (coming in Slice 2)' },
   { id: 'contracts',     label: 'Contracts',        hint: 'High-frequency buyers' },
   { id: 'a_z',           label: 'A-Z',              hint: 'Alphabetical (tie-breaker)' },
 ];
+
+// DOD recognition: substring matches against the agency name. Covers
+// the variants USAspending returns ("Department of Defense", "Air
+// Force", "Army", "Navy", etc.) plus their canonical abbrev. Keep
+// case-insensitive; sub_agency names get checked too in the sort.
+const DOD_AGENCY_PATTERNS = [
+  'department of defense',
+  'dod',
+  'air force',
+  'army',
+  'navy',
+  'marine',
+  'defense logistics',
+  'missile defense',
+  'defense health',
+  'defense advanced',  // DARPA
+  'defense information', // DISA
+  'defense threat',     // DTRA
+  'national guard',
+];
+function isDodAgency(row: AgencyTableRow): boolean {
+  const haystack = `${row.parentAgency || ''} ${row.subAgency || ''}`.toLowerCase();
+  return DOD_AGENCY_PATTERNS.some(p => haystack.includes(p));
+}
 
 function formatRowCurrency(amount: number): string {
   if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)}B`;
@@ -2729,6 +2762,18 @@ function AgencyTable({
       case 'top_spending':
         copy.sort((a, b) => b.metric_top_spending - a.metric_top_spending);
         break;
+      case 'civilian_first':
+        // Civilians first, then DOD. Within each group, sort by
+        // spend descending so the biggest pie surfaces inside each
+        // bucket. Mental model: "I want to see HHS and GSA at the
+        // top of my list, not 5 different DOD sub-agencies."
+        copy.sort((a, b) => {
+          const aDod = isDodAgency(a) ? 1 : 0;
+          const bDod = isDodAgency(b) ? 1 : 0;
+          if (aDod !== bDod) return aDod - bDod;  // civilians (0) come before DOD (1)
+          return b.metric_top_spending - a.metric_top_spending;
+        });
+        break;
       case 'easy_entry':
         copy.sort((a, b) => b.metric_easy_entry - a.metric_easy_entry);
         break;
@@ -2754,11 +2799,15 @@ function AgencyTable({
       const copy = [...rows];
       const metric = (r: AgencyTableRow): number => {
         switch (lens) {
-          case 'top_spending':  return r.metric_top_spending;
-          case 'easy_entry':    return r.metric_easy_entry;
-          case 'budget_growth': return r.metric_budget_growth;
-          case 'contracts':     return r.metric_contracts;
-          case 'a_z':           return 0;
+          case 'top_spending':   return r.metric_top_spending;
+          // civilian_first ranks DOD lower by giving them a
+          // negative spend signal — quick-pick still picks the
+          // top civilian agency.
+          case 'civilian_first': return isDodAgency(r) ? -1 : r.metric_top_spending;
+          case 'easy_entry':     return r.metric_easy_entry;
+          case 'budget_growth':  return r.metric_budget_growth;
+          case 'contracts':      return r.metric_contracts;
+          case 'a_z':            return 0;
         }
       };
       copy.sort((a, b) => mode === 'high' ? metric(b) - metric(a) : metric(a) - metric(b));
