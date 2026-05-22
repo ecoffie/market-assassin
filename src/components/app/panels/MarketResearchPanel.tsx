@@ -568,6 +568,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // in the page header so the new presentation-grade view is the
   // first impression but the raw data is always one click away.
   const [viewMode, setViewMode] = useState<'map' | 'reports'>('map');
+  // tmrRows — the full row set from /api/app/target-market-research,
+  // captured via AgencyTable's onRowsChange callback. Powers the
+  // upstream charts (Spending by Agency, Set-Aside Mix) so they
+  // render from the same 96-row data the table uses instead of the
+  // legacy 7-row reportData.governmentBuyers path.
+  const [tmrRows, setTmrRows] = useState<AgencyTableRow[]>([]);
   const [marketFocuses, setMarketFocuses] = useState<MarketFocus[]>([]);
   const [activeFocusId, setActiveFocusId] = useState<string>('saved-profile');
   const [showSaveFocus, setShowSaveFocus] = useState(false);
@@ -1187,6 +1193,36 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   }, [email, getAuthHeaders, loadRecommendedOpportunities]);
 
   const buyers = reportData?.governmentBuyers?.agencies || [];
+
+  // chartBuyers — prefer the full TMR row set when it's loaded; fall
+  // back to the legacy 7-row governmentBuyers data so the charts
+  // never empty out mid-render. AgencyTableRow uses
+  // `setAsideSpending` whereas BuyerLike expects `spending`, so we
+  // map the field name. setAsideSpending IS the correct number to
+  // show — it's the total tracked spend per office in this NAICS
+  // window, not just SAT-eligible spend. Confusing field name from
+  // the upstream USASpending wrapper; documented in
+  // src/types/federal-market-assassin.ts.
+  const chartBuyers: BuyerLike[] = tmrRows.length > 0
+    ? tmrRows.map((row) => ({
+        contractingOffice: row.contractingOffice,
+        parentAgency: row.parentAgency,
+        subAgency: row.subAgency,
+        spending: row.setAsideSpending,
+        contractCount: row.contractCount,
+      }))
+    : buyers;
+
+  // Total spend across the full TMR row set, used by the Set-Aside
+  // Mix chart denominator and Mindy Says narrative. Falls back to
+  // the legacy buyerSummary value when TMR hasn't loaded.
+  const chartTotalSpending = tmrRows.length > 0
+    ? tmrRows.reduce((sum, row) => sum + (row.setAsideSpending || 0), 0)
+    : 0;
+
+  const chartSatTotal = tmrRows.length > 0
+    ? tmrRows.reduce((sum, row) => sum + (row.satSpending || 0), 0)
+    : 0;
   const buyerSummary = reportData?.governmentBuyers?.summary;
   const painSummary = reportData?.agencyPainPoints?.summary;
   const primeSummary = reportData?.primeContractor?.summary;
@@ -1445,8 +1481,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           {/* Headline stats — same 4 numbers as the reports view's
               MetricCards but with stronger visual hierarchy here. */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label="Agencies to review" value={(buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
-            <MetricCard label="Relevant spending" value={formatCurrency(buyerSummary?.totalSpending)} tone="green" />
+            <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
+            <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" />
             <MetricCard label="Competition signals" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} />
             <MetricCard label="Upcoming signals" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" />
           </section>
@@ -1456,9 +1492,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               adds Trend line + Top 5 Primes. The slots are here
               so the layout is visible/scannable from Slice 1. */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SpendingByAgencyChart buyers={buyers} />
-            <SetAsideMixChart buyers={buyers} satTotal={(reportData?.simplifiedAcquisition?.summary?.totalSATSpending) || 0} totalSpend={buyerSummary?.totalSpending || 0} />
-            <TrendPlaceholderChart totalSpend={buyerSummary?.totalSpending || 0} agencyCount={buyerSummary?.totalAgencies || buyers.length} />
+            <SpendingByAgencyChart buyers={chartBuyers} />
+            <SetAsideMixChart
+              buyers={chartBuyers}
+              satTotal={chartSatTotal || (reportData?.simplifiedAcquisition?.summary?.totalSATSpending) || 0}
+              totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
+            />
+            <TrendPlaceholderChart
+              totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
+              agencyCount={chartBuyers.length}
+            />
             <TopPrimesChart primes={reportData?.primeContractor?.suggestedPrimes || []} email={email} />
           </section>
 
@@ -1486,6 +1529,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             veteranStatus={formData.veteranStatus}
             zipCode={formData.zipCode}
             excludeDOD={formData.excludeDOD}
+            onRowsChange={setTmrRows}
           />
 
           {/* Mindy Says — Groq-generated market narrative + 3
@@ -1496,10 +1540,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             email={email}
             naicsCode={formData.naicsCode}
             businessType={formData.businessType}
-            totalSpending={buyerSummary?.totalSpending || 0}
-            satTotal={reportData?.simplifiedAcquisition?.summary?.totalSATSpending || 0}
-            agencyCount={buyerSummary?.totalAgencies || buyers.length}
-            topAgencies={buyers}
+            totalSpending={chartTotalSpending || buyerSummary?.totalSpending || 0}
+            satTotal={chartSatTotal || reportData?.simplifiedAcquisition?.summary?.totalSATSpending || 0}
+            agencyCount={chartBuyers.length}
+            topAgencies={chartBuyers}
             topPrimes={reportData?.primeContractor?.suggestedPrimes || []}
           />
 
@@ -1512,8 +1556,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       {viewMode === 'reports' && reportData && (
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label="Agencies to review" value={(buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
-            <MetricCard label="Relevant spending" value={formatCurrency(buyerSummary?.totalSpending)} tone="green" />
+            <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
+            <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" />
             <MetricCard label="Competition signals" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} />
             <MetricCard label="Upcoming signals" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" />
           </section>
@@ -2793,6 +2837,7 @@ function AgencyTable({
   veteranStatus,
   zipCode,
   excludeDOD,
+  onRowsChange,
 }: {
   email: string | null;
   naicsCode: string;
@@ -2801,6 +2846,11 @@ function AgencyTable({
   veteranStatus: string;
   zipCode: string;
   excludeDOD: boolean;
+  // Optional escape hatch — parent can subscribe to the full row
+  // set so the upstream charts (Spending by Agency, Set-Aside Mix)
+  // can render from the same 96-row data this table uses, not the
+  // legacy 7-row reportData.governmentBuyers path.
+  onRowsChange?: (rows: AgencyTableRow[]) => void;
 }) {
   const [rows, setRows] = useState<AgencyTableRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2856,11 +2906,17 @@ function AgencyTable({
         if (!data?.success) {
           setError(data?.error || 'Could not load research data');
           setRows([]);
+          onRowsChange?.([]);
           return;
         }
-        setRows(data.agencies || []);
+        const nextRows = (data.agencies || []) as AgencyTableRow[];
+        setRows(nextRows);
         setCached(!!data.cached);
         setFreeTierLimited(!!data.free_tier_limited);
+        // Bubble the full row set to the parent for chart rendering.
+        // Done inside the success branch so we never send the parent
+        // a stale array during an error retry.
+        onRowsChange?.(nextRows);
       })
       .catch(err => {
         if (cancelled) return;
