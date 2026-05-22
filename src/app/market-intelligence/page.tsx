@@ -209,40 +209,15 @@ function MarketIntelligenceContent() {
         </div>
       </div>
 
-      {/* Access Check Section */}
-      <div className="max-w-4xl mx-auto px-4 -mt-8">
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
-          <p className="text-slate-300 text-center mb-4">Already have access? Enter your email:</p>
-          <form onSubmit={handleVerifyAccess} className="flex gap-2 max-w-xl mx-auto">
-            <input
-              ref={emailRef}
-              type="email"
-              placeholder="Enter your purchase email"
-              className="flex-1 px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold disabled:opacity-50 transition-all"
-            >
-              {loading ? '...' : 'Access'}
-            </button>
-          </form>
-          <div className="mt-3 text-center">
-            <button
-              type="button"
-              onClick={handleSendSecureLink}
-              disabled={sendingLink}
-              className="text-sm text-purple-400 hover:text-purple-300 disabled:opacity-50"
-            >
-              {sendingLink ? 'Sending secure link...' : 'Email me a secure access link'}
-            </button>
-          </div>
-          {error && <p className="text-red-400 text-sm mt-3 text-center">{error}</p>}
-          {success && <p className="text-green-400 text-sm mt-3 text-center">{success}</p>}
-          {redirecting && <p className="text-green-400 text-sm mt-3 text-center">Access verified! Redirecting...</p>}
-        </div>
-      </div>
+      {/* Access-check block removed May 22, 2026.
+          User: "this is an upgrade plan there is no need for
+          enter your email if they need access". Users on this
+          page are already signed in via the app sidebar's
+          upgrade CTA — they don't need a second auth surface.
+          The handleVerifyAccess / handleSendSecureLink handlers
+          remain in scope but are now dead callers; leave them
+          for now so we can re-introduce a quieter "already a
+          customer? sign in" link in the footer if needed. */}
 
       {/* PRICING-TOGGLE — first thing the user sees after the hero.
           User flagged: "This is an upgrade page, choose your plan
