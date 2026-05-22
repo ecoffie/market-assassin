@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
@@ -1422,6 +1422,21 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             <ChartPlaceholder title="Top 5 Primes" subtitle="Incumbents to track or team with" slice="3" />
           </section>
 
+          {/* Slice 1.5C — Agency table with sort lenses. Replaces the
+              old "Start Here" 3-card black box with full transparency:
+              all N offices, 4 sortable metrics, methodology you can
+              swap. Drives off /api/app/target-market-research which
+              merges USAspending + SAM + pain points + events. */}
+          <AgencyTable
+            email={email}
+            naicsCode={formData.naicsCode}
+            pscCode={formData.pscCode}
+            businessType={formData.businessType}
+            veteranStatus={formData.veteranStatus}
+            zipCode={formData.zipCode}
+            excludeDOD={formData.excludeDOD}
+          />
+
           {/* Mindy Says — Slice 4 wires this to Groq. Slice 1 ships
               an empty box so the layout is anchored. */}
           <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-900/20 to-purple-800/5 p-5">
@@ -1907,6 +1922,436 @@ function ChartPlaceholder({ title, subtitle, slice }: { title: string; subtitle:
           <p className="text-xs text-slate-600 uppercase tracking-wider">Chart ships in Slice {slice}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// AgencyTable — Slice 1.5C
+// ---------------------------------------------------------------------
+//
+// Renders all N target offices (60-100 typical) with 4 sortable
+// metrics. Replaces the legacy 3-card "BEST / STRONGEST / COMPETITION"
+// black box. Data comes from /api/app/target-market-research.
+//
+// Sort lenses correspond 1:1 to the metric_* fields the endpoint
+// pre-computes server-side. Switching a lens does NOT re-fetch — it
+// just re-sorts the existing rows.
+//
+// Methodology selectors on the 3 quick-pick cards above the table
+// let users override which metric drives each card. Per the Tesla
+// steering-wheel feedback: every "best by" call has a Why? tooltip
+// + a metric dropdown so power users can drive.
+type SortLens = 'top_spending' | 'easy_entry' | 'budget_growth' | 'contracts' | 'a_z';
+type QuickPickKind = 'biggest_spender' | 'strongest_signal' | 'low_competition';
+
+interface AgencyTableRow {
+  id: string;
+  name: string;
+  contractingOffice: string;
+  subAgency: string;
+  parentAgency: string;
+  officeId: string;
+  location: string;
+  setAsideSpending: number;
+  contractCount: number;
+  satSpending: number;
+  satContractCount: number;
+  metric_top_spending: number;
+  metric_contracts: number;
+  metric_easy_entry: number;
+  metric_budget_growth: number;
+  painPointCount: number;
+  openOppCount: number;
+  upcomingEventCount: number;
+  satRatio: number;
+  isSubAgency: boolean;
+}
+
+const SORT_LENSES: Array<{ id: SortLens; label: string; hint: string }> = [
+  { id: 'top_spending',  label: 'Top Spending',     hint: 'Biggest pie in your NAICS' },
+  { id: 'easy_entry',    label: 'Easy Entry (SAT)', hint: 'Most contracts under $250K — easiest first wins' },
+  { id: 'budget_growth', label: 'Budget Growth',    hint: 'Where the trend favors you (coming in Slice 2)' },
+  { id: 'contracts',     label: 'Contracts',        hint: 'High-frequency buyers' },
+  { id: 'a_z',           label: 'A-Z',              hint: 'Alphabetical (tie-breaker)' },
+];
+
+function formatRowCurrency(amount: number): string {
+  if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)}B`;
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `$${(amount / 1_000).toFixed(0)}K`;
+  return `$${amount.toFixed(0)}`;
+}
+
+function AgencyTable({
+  email,
+  naicsCode,
+  pscCode,
+  businessType,
+  veteranStatus,
+  zipCode,
+  excludeDOD,
+}: {
+  email: string | null;
+  naicsCode: string;
+  pscCode: string;
+  businessType: string;
+  veteranStatus: string;
+  zipCode: string;
+  excludeDOD: boolean;
+}) {
+  const [rows, setRows] = useState<AgencyTableRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeLens, setActiveLens] = useState<SortLens>('top_spending');
+  const [quickPick, setQuickPick] = useState<Record<QuickPickKind, SortLens>>({
+    biggest_spender: 'top_spending',
+    strongest_signal: 'top_spending',   // overridden after fetch via painPointCount
+    low_competition: 'top_spending',    // overridden after fetch via openOppCount inverse
+  });
+  const [cached, setCached] = useState(false);
+  const [freeTierLimited, setFreeTierLimited] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  // Fetch happens once per (naics, psc, businessType, veteran) combo.
+  // The endpoint itself does the 24h cache layer — we just call it.
+  useEffect(() => {
+    if (!email || !naicsCode.trim()) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetch('/api/app/target-market-research', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        naicsCode,
+        pscCode,
+        businessType,
+        veteranStatus,
+        zipCode,
+        excludeDOD,
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        if (!data?.success) {
+          setError(data?.error || 'Could not load research data');
+          setRows([]);
+          return;
+        }
+        setRows(data.agencies || []);
+        setCached(!!data.cached);
+        setFreeTierLimited(!!data.free_tier_limited);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.error('[AgencyTable] fetch failed:', err);
+        setError('Network error loading research data');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [email, naicsCode, pscCode, businessType, veteranStatus, zipCode, excludeDOD]);
+
+  // Pure sort step. The endpoint pre-computes every metric_* field so
+  // switching lenses is a client-only re-sort with no network call.
+  const sortedRows = useMemo(() => {
+    const copy = [...rows];
+    switch (activeLens) {
+      case 'top_spending':
+        copy.sort((a, b) => b.metric_top_spending - a.metric_top_spending);
+        break;
+      case 'easy_entry':
+        copy.sort((a, b) => b.metric_easy_entry - a.metric_easy_entry);
+        break;
+      case 'budget_growth':
+        copy.sort((a, b) => b.metric_budget_growth - a.metric_budget_growth);
+        break;
+      case 'contracts':
+        copy.sort((a, b) => b.metric_contracts - a.metric_contracts);
+        break;
+      case 'a_z':
+        copy.sort((a, b) => (a.contractingOffice || a.name).localeCompare(b.contractingOffice || b.name));
+        break;
+    }
+    return copy;
+  }, [rows, activeLens]);
+
+  // Pick the row that wins each quick-pick category using the user's
+  // selected metric. The dropdowns on the cards write into quickPick
+  // state and we recompute from sortedRows-style logic.
+  const quickPicks = useMemo(() => {
+    const pickBy = (lens: SortLens, mode: 'high' | 'low' = 'high'): AgencyTableRow | undefined => {
+      if (rows.length === 0) return undefined;
+      const copy = [...rows];
+      const metric = (r: AgencyTableRow): number => {
+        switch (lens) {
+          case 'top_spending':  return r.metric_top_spending;
+          case 'easy_entry':    return r.metric_easy_entry;
+          case 'budget_growth': return r.metric_budget_growth;
+          case 'contracts':     return r.metric_contracts;
+          case 'a_z':           return 0;
+        }
+      };
+      copy.sort((a, b) => mode === 'high' ? metric(b) - metric(a) : metric(a) - metric(b));
+      return copy[0];
+    };
+    return {
+      biggest_spender:  pickBy(quickPick.biggest_spender, 'high'),
+      strongest_signal: rows.length > 0
+        ? [...rows].sort((a, b) => b.painPointCount - a.painPointCount)[0]
+        : undefined,
+      low_competition: rows.length > 0
+        // Fewest open opps = least crowded near-term competition
+        ? [...rows].sort((a, b) => a.openOppCount - b.openOppCount)[0]
+        : undefined,
+    };
+  }, [rows, quickPick]);
+
+  if (!naicsCode.trim()) {
+    return (
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+        <p className="text-sm text-slate-400">
+          Enter a NAICS or PSC code in your profile to load Target Market Research.
+        </p>
+      </section>
+    );
+  }
+
+  if (loading) {
+    return (
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+        <p className="text-sm text-slate-400">Loading agency data...</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-300">
+        {error}
+      </section>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+        <p className="text-sm text-slate-400">No agencies found for this profile.</p>
+      </section>
+    );
+  }
+
+  const visibleRows = showAll ? sortedRows : sortedRows.slice(0, 10);
+
+  return (
+    <section className="space-y-4">
+      {/* Quick-pick cards with methodology selectors. Each card shows
+          which agency the LENS picked, plus a Why? tooltip explaining
+          the metric, plus a dropdown letting power users swap the
+          ranking rule. This is the Tesla steering-wheel fix. */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <QuickPickCard
+          title="BIGGEST SPENDER"
+          winner={quickPicks.biggest_spender}
+          metricLabel="Spend"
+          metricValue={quickPicks.biggest_spender ? formatRowCurrency(quickPicks.biggest_spender.metric_top_spending) : '—'}
+          selectedLens={quickPick.biggest_spender}
+          onLensChange={(lens) => setQuickPick(prev => ({ ...prev, biggest_spender: lens }))}
+          rule="Highest tracked spending in your NAICS"
+        />
+        <QuickPickCard
+          title="STRONGEST SIGNAL"
+          winner={quickPicks.strongest_signal}
+          metricLabel="Pain Points"
+          metricValue={quickPicks.strongest_signal ? String(quickPicks.strongest_signal.painPointCount) : '—'}
+          // Strongest signal currently fixed at pain-point count; future
+          // versions could let users swap to "most upcoming events" or
+          // "most recent awards" — leaving the prop here for that.
+          selectedLens={null}
+          onLensChange={undefined}
+          rule="Most pain points + priorities logged for this agency. Hand-curated from GAO reports + agency strategic plans."
+        />
+        <QuickPickCard
+          title="LOW COMPETITION"
+          winner={quickPicks.low_competition}
+          metricLabel="Open Opps"
+          metricValue={quickPicks.low_competition ? String(quickPicks.low_competition.openOppCount) : '—'}
+          selectedLens={null}
+          onLensChange={undefined}
+          rule="Fewest open SAM.gov solicitations right now. Less crowded near-term competition."
+        />
+      </div>
+
+      {/* The agency table itself. Sort lens chips drive the order. */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+        <div className="border-b border-slate-800 p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-white">All Agencies ({rows.length} found)</h3>
+            <p className="text-xs text-slate-500">
+              Sort lenses re-rank the same data — no re-fetch.
+              {cached && <span className="ml-1 text-emerald-400">· cached</span>}
+              {freeTierLimited && <span className="ml-1 text-amber-400">· Free tier shows top 10; upgrade for the full list</span>}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {SORT_LENSES.map(lens => (
+              <button
+                key={lens.id}
+                onClick={() => setActiveLens(lens.id)}
+                title={lens.hint}
+                className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
+                  activeLens === lens.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                {lens.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/60 text-xs text-slate-500 uppercase">
+              <tr>
+                <th className="text-left px-4 py-2 font-medium">Agency / Office</th>
+                <th className="text-right px-4 py-2 font-medium">Set-Aside $</th>
+                <th className="text-right px-4 py-2 font-medium">Contracts</th>
+                <th className="text-right px-4 py-2 font-medium">SAT %</th>
+                <th className="text-right px-4 py-2 font-medium">Open Opps</th>
+                <th className="text-right px-4 py-2 font-medium">Events</th>
+                <th className="text-left px-4 py-2 font-medium">Location</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              {visibleRows.map(row => (
+                <tr key={row.id} className="border-t border-slate-800/60 hover:bg-slate-800/30">
+                  <td className="px-4 py-2">
+                    <div className="font-medium text-slate-200">{row.contractingOffice || row.name}</div>
+                    {row.subAgency && (
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {row.subAgency}
+                        {row.parentAgency && row.parentAgency !== row.subAgency && (
+                          <> · <span className="text-slate-600">{row.parentAgency}</span></>
+                        )}
+                        {row.officeId && <> · <span className="text-slate-600 font-mono">{row.officeId}</span></>}
+                      </div>
+                    )}
+                  </td>
+                  <td className="text-right px-4 py-2 text-emerald-400 font-semibold">{formatRowCurrency(row.setAsideSpending)}</td>
+                  <td className="text-right px-4 py-2">{row.contractCount.toLocaleString()}</td>
+                  <td className="text-right px-4 py-2">
+                    {row.contractCount > 0 ? `${Math.round(row.satRatio * 100)}%` : '—'}
+                  </td>
+                  <td className="text-right px-4 py-2">
+                    {row.openOppCount > 0 ? (
+                      <span className="text-amber-300">{row.openOppCount}</span>
+                    ) : <span className="text-slate-600">0</span>}
+                  </td>
+                  <td className="text-right px-4 py-2">
+                    {row.upcomingEventCount > 0 ? (
+                      <span className="text-purple-300">{row.upcomingEventCount}</span>
+                    ) : <span className="text-slate-600">0</span>}
+                  </td>
+                  <td className="px-4 py-2 text-slate-400 text-xs">{row.location}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {!showAll && sortedRows.length > 10 && (
+          <div className="border-t border-slate-800 p-3 text-center">
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+            >
+              Show all {sortedRows.length} agencies
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// Used by AgencyTable for the 3 quick-pick cards above the table.
+function QuickPickCard({
+  title,
+  winner,
+  metricLabel,
+  metricValue,
+  selectedLens,
+  onLensChange,
+  rule,
+}: {
+  title: string;
+  winner: AgencyTableRow | undefined;
+  metricLabel: string;
+  metricValue: string;
+  selectedLens: SortLens | null;
+  onLensChange?: (lens: SortLens) => void;
+  rule: string;
+}) {
+  const [showWhy, setShowWhy] = useState(false);
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+      <div className="flex items-center justify-between mb-1">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{title}</h4>
+        <button
+          type="button"
+          onClick={() => setShowWhy(v => !v)}
+          className="text-[10px] text-slate-500 hover:text-slate-300"
+        >
+          Why?
+        </button>
+      </div>
+      {showWhy && (
+        <p className="text-[10px] text-slate-400 italic border-l-2 border-slate-700 pl-2 mb-2">{rule}</p>
+      )}
+      {winner ? (
+        <>
+          <div className="text-sm font-bold text-white truncate" title={winner.contractingOffice || winner.name}>
+            {winner.contractingOffice || winner.name}
+          </div>
+          <div className="text-xs text-slate-500 truncate mb-2">
+            {winner.subAgency || winner.parentAgency}
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-[10px] text-slate-500">{metricLabel}</span>
+            <span className="text-base font-semibold text-emerald-400">{metricValue}</span>
+          </div>
+        </>
+      ) : (
+        <p className="text-xs text-slate-500">No data yet.</p>
+      )}
+      {/* Methodology dropdown — only shown for the card that supports
+          swapping its rule. Strongest Signal + Low Competition are
+          fixed in v1 (pain points / fewest opps); BIGGEST SPENDER
+          can swap between any of the 4 lenses. */}
+      {onLensChange && selectedLens && (
+        <div className="mt-3 pt-3 border-t border-slate-800">
+          <label className="text-[10px] uppercase tracking-wider text-slate-500">Rank by</label>
+          <select
+            value={selectedLens}
+            onChange={(e) => onLensChange(e.target.value as SortLens)}
+            className="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200"
+          >
+            {SORT_LENSES.filter(l => l.id !== 'a_z').map(l => (
+              <option key={l.id} value={l.id}>{l.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }
