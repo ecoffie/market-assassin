@@ -37,6 +37,22 @@ interface TargetRow {
   updated_at: string;
 }
 
+// Slice 4 — one upcoming event from /api/app/target-events. Sources
+// are sam_events (dated, SAM.gov special-notice extraction), static
+// event series (AFCEA, SAME, etc. — ongoing, not dated), and major
+// annual conferences (typical_month only). The 3 source types
+// surface distinct UI cues so the user knows which is which.
+interface TargetEvent {
+  source: 'sam' | 'static_series' | 'static_conference';
+  title: string;
+  event_type: string;
+  event_date: string | null;
+  location: string | null;
+  url: string | null;
+  description: string | null;
+  matched_agency: string;
+}
+
 const STATUS_OPTIONS: Array<{ id: TargetRow['status']; label: string; color: string }> = [
   { id: 'targeting', label: 'Targeting', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
   { id: 'contacted', label: 'Contacted', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
@@ -70,6 +86,14 @@ export default function MyTargetListPanel({
   // Slice 3D — which target row is expanded to show its outreach
   // log. Only one expanded at a time keeps the UI focused.
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Slice 4 — Event Radar. Map of target_id → upcoming events. One
+  // fetch covers every target (the endpoint loops server-side so the
+  // client makes a single round trip regardless of list size).
+  const [eventsByTarget, setEventsByTarget] = useState<Record<string, TargetEvent[]>>({});
+  // Track which targets have events expanded vs collapsed. Distinct
+  // from expandedId (outreach log) so users can have both views open
+  // on the same card at the same time.
+  const [eventsExpandedId, setEventsExpandedId] = useState<string | null>(null);
   const { showToast } = useToast();
   const track = useAppTracker(email);
 
@@ -98,6 +122,27 @@ export default function MyTargetListPanel({
   useEffect(() => {
     loadTargets();
   }, [loadTargets]);
+
+  // Slice 4 — load all target events in a single call after the
+  // target list itself is ready. Fires whenever targets change so
+  // newly-added offices get their events. Fail-soft: a network
+  // hiccup just leaves eventsByTarget empty.
+  useEffect(() => {
+    if (!email || targets.length === 0) return;
+    let cancelled = false;
+    fetch(`/api/app/target-events?email=${encodeURIComponent(email)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled || !data?.success) return;
+        setEventsByTarget(data.events_by_target || {});
+      })
+      .catch(err => console.warn('[MyTargetList] events load failed:', err));
+    return () => { cancelled = true; };
+  // targets.length (not targets) so we don't re-fetch on every
+  // status / notes update — only when the list actually grows or
+  // shrinks. The endpoint reads from saved targets anyway, so this
+  // is the right granularity.
+  }, [email, targets.length]);
 
   // PATCH a single target field. Optimistic update with rollback.
   const updateTarget = useCallback(async (id: string, changes: Partial<TargetRow>) => {
@@ -328,16 +373,45 @@ export default function MyTargetListPanel({
                         />
                       </div>
 
-                      {/* Slice 3D — toggle for the outreach log. Click
-                          to expand the activity timeline + log-new
-                          form inline beneath the card. */}
-                      <button
-                        type="button"
-                        onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
-                        className="mt-3 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-                      >
-                        {expandedId === t.id ? '▼ Hide outreach log' : '▸ Show outreach log'}
-                      </button>
+                      {/* Slice 4 — Event Radar toggle. Shows count
+                          of matching upcoming events. Click to
+                          expand the event list inline. Distinct
+                          state from outreach log so both can be
+                          open simultaneously. */}
+                      <div className="mt-3 flex flex-wrap gap-3">
+                        {(() => {
+                          const evs = eventsByTarget[t.id] || [];
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setEventsExpandedId(eventsExpandedId === t.id ? null : t.id)}
+                              disabled={evs.length === 0}
+                              className={`text-xs transition-colors ${
+                                evs.length === 0
+                                  ? 'text-slate-600 cursor-default'
+                                  : 'text-purple-300 hover:text-purple-200'
+                              }`}
+                            >
+                              {evs.length === 0
+                                ? '◌ No events matched'
+                                : eventsExpandedId === t.id
+                                  ? `▼ Hide ${evs.length} ${evs.length === 1 ? 'event' : 'events'}`
+                                  : `▸ Show ${evs.length} upcoming ${evs.length === 1 ? 'event' : 'events'}`}
+                            </button>
+                          );
+                        })()}
+
+                        {/* Slice 3D — toggle for the outreach log. Click
+                            to expand the activity timeline + log-new
+                            form inline beneath the card. */}
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                        >
+                          {expandedId === t.id ? '▼ Hide outreach log' : '▸ Show outreach log'}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Right rail: status dropdown + remove */}
@@ -360,6 +434,14 @@ export default function MyTargetListPanel({
                       </button>
                     </div>
                   </div>
+
+                  {/* Slice 4 — Event Radar list. Renders inline
+                      when the user expands events for this target.
+                      Pre-fetched in batch via /api/app/target-events
+                      so no per-card request. */}
+                  {eventsExpandedId === t.id && (
+                    <EventRadarList events={eventsByTarget[t.id] || []} />
+                  )}
 
                   {/* Slice 3D — outreach timeline + log-new form,
                       revealed when the row is expanded. Lazy: the
@@ -455,6 +537,139 @@ function NotesEditor({
       className="w-full text-xs bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
       placeholder="Notes (Esc to cancel, blur to save)"
     />
+  );
+}
+
+// ---------------------------------------------------------------------
+// EventRadarList — Slice 4
+// ---------------------------------------------------------------------
+//
+// Inline list of upcoming events matched to this target's agency.
+// Receives events as a prop — the parent fetched everything in batch
+// via /api/app/target-events. We just render here.
+//
+// Three source types render with distinct cues so the user knows
+// whether they're looking at a confirmed date (sam_events) or a
+// recurring series / annual conference that they should bookmark
+// the calendar for.
+
+const EVENT_TYPE_ICONS: Record<string, string> = {
+  industry_day: '🎤',
+  rfi: '📄',
+  forecast: '🔮',
+  webinar: '💻',
+  conference: '🎟️',
+  event_series: '📅',
+  event: '📍',
+  other: '📍',
+};
+
+function formatEventDate(iso: string | null): string {
+  if (!iso) return 'TBD';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const today = new Date();
+  const diffDays = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  const base = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  if (diffDays < 0) return `${base} (past)`;
+  if (diffDays === 0) return `${base} · TODAY`;
+  if (diffDays === 1) return `${base} · tomorrow`;
+  if (diffDays <= 30) return `${base} · ${diffDays}d`;
+  return base;
+}
+
+function EventRadarList({ events }: { events: TargetEvent[] }) {
+  if (events.length === 0) {
+    return (
+      <div className="mt-4 pt-4 border-t border-slate-800">
+        <p className="text-xs text-slate-500 italic">
+          No upcoming events matched. Add more sub-agencies to your target list, or check back as
+          sam_events refreshes daily.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-800">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          Upcoming Events
+          <span className="ml-2 text-slate-500 font-normal normal-case">
+            ({events.length} matched · next 90 days)
+          </span>
+        </h4>
+      </div>
+
+      <ul className="space-y-2">
+        {events.map((ev, idx) => {
+          const icon = EVENT_TYPE_ICONS[ev.event_type] || EVENT_TYPE_ICONS.other;
+          const sourceLabel = ev.source === 'sam'
+            ? 'SAM.gov'
+            : ev.source === 'static_conference'
+              ? 'Annual conference'
+              : 'Event series';
+          const sourceColor = ev.source === 'sam'
+            ? 'text-emerald-400'
+            : ev.source === 'static_conference'
+              ? 'text-amber-300'
+              : 'text-purple-300';
+          return (
+            <li
+              key={`${ev.source}-${ev.title}-${idx}`}
+              className="bg-slate-950/40 border border-slate-800 rounded-lg p-3"
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-lg shrink-0" aria-hidden>{icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider ${sourceColor}`}>
+                      {sourceLabel}
+                    </span>
+                    {ev.event_date && (
+                      <span className="text-[10px] text-slate-400">{formatEventDate(ev.event_date)}</span>
+                    )}
+                    {!ev.event_date && (
+                      <span className="text-[10px] text-slate-500 italic">recurring</span>
+                    )}
+                    {ev.matched_agency && (
+                      <span className="text-[10px] text-slate-500">
+                        matched: <span className="text-slate-400">{ev.matched_agency}</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-medium text-slate-200 mb-1">{ev.title}</p>
+                  {ev.location && (
+                    <p className="text-xs text-slate-500">📍 {ev.location}</p>
+                  )}
+                  {ev.description && (
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{ev.description}</p>
+                  )}
+                  {ev.url && (
+                    <a
+                      href={ev.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block text-xs text-emerald-400 hover:text-emerald-300 underline"
+                    >
+                      Register / Details ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Footer note explaining the data sources. Helps the user
+          calibrate trust — confirmed dates vs ongoing series. */}
+      <p className="text-[10px] text-slate-600 italic mt-3">
+        Sources: SAM.gov Special Notices (dated) + curated industry
+        catalog (recurring series, annual conferences). AI web
+        discovery for off-catalog events ships in a future release.
+      </p>
+    </div>
   );
 }
 
