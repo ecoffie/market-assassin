@@ -18,7 +18,8 @@ export type AppPanel =
   | 'contacts'       // Relationships
   | 'team'           // Team access and seats
   | 'settings'       // Unified account settings
-  | 'proposals'      // AI Proposal Assist
+  | 'pricing'        // Pricing Intel — labor rates, GSA/SCA wages (Estimating section)
+  | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'grants';        // Federal grants
 
 // Tier definitions
@@ -128,6 +129,23 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Seats + roles',
         tier: ['team', 'enterprise'],
         badge: 'Teams',
+      },
+    ],
+  },
+  {
+    // Estimating = the "what should I bid?" mental mode. Separate
+    // from Pipeline (which is "what am I working on?") because BD
+    // people switch contexts when they go from tracking opps to
+    // pricing one. Lives between Pipeline and Opportunities so the
+    // daily flow is: Pursuits → Estimating → submit.
+    title: 'Estimating',
+    items: [
+      {
+        id: 'pricing',
+        label: 'Pricing Intel',
+        icon: '💵',
+        description: 'Labor rates, GSA/SCA wages',
+        tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'proposals',

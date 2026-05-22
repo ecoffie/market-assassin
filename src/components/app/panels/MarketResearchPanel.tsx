@@ -240,25 +240,40 @@ interface ReportData {
   };
 }
 
+// Reorganized to the 3-theme structure per Phase 1 plan (May 2026).
+//
+// REMOVED from this panel (they live elsewhere now):
+//   - 'teaming' / Teaming Partners → Contractor DB (with teaming-ready chip
+//     — currently a data gap, see tasks/should-cost-builder-v2.md)
+//   - 'vehicles' / IDV Contracts → covered by Recompete Tracker
+//   - Tribal as a separate report → will become a Contractor DB filter
+//
+// Pricing Intel was never in this list (lives in its own
+// PricingIntelPanel under the new Estimating sidebar section).
 const REPORTS: Report[] = [
+  // Market Map theme — "where do I focus?"
   { id: 'analytics', title: 'Market Analytics', description: 'Spending patterns and trends', icon: '📊', tier: 'free', reportKey: 'simplifiedAcquisition' },
   { id: 'budget', title: 'Budget Authority', description: 'Agency budget analysis', icon: '💰', tier: 'free', reportKey: 'budgetCheckup' },
+  { id: 'forecast', title: 'Market Forecast', description: 'Future opportunity pipeline', icon: '🔮', tier: 'pro', reportKey: 'forecastList' },
+
+  // Agency Intel theme — "who is the buyer?"
   { id: 'buyers', title: 'Gov Buyers', description: 'Decision maker identification', icon: '👤', tier: 'free', reportKey: 'governmentBuyers' },
   { id: 'osbp', title: 'OSBP Contacts', description: 'Small business office contacts', icon: '🤝', tier: 'free', reportKey: 'governmentBuyers' },
   { id: 'pain', title: 'Pain Points', description: 'Agency challenges and needs', icon: '🎯', tier: 'pro', reportKey: 'agencyPainPoints' },
-  { id: 'primes', title: 'Prime Analysis', description: 'Incumbent contractor intel', icon: '🏢', tier: 'pro', reportKey: 'primeContractor' },
-  { id: 'vehicles', title: 'Contract Vehicles', description: 'Relevant acquisition vehicles', icon: '🚗', tier: 'pro', reportKey: 'idvContracts' },
   { id: 'positioning', title: 'Agency Needs', description: 'Strategic positioning intel', icon: '📈', tier: 'pro', reportKey: 'agencyNeeds' },
-  { id: 'teaming', title: 'Teaming Partners', description: 'Potential partner analysis', icon: '🤲', tier: 'pro', reportKey: 'tier2Subcontracting' },
-  { id: 'forecast', title: 'Market Forecast', description: 'Future opportunity pipeline', icon: '🔮', tier: 'pro', reportKey: 'forecastList' },
+
+  // Competitor Intel theme — "who am I up against?"
+  { id: 'primes', title: 'Prime Analysis', description: 'Incumbent contractor intel', icon: '🏢', tier: 'pro', reportKey: 'primeContractor' },
 ];
 
 const RESEARCH_LENSES = [
-  { id: 'map', label: 'Market Map', description: 'Where to focus first', reports: ['buyers', 'budget', 'analytics'] },
-  { id: 'buyers', label: 'Buyers', description: 'Offices and contacts', reports: ['buyers', 'osbp'] },
-  { id: 'competition', label: 'Competition', description: 'Primes and vehicles', reports: ['primes', 'vehicles'] },
-  { id: 'signals', label: 'Signals', description: 'Needs and upcoming demand', reports: ['pain', 'positioning', 'forecast'] },
-  { id: 'partners', label: 'Partners', description: 'Teaming targets', reports: ['teaming'] },
+  // 3-theme collapse. Each theme answers ONE question:
+  //   Map        → where in the market should I play?
+  //   Agency     → who is the buyer and what do they want?
+  //   Competitor → who am I competing against?
+  { id: 'map', label: 'Market Map', description: 'Where to focus first', reports: ['budget', 'analytics', 'forecast'] },
+  { id: 'agency', label: 'Agency Intel', description: 'Buyers, pain points, OSBP contacts', reports: ['buyers', 'osbp', 'pain', 'positioning'] },
+  { id: 'competition', label: 'Competitor Intel', description: 'Incumbent primes, similar awards', reports: ['primes'] },
 ] as const;
 
 type ResearchLensId = typeof RESEARCH_LENSES[number]['id'];

@@ -15,6 +15,7 @@ const RelationshipsPanel = lazy(() => import('./RelationshipsPanel'));
 const TeamPanel = lazy(() => import('./TeamPanel'));
 const UnifiedSettingsPanel = lazy(() => import('./UnifiedSettingsPanel'));
 const ProposalsPanel = lazy(() => import('./ProposalsPanel'));
+const PricingIntelPanel = lazy(() => import('./PricingIntelPanel'));
 const GrantsPanel = lazy(() => import('./GrantsPanel'));
 
 interface PanelContainerProps {
@@ -60,6 +61,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <UnifiedSettingsPanel email={email} tier={tier} />;
       case 'proposals':
         return <ProposalsPanel email={email} tier={tier} />;
+      case 'pricing':
+        return <PricingIntelPanel email={email} tier={tier} />;
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
       default:

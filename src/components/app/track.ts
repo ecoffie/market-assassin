@@ -51,7 +51,8 @@ export type AppEventSource =
   | 'settings'
   | 'onboarding'
   | 'sidebar'
-  | 'app_root';
+  | 'app_root'
+  | 'pricing_intel'; // Estimating section — added May 2026
 
 // Keys we accept as attribution. utm_term is also standard but we don't
 // publish links with it; including it costs nothing if it ever appears.
