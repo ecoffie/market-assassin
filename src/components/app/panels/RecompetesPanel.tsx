@@ -5,6 +5,7 @@ import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
+import ContractorLink from '../contractors/ContractorLink';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -688,11 +689,18 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         {contract.subAgency && <span className="text-slate-500"> • {contract.subAgency}</span>}
                       </p>
 
-                      {/* Incumbent */}
+                      {/* Incumbent — clickable to open YoY award history */}
                       {contract.incumbent?.name && (
                         <div className="flex items-center gap-1.5 mb-2">
                           <span className="text-xs text-amber-500">Incumbent:</span>
-                          <span className="text-xs text-amber-400 font-medium">{contract.incumbent.name}</span>
+                          <ContractorLink
+                            name={contract.incumbent.name}
+                            email={email}
+                            variant="inline"
+                            className="text-xs font-medium"
+                          >
+                            {contract.incumbent.name}
+                          </ContractorLink>
                         </div>
                       )}
 
@@ -771,7 +779,20 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           <dl className="mt-3 space-y-3 text-sm">
                             <div className="flex justify-between gap-3">
                               <dt className="text-slate-500">Incumbent</dt>
-                              <dd className="text-right text-slate-200">{contract.incumbent?.name || 'Unknown'}</dd>
+                              <dd className="text-right">
+                                {contract.incumbent?.name ? (
+                                  <ContractorLink
+                                    name={contract.incumbent.name}
+                                    email={email}
+                                    variant="inline"
+                                    className="text-slate-200"
+                                  >
+                                    {contract.incumbent.name}
+                                  </ContractorLink>
+                                ) : (
+                                  <span className="text-slate-200">Unknown</span>
+                                )}
+                              </dd>
                             </div>
                             <div className="flex justify-between gap-3">
                               <dt className="text-slate-500">Potential value</dt>

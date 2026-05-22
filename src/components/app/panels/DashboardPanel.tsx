@@ -9,6 +9,7 @@ import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useToast } from '../Toast';
+import ContractorLink from '../contractors/ContractorLink';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -41,6 +42,11 @@ interface BriefingItem {
   actionUrl?: string;
   actionLabel?: string;
   signals: string[];
+  // Contractor / prime names. When present, rendered as clickable
+  // ContractorLink to open the YoY award-history drawer. Separate
+  // from `subtitle` so the wrapper can target just the name.
+  incumbent?: string;
+  targetPrimes?: string[];
 }
 
 type BriefingFilter = 'all' | 'urgent' | 'opportunity' | 'teaming';
@@ -377,18 +383,27 @@ function collectLegacyItems(content: Record<string, unknown>): BriefingItem[] {
       actionUrl: text(item.samLink),
       actionLabel: text(item.samLink) ? 'View on SAM.gov' : 'View details',
       signals: [text(item.noticeType), text(item.setAside)].filter(Boolean),
+      // Surface incumbent as a structured field too so the renderer
+      // can wrap it with ContractorLink. The subtitle still includes
+      // it as a fallback for non-Pro rendering paths.
+      incumbent: text(item.incumbent) || undefined,
     };
   });
 
   const teaming = asArray(content.teamingPlays).map((raw, index) => {
     const item = asRecord(raw);
+    const primes = asArray(item.targetPrimes).map(prime => text(prime)).filter(Boolean);
     return {
       id: `teaming-${index}`,
       title: text(item.strategyName, 'Teaming play'),
-      subtitle: asArray(item.targetPrimes).map(prime => text(prime)).filter(Boolean).join(' • '),
+      subtitle: primes.join(' • '),
       description: text(item.rationale, text(item.suggestedOpener, 'Recommended teaming action.')),
       category: 'Teaming',
       signals: ['Teaming'],
+      // Each prime in this teaming play is a candidate contractor.
+      // The renderer iterates over targetPrimes to make each one
+      // individually clickable.
+      targetPrimes: primes,
     };
   });
 
@@ -968,6 +983,27 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               {itemBuyer.primary}
                               {itemBuyer.secondary && <span className="text-slate-500"> • {itemBuyer.secondary}</span>}
                               {itemBuyer.parent && <span className="text-slate-600"> • {itemBuyer.parent}</span>}
+                            </p>
+                          )}
+                          {item.incumbent && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              Incumbent:{' '}
+                              <ContractorLink name={item.incumbent} email={email} variant="inline">
+                                {item.incumbent}
+                              </ContractorLink>
+                            </p>
+                          )}
+                          {item.targetPrimes && item.targetPrimes.length > 0 && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              Suggested primes:{' '}
+                              {item.targetPrimes.map((prime, idx) => (
+                                <span key={`${prime}-${idx}`}>
+                                  {idx > 0 && ' · '}
+                                  <ContractorLink name={prime} email={email} variant="inline">
+                                    {prime}
+                                  </ContractorLink>
+                                </span>
+                              ))}
                             </p>
                           )}
                           {itemMetaLine && <p className="text-sm text-slate-500 mt-1">{itemMetaLine}</p>}

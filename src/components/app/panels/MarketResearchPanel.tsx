@@ -10,6 +10,7 @@ import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
+import ContractorLink from '../contractors/ContractorLink';
 import type { Agency } from '@/types/federal-market-assassin';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
@@ -1424,7 +1425,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             <SpendingByAgencyChart buyers={buyers} />
             <SetAsideMixChart buyers={buyers} satTotal={(reportData?.simplifiedAcquisition?.summary?.totalSATSpending) || 0} totalSpend={buyerSummary?.totalSpending || 0} />
             <TrendPlaceholderChart totalSpend={buyerSummary?.totalSpending || 0} agencyCount={buyerSummary?.totalAgencies || buyers.length} />
-            <TopPrimesChart primes={reportData?.primeContractor?.suggestedPrimes || []} />
+            <TopPrimesChart primes={reportData?.primeContractor?.suggestedPrimes || []} email={email} />
           </section>
 
           {/* Slice 1.5C — Agency table with sort lenses. Replaces the
@@ -2169,7 +2170,7 @@ interface PrimeLike {
   name: string;
   reason?: string;
 }
-function TopPrimesChart({ primes }: { primes: PrimeLike[] }) {
+function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string | null }) {
   const top = primes.slice(0, 5);
 
   if (top.length === 0) {
@@ -2185,7 +2186,7 @@ function TopPrimesChart({ primes }: { primes: PrimeLike[] }) {
   return (
     <ChartShell
       title="Top 5 Primes"
-      subtitle="Incumbents to track or team with"
+      subtitle="Click a prime to see their federal award history"
       footer={
         <p className="text-[11px] text-slate-500">
           Win-count weighting ships when we wire USASpending awards. Today: rank only.
@@ -2199,7 +2200,9 @@ function TopPrimesChart({ primes }: { primes: PrimeLike[] }) {
               {i + 1}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-slate-200 truncate">{p.name}</div>
+              <ContractorLink name={p.name} email={email} variant="plain" className="text-xs font-medium block truncate">
+                {p.name}
+              </ContractorLink>
               {p.reason && (
                 <div className="text-[10px] text-slate-500 truncate">{p.reason}</div>
               )}
