@@ -3215,6 +3215,37 @@ function AgencyTable({
     return copy;
   }, [rows, activeLens]);
 
+  // Per-lens "is this lens inert on the current data" check. If a
+  // lens would produce zero visible movement (because every row has
+  // metric=0, or every row is the same agency-class, etc.) the chip
+  // gets disabled with an explanatory tooltip — better than the user
+  // clicking and thinking the feature is broken.
+  //
+  // For each lens we compute the discriminator quickly. Inert iff:
+  //   - All rows have the same metric value (sort wouldn't reorder),
+  //     OR
+  //   - The metric is hardcoded zero (budget_growth in v1)
+  const lensIsInert = useMemo(() => {
+    const allRows = rows;
+    const checkVariance = (getter: (r: AgencyTableRow) => number) => {
+      if (allRows.length < 2) return true;
+      const first = getter(allRows[0]);
+      return allRows.every((r) => getter(r) === first);
+    };
+    return {
+      top_spending: false,  // The default sort; always functional
+      civilian_first: (() => {
+        // Inert when all rows are civilian OR all are DOD.
+        const dodCount = allRows.filter(isDodAgency).length;
+        return dodCount === 0 || dodCount === allRows.length;
+      })(),
+      easy_entry: checkVariance((r) => r.metric_easy_entry),
+      budget_growth: true,  // hardcoded 0 across all rows in v1
+      contracts: checkVariance((r) => r.metric_contracts),
+      a_z: false,
+    };
+  }, [rows]);
+
   // Pick the row that wins each quick-pick category using the user's
   // selected metric. The dropdowns on the cards write into quickPick
   // state and we recompute from sortedRows-style logic.
@@ -3337,20 +3368,38 @@ function AgencyTable({
             </p>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {SORT_LENSES.map(lens => (
-              <button
-                key={lens.id}
-                onClick={() => setActiveLens(lens.id)}
-                title={lens.hint}
-                className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
-                  activeLens === lens.id
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                {lens.label}
-              </button>
-            ))}
+            {SORT_LENSES.map(lens => {
+              const inert = lensIsInert[lens.id];
+              // Per-lens reason copy. Surfaces in the tooltip so a
+              // disabled chip explains itself instead of looking
+              // broken.
+              const inertReason = inert
+                ? lens.id === 'budget_growth'
+                  ? 'Budget growth ships in v2 when we wire FY-broken USAspending data.'
+                  : lens.id === 'civilian_first'
+                    ? 'All agencies in this NAICS are the same class — sort would not change order.'
+                    : lens.id === 'easy_entry'
+                      ? 'No SAT-eligible contract data tracked for this NAICS — sort would not change order.'
+                      : 'All rows have the same value for this metric.'
+                : null;
+              return (
+                <button
+                  key={lens.id}
+                  onClick={() => { if (!inert) setActiveLens(lens.id); }}
+                  disabled={inert}
+                  title={inertReason || lens.hint}
+                  className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
+                    inert
+                      ? 'bg-slate-900 text-slate-600 cursor-not-allowed border border-slate-800'
+                      : activeLens === lens.id
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {lens.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
