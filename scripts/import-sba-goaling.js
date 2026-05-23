@@ -57,13 +57,35 @@ function loadEnv() {
       const m = line.match(/^([A-Z_]+)=(.*)$/);
       if (!m) continue;
       const [, k, v] = m;
-      if (!(k in env)) env[k] = v.replace(/^['"]|['"]$/g, '');
+      if (!(k in env)) env[k] = cleanEnvValue(v);
     }
   }
   return {
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL,
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseUrl: cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || ''),
+    serviceKey: cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || ''),
   };
+}
+
+/**
+ * Strip the common garbage that gets stuck onto env values:
+ *   - Wrapping single or double quotes
+ *   - Literal "\n" (two-char backslash-n) — happens when a previous
+ *     sed/edit op wrote the escape sequence verbatim into the file
+ *     instead of a real newline. Eric's .env.local has this on
+ *     several Supabase lines. Without cleaning it, the service key
+ *     gets sent to Supabase with 2 garbage chars at the end and
+ *     gets rejected as "Invalid API key".
+ *   - Trailing CR (\r) from Windows line endings
+ *   - Trailing whitespace
+ */
+function cleanEnvValue(value) {
+  if (!value) return '';
+  return value
+    .replace(/^['"]|['"]$/g, '')   // strip surrounding quotes
+    .replace(/\\n$/g, '')          // strip trailing literal "\n"
+    .replace(/\\r$/g, '')          // strip trailing literal "\r"
+    .replace(/[\r\n]+$/g, '')      // strip real trailing newlines
+    .trim();
 }
 
 /**
