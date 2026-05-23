@@ -2923,7 +2923,7 @@ function MindyNarrative({
 // let users override which metric drives each card. Per the Tesla
 // steering-wheel feedback: every "best by" call has a Why? tooltip
 // + a metric dropdown so power users can drive.
-type SortLens = 'top_spending' | 'civilian_first' | 'easy_entry' | 'budget_growth' | 'contracts' | 'a_z';
+type SortLens = 'top_spending' | 'civilian_first' | 'easy_entry' | 'contracts';
 type QuickPickKind = 'biggest_spender' | 'strongest_signal' | 'low_competition';
 
 interface AgencyTableRow {
@@ -2949,6 +2949,20 @@ interface AgencyTableRow {
   isSubAgency: boolean;
 }
 
+// Sort lenses surfaced to the user. Slimmed May 23, 2026 per Eric:
+// removed A-Z (nobody picks federal agencies alphabetically) and
+// Budget Growth (was hardcoded zero pending FY-broken USAspending
+// data — surfacing a dead chip is worse than not having one). Four
+// lenses remain, each backed by real data that varies across rows:
+//
+//   - Top Spending  : metric_top_spending (set-aside $)
+//   - Civilian First: partition by isDodAgency, then by spend
+//   - Small Biz %   : sbShareFor(row) from SBA Goaling Report
+//   - Contracts     : metric_contracts (raw contract count)
+//
+// Budget Growth deferred to a future commit when we wire
+// USAspending's annual breakdown — captured in the TODO grep
+// 'metric_budget_growth' for future-finder context.
 const SORT_LENSES: Array<{ id: SortLens; label: string; hint: string }> = [
   { id: 'top_spending',  label: 'Top Spending',     hint: 'Biggest pie in your NAICS' },
   // "Civilian First" surfaces non-DOD agencies at the top, sorted
@@ -2961,9 +2975,7 @@ const SORT_LENSES: Array<{ id: SortLens; label: string; hint: string }> = [
   // you're looking for first-contract candidates.
   { id: 'civilian_first', label: 'Civilian First',  hint: 'Non-DOD agencies first — often easier for new entrants' },
   { id: 'easy_entry',    label: 'Small Biz %',      hint: 'Highest % of agency spend that goes to small businesses (SBA Goaling Report FY23)' },
-  { id: 'budget_growth', label: 'Budget Growth',    hint: 'Where the trend favors you (coming in Slice 2)' },
-  { id: 'contracts',     label: 'Contracts',        hint: 'High-frequency buyers' },
-  { id: 'a_z',           label: 'A-Z',              hint: 'Alphabetical (tie-breaker)' },
+  { id: 'contracts',     label: 'Contracts',        hint: 'Most contract awards in your NAICS — high-frequency buyers' },
 ];
 
 // DOD recognition: substring matches against the agency name. Covers
@@ -3342,14 +3354,8 @@ function AgencyTable({
         // Agencies without SBA data sort to the bottom (share=0).
         copy.sort((a, b) => sbShareFor(b) - sbShareFor(a));
         break;
-      case 'budget_growth':
-        copy.sort((a, b) => b.metric_budget_growth - a.metric_budget_growth);
-        break;
       case 'contracts':
         copy.sort((a, b) => b.metric_contracts - a.metric_contracts);
-        break;
-      case 'a_z':
-        copy.sort((a, b) => (a.contractingOffice || a.name).localeCompare(b.contractingOffice || b.name));
         break;
     }
     return copy;
@@ -3387,9 +3393,7 @@ function AgencyTable({
       // Inert when no agency in the result has any SBA data — i.e.
       // the bulk fetch returned 0 matches, or every match is 0.
       easy_entry: allRows.every((r) => sbShareFor(r) === 0),
-      budget_growth: true,  // hardcoded 0 across all rows in v1
       contracts: checkVariance((r) => r.metric_contracts),
-      a_z: false,
     };
   // sbShareByAgency must be a dep — without it the easy_entry inert
   // check would lock to its initial value (all zeros) on first render
@@ -3413,10 +3417,14 @@ function AgencyTable({
           // negative spend signal — quick-pick still picks the
           // top civilian agency.
           case 'civilian_first': return isDodAgency(r) ? -1 : r.metric_top_spending;
+          // easy_entry now sorts by SBA Goaling SB% per parent agency.
+          // metric_easy_entry on the row is the legacy SAT-based score,
+          // which is still useful as a tie-breaker but no longer the
+          // primary signal. Using row-level metric_easy_entry keeps
+          // the quick-pick consistent with the legacy behavior; the
+          // main table sort uses sbShareFor() instead.
           case 'easy_entry':     return r.metric_easy_entry;
-          case 'budget_growth':  return r.metric_budget_growth;
           case 'contracts':      return r.metric_contracts;
-          case 'a_z':            return 0;
         }
       };
       copy.sort((a, b) => mode === 'high' ? metric(b) - metric(a) : metric(a) - metric(b));
@@ -3527,13 +3535,11 @@ function AgencyTable({
               // disabled chip explains itself instead of looking
               // broken.
               const inertReason = inert
-                ? lens.id === 'budget_growth'
-                  ? 'Budget growth ships in v2 when we wire FY-broken USAspending data.'
-                  : lens.id === 'civilian_first'
-                    ? 'All agencies in this NAICS are the same class — sort would not change order.'
-                    : lens.id === 'easy_entry'
-                      ? 'No SAT-eligible contract data tracked for this NAICS — sort would not change order.'
-                      : 'All rows have the same value for this metric.'
+                ? lens.id === 'civilian_first'
+                  ? 'All agencies in this NAICS are the same class — sort would not change order.'
+                  : lens.id === 'easy_entry'
+                    ? 'Small business data from SBA Goaling not loaded for these agencies yet.'
+                    : 'All rows have the same value for this metric.'
                 : null;
               return (
                 <button
@@ -4187,7 +4193,7 @@ function QuickPickCard({
             onChange={(e) => onLensChange(e.target.value as SortLens)}
             className="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200"
           >
-            {SORT_LENSES.filter(l => l.id !== 'a_z').map(l => (
+            {SORT_LENSES.map(l => (
               <option key={l.id} value={l.id}>{l.label}</option>
             ))}
           </select>
