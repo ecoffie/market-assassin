@@ -3459,6 +3459,172 @@ function AgencyTable({
 // already carries — no extra network call. Future-Slice 3 work
 // (saved targets / outreach log) will mount additional sections here
 // without re-architecting the drawer.
+
+// ---------------------------------------------------------------------
+// SbaMixSection — agency-level breakdown by socioeconomic category
+// ---------------------------------------------------------------------
+//
+// Powered by /api/sba-goaling which reads the imported FY23 SBA
+// Goaling Report data. Renders only when we have data for the
+// agency; degrades gracefully to nothing when the agency isn't in
+// the dataset (small/independent agencies often won't be).
+//
+// The bar chart is a horizontal stacked layout showing the 8 SBA
+// categories as percentages of agency total. The headline number
+// is "% goes to small business" (everything except "Not a Small
+// Business").
+
+interface SbaGoalingCategory {
+  category: string;
+  dollars: number;
+  pct: number;
+}
+interface SbaGoalingResponse {
+  success: boolean;
+  fiscal_year?: number;
+  funding_department?: string;
+  total?: number;
+  categories?: SbaGoalingCategory[];
+  small_business_share?: number;
+  error?: string;
+}
+
+// Color map for the 8 categories. Socioeconomic categories get
+// distinct hues; non-SB is muted slate. Order matches the typical
+// rank (Other SB usually #1 small-biz category by dollars).
+const SBA_CATEGORY_COLORS: Record<string, string> = {
+  'Asian American Owned Small Business': 'bg-rose-500',
+  'Black American Owned Small Business': 'bg-amber-500',
+  'Hispanic American Owned Small Business': 'bg-orange-500',
+  'Native American Owned Small Business': 'bg-yellow-500',
+  'Subcontinent Asian American Owned Small Business': 'bg-pink-500',
+  'Other Minority Owned Small Business': 'bg-fuchsia-500',
+  'Other Small Business': 'bg-emerald-500',
+  'Not a Small Business': 'bg-slate-700',
+};
+
+function sbaCategoryShortLabel(category: string): string {
+  // Drop the trailing "Owned Small Business" suffix for compact display.
+  // "Asian American Owned Small Business" → "Asian American"
+  // "Other Small Business" → "Other SB"
+  // "Not a Small Business" → "Not SB"
+  return category
+    .replace(/ Owned Small Business$/, '')
+    .replace(/Other Small Business$/, 'Other SB')
+    .replace(/Not a Small Business$/, 'Not SB');
+}
+
+function SbaMixSection({ agencyName }: { agencyName: string }) {
+  const [data, setData] = useState<SbaGoalingResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!agencyName) return;
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+
+    fetch(`/api/sba-goaling?agency=${encodeURIComponent(agencyName)}`)
+      .then(async (r) => {
+        const json = (await r.json().catch(() => null)) as SbaGoalingResponse | null;
+        if (cancelled) return;
+        if (r.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        if (!r.ok || !json?.success) {
+          // Silent fail — drawer hides the section. The data is
+          // a nice-to-have, not load-bearing.
+          setNotFound(true);
+          return;
+        }
+        setData(json);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setNotFound(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [agencyName]);
+
+  // Hide the section entirely when there's no data for this agency.
+  // Most small/independent agencies aren't in the Goaling Report.
+  if (notFound && !loading) return null;
+
+  return (
+    <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Small Business Mix</h3>
+        {data?.fiscal_year && (
+          <span className="text-[10px] text-slate-500">FY{data.fiscal_year} · SBA Goaling Report</span>
+        )}
+      </div>
+
+      {loading && (
+        <div className="space-y-2 animate-pulse">
+          <div className="h-3 bg-slate-800 rounded w-1/3" />
+          <div className="h-8 bg-slate-800 rounded" />
+        </div>
+      )}
+
+      {data && data.categories && (
+        <>
+          {/* Headline %: small business share */}
+          <div className="mb-4">
+            <div className="text-3xl font-bold text-emerald-400">
+              {((data.small_business_share || 0) * 100).toFixed(1)}%
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              of {(data.funding_department || agencyName).toLowerCase().replace(/(^|\s)\S/g, (s) => s.toUpperCase())}&apos;s
+              {' '}${(data.total || 0 / 1e9).toFixed(2)}B FY{data.fiscal_year} spend went to small businesses
+            </div>
+          </div>
+
+          {/* Stacked horizontal bar — visual representation of the 8 categories */}
+          <div className="flex h-6 rounded-md overflow-hidden mb-3" title="Categories proportional to spend">
+            {data.categories.map((c) => (
+              <div
+                key={c.category}
+                className={SBA_CATEGORY_COLORS[c.category] || 'bg-slate-600'}
+                style={{ width: `${(c.pct * 100).toFixed(2)}%` }}
+                title={`${c.category}: $${(c.dollars / 1e6).toFixed(1)}M (${(c.pct * 100).toFixed(1)}%)`}
+              />
+            ))}
+          </div>
+
+          {/* Legend / detail table — clickable categories could
+              eventually filter the Market Map to "show me agencies
+              where this category is high". v1 just shows the
+              numbers. */}
+          <ul className="space-y-1.5">
+            {data.categories.map((c) => (
+              <li key={c.category} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className={`shrink-0 w-3 h-3 rounded ${SBA_CATEGORY_COLORS[c.category] || 'bg-slate-600'}`} />
+                  <span className="truncate text-slate-300">{sbaCategoryShortLabel(c.category)}</span>
+                </span>
+                <span className="shrink-0 text-slate-400 tabular-nums">
+                  {(c.pct * 100).toFixed(1)}%
+                  <span className="text-slate-600 ml-2">${(c.dollars / 1e6).toFixed(0)}M</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <p className="text-[10px] text-slate-500 mt-4 italic">
+            Source: SBA Small Business Goaling Report via data.sba.gov. Categories from SBA verbatim — race/ethnicity-based socioeconomic classifications.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function AgencyDrawer({
   row,
   onClose,
@@ -3591,6 +3757,14 @@ function AgencyDrawer({
               />
             </div>
           </div>
+
+          {/* Small Business Mix — per-agency breakdown from the SBA
+              Goaling Report. Tells the user what % of THIS specific
+              agency's spend went to small businesses last fiscal year,
+              broken out by socioeconomic category. Better than the
+              page-level Set-Aside Mix donut for SMB targeting because
+              it's specific to the office in front of them. */}
+          <SbaMixSection agencyName={row.parentAgency || row.subAgency || row.contractingOffice || row.name} />
 
           {/* Market Research Links — deep-link out to the source */}
           <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
