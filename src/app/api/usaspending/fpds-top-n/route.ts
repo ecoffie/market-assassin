@@ -204,23 +204,32 @@ export async function GET(request: NextRequest) {
 
     if (cached?.generated_at) {
       const age = Date.now() - new Date(cached.generated_at).getTime();
-      // Treat all-empty cached results as STALE regardless of age.
-      // This is the recovery path for cache rows written by buggy
-      // earlier code (e.g. before NAICS expansion was wired).
-      // Forces a live re-fetch + overwrite on next request.
+      // Treat any partially-empty result as STALE. The previous check
+      // only invalidated when ALL four leaderboards were empty, which
+      // let rows like { departments: [10], vendors: [] } stick around
+      // and break the Top 10 Vendors panel for the cache's lifetime.
+      // Any of the 4 being empty for a real NAICS is anomalous —
+      // refetch and overwrite. (Truly dead NAICS will keep empty
+      // results, that's fine — TTL still applies.)
       const cachedDepartments = cached.top_departments || [];
+      const cachedContracting = cached.top_contracting || [];
       const cachedVendors = cached.top_vendors || [];
-      const allEmpty = cachedDepartments.length === 0 && cachedVendors.length === 0;
-      if (age < CACHE_TTL_MS && !allEmpty) {
+      const cachedFunding = cached.top_funding_agencies || [];
+      const anyEmpty =
+        cachedDepartments.length === 0 ||
+        cachedContracting.length === 0 ||
+        cachedVendors.length === 0 ||
+        cachedFunding.length === 0;
+      if (age < CACHE_TTL_MS && !anyEmpty) {
         return NextResponse.json({
           success: true,
           cached: true,
           cache_age_ms: age,
           fiscal_year: fiscalYear,
           top_departments: cachedDepartments,
-          top_contracting: cached.top_contracting || [],
+          top_contracting: cachedContracting,
           top_vendors: cachedVendors,
-          top_funding_agencies: cached.top_funding_agencies || [],
+          top_funding_agencies: cachedFunding,
           total_obligation: cached.total_obligation,
           total_award_count: cached.total_award_count,
           generated_at: cached.generated_at,

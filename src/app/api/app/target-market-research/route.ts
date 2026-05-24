@@ -97,6 +97,7 @@ interface TargetMarketResearchRow {
 
   // USASpending money signals
   setAsideSpending: number;
+  totalSpending: number;           // ALL contracts (no set-aside filter)
   contractCount: number;
   satSpending: number;
   satContractCount: number;
@@ -104,6 +105,7 @@ interface TargetMarketResearchRow {
   // Pre-computed sort metrics. Each is a number 0..∞ so the UI
   // can just sort DESC on whichever the user picked.
   metric_top_spending: number;     // = setAsideSpending
+  metric_top_total: number;        // = totalSpending — surfaces market giants like USACE
   metric_contracts: number;        // = contractCount
   metric_easy_entry: number;       // satContractCount / max(contractCount,1)
   metric_budget_growth: number;    // YoY % growth (not yet computed — 0 for v1)
@@ -216,19 +218,33 @@ export async function POST(request: NextRequest) {
       console.warn('[target-market-research] cache lookup failed (proceeding live):', cacheErr);
     }
 
-    // Cache miss / stale. Call /api/usaspending/find-agencies internally
-    // to get the agency list with money signals, then enrich.
+    // Cache miss / stale. Two parallel find-agencies calls:
+    //   (1) WITH set-aside filter -> per-office SET-ASIDE spend (existing)
+    //   (2) WITHOUT set-aside filter -> per-office TOTAL spend
+    // The second pass uses businessType/veteranStatus='' which short-
+    // circuits the set-aside code build inside find-agencies, so we
+    // get the raw total-contract spending per office (still filtered
+    // by naics + state). Lets USACE/NAVFAC surface as the giants they
+    // are even though only a slice of their work is set-aside.
     const findAgenciesStart = Date.now();
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
       || (request.headers.get('x-forwarded-proto') && request.headers.get('host')
           ? `${request.headers.get('x-forwarded-proto')}://${request.headers.get('host')}`
           : 'http://localhost:3000');
-    const findRes = await fetch(`${baseUrl}/api/usaspending/find-agencies`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ naicsCode, businessType, veteranStatus, zipCode, pscCode, excludeDOD }),
-    });
+    const [findRes, totalRes] = await Promise.all([
+      fetch(`${baseUrl}/api/usaspending/find-agencies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ naicsCode, businessType, veteranStatus, zipCode, pscCode, excludeDOD }),
+      }),
+      fetch(`${baseUrl}/api/usaspending/find-agencies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ naicsCode, businessType: '', veteranStatus: '', zipCode, pscCode, excludeDOD }),
+      }),
+    ]);
     const findData = (await findRes.json()) as FindAgenciesPayload;
+    const totalData = (await totalRes.json().catch(() => ({ success: false }))) as FindAgenciesPayload;
     const findAgenciesMs = Date.now() - findAgenciesStart;
 
     if (!findData.success || !findData.agencies || findData.agencies.length === 0) {
@@ -241,6 +257,20 @@ export async function POST(request: NextRequest) {
     }
 
     const findAgencies = findData.agencies;
+
+    // Build officeId -> totalSpending map from the no-set-aside pass.
+    // Same officeId scheme as the primary pass (find-agencies dedupes
+    // by parentAgency+subAgency+contractingOffice), so the lookup is
+    // a straight string match. Falls back to 0 when the office didn't
+    // appear in the total pass at all (rare: would mean it has set-
+    // aside spend but no other spend, which can't happen).
+    const totalSpendingByOffice: Record<string, number> = {};
+    if (totalData.success && Array.isArray(totalData.agencies)) {
+      for (const t of totalData.agencies) {
+        const key = t.officeId || t.subAgencyCode || t.agencyCode || t.id || '';
+        if (key) totalSpendingByOffice[key] = t.setAsideSpending || 0;
+      }
+    }
     const agencyNames = Array.from(new Set(
       findAgencies.flatMap((a) => [a.subAgency, a.parentAgency, a.contractingOffice]).filter(Boolean) as string[]
     ));
@@ -317,6 +347,13 @@ export async function POST(request: NextRequest) {
         : 0;
       const naicsAligned = naicsAlignedPainAgencies.has((lookupKey || '').toLowerCase());
 
+      const lookupOfficeKey = a.officeId || a.subAgencyCode || a.agencyCode || a.id || '';
+      const totalSpending = totalSpendingByOffice[lookupOfficeKey]
+        // Fallback: if the total pass missed this office under the same
+        // key (rare but possible if the dedupe keying drifts), at least
+        // use the set-aside number so the row isn't an obvious zero.
+        ?? (a.setAsideSpending || 0);
+
       return {
         id: a.id,
         name: a.name,
@@ -327,12 +364,14 @@ export async function POST(request: NextRequest) {
         location: a.location || '',
 
         setAsideSpending: a.setAsideSpending || 0,
+        totalSpending,
         contractCount: a.contractCount || 0,
         satSpending: a.satSpending || 0,
         satContractCount: a.satContractCount || 0,
 
         // Pre-computed sort metrics. Higher is better for all of them.
         metric_top_spending: a.setAsideSpending || 0,
+        metric_top_total: totalSpending,
         metric_contracts: a.contractCount || 0,
         // Easy Entry score combines SAT ratio (% of contracts under
         // $250K) with raw SAT count, so agencies with 80% SAT but only

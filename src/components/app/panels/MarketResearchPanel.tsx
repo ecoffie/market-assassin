@@ -42,6 +42,7 @@ interface WorkspaceProfileRow {
   company_name?: string | null;
   zip_code?: string | null;
   zip_codes?: string[] | null;
+  location_states?: string[] | null;
   certifications?: string[] | null;
   set_aside_preferences?: string[] | null;
   aggregated_profile?: {
@@ -49,6 +50,7 @@ interface WorkspaceProfileRow {
     agencies?: string[] | null;
     keywords?: string[] | null;
     zip_codes?: string[] | null;
+    location_states?: string[] | null;
     psc_codes?: string[] | null;
     business_type?: string | null;
     company_name?: string | null;
@@ -82,6 +84,8 @@ interface SavedResearchProfile {
   naicsCodes: string[];
   pscCodes: string[];
   agencies: string[];
+  setAsides: string[];
+  locationStates: string[];
   zipCode: string;
   companyName: string;
   source: string;
@@ -516,6 +520,13 @@ function buildSavedResearchProfile(data: WorkspaceData | null): SavedResearchPro
     certifications
   );
   const zipCodes = firstArray(notificationAggregated.zip_codes, notification.zip_codes, briefingAggregated.zip_codes);
+  const locationStates = firstArray(
+    settings.location_states,
+    notification.location_states,
+    notificationAggregated.location_states,
+    briefing.location_states,
+    briefingAggregated.location_states
+  );
   const companyName = String(
     settings.company_name ||
     notification.company_name ||
@@ -534,6 +545,8 @@ function buildSavedResearchProfile(data: WorkspaceData | null): SavedResearchPro
     naicsCodes,
     pscCodes,
     agencies,
+    setAsides: certifications,
+    locationStates,
     zipCode: briefing.zip_code || zipCodes[0] || '',
     companyName,
     source: data.settings ? 'MI workspace settings' : notification.naics_codes || notificationAggregated.naics_codes ? 'briefing settings' : 'saved profile',
@@ -587,6 +600,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // The TMR endpoint is independently cacheable (24h) and idempotent
   // so firing it eagerly costs nothing.
   const [tmrRows, setTmrRows] = useState<AgencyTableRow[]>([]);
+  // Parent-agency filter for AgencyTable. Wired from FpdsLeaderboards
+  // so clicking 'Department of the Army' in a leaderboard scrolls down
+  // and narrows the table to Army offices only. Null = no filter.
+  const [parentAgencyFilter, setParentAgencyFilter] = useState<string | null>(null);
+  const agencyTableRef = useRef<HTMLDivElement>(null);
   // parentSbShareMap — SBA Goaling small-business share keyed by
   // agency name (parent / subAgency / name, whichever was passed
   // to the bulk endpoint). Populated by a parent-level effect once
@@ -951,6 +969,15 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           ...(prefsData.targetAgencies || []),
           ...(prefsData.agencies || []),
         ]);
+        const setAsides = uniqueStrings([
+          ...(workspaceProfile?.setAsides || []),
+          ...(prefsData.setAsides || []),
+        ]);
+        const locationStates = uniqueStrings([
+          ...(workspaceProfile?.locationStates || []),
+          ...(prefsData.locationStates || []),
+          ...(prefsData.locationState ? [prefsData.locationState] : []),
+        ]);
 
         const profile: SavedResearchProfile | null = (
           workspaceProfile || naicsCodes.length > 0 || pscCodes.length > 0 || agencies.length > 0 || prefsData.businessType || prefsData.companyName
@@ -959,6 +986,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           naicsCodes,
           pscCodes,
           agencies,
+          setAsides,
+          locationStates,
           zipCode: workspaceProfile?.zipCode || '',
           companyName: workspaceProfile?.companyName || prefsData.companyName || '',
           source: workspaceProfile?.source || 'alert settings',
@@ -1363,42 +1392,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
   return (
     <div className="p-6 space-y-6">
-      {/* Compact Header with Inline Profile Pills */}
+      {/* Header: title + actions on top, full filter strip below (matches Source Feed) */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold text-white">Market Research</h1>
-          {profileLoading ? (
-            <span className="text-sm text-slate-500">Loading profile...</span>
-          ) : savedProfile ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {savedProfile.naicsCodes.length > 0 && (
-                <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
-                  {savedProfile.naicsCodes.slice(0, 2).join(', ')}{savedProfile.naicsCodes.length > 2 ? ` +${savedProfile.naicsCodes.length - 2}` : ''}
-                </span>
-              )}
-              {savedProfile.businessType && (
-                <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
-                  {savedProfile.businessType}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowAdvancedProfile((v) => !v)}
-                className="text-xs text-slate-500 hover:text-slate-300"
-              >
-                {showAdvancedProfile ? '✕' : 'Edit'}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowAdvancedProfile(true)}
-              className="text-xs text-amber-400 hover:text-amber-300"
-            >
-              + Set profile
-            </button>
-          )}
-        </div>
+        <h1 className="text-2xl font-bold text-white">Market Research</h1>
         <div className="flex items-center gap-3">
           {/* Market Focus Pills (Pro only, inline) */}
           {tier !== 'free' && marketFocuses.length > 0 && (
@@ -1460,6 +1456,56 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           </button>
         </div>
       </div>
+
+      {/* Filter context strip — mirrors Source Feed so free users see their scope */}
+      {profileLoading ? (
+        <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-2 text-xs text-slate-500">
+          Loading profile...
+        </div>
+      ) : savedProfile ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-2 text-xs text-slate-400">
+          <span className="font-semibold text-slate-300">Filters:</span>
+          {savedProfile.naicsCodes.length > 0 && (
+            <span>
+              NAICS {savedProfile.naicsCodes.slice(0, 3).join(', ')}
+              {savedProfile.naicsCodes.length > 3 && ` +${savedProfile.naicsCodes.length - 3}`}
+            </span>
+          )}
+          {savedProfile.businessType && <span>• {savedProfile.businessType}</span>}
+          {savedProfile.setAsides.length > 0 && (
+            <span>• Set-asides: {savedProfile.setAsides.slice(0, 3).join(', ')}
+              {savedProfile.setAsides.length > 3 && ` +${savedProfile.setAsides.length - 3}`}
+            </span>
+          )}
+          {savedProfile.locationStates.length > 0 ? (
+            <span>
+              • States: {savedProfile.locationStates.length <= 4
+                ? savedProfile.locationStates.join(', ')
+                : `${savedProfile.locationStates.slice(0, 3).join(', ')} +${savedProfile.locationStates.length - 3}`}
+            </span>
+          ) : (
+            <span className="text-slate-500">• States: all (national)</span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowAdvancedProfile((v) => !v)}
+            className="ml-auto text-xs text-slate-500 hover:text-slate-300"
+          >
+            {showAdvancedProfile ? '✕ Close' : 'Edit'}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-300">
+          <span>No profile set — Mindy will use defaults until you tell her your NAICS, set-asides, and states.</span>
+          <button
+            type="button"
+            onClick={() => setShowAdvancedProfile(true)}
+            className="text-amber-400 hover:text-amber-200"
+          >
+            + Set profile
+          </button>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -1593,11 +1639,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         </section>
       )}
 
-      {isGenerating && (
-        <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-5 text-blue-200">
-          Building your market map from spending, buyers, budgets, forecasts, and partners...
-        </div>
-      )}
+      {isGenerating && <MarketMapLoadingBanner />}
 
       {/* Phase 2 Slice 1 — Market Map flagship view. Shows when
           viewMode === 'map' AND reports have been generated. Slice 1
@@ -1642,6 +1684,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             naicsCode={formData.naicsCode}
             excludeDOD={formData.excludeDOD}
             email={email}
+            onAgencyClick={(agencyName) => {
+              setParentAgencyFilter(agencyName);
+              // Scroll the All Agencies table into view so the user
+              // sees the filter was applied. setTimeout pushes the
+              // scroll to the next frame so React has rendered the
+              // filter state first.
+              setTimeout(() => {
+                agencyTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 50);
+            }}
           />
 
           {/* Slice 1.5C — Agency table with sort lenses. Replaces the
@@ -1649,16 +1701,20 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               all N offices, 4 sortable metrics, methodology you can
               swap. Drives off /api/app/target-market-research which
               merges USAspending + SAM + pain points + events. */}
-          <AgencyTable
-            email={email}
-            naicsCode={formData.naicsCode}
-            pscCode={formData.pscCode}
-            businessType={formData.businessType}
-            veteranStatus={formData.veteranStatus}
-            zipCode={formData.zipCode}
-            excludeDOD={formData.excludeDOD}
-            onRowsChange={setTmrRows}
-          />
+          <div ref={agencyTableRef}>
+            <AgencyTable
+              email={email}
+              naicsCode={formData.naicsCode}
+              pscCode={formData.pscCode}
+              businessType={formData.businessType}
+              veteranStatus={formData.veteranStatus}
+              zipCode={formData.zipCode}
+              excludeDOD={formData.excludeDOD}
+              onRowsChange={setTmrRows}
+              parentAgencyFilter={parentAgencyFilter}
+              onClearParentFilter={() => setParentAgencyFilter(null)}
+            />
+          </div>
 
           {/* Mindy Says — Groq-generated market narrative + 3
               recommended next actions. Pro-gated (free users see
@@ -2131,6 +2187,61 @@ function MetricCard({ label, value, tone = 'default' }: { label: string; value: 
   );
 }
 
+// Loading banner shown while Build Market Map is fetching. Visible
+// motion (shimmer bar + cycling status messages) so users don't think
+// the page is broken during the ~10-30s generation window.
+function MarketMapLoadingBanner() {
+  const messages = useMemo(() => [
+    'Pulling agency spending from USAspending…',
+    'Cross-referencing SAM.gov opportunities…',
+    'Matching agency pain points to your NAICS…',
+    'Scoring buyers by set-aside fit…',
+    'Identifying prime partners and recompetes…',
+    'Building forecast pipeline…',
+    'Almost ready — assembling your map…',
+  ], []);
+  const [messageIdx, setMessageIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setMessageIdx((i) => (i + 1) % messages.length);
+    }, 2200);
+    return () => clearInterval(id);
+  }, [messages.length]);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 via-blue-500/10 to-emerald-500/10 p-5">
+      <div className="flex items-center gap-3">
+        <span className="relative inline-flex h-3 w-3">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+        </span>
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-emerald-200">Building your market map</div>
+          <div key={messageIdx} className="mt-0.5 animate-fadeIn text-xs text-slate-300">
+            {messages[messageIdx]}
+          </div>
+        </div>
+      </div>
+      {/* Indeterminate progress bar — pure CSS, slides left-to-right */}
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-slate-800">
+        <div className="h-full w-1/3 animate-[marketMapProgress_1.8s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-emerald-500 via-blue-400 to-emerald-500" />
+      </div>
+      <style jsx>{`
+        @keyframes marketMapProgress {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(400%); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(2px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+      `}</style>
+    </div>
+  );
+}
+
 // Slice 1 placeholder for chart slots. Kept around for the 3-Year
 // Trend tile that we can't honestly populate yet (we don't have
 // USAspending FY-broken data in reportData).
@@ -2544,10 +2655,19 @@ function FpdsLeaderboards({
   naicsCode,
   excludeDOD,
   email,
+  onAgencyClick,
 }: {
   naicsCode: string;
   excludeDOD: boolean;
   email: string | null;
+  /**
+   * Click handler for agency-name rows in the 3 agency leaderboards
+   * (Departments, Contracting Agencies, Funding Agencies). Parent
+   * (MarketResearchPanel) sets parentAgencyFilter + scrolls the
+   * All Agencies table into view. Vendors keep their existing
+   * ContractorLink drawer behavior — they're a different drill-down.
+   */
+  onAgencyClick?: (agencyName: string) => void;
 }) {
   const [data, setData] = useState<FpdsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2623,15 +2743,17 @@ function FpdsLeaderboards({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <FpdsLeaderboardCard
           title="Top 10 Departments"
-          subtitle="Parent agencies buying in this NAICS"
+          subtitle="Parent agencies buying in this NAICS (click to filter table below)"
           rows={data?.top_departments || []}
           loading={loading}
+          onAgencyClick={onAgencyClick}
         />
         <FpdsLeaderboardCard
           title="Top 10 Contracting Agencies"
-          subtitle="Sub-agencies awarding the contracts"
+          subtitle="Sub-agencies awarding the contracts (click to filter table below)"
           rows={data?.top_contracting || []}
           loading={loading}
+          onAgencyClick={onAgencyClick}
         />
         <FpdsLeaderboardCard
           title="Top 10 Vendors"
@@ -2643,9 +2765,10 @@ function FpdsLeaderboards({
         />
         <FpdsLeaderboardCard
           title="Top 10 Funding Agencies"
-          subtitle="Agencies funding the contracts (FPDS Treasury Acct equivalent)"
+          subtitle="Agencies funding the contracts (click to filter table below)"
           rows={data?.top_funding_agencies || []}
           loading={loading}
+          onAgencyClick={onAgencyClick}
         />
       </div>
     </section>
@@ -2659,6 +2782,7 @@ function FpdsLeaderboardCard({
   loading,
   linkVendor,
   email,
+  onAgencyClick,
 }: {
   title: string;
   subtitle: string;
@@ -2666,6 +2790,10 @@ function FpdsLeaderboardCard({
   loading: boolean;
   linkVendor?: boolean;
   email?: string | null;
+  /** Agency-card click handler. Wired only on the 3 agency cards
+   *  (not vendors — vendors use ContractorLink). When provided, each
+   *  row name becomes a button that filters the All Agencies table. */
+  onAgencyClick?: (agencyName: string) => void;
 }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
@@ -2698,6 +2826,15 @@ function FpdsLeaderboardCard({
                   <ContractorLink name={row.name} email={email} variant="plain" className="truncate text-slate-200 hover:text-white">
                     {row.name}
                   </ContractorLink>
+                ) : onAgencyClick ? (
+                  <button
+                    type="button"
+                    onClick={() => onAgencyClick(row.name)}
+                    className="truncate text-left text-slate-200 hover:text-emerald-300 hover:underline cursor-pointer"
+                    title={`Filter All Agencies table to ${row.name}`}
+                  >
+                    {row.name}
+                  </button>
                 ) : (
                   <span className="truncate text-slate-200">{row.name}</span>
                 )}
@@ -2923,7 +3060,7 @@ function MindyNarrative({
 // let users override which metric drives each card. Per the Tesla
 // steering-wheel feedback: every "best by" call has a Why? tooltip
 // + a metric dropdown so power users can drive.
-type SortLens = 'top_spending' | 'civilian_first' | 'easy_entry' | 'contracts';
+type SortLens = 'top_total' | 'top_spending' | 'civilian_first' | 'easy_entry' | 'contracts';
 type QuickPickKind = 'biggest_spender' | 'strongest_signal' | 'low_competition';
 
 interface AgencyTableRow {
@@ -2935,10 +3072,12 @@ interface AgencyTableRow {
   officeId: string;
   location: string;
   setAsideSpending: number;
+  totalSpending: number;          // All contracts (no set-aside filter)
   contractCount: number;
   satSpending: number;
   satContractCount: number;
   metric_top_spending: number;
+  metric_top_total: number;       // For "Top Total $" sort lens
   metric_contracts: number;
   metric_easy_entry: number;
   metric_budget_growth: number;
@@ -2964,7 +3103,8 @@ interface AgencyTableRow {
 // USAspending's annual breakdown — captured in the TODO grep
 // 'metric_budget_growth' for future-finder context.
 const SORT_LENSES: Array<{ id: SortLens; label: string; hint: string }> = [
-  { id: 'top_spending',  label: 'Top Spending',     hint: 'Biggest pie in your NAICS' },
+  { id: 'top_total',     label: 'Top Total $',      hint: 'Biggest total contract spend in your NAICS — surfaces market giants like USACE/NAVFAC even when their set-aside spend is small' },
+  { id: 'top_spending',  label: 'Top Set-Aside $',  hint: 'Biggest set-aside pie in your NAICS — what gets carved out for your business type' },
   // "Civilian First" surfaces non-DOD agencies at the top, sorted
   // by spend within the civilian group. DOD agencies still appear
   // (sorted by spend among themselves) but at the bottom of the
@@ -3018,6 +3158,8 @@ function AgencyTable({
   zipCode,
   excludeDOD,
   onRowsChange,
+  parentAgencyFilter,
+  onClearParentFilter,
 }: {
   email: string | null;
   naicsCode: string;
@@ -3031,11 +3173,17 @@ function AgencyTable({
   // can render from the same 96-row data this table uses, not the
   // legacy 7-row reportData.governmentBuyers path.
   onRowsChange?: (rows: AgencyTableRow[]) => void;
+  /** Set by FpdsLeaderboards click. Filters rows to a single parent
+   *  agency (substring-matched against row.parentAgency or row.subAgency).
+   *  Null = no filter. */
+  parentAgencyFilter?: string | null;
+  /** Clear handler, fired by the filter pill's X button. */
+  onClearParentFilter?: () => void;
 }) {
   const [rows, setRows] = useState<AgencyTableRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeLens, setActiveLens] = useState<SortLens>('top_spending');
+  const [activeLens, setActiveLens] = useState<SortLens>('top_total');
   // SBA Goaling small-business share per agency name. Populated by a
   // bulk fetch once rows arrive. Keyed by the agency name we PASSED
   // (parent or subAgency) so lookup in the row render is O(1).
@@ -3329,6 +3477,9 @@ function AgencyTable({
   const sortedRows = useMemo(() => {
     const copy = [...rows];
     switch (activeLens) {
+      case 'top_total':
+        copy.sort((a, b) => b.metric_top_total - a.metric_top_total);
+        break;
       case 'top_spending':
         copy.sort((a, b) => b.metric_top_spending - a.metric_top_spending);
         break;
@@ -3383,6 +3534,7 @@ function AgencyTable({
       return allRows.every((r) => getter(r) === first);
     };
     return {
+      top_total: checkVariance((r) => r.metric_top_total),
       top_spending: false,  // The default sort; always functional
       civilian_first: (() => {
         // Inert when all rows are civilian OR all are DOD.
@@ -3412,6 +3564,7 @@ function AgencyTable({
       const copy = [...rows];
       const metric = (r: AgencyTableRow): number => {
         switch (lens) {
+          case 'top_total':      return r.metric_top_total;
           case 'top_spending':   return r.metric_top_spending;
           // civilian_first ranks DOD lower by giving them a
           // negative spend signal — quick-pick still picks the
@@ -3476,7 +3629,21 @@ function AgencyTable({
     );
   }
 
-  const visibleRows = showAll ? sortedRows : sortedRows.slice(0, 10);
+  // Apply parent-agency filter from FpdsLeaderboards clicks. Case-
+  // insensitive substring match against parentAgency or subAgency so
+  // 'Department of the Army' matches rows whose parentAgency is
+  // 'Department of Defense' but subAgency is 'Department of the Army'.
+  const filteredRows = parentAgencyFilter
+    ? sortedRows.filter((r) => {
+        const needle = parentAgencyFilter.toLowerCase();
+        return (
+          (r.parentAgency || '').toLowerCase().includes(needle) ||
+          (r.subAgency || '').toLowerCase().includes(needle) ||
+          (r.name || '').toLowerCase().includes(needle)
+        );
+      })
+    : sortedRows;
+  const visibleRows = showAll ? filteredRows : filteredRows.slice(0, 10);
 
   return (
     <section className="space-y-4">
@@ -3517,16 +3684,48 @@ function AgencyTable({
         />
       </div>
 
+      {/* Data accuracy disclaimer — set expectations while we wait on
+          SAM.gov System Account approval for true office-level data.
+          USAspending caps award-level fetches at 10K so office $ is
+          sampled, not total. Sub-agency $ aggregates from the same
+          sample. Honest > silent. Remove when SAM access lands. */}
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+        <div className="flex items-start gap-2">
+          <span className="text-amber-400 mt-0.5">ⓘ</span>
+          <div className="flex-1">
+            <span className="font-semibold text-amber-100">Data accuracy: limited</span>
+            <span className="text-amber-300/80"> · Office-level dollar amounts are sampled from USAspending&apos;s public API (capped at 10K awards), not full totals. Use them as relative signal, not authoritative spend. True office-level data (NAVFAC Mid-Atlantic vs NAVFAC Pacific etc.) is coming once our SAM.gov Contract Data API access is approved (2-4 weeks). For accurate parent-agency totals in the meantime, see the &ldquo;FUNDING AGENCIES&rdquo; leaderboard above.</span>
+          </div>
+        </div>
+      </div>
+
       {/* The agency table itself. Sort lens chips drive the order. */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
         <div className="border-b border-slate-800 p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-white">All Agencies ({rows.length} found)</h3>
+            <h3 className="text-lg font-semibold text-white">
+              All Agencies ({filteredRows.length}{parentAgencyFilter ? ` of ${rows.length}` : ''} found)
+            </h3>
             <p className="text-xs text-slate-500">
               Sort lenses re-rank the same data — no re-fetch.
               {cached && <span className="ml-1 text-emerald-400">· cached</span>}
               {freeTierLimited && <span className="ml-1 text-amber-400">· Free tier shows top 10; upgrade for the full list</span>}
             </p>
+            {parentAgencyFilter && (
+              <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+                <span>Filtered: {parentAgencyFilter}</span>
+                {onClearParentFilter && (
+                  <button
+                    type="button"
+                    onClick={onClearParentFilter}
+                    className="text-emerald-300 hover:text-white"
+                    aria-label="Clear filter"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {SORT_LENSES.map(lens => {
@@ -3567,7 +3766,14 @@ function AgencyTable({
             <thead className="bg-slate-900/60 text-xs text-slate-500 uppercase">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">Agency / Office</th>
-                <th className="text-right px-4 py-2 font-medium">Set-Aside $</th>
+                <th
+                  className="text-right px-4 py-2 font-medium"
+                  title="Total contract spend by this office on your NAICS (no set-aside filter). Surfaces market giants like USACE/NAVFAC."
+                >Total $</th>
+                <th
+                  className="text-right px-4 py-2 font-medium"
+                  title="Set-aside-only spend by this office (filtered to contracts that match your business type)."
+                >Set-Aside $</th>
                 <th className="text-right px-4 py-2 font-medium">Contracts</th>
                 <th
                   className="text-right px-4 py-2 font-medium"
@@ -3609,6 +3815,7 @@ function AgencyTable({
                       </div>
                     )}
                   </td>
+                  <td className="text-right px-4 py-2 text-white font-bold">{formatRowCurrency(row.totalSpending)}</td>
                   <td className="text-right px-4 py-2 text-emerald-400 font-semibold">{formatRowCurrency(row.setAsideSpending)}</td>
                   <td className="text-right px-4 py-2">{row.contractCount.toLocaleString()}</td>
                   <td className="text-right px-4 py-2">
@@ -3918,9 +4125,16 @@ function AgencyDrawer({
           {/* 4 stat tiles — matches the legacy modal exactly */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <DrawerStat
+              label="Total Spending"
+              value={formatRowCurrency(row.totalSpending)}
+              tone="slate"
+              hint="All contracts in your NAICS (no set-aside filter)"
+            />
+            <DrawerStat
               label="Set-Aside Spending"
               value={formatRowCurrency(row.setAsideSpending)}
               tone="emerald"
+              hint="Filtered to contracts matching your business type"
             />
             <DrawerStat
               label="Total Contracts"
@@ -3934,11 +4148,6 @@ function AgencyDrawer({
               hint={row.contractCount > 0
                 ? `${row.satContractCount} of ${row.contractCount} contracts under $350K`
                 : undefined}
-            />
-            <DrawerStat
-              label="Office ID"
-              value={row.officeId || '—'}
-              tone="purple"
             />
           </div>
 
