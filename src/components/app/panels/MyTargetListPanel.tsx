@@ -92,8 +92,12 @@ export default function MyTargetListPanel({
   const [eventsByTarget, setEventsByTarget] = useState<Record<string, TargetEvent[]>>({});
   // Track which targets have events expanded vs collapsed. Distinct
   // from expandedId (outreach log) so users can have both views open
-  // on the same card at the same time.
-  const [eventsExpandedId, setEventsExpandedId] = useState<string | null>(null);
+  // on the same card at the same time. Scheduled events (industry
+  // days, webinars, conferences) and sources sought / market research
+  // notices are independent toggles per Eric — different BD actions,
+  // different cadence, user wants to see them separately.
+  const [scheduledExpandedId, setScheduledExpandedId] = useState<string | null>(null);
+  const [sourcesSoughtExpandedId, setSourcesSoughtExpandedId] = useState<string | null>(null);
   // Pain points drill-down. Lazy-fetched per target on first click,
   // cached so the second click is instant. Keyed by target.id.
   const [painExpandedId, setPainExpandedId] = useState<string | null>(null);
@@ -385,8 +389,15 @@ export default function MyTargetListPanel({
                         <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">
                           {t.contract_count} contracts
                         </span>
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                          {Math.round((t.sat_ratio || 0) * 100)}% SAT
+                        <span
+                          className="px-2 py-0.5 rounded bg-slate-800 text-slate-300"
+                          title={
+                            (t.sat_ratio || 0) > 0
+                              ? `${Math.round(t.sat_ratio * 100)}% of this office's sampled contracts are under the $350K Simplified Acquisition Threshold — easier-entry territory.`
+                              : 'No small-dollar contracts (<$350K) appeared in our USAspending sample. Our pipeline pulls awards sorted by amount + date, which skews toward larger contracts. True small-contract count requires the SAM Contract Data API (pending approval).'
+                          }
+                        >
+                          {(t.sat_ratio || 0) > 0 ? `${Math.round(t.sat_ratio * 100)}% SAT` : 'SAT —'}
                         </span>
                         {t.pain_point_count > 0 && (
                           <button
@@ -418,31 +429,51 @@ export default function MyTargetListPanel({
                         />
                       </div>
 
-                      {/* Slice 4 — Event Radar toggle. Shows count
-                          of matching upcoming events. Click to
-                          expand the event list inline. Distinct
-                          state from outreach log so both can be
-                          open simultaneously. */}
+                      {/* Three independent toggles: scheduled events
+                          (industry days etc.), sources sought (RFI /
+                          market research notices), outreach log. Each
+                          opens its own panel below; multiple can be
+                          open at once. */}
                       <div className="mt-3 flex flex-wrap gap-3">
                         {(() => {
                           const evs = eventsByTarget[t.id] || [];
+                          const scheduled = evs.filter(isScheduledEvent);
+                          const sourcesSought = evs.filter(isSourcesSoughtEvent);
                           return (
-                            <button
-                              type="button"
-                              onClick={() => setEventsExpandedId(eventsExpandedId === t.id ? null : t.id)}
-                              disabled={evs.length === 0}
-                              className={`text-xs transition-colors ${
-                                evs.length === 0
-                                  ? 'text-slate-600 cursor-default'
-                                  : 'text-purple-300 hover:text-purple-200'
-                              }`}
-                            >
-                              {evs.length === 0
-                                ? '◌ No events matched'
-                                : eventsExpandedId === t.id
-                                  ? `▼ Hide ${evs.length} ${evs.length === 1 ? 'event' : 'events'}`
-                                  : `▸ Show ${evs.length} upcoming ${evs.length === 1 ? 'event' : 'events'}`}
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setScheduledExpandedId(scheduledExpandedId === t.id ? null : t.id)}
+                                disabled={scheduled.length === 0}
+                                className={`text-xs transition-colors ${
+                                  scheduled.length === 0
+                                    ? 'text-slate-600 cursor-default'
+                                    : 'text-purple-300 hover:text-purple-200'
+                                }`}
+                              >
+                                {scheduled.length === 0
+                                  ? '◌ No scheduled events'
+                                  : scheduledExpandedId === t.id
+                                    ? `▼ Hide ${scheduled.length} scheduled ${scheduled.length === 1 ? 'event' : 'events'}`
+                                    : `▸ Show ${scheduled.length} scheduled ${scheduled.length === 1 ? 'event' : 'events'}`}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSourcesSoughtExpandedId(sourcesSoughtExpandedId === t.id ? null : t.id)}
+                                disabled={sourcesSought.length === 0}
+                                className={`text-xs transition-colors ${
+                                  sourcesSought.length === 0
+                                    ? 'text-slate-600 cursor-default'
+                                    : 'text-amber-300 hover:text-amber-200'
+                                }`}
+                              >
+                                {sourcesSought.length === 0
+                                  ? '◌ No sources sought'
+                                  : sourcesSoughtExpandedId === t.id
+                                    ? `▼ Hide ${sourcesSought.length} sources sought`
+                                    : `▸ Show ${sourcesSought.length} sources sought`}
+                              </button>
+                            </>
                           );
                         })()}
 
@@ -480,12 +511,36 @@ export default function MyTargetListPanel({
                     </div>
                   </div>
 
-                  {/* Slice 4 — Event Radar list. Renders inline
-                      when the user expands events for this target.
-                      Pre-fetched in batch via /api/app/target-events
-                      so no per-card request. */}
-                  {eventsExpandedId === t.id && (
-                    <EventRadarList events={eventsByTarget[t.id] || []} />
+                  {/* Two independent event panels, each tied to its
+                      own toggle button above. Both can be open at
+                      once. Data is pre-fetched in batch via
+                      /api/app/target-events. */}
+                  {scheduledExpandedId === t.id && (
+                    <div className="mt-4 pt-4 border-t border-slate-800">
+                      <EventSection
+                        title="Scheduled Events"
+                        subtitle="Industry days, webinars, conferences — show up and meet people"
+                        accent="purple"
+                        events={(eventsByTarget[t.id] || []).filter(isScheduledEvent)}
+                      />
+                      <p className="text-[10px] text-slate-600 italic mt-3">
+                        Sources: SAM.gov Special Notices (dated) + curated industry
+                        catalog (recurring series, annual conferences).
+                      </p>
+                    </div>
+                  )}
+                  {sourcesSoughtExpandedId === t.id && (
+                    <div className="mt-4 pt-4 border-t border-slate-800">
+                      <EventSection
+                        title="Sources Sought & Market Research"
+                        subtitle="Response-deadline notices — early signal of upcoming buys"
+                        accent="amber"
+                        events={(eventsByTarget[t.id] || []).filter(isSourcesSoughtEvent)}
+                      />
+                      <p className="text-[10px] text-slate-600 italic mt-3">
+                        Sources: SAM.gov Sources Sought + RFI notices from sam_events table.
+                      </p>
+                    </div>
                   )}
 
                   {/* Pain points + priorities list, lazy-fetched on
@@ -593,17 +648,19 @@ function NotesEditor({
 }
 
 // ---------------------------------------------------------------------
-// EventRadarList — Slice 4
+// Event display helpers + EventSection — Slice 4
 // ---------------------------------------------------------------------
 //
-// Inline list of upcoming events matched to this target's agency.
-// Receives events as a prop — the parent fetched everything in batch
-// via /api/app/target-events. We just render here.
+// Renders inline lists of events matched to a target's agency. Data
+// is pre-fetched in batch via /api/app/target-events. Events are
+// split into TWO independent panels per Eric (2026-05-24): scheduled
+// events (industry days etc., purple) and sources sought / RFIs
+// (amber), each with its own toggle button in the parent row.
 //
-// Three source types render with distinct cues so the user knows
-// whether they're looking at a confirmed date (sam_events) or a
-// recurring series / annual conference that they should bookmark
-// the calendar for.
+// Source types render with distinct cues so the user knows whether
+// they're looking at a confirmed date (sam_events) or a recurring
+// series / annual conference that they should bookmark the calendar
+// for.
 
 const EVENT_TYPE_ICONS: Record<string, string> = {
   industry_day: '🎤',
@@ -630,56 +687,19 @@ function formatEventDate(iso: string | null): string {
   return base;
 }
 
-function EventRadarList({ events }: { events: TargetEvent[] }) {
-  if (events.length === 0) {
-    return (
-      <div className="mt-4 pt-4 border-t border-slate-800">
-        <p className="text-xs text-slate-500 italic">
-          No upcoming events matched. Add more sub-agencies to your target list, or check back as
-          sam_events refreshes daily.
-        </p>
-      </div>
-    );
-  }
-
-  // Split the events into two buckets so the user can tell scheduled
-  // events (industry days, webinars, conferences — show up to attend)
-  // apart from sources sought / RFIs / forecasts (response-deadline
-  // notices that signal upcoming buys). Both are useful — different
-  // actions. Per Eric: "I like sources sought and market research,
-  // but I also want actual industry day and conference events."
-  const RFI_TYPES = new Set(['rfi', 'forecast']);
-  const scheduledEvents = events.filter((e) => !RFI_TYPES.has(e.event_type));
-  const rfiEvents = events.filter((e) => RFI_TYPES.has(e.event_type));
-
-  return (
-    <div className="mt-4 pt-4 border-t border-slate-800 space-y-5">
-      {scheduledEvents.length > 0 && (
-        <EventSection
-          title="Scheduled Events"
-          subtitle="Industry days, webinars, conferences — show up and meet people"
-          accent="purple"
-          events={scheduledEvents}
-        />
-      )}
-      {rfiEvents.length > 0 && (
-        <EventSection
-          title="Sources Sought & Market Research"
-          subtitle="Response-deadline notices — early signal of upcoming buys"
-          accent="amber"
-          events={rfiEvents}
-        />
-      )}
-
-      {/* Footer note explaining the data sources. Helps the user
-          calibrate trust — confirmed dates vs ongoing series. */}
-      <p className="text-[10px] text-slate-600 italic">
-        Sources: SAM.gov Special Notices (dated) + curated industry
-        catalog (recurring series, annual conferences). AI web
-        discovery for off-catalog events ships in a future release.
-      </p>
-    </div>
-  );
+// Event-type buckets. RFI/forecast notices live in sam_events too
+// (extract-sam-events classifies 'sources sought' / 'rfi' under the
+// 'rfi' event_type) but they're a different BD action from showing
+// up at an industry day — so we split them into independent toggle
+// buttons + panels per Eric's note: "I like sources sought and
+// market research, but I also want actual industry day and
+// conference events."
+const RFI_EVENT_TYPES = new Set(['rfi', 'forecast']);
+function isScheduledEvent(e: TargetEvent): boolean {
+  return !RFI_EVENT_TYPES.has(e.event_type);
+}
+function isSourcesSoughtEvent(e: TargetEvent): boolean {
+  return RFI_EVENT_TYPES.has(e.event_type);
 }
 
 function EventSection({

@@ -4143,11 +4143,15 @@ function AgencyDrawer({
             />
             <DrawerStat
               label="SAT %"
-              value={row.contractCount > 0 ? `${Math.round(row.satRatio * 100)}%` : '—'}
+              value={row.satContractCount > 0 ? `${Math.round(row.satRatio * 100)}%` : '—'}
               tone="blue"
-              hint={row.contractCount > 0
-                ? `${row.satContractCount} of ${row.contractCount} contracts under $350K`
-                : undefined}
+              hint={
+                row.satContractCount > 0
+                  ? `${row.satContractCount} of ${row.contractCount} contracts under $350K`
+                  : row.contractCount > 0
+                    ? 'No small-dollar awards (<$350K) in our USAspending sample. Pipeline skews to large contracts; true SAT count needs SAM Contract Data API.'
+                    : undefined
+              }
             />
           </div>
 
