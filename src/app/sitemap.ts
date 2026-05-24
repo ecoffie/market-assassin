@@ -37,11 +37,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // these are the entry points where Google sends people first.
   const now = new Date();
   const topLevel: MetadataRoute.Sitemap = [
-    { url: SITE_URL,                          lastModified: now, changeFrequency: 'daily',   priority: 1.0 },
-    { url: `${SITE_URL}/contractors`,          lastModified: now, changeFrequency: 'daily',   priority: 0.9 },
-    { url: `${SITE_URL}/market-intelligence`,  lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
-    { url: `${SITE_URL}/app`,                  lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
-    { url: `${SITE_URL}/pricing`,              lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: SITE_URL,                            lastModified: now, changeFrequency: 'daily',   priority: 1.0 },
+    { url: `${SITE_URL}/contractors`,           lastModified: now, changeFrequency: 'daily',   priority: 0.9 },
+    { url: `${SITE_URL}/market-intelligence`,   lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
+    { url: `${SITE_URL}/opportunity-hunter`,    lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    { url: `${SITE_URL}/expiring-contracts`,    lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    { url: `${SITE_URL}/forecasts`,             lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    { url: `${SITE_URL}/bd-assist`,             lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    { url: `${SITE_URL}/app`,                   lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    { url: `${SITE_URL}/pricing`,               lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE_URL}/about`,                 lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },
+    { url: `${SITE_URL}/privacy`,               lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
+    { url: `${SITE_URL}/terms`,                 lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
   ];
 
   // 2) Every contractor page. Priority graded by spend so Google

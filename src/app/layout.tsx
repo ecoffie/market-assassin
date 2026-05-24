@@ -23,6 +23,14 @@ const jetbrainsMono = JetBrains_Mono({
 // mi.govcongiants.com and getmindy.ai via the host-rewrites in
 // next.config.ts; the wording is brand-neutral enough to work on both.
 export const metadata: Metadata = {
+  // metadataBase + alternates.canonical tell Google that getmindy.ai is
+  // the canonical hostname even when the page is served from the
+  // mi.govcongiants.com mirror. Without this, the two hostnames split
+  // link equity and Google may pick the wrong one to rank.
+  metadataBase: new URL("https://getmindy.ai"),
+  alternates: {
+    canonical: "/",
+  },
   title: "Mindy — Your 24/7 Federal Market Intelligence Analyst",
   description: "Mindy scans 24,000+ federal opportunities daily, scores your fit, and tells you which to pursue. The big contractors have armies. You have Mindy.",
   openGraph: {

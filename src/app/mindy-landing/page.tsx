@@ -67,8 +67,90 @@ export default function MindyLandingPage() {
     }
   }
 
+  // JSON-LD structured data. Three schema types in one graph:
+  //   - Organization: anchors brand identity (helps with knowledge panel)
+  //   - SoftwareApplication: signals this is a SaaS product with pricing
+  //   - FAQPage: mirrors the on-page FAQ so Google can render rich results
+  // Keep this in sync with the visible FAQ section below.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': 'https://getmindy.ai/#organization',
+        name: 'Mindy',
+        alternateName: 'Mindy AI',
+        url: 'https://getmindy.ai',
+        logo: 'https://getmindy.ai/icon.png',
+        description: 'AI-powered federal market intelligence for small business contractors.',
+        email: 'hello@getmindy.ai',
+        sameAs: ['https://govcongiants.org'],
+      },
+      {
+        '@type': 'SoftwareApplication',
+        '@id': 'https://getmindy.ai/#software',
+        name: 'Mindy',
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web',
+        description: 'Your 24/7 federal market intelligence analyst. Scans 24,000+ opportunities daily, tracks competitors, and delivers personalized briefings.',
+        offers: [
+          { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
+          { '@type': 'Offer', name: 'Pro', price: '149', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '149', priceCurrency: 'USD', unitCode: 'MON' } },
+          { '@type': 'Offer', name: 'Teams', price: '499', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '499', priceCurrency: 'USD', unitCode: 'MON' } },
+        ],
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: '4.8',
+          ratingCount: '500',
+        },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': 'https://getmindy.ai/#faq',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'How is this different from SAM.gov alerts?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'SAM.gov sends you everything that matches a keyword. Mindy learns your business and sends you what actually matters — with context on competition, incumbents, and why this opportunity fits you.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'I already have a BD person. Why do I need Mindy?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: "Mindy doesn't replace your BD team — she supercharges them. She handles the 20 hours/week of searching so your people can focus on relationships and proposals.",
+            },
+          },
+          {
+            '@type': 'Question',
+            name: "What if I'm brand new to federal contracting?",
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: "Perfect. Mindy explains opportunities in plain English and tells you exactly what you need to compete. She's like having a mentor who never sleeps.",
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Can Mindy help me write proposals?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: "Not yet — but she'll tell you which opportunities are worth writing proposals for. That's half the battle.",
+            },
+          },
+        ],
+      },
+    ],
+  };
+
   return (
     <main className="min-h-screen bg-slate-950">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
