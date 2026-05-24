@@ -214,12 +214,19 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
   }, [email, loadPursuits, loadSavedContacts]);
 
   useEffect(() => {
-    if (activeTab !== 'network') {
-      searchCandidates();
-    } else {
+    if (activeTab === 'network') {
       setCandidates([]);
+      return;
     }
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Debounce 350ms so typing in the NAICS / Agency / search inputs
+    // doesn't hammer the API on every keystroke. Per-tab change fires
+    // immediately (debounce window includes the first activeTab tick
+    // so there's no double-fetch).
+    const t = setTimeout(() => {
+      searchCandidates();
+    }, 350);
+    return () => clearTimeout(t);
+  }, [activeTab, searchQuery, naicsFilter, agencyFilter, searchCandidates]);
 
   const saveContact = async (contact: RelationshipContact) => {
     if (!email) return;
@@ -250,8 +257,44 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
 
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Failed to save contact');
-      showNotification(data.alreadySaved ? `${contact.full_name} already in network` : `✓ ${contact.full_name} saved to network`);
+
+      // If user picked a pursuit in the dropdown, auto-attach. Lets
+      // Discovery-tab Save do BOTH actions in one click — saving to
+      // network AND binding to the active pursuit. Without this the
+      // dropdown was a visual no-op on Discovery tabs (user complaint
+      // 2026-05-24). The saved contact ID may come back on the POST
+      // response directly; if not, we fall back to looking it up by
+      // source_record_id after reloading the saved list.
+      const savedId: string | undefined = data.contact?.id || data.id;
       await loadSavedContacts();
+
+      if (selectedPursuit && !data.alreadySaved) {
+        const linkId = savedId
+          || savedContacts.find(c => c.source_record_id === contact.source_record_id)?.id;
+        const pursuit = pursuits.find(p => p.id === selectedPursuit);
+        if (linkId) {
+          try {
+            await fetch('/api/app/relationships', {
+              method: 'POST',
+              headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+              body: JSON.stringify({
+                action: 'link_contact',
+                user_email: email,
+                contact_id: linkId,
+                pipeline_id: selectedPursuit,
+              }),
+            });
+            showNotification(`✓ ${contact.full_name} saved + attached to ${pursuit?.title.slice(0, 30) || 'pursuit'}`);
+            await loadSavedContacts();
+            return;
+          } catch (linkErr) {
+            console.warn('[Relationships] Save succeeded but attach failed:', linkErr);
+            // Fall through to plain save toast
+          }
+        }
+      }
+
+      showNotification(data.alreadySaved ? `${contact.full_name} already in network` : `✓ ${contact.full_name} saved to network`);
     } catch (err) {
       console.error('Failed to save contact:', err);
       setError('Failed to save contact.');
@@ -450,7 +493,9 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-slate-500">Attach saved contacts to:</span>
+          <span className="text-sm text-slate-500">
+            {activeTab === 'network' ? 'Attach saved contacts to:' : 'Save + attach to:'}
+          </span>
           <select
             value={selectedPursuit}
             onChange={(event) => setSelectedPursuit(event.target.value)}
