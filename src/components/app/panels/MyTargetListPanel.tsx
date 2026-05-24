@@ -94,6 +94,10 @@ export default function MyTargetListPanel({
   // from expandedId (outreach log) so users can have both views open
   // on the same card at the same time.
   const [eventsExpandedId, setEventsExpandedId] = useState<string | null>(null);
+  // Pain points drill-down. Lazy-fetched per target on first click,
+  // cached so the second click is instant. Keyed by target.id.
+  const [painExpandedId, setPainExpandedId] = useState<string | null>(null);
+  const [painByTarget, setPainByTarget] = useState<Record<string, { painPoints: string[]; priorities: string[]; loading: boolean; error?: string }>>({});
   const { showToast } = useToast();
   const track = useAppTracker(email);
 
@@ -178,6 +182,42 @@ export default function MyTargetListPanel({
       showToast({ message: 'Network error — change not saved', variant: 'error' });
     }
   }, [email, targets, showToast, track]);
+
+  // Toggle the pain points panel for a target. Lazy-fetches on first
+  // open and caches result so subsequent toggles are instant. Tries
+  // sub_agency first (more specific) then falls back to parent.
+  const togglePainExpanded = useCallback(async (target: TargetRow) => {
+    setPainExpandedId((prev) => (prev === target.id ? null : target.id));
+
+    // Already cached (or in-flight) — no fetch needed
+    if (painByTarget[target.id]) return;
+
+    // Mark loading
+    setPainByTarget((prev) => ({
+      ...prev,
+      [target.id]: { painPoints: [], priorities: [], loading: true },
+    }));
+
+    const queryName = target.sub_agency_name || target.agency_name;
+    try {
+      const res = await fetch(`/api/pain-points?agency=${encodeURIComponent(queryName)}`);
+      const json = await res.json();
+      setPainByTarget((prev) => ({
+        ...prev,
+        [target.id]: {
+          painPoints: Array.isArray(json.painPoints) ? json.painPoints : [],
+          priorities: Array.isArray(json.priorities) ? json.priorities : [],
+          loading: false,
+        },
+      }));
+    } catch (err) {
+      console.warn('[MyTargetList] pain points fetch failed:', err);
+      setPainByTarget((prev) => ({
+        ...prev,
+        [target.id]: { painPoints: [], priorities: [], loading: false, error: 'Failed to load' },
+      }));
+    }
+  }, [painByTarget]);
 
   const removeTarget = useCallback(async (id: string) => {
     if (!email) return;
@@ -349,9 +389,14 @@ export default function MyTargetListPanel({
                           {Math.round((t.sat_ratio || 0) * 100)}% SAT
                         </span>
                         {t.pain_point_count > 0 && (
-                          <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300">
-                            {t.pain_point_count} pain pts
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => togglePainExpanded(t)}
+                            className={`px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 transition-colors cursor-pointer ${painExpandedId === t.id ? 'ring-1 ring-amber-400/50' : ''}`}
+                            title="Click to see the documented pain points + priorities for this agency"
+                          >
+                            {t.pain_point_count} pain pts {painExpandedId === t.id ? '▼' : '▸'}
+                          </button>
                         )}
                         {t.open_opp_count > 0 && (
                           <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300">
@@ -441,6 +486,13 @@ export default function MyTargetListPanel({
                       so no per-card request. */}
                   {eventsExpandedId === t.id && (
                     <EventRadarList events={eventsByTarget[t.id] || []} />
+                  )}
+
+                  {/* Pain points + priorities list, lazy-fetched on
+                      first expand via togglePainExpanded. Shows the
+                      actual documented issues, not just the count. */}
+                  {painExpandedId === t.id && (
+                    <PainPointsList data={painByTarget[t.id]} agencyName={t.sub_agency_name || t.agency_name} />
                   )}
 
                   {/* Slice 3D — outreach timeline + log-new form,
@@ -590,17 +642,67 @@ function EventRadarList({ events }: { events: TargetEvent[] }) {
     );
   }
 
-  return (
-    <div className="mt-4 pt-4 border-t border-slate-800">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-          Upcoming Events
-          <span className="ml-2 text-slate-500 font-normal normal-case">
-            ({events.length} matched · next 90 days)
-          </span>
-        </h4>
-      </div>
+  // Split the events into two buckets so the user can tell scheduled
+  // events (industry days, webinars, conferences — show up to attend)
+  // apart from sources sought / RFIs / forecasts (response-deadline
+  // notices that signal upcoming buys). Both are useful — different
+  // actions. Per Eric: "I like sources sought and market research,
+  // but I also want actual industry day and conference events."
+  const RFI_TYPES = new Set(['rfi', 'forecast']);
+  const scheduledEvents = events.filter((e) => !RFI_TYPES.has(e.event_type));
+  const rfiEvents = events.filter((e) => RFI_TYPES.has(e.event_type));
 
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-800 space-y-5">
+      {scheduledEvents.length > 0 && (
+        <EventSection
+          title="Scheduled Events"
+          subtitle="Industry days, webinars, conferences — show up and meet people"
+          accent="purple"
+          events={scheduledEvents}
+        />
+      )}
+      {rfiEvents.length > 0 && (
+        <EventSection
+          title="Sources Sought & Market Research"
+          subtitle="Response-deadline notices — early signal of upcoming buys"
+          accent="amber"
+          events={rfiEvents}
+        />
+      )}
+
+      {/* Footer note explaining the data sources. Helps the user
+          calibrate trust — confirmed dates vs ongoing series. */}
+      <p className="text-[10px] text-slate-600 italic">
+        Sources: SAM.gov Special Notices (dated) + curated industry
+        catalog (recurring series, annual conferences). AI web
+        discovery for off-catalog events ships in a future release.
+      </p>
+    </div>
+  );
+}
+
+function EventSection({
+  title,
+  subtitle,
+  accent,
+  events,
+}: {
+  title: string;
+  subtitle: string;
+  accent: 'purple' | 'amber';
+  events: TargetEvent[];
+}) {
+  const headerColor = accent === 'purple' ? 'text-purple-300' : 'text-amber-300';
+  return (
+    <div>
+      <div className="mb-2">
+        <h4 className={`text-xs font-bold uppercase tracking-wider ${headerColor}`}>
+          {title}
+          <span className="ml-2 text-slate-500 font-normal normal-case">({events.length})</span>
+        </h4>
+        <p className="text-[10px] text-slate-500 mt-0.5">{subtitle}</p>
+      </div>
       <ul className="space-y-2">
         {events.map((ev, idx) => {
           const icon = EVENT_TYPE_ICONS[ev.event_type] || EVENT_TYPE_ICONS.other;
@@ -661,13 +763,97 @@ function EventRadarList({ events }: { events: TargetEvent[] }) {
           );
         })}
       </ul>
+    </div>
+  );
+}
 
-      {/* Footer note explaining the data sources. Helps the user
-          calibrate trust — confirmed dates vs ongoing series. */}
-      <p className="text-[10px] text-slate-600 italic mt-3">
-        Sources: SAM.gov Special Notices (dated) + curated industry
-        catalog (recurring series, annual conferences). AI web
-        discovery for off-catalog events ships in a future release.
+// ---------------------------------------------------------------------
+// PainPointsList — drill-down panel for the "X pain pts" badge
+// ---------------------------------------------------------------------
+// Shows the actual documented pain points + priorities for an agency.
+// Data comes from /api/pain-points which reads from the curated
+// src/data/agency-pain-points.json + agency_intelligence Supabase table
+// (GAO high-risk reports, agency strategic plans, budget docs).
+// Use case: BD person clicks "22 pain pts" → reads the actual issues
+// → cites them in capability statement / Sources Sought response.
+function PainPointsList({
+  data,
+  agencyName,
+}: {
+  data?: { painPoints: string[]; priorities: string[]; loading: boolean; error?: string };
+  agencyName: string;
+}) {
+  if (!data || data.loading) {
+    return (
+      <div className="mt-4 pt-4 border-t border-slate-800">
+        <p className="text-xs text-amber-400/70 italic animate-pulse">Loading pain points for {agencyName}…</p>
+      </div>
+    );
+  }
+
+  if (data.error) {
+    return (
+      <div className="mt-4 pt-4 border-t border-slate-800">
+        <p className="text-xs text-red-400 italic">Could not load pain points: {data.error}</p>
+      </div>
+    );
+  }
+
+  const { painPoints, priorities } = data;
+  if (painPoints.length === 0 && priorities.length === 0) {
+    return (
+      <div className="mt-4 pt-4 border-t border-slate-800">
+        <p className="text-xs text-slate-500 italic">
+          No documented pain points or priorities for {agencyName} yet. Our intel database is growing — check back as GAO and budget cycles release.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-800 space-y-4">
+      {painPoints.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+            Documented Pain Points
+            <span className="ml-2 text-slate-500 font-normal normal-case">({painPoints.length})</span>
+          </h4>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            Stated problems & unmet needs. Cite these in your capability statement and Sources Sought responses.
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {painPoints.map((pp, i) => (
+              <li key={i} className="flex gap-2 text-xs text-slate-300">
+                <span className="text-amber-400/60 shrink-0">▸</span>
+                <span className="leading-snug">{pp}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {priorities.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300">
+            Agency Priorities
+            <span className="ml-2 text-slate-500 font-normal normal-case">({priorities.length})</span>
+          </h4>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            What this agency says it wants to fund next. Align your pitch with these themes.
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {priorities.map((p, i) => (
+              <li key={i} className="flex gap-2 text-xs text-slate-300">
+                <span className="text-purple-300/60 shrink-0">▸</span>
+                <span className="leading-snug">{p}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-[10px] text-slate-600 italic">
+        Sources: GAO high-risk reports, agency strategic plans, budget justification docs, congressional testimony. Curated in our intelligence database.
       </p>
     </div>
   );
