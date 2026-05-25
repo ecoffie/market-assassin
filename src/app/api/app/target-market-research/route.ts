@@ -344,38 +344,69 @@ export async function POST(request: NextRequest) {
     // small-business share per parent agency. One bulk query for the
     // whole FY (~200 rows total — multiple rows per dept, one per
     // category like 'Not a Small Business', 'Small Business', etc).
-    // Returns a map of UPPERCASE dept name -> share (0..1).
     //
     // Computation mirrors /api/sba-goaling/bulk: share = 1 - (nonSB / total).
-    // The `Not a Small Business` row carries the non-SB dollar amount;
-    // `total` is repeated on every category row for the same dept so
-    // we track it once.
+    // Name matching uses normalizeAgency() — lowercase, strip
+    // 'department of', 'dept', 'the', punctuation — then bidirectional
+    // substring match. Fixes 'Interior, Department of' (SBA Goaling
+    // format) vs 'Department of the Interior' (USAspending format).
+    //
+    // Stores TWO maps: by-normalized for lookup, by-display for debug.
+    // Lookup at row-time normalizes the parentAgency the same way.
     const sbaStart = Date.now();
-    const smallBizByParent = new Map<string, number>();
+    const normalizeSbaAgency = (name: string): string =>
+      (name || '')
+        .toLowerCase()
+        .replace(/,/g, ' ')
+        .replace(/\bdepartment of\b/g, '')
+        .replace(/\bdept(\.|of)?\b/g, '')
+        .replace(/\bthe\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const smallBizByNormalized = new Map<string, number>();
     try {
       const { data: goalingRows } = await supabase
         .from('sba_goaling')
         .select('funding_department, category, dollars, total')
         .eq('fiscal_year', 2023);
-      const deptStats = new Map<string, { total: number; nonSb: number }>();
+      const deptStats = new Map<string, { total: number; nonSb: number; normalized: string }>();
       for (const row of (goalingRows || []) as Array<{ funding_department: string; category: string; dollars: number; total: number }>) {
-        const dept = (row.funding_department || '').toUpperCase().trim();
+        const dept = row.funding_department;
         if (!dept) continue;
         if (!deptStats.has(dept)) {
-          deptStats.set(dept, { total: Number(row.total || 0), nonSb: 0 });
+          deptStats.set(dept, {
+            total: Number(row.total || 0),
+            nonSb: 0,
+            normalized: normalizeSbaAgency(dept),
+          });
         }
         if (row.category === 'Not a Small Business') {
           const stats = deptStats.get(dept)!;
           stats.nonSb = Number(row.dollars || 0);
         }
       }
-      for (const [dept, { total, nonSb }] of deptStats.entries()) {
-        if (total > 0) smallBizByParent.set(dept, 1 - (nonSb / total));
+      for (const { total, nonSb, normalized } of deptStats.values()) {
+        if (total > 0 && normalized) {
+          smallBizByNormalized.set(normalized, 1 - (nonSb / total));
+        }
       }
     } catch (sbaErr) {
       console.warn('[target-market-research] SBA Goaling fetch failed:', sbaErr);
     }
     const sbaMs = Date.now() - sbaStart;
+    // Bidirectional substring match — mirrors /api/sba-goaling/bulk.
+    // Tries exact normalized match first, then either-direction
+    // substring fallback so 'navy' matches 'department of the navy'.
+    const lookupSmallBiz = (parentAgency: string): number | null => {
+      const wanted = normalizeSbaAgency(parentAgency);
+      if (!wanted) return null;
+      const exact = smallBizByNormalized.get(wanted);
+      if (exact !== undefined) return exact;
+      for (const [normalized, share] of smallBizByNormalized.entries()) {
+        if (normalized.includes(wanted) || wanted.includes(normalized)) return share;
+      }
+      return null;
+    };
 
     // Enrichment 5 (triage card intel v1, 2026-05-25): top-3 incumbent
     // primes per office. Pre-build a (subAgency|parentAgency) -> top 3
@@ -458,12 +489,10 @@ export async function POST(request: NextRequest) {
         avgBidders: a.avgBidders ?? null,
         uniqueVendorCount: a.uniqueVendorCount || 0,
         // Small biz % from SBA Goaling FY23 (parent-agency level).
-        // Falls back to null if no data — UI shows '—' with tooltip.
-        smallBizPercent: (() => {
-          const parentNormalized = (a.parentAgency || '').toUpperCase().trim();
-          const share = smallBizByParent.get(parentNormalized);
-          return share !== undefined ? share : null;
-        })(),
+        // Uses bidirectional substring match — handles 'Department of
+        // the Interior' (USAspending) vs 'Interior, Department of'
+        // (SBA Goaling) name format differences.
+        smallBizPercent: lookupSmallBiz(a.parentAgency || a.subAgency || a.name || ''),
         // Top 3 incumbent primes for this office (fuzzy match on
         // sub-agency name first, falls back to parent). Cached per key
         // in this request scope.
