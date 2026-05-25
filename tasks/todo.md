@@ -173,6 +173,41 @@ node scripts/fetch-2027-contracts.js --merge
 
 ---
 
+### USAspending Bulk Ingest → SAT% Precompute Pipeline
+**Goal:** Replace runtime SAT% calculation (broken by USAspending API sampling bias — shows 0% / dash for large NAICS like construction) with a precomputed lookup table powered by USAspending's bulk award archive downloads.
+
+**Why this exists:** Investigation 2026-05-25 found that find-agencies samples ~10K awards sorted by Amount desc, so for high-volume NAICS the sample is all mega-contracts; ZERO fall under the $350K SAT threshold; computed SAT% = 0. MA's Federal Market Assassin shows correct numbers (Coast Guard 95.5% etc.) only because the user happened to search a smaller NAICS where the sample captures the right awards. Same bug, different surface.
+
+**Research finding (2026-05-25):** No public source publishes pre-aggregated "% under $350K per agency × NAICS." Closest is USAspending's free Award Data Archive (https://www.usaspending.gov/download_center/award_data_archive) which provides transaction-level `Contracts_Full_FYxxxx.zip` per agency. ~5GB total for FY2024+FY2025, ~50M rows.
+
+**Architecture (locked):**
+- **New analytics Supabase project** (`usaspending-analytics`) — holds 50M-row `usaspending_awards` raw table + ingest jobs + heavy aggregation queries. App never reads from it.
+- **Main Supabase (market-assassin)** — adds small `agency_sat_stats` table (~5K rows) that the app reads at request time. Populated by a "publish" step at end of each precompute.
+- **Granularity:** sub-agency level for civilian (Coast Guard ≠ FEMA), parent-agency level for DoD (Navy total, not split into NAVFAC/NAVSEA — DoD has too many sub-agencies to enumerate quarterly).
+- **Scope:** 25 cabinet departments + their major sub-agencies (~30-50 ZIPs per FY).
+- **Refresh:** Monthly delta for current FY using `Contracts_Delta` files + one-shot ingest for closed FYs.
+- **Triggers:** Monthly cron (1st of month) + admin manual endpoint `/api/admin/recompute-sat?password=`.
+
+**Consumers (read from `agency_sat_stats` in main DB):**
+- Mindy `find-agencies` (replaces broken runtime calc)
+- My Target List SAT badge
+- Market Map drawer SAT % tile
+- MA `ReportsDisplay` "Entry Accessibility" table
+
+**Engineering ETA:** ~11hr total, split into 4 phases:
+- Phase 1 (~4hr): Create analytics Supabase project, schema migration, one-shot script to download FY2024 closed data, parse, load
+- Phase 2 (~3hr): SAT% computation query + summary table publish step to main DB
+- Phase 3 (~2hr): Update find-agencies + UI consumers to read from `agency_sat_stats`
+- Phase 4 (~2hr): Monthly delta cron + admin manual trigger endpoint
+
+**Prerequisite from Eric:** Create new Supabase project named `usaspending-analytics` (us-east-1, free tier to start), share `URL`, `service_role_key`, `anon_key`.
+
+**Potential blocker / decision point:** SAM.gov System Account application is currently Pending Review (submitted 2026-05-24, see [`oauth-branding-runbook.md`](./oauth-branding-runbook.md) and task notes). If SAM access is approved in <3 weeks, the SAM Contract Data API gives clean office-level real-time award data that makes this whole bulk-ingest approach redundant. **Recommendation:** check SAM status weekly; if still pending after 3 weeks, proceed with bulk-ingest build. If SAM approves first, scrap this and use SAM data directly.
+
+**Interim state (shipped 2026-05-25):** Honest 'SAT —' dash + tooltip explaining the sampling skew. Users no longer see misleading 0%.
+
+---
+
 ## P3 - LOW (Backlog)
 
 ### Phase 1A: 21-Day Free Trial System
