@@ -267,7 +267,11 @@ export async function POST(request: NextRequest) {
         hasSubcontractPlan: prime.hasSubcontractPlan || false,
         supplierPortal: prime.supplierPortal || null,
         naicsCategories: prime.naicsCategories || [],
-        agencies: prime.agencies?.slice(0, 5) || [],
+        // Bumped from 5 → 20 on 2026-05-25 so the client can filter
+        // primes against the user's saved target agencies (Teaming
+        // Candidates contextualization). 5 was too narrow — most
+        // primes have agency footprints of 10-50 entries.
+        agencies: prime.agencies?.slice(0, 20) || [],
       })),
       otherAgencies: Array.from(similarAgenciesSet).slice(0, 5).map(agencyName => {
         const painPoints = getPainPointsForAgency(agencyName);

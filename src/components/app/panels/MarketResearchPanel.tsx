@@ -179,6 +179,8 @@ interface ReportData {
       email?: string;
       phone?: string;
       naicsCategories?: string[];
+      agencies?: string[];  // Used by TopPrimesChart to filter primes
+                            // against the user's saved target agencies.
     }>;
     otherAgencies?: Array<{ name: string; reason?: string }>;
     summary?: { totalPrimes: number };
@@ -2526,41 +2528,97 @@ function TrendPlaceholderChart({ totalSpend, agencyCount }: { totalSpend: number
 interface PrimeLike {
   name: string;
   reason?: string;
+  agencies?: string[];  // Optional agency footprint, used by TopPrimesChart
+                        // to filter against the user's saved target list.
 }
 function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string | null }) {
-  // Reframed May 22, 2026 per user: "The top 5 primes data is that
-  // useful for SMBs?" Not as a 'who's dominant' chart \— SMBs
-  // already know Booz Allen + Leidos exist. Reframed as TEAMING
-  // CANDIDATES \— these are active primes in your NAICS who you
-  // can pursue as subcontracting partners. Each click opens their
-  // sales history so the user can judge: are they growing? do
-  // they have recompetes coming up? do they sub at all?
-  //
-  // Future v2: filter the upstream suggestPrimesForAgencies() to
-  // skip primes with >25% market share (those don't need subs)
-  // and rank by mid-tier teaming viability instead of dominance.
-  const top = primes.slice(0, 5);
+  // Reframed May 22 → rebuilt for user context May 25, 2026 per Eric:
+  // "the teaming candidates are the same names over and over again,
+  // this is not helpful once I've called all 9." Old behavior: top 5
+  // primes by NAICS prefix from prime-contractors-database.json —
+  // identical results for every user with the same NAICS. New
+  // behavior: fetch the user's saved target agencies from
+  // user_target_list, then filter primes whose agencies[] field
+  // overlaps the user's targets. Empty target list → fall back to
+  // top NAICS primes + nudge to save targets.
+  const [savedAgencies, setSavedAgencies] = useState<Set<string>>(new Set());
+  const [targetsLoaded, setTargetsLoaded] = useState(false);
 
-  if (top.length === 0) {
+  useEffect(() => {
+    if (!email) {
+      setTargetsLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        const names = new Set<string>();
+        for (const t of (data?.targets || [])) {
+          // Match on agency_name AND sub_agency_name so we catch
+          // both 'Department of the Navy' and 'NAVFAC' style saves.
+          if (t.agency_name) names.add(String(t.agency_name).toLowerCase().trim());
+          if (t.sub_agency_name) names.add(String(t.sub_agency_name).toLowerCase().trim());
+        }
+        setSavedAgencies(names);
+      })
+      .catch(() => { /* graceful degrade to no-filter fallback */ })
+      .finally(() => { if (!cancelled) setTargetsLoaded(true); });
+    return () => { cancelled = true; };
+  }, [email]);
+
+  // Filter primes against the user's saved target agencies. A prime
+  // qualifies if ANY of its known agency strings substring-matches
+  // ANY of the user's saved agency names (in either direction).
+  // Loose match because the data is messy: 'DEPT OF THE AIR FORCE'
+  // vs 'Department of the Air Force' vs 'Air Force'.
+  const contextualPrimes = useMemo(() => {
+    if (savedAgencies.size === 0) return [];
+    return primes.filter(p => {
+      // Skip primes without an agencies footprint — can't filter them.
+      // The fallback path below uses these primes as 'top NAICS overall.'
+      if (!p.agencies || p.agencies.length === 0) return false;
+      return p.agencies.some(pa => {
+        const haystack = pa.toLowerCase();
+        for (const saved of savedAgencies) {
+          if (haystack.includes(saved) || saved.includes(haystack)) return true;
+        }
+        return false;
+      });
+    });
+  }, [primes, savedAgencies]);
+
+  const hasContextualMatches = contextualPrimes.length > 0;
+  const usedFallback = !hasContextualMatches;
+  const top = (hasContextualMatches ? contextualPrimes : primes).slice(0, 5);
+
+  if (!targetsLoaded || top.length === 0) {
     return (
-      <ChartShell title="Teaming Candidates" subtitle="Primes in your NAICS who actively sub work out">
+      <ChartShell title="Teaming Candidates" subtitle="Primes you can pursue as subcontracting partners">
         <div className="flex items-center justify-center h-full text-xs text-slate-500">
-          No prime data yet. Build the report to populate.
+          {!targetsLoaded ? 'Loading…' : 'No prime data yet. Build the report to populate.'}
         </div>
       </ChartShell>
     );
   }
 
+  const subtitle = hasContextualMatches
+    ? `Primes active on your ${savedAgencies.size} target ${savedAgencies.size === 1 ? 'agency' : 'agencies'} — click for sales history`
+    : 'Primes in your NAICS — click for sales history + recompete signals';
+
+  const footer = usedFallback ? (
+    <p className="text-[11px] text-amber-300/80">
+      Showing top NAICS primes (not yet contextual). <span className="text-slate-500">Save 3+ target agencies above to see primes who actually work with them.</span>
+    </p>
+  ) : (
+    <p className="text-[11px] text-emerald-400/80">
+      Filtered to primes whose agency footprint overlaps your saved targets. Same NAICS, your buyers.
+    </p>
+  );
+
   return (
-    <ChartShell
-      title="Teaming Candidates"
-      subtitle="Primes in your NAICS — click for sales history + recompete signals"
-      footer={
-        <p className="text-[11px] text-slate-500">
-          Teaming viability score (market share + sub-history) ships in v2. Today: surfaced by NAICS overlap only.
-        </p>
-      }
-    >
+    <ChartShell title="Teaming Candidates" subtitle={subtitle} footer={footer}>
       <ul className="space-y-2">
         {top.map((p, i) => (
           <li key={`${p.name}-${i}`} className="flex items-start gap-3">
