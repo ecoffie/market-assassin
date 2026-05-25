@@ -1,6 +1,66 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** May 14, 2026
+**Last Updated:** May 25, 2026
+
+---
+
+## Session Handoff — 2026-05-25 (long Mindy polish session)
+
+### Completed (all live on prod unless noted)
+- [x] **Market Research filter strip header** (NAICS · Business · Set-asides · States)
+- [x] **MarketMapLoadingBanner** with cycling status messages + shimmer + ping dot
+- [x] **Loading banner extended through child-chart settle** (2.5s grace after tmrRows arrive)
+- [x] **Data accuracy disclaimer banner** above All Agencies table
+- [x] **fpds-top-n cache fix** (any-empty leaderboard now stale, not just all-empty)
+- [x] **Total $ column + 'Top Total $' sort lens** (with caveat — uses same sampling pipeline, still inaccurate for high-volume NAICS)
+- [x] **'Top Spending' renamed to 'Top Set-Aside $'** (honest label)
+- [x] **Drawer Total Spending + Set-Aside Spending tiles** with explanatory hints
+- [x] **Leaderboard agency drill-down** (click 'Department of the Army' → filter All Agencies + scroll)
+- [x] **Top 10 Funding Agencies leaderboard cut** (near-duplicate of Departments)
+- [x] **'Start Here' 3-card row deleted** (broken picker showing Homeland $0/0 as 'best first')
+- [x] **Pain pts badge clickable** in My Target List → expandable panel with documented issues + priorities
+- [x] **Events split into 2 independent toggle buttons** (Scheduled Events purple, Sources Sought amber)
+- [x] **SAT% shows 'SAT —' instead of misleading 0%** when sample has no small-dollar contracts
+- [x] **Relationships NAICS/Agency inputs live-filter** (350ms debounce)
+- [x] **Save+Attach on Discovery tabs** (Save also attaches to selected pursuit in one click)
+- [x] **Contextual Teaming Candidates** — filters primes against user's saved target agencies; empty state nudges to save targets
+- [x] **SAM.gov System Account application submitted** (eric ops, status: Pending Review)
+- [x] **Vercel Static IPs enabled** for SAM allowlist (us-east-1: 34.203.20.143, 3.235.96.207)
+- [x] **My Target List table** (`user_target_list` + `user_target_outreach`) created in Supabase
+
+### Reverted — needs redo next session
+- [ ] **Start Tracking triage flow** — broke /app with client-side React exception. Rolled back to pre-triage build, then `git revert` of `feb239b` + `939fa3f`. Code preserved in those reverted commits for resurrection. **Next session:** open DevTools console on the previously-broken deploy URL `market-assassin-9p34lmm7a-eric-coffies-projects.vercel.app`, get the actual stack trace, fix the specific line, redeploy. Likely culprits per code audit: TriageAgencyCard import order, useMemo dep array, or hook-order violation when triage modal mounts conditionally.
+- [ ] **`user_dismissed_targets` table** was successfully created in Supabase already (NOT reverted). Safe to leave empty; triage code can reuse it on redo.
+
+### Decisions made (and why)
+- **Triage modal pattern over per-row buttons** — research showed per-row buttons invite overtracking (users click 20 buttons because it's cheap; capture nothing). Triage forces per-agency decision with rich context. Soft cap at 5.
+- **Reverted broken triage rather than guess-fixing in prod** — followed our new "commit before deploy" rule and immediately rolled back when the crash hit. Diagnose with DevTools next session instead of guessing.
+- **Honest "SAT —" dash instead of fake number** — for users on construction NAICS, SAT ratio is structurally wrong (sample skewed to mega-contracts). Tooltip explains. Real fix needs USAspending bulk-ingest pipeline (P2 backlog item) OR SAM Contract Data API (Pending Review).
+- **Cut Funding Agencies leaderboard entirely** — 95% duplicate of Departments for SMB audience. Cleaner UX wins over preserving the awarding-vs-funding distinction.
+- **Contextual Teaming filters by prime.agencies[] not USAspending live query** — fast (no extra API call), good enough. Future: USAspending recipient lookup per saved target for richer signal.
+- **Loading banner uses 2.5s timer grace period, not child-state subscription** — the cheap path; child components don't currently expose loading flags upstream. Better v2: refactor to use loading callbacks.
+
+### State at handoff
+- Branch: `main`
+- Working tree: clean (no uncommitted changes)
+- Prod deploy: `market-assassin-nz69587kb` (10m ago, `7c5fc75 fix(research): keep loading banner visible until child charts settle`)
+- Aliases: getmindy.ai, tools.govcongiants.org, mi.govcongiants.com (all 200)
+- Supabase: `user_target_list`, `user_target_outreach`, `user_dismissed_targets` tables all live in main DB
+- Dev server: not running
+
+### Next session priorities (in order)
+1. **Diagnose triage crash** (task #47): open DevTools console, get stack trace, fix specific line, resurrect from `git show feb239b -- src/components/app/panels/triage/StartTrackingModal.tsx` etc.
+2. **SAT/Entry Accessibility table** in Reports view where 'Start Here' used to be (task #41) — after triage stable
+3. **Check SAM System Account status weekly** (task #20) — if approved → can build real office-level data layer
+4. **Other ideas surfaced this session:**
+   - Map "Reports" view is still confusing — needs an audit similar to what we did for Map view
+   - Bigger USAspending bulk-ingest pipeline (P2 todo entry already written) becomes relevant if SAM access doesn't land
+
+### Notes for next session
+- The user has SAM Joint Account Holder still set as himself (against video instruction). May get rejected for self-approval. If so: pick a teammate (Branden was the planned choice), have them register a SAM account, edit the request.
+- Vercel Static IPs cost $100/mo (us-east-1 only, dropped us-west-1 to save $50/mo). Live now.
+- Memory `commit-before-deploy.md` saved — future sessions should commit then deploy, not the reverse. Saved us tonight when we needed to rollback.
+- The user appreciates honest disclaimers over fake data. Pattern: when something's structurally inaccurate, surface a tooltip/banner explaining why instead of hiding the limitation behind nice-looking numbers.
 
 ---
 
