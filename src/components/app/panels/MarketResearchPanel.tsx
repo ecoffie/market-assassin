@@ -602,6 +602,20 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // The TMR endpoint is independently cacheable (24h) and idempotent
   // so firing it eagerly costs nothing.
   const [tmrRows, setTmrRows] = useState<AgencyTableRow[]>([]);
+  // Charts-ready signal — gates the MarketMapLoadingBanner so it stays
+  // visible past isGenerating=false, until child charts (AgencyTable
+  // rows + FPDS leaderboards + SBA goaling lookups) have settled.
+  // Per Eric (2026-05-25): "between the time where the first graph
+  // loads to the final we still need to show image one working" —
+  // banner was disappearing while half-rendered charts were still
+  // settling, looked broken. Flips true ~2.5s after tmrRows arrive.
+  const [chartsReady, setChartsReady] = useState(true);
+  useEffect(() => {
+    if (tmrRows.length === 0) return;
+    setChartsReady(false);
+    const t = setTimeout(() => setChartsReady(true), 2500);
+    return () => clearTimeout(t);
+  }, [tmrRows]);
   // Parent-agency filter for AgencyTable. Wired from FpdsLeaderboards
   // so clicking 'Department of the Army' in a leaderboard scrolls down
   // and narrows the table to Army offices only. Null = no filter.
@@ -1639,7 +1653,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         </section>
       )}
 
-      {isGenerating && <MarketMapLoadingBanner />}
+      {(isGenerating || !chartsReady) && <MarketMapLoadingBanner />}
 
       {/* Phase 2 Slice 1 — Market Map flagship view. Shows when
           viewMode === 'map' AND reports have been generated. Slice 1
