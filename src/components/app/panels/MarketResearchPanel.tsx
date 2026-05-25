@@ -3618,21 +3618,32 @@ function AgencyTable({
   }, [sortedRows, savedTargets, dismissedOfficeNames]);
 
   // After a triage action, update local state so the table + modal
-  // stay in sync without a full refetch.
+  // stay in sync without a full refetch. Also fire a toast — without
+  // it the modal silently swaps cards and users think Track did
+  // nothing (Eric reported this 2026-05-25, after the modal was
+  // already working). Toast confirms the action took.
   const handleTriageAction = useCallback((action: 'track' | 'defer' | 'skip', officeName: string) => {
+    // Truncate long office names to keep toast readable
+    const shortName = officeName.length > 40 ? `${officeName.slice(0, 37)}…` : officeName;
     if (action === 'track') {
       // Optimistic flip — server returns the new target_id but we
       // don't need it for the ★ indicator; any truthy value works.
       // Next page navigation re-fetches anyway.
       setSavedTargets(prev => ({ ...prev, [officeName]: 'pending' }));
+      showAgencyToast({ message: `✓ Tracked: ${shortName}`, variant: 'success' });
     } else {
       setDismissedOfficeNames(prev => {
         const next = new Set(prev);
         next.add(officeName);
         return next;
       });
+      if (action === 'defer') {
+        showAgencyToast({ message: `⏱ Deferred 30 days: ${shortName}`, variant: 'info' });
+      } else {
+        showAgencyToast({ message: `✕ Skipped: ${shortName}`, variant: 'info' });
+      }
     }
-  }, []);
+  }, [showAgencyToast]);
 
   // Per-lens "is this lens inert on the current data" check. If a
   // lens would produce zero visible movement (because every row has
