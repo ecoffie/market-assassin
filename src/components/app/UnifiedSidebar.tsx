@@ -44,6 +44,22 @@ interface NavSection {
   items: NavItem[];
 }
 
+// Sidebar order reorganized 2026-05-25 per Eric: pipeline/execution
+// at the top, research at the bottom. The old "Intelligence → Research
+// → Pipeline → Estimating → Account" order optimized for first-time
+// onboarding (~5% of sessions). The new order optimizes for returning
+// users (~95% of sessions) who land in the app to work pursuits, not
+// to rediscover their market.
+//
+// Daily-use flow (top to bottom):
+//   1. Intelligence — what's hot today (every session)
+//   2. Pipeline — what I'm working on (daily/weekly)
+//   3. Estimating — what should I bid (per-opp work)
+//   4. Research — discovery / occasional (mostly first-time)
+//   5. Account — settings
+//
+// Mirrors Slack (Inbox/Threads top), Linear (Inbox/Active top),
+// Salesforce (My Opps/My Tasks top) — execution before discovery.
 const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Intelligence',
@@ -70,6 +86,68 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Charts, full SAM, CSV export',
         tier: ['free', 'pro', 'team', 'enterprise'],
         href: '/app/market-intel',
+      },
+    ],
+  },
+  {
+    title: 'Pipeline',
+    items: [
+      {
+        id: 'pipeline',
+        label: 'My Pursuits',
+        icon: '📈',
+        description: 'Track opportunities',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        // Slice 3 of the Target Market Research roadmap. Saved BD
+        // targets sourced from the Market Research drawer. Sits with
+        // Pipeline because it's the "what am I working on?" mental
+        // mode — opps you're chasing + offices you're courting.
+        id: 'target-list',
+        label: 'My Target List',
+        icon: '🎯',
+        description: 'Saved offices to work',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        id: 'contacts',
+        label: 'My Network',
+        icon: '🤝',
+        description: 'Buyers + partners',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        id: 'team',
+        label: 'Team Access',
+        icon: '👥',
+        description: 'Seats + roles',
+        tier: ['team', 'enterprise'],
+        badge: 'Teams',
+      },
+    ],
+  },
+  {
+    // Estimating = the "what should I bid?" mental mode. Sits right
+    // after Pipeline so the daily flow is: Pursuits → Estimating →
+    // submit. Research lives below since pricing happens on opps
+    // you're already chasing, not discovering.
+    title: 'Estimating',
+    items: [
+      {
+        id: 'pricing',
+        label: 'Pricing Intel',
+        icon: '💵',
+        description: 'Labor rates, GSA/SCA wages',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        id: 'proposals',
+        label: 'Proposal Assist',
+        icon: '📝',
+        description: 'AI proposal help',
+        tier: ['pro', 'team', 'enterprise'],
+        badge: 'AI',
       },
     ],
   },
@@ -117,69 +195,6 @@ const NAV_SECTIONS: NavSection[] = [
         icon: '🏢',
         description: 'Prime contractor DB',
         tier: ['pro', 'team', 'enterprise'],
-      },
-    ],
-  },
-  {
-    title: 'Pipeline',
-    items: [
-      {
-        id: 'pipeline',
-        label: 'My Pursuits',
-        icon: '📈',
-        description: 'Track opportunities',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        // Slice 3 of the Target Market Research roadmap. Saved BD
-        // targets sourced from the Market Research drawer. Sits with
-        // Pipeline because it's the "what am I working on?" mental
-        // mode — opps you're chasing + offices you're courting.
-        id: 'target-list',
-        label: 'My Target List',
-        icon: '🎯',
-        description: 'Saved offices to work',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        id: 'contacts',
-        label: 'My Network',
-        icon: '🤝',
-        description: 'Buyers + partners',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        id: 'team',
-        label: 'Team Access',
-        icon: '👥',
-        description: 'Seats + roles',
-        tier: ['team', 'enterprise'],
-        badge: 'Teams',
-      },
-    ],
-  },
-  {
-    // Estimating = the "what should I bid?" mental mode. Separate
-    // from Pipeline (which is "what am I working on?") because BD
-    // people switch contexts when they go from tracking opps to
-    // pricing one. Lives between Pipeline and Opportunities so the
-    // daily flow is: Pursuits → Estimating → submit.
-    title: 'Estimating',
-    items: [
-      {
-        id: 'pricing',
-        label: 'Pricing Intel',
-        icon: '💵',
-        description: 'Labor rates, GSA/SCA wages',
-        tier: ['pro', 'team', 'enterprise'],
-      },
-      {
-        id: 'proposals',
-        label: 'Proposal Assist',
-        icon: '📝',
-        description: 'AI proposal help',
-        tier: ['pro', 'team', 'enterprise'],
-        badge: 'AI',
       },
     ],
   },
