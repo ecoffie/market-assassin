@@ -1385,8 +1385,6 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   const primeSummary = reportData?.primeContractor?.summary;
   const vehicleSummary = reportData?.idvContracts?.summary;
   const forecastSummary = reportData?.forecastList?.summary;
-  const bestBuyer = buyers[0];
-  const topNeed = reportData?.agencyPainPoints?.highOpportunityMatches?.[0] || reportData?.agencyPainPoints?.painPoints?.[0];
   const recommendedReports: readonly string[] = RESEARCH_LENSES.find(lens => lens.id === activeLens)?.reports || [];
   const readyReports = REPORTS.filter(report => recommendedReports.includes(report.id) && canAccessReport(report.tier));
 
@@ -1746,44 +1744,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             <MetricCard label="Upcoming signals" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" />
           </section>
 
-          <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Start Here</h2>
-                <p className="text-sm text-slate-500">The three things worth looking at first.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveReportId('buyers')}
-                className="self-start rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700"
-              >
-                View all buyers
-              </button>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <InsightCard
-                label="Best first agency"
-                title={bestBuyer?.parentAgency || bestBuyer?.contractingOffice || 'No agency found yet'}
-                detail={bestBuyer ? `${formatCurrency(bestBuyer.spending)} tracked spend • ${bestBuyer.contractCount || 0} contracts` : 'Refresh research after your profile loads.'}
-                action="See buyers"
-                onClick={() => setActiveReportId('buyers')}
-              />
-              <InsightCard
-                label="Strongest need signal"
-                title={topNeed?.agency || 'Needs analysis'}
-                detail={'painPoint' in (topNeed || {}) && topNeed?.painPoint ? topNeed.painPoint : 'Open the needs view to see positioning themes.'}
-                action="See signals"
-                onClick={() => setActiveReportId('pain')}
-              />
-              <InsightCard
-                label="Competition angle"
-                title={`${primeSummary?.totalPrimes || 0} prime targets`}
-                detail={`${vehicleSummary?.totalContracts || 0} contract vehicle records in this market.`}
-                action="See competition"
-                onClick={() => setActiveReportId('primes')}
-              />
-            </div>
-          </section>
+          {/* 'Start Here' 3-card row removed 2026-05-25 per Eric.
+              The picker was unreliable: 'Best first agency' would pick
+              Homeland Security with $0 tracked spend, 'Strongest need
+              signal' surfaced GSA cybersecurity when the user searched
+              construction NAICS, 'Competition angle' showed contradictory
+              counts. Cards didn't earn their slot. The All Agencies
+              table below already lets users pick winners by their own
+              criteria. */}
 
           {/* Recommended Opportunities section removed May 22, 2026.
               It duplicated Today's Intel and Source Feed (3 surfaces
@@ -2740,7 +2708,13 @@ function FpdsLeaderboards({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {/* Top 10 Funding Agencies card removed 2026-05-25 per Eric:
+          near-duplicate of Top 10 Departments for the SMB audience
+          (same 10 names slightly reordered). 'Awarding vs funding'
+          distinction is a power-user concept that adds confusion
+          without action. Going from 4 cards → 3, full-width Vendors
+          on lg screens. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         <FpdsLeaderboardCard
           title="Top 10 Departments"
           subtitle="Parent agencies buying in this NAICS (click to filter table below)"
@@ -2762,13 +2736,6 @@ function FpdsLeaderboards({
           loading={loading}
           linkVendor
           email={email}
-        />
-        <FpdsLeaderboardCard
-          title="Top 10 Funding Agencies"
-          subtitle="Agencies funding the contracts (click to filter table below)"
-          rows={data?.top_funding_agencies || []}
-          loading={loading}
-          onAgencyClick={onAgencyClick}
         />
       </div>
     </section>
@@ -4416,32 +4383,7 @@ function QuickPickCard({
   );
 }
 
-function InsightCard({
-  label,
-  title,
-  detail,
-  action,
-  onClick,
-}: {
-  label: string;
-  title: string;
-  detail: string;
-  action: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-xl border border-slate-800 bg-slate-950/50 p-5 text-left hover:border-emerald-500/50"
-    >
-      <div className="text-xs uppercase tracking-wider text-emerald-300">{label}</div>
-      <div className="mt-3 text-lg font-semibold text-white">{title}</div>
-      <div className="mt-2 line-clamp-3 text-sm text-slate-400">{detail}</div>
-      <div className="mt-4 text-sm font-medium text-emerald-300">{action} →</div>
-    </button>
-  );
-}
+// InsightCard component removed 2026-05-25 with the 'Start Here' row.
 
 // Report Viewer Component
 interface ReportViewerProps {
