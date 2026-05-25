@@ -3578,6 +3578,62 @@ function AgencyTable({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, activeLens, sbShareByAgency]);
 
+  // Triage candidate list: sorted rows minus already-tracked + dismissed.
+  // Uses sortedRows (not filteredRows) so the parent-agency filter
+  // doesn't accidentally limit triage scope — the modal should always
+  // see the full eligible set, not the filtered view.
+  //
+  // IMPORTANT: This useMemo + the useCallback below MUST live before
+  // the early returns at lines ~3660-3697 (no naics / loading / error /
+  // no rows). React's hook order must be identical across renders; if
+  // these hooks land AFTER an early return, they only run on some
+  // renders → 'Rendered more hooks than during the previous render' →
+  // white-screen crash. This bit us once already (commit feb239b,
+  // rolled back, fixed in 49 — see tasks/lessons.md if it exists).
+  const triageCandidates: TriageAgencyCard[] = useMemo(() => {
+    return sortedRows
+      .filter(r => {
+        const officeName = r.contractingOffice || r.name;
+        if (savedTargets[officeName]) return false;            // already tracked
+        if (dismissedOfficeNames.has(officeName)) return false; // already skipped / deferred
+        return true;
+      })
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        contractingOffice: r.contractingOffice,
+        subAgency: r.subAgency,
+        parentAgency: r.parentAgency,
+        officeId: r.officeId,
+        location: r.location,
+        totalSpending: r.totalSpending,
+        setAsideSpending: r.setAsideSpending,
+        contractCount: r.contractCount,
+        satRatio: r.satRatio,
+        satContractCount: r.satContractCount,
+        painPointCount: r.painPointCount,
+        openOppCount: r.openOppCount,
+        upcomingEventCount: r.upcomingEventCount,
+      }));
+  }, [sortedRows, savedTargets, dismissedOfficeNames]);
+
+  // After a triage action, update local state so the table + modal
+  // stay in sync without a full refetch.
+  const handleTriageAction = useCallback((action: 'track' | 'defer' | 'skip', officeName: string) => {
+    if (action === 'track') {
+      // Optimistic flip — server returns the new target_id but we
+      // don't need it for the ★ indicator; any truthy value works.
+      // Next page navigation re-fetches anyway.
+      setSavedTargets(prev => ({ ...prev, [officeName]: 'pending' }));
+    } else {
+      setDismissedOfficeNames(prev => {
+        const next = new Set(prev);
+        next.add(officeName);
+        return next;
+      });
+    }
+  }, []);
+
   // Per-lens "is this lens inert on the current data" check. If a
   // lens would produce zero visible movement (because every row has
   // metric=0, or every row is the same agency-class, etc.) the chip
@@ -3707,53 +3763,9 @@ function AgencyTable({
     : sortedRows;
   const visibleRows = showAll ? filteredRows : filteredRows.slice(0, 10);
 
-  // Triage candidate list: sorted rows minus already-tracked + dismissed.
-  // Uses sortedRows (not filteredRows) so the parent-agency filter
-  // doesn't accidentally limit triage scope — the modal should always
-  // see the full eligible set, not the filtered view.
-  const triageCandidates: TriageAgencyCard[] = useMemo(() => {
-    return sortedRows
-      .filter(r => {
-        const officeName = r.contractingOffice || r.name;
-        if (savedTargets[officeName]) return false;            // already tracked
-        if (dismissedOfficeNames.has(officeName)) return false; // already skipped / deferred
-        return true;
-      })
-      .map(r => ({
-        id: r.id,
-        name: r.name,
-        contractingOffice: r.contractingOffice,
-        subAgency: r.subAgency,
-        parentAgency: r.parentAgency,
-        officeId: r.officeId,
-        location: r.location,
-        totalSpending: r.totalSpending,
-        setAsideSpending: r.setAsideSpending,
-        contractCount: r.contractCount,
-        satRatio: r.satRatio,
-        satContractCount: r.satContractCount,
-        painPointCount: r.painPointCount,
-        openOppCount: r.openOppCount,
-        upcomingEventCount: r.upcomingEventCount,
-      }));
-  }, [sortedRows, savedTargets, dismissedOfficeNames]);
-
-  // After a triage action, update local state so the table + modal
-  // stay in sync without a full refetch.
-  const handleTriageAction = useCallback((action: 'track' | 'defer' | 'skip', officeName: string) => {
-    if (action === 'track') {
-      // Optimistic flip — server returns the new target_id but we
-      // don't need it for the ★ indicator; any truthy value works.
-      // Next page navigation re-fetches anyway.
-      setSavedTargets(prev => ({ ...prev, [officeName]: 'pending' }));
-    } else {
-      setDismissedOfficeNames(prev => {
-        const next = new Set(prev);
-        next.add(officeName);
-        return next;
-      });
-    }
-  }, []);
+  // (triageCandidates + handleTriageAction were defined above, before
+  // the early returns, to avoid the React 'rendered more hooks than
+  // previous render' crash that hit in commit feb239b.)
 
   return (
     <section className="space-y-4">
