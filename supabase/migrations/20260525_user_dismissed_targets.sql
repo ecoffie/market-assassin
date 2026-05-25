@@ -37,15 +37,9 @@ CREATE TABLE IF NOT EXISTS user_dismissed_targets (
 -- office_name, naics_profile); add a secondary index for the common
 -- (user_email, naics_profile) scan so we don't hit the heap for
 -- every office check.
---
--- NOTE: Partial index WHERE defer_until > NOW() was rejected by
--- Postgres (NOW() isn't IMMUTABLE — predicate value changes every
--- second, so a static index can't reference it). Filtering by time
--- happens at query time inside /api/app/triage GET instead, which
--- works fine since the table will stay small (one row per user per
--- dismissed office per NAICS profile).
 CREATE INDEX IF NOT EXISTS idx_user_dismissed_targets_lookup
-  ON user_dismissed_targets (user_email, naics_profile, reason);
+  ON user_dismissed_targets (user_email, naics_profile, reason)
+  WHERE reason = 'skip' OR defer_until > NOW();
 
 -- Cleanup: deferred rows whose cooldown has expired should be eligible
 -- to surface again. We don't auto-delete them (the dismissed_at +
