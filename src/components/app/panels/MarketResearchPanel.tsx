@@ -11,7 +11,6 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
-import StartTrackingModal, { type TriageAgencyCard } from './triage/StartTrackingModal';
 import type { Agency } from '@/types/federal-market-assassin';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
@@ -3235,12 +3234,6 @@ function AgencyTable({
   // GET /api/app/target-list. We update the map optimistically when
   // the user clicks Add / Remove inside the drawer.
   const [savedTargets, setSavedTargets] = useState<Record<string, string>>({});
-  // Triage flow state. Modal opens via 'Start Tracking' CTA. Dismissed
-  // set comes from /api/app/triage GET — agencies the user has already
-  // skipped or deferred for this NAICS profile so the modal doesn't
-  // surface them again.
-  const [triageOpen, setTriageOpen] = useState(false);
-  const [dismissedOfficeNames, setDismissedOfficeNames] = useState<Set<string>>(new Set());
   const { showToast: showAgencyToast } = useToast();
 
   // Fetch happens once per (naics, psc, businessType, veteran) combo.
@@ -3348,22 +3341,6 @@ function AgencyTable({
       .catch(err => console.warn('[AgencyTable] target-list fetch failed:', err));
     return () => { cancelled = true; };
   }, [email]);
-
-  // Triage flow context — fetch dismissed office names so the
-  // StartTrackingModal doesn't surface them. Re-fetches when NAICS
-  // changes since dismissals are profile-scoped.
-  useEffect(() => {
-    if (!email || !naicsCode.trim()) return;
-    let cancelled = false;
-    fetch(`/api/app/triage?email=${encodeURIComponent(email)}&naics=${encodeURIComponent(naicsCode)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (cancelled || !data?.success) return;
-        setDismissedOfficeNames(new Set(data.dismissed_office_names || []));
-      })
-      .catch(err => console.warn('[AgencyTable] triage context fetch failed:', err));
-    return () => { cancelled = true; };
-  }, [email, naicsCode]);
 
   // Slice 3B — add an office to my target list. Optimistic flip on
   // success, server-side Pro gate (402) surfaces as the upgrade toast.
@@ -3693,54 +3670,6 @@ function AgencyTable({
     : sortedRows;
   const visibleRows = showAll ? filteredRows : filteredRows.slice(0, 10);
 
-  // Triage candidate list: sorted rows minus already-tracked + dismissed.
-  // Uses sortedRows (not filteredRows) so the parent-agency filter
-  // doesn't accidentally limit triage scope — the modal should always
-  // see the full eligible set, not the filtered view.
-  const triageCandidates: TriageAgencyCard[] = useMemo(() => {
-    return sortedRows
-      .filter(r => {
-        const officeName = r.contractingOffice || r.name;
-        if (savedTargets[officeName]) return false;            // already tracked
-        if (dismissedOfficeNames.has(officeName)) return false; // already skipped / deferred
-        return true;
-      })
-      .map(r => ({
-        id: r.id,
-        name: r.name,
-        contractingOffice: r.contractingOffice,
-        subAgency: r.subAgency,
-        parentAgency: r.parentAgency,
-        officeId: r.officeId,
-        location: r.location,
-        totalSpending: r.totalSpending,
-        setAsideSpending: r.setAsideSpending,
-        contractCount: r.contractCount,
-        satRatio: r.satRatio,
-        satContractCount: r.satContractCount,
-        painPointCount: r.painPointCount,
-        openOppCount: r.openOppCount,
-        upcomingEventCount: r.upcomingEventCount,
-      }));
-  }, [sortedRows, savedTargets, dismissedOfficeNames]);
-
-  // After a triage action, update local state so the table + modal
-  // stay in sync without a full refetch.
-  const handleTriageAction = useCallback((action: 'track' | 'defer' | 'skip', officeName: string) => {
-    if (action === 'track') {
-      // Optimistic flip — server returns the new target_id but we
-      // don't need it for the ★ indicator; any truthy value works.
-      // Next page navigation re-fetches anyway.
-      setSavedTargets(prev => ({ ...prev, [officeName]: 'pending' }));
-    } else {
-      setDismissedOfficeNames(prev => {
-        const next = new Set(prev);
-        next.add(officeName);
-        return next;
-      });
-    }
-  }, []);
-
   return (
     <section className="space-y-4">
       {/* Quick-pick cards with methodology selectors. Each card shows
@@ -3823,25 +3752,7 @@ function AgencyTable({
               </div>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Start Tracking CTA — opens the triage flow modal. Disabled
-                when no candidates remain (everything tracked or
-                dismissed). Sized prominently to draw attention as the
-                primary action on this table. */}
-            <button
-              type="button"
-              onClick={() => setTriageOpen(true)}
-              disabled={triageCandidates.length === 0}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
-              title={triageCandidates.length === 0
-                ? 'No offices left to triage — refresh the report or unskip dismissed targets.'
-                : `Triage ${triageCandidates.length} offices — Track / Defer / Skip one at a time`}
-            >
-              Start Tracking →
-              <span className="ml-1.5 text-[10px] font-normal text-emerald-200">
-                {triageCandidates.length} ready
-              </span>
-            </button>
+          <div className="flex flex-wrap gap-1.5">
             {SORT_LENSES.map(lens => {
               const inert = lensIsInert[lens.id];
               // Per-lens reason copy. Surfaces in the tooltip so a
@@ -3991,19 +3902,6 @@ function AgencyTable({
           onRemove={(targetId) => handleRemoveFromList(selectedRow.contractingOffice || selectedRow.name, targetId)}
         />
       )}
-
-      {/* Triage flow modal — Start Tracking. Mounted at the AgencyTable
-          level so it shares state with the table (savedTargets,
-          dismissedOfficeNames). Closed by default; opens via the CTA
-          button in the table header. */}
-      <StartTrackingModal
-        open={triageOpen}
-        onClose={() => setTriageOpen(false)}
-        email={email}
-        naicsCode={naicsCode}
-        agencies={triageCandidates}
-        onAction={handleTriageAction}
-      />
     </section>
   );
 }
