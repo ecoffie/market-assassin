@@ -3126,6 +3126,11 @@ interface AgencyTableRow {
   upcomingEventCount: number;
   satRatio: number;
   isSubAgency: boolean;
+  // Triage decision intel added 2026-05-25 (v1 card upgrade)
+  avgBidders?: number | null;     // Avg # offers per contract; null when no data
+  uniqueVendorCount?: number;     // Distinct primes who won at this office
+  smallBizPercent?: number | null;  // 0..1 from SBA Goaling FY23 (parent level)
+  topPrimes?: Array<{ name: string; contractCount?: number; totalValue?: number }>;
 }
 
 // Sort lenses surfaced to the user. Slimmed May 23, 2026 per Eric:
@@ -3614,6 +3619,12 @@ function AgencyTable({
         painPointCount: r.painPointCount,
         openOppCount: r.openOppCount,
         upcomingEventCount: r.upcomingEventCount,
+        // Decision intel v1 (2026-05-25): server-derived in TMR
+        // route — all four signals arrive with the row.
+        avgBidders: r.avgBidders,
+        uniqueVendorCount: r.uniqueVendorCount,
+        smallBizPercent: r.smallBizPercent,
+        topPrimes: r.topPrimes,
       }));
   }, [sortedRows, savedTargets, dismissedOfficeNames]);
 

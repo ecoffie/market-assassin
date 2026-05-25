@@ -48,6 +48,7 @@ import {
   getPainPointsForAgency,
   getPainPointsByNaics,
 } from '@/lib/agency-hierarchy/pain-points-linker';
+import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -83,6 +84,8 @@ interface FindAgenciesAgency {
   microSpending?: number;
   microContractCount?: number;
   priorityScore?: number;
+  avgBidders?: number | null;        // Added 2026-05-25: USAspending Number of Offers avg
+  uniqueVendorCount?: number;        // Added 2026-05-25: distinct primes who won at this office
 }
 
 interface TargetMarketResearchRow {
@@ -114,6 +117,14 @@ interface TargetMarketResearchRow {
   painPointCount: number;          // # pain points logged for this agency
   openOppCount: number;            // # current SAM opps
   upcomingEventCount: number;      // # events in next 90 days
+
+  // Decision intel added 2026-05-25 for the triage card (StartTrackingModal).
+  // Surfaces competitive density signals so users can pick smart targets,
+  // not just biggest-spender targets.
+  avgBidders: number | null;       // Avg # of offers received per contract; null if no data
+  uniqueVendorCount: number;       // Distinct primes who won at this office (Recipient Name dedupe)
+  smallBizPercent: number | null;  // From SBA Goaling Report (FY23). Null if no data for parent.
+  topPrimes: Array<{ name: string; contractCount?: number; totalValue?: number }>;  // Top 3 incumbents
 
   // Display flags so the UI can render chips inline with the row
   hasOSBP: boolean;                // We have an OSBP contact for this agency
@@ -329,6 +340,65 @@ export async function POST(request: NextRequest) {
     );
     const painMs = Date.now() - painStart;
 
+    // Enrichment 4 (triage card intel v1, 2026-05-25): SBA Goaling
+    // small-business share per parent agency. One bulk query for the
+    // whole FY (~200 rows total — multiple rows per dept, one per
+    // category like 'Not a Small Business', 'Small Business', etc).
+    // Returns a map of UPPERCASE dept name -> share (0..1).
+    //
+    // Computation mirrors /api/sba-goaling/bulk: share = 1 - (nonSB / total).
+    // The `Not a Small Business` row carries the non-SB dollar amount;
+    // `total` is repeated on every category row for the same dept so
+    // we track it once.
+    const sbaStart = Date.now();
+    const smallBizByParent = new Map<string, number>();
+    try {
+      const { data: goalingRows } = await supabase
+        .from('sba_goaling')
+        .select('funding_department, category, dollars, total')
+        .eq('fiscal_year', 2023);
+      const deptStats = new Map<string, { total: number; nonSb: number }>();
+      for (const row of (goalingRows || []) as Array<{ funding_department: string; category: string; dollars: number; total: number }>) {
+        const dept = (row.funding_department || '').toUpperCase().trim();
+        if (!dept) continue;
+        if (!deptStats.has(dept)) {
+          deptStats.set(dept, { total: Number(row.total || 0), nonSb: 0 });
+        }
+        if (row.category === 'Not a Small Business') {
+          const stats = deptStats.get(dept)!;
+          stats.nonSb = Number(row.dollars || 0);
+        }
+      }
+      for (const [dept, { total, nonSb }] of deptStats.entries()) {
+        if (total > 0) smallBizByParent.set(dept, 1 - (nonSb / total));
+      }
+    } catch (sbaErr) {
+      console.warn('[target-market-research] SBA Goaling fetch failed:', sbaErr);
+    }
+    const sbaMs = Date.now() - sbaStart;
+
+    // Enrichment 5 (triage card intel v1, 2026-05-25): top-3 incumbent
+    // primes per office. Pre-build a (subAgency|parentAgency) -> top 3
+    // primes map by sorting prime-contractors-database.json entries by
+    // contract value. getPrimesByAgency() does a fuzzy substring match
+    // so we just call it once per unique lookup key.
+    const primesStart = Date.now();
+    const primesByAgencyKey = new Map<string, Array<{ name: string; contractCount?: number; totalValue?: number }>>();
+    function loadPrimesForKey(key: string) {
+      if (!key || primesByAgencyKey.has(key)) return;
+      const primes = getPrimesByAgency(key);
+      const top3 = primes
+        .sort((p1, p2) => (p2.totalContractValue || 0) - (p1.totalContractValue || 0))
+        .slice(0, 3)
+        .map(p => ({
+          name: p.name,
+          contractCount: p.contractCount ?? undefined,
+          totalValue: p.totalContractValue ?? undefined,
+        }));
+      primesByAgencyKey.set(key, top3);
+    }
+    const primesMs = Date.now() - primesStart;
+
     // Build the merged research rows. Each row gets all 4 sort
     // metrics pre-computed so the UI can sort without re-fetching.
     const rows: TargetMarketResearchRow[] = findAgencies.map((a) => {
@@ -383,6 +453,30 @@ export async function POST(request: NextRequest) {
         painPointCount: painPointCount + (naicsAligned ? 5 : 0), // boost for NAICS-aligned
         openOppCount,
         upcomingEventCount,
+
+        // Decision intel: passed through from find-agencies aggregation
+        avgBidders: a.avgBidders ?? null,
+        uniqueVendorCount: a.uniqueVendorCount || 0,
+        // Small biz % from SBA Goaling FY23 (parent-agency level).
+        // Falls back to null if no data — UI shows '—' with tooltip.
+        smallBizPercent: (() => {
+          const parentNormalized = (a.parentAgency || '').toUpperCase().trim();
+          const share = smallBizByParent.get(parentNormalized);
+          return share !== undefined ? share : null;
+        })(),
+        // Top 3 incumbent primes for this office (fuzzy match on
+        // sub-agency name first, falls back to parent). Cached per key
+        // in this request scope.
+        topPrimes: (() => {
+          const subKey = a.subAgency || a.parentAgency || a.name || '';
+          loadPrimesForKey(subKey);
+          let result = primesByAgencyKey.get(subKey) || [];
+          if (result.length === 0 && a.parentAgency && a.parentAgency !== subKey) {
+            loadPrimesForKey(a.parentAgency);
+            result = primesByAgencyKey.get(a.parentAgency) || [];
+          }
+          return result;
+        })(),
 
         hasOSBP: false, // TODO: wire from agency-hierarchy lib in Slice 1.5D drawer pass
         isSubAgency: !!a.subAgency && a.subAgency !== a.parentAgency,

@@ -746,7 +746,15 @@ export async function POST(request: NextRequest) {
           satSpending: 0,
           satContractCount: 0,
           microSpending: 0,
-          microContractCount: 0
+          microContractCount: 0,
+          // Bidder + vendor tracking added 2026-05-25 for triage card
+          // decision intel. bidsTotal/bidsCount drive avgBidders (a
+          // proxy for competitive density). uniqueVendorNames captures
+          // recipient diversity at this office — high = open door, low
+          // = locked relationships. Set is converted to count at the end.
+          bidsTotal: 0,
+          bidsCount: 0,
+          uniqueVendorNames: new Set<string>(),
         };
       }
 
@@ -762,9 +770,39 @@ export async function POST(request: NextRequest) {
         officeSpending[officeKey].microSpending += amount;
         officeSpending[officeKey].microContractCount += 1;
       }
+
+      // Bidder tracking — USAspending sets 'Number of Offers Received'
+      // for most contracts but some are blank/null. Only count entries
+      // with a positive number so the avg isn't deflated by missing data.
+      const offers = Number(award['Number of Offers Received'] || 0);
+      if (offers > 0) {
+        officeSpending[officeKey].bidsTotal += offers;
+        officeSpending[officeKey].bidsCount += 1;
+      }
+
+      // Unique vendor tracking — Recipient Name is the prime that won
+      // this contract. Aggregating into a Set gives us 'how many
+      // distinct primes win at this office?'
+      const recipient = award['Recipient Name'];
+      if (recipient && typeof recipient === 'string') {
+        officeSpending[officeKey].uniqueVendorNames.add(recipient.trim().toUpperCase());
+      }
     });
 
     // Convert to array and sort for small-business entry points.
+    // Finalize the bidder + vendor aggregations before any sorting
+    // happens. avgBidders is null (not 0) when we have no offer data
+    // so the UI can render an honest '—' instead of a misleading 0.
+    Object.values(officeSpending).forEach((office: any) => {
+      office.avgBidders = office.bidsCount > 0
+        ? Math.round((office.bidsTotal / office.bidsCount) * 10) / 10
+        : null;
+      office.uniqueVendorCount = office.uniqueVendorNames.size;
+      delete office.uniqueVendorNames;  // Set isn't JSON-serializable; drop it after counting
+      delete office.bidsTotal;          // Internal accumulator, not needed in response
+      delete office.bidsCount;
+    });
+
     let agencies = sortAgenciesForSmallBusiness(Object.values(officeSpending));
 
     let totalSpending = agencies.reduce((sum, a) => sum + a.setAsideSpending, 0);

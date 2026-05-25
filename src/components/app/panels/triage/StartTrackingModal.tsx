@@ -50,6 +50,11 @@ export interface TriageAgencyCard {
   painPointCount?: number;
   openOppCount?: number;
   upcomingEventCount?: number;
+  // Decision intel added 2026-05-25 (v1 card upgrade)
+  avgBidders?: number | null;     // Competitive density: avg # offers per contract
+  uniqueVendorCount?: number;     // Vendor diversity: distinct primes winning here
+  smallBizPercent?: number | null; // SBA Goaling small-biz share (fetched client-side)
+  topPrimes?: Array<{ name: string; share?: number }>; // Top 3 incumbents (client lookup)
 }
 
 interface StartTrackingModalProps {
@@ -253,10 +258,24 @@ export default function StartTrackingModal({
                     <span className="ml-2 text-slate-500">📍 {current.location}</span>
                   )}
                 </div>
+                {/* Incumbents line — top 3 primes who win at this
+                    office. Tells the user the competitive landscape
+                    before they commit. Added 2026-05-25 v1. */}
+                {current.topPrimes && current.topPrimes.length > 0 && (
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    <span className="font-semibold text-slate-400">INCUMBENTS:</span>{' '}
+                    {current.topPrimes.map((p, i) => (
+                      <span key={p.name}>
+                        {i > 0 && ' · '}
+                        <span className="text-slate-300">{p.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Money stats — Total $ (white bold) + Set-Aside $ (emerald) */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Money stats — Total $ + Set-Aside $ + Small Biz % */}
+              <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
                   <div className="text-[10px] uppercase tracking-wider text-slate-500">Total Spend</div>
                   <div className="mt-1 text-xl font-bold text-white">{moneyDisplay.total}</div>
@@ -265,7 +284,35 @@ export default function StartTrackingModal({
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
                   <div className="text-[10px] uppercase tracking-wider text-emerald-300">Set-Aside Spend</div>
                   <div className="mt-1 text-xl font-bold text-emerald-400">{moneyDisplay.setAside}</div>
-                  <div className="mt-0.5 text-[10px] text-emerald-300/60">Filtered to your business type</div>
+                  <div className="mt-0.5 text-[10px] text-emerald-300/60">Your business type only</div>
+                </div>
+                {/* Small Biz % tile — the real accessibility signal.
+                    Source: SBA Goaling Report FY23 (parent agency level).
+                    Honest '—' when no data. */}
+                <div className={`rounded-lg border p-3 ${
+                  (current.smallBizPercent ?? 0) >= 0.3
+                    ? 'border-blue-500/30 bg-blue-500/5'
+                    : (current.smallBizPercent ?? 0) > 0
+                      ? 'border-amber-500/30 bg-amber-500/5'
+                      : 'border-slate-800 bg-slate-950/50'
+                }`}>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400">Small Biz Share</div>
+                  <div className={`mt-1 text-xl font-bold ${
+                    (current.smallBizPercent ?? 0) >= 0.3
+                      ? 'text-blue-400'
+                      : (current.smallBizPercent ?? 0) > 0
+                        ? 'text-amber-400'
+                        : 'text-slate-500'
+                  }`}>
+                    {current.smallBizPercent != null
+                      ? `${Math.round(current.smallBizPercent * 100)}%`
+                      : '—'}
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-slate-600">
+                    {current.smallBizPercent != null
+                      ? 'of agency spend to small biz (SBA FY23)'
+                      : 'No SBA Goaling data for parent'}
+                  </div>
                 </div>
               </div>
 
@@ -274,6 +321,22 @@ export default function StartTrackingModal({
                 <span className="rounded bg-slate-800 px-2 py-1 text-slate-300">
                   {(current.contractCount || 0).toLocaleString()} contracts
                 </span>
+                <span
+                  className="rounded bg-slate-800 px-2 py-1 text-slate-300"
+                  title="Avg # of bidders per contract from USAspending Number of Offers Received. Lower = less competition."
+                >
+                  {current.avgBidders != null && current.avgBidders > 0
+                    ? `${current.avgBidders} avg bidders`
+                    : 'Bidders —'}
+                </span>
+                {(current.uniqueVendorCount || 0) > 0 && (
+                  <span
+                    className="rounded bg-slate-800 px-2 py-1 text-slate-300"
+                    title="Distinct primes who won contracts here. High = open door for new vendors."
+                  >
+                    {current.uniqueVendorCount} unique vendors
+                  </span>
+                )}
                 <span className="rounded bg-slate-800 px-2 py-1 text-slate-300">
                   {(current.satContractCount || 0) > 0
                     ? `${Math.round((current.satRatio || 0) * 100)}% SAT`
