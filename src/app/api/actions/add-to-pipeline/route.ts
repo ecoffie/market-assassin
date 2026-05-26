@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
+import { sanitizeValueEstimate } from '@/lib/pipeline/value-estimate';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,7 +99,10 @@ export async function GET(request: NextRequest) {
       notice_id: cleanNoticeId,
       title: decodeURIComponent(title),
       agency: agency ? decodeURIComponent(agency) : null,
-      value_estimate: value ? decodeURIComponent(value) : null,
+      // Sanitize value_estimate — reject display labels like "Due in
+      // 6 days" or "Open market research window..." that leaked from
+      // briefing UIs (audit 2026-05-26).
+      value_estimate: sanitizeValueEstimate(value ? decodeURIComponent(value) : null),
       response_deadline: deadline || null,
       naics_code: naics || null,
       set_aside: setAside ? decodeURIComponent(setAside) : null,
@@ -224,7 +228,7 @@ export async function POST(request: NextRequest) {
         notice_id: cleanNoticeIdPost,
         title,
         agency: agency || null,
-        value_estimate: value || null,
+        value_estimate: sanitizeValueEstimate(value),
         response_deadline: deadline || null,
         naics_code: naics || null,
         set_aside: setAside || null,

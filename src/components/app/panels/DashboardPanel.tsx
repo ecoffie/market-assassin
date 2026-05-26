@@ -672,7 +672,11 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           naics_code: item.signals.find(s => s.startsWith('NAICS'))?.replace('NAICS ', '') || '',
           set_aside: item.signals.find(s => ['8(a)', 'WOSB', 'SDVOSB', 'HUBZone', 'SBA', 'Small Business'].some(sa => s.includes(sa))) || '',
           response_deadline: parsedDeadline,
-          value_estimate: item.amount || null,
+          // item.amount is a DISPLAY LABEL ("Due in 6 days", "Open
+          // market research window..."), NOT a dollar value. Writing
+          // it here polluted user_pipeline.value_estimate for months.
+          // Send null so the column stays clean — UI shows "—".
+          value_estimate: null,
           external_url: item.actionUrl || '',
           stage: 'tracking',
           priority: 'medium',

@@ -15,6 +15,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
+import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -179,6 +180,16 @@ export async function POST(request: NextRequest) {
     if (body.notice_id && !isValidSamNoticeId(body.notice_id)) {
       console.warn(`[Pipeline POST] rejecting malformed notice_id "${body.notice_id}" for "${body.title}"`);
       body.notice_id = undefined;
+    }
+
+    // Reject value_estimate strings that are display labels ("Due in
+    // 6 days", "Open market research window...") instead of dollar
+    // amounts. Audit 2026-05-26 found DashboardPanel writing item.amount
+    // (a display label) into value_estimate. Null-out garbage so the
+    // Pipeline Value column stays scannable.
+    if (body.value_estimate && !isCleanValueEstimate(body.value_estimate)) {
+      console.warn(`[Pipeline POST] rejecting non-dollar value_estimate "${body.value_estimate}" for "${body.title}"`);
+      body.value_estimate = undefined;
     }
 
     const { data, error } = await getSupabase()
