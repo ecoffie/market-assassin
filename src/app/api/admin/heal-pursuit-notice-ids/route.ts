@@ -105,14 +105,24 @@ async function findRealNoticeId(opts: {
   const today = new Date();
   const fmt = (d: Date) =>
     `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-  const past = new Date(today);
-  past.setFullYear(past.getFullYear() - 2);
 
-  async function search(params: Record<string, string>): Promise<Array<{ noticeId: string; title: string; department?: string; fullParentPathName?: string }>> {
+  // SAM API constraint: postedFrom and postedTo must be in the SAME
+  // calendar year (otherwise it returns 'Date range must be null
+  // year(s) apart' with 0 results). Two-pass strategy: try current
+  // year first (most pursuits are recent), then last calendar year
+  // as a fallback for older pursuits.
+  const currentYear = today.getFullYear();
+  const lastYear = currentYear - 1;
+  const dateWindows = [
+    { from: `01/01/${currentYear}`, to: fmt(today) },
+    { from: `01/01/${lastYear}`, to: `12/31/${lastYear}` },
+  ];
+
+  async function searchWindow(params: Record<string, string>, fromDate: string, toDate: string): Promise<Array<{ noticeId: string; title: string; department?: string; fullParentPathName?: string }>> {
     const url = new URL(SAM_OPPS_URL);
     url.searchParams.set('api_key', apiKey);
-    url.searchParams.set('postedFrom', fmt(past));
-    url.searchParams.set('postedTo', fmt(today));
+    url.searchParams.set('postedFrom', fromDate);
+    url.searchParams.set('postedTo', toDate);
     url.searchParams.set('limit', '10');
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     if (naicsCode) {
@@ -131,6 +141,18 @@ async function findRealNoticeId(opts: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload = await res.json().catch(() => null) as any;
     return payload?.opportunitiesData || [];
+  }
+
+  // Loop the two date windows (current calendar year, then last year);
+  // return first window's results that yielded hits. Same-year
+  // constraint is a SAM API quirk — 'Date range must be null year(s)
+  // apart' is their (incoherent) error when from + to span years.
+  async function search(params: Record<string, string>): Promise<Array<{ noticeId: string; title: string; department?: string; fullParentPathName?: string }>> {
+    for (const window of dateWindows) {
+      const hits = await searchWindow(params, window.from, window.to);
+      if (hits.length > 0) return hits;
+    }
+    return [];
   }
 
   // Attempt 1: solnum lookup if extractable

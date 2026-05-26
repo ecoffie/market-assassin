@@ -107,27 +107,43 @@ async function discoverFiles(noticeId: string, apiKey: string): Promise<SamFileR
   const today = new Date();
   const fmt = (d: Date) =>
     `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
-  const past = new Date(today);
-  past.setFullYear(past.getFullYear() - 2);
 
-  const url = new URL(SAM_OPPS_URL);
-  url.searchParams.set('api_key', apiKey);
-  url.searchParams.set('noticeId', noticeId);
-  url.searchParams.set('postedFrom', fmt(past));
-  url.searchParams.set('postedTo', fmt(today));
-  url.searchParams.set('limit', '1');
+  // SAM API rejects cross-calendar-year date windows with the bogus
+  // error 'Date range must be null year(s) apart'. Try current calendar
+  // year first, then last year as fallback. This bit us hard — the
+  // earlier 2-year window returned 0 results for every notice.
+  const currentYear = today.getFullYear();
+  const dateWindows = [
+    { from: `01/01/${currentYear}`, to: fmt(today) },
+    { from: `01/01/${currentYear - 1}`, to: `12/31/${currentYear - 1}` },
+  ];
 
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-  } catch (err) {
-    console.warn('[fetch-pursuit-docs] discoverFiles fetch failed:', err);
-    return [];
-  }
-  if (!res.ok) return [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const payload = await res.json().catch(() => null) as any;
-  const opp = payload?.opportunitiesData?.[0];
+  let opp: any = null;
+  for (const window of dateWindows) {
+    const url = new URL(SAM_OPPS_URL);
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('noticeId', noticeId);
+    url.searchParams.set('postedFrom', window.from);
+    url.searchParams.set('postedTo', window.to);
+    url.searchParams.set('limit', '1');
+
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+    } catch (err) {
+      console.warn('[fetch-pursuit-docs] discoverFiles fetch failed:', err);
+      continue;
+    }
+    if (!res.ok) continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payload = await res.json().catch(() => null) as any;
+    const candidate = payload?.opportunitiesData?.[0];
+    if (candidate) {
+      opp = candidate;
+      break;
+    }
+  }
   if (!opp) return [];
 
   const links: string[] = Array.isArray(opp.resourceLinks) ? opp.resourceLinks : [];
