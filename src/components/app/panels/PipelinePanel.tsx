@@ -858,7 +858,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                   <SortHeader field="deadline">Deadline</SortHeader>
                   <SortHeader field="priority">Priority</SortHeader>
                   <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Next Action</th>
-                  <th className="text-right px-2 py-3 text-xs text-slate-500 font-medium w-12">{/* Archive */}</th>
+                  <th className="text-center px-2 py-3 text-xs text-slate-500 font-medium w-24">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -997,18 +997,44 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                           can be archived once you're done with it.
                           stopPropagation so the row's onClick doesn't
                           fire and open the detail drawer. */}
-                      <td className="px-2 py-3 w-12 text-right">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            archiveOpportunity(opp);
-                          }}
-                          title="Archive (hide from active view)"
-                          className="text-slate-500 hover:text-slate-200 text-xs px-2 py-1 rounded hover:bg-slate-800 transition-colors"
-                        >
-                          {opp.is_archived ? '↩' : '🗄'}
-                        </button>
+                      <td className="px-2 py-3 w-24 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {/* Draft Proposal — same action as on the
+                              Board view cards. Opens Proposal Assist
+                              with this pursuit's docs auto-loaded. */}
+                          {onPanelChange && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onPanelChange('proposals', { pursuit_id: opp.id });
+                              }}
+                              title={
+                                opp.docs_status === 'ready'
+                                  ? `Draft Proposal — ${opp.docs_count || 0} doc(s) ready`
+                                  : opp.docs_status === 'fetching'
+                                    ? 'Draft Proposal — SAM docs still downloading'
+                                    : opp.docs_status === 'none'
+                                      ? 'Draft Proposal — no SAM attachments'
+                                      : 'Draft Proposal'
+                              }
+                              className="rounded bg-emerald-600/80 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-500"
+                            >
+                              📝
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              archiveOpportunity(opp);
+                            }}
+                            title="Archive (hide from active view)"
+                            className="text-slate-500 hover:text-slate-200 text-xs px-1.5 py-0.5 rounded hover:bg-slate-800 transition-colors"
+                          >
+                            {opp.is_archived ? '↩' : '🗄'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
