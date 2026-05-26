@@ -10,7 +10,7 @@
  */
 
 import {
-  SAM_API_CONFIGS,
+  getSAMAPIConfig,
   makeSAMRequest
 } from './utils';
 
@@ -107,57 +107,85 @@ const SBA_TYPE_MAP: Record<string, string> = {
  * Transform raw API response to our SAMEntity type
  */
 function transformEntity(raw: Record<string, unknown>): SAMEntity {
-  const expirationDate = raw.registrationExpirationDate as string;
+  // SAM v3 Entity API response shape is nested:
+  //   entityRegistration: { ueiSAM, legalBusinessName, registrationStatus, ... }
+  //   coreData: { entityInformation: {...}, physicalAddress, mailingAddress }
+  //   assertions: { goodsAndServices: { naicsList, pscList } }
+  //   pointsOfContact: { governmentBusinessPOC, electronicBusinessPOC, ... }
+  //
+  // Bug fixed 2026-05-26: transformer was reading top-level fields
+  // that don't exist, so even valid entity rows returned empty fields.
+  const er = (raw.entityRegistration as Record<string, unknown>) || {};
+  const core = (raw.coreData as Record<string, unknown>) || {};
+  const assertions = (raw.assertions as Record<string, unknown>) || {};
+  const pocSection = (raw.pointsOfContact as Record<string, unknown>) || {};
+
+  const expirationDate = (er.registrationExpirationDate as string) || (raw.registrationExpirationDate as string);
   const daysUntilExpiration = expirationDate
     ? Math.ceil((new Date(expirationDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : undefined;
 
-  const status = raw.registrationStatus as string || 'Unknown';
-  const sbaTypes = (raw.sbaBusinessTypes as string[]) || [];
+  const status = (er.registrationStatus as string) || (raw.registrationStatus as string) || 'Unknown';
 
-  // Parse NAICS list
-  const naicsRaw = raw.naicsList as Array<Record<string, unknown>> || [];
+  // SBA business types live under assertions.goodsAndServices or directly on raw
+  const goodsServices = (assertions.goodsAndServices as Record<string, unknown>) || {};
+  const sbaTypesArr =
+    (goodsServices.sbaBusinessTypeList as Array<Record<string, unknown>>) ||
+    (raw.sbaBusinessTypes as unknown as Array<Record<string, unknown>>) ||
+    [];
+  const sbaTypes: string[] = Array.isArray(sbaTypesArr)
+    ? sbaTypesArr.map(t => (typeof t === 'string' ? t : (t.sbaBusinessTypeCode as string) || (t.sbaBusinessTypeDesc as string) || '')).filter(Boolean)
+    : [];
+
+  // NAICS list lives under assertions.goodsAndServices.naicsList
+  const naicsRaw = (goodsServices.naicsList as Array<Record<string, unknown>>) || (raw.naicsList as Array<Record<string, unknown>>) || [];
   const naicsList = naicsRaw.map(n => ({
     naicsCode: String(n.naicsCode || ''),
     naicsDescription: String(n.naicsDescription || ''),
-    isPrimary: Boolean(n.isPrimary)
+    isPrimary: Boolean(n.isPrimary === 'Y' || n.isPrimary === true || n.primaryNaics === 'Y')
   }));
 
-  // Parse PSC list
-  const pscRaw = raw.pscList as Array<Record<string, unknown>> || [];
+  // PSC list
+  const pscRaw = (goodsServices.pscList as Array<Record<string, unknown>>) || (raw.pscList as Array<Record<string, unknown>>) || [];
   const pscList = pscRaw.map(p => ({
     pscCode: String(p.pscCode || ''),
     pscDescription: String(p.pscDescription || '')
   }));
 
-  // Parse addresses
-  const physAddr = raw.physicalAddress as Record<string, unknown> || {};
-  const mailAddr = raw.mailingAddress as Record<string, unknown> || {};
+  // Addresses
+  const physAddr = (core.physicalAddress as Record<string, unknown>) || (raw.physicalAddress as Record<string, unknown>) || {};
+  const mailAddr = (core.mailingAddress as Record<string, unknown>) || (raw.mailingAddress as Record<string, unknown>) || {};
 
-  // Parse POCs
-  const pocsRaw = raw.pocList as Array<Record<string, unknown>> || [];
-  const pointsOfContact = pocsRaw.map(p => ({
-    name: String(p.name || p.firstName || ''),
-    title: String(p.title || ''),
-    phone: String(p.phone || ''),
-    email: String(p.email || ''),
-    type: String(p.type || '')
-  }));
+  // POCs — v3 nests them: governmentBusinessPOC, electronicBusinessPOC,
+  // pastPerformancePOC. Flatten to an array.
+  const pointsOfContact: SAMEntity['pointsOfContact'] = [];
+  for (const [type, poc] of Object.entries(pocSection)) {
+    if (poc && typeof poc === 'object') {
+      const p = poc as Record<string, unknown>;
+      pointsOfContact.push({
+        name: String([p.firstName, p.lastName].filter(Boolean).join(' ') || p.fullName || ''),
+        title: String(p.title || ''),
+        phone: String(p.usPhone || p.phone || ''),
+        email: String(p.email || ''),
+        type,
+      });
+    }
+  }
 
   return {
-    ueiSAM: String(raw.ueiSAM || ''),
-    cageCode: String(raw.cageCode || ''),
-    legalBusinessName: String(raw.legalBusinessName || ''),
-    dbaName: raw.dbaName ? String(raw.dbaName) : undefined,
+    ueiSAM: String(er.ueiSAM || raw.ueiSAM || ''),
+    cageCode: String(er.cageCode || raw.cageCode || ''),
+    legalBusinessName: String(er.legalBusinessName || raw.legalBusinessName || ''),
+    dbaName: er.dbaName ? String(er.dbaName) : raw.dbaName ? String(raw.dbaName) : undefined,
     registrationStatus: status as SAMEntity['registrationStatus'],
     registrationExpirationDate: expirationDate,
-    purposeOfRegistration: raw.purposeOfRegistration ? String(raw.purposeOfRegistration) : undefined,
-    entityStructure: raw.entityStructure ? String(raw.entityStructure) : undefined,
+    purposeOfRegistration: er.purposeOfRegistrationDesc ? String(er.purposeOfRegistrationDesc) : undefined,
+    entityStructure: (core.entityStructure as Record<string, unknown>)?.entityStructureDesc as string | undefined,
     physicalAddress: {
       addressLine1: physAddr.addressLine1 ? String(physAddr.addressLine1) : undefined,
       addressLine2: physAddr.addressLine2 ? String(physAddr.addressLine2) : undefined,
       city: physAddr.city ? String(physAddr.city) : undefined,
-      stateOrProvince: physAddr.stateOrProvince ? String(physAddr.stateOrProvince) : undefined,
+      stateOrProvince: physAddr.stateOrProvinceCode ? String(physAddr.stateOrProvinceCode) : physAddr.stateOrProvince ? String(physAddr.stateOrProvince) : undefined,
       zipCode: physAddr.zipCode ? String(physAddr.zipCode) : undefined,
       countryCode: physAddr.countryCode ? String(physAddr.countryCode) : undefined,
     },
@@ -165,7 +193,7 @@ function transformEntity(raw: Record<string, unknown>): SAMEntity {
       addressLine1: mailAddr.addressLine1 ? String(mailAddr.addressLine1) : undefined,
       addressLine2: mailAddr.addressLine2 ? String(mailAddr.addressLine2) : undefined,
       city: mailAddr.city ? String(mailAddr.city) : undefined,
-      stateOrProvince: mailAddr.stateOrProvince ? String(mailAddr.stateOrProvince) : undefined,
+      stateOrProvince: mailAddr.stateOrProvinceCode ? String(mailAddr.stateOrProvinceCode) : mailAddr.stateOrProvince ? String(mailAddr.stateOrProvince) : undefined,
       zipCode: mailAddr.zipCode ? String(mailAddr.zipCode) : undefined,
       countryCode: mailAddr.countryCode ? String(mailAddr.countryCode) : undefined,
     },
@@ -173,16 +201,15 @@ function transformEntity(raw: Record<string, unknown>): SAMEntity {
     pscList,
     certifications: {
       sbaBusinessTypes: sbaTypes.map(t => SBA_TYPE_MAP[t] || t),
-      certificationExpirations: [] // Would need additional parsing
+      certificationExpirations: [],
     },
     pointsOfContact,
-    // Computed fields
     isActive: status === 'Active',
     daysUntilExpiration,
-    has8a: sbaTypes.includes('2X'),
-    hasSDVOSB: sbaTypes.includes('XY'),
-    hasWOSB: sbaTypes.includes('23') || sbaTypes.includes('A2'),
-    hasHUBZone: sbaTypes.includes('XX')
+    has8a: sbaTypes.includes('2X') || sbaTypes.some(t => /8\(a\)/i.test(t)),
+    hasSDVOSB: sbaTypes.includes('XY') || sbaTypes.some(t => /SDVOSB|Service.Disabled/i.test(t)),
+    hasWOSB: sbaTypes.includes('23') || sbaTypes.includes('A2') || sbaTypes.some(t => /WOSB|Women.Owned/i.test(t)),
+    hasHUBZone: sbaTypes.includes('XX') || sbaTypes.some(t => /HUBZone/i.test(t)),
   };
 }
 
@@ -192,13 +219,24 @@ function transformEntity(raw: Record<string, unknown>): SAMEntity {
 export async function searchEntities(
   params: EntitySearchParams
 ): Promise<EntitySearchResult> {
-  const config = SAM_API_CONFIGS.entity;
+  // Use the dynamic config getter so we get a populated apiKey
+  // (the static SAM_API_CONFIGS map sets apiKey='' as a stale default;
+  // bug fixed 2026-05-26 — was making getEntityByUEI() return 404 even
+  // for valid UEIs because the empty Bearer token rejected the call.)
+  const config = getSAMAPIConfig('entity');
 
   // Build query parameters
-  const queryParams: Record<string, string | number> = {
-    page: params.page || 1,
-    size: params.size || 25
-  };
+  // SAM v3 Entity API quirk: when ueiSAM is provided, do NOT include
+  // page/size — the API auto-narrows to 1 record and pagination params
+  // cause it to return totalRecords=1 but entityData=[]. Bug fixed
+  // 2026-05-26 — was making UEI lookups silently return null.
+  const queryParams: Record<string, string | number> = {};
+
+  if (!params.uei && !params.cageCode) {
+    // Only add pagination for list searches, not single-record lookups
+    queryParams.page = params.page || 1;
+    queryParams.size = params.size || 25;
+  }
 
   if (params.legalBusinessName) {
     queryParams.legalBusinessName = params.legalBusinessName;

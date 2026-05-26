@@ -393,13 +393,18 @@ export async function makeSAMRequest<T>(
     }
   }
 
-  // 3. Build URL
+  // 3. Build URL — SAM uses query-param auth (?api_key=...), NOT
+  // Bearer header. Bug fixed 2026-05-26: was sending Bearer which
+  // returned 404 on Entity API for valid UEIs.
   const url = new URL(`${config.baseUrl}${endpoint}`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.append(key, String(value));
     }
   });
+  if (config.apiKey) {
+    url.searchParams.append('api_key', config.apiKey);
+  }
 
   // 4. Make request
   try {
@@ -408,7 +413,6 @@ export async function makeSAMRequest<T>(
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
         'Accept': 'application/json'
       }
     });
