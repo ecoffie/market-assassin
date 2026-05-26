@@ -11,9 +11,14 @@ const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 const MAX_INPUT_CHARS = 40000; // a bit lower than compliance to leave room for output
 
-type SectionType = 'exec_summary' | 'technical' | 'management' | 'past_performance' | 'pricing';
+// RFP section types — for traditional proposal responses
+type RfpSectionType = 'exec_summary' | 'technical' | 'management' | 'past_performance' | 'pricing';
+// Capability-statement section types — for Sources Sought / RFI responses
+type CapStatementSectionType = 'company_overview' | 'cap_past_performance' | 'capabilities' | 'differentiators' | 'poc';
+type SectionType = RfpSectionType | CapStatementSectionType;
 
 const SECTION_PROMPTS: Record<SectionType, { label: string; prompt: string; targetWords: number }> = {
+  // ---- RFP sections (existing) ----
   exec_summary: {
     label: 'Executive Summary',
     targetWords: 350,
@@ -38,6 +43,36 @@ const SECTION_PROMPTS: Record<SectionType, { label: string; prompt: string; targ
     label: 'Pricing Narrative',
     targetWords: 300,
     prompt: `Draft a Pricing Narrative (the cover-letter style story, not a cost table). Cover: pricing approach (FFP, T&M, hybrid), basis of estimate, how labor categories were chosen, assumptions and exclusions, and value tradeoff vs. risk. Do not invent dollar figures — use [TBD] or [INSERT RATE] placeholders. Target ~300 words.`,
+  },
+  // ---- Capability Statement sections (Sources Sought / RFI responses) ----
+  // Added 2026-05-26 after Eric flagged 'proposal assist is working but it
+  // is still saying RFP things'. SS/RFI responses are 2-3 page capability
+  // statements, not multi-volume proposals. Different prompt structure,
+  // tighter word counts.
+  company_overview: {
+    label: 'Company Overview',
+    targetWords: 150,
+    prompt: `Draft a Company Overview block for a Capability Statement (Sources Sought / RFI response). Two paragraphs max. Lead with what the company does + business type / certifications (SDVOSB, 8(a), WOSB, HUBZone, Small Business). Include UEI, CAGE, NAICS codes worked, primary geographic capability. End with 1 sentence on why this agency's mission aligns with the company's specialty. Be concise — capability statements are scanned in 30 seconds. Target ~150 words. Use bracketed [placeholders] for facts not in the profile (UEI, CAGE, founding year).`,
+  },
+  cap_past_performance: {
+    label: 'Relevant Past Performance',
+    targetWords: 300,
+    prompt: `Draft a Relevant Past Performance section for a Capability Statement (Sources Sought / RFI response). NOT the full past-performance narrative of an RFP — this is a scannable table-style list of 3-5 directly relevant contracts. Format each as: '**[Contract Title]** — [Agency], [Period], [Value], [Prime/Sub]. [One-line scope description tying to this Sources Sought scope].' Pick contracts that match the work described in the source document. Use bracketed placeholders for specifics — do not invent. End with one sentence summarizing the pattern of relevance. Target ~300 words.`,
+  },
+  capabilities: {
+    label: 'Capabilities',
+    targetWords: 250,
+    prompt: `Draft a Capabilities section for a Capability Statement (Sources Sought / RFI response). Bullet list of 6-10 core capabilities the company offers, scoped to what the source document is asking about. Each bullet: 1-2 lines max, capability + brief evidence (e.g. tools used, methodologies, certifications). Mirror language from the source document where possible so the keyword scan picks up matches. Avoid generic words like 'world-class' or 'best-in-class'. Target ~250 words.`,
+  },
+  differentiators: {
+    label: 'Differentiators',
+    targetWords: 200,
+    prompt: `Draft a Differentiators section for a Capability Statement (Sources Sought / RFI response). 3-5 short bullets explaining what makes this company a better fit than typical competitors for the agency's described need. Anchor each in concrete evidence: years of experience in this specific scope, agency-specific past performance, proprietary methods, certifications competitors lack, geographic advantage, etc. No marketing fluff. Target ~200 words.`,
+  },
+  poc: {
+    label: 'Point of Contact',
+    targetWords: 80,
+    prompt: `Draft a Point of Contact block for a Capability Statement. Single block at the bottom. Format:\n\n[Full Name], [Title]\n[Company Name]\n[Phone] · [Email]\n[Website]\n\nUEI: [UEI]\nCAGE: [CAGE]\nNAICS: [primary NAICS codes from profile]\n\nUse bracketed placeholders for fields not in the saved profile. No prose — this is a contact card, not a paragraph. Target ~80 words.`,
   },
 };
 
@@ -131,7 +166,7 @@ export async function POST(request: NextRequest) {
   }
   if (!sectionType || !SECTION_PROMPTS[sectionType]) {
     return NextResponse.json(
-      { success: false, error: 'sectionType must be one of: exec_summary, technical, management, past_performance, pricing' },
+      { success: false, error: 'sectionType must be one of: exec_summary, technical, management, past_performance, pricing, company_overview, cap_past_performance, capabilities, differentiators, poc' },
       { status: 400 }
     );
   }
@@ -149,7 +184,24 @@ export async function POST(request: NextRequest) {
 
   const sectionMeta = SECTION_PROMPTS[sectionType];
 
-  const systemPrompt = `You are a senior federal proposal writer. Draft proposal section copy that is compliant, specific to the source solicitation, and grounded in the bidder's saved profile.
+  // Capability-statement sections get a different system prompt that
+  // reframes the work as a Sources Sought / RFI response, not an RFP
+  // proposal. Otherwise the AI defaults to proposal-speak even when
+  // the section guidance asks for capability-statement format.
+  const isCapStatementSection = ['company_overview', 'cap_past_performance', 'capabilities', 'differentiators', 'poc'].includes(sectionType);
+
+  const systemPrompt = isCapStatementSection
+    ? `You are a senior federal capture writer. Draft a SHORT capability-statement section for a Sources Sought or RFI response — NOT a proposal. Capability statements are 2-3 pages total, scanned in 30 seconds by agency staff doing market research.
+
+Rules:
+- Concise prose + scannable bullets. No marketing fluff.
+- Mirror language from the source notice where it shows alignment with the scope.
+- Use bracketed [placeholders] for facts not in the bidder profile (UEI, CAGE, specific past contracts, named personnel).
+- Never invent facts about the bidder beyond the profile block.
+- Never use 'world-class', 'best-in-class', 'cutting-edge'.
+- Do NOT use proposal section labels like 'Executive Summary' — this is a capability statement section.
+- Output plain markdown only. No JSON. No commentary about what you wrote.`
+    : `You are a senior federal proposal writer. Draft proposal section copy that is compliant, specific to the source solicitation, and grounded in the bidder's saved profile.
 
 Rules:
 - Use clear headings and short paragraphs.

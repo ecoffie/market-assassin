@@ -77,15 +77,31 @@ const STATUS_LABELS: Record<ComplianceStatus, string> = {
   n_a: 'N/A',
 };
 
-type SectionType = 'exec_summary' | 'technical' | 'management' | 'past_performance' | 'pricing';
+type SectionType =
+  // RFP / Proposal sections
+  | 'exec_summary' | 'technical' | 'management' | 'past_performance' | 'pricing'
+  // Capability Statement sections (SS / RFI responses)
+  | 'company_overview' | 'cap_past_performance' | 'capabilities' | 'differentiators' | 'poc';
 
-const SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: number }> = [
+const RFP_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: number }> = [
   { id: 'exec_summary', label: 'Exec Summary', targetWords: 350 },
   { id: 'technical', label: 'Technical', targetWords: 600 },
   { id: 'management', label: 'Management', targetWords: 450 },
   { id: 'past_performance', label: 'Past Performance', targetWords: 400 },
   { id: 'pricing', label: 'Pricing', targetWords: 300 },
 ];
+
+// Capability-statement tabs surface when detectedNoticeType === 'sources_sought'
+// or 'rfi'. Shorter sections, different prompts on the server. Per Eric
+// 2026-05-26: 'proposal assist is working but it is still saying RFP things'.
+const CAP_STATEMENT_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: number }> = [
+  { id: 'company_overview', label: 'Company Overview', targetWords: 150 },
+  { id: 'cap_past_performance', label: 'Past Performance', targetWords: 300 },
+  { id: 'capabilities', label: 'Capabilities', targetWords: 250 },
+  { id: 'differentiators', label: 'Differentiators', targetWords: 200 },
+  { id: 'poc', label: 'Point of Contact', targetWords: 80 },
+];
+
 
 interface SectionDraft {
   draft: string;
@@ -189,6 +205,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       management: undefined,
       past_performance: undefined,
       pricing: undefined,
+      company_overview: undefined,
+      cap_past_performance: undefined,
+      capabilities: undefined,
+      differentiators: undefined,
+      poc: undefined,
     });
     setDraftError(null);
     setChecklist(DEFAULT_CHECKLIST.map(item => ({ ...item, checked: false })));
@@ -249,15 +270,47 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     });
   }, [compliance, statusFilter, categoryFilter]);
 
-  // Section drafts (Step 3)
+  // Section drafts (Step 3). Holds slots for BOTH RFP + capability-statement
+  // sections; only the active tab set is shown at any time based on
+  // detectedNoticeType.
   const [drafts, setDrafts] = useState<Record<SectionType, SectionDraft | undefined>>({
     exec_summary: undefined,
     technical: undefined,
     management: undefined,
     past_performance: undefined,
     pricing: undefined,
+    company_overview: undefined,
+    cap_past_performance: undefined,
+    capabilities: undefined,
+    differentiators: undefined,
+    poc: undefined,
   });
   const [activeSection, setActiveSection] = useState<SectionType>('exec_summary');
+
+  // Detected notice type from the loaded doc text. 'sources_sought'
+  // and 'rfi' don't ask for a proposal — they ask for a capability
+  // statement. The UI was assuming RFP for everything. Detect from
+  // the first ~2KB of extracted text using telltale phrases. Per
+  // Eric (2026-05-26): 'this may not be an RFP from my understanding
+  // this was a SS'.
+  const [detectedNoticeType, setDetectedNoticeType] = useState<'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown'>('unknown');
+
+  // Pick the right tab set based on what we detected from the loaded
+  // doc. SS/RFI = capability statement tabs. Everything else
+  // (RFP/RFQ/unknown) = traditional proposal tabs.
+  const isCapStatementMode = detectedNoticeType === 'sources_sought' || detectedNoticeType === 'rfi';
+  const currentSectionTabs = isCapStatementMode ? CAP_STATEMENT_SECTION_TABS : RFP_SECTION_TABS;
+
+  // When the detected mode flips (e.g., user loads a different doc),
+  // make sure activeSection isn't pointing to a tab that no longer
+  // exists in the current set. If it isn't in currentSectionTabs,
+  // default to the first available.
+  useEffect(() => {
+    if (!currentSectionTabs.some(t => t.id === activeSection)) {
+      setActiveSection(currentSectionTabs[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCapStatementMode]);
   const [draftLoading, setDraftLoading] = useState<SectionType | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
 
@@ -319,7 +372,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const downloadDraft = useCallback((sectionType: SectionType) => {
     const d = drafts[sectionType];
     if (!d) return;
-    const meta = SECTION_TABS.find(t => t.id === sectionType);
+    const meta = currentSectionTabs.find(t => t.id === sectionType);
     const label = meta?.label || sectionType;
     const safeName = (uploadedRfp?.fileName || 'proposal').replace(/[^a-z0-9-_.]/gi, '_');
     const blob = new Blob([d.draft], { type: 'text/markdown;charset=utf-8;' });
@@ -343,7 +396,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [exportError, setExportError] = useState<string | null>(null);
 
   const hasAnyDraft = useMemo(
-    () => SECTION_TABS.some(t => !!drafts[t.id]?.draft),
+    () => currentSectionTabs.some(t => !!drafts[t.id]?.draft),
     [drafts]
   );
 
@@ -353,7 +406,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setExportError(null);
     try {
       const draftsForExport: Record<string, { label: string; draft: string; wordCount?: number }> = {};
-      for (const tab of SECTION_TABS) {
+      for (const tab of currentSectionTabs) {
         const d = drafts[tab.id];
         if (d?.draft) {
           draftsForExport[tab.id] = { label: tab.label, draft: d.draft, wordCount: d.wordCount };
@@ -477,13 +530,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // when the cache has what they need.
   const [autoLoadStatus, setAutoLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'no-docs' | 'error'>('idle');
   const [autoLoadMessage, setAutoLoadMessage] = useState<string | null>(null);
-  // Detected notice type from the loaded doc text. 'sources_sought'
-  // and 'rfi' don't ask for a proposal — they ask for a capability
-  // statement. The UI was assuming RFP for everything. Detect from
-  // the first ~2KB of extracted text using telltale phrases. Per
-  // Eric (2026-05-26): 'this may not be an RFP from my understanding
-  // this was a SS'.
-  const [detectedNoticeType, setDetectedNoticeType] = useState<'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown'>('unknown');
+  // detectedNoticeType moved up near currentSectionTabs declaration
+  // so we can derive isCapStatementMode before any consumer needs it.
   useEffect(() => {
     const pursuitId = panelContext?.pursuit_id;
     if (!pursuitId || typeof pursuitId !== 'string' || !email) return;
@@ -938,10 +986,18 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
-              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 3 · Draft Sections</p>
-              <h2 className="text-lg font-semibold text-white">First drafts grounded in the RFP + your profile</h2>
+              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">
+                Step 3 · {isCapStatementMode ? 'Capability Statement Sections' : 'Draft Sections'}
+              </p>
+              <h2 className="text-lg font-semibold text-white">
+                {isCapStatementMode
+                  ? 'Capability statement drafts grounded in the notice + your profile'
+                  : 'First drafts grounded in the RFP + your profile'}
+              </h2>
               <p className="text-sm text-slate-400 mt-1">
-                Pick a section. Mindy uses the source doc and your saved profile (NAICS, set-asides, target agencies) to write a first pass with [placeholders] for facts it shouldn&apos;t invent.
+                {isCapStatementMode
+                  ? 'Pick a section. Mindy uses the Sources Sought / RFI text and your saved profile (NAICS, certifications, agencies worked) to write capability-statement copy — short, scannable, evidence-focused.'
+                  : 'Pick a section. Mindy uses the source doc and your saved profile (NAICS, set-asides, target agencies) to write a first pass with [placeholders] for facts it shouldn\'t invent.'}
               </p>
             </div>
           </div>
@@ -952,9 +1008,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </div>
           )}
 
-          {/* Section tabs */}
+          {/* Section tabs — RFP set OR capability-statement set
+              based on detected notice type. */}
           <div className="flex flex-wrap items-center gap-1 border-b border-slate-800 mb-4 -mx-1 px-1">
-            {SECTION_TABS.map(tab => {
+            {currentSectionTabs.map(tab => {
               const hasDraft = !!drafts[tab.id];
               const isActive = activeSection === tab.id;
               return (
@@ -977,7 +1034,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
           {/* Active section pane */}
           {(() => {
-            const meta = SECTION_TABS.find(t => t.id === activeSection)!;
+            const meta = currentSectionTabs.find(t => t.id === activeSection)!;
+            // Safety: if activeSection isn't in the current set
+            // (race between mode-switch effect + render), bail.
+            if (!meta) return null;
             const current = drafts[activeSection];
             const isLoading = draftLoading === activeSection;
 
@@ -1062,9 +1122,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 4 · Review &amp; Export</p>
-              <h2 className="text-lg font-semibold text-white">Final compliance review + Word export</h2>
+              <h2 className="text-lg font-semibold text-white">
+                {isCapStatementMode
+                  ? 'Final review + capability statement export'
+                  : 'Final compliance review + Word export'}
+              </h2>
               <p className="text-sm text-slate-400 mt-1">
-                Walk the checklist before you ship. Then export a single .docx containing the compliance matrix, drafted sections, and the checklist appendix.
+                {isCapStatementMode
+                  ? 'Walk the checklist before you submit. Then export a 2-3 page capability statement .docx with company overview, past performance, capabilities, differentiators, and POC.'
+                  : 'Walk the checklist before you ship. Then export a single .docx containing the compliance matrix, drafted sections, and the checklist appendix.'}
               </p>
             </div>
             <div className="text-right">
@@ -1100,7 +1166,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   <li className={compliance.length > 0 ? 'text-emerald-400' : 'text-slate-600'}>
                     {compliance.length > 0 ? '✓' : '○'} Compliance Matrix ({compliance.length} requirements)
                   </li>
-                  {SECTION_TABS.map(tab => {
+                  {currentSectionTabs.map(tab => {
                     const has = !!drafts[tab.id]?.draft;
                     return (
                       <li key={tab.id} className={has ? 'text-emerald-400' : 'text-slate-600'}>
