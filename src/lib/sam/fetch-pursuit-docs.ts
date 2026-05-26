@@ -22,6 +22,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from './utils';
+import { extractPdf, extractDocx, extractTxt } from './pdf-extract';
 
 const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_FILE_URL_PREFIX = 'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/';
@@ -47,27 +48,9 @@ interface SamFileRef {
   filename: string;
 }
 
-interface ExtractResult {
-  text: string;
-  pageCount?: number;
-}
-
-async function extractPdf(buffer: Buffer): Promise<ExtractResult> {
-  const { PDFParse } = await import('pdf-parse');
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  try {
-    const result = await parser.getText();
-    return { text: result.text || '', pageCount: result.total };
-  } finally {
-    await parser.destroy().catch(() => {});
-  }
-}
-
-async function extractDocx(buffer: Buffer): Promise<ExtractResult> {
-  const mammoth = await import('mammoth');
-  const result = await mammoth.extractRawText({ buffer });
-  return { text: result.value || '' };
-}
+// Extractors (extractPdf, extractDocx, extractTxt) imported from
+// ./pdf-extract — shared module with DOMMatrix/ImageData/Path2D
+// polyfills installed before pdf-parse loads.
 
 function inferKind(filename: string, mime: string | null, buffer?: Buffer): 'pdf' | 'docx' | 'txt' | null {
   const lower = filename.toLowerCase();

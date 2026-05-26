@@ -9,7 +9,7 @@
  * DELETE /api/pipeline - Remove from pipeline
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
@@ -226,21 +226,23 @@ export async function POST(request: NextRequest) {
       metadata: { stage: data.stage, priority: data.priority },
     });
 
-    // Fire-and-forget: pull SAM.gov attachments for this pursuit and
-    // cache them in pursuit_documents + Supabase Storage. Proposal
-    // Assist will read from that cache when the user opens it from
-    // this pursuit, eliminating the manual download → re-upload step.
-    //
-    // NO AWAIT — return to client immediately. The fetcher updates
-    // user_pipeline.docs_status as it runs (pending → fetching →
-    // ready|none|failed) so the UI can poll for status.
+    // Background-task SAM doc fetch. Uses Next.js after() so the
+    // lambda stays alive past the response (the OLD fire-and-forget
+    // approach was getting killed mid-pdf-parse by Vercel teardown,
+    // which surfaced as 'DOMMatrix is not defined' — see commit
+    // history 2026-05-26). The fetcher updates user_pipeline.docs_status
+    // as it runs so the UI can poll.
     if (data.notice_id && data.id) {
-      fetchPursuitDocs({
-        pipelineId: data.id,
-        userEmail: body.user_email,
-        noticeId: data.notice_id,
-      }).catch(err => {
-        console.warn('[Pipeline POST] background doc fetch threw:', err);
+      after(async () => {
+        try {
+          await fetchPursuitDocs({
+            pipelineId: data.id,
+            userEmail: body.user_email,
+            noticeId: data.notice_id,
+          });
+        } catch (err) {
+          console.warn('[Pipeline POST] background doc fetch threw:', err);
+        }
       });
     }
 

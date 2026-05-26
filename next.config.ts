@@ -17,6 +17,14 @@ const nextConfig: NextConfig = {
   experimental: {
     // Use React Compiler if available
   },
+  // Packages that must NOT be bundled by the Next compiler — they
+  // need to be required at runtime from node_modules so their
+  // internals (WASM, dynamic imports, eval'd workers) work right.
+  // pdf-parse and mammoth both rely on dynamic loading patterns
+  // that webpack mangles. mammoth was working accidentally; pdf-parse
+  // was throwing 'DOMMatrix is not defined' until we added this
+  // (paired with the polyfills in src/lib/sam/pdf-extract.ts).
+  serverExternalPackages: ['pdf-parse', 'mammoth'],
   // Rewrites for host-based routing
   async rewrites() {
     return {

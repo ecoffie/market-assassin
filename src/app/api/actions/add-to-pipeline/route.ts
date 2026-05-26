@@ -10,7 +10,7 @@
  * </a>
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
@@ -123,16 +123,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fire-and-forget: pull SAM.gov attachments for this pursuit so
-    // Proposal Assist can load them when the user opens it. Mirrors
-    // the POST /api/pipeline path.
+    // Background task via Next.js after() — keeps lambda alive past
+    // the redirect so pdf-parse can finish initializing without being
+    // killed mid-extraction (see commit 2026-05-26).
     if (insertedRow?.notice_id && insertedRow?.id) {
-      fetchPursuitDocs({
-        pipelineId: insertedRow.id,
-        userEmail: email,
-        noticeId: insertedRow.notice_id,
-      }).catch(err => {
-        console.warn('[add-to-pipeline GET] background doc fetch threw:', err);
+      after(async () => {
+        try {
+          await fetchPursuitDocs({
+            pipelineId: insertedRow.id,
+            userEmail: email,
+            noticeId: insertedRow.notice_id,
+          });
+        } catch (err) {
+          console.warn('[add-to-pipeline GET] background doc fetch threw:', err);
+        }
       });
     }
 
@@ -242,14 +246,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fire-and-forget doc fetch (same as GET path above)
+    // Background task via Next.js after() — same lifecycle fix as GET path.
     if (data?.notice_id && data?.id) {
-      fetchPursuitDocs({
-        pipelineId: data.id,
-        userEmail: email.toLowerCase(),
-        noticeId: data.notice_id,
-      }).catch(err => {
-        console.warn('[add-to-pipeline POST] background doc fetch threw:', err);
+      after(async () => {
+        try {
+          await fetchPursuitDocs({
+            pipelineId: data.id,
+            userEmail: email.toLowerCase(),
+            noticeId: data.notice_id,
+          });
+        } catch (err) {
+          console.warn('[add-to-pipeline POST] background doc fetch threw:', err);
+        }
       });
     }
 
