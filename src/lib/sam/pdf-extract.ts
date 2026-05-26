@@ -90,6 +90,12 @@ if (typeof g.Path2D === 'undefined') {
 export interface ExtractResult {
   text: string;
   pageCount?: number;
+  /** Document title from PDF metadata (/Title field) if present.
+   *  Useful as a last-resort filename when SAM didn't surface
+   *  Content-Disposition. Often the title an agency typed when
+   *  generating the PDF — e.g. 'Sources Sought - DK Shadehill
+   *  Gatehouse Roofing'. */
+  pdfTitle?: string;
 }
 
 export async function extractPdf(buffer: Buffer): Promise<ExtractResult> {
@@ -97,7 +103,20 @@ export async function extractPdf(buffer: Buffer): Promise<ExtractResult> {
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   try {
     const result = await parser.getText();
-    return { text: result.text || '', pageCount: result.total };
+    // pdf-parse exposes metadata via getMetadata() — pull /Title if set.
+    // Cast through unknown because pdf-parse 2.x typings don't expose
+    // getMetadata even though the runtime method exists.
+    let pdfTitle: string | undefined;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const meta = await (parser as any).getMetadata?.().catch(() => null);
+      const candidate = meta?.info?.Title || meta?.metadata?.Title;
+      if (candidate && typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed && trimmed.length <= 200) pdfTitle = trimmed;
+      }
+    } catch { /* optional, swallow */ }
+    return { text: result.text || '', pageCount: result.total, pdfTitle };
   } finally {
     await parser.destroy().catch(() => {});
   }

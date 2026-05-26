@@ -155,38 +155,36 @@ async function discoverFiles(noticeId: string, apiKey: string): Promise<SamFileR
   const links: string[] = Array.isArray(opp.resourceLinks) ? opp.resourceLinks : [];
   if (links.length === 0) return [];
 
-  return Promise.all(
-    links.map(async (rawUrl: string, i: number): Promise<SamFileRef> => {
-      let fileId = '';
-      try {
-        const parts = new URL(rawUrl).pathname.split('/').filter(Boolean);
-        const last = parts[parts.length - 1];
-        if (last && last.toLowerCase() !== 'download') fileId = last;
-        else if (parts.length >= 2) fileId = parts[parts.length - 2];
-      } catch { /* leave empty */ }
+  // Don't HEAD-then-GET — SAM doesn't reliably surface Content-Disposition
+  // on HEAD (saw blank filenames in production despite the file having
+  // a real Content-Disposition on GET). Return fileId-only refs here.
+  // The actual GET in downloadFile() captures filename from the same
+  // request that's pulling bytes — one round trip, more reliable.
+  return links.map((rawUrl: string, i: number): SamFileRef => {
+    let fileId = '';
+    try {
+      const parts = new URL(rawUrl).pathname.split('/').filter(Boolean);
+      const last = parts[parts.length - 1];
+      if (last && last.toLowerCase() !== 'download') fileId = last;
+      else if (parts.length >= 2) fileId = parts[parts.length - 2];
+    } catch { /* leave empty */ }
 
-      // HEAD with api_key for the real filename
-      let realName = '';
-      try {
-        const headUrl = new URL(rawUrl);
-        if (!headUrl.searchParams.has('api_key')) headUrl.searchParams.set('api_key', apiKey);
-        const headRes = await fetch(headUrl.toString(), { method: 'HEAD' });
-        realName = parseFilenameFromDisposition(headRes.headers.get('content-disposition')) || '';
-      } catch { /* fall through */ }
-
-      return {
-        url: rawUrl,
-        fileId: fileId || `unknown-${i}`,
-        filename: realName || (fileId ? `Document ${i + 1} (${fileId.slice(0, 8)})` : `Document ${i + 1}`),
-      };
-    })
-  );
+    return {
+      url: rawUrl,
+      fileId: fileId || `unknown-${i}`,
+      // Provisional fallback name; downloadFile() upgrades it from
+      // Content-Disposition header if SAM provides one.
+      filename: fileId ? `Document ${i + 1} (${fileId.slice(0, 8)})` : `Document ${i + 1}`,
+    };
+  });
 }
 
 /**
  * Step 2: download one file blob from SAM with our API key.
+ * Also captures the real filename from Content-Disposition on the
+ * GET response (HEAD didn't surface it reliably — see discoverFiles).
  */
-async function downloadFile(ref: SamFileRef, apiKey: string): Promise<{ buffer: Buffer; mime: string; size: number } | null> {
+async function downloadFile(ref: SamFileRef, apiKey: string): Promise<{ buffer: Buffer; mime: string; size: number; realFilename: string | null } | null> {
   const fetchUrl = new URL(ref.url.startsWith('http') ? ref.url : `${SAM_FILE_URL_PREFIX}${ref.fileId}/download`);
   if (!fetchUrl.searchParams.has('api_key')) fetchUrl.searchParams.set('api_key', apiKey);
 
@@ -202,6 +200,10 @@ async function downloadFile(ref: SamFileRef, apiKey: string): Promise<{ buffer: 
     return null;
   }
 
+  // Grab filename from THIS response's headers — same round trip,
+  // more reliable than a separate HEAD which SAM's CDN may strip.
+  const realFilename = parseFilenameFromDisposition(res.headers.get('content-disposition'));
+
   const ab = await res.arrayBuffer();
   if (ab.byteLength > MAX_FILE_SIZE) {
     console.warn(`[fetch-pursuit-docs] file ${ref.fileId} too large (${ab.byteLength} bytes), skipping`);
@@ -212,6 +214,7 @@ async function downloadFile(ref: SamFileRef, apiKey: string): Promise<{ buffer: 
     buffer: Buffer.from(ab),
     mime: res.headers.get('content-type') || 'application/octet-stream',
     size: ab.byteLength,
+    realFilename,
   };
 }
 
@@ -268,6 +271,13 @@ export async function fetchPursuitDocs(opts: {
       const dl = await downloadFile(ref, apiKey);
       if (!dl) { failed++; continue; }
 
+      // Upgrade the provisional 'Document N (xxx)' filename with the
+      // real Content-Disposition filename if SAM sent one. Falls back
+      // to the placeholder if not.
+      if (dl.realFilename) {
+        ref.filename = dl.realFilename;
+      }
+
       const kind = inferKind(ref.filename, dl.mime, dl.buffer);
       let extractedText = '';
       let pageCount: number | undefined;
@@ -278,6 +288,17 @@ export async function fetchPursuitDocs(opts: {
           const result = await extractPdf(dl.buffer);
           extractedText = (result.text || '').slice(0, MAX_EXTRACTED_TEXT_CHARS);
           pageCount = result.pageCount;
+          // Last-resort filename fallback: when SAM gave no Content-
+          // Disposition AND ref.filename is still the 'Document N
+          // (xxx)' placeholder, use the PDF's internal /Title metadata
+          // if the document has one. Often agency-typed titles like
+          // 'Sources Sought - DK Shadehill Gatehouse Roofing.pdf'.
+          if (result.pdfTitle && ref.filename.startsWith('Document ')) {
+            // Add .pdf extension if not present so extension-based
+            // type-sniffing elsewhere still works.
+            const title = /\.pdf$/i.test(result.pdfTitle) ? result.pdfTitle : `${result.pdfTitle}.pdf`;
+            ref.filename = title;
+          }
         } catch (err) {
           extractionError = err instanceof Error ? err.message : 'PDF parse failed';
         }

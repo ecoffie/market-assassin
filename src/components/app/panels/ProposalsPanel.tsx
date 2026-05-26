@@ -477,6 +477,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // when the cache has what they need.
   const [autoLoadStatus, setAutoLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'no-docs' | 'error'>('idle');
   const [autoLoadMessage, setAutoLoadMessage] = useState<string | null>(null);
+  // Detected notice type from the loaded doc text. 'sources_sought'
+  // and 'rfi' don't ask for a proposal — they ask for a capability
+  // statement. The UI was assuming RFP for everything. Detect from
+  // the first ~2KB of extracted text using telltale phrases. Per
+  // Eric (2026-05-26): 'this may not be an RFP from my understanding
+  // this was a SS'.
+  const [detectedNoticeType, setDetectedNoticeType] = useState<'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown'>('unknown');
   useEffect(() => {
     const pursuitId = panelContext?.pursuit_id;
     if (!pursuitId || typeof pursuitId !== 'string' || !email) return;
@@ -527,6 +534,37 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             pageCount: primary.page_count,
             text: primary.extracted_text,
           });
+          // Sniff notice type from first 2KB. Order matters — SS
+          // language tends to also mention 'RFP' in the boilerplate
+          // ('this is not an RFP'), so check SS phrases first.
+          const head = primary.extracted_text.slice(0, 2000).toLowerCase();
+          let detected: typeof detectedNoticeType = 'unknown';
+          if (
+            head.includes('sources sought') ||
+            head.includes('this is not a request for proposal') ||
+            head.includes('this announcement is being used for market research') ||
+            head.includes('not a solicitation')
+          ) {
+            detected = 'sources_sought';
+          } else if (
+            head.includes('request for information') ||
+            head.match(/\brfi\b/) ||
+            head.includes('responses to this rfi')
+          ) {
+            detected = 'rfi';
+          } else if (
+            head.includes('request for proposal') ||
+            head.match(/\brfp\b/) ||
+            head.includes('offerors shall')
+          ) {
+            detected = 'rfp';
+          } else if (
+            head.includes('request for quotation') ||
+            head.match(/\brfq\b/)
+          ) {
+            detected = 'rfq';
+          }
+          setDetectedNoticeType(detected);
           setAutoLoadStatus('loaded');
           setAutoLoadMessage(
             docs.length > 1
@@ -622,6 +660,25 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               {autoLoadStatus === 'error' && '✕ '}
             </span>
             {autoLoadStatus === 'loading' ? 'Loading pursuit documents…' : autoLoadMessage}
+          </div>
+        )}
+
+        {/* Notice type warning — when the loaded doc is a Sources
+            Sought or RFI, this panel's RFP-centric flow (compliance
+            matrix, exec summary, technical/management drafts,
+            pricing narrative) is the WRONG playbook. SS/RFI responses
+            are 2-3 page capability statements. Honest disclaimer +
+            user can still proceed if they want. */}
+        {uploadedRfp && (detectedNoticeType === 'sources_sought' || detectedNoticeType === 'rfi') && (
+          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+            <div className="font-semibold mb-1">
+              ⚠ This looks like a {detectedNoticeType === 'sources_sought' ? 'Sources Sought' : 'Request for Information'}, not an RFP.
+            </div>
+            <div className="text-xs text-amber-200/90">
+              {detectedNoticeType === 'sources_sought'
+                ? 'Sources Sought notices are market research — the agency wants to know who can do the work. You respond with a capability statement (2-3 pages), not a full proposal. The compliance-matrix + drafting steps below were built for RFPs and will produce content that does not fit a Sources Sought response. Use the extracted text as research; write a capability statement separately.'
+                : 'RFIs ask for information about your capabilities, methods, or pricing. You respond with a short white paper or capability statement, not a full proposal. The drafting steps below assume an RFP and will not match an RFI response format.'}
+            </div>
           </div>
         )}
 
