@@ -23,7 +23,12 @@ interface PanelContainerProps {
   activePanel: AppPanel;
   email: string | null;
   tier: AppTier;
-  onPanelChange?: (panel: AppPanel) => void;
+  onPanelChange?: (panel: AppPanel, context?: Record<string, unknown>) => void;
+  /** Optional context passed by the previous panel when it requested
+   *  a switch. e.g. PipelinePanel sets { pursuit_id: 'xyz' } when the
+   *  user clicks 'Draft Proposal', and ProposalsPanel reads it on mount
+   *  to auto-load that pursuit's cached SAM attachments. */
+  panelContext?: Record<string, unknown>;
 }
 
 function PanelLoading() {
@@ -37,7 +42,7 @@ function PanelLoading() {
   );
 }
 
-export default function PanelContainer({ activePanel, email, tier, onPanelChange }: PanelContainerProps) {
+export default function PanelContainer({ activePanel, email, tier, onPanelChange, panelContext }: PanelContainerProps) {
   const renderPanel = () => {
     switch (activePanel) {
       case 'dashboard':
@@ -53,7 +58,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'contractors':
         return <ContractorsPanel email={email} tier={tier} />;
       case 'pipeline':
-        return <PipelinePanel email={email} tier={tier} />;
+        return <PipelinePanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'contacts':
         return <RelationshipsPanel email={email} tier={tier} />;
       case 'team':
@@ -61,7 +66,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'settings':
         return <UnifiedSettingsPanel email={email} tier={tier} />;
       case 'proposals':
-        return <ProposalsPanel email={email} tier={tier} />;
+        return <ProposalsPanel email={email} tier={tier} panelContext={panelContext} />;
       case 'pricing':
         return <PricingIntelPanel email={email} tier={tier} />;
       case 'target-list':

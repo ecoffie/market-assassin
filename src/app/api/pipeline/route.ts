@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
+import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -213,6 +214,24 @@ export async function POST(request: NextRequest) {
       summary: `Added ${data.title} to pipeline`,
       metadata: { stage: data.stage, priority: data.priority },
     });
+
+    // Fire-and-forget: pull SAM.gov attachments for this pursuit and
+    // cache them in pursuit_documents + Supabase Storage. Proposal
+    // Assist will read from that cache when the user opens it from
+    // this pursuit, eliminating the manual download → re-upload step.
+    //
+    // NO AWAIT — return to client immediately. The fetcher updates
+    // user_pipeline.docs_status as it runs (pending → fetching →
+    // ready|none|failed) so the UI can poll for status.
+    if (data.notice_id && data.id) {
+      fetchPursuitDocs({
+        pipelineId: data.id,
+        userEmail: body.user_email,
+        noticeId: data.notice_id,
+      }).catch(err => {
+        console.warn('[Pipeline POST] background doc fetch threw:', err);
+      });
+    }
 
     return NextResponse.json({
       success: true,

@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,15 +102,30 @@ export async function GET(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await getSupabase()
+    const { data: insertedRow, error } = await getSupabase()
       .from('user_pipeline')
-      .insert(pipelineEntry);
+      .insert(pipelineEntry)
+      .select()
+      .single();
 
     if (error) {
       console.error('Failed to add to pipeline:', error);
       return NextResponse.redirect(
         new URL('/pipeline/error?reason=db_error', request.url)
       );
+    }
+
+    // Fire-and-forget: pull SAM.gov attachments for this pursuit so
+    // Proposal Assist can load them when the user opens it. Mirrors
+    // the POST /api/pipeline path.
+    if (insertedRow?.notice_id && insertedRow?.id) {
+      fetchPursuitDocs({
+        pipelineId: insertedRow.id,
+        userEmail: email,
+        noticeId: insertedRow.notice_id,
+      }).catch(err => {
+        console.warn('[add-to-pipeline GET] background doc fetch threw:', err);
+      });
     }
 
     // Success - redirect to confirmation
@@ -211,6 +227,17 @@ export async function POST(request: NextRequest) {
         { success: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // Fire-and-forget doc fetch (same as GET path above)
+    if (data?.notice_id && data?.id) {
+      fetchPursuitDocs({
+        pipelineId: data.id,
+        userEmail: email.toLowerCase(),
+        noticeId: data.notice_id,
+      }).catch(err => {
+        console.warn('[add-to-pipeline POST] background doc fetch threw:', err);
+      });
     }
 
     return NextResponse.json({

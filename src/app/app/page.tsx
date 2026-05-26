@@ -55,6 +55,12 @@ function AppDashboard() {
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<AppTier>('free');
   const [activePanel, setActivePanel] = useState<AppPanel>('dashboard');
+  // Optional context the previous panel can pass to the next (e.g.
+  // PipelinePanel sets { pursuit_id } when user clicks 'Draft Proposal'
+  // so ProposalsPanel knows which pursuit to auto-load docs for).
+  // Clears the next time the user manually navigates so a context
+  // doesn't persist across unrelated panel switches.
+  const [panelContext, setPanelContext] = useState<Record<string, unknown> | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -323,12 +329,16 @@ function AppDashboard() {
     };
   }, [email, activePanel, tier, trackEngagement, flushPanelTime]);
 
-  const handlePanelChange = useCallback((nextPanel: AppPanel) => {
-    if (nextPanel === activePanelRef.current) return;
+  const handlePanelChange = useCallback((nextPanel: AppPanel, context?: Record<string, unknown>) => {
+    if (nextPanel === activePanelRef.current && !context) return;
     flushPanelTime(activePanelRef.current, { keepalive: true });
     activePanelRef.current = nextPanel;
     panelStartedAtRef.current = Date.now();
     setActivePanel(nextPanel);
+    // Context is set by the previous panel via the optional 2nd arg.
+    // Clearing to undefined when no context was passed prevents stale
+    // context from a previous navigation from leaking into the next panel.
+    setPanelContext(context);
     trackEngagement('page_view', { panel: nextPanel, tier });
   }, [flushPanelTime, tier, trackEngagement]);
 
@@ -944,6 +954,7 @@ function AppDashboard() {
           email={email}
           tier={tier}
           onPanelChange={handlePanelChange}
+          panelContext={panelContext}
         />
       </main>
     </div>

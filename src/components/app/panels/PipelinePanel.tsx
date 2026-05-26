@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { AppTier } from '../UnifiedSidebar';
+import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
@@ -9,6 +9,10 @@ import { useToast } from '../Toast';
 interface PipelinePanelProps {
   email: string | null;
   tier: AppTier;
+  /** Hand-off to other panels. Used by the 'Draft Proposal' button on
+   *  each pursuit to jump to Proposal Assist with the pursuit pre-loaded.
+   *  Set by /app/page.tsx via handlePanelChange. */
+  onPanelChange?: (panel: AppPanel, context?: Record<string, unknown>) => void;
 }
 
 interface PipelineOpportunity {
@@ -31,6 +35,11 @@ interface PipelineOpportunity {
   external_url?: string;
   owner_email?: string;
   created_at?: string;
+  // Doc auto-ingest status (Pursuit Document Pipeline v1, 2026-05-25).
+  // Set by fetchPursuitDocs background job after pursuit save.
+  docs_status?: 'pending' | 'fetching' | 'ready' | 'none' | 'failed';
+  docs_count?: number;
+  docs_fetched_at?: string;
 }
 
 type PipelineStage = PipelineOpportunity['stage'];
@@ -73,7 +82,7 @@ const PRIORITIES: Array<{ id: PipelinePriority; label: string }> = [
   { id: 'critical', label: 'Critical' },
 ];
 
-export default function PipelinePanel({ email }: PipelinePanelProps) {
+export default function PipelinePanel({ email, onPanelChange }: PipelinePanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [partners, setPartners] = useState<TeamingPartner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -748,6 +757,37 @@ export default function PipelinePanel({ email }: PipelinePanelProps) {
                     <div className="mt-3 text-xs font-medium text-blue-300">
                       Open details
                     </div>
+                    {onPanelChange && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onPanelChange('proposals', { pursuit_id: opp.id });
+                        }}
+                        className="mt-2 w-full rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500"
+                        title={
+                          opp.docs_status === 'ready'
+                            ? `${opp.docs_count || 0} doc(s) ready — open Proposal Assist`
+                            : opp.docs_status === 'fetching'
+                              ? 'SAM docs still downloading — Proposal Assist will load what is ready'
+                              : opp.docs_status === 'none'
+                                ? 'No SAM attachments — Proposal Assist will still draft from the notice metadata'
+                                : 'Open Proposal Assist for this pursuit'
+                        }
+                      >
+                        Draft Proposal →
+                        {opp.docs_status === 'ready' && (opp.docs_count || 0) > 0 && (
+                          <span className="ml-1 text-[10px] font-normal text-emerald-200">
+                            {opp.docs_count} {opp.docs_count === 1 ? 'doc' : 'docs'}
+                          </span>
+                        )}
+                        {opp.docs_status === 'fetching' && (
+                          <span className="ml-1 text-[10px] font-normal text-emerald-200 animate-pulse">
+                            fetching…
+                          </span>
+                        )}
+                      </button>
+                    )}
                     <label
                       className="mt-3 block"
                       onClick={(event) => event.stopPropagation()}

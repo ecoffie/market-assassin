@@ -7,6 +7,12 @@ import { getMIApiHeaders } from '../authHeaders';
 interface ProposalsPanelProps {
   email: string | null;
   tier: AppTier;
+  /** Optional context passed when user navigated here from another
+   *  panel. PipelinePanel sets { pursuit_id: 'xyz' } when the user
+   *  clicks 'Draft Proposal' on a pursuit card — we then auto-fetch
+   *  that pursuit's cached SAM attachments and pre-populate the RFP
+   *  upload state so the user can skip the manual download + re-upload. */
+  panelContext?: Record<string, unknown>;
 }
 
 interface PipelineOpportunity {
@@ -109,7 +115,7 @@ const DEFAULT_CHECKLIST: ChecklistItemState[] = [
   { id: 'submission-time', label: 'Submission is ready at least 24 hours before the deadline (portal upload buffer + amendment check).', checked: false },
 ];
 
-export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
+export default function ProposalsPanel({ email, tier, panelContext }: ProposalsPanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -461,6 +467,90 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
     loadPipeline();
   }, [loadPipeline]);
 
+  // Pursuit Document Pipeline v1 (2026-05-25) — auto-load cached SAM
+  // attachments when the user lands here from PipelinePanel's
+  // 'Draft Proposal' button. Context shape: { pursuit_id: 'uuid' }.
+  // Fetches the first/largest doc from /api/app/proposal/pursuit-docs
+  // and pre-populates uploadedRfp state so the user can skip the
+  // manual download-from-SAM + re-upload step. They can still upload
+  // a different file manually after — this just removes the friction
+  // when the cache has what they need.
+  const [autoLoadStatus, setAutoLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'no-docs' | 'error'>('idle');
+  const [autoLoadMessage, setAutoLoadMessage] = useState<string | null>(null);
+  useEffect(() => {
+    const pursuitId = panelContext?.pursuit_id;
+    if (!pursuitId || typeof pursuitId !== 'string' || !email) return;
+
+    let cancelled = false;
+    setAutoLoadStatus('loading');
+    setSelectedId(pursuitId);
+
+    fetch(`/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pursuitId)}`, {
+      headers: getAuthHeaders(),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.success) {
+          if (!cancelled) {
+            setAutoLoadStatus('error');
+            setAutoLoadMessage('Could not load pursuit docs');
+          }
+          return;
+        }
+        const docs = data.documents || [];
+        if (docs.length === 0) {
+          // Pursuit has no SAM attachments — explain so user knows to
+          // upload manually (or the fetch is still in flight).
+          const status = data.pursuit?.docs_status;
+          setAutoLoadStatus('no-docs');
+          setAutoLoadMessage(
+            status === 'fetching'
+              ? 'SAM.gov attachments still downloading. Refresh in a moment, or upload manually below.'
+              : status === 'none'
+                ? 'This SAM notice has no attachments. Upload a draft or related document manually below.'
+                : status === 'failed'
+                  ? 'SAM attachment download failed. Upload manually below.'
+                  : 'No documents cached yet. Upload manually below.'
+          );
+          return;
+        }
+        // Use the largest doc as the "main" RFP — typically the SOW
+        // or the actual RFP rather than amendments / Q&A which tend
+        // to be smaller. User can manually re-upload to pick a
+        // different one.
+        const primary = docs[0];
+        if (primary.extracted_text) {
+          setUploadedRfp({
+            fileName: primary.filename,
+            fileSize: primary.size_bytes || 0,
+            charCount: primary.char_count || primary.extracted_text.length,
+            pageCount: primary.page_count,
+            text: primary.extracted_text,
+          });
+          setAutoLoadStatus('loaded');
+          setAutoLoadMessage(
+            docs.length > 1
+              ? `Loaded ${primary.filename} (${docs.length} total docs in this pursuit — pick a different one with the upload button below)`
+              : `Loaded ${primary.filename} from this pursuit`
+          );
+        } else if (primary.extraction_error) {
+          setAutoLoadStatus('error');
+          setAutoLoadMessage(`Could not extract text from ${primary.filename}: ${primary.extraction_error}. Upload manually below.`);
+        } else {
+          setAutoLoadStatus('no-docs');
+          setAutoLoadMessage('Docs found but text not yet extracted. Try again in a moment.');
+        }
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn('[ProposalsPanel] pursuit-docs fetch failed:', err);
+        setAutoLoadStatus('error');
+        setAutoLoadMessage('Could not load pursuit docs (network error)');
+      });
+
+    return () => { cancelled = true; };
+  }, [panelContext, email, getAuthHeaders]);
+
   if (tier === 'free') {
     return (
       <div className="p-6">
@@ -510,6 +600,30 @@ export default function ProposalsPanel({ email, tier }: ProposalsPanelProps) {
             </p>
           </div>
         </div>
+
+        {/* Auto-load status banner — appears when user landed here from
+            PipelinePanel's 'Draft Proposal' button and a pursuit_id was
+            passed via panelContext. Tells them what we did (or didn't do)
+            with their pursuit's cached SAM docs. */}
+        {autoLoadStatus !== 'idle' && autoLoadMessage && (
+          <div className={`mb-4 rounded-lg border p-3 text-sm ${
+            autoLoadStatus === 'loaded'
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+              : autoLoadStatus === 'loading'
+                ? 'border-blue-500/30 bg-blue-500/10 text-blue-200'
+                : autoLoadStatus === 'no-docs'
+                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+                  : 'border-red-500/30 bg-red-500/10 text-red-200'
+          }`}>
+            <span className="font-semibold">
+              {autoLoadStatus === 'loaded' && '✓ '}
+              {autoLoadStatus === 'loading' && '⏳ '}
+              {autoLoadStatus === 'no-docs' && 'ⓘ '}
+              {autoLoadStatus === 'error' && '✕ '}
+            </span>
+            {autoLoadStatus === 'loading' ? 'Loading pursuit documents…' : autoLoadMessage}
+          </div>
+        )}
 
         {!uploadedRfp ? (
           <div
