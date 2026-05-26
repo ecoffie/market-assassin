@@ -82,7 +82,11 @@ const PRIORITIES: Array<{ id: PipelinePriority; label: string }> = [
   { id: 'critical', label: 'Critical' },
 ];
 
-export default function PipelinePanel({ email, onPanelChange }: PipelinePanelProps) {
+export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePanelProps) {
+  // Owner column only matters when multiple teammates share pursuits.
+  // Solo users (free/pro) always see their own email on every row —
+  // that's just visual noise. Show only on team/enterprise tiers.
+  const showOwnerColumn = tier === 'team' || tier === 'enterprise';
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [partners, setPartners] = useState<TeamingPartner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -846,7 +850,9 @@ export default function PipelinePanel({ email, onPanelChange }: PipelinePanelPro
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-900/50">
                   <SortHeader field="title">Opportunity</SortHeader>
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Owner</th>
+                  {showOwnerColumn && (
+                    <th className="text-center px-2 py-3 text-xs text-slate-500 font-medium w-16">Owner</th>
+                  )}
                   <SortHeader field="value">Value</SortHeader>
                   <SortHeader field="stage">Stage</SortHeader>
                   <SortHeader field="deadline">Deadline</SortHeader>
@@ -867,9 +873,11 @@ export default function PipelinePanel({ email, onPanelChange }: PipelinePanelPro
                         urgency?.label === 'OVERDUE' ? 'bg-red-500/5' : ''
                       }`}
                     >
-                      {/* Opportunity Title + Agency */}
-                      <td className="px-4 py-3 max-w-[300px]">
-                        <div className="text-sm text-white font-medium line-clamp-1">{opp.title}</div>
+                      {/* Opportunity Title + Agency. Wider + 2-line
+                          wrap so users can actually read the pursuit
+                          name (was truncating at 1 line / 300px). */}
+                      <td className="px-4 py-3 max-w-[420px]">
+                        <div className="text-sm text-white font-medium line-clamp-2" title={opp.title}>{opp.title}</div>
                         <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{opp.agency || 'Unknown Agency'}</div>
                         {opp.teaming_partners && opp.teaming_partners.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1">
@@ -887,10 +895,23 @@ export default function PipelinePanel({ email, onPanelChange }: PipelinePanelPro
                         )}
                       </td>
 
-                      {/* Owner */}
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-slate-400">{opp.owner_email || 'Unassigned'}</span>
-                      </td>
+                      {/* Owner — team/enterprise only. Solo users see
+                          their own email on every row (visual noise),
+                          so the column is hidden for free/pro tiers. */}
+                      {showOwnerColumn && (
+                        <td className="px-2 py-3 text-center">
+                          {opp.owner_email ? (
+                            <span
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-[10px] font-semibold uppercase text-slate-200"
+                              title={opp.owner_email}
+                            >
+                              {opp.owner_email.slice(0, 2)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-600" title="Unassigned">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Value */}
                       <td className="px-4 py-3">
