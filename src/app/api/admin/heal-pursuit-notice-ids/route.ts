@@ -54,78 +54,138 @@ function getSupabase() {
 }
 
 /**
- * Search SAM by title (+ optional agency hint) and return the most
- * recent matching noticeId. Returns null if no candidate found.
+ * Strip the React-key prefix (deadline-, opp-, alert-, etc.) from a
+ * polluted notice_id to recover the embedded solicitation number.
+ * Returns the bare value if it looks like a solnum, null otherwise.
+ */
+function extractSolnumFromDirtyId(dirty: string): string | null {
+  const stripped = dirty.replace(/^(deadline|opp|alert|brief|item|notice)-/i, '').trim();
+  // Solicitation numbers are alphanumeric + hyphens, at least one digit,
+  // 4-30 chars. Different from a React key (which had a known prefix).
+  if (/^[A-Z0-9-]{4,30}$/i.test(stripped) && /\d/.test(stripped)) {
+    return stripped;
+  }
+  return null;
+}
+
+/**
+ * Aggressive title cleaner. SAM notice titles often start with:
+ *   - 'Z--' / 'R--' / 'Y--' / 'X--' (notice type prefix)
+ *   - Sometimes followed by 'DK - ', 'XX - ', or other office codes
+ *   - Sometimes with extra leading punctuation
+ * Strip all of that to get a search-friendly core title.
+ */
+function cleanTitle(raw: string): string {
+  return raw
+    .replace(/^[A-Z]{1,2}--\s*/, '')      // 'Z-- '
+    .replace(/^[A-Z]{1,4}\s*-\s*/, '')    // 'DK - '
+    .replace(/^[-\s]+/, '')               // leading dashes/spaces
+    .trim();
+}
+
+/**
+ * Search SAM by solnum first (high-precision match), then fall back
+ * to title search if no solnum is recoverable from the dirty id.
+ * Returns null if nothing found.
  *
- * SAM's search is forgiving on title — partial matches work.
- * We narrow with department/agency when available to reduce false
- * positives (multiple agencies post 'Roof Repair' type titles).
+ * Three-attempt strategy:
+ *   1. solnum query (extracted from dirty notice_id) — most reliable
+ *   2. cleaned title query — fallback if no solnum or solnum miss
+ *   3. raw title query — last resort if cleaning was too aggressive
  */
 async function findRealNoticeId(opts: {
   title: string;
   agency?: string | null;
   naicsCode?: string | null;
+  dirtyNoticeId: string;
   apiKey: string;
-}): Promise<{ noticeId: string; matchedTitle: string } | null> {
-  const { title, agency, naicsCode, apiKey } = opts;
+}): Promise<{ noticeId: string; matchedTitle: string; matchedBy: 'solnum' | 'title-clean' | 'title-raw' } | null> {
+  const { title, agency, naicsCode, dirtyNoticeId, apiKey } = opts;
 
-  // Use a 2-year window — most active opps were posted in that range.
   const today = new Date();
   const fmt = (d: Date) =>
     `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
   const past = new Date(today);
   past.setFullYear(past.getFullYear() - 2);
 
-  // Clean the title — strip the leading 'Z--', 'Y--', 'X--' notice-type
-  // prefixes that aren't part of the actual title. SAM search struggles
-  // with them.
-  const cleanTitle = title.replace(/^[A-Z]{1,2}--\s*/, '').trim();
+  async function search(params: Record<string, string>): Promise<Array<{ noticeId: string; title: string; department?: string; fullParentPathName?: string }>> {
+    const url = new URL(SAM_OPPS_URL);
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('postedFrom', fmt(past));
+    url.searchParams.set('postedTo', fmt(today));
+    url.searchParams.set('limit', '10');
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    if (naicsCode) {
+      const firstNaics = naicsCode.split(',')[0]?.trim();
+      if (firstNaics && /^\d{2,6}$/.test(firstNaics)) {
+        url.searchParams.set('ncode', firstNaics);
+      }
+    }
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+    } catch {
+      return [];
+    }
+    if (!res.ok) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payload = await res.json().catch(() => null) as any;
+    return payload?.opportunitiesData || [];
+  }
 
-  const url = new URL(SAM_OPPS_URL);
-  url.searchParams.set('api_key', apiKey);
-  url.searchParams.set('title', cleanTitle.slice(0, 100));
-  url.searchParams.set('postedFrom', fmt(past));
-  url.searchParams.set('postedTo', fmt(today));
-  url.searchParams.set('limit', '10');
-  if (naicsCode) {
-    // Only send the first NAICS code (SAM doesn't like comma-separated)
-    const firstNaics = naicsCode.split(',')[0]?.trim();
-    if (firstNaics && /^\d{2,6}$/.test(firstNaics)) {
-      url.searchParams.set('ncode', firstNaics);
+  // Attempt 1: solnum lookup if extractable
+  const solnum = extractSolnumFromDirtyId(dirtyNoticeId);
+  if (solnum) {
+    const hits = await search({ solnum });
+    if (hits.length > 0 && hits[0].noticeId) {
+      return {
+        noticeId: hits[0].noticeId,
+        matchedTitle: hits[0].title || '',
+        matchedBy: 'solnum',
+      };
     }
   }
 
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const payload = await res.json().catch(() => null) as any;
-  const opps: { noticeId: string; title: string; department?: string; fullParentPathName?: string }[] =
-    payload?.opportunitiesData || [];
-
-  if (opps.length === 0) return null;
-
-  // Score candidates — prefer agency match if we have one.
-  const agencyLower = (agency || '').toLowerCase();
-  const scored = opps.map((opp) => {
-    let score = 0;
-    if (opp.title?.toLowerCase().includes(cleanTitle.toLowerCase())) score += 5;
-    if (agencyLower) {
-      const dept = (opp.department || opp.fullParentPathName || '').toLowerCase();
-      if (dept.includes(agencyLower) || agencyLower.includes(dept)) score += 3;
+  // Attempt 2: cleaned title
+  const cleaned = cleanTitle(title);
+  if (cleaned.length >= 4) {
+    const hits = await search({ title: cleaned.slice(0, 100) });
+    if (hits.length > 0) {
+      const agencyLower = (agency || '').toLowerCase();
+      const scored = hits.map((opp) => {
+        let score = 0;
+        if (opp.title?.toLowerCase().includes(cleaned.toLowerCase())) score += 5;
+        if (agencyLower) {
+          const dept = (opp.department || opp.fullParentPathName || '').toLowerCase();
+          if (dept.includes(agencyLower) || agencyLower.includes(dept)) score += 3;
+        }
+        return { opp, score };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      const winner = scored[0]?.opp;
+      if (winner?.noticeId) {
+        return {
+          noticeId: winner.noticeId,
+          matchedTitle: winner.title || '',
+          matchedBy: 'title-clean',
+        };
+      }
     }
-    return { opp, score };
-  });
-  scored.sort((a, b) => b.score - a.score);
+  }
 
-  const winner = scored[0]?.opp;
-  if (!winner?.noticeId) return null;
-  return { noticeId: winner.noticeId, matchedTitle: winner.title || '' };
+  // Attempt 3: raw title (last resort, in case cleaning was too aggressive)
+  if (title !== cleaned && title.length >= 4) {
+    const hits = await search({ title: title.slice(0, 100) });
+    if (hits.length > 0 && hits[0].noticeId) {
+      return {
+        noticeId: hits[0].noticeId,
+        matchedTitle: hits[0].title || '',
+        matchedBy: 'title-raw',
+      };
+    }
+  }
+
+  return null;
 }
 
 async function handle(request: NextRequest) {
@@ -185,6 +245,7 @@ async function handle(request: NextRequest) {
       title: row.title,
       agency: row.agency,
       naicsCode: row.naics_code,
+      dirtyNoticeId: row.notice_id,
       apiKey,
     });
 
@@ -208,6 +269,7 @@ async function handle(request: NextRequest) {
         old_notice_id: row.notice_id,
         would_set: match.noticeId,
         matched_title: match.matchedTitle,
+        matched_by: match.matchedBy,
         dry_run: true,
       });
       healed++;
@@ -248,6 +310,7 @@ async function handle(request: NextRequest) {
       old_notice_id: row.notice_id,
       new_notice_id: match.noticeId,
       matched_title: match.matchedTitle,
+      matched_by: match.matchedBy,
       doc_fetch: fetchResult,
     });
   }
