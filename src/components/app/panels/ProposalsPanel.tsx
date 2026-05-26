@@ -142,6 +142,32 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
+  // Vault summary — drives the "add to vault for better drafts" nudge
+  // shown above the draft sections. Fetched once on mount; if user
+  // is empty, the banner stays. If they have any vault content, it
+  // disappears.
+  const [vaultSummary, setVaultSummary] = useState<{
+    past_performance: number;
+    capabilities: number;
+    team: number;
+    hasIdentity: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (!email) return;
+    fetch(`/api/app/vault?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d) return;
+        setVaultSummary({
+          past_performance: (d.past_performance || []).length,
+          capabilities: (d.capabilities || []).length,
+          team: (d.team || []).length,
+          hasIdentity: Boolean(d.identity && (d.identity.legal_name || d.identity.uei || d.identity.one_liner)),
+        });
+      })
+      .catch(() => { /* silent — nudge just doesn't show */ });
+  }, [email]);
+
   const handleRfpFile = useCallback(async (file: File) => {
     if (!email) {
       setUploadError('Sign in required.');
@@ -1007,6 +1033,27 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               {draftError}
             </div>
           )}
+
+          {/* Vault empty-state nudge — fires when user has no vault
+              data so drafts will use [placeholders] for facts they
+              could have stored. Lock-in tee-up. */}
+          {vaultSummary &&
+            !vaultSummary.hasIdentity &&
+            vaultSummary.past_performance === 0 &&
+            vaultSummary.capabilities === 0 && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 mb-3 flex items-start gap-3">
+                <span className="text-2xl">🗂️</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-amber-200">
+                    Want drafts that cite YOUR real past performance + capabilities?
+                  </p>
+                  <p className="text-xs text-amber-100/70 mt-0.5">
+                    Add your past contracts, capabilities, and team to <span className="font-medium">My Vault</span> (Account → My Vault, ~2 min).
+                    Mindy will weave them in instead of using [bracketed placeholders].
+                  </p>
+                </div>
+              </div>
+            )}
 
           {/* Section tabs — RFP set OR capability-statement set
               based on detected notice type. */}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
+import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -139,6 +140,145 @@ function buildProfileBlock(profile: UserProfile): string {
   return parts.length > 0 ? parts.join('\n') : 'No saved profile — write generically with [Company name] placeholders.';
 }
 
+// ---- Vault context loader -------------------------------------------
+//
+// Pulls the rows the AI needs to write THIS specific section. Loading
+// only what's relevant keeps the prompt small + focused. E.g. drafting
+// the Capabilities section pulls capabilities + identity but NOT past
+// performance or team bios.
+//
+// All vault data is treated by the AI as FACTUAL — use verbatim if
+// relevant, do not paraphrase. This is the "your real data, not
+// placeholders" moment.
+
+interface VaultContext {
+  identity?: Record<string, unknown> | null;
+  past_performance?: Array<Record<string, unknown>>;
+  capabilities?: Array<Record<string, unknown>>;
+  team?: Array<Record<string, unknown>>;
+  has_any: boolean;
+}
+
+async function loadVaultContext(email: string, sectionType: SectionType): Promise<VaultContext> {
+  const supabase = getSupabase();
+  const ctx: VaultContext = { has_any: false };
+
+  // Sections that need each table — keeps payload tight.
+  const needsIdentity = true;  // every section uses identity
+  const needsPastPerf = sectionType === 'past_performance' || sectionType === 'cap_past_performance' || sectionType === 'exec_summary';
+  const needsCapabilities = sectionType === 'capabilities' || sectionType === 'technical' || sectionType === 'differentiators' || sectionType === 'company_overview';
+  const needsTeam = sectionType === 'management' || sectionType === 'poc';
+
+  const queries: Promise<unknown>[] = [];
+  if (needsIdentity) {
+    queries.push(supabase.from('user_identity_profile').select('*').eq('user_email', email).maybeSingle());
+  }
+  if (needsPastPerf) {
+    queries.push(supabase.from('user_past_performance')
+      .select('contract_title, agency, sub_agency, contract_number, period_start, period_end, contract_value, role, scope_description, outcomes, cpars_rating, relevance_keywords, naics_codes')
+      .eq('user_email', email).is('archived_at', null).limit(10));
+  }
+  if (needsCapabilities) {
+    queries.push(supabase.from('user_capabilities_library')
+      .select('capability_name, description, related_naics, evidence, tools_methods')
+      .eq('user_email', email).is('archived_at', null).limit(15));
+  }
+  if (needsTeam) {
+    queries.push(supabase.from('user_team_members')
+      .select('full_name, title, security_clearance, certifications, years_experience, bio_short, role_type, is_key_personnel')
+      .eq('user_email', email).is('archived_at', null).order('is_key_personnel', { ascending: false }).limit(8));
+  }
+
+  const results = await Promise.all(queries);
+  let idx = 0;
+  if (needsIdentity)     { ctx.identity = (results[idx++] as { data: Record<string, unknown> | null }).data; }
+  if (needsPastPerf)     { ctx.past_performance = (results[idx++] as { data: Array<Record<string, unknown>> | null }).data || []; }
+  if (needsCapabilities) { ctx.capabilities = (results[idx++] as { data: Array<Record<string, unknown>> | null }).data || []; }
+  if (needsTeam)         { ctx.team = (results[idx++] as { data: Array<Record<string, unknown>> | null }).data || []; }
+
+  // Identity row exists with any non-null value, OR any list has rows
+  const identityHas = ctx.identity && Object.entries(ctx.identity).some(([k, v]) => k !== 'user_email' && k !== 'created_at' && k !== 'updated_at' && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
+  ctx.has_any = Boolean(identityHas) || (ctx.past_performance?.length ?? 0) > 0 || (ctx.capabilities?.length ?? 0) > 0 || (ctx.team?.length ?? 0) > 0;
+
+  return ctx;
+}
+
+function formatVaultForPrompt(ctx: VaultContext): string {
+  if (!ctx.has_any) return '';
+  const blocks: string[] = [];
+
+  if (ctx.identity) {
+    const id = ctx.identity;
+    const lines: string[] = [];
+    if (id.legal_name) lines.push(`Legal name: ${id.legal_name}`);
+    if (id.dba) lines.push(`DBA: ${id.dba}`);
+    if (id.uei) lines.push(`UEI: ${id.uei}`);
+    if (id.cage_code) lines.push(`CAGE: ${id.cage_code}`);
+    if (id.ein) lines.push(`EIN: ${id.ein}`);
+    if (id.year_founded) lines.push(`Founded: ${id.year_founded}`);
+    if (id.employee_count) lines.push(`Employees: ${id.employee_count}`);
+    if (Array.isArray(id.certifications) && id.certifications.length) lines.push(`Certifications: ${(id.certifications as string[]).join(', ')}`);
+    if (Array.isArray(id.primary_naics) && id.primary_naics.length) lines.push(`Primary NAICS: ${(id.primary_naics as string[]).join(', ')}`);
+    if (id.one_liner) lines.push(`One-liner: ${id.one_liner}`);
+    if (id.elevator_pitch) lines.push(`Elevator pitch: ${id.elevator_pitch}`);
+    if (id.hq_state || id.hq_city) lines.push(`HQ: ${[id.hq_city, id.hq_state].filter(Boolean).join(', ')}`);
+    if (Array.isArray(id.service_states) && id.service_states.length) lines.push(`Service states: ${(id.service_states as string[]).join(', ')}`);
+    if (Array.isArray(id.contract_vehicles) && id.contract_vehicles.length) lines.push(`Contract vehicles: ${(id.contract_vehicles as string[]).join(', ')}`);
+    if (lines.length) blocks.push(`### Bidder identity (FACTUAL — use these verbatim)\n${lines.join('\n')}`);
+  }
+
+  if (ctx.past_performance && ctx.past_performance.length) {
+    const lines = ctx.past_performance.map((p, i) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pp = p as any;
+      const parts: string[] = [];
+      parts.push(`${i + 1}. **${pp.contract_title}** — ${pp.agency}`);
+      if (pp.sub_agency) parts[parts.length - 1] += ` / ${pp.sub_agency}`;
+      const meta: string[] = [];
+      if (pp.contract_number) meta.push(`#${pp.contract_number}`);
+      if (pp.period_start || pp.period_end) meta.push(`${pp.period_start || '?'} → ${pp.period_end || 'ongoing'}`);
+      if (pp.contract_value) meta.push(`$${Number(pp.contract_value).toLocaleString()}`);
+      if (pp.role) meta.push(pp.role);
+      if (meta.length) parts.push(`   ${meta.join(' · ')}`);
+      if (pp.scope_description) parts.push(`   Scope: ${pp.scope_description}`);
+      if (pp.outcomes) parts.push(`   Outcomes: ${pp.outcomes}`);
+      if (pp.cpars_rating) parts.push(`   CPARS: ${pp.cpars_rating}`);
+      return parts.join('\n');
+    }).join('\n\n');
+    blocks.push(`### Bidder past performance (FACTUAL — cite these instead of [placeholders])\n${lines}`);
+  }
+
+  if (ctx.capabilities && ctx.capabilities.length) {
+    const lines = ctx.capabilities.map((c) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cc = c as any;
+      let line = `- **${cc.capability_name}**: ${cc.description}`;
+      if (cc.evidence) line += ` (${cc.evidence})`;
+      return line;
+    }).join('\n');
+    blocks.push(`### Bidder capabilities (FACTUAL — weave into Capabilities section)\n${lines}`);
+  }
+
+  if (ctx.team && ctx.team.length) {
+    const lines = ctx.team.map((m) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mm = m as any;
+      const tags: string[] = [];
+      if (mm.is_key_personnel) tags.push('KEY PERSONNEL');
+      if (mm.years_experience) tags.push(`${mm.years_experience} yrs`);
+      if (mm.security_clearance) tags.push(`${mm.security_clearance} cleared`);
+      if (Array.isArray(mm.certifications) && mm.certifications.length) tags.push((mm.certifications as string[]).join(', '));
+      const tagStr = tags.length ? ` [${tags.join(' · ')}]` : '';
+      let line = `- **${mm.full_name}**, ${mm.title}${tagStr}`;
+      if (mm.bio_short) line += `\n  ${mm.bio_short}`;
+      return line;
+    }).join('\n');
+    blocks.push(`### Bidder team (FACTUAL — name these specific people)\n${lines}`);
+  }
+
+  return blocks.join('\n\n');
+}
+
 export async function POST(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   if (!email) {
@@ -179,10 +319,51 @@ export async function POST(request: NextRequest) {
   const wasTruncated = sourceText.length > MAX_INPUT_CHARS;
   const inputText = wasTruncated ? sourceText.slice(0, MAX_INPUT_CHARS) : sourceText;
 
-  const profile = await loadUserProfile(email);
-  const profileBlock = buildProfileBlock(profile);
-
+  // Load all the context the AI will use to draft this section.
+  // Three sources, in priority order:
+  //   1. Profile (NAICS / agencies / set-asides — minimal sketch)
+  //   2. Vault (FACTUAL — UEI / past perf / capabilities / team)
+  //   3. RAG (STYLE — chunks from Eric's teaching corpus on this topic)
+  // Run in parallel; even if vault/RAG return nothing, profile still
+  // works as the fallback.
   const sectionMeta = SECTION_PROMPTS[sectionType];
+
+  // Build a RAG query from section + RFP signal. We strip down to
+  // the meaningful tokens so FTS doesn't drown in filler.
+  // Cap RFP excerpt at 1k chars — enough to capture the topic, not
+  // enough to dominate the token budget.
+  const rfpSnippet = inputText.slice(0, 1000).replace(/\s+/g, ' ');
+  const ragQuery = `${sectionMeta.label} ${rfpSnippet}`;
+
+  const [profile, vault, ragChunks] = await Promise.all([
+    loadUserProfile(email),
+    loadVaultContext(email, sectionType).catch((err) => {
+      console.error('[proposal/draft] vault load failed:', err);
+      return { has_any: false } as VaultContext;
+    }),
+    retrieveRagContext({
+      query: ragQuery,
+      // Bias toward authored content for the matching mental model.
+      // Past-perf-style sections look at past_performance + proposal_template;
+      // capability sections look at cap_statement + proposal_template;
+      // technical/management look at course_material + webinar_resource + proposal_template.
+      docTypes: (() => {
+        if (sectionType === 'past_performance' || sectionType === 'cap_past_performance') return ['proposal_template', 'past_performance', 'cap_statement', 'course_material'];
+        if (sectionType === 'company_overview' || sectionType === 'capabilities' || sectionType === 'differentiators' || sectionType === 'poc') return ['cap_statement', 'proposal_template', 'course_material'];
+        return ['proposal_template', 'course_material', 'webinar_resource', 'teaching_handout'];
+      })(),
+      limit: 4,
+      maxChars: 3500,
+      maxPerDoc: 1,
+    }).catch((err) => {
+      console.error('[proposal/draft] RAG retrieval failed:', err);
+      return [];
+    }),
+  ]);
+
+  const profileBlock = buildProfileBlock(profile);
+  const vaultBlock = formatVaultForPrompt(vault);
+  const ragBlock = formatChunksForPrompt(ragChunks);
 
   // Capability-statement sections get a different system prompt that
   // reframes the work as a Sources Sought / RFI response, not an RFP
@@ -190,37 +371,57 @@ export async function POST(request: NextRequest) {
   // the section guidance asks for capability-statement format.
   const isCapStatementSection = ['company_overview', 'cap_past_performance', 'capabilities', 'differentiators', 'poc'].includes(sectionType);
 
+  // Three context tiers the AI will see, distinguished in the prompt:
+  //   - Bidder profile + Vault data: FACTUAL. Use as truth. Cite verbatim.
+  //   - RAG chunks from Eric Coffie's teaching library: STYLE REFERENCES.
+  //     Show the AI what good GovCon writing looks like in this section.
+  //     Do NOT copy verbatim — adapt the framing/vocabulary.
+  //
+  // System prompt is updated to teach the AI the difference so it doesn't
+  // (a) ignore vault data and use [placeholders] for facts it actually has,
+  // or (b) plagiarize RAG chunks.
+
   const systemPrompt = isCapStatementSection
     ? `You are a senior federal capture writer. Draft a SHORT capability-statement section for a Sources Sought or RFI response — NOT a proposal. Capability statements are 2-3 pages total, scanned in 30 seconds by agency staff doing market research.
+
+How to use the context you'll receive:
+- Bidder profile + vault data = FACTS about this bidder. Use them verbatim (real UEI, real past performance, real capabilities, real team). Do NOT use [placeholders] for anything the vault provides.
+- Teaching examples (if present) = STYLE references from Eric Coffie's teaching library. Learn the framing + vocabulary + structure. Do NOT copy phrasing verbatim; adapt to this specific bidder + solicitation.
 
 Rules:
 - Concise prose + scannable bullets. No marketing fluff.
 - Mirror language from the source notice where it shows alignment with the scope.
-- Use bracketed [placeholders] for facts not in the bidder profile (UEI, CAGE, specific past contracts, named personnel).
-- Never invent facts about the bidder beyond the profile block.
+- Use bracketed [placeholders] ONLY for facts not in the bidder profile or vault.
+- Never invent facts about the bidder beyond what is provided.
 - Never use 'world-class', 'best-in-class', 'cutting-edge'.
 - Do NOT use proposal section labels like 'Executive Summary' — this is a capability statement section.
 - Output plain markdown only. No JSON. No commentary about what you wrote.`
-    : `You are a senior federal proposal writer. Draft proposal section copy that is compliant, specific to the source solicitation, and grounded in the bidder's saved profile.
+    : `You are a senior federal proposal writer. Draft proposal section copy that is compliant, specific to the source solicitation, and grounded in the bidder's saved profile + vault.
+
+How to use the context you'll receive:
+- Bidder profile + vault data = FACTS about this bidder. Use them verbatim (real UEI, real past performance, real capabilities, real team). Do NOT use [placeholders] for anything the vault provides.
+- Teaching examples (if present) = STYLE references from Eric Coffie's teaching library. Learn the framing + vocabulary + structure. Do NOT copy phrasing verbatim; adapt to this specific bidder + solicitation.
 
 Rules:
 - Use clear headings and short paragraphs.
 - Mirror language from the solicitation where it shows the bidder understands the scope.
-- Use bracketed [placeholders] for anything you do not know (specific past performance contracts, exact dollar amounts, named personnel).
-- Never invent facts about the bidder beyond the profile block provided.
+- Use bracketed [placeholders] ONLY for facts not in the bidder profile or vault.
+- Never invent facts about the bidder beyond what is provided.
 - No marketing fluff, no superlatives like "world-class" or "best-in-class".
 - Output plain markdown only. No JSON. No commentary about what you wrote.`;
 
-  const userPrompt = `Bidder profile:
-${profileBlock}
+  // Assemble user prompt with all available context. We list profile +
+  // vault first so the AI sees facts before style examples.
+  const promptParts: string[] = [];
+  promptParts.push(`Bidder profile (NAICS / agencies / set-asides):\n${profileBlock}`);
+  if (vaultBlock) promptParts.push(vaultBlock);
+  if (ragBlock) {
+    promptParts.push(`### Eric Coffie teaching library — STYLE references (do NOT copy verbatim)\n${ragBlock}`);
+  }
+  promptParts.push(`### Section to draft: ${sectionMeta.label}\n${sectionMeta.prompt}`);
+  promptParts.push(`### Solicitation: ${body.fileName || 'untitled'}\n--- SOURCE TEXT (${inputText.length.toLocaleString()} chars${wasTruncated ? ', truncated' : ''}) ---\n${inputText}`);
 
-Section to draft: ${sectionMeta.label}
-Section guidance:
-${sectionMeta.prompt}
-
-Solicitation: ${body.fileName || 'untitled'}
---- SOURCE TEXT (${inputText.length.toLocaleString()} chars${wasTruncated ? ', truncated' : ''}) ---
-${inputText}`;
+  const userPrompt = promptParts.join('\n\n');
 
   try {
     const response = await fetch(GROQ_API_URL, {
@@ -276,6 +477,14 @@ ${inputText}`;
         truncated: wasTruncated,
         originalChars: sourceText.length,
         profileGrounded: profileBlock !== 'No saved profile — write generically with [Company name] placeholders.',
+        vaultGrounded: vault.has_any,
+        vaultCounts: {
+          past_performance: vault.past_performance?.length || 0,
+          capabilities: vault.capabilities?.length || 0,
+          team: vault.team?.length || 0,
+        },
+        ragChunksUsed: ragChunks.length,
+        ragSources: ragChunks.map((c) => ({ title: c.doc_title, type: c.doc_type })),
       },
     });
   } catch (err) {
