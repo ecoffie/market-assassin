@@ -913,10 +913,19 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         </td>
                       )}
 
-                      {/* Value */}
-                      <td className="px-4 py-3">
+                      {/* Value — capped + truncated. Some rows have
+                          deadline countdowns or Mindy notes stuffed
+                          into value_estimate upstream (DATA BUG to
+                          fix separately); cap stops them from
+                          blowing out the column width. */}
+                      <td className="px-4 py-3 max-w-[140px]">
                         {opp.value_estimate ? (
-                          <span className="text-sm font-semibold text-emerald-400">{opp.value_estimate}</span>
+                          <span
+                            className="text-sm font-semibold text-emerald-400 line-clamp-1 block"
+                            title={opp.value_estimate}
+                          >
+                            {opp.value_estimate}
+                          </span>
                         ) : (
                           <span className="text-xs text-slate-600">-</span>
                         )}
