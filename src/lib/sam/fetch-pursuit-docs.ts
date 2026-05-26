@@ -69,7 +69,7 @@ async function extractDocx(buffer: Buffer): Promise<ExtractResult> {
   return { text: result.value || '' };
 }
 
-function inferKind(filename: string, mime: string | null): 'pdf' | 'docx' | 'txt' | null {
+function inferKind(filename: string, mime: string | null, buffer?: Buffer): 'pdf' | 'docx' | 'txt' | null {
   const lower = filename.toLowerCase();
   if (mime === 'application/pdf' || lower.endsWith('.pdf')) return 'pdf';
   if (
@@ -77,6 +77,26 @@ function inferKind(filename: string, mime: string | null): 'pdf' | 'docx' | 'txt
     lower.endsWith('.docx')
   ) return 'docx';
   if (mime === 'text/plain' || lower.endsWith('.txt')) return 'txt';
+
+  // SAM downloads frequently come back as 'application/octet-stream'
+  // with no useful filename (Content-Disposition not exposed via
+  // CORS, or just missing). Fall back to magic-byte sniffing:
+  //   PDF:  first 4 bytes = '%PDF'
+  //   DOCX: ZIP signature 'PK' at offset 0 + 'word/' string in first 1KB
+  //   TXT:  printable ASCII / UTF-8 only (no null bytes)
+  if (buffer && buffer.length >= 4) {
+    const head = buffer.slice(0, 4).toString('ascii');
+    if (head === '%PDF') return 'pdf';
+    if (head.startsWith('PK')) {
+      // Could be DOCX, XLSX, ZIP, etc. — look for 'word/' marker.
+      const probe = buffer.slice(0, 2048).toString('ascii');
+      if (probe.includes('word/')) return 'docx';
+    }
+    // Heuristic for plain text: scan first 1KB for null bytes (binary
+    // files almost always have them, text files don't).
+    const sample = buffer.slice(0, 1024);
+    if (!sample.includes(0)) return 'txt';
+  }
   return null;
 }
 
@@ -265,7 +285,7 @@ export async function fetchPursuitDocs(opts: {
       const dl = await downloadFile(ref, apiKey);
       if (!dl) { failed++; continue; }
 
-      const kind = inferKind(ref.filename, dl.mime);
+      const kind = inferKind(ref.filename, dl.mime, dl.buffer);
       let extractedText = '';
       let pageCount: number | undefined;
       let extractionError: string | null = null;
