@@ -123,7 +123,10 @@ async function discoverFiles(noticeId: string, apiKey: string): Promise<SamFileR
   for (const window of dateWindows) {
     const url = new URL(SAM_OPPS_URL);
     url.searchParams.set('api_key', apiKey);
-    url.searchParams.set('noticeId', noticeId);
+    // SAM API quirk: the parameter MUST be lowercase 'noticeid' for
+    // exact-match lookup. Camel-case 'noticeId' returns broad fuzzy
+    // results (often the wrong opportunity entirely). Tested 2026-05-25.
+    url.searchParams.set('noticeid', noticeId);
     url.searchParams.set('postedFrom', window.from);
     url.searchParams.set('postedTo', window.to);
     url.searchParams.set('limit', '1');
