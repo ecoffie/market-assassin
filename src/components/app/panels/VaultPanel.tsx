@@ -223,8 +223,13 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
   const [form, setForm] = useState<IdentityProfile>(data);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [showAutoFill, setShowAutoFill] = useState(false);
 
   useEffect(() => { setForm(data); }, [data]);
+
+  // Show the auto-fill banner if identity is meaningfully empty.
+  // "Meaningfully empty" = no legal_name AND no UEI saved yet.
+  const isEmpty = !form.legal_name?.trim() && !form.uei?.trim();
 
   const onField = (k: keyof IdentityProfile, v: string | number | string[] | null) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -255,6 +260,57 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
 
   return (
     <div className="max-w-3xl space-y-5">
+      {/* Day 0 auto-fill banner — shown when identity is empty, hidden
+          once the user has saved anything. Single big CTA. */}
+      {isEmpty && (
+        <div className="rounded-xl border border-emerald-500/40 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-purple-500/10 p-5">
+          <div className="flex items-start gap-4">
+            <div className="text-3xl">⚡</div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-white font-semibold mb-1">
+                Auto-fill from your SAM.gov registration
+              </h3>
+              <p className="text-sm text-slate-300 mb-3">
+                Enter your <strong>UEI</strong> (the 12-character SAM.gov ID) and Mindy will pull
+                your legal name, NAICS, certifications, HQ — plus draft a one-liner, capabilities,
+                and starter past-performance entries grounded in the GovCon Giants curriculum.
+                <span className="block text-xs text-slate-400 mt-1">
+                  Takes ~10 seconds. You review everything before it saves.
+                </span>
+              </p>
+              <button
+                onClick={() => setShowAutoFill(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded transition"
+              >
+                Auto-fill from UEI →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* The modal, mounted at root so the form below stays editable */}
+      {showAutoFill && (
+        <AutoFillModal
+          email={email}
+          onClose={() => setShowAutoFill(false)}
+          onApplied={() => { setShowAutoFill(false); onSaved(); }}
+        />
+      )}
+
+      {/* Compact secondary button — visible even when identity has data,
+          so power users can re-run the prefill if their SAM changes. */}
+      {!isEmpty && (
+        <div className="flex justify-end -mb-2">
+          <button
+            onClick={() => setShowAutoFill(true)}
+            className="text-xs text-slate-400 hover:text-emerald-300 transition"
+          >
+            ⚡ Re-fetch from SAM.gov
+          </button>
+        </div>
+      )}
+
       <Field label="Legal name" value={form.legal_name || ''} onChange={(v) => onField('legal_name', v)} placeholder="Acme Federal Services LLC" />
       <Field label="One-liner" value={form.one_liner || ''} onChange={(v) => onField('one_liner', v)} placeholder="AI-powered cybersecurity for federal" hint="Goes into every Company Overview draft" />
       <Field label="Elevator pitch" value={form.elevator_pitch || ''} onChange={(v) => onField('elevator_pitch', v)} placeholder="2-3 sentence longer version" multiline />
@@ -784,5 +840,375 @@ function UploadCard({
         }}
       />
     </label>
+  );
+}
+
+// ---- Auto-fill modal ------------------------------------------------
+//
+// Driven by /api/app/vault/prefill:
+//   GET  → fetch SAM Entity + USASpending + AI coach preview
+//   POST → write accepted preview to vault tables
+//
+// Three states: 'input' (UEI entry), 'preview' (review what was found),
+// 'applying' (saving). Errors handled inline.
+
+interface PreviewIdentity {
+  uei?: string;
+  cage_code?: string | null;
+  legal_name?: string;
+  dba?: string | null;
+  certifications?: string[];
+  primary_naics?: string[];
+  hq_city?: string | null;
+  hq_state?: string | null;
+  service_states?: string[];
+  contract_vehicles?: string[];
+  one_liner?: string | null;
+  elevator_pitch?: string | null;
+}
+
+interface PreviewCapability {
+  capability_name: string;
+  description: string;
+  evidence?: string;
+}
+
+interface PreviewSamplePP {
+  contract_title: string;
+  agency: string;
+  contract_value: string;
+  scope_description: string;
+  coaching_note: string;
+}
+
+interface PreviewRealPP {
+  contract_title: string;
+  agency: string | null;
+  contract_number: string | null;
+  contract_value: number | null;
+  period_start: string | null;
+  period_end: string | null;
+}
+
+interface PrefillResponse {
+  success: boolean;
+  error?: string;
+  source?: { sam_entity: boolean; usaspending: boolean; ai_coach: boolean };
+  identity?: PreviewIdentity;
+  past_performance?: PreviewRealPP[];
+  capabilities?: PreviewCapability[];
+  sample_past_performance?: PreviewSamplePP[];
+  summary?: {
+    sam_registration_status?: string;
+    sam_active?: boolean;
+    contracts_found?: number;
+    capabilities_drafted?: number;
+    sample_pp_drafted?: number;
+  };
+}
+
+function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: () => void; onApplied: () => void }) {
+  const [stage, setStage] = useState<'input' | 'loading' | 'preview' | 'applying'>('input');
+  const [uei, setUei] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PrefillResponse | null>(null);
+
+  // Per-section accept toggles — user can opt out of any layer.
+  const [acceptIdentity, setAcceptIdentity] = useState(true);
+  const [acceptCapabilities, setAcceptCapabilities] = useState(true);
+  const [acceptSamplePp, setAcceptSamplePp] = useState(true);
+  const [acceptRealPp, setAcceptRealPp] = useState(true);
+
+  const handleLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = uei.trim().toUpperCase();
+    if (clean.length !== 12) {
+      setError('UEI must be exactly 12 characters');
+      return;
+    }
+    setError(null);
+    setStage('loading');
+    try {
+      const res = await fetch(
+        `/api/app/vault/prefill?uei=${encodeURIComponent(clean)}&email=${encodeURIComponent(email)}`,
+        { headers: getMIApiHeaders(email) },
+      );
+      const data: PrefillResponse = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || `Lookup failed (HTTP ${res.status})`);
+        setStage('input');
+        return;
+      }
+      setPreview(data);
+      setStage('preview');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lookup failed');
+      setStage('input');
+    }
+  };
+
+  const handleApply = async () => {
+    if (!preview) return;
+    setStage('applying');
+    try {
+      const res = await fetch('/api/app/vault/prefill', {
+        method: 'POST',
+        headers: {
+          ...Object.fromEntries(getMIApiHeaders(email).entries()),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          uei: uei.trim().toUpperCase(),
+          identity: acceptIdentity ? preview.identity : null,
+          capabilities: acceptCapabilities ? preview.capabilities : [],
+          sample_past_performance: acceptSamplePp ? preview.sample_past_performance : [],
+          past_performance: acceptRealPp ? preview.past_performance : [],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || `Apply failed (HTTP ${res.status})`);
+        setStage('preview');
+        return;
+      }
+      onApplied();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Apply failed');
+      setStage('preview');
+    }
+  };
+
+  const summary = preview?.summary;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl my-8 shadow-2xl shadow-emerald-500/10">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⚡</span>
+            <h2 className="text-white font-semibold">Auto-fill from SAM.gov</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none" aria-label="Close">×</button>
+        </div>
+
+        {/* INPUT */}
+        {stage === 'input' && (
+          <form onSubmit={handleLookup} className="p-6">
+            <p className="text-sm text-slate-300 mb-4">
+              Enter your <strong>SAM.gov UEI</strong> (12 characters). Mindy will fetch your registration, draft a one-liner, capabilities, and starter past performance entries — grounded in the GovCon Giants curriculum.
+            </p>
+            <p className="text-xs text-slate-500 mb-4">
+              Don&apos;t know your UEI? Look it up at <a href="https://sam.gov/content/entity-information" target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300">sam.gov</a>.
+            </p>
+            <input
+              type="text"
+              value={uei}
+              onChange={(e) => setUei(e.target.value.toUpperCase().slice(0, 12))}
+              placeholder="e.g. W7BEELSVFR91"
+              maxLength={12}
+              autoFocus
+              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded text-white text-lg font-mono tracking-wider focus:border-emerald-500 focus:outline-none uppercase mb-3"
+            />
+            {error && <p className="text-sm text-rose-400 mb-3">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={uei.length !== 12}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Look up →
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* LOADING */}
+        {stage === 'loading' && (
+          <div className="p-12 text-center">
+            <div className="inline-block w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-white font-medium mb-1">Looking up {uei}…</p>
+            <p className="text-sm text-slate-400">
+              Fetching SAM.gov registration · checking USASpending · drafting capability profile
+            </p>
+          </div>
+        )}
+
+        {/* PREVIEW */}
+        {stage === 'preview' && preview && (
+          <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+            {/* Summary chip row */}
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className={`px-2 py-1 rounded ${summary?.sam_active ? 'bg-emerald-900/60 text-emerald-300' : 'bg-amber-900/60 text-amber-300'}`}>
+                SAM: {summary?.sam_registration_status || 'unknown'}
+              </span>
+              <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                Capabilities: {summary?.capabilities_drafted || 0}
+              </span>
+              <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                Sample PP: {summary?.sample_pp_drafted || 0}
+              </span>
+              {(summary?.contracts_found ?? 0) > 0 && (
+                <span className="px-2 py-1 rounded bg-purple-900/60 text-purple-300">
+                  USASpending: {summary?.contracts_found} contracts found
+                </span>
+              )}
+            </div>
+
+            {/* Identity */}
+            {preview.identity && (
+              <section className="border border-slate-800 rounded-lg p-4 bg-slate-950/50">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptIdentity}
+                    onChange={(e) => setAcceptIdentity(e.target.checked)}
+                    className="mt-1 accent-emerald-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-medium mb-2">🪪 Identity</h3>
+                    <div className="text-sm text-slate-300 space-y-1">
+                      <div><span className="text-slate-500">Legal:</span> {preview.identity.legal_name || '—'}</div>
+                      <div className="flex gap-4 flex-wrap">
+                        <span><span className="text-slate-500">UEI:</span> <span className="font-mono">{preview.identity.uei || '—'}</span></span>
+                        <span><span className="text-slate-500">CAGE:</span> <span className="font-mono">{preview.identity.cage_code || '—'}</span></span>
+                        <span><span className="text-slate-500">HQ:</span> {[preview.identity.hq_city, preview.identity.hq_state].filter(Boolean).join(', ') || '—'}</span>
+                      </div>
+                      {(preview.identity.certifications || []).length > 0 && (
+                        <div><span className="text-slate-500">Certifications:</span> {preview.identity.certifications!.join(', ')}</div>
+                      )}
+                      {(preview.identity.primary_naics || []).length > 0 && (
+                        <div><span className="text-slate-500">NAICS:</span> <span className="font-mono">{preview.identity.primary_naics!.slice(0, 6).join(', ')}{preview.identity.primary_naics!.length > 6 ? ` +${preview.identity.primary_naics!.length - 6}` : ''}</span></div>
+                      )}
+                      {preview.identity.one_liner && (
+                        <div className="pt-2 border-t border-slate-800 mt-2"><span className="text-slate-500">One-liner:</span> <em className="text-emerald-300">&ldquo;{preview.identity.one_liner}&rdquo;</em></div>
+                      )}
+                      {preview.identity.elevator_pitch && (
+                        <div><span className="text-slate-500">Elevator pitch:</span> <span className="text-slate-300">{preview.identity.elevator_pitch}</span></div>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              </section>
+            )}
+
+            {/* Capabilities */}
+            {(preview.capabilities || []).length > 0 && (
+              <section className="border border-slate-800 rounded-lg p-4 bg-slate-950/50">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptCapabilities}
+                    onChange={(e) => setAcceptCapabilities(e.target.checked)}
+                    className="mt-1 accent-emerald-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-medium mb-2">🛠️ Capabilities ({preview.capabilities!.length})</h3>
+                    <div className="space-y-2">
+                      {preview.capabilities!.map((c, i) => (
+                        <div key={i} className="text-sm">
+                          <span className="text-white font-medium">{c.capability_name}</span>
+                          <span className="text-slate-400"> — {c.description}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </label>
+              </section>
+            )}
+
+            {/* Real past performance from USASpending */}
+            {(preview.past_performance || []).length > 0 && (
+              <section className="border border-purple-900 rounded-lg p-4 bg-purple-950/20">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptRealPp}
+                    onChange={(e) => setAcceptRealPp(e.target.checked)}
+                    className="mt-1 accent-purple-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-medium mb-2">🏆 Past Performance from USASpending ({preview.past_performance!.length})</h3>
+                    <p className="text-xs text-purple-300/80 mb-2">Real contracts on file for your UEI.</p>
+                    <div className="space-y-1.5 text-sm">
+                      {preview.past_performance!.slice(0, 8).map((p, i) => (
+                        <div key={i} className="text-slate-300">
+                          <span className="text-white">{p.contract_title.slice(0, 80)}</span>
+                          <span className="text-slate-500"> · {p.agency} · ${(p.contract_value || 0).toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {preview.past_performance!.length > 8 && (
+                        <div className="text-xs text-slate-500">+ {preview.past_performance!.length - 8} more</div>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              </section>
+            )}
+
+            {/* Sample past performance — coaching placeholders */}
+            {(preview.sample_past_performance || []).length > 0 && (
+              <section className="border border-amber-900 rounded-lg p-4 bg-amber-950/20">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptSamplePp}
+                    onChange={(e) => setAcceptSamplePp(e.target.checked)}
+                    className="mt-1 accent-amber-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-medium mb-2">📝 Sample Past Performance — Starter Templates ({preview.sample_past_performance!.length})</h3>
+                    <p className="text-xs text-amber-300/80 mb-3">
+                      Templates with [bracketed placeholders] so you can see what strong past perf looks like in your NAICS. You edit in your real contracts later.
+                    </p>
+                    <div className="space-y-3">
+                      {preview.sample_past_performance!.map((p, i) => (
+                        <div key={i} className="text-sm border-l-2 border-amber-800/60 pl-3">
+                          <div className="text-white">{p.contract_title}</div>
+                          <div className="text-slate-400 text-xs">{p.agency} · {p.contract_value}</div>
+                          <div className="text-slate-300 text-xs mt-1">{p.scope_description}</div>
+                          {p.coaching_note && (
+                            <div className="text-amber-300/70 text-xs mt-1 italic">📝 {p.coaching_note}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </label>
+              </section>
+            )}
+
+            {error && <p className="text-sm text-rose-400">{error}</p>}
+          </div>
+        )}
+
+        {/* APPLYING */}
+        {stage === 'applying' && (
+          <div className="p-12 text-center">
+            <div className="inline-block w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-white font-medium">Saving to your Vault…</p>
+          </div>
+        )}
+
+        {/* Footer */}
+        {stage === 'preview' && (
+          <div className="px-6 py-4 border-t border-slate-800 flex justify-between items-center bg-slate-950/50 rounded-b-2xl">
+            <button onClick={onClose} className="text-sm text-slate-400 hover:text-white">
+              Cancel
+            </button>
+            <button
+              onClick={handleApply}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded"
+            >
+              Apply to my Vault →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
