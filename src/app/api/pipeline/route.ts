@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
+import { isValidSamNoticeId } from '@/lib/sam/utils';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -169,6 +170,16 @@ export async function POST(request: NextRequest) {
     body.owner_email = body.owner_email || body.user_email;
     body.created_by = body.user_email;
     body.updated_by = body.user_email;
+
+    // Reject malformed notice_id values. React render keys like
+    // 'deadline-140R6026Q0068' have been leaking into this field via
+    // email action URLs, which then breaks SAM API lookups (fetchPursuitDocs,
+    // attachment resolution). Null-out garbage instead of storing it so
+    // downstream code can fall back to title-based search gracefully.
+    if (body.notice_id && !isValidSamNoticeId(body.notice_id)) {
+      console.warn(`[Pipeline POST] rejecting malformed notice_id "${body.notice_id}" for "${body.title}"`);
+      body.notice_id = undefined;
+    }
 
     const { data, error } = await getSupabase()
       .from('user_pipeline')

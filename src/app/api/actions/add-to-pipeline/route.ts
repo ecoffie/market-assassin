@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
+import { isValidSamNoticeId } from '@/lib/sam/utils';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,10 +85,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
+    // Reject malformed notice_id values before persisting. React render
+    // keys like 'deadline-140R6026Q0068' have been leaking in via email
+    // action URLs, which then breaks downstream SAM lookups.
+    const cleanNoticeId = notice_id && isValidSamNoticeId(notice_id)
+      ? notice_id
+      : (notice_id ? (console.warn(`[add-to-pipeline GET] dropping malformed notice_id "${notice_id}" for "${title}"`), null) : null);
+
     // Add to pipeline
     const pipelineEntry = {
       user_email: email.toLowerCase(),
-      notice_id: notice_id || null,
+      notice_id: cleanNoticeId,
       title: decodeURIComponent(title),
       agency: agency ? decodeURIComponent(agency) : null,
       value_estimate: value ? decodeURIComponent(value) : null,
@@ -199,12 +207,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Same validation as the GET path — reject React-key garbage.
+    const cleanNoticeIdPost = notice_id && isValidSamNoticeId(notice_id)
+      ? notice_id
+      : (notice_id ? (console.warn(`[add-to-pipeline POST] dropping malformed notice_id "${notice_id}" for "${title}"`), null) : null);
+
     // Insert
     const { data, error } = await getSupabase()
       .from('user_pipeline')
       .insert({
         user_email: email.toLowerCase(),
-        notice_id: notice_id || null,
+        notice_id: cleanNoticeIdPost,
         title,
         agency: agency || null,
         value_estimate: value || null,

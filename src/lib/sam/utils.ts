@@ -509,6 +509,48 @@ export async function cleanExpiredCache(): Promise<number> {
 }
 
 /**
+ * Validate that a notice_id looks like something SAM.gov could
+ * actually resolve. Rejects garbage like 'deadline-140R6026Q0068'
+ * that's been polluting user_pipeline because React render keys
+ * (deadline-{id}) accidentally got passed through URL query params
+ * into our /api/actions/add-to-pipeline endpoint, which stored
+ * them without validation.
+ *
+ * Accepts:
+ *   - SAM internal UUIDs: 32 hex chars (e.g., 2ef4599dadd34556b6adcc241de579d9)
+ *   - Solicitation numbers: agency-prefixed format like FA8773-24-R-0001,
+ *     140R6026Q0068, N6274223F4007, etc. We allow a broad mix of letters
+ *     digits and hyphens (4-30 chars) since formats vary across agencies.
+ *
+ * Rejects:
+ *   - Anything starting with 'deadline-' (React render key leakage)
+ *   - Empty / whitespace
+ *   - Too short (<4 chars) or too long (>50 chars)
+ *
+ * Returns true if the value is plausibly a real SAM identifier.
+ * Caller decides whether to null-out (preferred) or hard-reject when false.
+ */
+export function isValidSamNoticeId(noticeId: string | null | undefined): boolean {
+  if (!noticeId || typeof noticeId !== 'string') return false;
+  const trimmed = noticeId.trim();
+  if (trimmed.length < 4 || trimmed.length > 50) return false;
+
+  // Known bad prefixes that came from React render keys
+  if (/^(deadline|alert|brief|opp|item)-/i.test(trimmed)) return false;
+
+  // SAM internal UUID: exactly 32 hex chars
+  if (/^[a-f0-9]{32}$/i.test(trimmed)) return true;
+
+  // Solicitation number / contract number — broad format match.
+  // Agencies use wildly different schemes (FA8773-24-R-0001,
+  // 140R6026Q0068, N6274223F4007, W912PL19C0015, SP4701-24-R-0001).
+  // We allow letters + digits + hyphens, must have at least one digit.
+  if (/^[A-Z0-9-]{4,50}$/i.test(trimmed) && /\d/.test(trimmed)) return true;
+
+  return false;
+}
+
+/**
  * Get rate limit status for all APIs
  */
 export function getRateLimitStatus(): Record<string, { remaining: number; resetIn: string }> {
