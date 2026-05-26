@@ -25,6 +25,21 @@ const nextConfig: NextConfig = {
   // was throwing 'DOMMatrix is not defined' until we added this
   // (paired with the polyfills in src/lib/sam/pdf-extract.ts).
   serverExternalPackages: ['pdf-parse', 'mammoth'],
+  // Force-include pdfjs-dist worker files in the serverless bundle.
+  // Vercel's output tracer doesn't pick up dynamic require() paths
+  // inside pdfjs-dist, so 'pdf.worker.mjs' wasn't getting deployed,
+  // causing 'Setting up fake worker failed: Cannot find module...'
+  // when pdf-parse tried to spawn its worker. Glob covers both
+  // legacy/ and build/ variants so we don't have to guess which
+  // pdf-parse 2.x is actually using.
+  outputFileTracingIncludes: {
+    '/api/**/*': [
+      './node_modules/pdfjs-dist/**/*.mjs',
+      './node_modules/pdfjs-dist/**/*.js',
+      './node_modules/pdfjs-dist/legacy/build/*',
+      './node_modules/pdfjs-dist/build/*',
+    ],
+  },
   // Rewrites for host-based routing
   async rewrites() {
     return {
