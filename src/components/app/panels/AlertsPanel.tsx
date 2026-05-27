@@ -918,26 +918,18 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     </p>
                   )}
 
-                  {/* Meta */}
+                  {/* Meta — keep tight; tooltip via title attr if user wants the description */}
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-500">
-                    {alert.naicsCode && (() => {
-                      const naicsEntry = getNaics(alert.naicsCode);
-                      return (
-                        <span title={naicsEntry?.title || alert.naicsCode}>
-                          NAICS: <span className="text-slate-400 font-mono">{alert.naicsCode}</span>
-                          {naicsEntry && <span className="text-slate-500"> · {naicsEntry.title.length > 40 ? naicsEntry.title.slice(0, 40) + '…' : naicsEntry.title}</span>}
-                        </span>
-                      );
-                    })()}
-                    {alert.pscCode && (() => {
-                      const pscEntry = getPsc(alert.pscCode);
-                      return (
-                        <span title={pscEntry?.title || alert.pscCode}>
-                          PSC: <span className="text-slate-400 font-mono">{alert.pscCode}</span>
-                          {pscEntry && <span className="text-slate-500"> · {pscEntry.title.length > 35 ? pscEntry.title.slice(0, 35) + '…' : pscEntry.title}</span>}
-                        </span>
-                      );
-                    })()}
+                    {alert.naicsCode && (
+                      <span title={getNaics(alert.naicsCode)?.title || alert.naicsCode}>
+                        NAICS: {alert.naicsCode}
+                      </span>
+                    )}
+                    {alert.pscCode && (
+                      <span title={getPsc(alert.pscCode)?.title || alert.pscCode}>
+                        PSC: {alert.pscCode}
+                      </span>
+                    )}
                     {getAlertLocation(alert) && (
                       <span>📍 {getAlertLocation(alert)}</span>
                     )}
