@@ -339,6 +339,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   }, [isCapStatementMode]);
   const [draftLoading, setDraftLoading] = useState<SectionType | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [draftAllLoading, setDraftAllLoading] = useState(false);
+  const [draftAllSummary, setDraftAllSummary] = useState<{ count: number; ms: number; errors: number } | null>(null);
 
   const generateDraft = useCallback(async (sectionType: SectionType) => {
     if (!email || !uploadedRfp) return;
@@ -371,6 +373,57 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       setDraftError('Request failed. Try again.');
     } finally {
       setDraftLoading(null);
+    }
+  }, [email, uploadedRfp, getAuthHeaders]);
+
+  // Draft ALL sections at once via the two-pass /draft-all endpoint.
+  // Content Reaper pattern #2 — outline + parallel write. Takes
+  // ~30-60s total instead of 5+ minutes of sequential clicks.
+  const generateAllDrafts = useCallback(async () => {
+    if (!email || !uploadedRfp) return;
+    setDraftAllLoading(true);
+    setDraftError(null);
+    setDraftAllSummary(null);
+    try {
+      const res = await fetch(`/api/app/proposal/draft-all?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDraftError(data.error || 'Could not generate the full draft.');
+        return;
+      }
+      // Merge each returned section into the drafts state
+      setDrafts(prev => {
+        const next = { ...prev };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const section of (data.sections || []) as any[]) {
+          next[section.section as SectionType] = {
+            draft: section.draft,
+            wordCount: section.wordCount,
+            targetWords: section.targetWords,
+            profileGrounded: section.meta?.profileGrounded,
+            generatedAt: Date.now(),
+          };
+        }
+        return next;
+      });
+      setDraftAllSummary({
+        count: (data.sections || []).length,
+        ms: data.totalProcessingMs || 0,
+        errors: (data.errors || []).length,
+      });
+      // Auto-focus the first section
+      if (data.sections?.[0]?.section) {
+        setActiveSection(data.sections[0].section);
+      }
+    } catch (err) {
+      console.error('Draft-all failed:', err);
+      setDraftError('Request failed. Try again.');
+    } finally {
+      setDraftAllLoading(false);
     }
   }, [email, uploadedRfp, getAuthHeaders]);
 
@@ -1026,7 +1079,29 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   : 'Pick a section. Mindy uses the source doc and your saved profile (NAICS, set-asides, target agencies) to write a first pass with [placeholders] for facts it shouldn\'t invent.'}
               </p>
             </div>
+            {/* Draft Entire Proposal — two-pass generation. Outlines all
+                sections in one cheap call, then parallel-writes them.
+                Drops ~5min of sequential clicking into ~30s. */}
+            <button
+              onClick={generateAllDrafts}
+              disabled={draftAllLoading || !!draftLoading}
+              className="px-4 py-2 bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-sm font-semibold rounded-lg shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              title="Outline + write all sections in parallel — ~30 seconds for the entire proposal"
+            >
+              {draftAllLoading
+                ? <>⏳ Drafting all sections…</>
+                : <>✨ Draft Entire {isCapStatementMode ? 'Capability Statement' : 'Proposal'}</>}
+            </button>
           </div>
+
+          {draftAllSummary && !draftAllLoading && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 mb-3 text-sm">
+              <span className="text-emerald-200">
+                ✅ Drafted {draftAllSummary.count} section{draftAllSummary.count === 1 ? '' : 's'} in {Math.round(draftAllSummary.ms / 1000)}s
+                {draftAllSummary.errors > 0 && ` (${draftAllSummary.errors} section${draftAllSummary.errors === 1 ? '' : 's'} failed — try those individually)`}
+              </span>
+            </div>
+          )}
 
           {draftError && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 mb-3">
