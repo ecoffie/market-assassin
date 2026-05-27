@@ -12,7 +12,8 @@ import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
 import StartTrackingModal, { type TriageAgencyCard } from './triage/StartTrackingModal';
-import type { Agency } from '@/types/federal-market-assassin';
+import { EntryAccessibilityCard } from './EntryAccessibilityCard';
+import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market-assassin';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 interface MarketResearchPanelProps {
@@ -1786,7 +1787,15 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               construction NAICS, 'Competition angle' showed contradictory
               counts. Cards didn't earn their slot. The All Agencies
               table below already lets users pick winners by their own
-              criteria. */}
+              criteria.
+
+              2026-05-27: Replaced with Entry Accessibility surface
+              (task #41). Ports the SAT/Micro-Purchase scoring from
+              MA's EntryPointsTab. Honest empty-state for NAICS that
+              skew to mega-contracts (construction, large IT). */}
+          <EntryAccessibilityCard
+            data={reportData?.simplifiedAcquisition as SimplifiedAcquisitionReport | undefined}
+          />
 
           {/* Recommended Opportunities section removed May 22, 2026.
               It duplicated Today's Intel and Source Feed (3 surfaces
