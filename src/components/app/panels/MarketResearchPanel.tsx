@@ -1697,7 +1697,15 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
               agencyCount={chartBuyers.length}
             />
-            <TopPrimesChart primes={reportData?.primeContractor?.suggestedPrimes || []} email={email} />
+            <TopPrimesChart
+              primes={reportData?.primeContractor?.suggestedPrimes || []}
+              tier2={reportData?.tier2Subcontracting?.suggestedPrimes || []}
+              tribal={(reportData?.tribalContracting?.suggestedTribes || []).map(t => ({
+                name: t.name,
+                reason: t.region || (t.capabilities && t.capabilities.length > 0 ? t.capabilities[0] : undefined),
+              }))}
+              email={email}
+            />
           </section>
 
           {/* FPDS-style top-10 leaderboards (Departments / Contracting
@@ -2555,8 +2563,17 @@ interface PrimeLike {
   reason?: string;
   agencies?: string[];  // Optional agency footprint, used by TopPrimesChart
                         // to filter against the user's saved target list.
+  tier?: 'tier1' | 'tier2' | 'tribal';  // Source tier for badge + priority
 }
-function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string | null }) {
+
+interface TopPrimesChartProps {
+  primes: PrimeLike[];      // Tier 1 primes (default)
+  tier2?: PrimeLike[];      // Tier 2 subcontractors — prioritized FIRST
+  tribal?: PrimeLike[];     // Tribal contractors — prioritized FIRST alongside tier 2
+  email: string | null;
+}
+
+function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesChartProps) {
   // Reframed May 22 → rebuilt for user context May 25, 2026 per Eric:
   // "the teaming candidates are the same names over and over again,
   // this is not helpful once I've called all 9." Old behavior: top 5
@@ -2598,11 +2615,9 @@ function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string 
   // ANY of the user's saved agency names (in either direction).
   // Loose match because the data is messy: 'DEPT OF THE AIR FORCE'
   // vs 'Department of the Air Force' vs 'Air Force'.
-  const contextualPrimes = useMemo(() => {
+  const contextualTier1 = useMemo(() => {
     if (savedAgencies.size === 0) return [];
     return primes.filter(p => {
-      // Skip primes without an agencies footprint — can't filter them.
-      // The fallback path below uses these primes as 'top NAICS overall.'
       if (!p.agencies || p.agencies.length === 0) return false;
       return p.agencies.some(pa => {
         const haystack = pa.toLowerCase();
@@ -2614,52 +2629,104 @@ function TopPrimesChart({ primes, email }: { primes: PrimeLike[]; email: string 
     });
   }, [primes, savedAgencies]);
 
-  const hasContextualMatches = contextualPrimes.length > 0;
-  const usedFallback = !hasContextualMatches;
-  const top = (hasContextualMatches ? contextualPrimes : primes).slice(0, 5);
+  // Merge: Tier 2 + Tribal FIRST, Tier 1 fills the rest. Per Eric
+  // (2026-05-27): "I want to choose tier 2 or tribal companies first
+  // not tier 1 primes." Emerging small businesses can rarely win a
+  // sub spot under Lockheed; Tier 2 + tribal are the realistic
+  // teaming partners. Dedup by name to handle overlap.
+  const merged = useMemo(() => {
+    const seen = new Set<string>();
+    const out: PrimeLike[] = [];
+
+    // 1. Tribal first (most-likely-to-team partner for small biz)
+    for (const t of tribal) {
+      const key = t.name.toLowerCase().trim();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        out.push({ ...t, tier: 'tribal' });
+      }
+    }
+    // 2. Tier 2 subs
+    for (const t of tier2) {
+      const key = t.name.toLowerCase().trim();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        out.push({ ...t, tier: 'tier2' });
+      }
+    }
+    // 3. Contextual Tier 1 (those actually working on user's saved agencies)
+    for (const t of contextualTier1) {
+      const key = t.name.toLowerCase().trim();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        out.push({ ...t, tier: 'tier1' });
+      }
+    }
+    // 4. Generic Tier 1 fallback if we still don't have enough
+    if (out.length < 10) {
+      for (const t of primes) {
+        const key = t.name.toLowerCase().trim();
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          out.push({ ...t, tier: 'tier1' });
+          if (out.length >= 10) break;
+        }
+      }
+    }
+    return out;
+  }, [tribal, tier2, contextualTier1, primes]);
+
+  const hasContextualTier1 = contextualTier1.length > 0;
+  const tribalCount = tribal.length;
+  const tier2Count = tier2.length;
+  const top = merged.slice(0, 10);  // 5 → 10 per Eric: "the list is not full"
 
   if (!targetsLoaded || top.length === 0) {
     return (
-      <ChartShell title="Teaming Candidates" subtitle="Primes you can pursue as subcontracting partners">
+      <ChartShell title="Teaming Candidates" subtitle="Tribal + Tier 2 partners you can pursue first">
         <div className="flex items-center justify-center h-full text-xs text-slate-500">
-          {!targetsLoaded ? 'Loading…' : 'No prime data yet. Build the report to populate.'}
+          {!targetsLoaded ? 'Loading…' : 'No teaming data yet. Build the report to populate.'}
         </div>
       </ChartShell>
     );
   }
 
-  const subtitle = hasContextualMatches
-    ? `Primes active on your ${savedAgencies.size} target ${savedAgencies.size === 1 ? 'agency' : 'agencies'} — click for sales history`
-    : 'Primes in your NAICS — click for sales history + recompete signals';
+  const subtitle = `${tribalCount > 0 || tier2Count > 0 ? `${tribalCount} tribal · ${tier2Count} Tier 2 · ` : ''}${hasContextualTier1 ? `${contextualTier1.length} contextual Tier 1` : 'plus Tier 1 backup'} — click for sales history`;
 
-  const footer = usedFallback ? (
-    <p className="text-[11px] text-amber-300/80">
-      Showing top NAICS primes (not yet contextual). <span className="text-slate-500">Save 3+ target agencies above to see primes who actually work with them.</span>
-    </p>
-  ) : (
-    <p className="text-[11px] text-emerald-400/80">
-      Filtered to primes whose agency footprint overlaps your saved targets. Same NAICS, your buyers.
+  const footer = (
+    <p className="text-[11px] text-slate-400">
+      <span className="text-emerald-400">Tribal + Tier 2 first</span> — realistic teaming partners for emerging small businesses. Tier 1 primes shown below as backup.
     </p>
   );
+
+  // Tier badge colors — tribal emerald, tier2 amber, tier1 purple
+  const tierStyle = (tier: PrimeLike['tier']) => {
+    if (tier === 'tribal') return { bg: 'bg-emerald-500/20', border: 'border-emerald-500/40', text: 'text-emerald-300', label: 'TRIBAL' };
+    if (tier === 'tier2') return { bg: 'bg-amber-500/20', border: 'border-amber-500/40', text: 'text-amber-300', label: 'T2' };
+    return { bg: 'bg-purple-500/20', border: 'border-purple-500/40', text: 'text-purple-300', label: 'T1' };
+  };
 
   return (
     <ChartShell title="Teaming Candidates" subtitle={subtitle} footer={footer}>
       <ul className="space-y-2">
-        {top.map((p, i) => (
-          <li key={`${p.name}-${i}`} className="flex items-start gap-3">
-            <div className="shrink-0 w-6 h-6 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-[10px] font-semibold text-purple-300">
-              {i + 1}
-            </div>
-            <div className="min-w-0 flex-1">
-              <ContractorLink name={p.name} email={email} variant="plain" className="text-xs font-medium block truncate">
-                {p.name}
-              </ContractorLink>
-              {p.reason && (
-                <div className="text-[10px] text-slate-500 truncate">{p.reason}</div>
-              )}
-            </div>
-          </li>
-        ))}
+        {top.map((p, i) => {
+          const style = tierStyle(p.tier);
+          return (
+            <li key={`${p.name}-${i}`} className="flex items-start gap-3">
+              <div className={`shrink-0 w-6 h-6 rounded-full ${style.bg} border ${style.border} flex items-center justify-center text-[9px] font-semibold ${style.text}`}>
+                {style.label}
+              </div>
+              <div className="min-w-0 flex-1">
+                <ContractorLink name={p.name} email={email} variant="plain" className="text-xs font-medium block truncate">
+                  {p.name}
+                </ContractorLink>
+                {p.reason && (
+                  <div className="text-[10px] text-slate-500 truncate">{p.reason}</div>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </ChartShell>
   );
