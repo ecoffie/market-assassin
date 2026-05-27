@@ -142,12 +142,17 @@ function getSupabase() {
       try {
         console.log(`[PrecomputeBriefings] Generating template for profile with ${profile.user_count} users: ${profile.naics_profile.slice(0, 50)}...`);
 
-        // Generate briefing using a synthetic email (template generation)
+        // Generate briefing using a synthetic email (template generation).
+        // naicsProfileHash threads through so the generator can fetch
+        // recent angles for this profile and tell the AI to prefer fresh
+        // framings (anti-repetition memory — Content Reaper pattern #3).
         const briefing = await generateAIBriefing('template@govcongiants.com', {
           maxOpportunities: 10,
           maxTeamingPlays: 3,
           skipEnrichment: true, // Skip Perplexity for batch processing
           naicsOverride: profile.naics_codes, // Use this profile's NAICS codes
+          naicsProfileHash: profile.naics_profile_hash,
+          briefingType: 'daily',
         });
 
         if (!briefing) {

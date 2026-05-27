@@ -16,6 +16,7 @@ import { enrichContractsWithIntel, ContractIntelligence } from '../enrichment';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 import { fetchMultisiteForUser, MultisiteOpportunity, ScoredMultisiteOpportunity } from '../pipelines/multisite';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
+import { extractAnglesFromBriefing, persistAngles, getRecentAngles, formatAnglesForPrompt } from '../angle-history';
 
 // Types for AI-generated briefings
 export interface AIBriefingOpportunity {
@@ -162,6 +163,12 @@ export async function generateAIBriefing(
     skipEnrichment?: boolean; // Skip Perplexity enrichment for faster batch processing
     skipDataFetch?: boolean; // Skip HTTP-based data fetches for faster batch processing
     naicsOverride?: string[]; // Override NAICS codes (for pre-computation by profile)
+    /** Profile hash for anti-repetition memory. When supplied, the
+     *  briefing prompt tells the AI which angles have been used
+     *  recently for this profile so it can prefer fresh framings. */
+    naicsProfileHash?: string;
+    /** Briefing type for anti-repetition memory. Defaults to 'daily'. */
+    briefingType?: 'daily' | 'weekly' | 'pursuit';
   } = {}
 ): Promise<AIGeneratedBriefing | null> {
   const startTime = Date.now();
@@ -339,8 +346,23 @@ export async function generateAIBriefing(
       console.log(`[AIBriefingGen] Skipping Perplexity enrichment (batch mode)`);
     }
 
-    // Step 4: Build user prompt with raw data + enriched intel
-    const userPrompt = buildUserPrompt(profile, organizedData, enrichedIntel);
+    // Anti-repetition memory: pull recent angles for this profile so
+    // the AI can prefer fresh framings. Non-fatal if it fails.
+    let recentAngles: string[] = [];
+    if (options.naicsProfileHash) {
+      try {
+        recentAngles = await getRecentAngles({
+          naicsProfileHash: options.naicsProfileHash,
+          briefingType: options.briefingType || 'daily',
+          limit: 10,
+        });
+      } catch (err) {
+        console.warn('[AIBriefingGen] recent-angles lookup failed (non-fatal):', err);
+      }
+    }
+
+    // Step 4: Build user prompt with raw data + enriched intel + recent angles
+    const userPrompt = buildUserPrompt(profile, organizedData, enrichedIntel, recentAngles);
 
     // Step 5: Call Claude for synthesis
     console.log(`[AIBriefingGen] Generating AI briefing for ${userEmail}...`);
@@ -382,6 +404,22 @@ export async function generateAIBriefing(
       `[AIBriefingGen] Generated briefing via ${provider}/${model}: ${briefing.opportunities.length} opportunities, ${briefing.teamingPlays.length} plays in ${briefing.processingTimeMs}ms`
     );
 
+    // Persist top angles for anti-repetition memory. Fire-and-forget —
+    // failure is non-blocking. Only does anything if a profile hash
+    // was supplied (template precompute path).
+    if (options.naicsProfileHash) {
+      const angles = extractAnglesFromBriefing(briefing);
+      if (angles.length > 0) {
+        // Fire-and-forget — don't await, don't crash on failure
+        persistAngles({
+          naicsProfileHash: options.naicsProfileHash,
+          briefingType: options.briefingType || 'daily',
+          briefingDate,
+          angles,
+        }).catch(() => { /* already logged inside */ });
+      }
+    }
+
     return briefing;
   } catch (error) {
     console.error('[AIBriefingGen] Error:', error);
@@ -408,8 +446,10 @@ function buildUserPrompt(
     webSignals: WebSignal[];
     multisiteOpps: ScoredMultisiteOpportunity[];
   },
-  enrichedIntel?: Map<string, ContractIntelligence>
+  enrichedIntel?: Map<string, ContractIntelligence>,
+  recentAngles: string[] = []
 ): string {
+  const recentAnglesBlock = formatAnglesForPrompt(recentAngles);
   // Build enriched intel section if available
   let enrichedSection = '';
   if (enrichedIntel && enrichedIntel.size > 0) {
@@ -440,7 +480,7 @@ incumbent issues, or M&A activity - USE IT in your displacement angles.
 
   return `Generate today's market intelligence briefing based on the following data:
 
-USER PROFILE:
+${recentAnglesBlock ? recentAnglesBlock + '\n\n' : ''}USER PROFILE:
 - NAICS Codes: ${profile.naics_codes.join(', ') || 'Any'}
 - Target Agencies: ${profile.agencies.join(', ') || 'Any federal agency'}
 - Keywords: ${profile.keywords.join(', ') || 'None specified'}
