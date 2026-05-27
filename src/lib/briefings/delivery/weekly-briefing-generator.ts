@@ -15,6 +15,8 @@ import { WebSignal } from '../web-intel/types';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 import { SAMNoticeSummary } from '../pipelines/sam-gov';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
+import { extractAnglesFromBriefing, persistAngles, getRecentAngles, formatAnglesForPrompt } from '../angle-history';
+import { pickBriefingLenses, formatLensesForPrompt, seedFromString } from '../lenses';
 
 export interface WeeklyOpportunityAnalysis {
   rank: number;
@@ -486,13 +488,40 @@ export async function generateWeeklyDeepDiveFromContracts(
     numberOfBids?: number;
     competitionLevel?: string;
   }>,
-  noticeSummary?: SAMNoticeSummary
+  noticeSummary?: SAMNoticeSummary,
+  options: {
+    /** Profile hash for anti-repetition memory (Content Reaper pattern #3) */
+    naicsProfileHash?: string;
+  } = {}
 ): Promise<PrecomputedWeeklyBriefing> {
   const weekOfDate = getWeekOfDate();
 
+  // Anti-repetition: pull recent weekly angles for this profile + inject
+  // as 'avoid repeating' guidance. Fire-and-forget on lookup failure.
+  let recentAngles: string[] = [];
+  if (options.naicsProfileHash) {
+    try {
+      recentAngles = await getRecentAngles({
+        naicsProfileHash: options.naicsProfileHash,
+        briefingType: 'weekly',
+        limit: 6, // weekly cadence — fewer rows but each represents a full week
+      });
+    } catch (err) {
+      console.warn('[WeeklyBriefingGen] recent-angles lookup failed (non-fatal):', err);
+    }
+  }
+  const recentAnglesBlock = formatAnglesForPrompt(recentAngles);
+
+  // Pick 2 lenses deterministically per-week-per-profile
+  const lensSeed = options.naicsProfileHash
+    ? seedFromString(`${options.naicsProfileHash}:${weekOfDate}`)
+    : undefined;
+  const lenses = pickBriefingLenses(2, lensSeed);
+  const lensBlock = formatLensesForPrompt(lenses);
+
   const prompt = `You are a senior GovCon capture strategist. Generate a Weekly Deep Dive briefing with full analysis.
 
-CONTRACT DATA (REAL DATA FROM USASPENDING):
+${lensBlock ? lensBlock + '\n' : ''}${recentAnglesBlock ? recentAnglesBlock + '\n\n' : ''}CONTRACT DATA (REAL DATA FROM USASPENDING):
 ${JSON.stringify(contracts, null, 2)}
 
 Generate JSON with:
@@ -519,7 +548,7 @@ Return ONLY valid JSON.`;
     calendar?: PrecomputedWeeklyBriefing['calendar'];
   }>(text);
 
-  return {
+  const briefing = {
     weekOf: weekOfDate,
     opportunities: data.opportunities || [],
     teamingPlays: data.teamingPlays || [],
@@ -532,6 +561,27 @@ Return ONLY valid JSON.`;
     llmProvider: provider,
     llmModel: model,
   };
+
+  // Persist top angles for next-week anti-repetition. Fire-and-forget.
+  if (options.naicsProfileHash) {
+    // We use contractName as the angle for weekly since the structure
+    // is contracts-first, not opportunities-first.
+    const angles = (briefing.opportunities || [])
+      .slice(0, 5)
+      .map((o) => o.contractName || '')
+      .filter(Boolean) as string[];
+    if (angles.length > 0) {
+      persistAngles({
+        naicsProfileHash: options.naicsProfileHash,
+        briefingType: 'weekly',
+        briefingDate: weekOfDate,
+        angles,
+      }).catch(() => { /* logged inside */ });
+    }
+    void extractAnglesFromBriefing; // reserved for future shared extractor
+  }
+
+  return briefing;
 }
 
 function buildProfile(profileData: Record<string, unknown>) {

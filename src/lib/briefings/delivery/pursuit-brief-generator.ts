@@ -12,6 +12,8 @@ import { RecompeteContract, fetchExpiringContractsFromLocal } from '../pipelines
 import { ContractAward } from '../pipelines/contract-awards';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
+import { persistAngles, getRecentAngles, formatAnglesForPrompt } from '../angle-history';
+import { pickBriefingLenses, formatLensesForPrompt, seedFromString } from '../lenses';
 
 export interface PursuitOutreachTarget {
   priority: number;
@@ -251,7 +253,14 @@ export async function generatePursuitBriefFromProfileInput(
     deadline?: string;
     rawData?: RecompeteContract | ContractAward | Record<string, unknown>;
   },
-  relatedMarketSignals: PursuitMarketSignal[] = []
+  relatedMarketSignals: PursuitMarketSignal[] = [],
+  options: {
+    /** Profile hash for anti-repetition memory (Content Reaper pattern #3).
+     *  When supplied, recent pursuit angles for this profile are pulled
+     *  + injected as 'avoid repeating' guidance. Distinct from userId
+     *  param because some callers pass a user id rather than a hash. */
+    naicsProfileHash?: string;
+  } = {}
 ): Promise<PursuitBrief | null> {
   const startTime = Date.now();
   const primaryIndustry = profile.primary_industry || null;
@@ -263,7 +272,37 @@ export async function generatePursuitBriefFromProfileInput(
     naics_codes: prioritizedNaics,
   };
 
-  const userPrompt = buildUserPrompt(normalizedProfile, opportunity, relatedMarketSignals);
+  // Anti-repetition: pull last 5 pursuit angles for this profile so the
+  // AI doesn't surface the same incumbent / agency / contract type
+  // week after week.
+  let recentAngles: string[] = [];
+  if (options.naicsProfileHash) {
+    try {
+      recentAngles = await getRecentAngles({
+        naicsProfileHash: options.naicsProfileHash,
+        briefingType: 'pursuit',
+        limit: 5, // pursuit cadence is weekly (Saturday) — small history is enough
+      });
+    } catch (err) {
+      console.warn('[PursuitBrief] recent-angles lookup failed (non-fatal):', err);
+    }
+  }
+  const recentAnglesBlock = formatAnglesForPrompt(recentAngles);
+
+  // Pick 1 lens for pursuit (single-target focus — too many lenses muddle)
+  const lensSeed = options.naicsProfileHash
+    ? seedFromString(`${options.naicsProfileHash}:${new Date().toISOString().split('T')[0]}`)
+    : undefined;
+  const lenses = pickBriefingLenses(1, lensSeed);
+  const lensBlock = formatLensesForPrompt(lenses);
+
+  let userPrompt = buildUserPrompt(normalizedProfile, opportunity, relatedMarketSignals);
+  if (lensBlock) {
+    userPrompt = `${lensBlock}\n${userPrompt}`;
+  }
+  if (recentAnglesBlock) {
+    userPrompt = `${recentAnglesBlock}\n\n${userPrompt}`;
+  }
 
   console.log(`[PursuitBrief] Generating for ${opportunity.contractName || opportunity.contractNumber}...`);
 
@@ -316,6 +355,21 @@ export async function generatePursuitBriefFromProfileInput(
   console.log(
     `[PursuitBrief] Generated via ${provider}/${model}: Score ${brief.opportunityScore}/100 in ${brief.processingTimeMs}ms`
   );
+
+  // Persist top angle for next-week anti-repetition. For pursuit briefs,
+  // the "angle" is the contract name + agency since each brief is about
+  // one specific target. Fire-and-forget.
+  if (options.naicsProfileHash) {
+    const angle = `${brief.contractName}${brief.agency ? ' @ ' + brief.agency : ''}`.slice(0, 120);
+    if (angle.trim().length > 0) {
+      persistAngles({
+        naicsProfileHash: options.naicsProfileHash,
+        briefingType: 'pursuit',
+        briefingDate: new Date().toISOString().split('T')[0],
+        angles: [angle],
+      }).catch(() => { /* logged inside */ });
+    }
+  }
 
   return brief;
 }

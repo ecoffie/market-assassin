@@ -17,6 +17,7 @@ import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 import { fetchMultisiteForUser, MultisiteOpportunity, ScoredMultisiteOpportunity } from '../pipelines/multisite';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
 import { extractAnglesFromBriefing, persistAngles, getRecentAngles, formatAnglesForPrompt } from '../angle-history';
+import { pickBriefingLenses, formatLensesForPrompt, seedFromString } from '../lenses';
 
 // Types for AI-generated briefings
 export interface AIBriefingOpportunity {
@@ -361,8 +362,18 @@ export async function generateAIBriefing(
       }
     }
 
-    // Step 4: Build user prompt with raw data + enriched intel + recent angles
-    const userPrompt = buildUserPrompt(profile, organizedData, enrichedIntel, recentAngles);
+    // Pick lenses deterministically per-day-per-profile. Same template
+    // run twice gets the same lenses (idempotent); next day's run picks
+    // different lenses; different profiles on same day get different
+    // mixes.
+    const lensSeed = options.naicsProfileHash
+      ? seedFromString(`${options.naicsProfileHash}:${briefingDate}`)
+      : undefined;
+    const lenses = pickBriefingLenses(2, lensSeed);
+
+    // Step 4: Build user prompt with raw data + enriched intel + recent
+    // angles + lenses
+    const userPrompt = buildUserPrompt(profile, organizedData, enrichedIntel, recentAngles, lenses);
 
     // Step 5: Call Claude for synthesis
     console.log(`[AIBriefingGen] Generating AI briefing for ${userEmail}...`);
@@ -447,9 +458,12 @@ function buildUserPrompt(
     multisiteOpps: ScoredMultisiteOpportunity[];
   },
   enrichedIntel?: Map<string, ContractIntelligence>,
-  recentAngles: string[] = []
+  recentAngles: string[] = [],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  lenses: any[] = []
 ): string {
   const recentAnglesBlock = formatAnglesForPrompt(recentAngles);
+  const lensBlock = formatLensesForPrompt(lenses);
   // Build enriched intel section if available
   let enrichedSection = '';
   if (enrichedIntel && enrichedIntel.size > 0) {
@@ -480,7 +494,7 @@ incumbent issues, or M&A activity - USE IT in your displacement angles.
 
   return `Generate today's market intelligence briefing based on the following data:
 
-${recentAnglesBlock ? recentAnglesBlock + '\n\n' : ''}USER PROFILE:
+${lensBlock ? lensBlock + '\n' : ''}${recentAnglesBlock ? recentAnglesBlock + '\n\n' : ''}USER PROFILE:
 - NAICS Codes: ${profile.naics_codes.join(', ') || 'Any'}
 - Target Agencies: ${profile.agencies.join(', ') || 'Any federal agency'}
 - Keywords: ${profile.keywords.join(', ') || 'None specified'}

@@ -299,7 +299,10 @@ function getSupabase() {
           keywords: profile.aggregated_keywords.slice(0, 20),
         });
 
-        const briefing = await generateWeeklyDeepDiveFromContracts(contracts, noticeSummary);
+
+        const briefing = await generateWeeklyDeepDiveFromContracts(contracts, noticeSummary, {
+          naicsProfileHash: profile.naics_profile_hash,
+        });
         briefing.processingTimeMs = Date.now() - profileStartTime;
 
         // Store template

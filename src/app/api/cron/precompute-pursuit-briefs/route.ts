@@ -387,7 +387,8 @@ function getSupabase() {
             description: undefined,
             rawData: topOpp,
           },
-          buildPursuitMarketSignals(noticeSummary, topOpp)
+          buildPursuitMarketSignals(noticeSummary, topOpp),
+          { naicsProfileHash: profile.naics_profile_hash }
         );
         if (!brief) {
           throw new Error('Shared pursuit generator returned null');
