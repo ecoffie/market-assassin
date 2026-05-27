@@ -17,7 +17,83 @@ import {
   categorizePainPoints,
 } from '@/lib/utils/pain-points';
 import { getBudgetForAgency } from '@/lib/utils/budget-authority';
+import agencyAliasesData from '@/data/agency-aliases.json';
 import type { AgencyContext } from './types';
+
+// ---- Agency name resolver -------------------------------------------
+//
+// User-supplied or text-extracted agency names rarely match the
+// canonical names in agency-pain-points.json verbatim. Examples:
+//   "U.S. Army Marketing and Advertising Program" → "Department of the Army"
+//   "NAVFAC Atlantic" → "Department of the Navy"
+//   "DOJ FBI Cyber Division" → "Department of Justice"
+//
+// This resolver normalizes raw agency strings to their canonical
+// parent name BEFORE pain-points lookup, using the existing
+// 450-entry agency-aliases.json file.
+
+interface AgencyAliasesData {
+  aliases: Record<string, string>;
+}
+const ALIASES = (agencyAliasesData as unknown as AgencyAliasesData).aliases || {};
+
+/**
+ * Try to resolve any raw agency string to its canonical name in
+ * agency-pain-points.json. Returns the original string if no
+ * resolution succeeds (so caller can still try direct match).
+ *
+ * Strategy (in priority order):
+ *   1. Exact alias key match (e.g. "DOD" → "Department of Defense")
+ *   2. Substring scan: walk alias keys, return the LONGEST match
+ *      that appears in the raw string (e.g. "U.S. Army Marketing..."
+ *      contains "ARMY" → "Department of the Army")
+ *   3. Keyword scan: known component/program prefixes (NAVFAC, USACE,
+ *      etc.) map to their parent department
+ */
+export function resolveAgencyName(raw: string): string {
+  if (!raw) return raw;
+  const trimmed = raw.trim();
+
+  // 1. Exact alias hit (case-insensitive)
+  const upper = trimmed.toUpperCase();
+  if (ALIASES[upper]) return ALIASES[upper];
+  if (ALIASES[trimmed]) return ALIASES[trimmed];
+
+  // 2. Longest substring match across alias keys.
+  //    Aliases come in many forms — abbreviations (DOD, NAVFAC),
+  //    keywords (ARMY, NAVY), full names. We want the longest hit
+  //    so "DEPARTMENT OF DEFENSE" beats "ARMY" if both appear.
+  let bestMatch: { key: string; canonical: string; length: number } | null = null;
+  for (const [aliasKey, canonical] of Object.entries(ALIASES)) {
+    // Skip very short aliases (2-char) to avoid noisy substring hits
+    if (aliasKey.length < 3) continue;
+    // Word-boundary check so "VA" doesn't match "AdVAntage"
+    const re = new RegExp(`\\b${aliasKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (re.test(trimmed)) {
+      if (!bestMatch || aliasKey.length > bestMatch.length) {
+        bestMatch = { key: aliasKey, canonical, length: aliasKey.length };
+      }
+    }
+  }
+  if (bestMatch) return bestMatch.canonical;
+
+  // 3. Hard-coded fallbacks for known program/component patterns
+  //    not covered by aliases (these are common in RFPs but their
+  //    full names don't appear in the aliases file).
+  const fallbacks: Array<[RegExp, string]> = [
+    [/\bArmy\b/i, 'Department of the Army'],
+    [/\bNavy\b|\bNAVFAC\b|\bNAVSEA\b|\bNAVAIR\b|\bNAVWAR\b|\bSPAWAR\b/i, 'Department of the Navy'],
+    [/\bAir Force\b|\bUSAF\b|\bAFLCMC\b/i, 'Department of the Air Force'],
+    [/\bMarine Corps\b/i, 'Department of the Navy'],
+    [/\bCoast Guard\b/i, 'Department of Homeland Security'],
+    [/\bUSACE\b|\bArmy Corps of Engineers\b/i, 'Department of the Army'],
+  ];
+  for (const [pattern, canonical] of fallbacks) {
+    if (pattern.test(trimmed)) return canonical;
+  }
+
+  return trimmed;
+}
 
 // ---- Agency detection from RFP text ---------------------------------
 //
@@ -100,9 +176,9 @@ export function detectRfpAgency(text: string): string | null {
  * draft without the context layer (degrades gracefully).
  */
 export function buildAgencyContext(rfpText: string, explicitAgency?: string | null): AgencyContext {
-  const agency = explicitAgency || detectRfpAgency(rfpText);
+  const rawAgency = explicitAgency || detectRfpAgency(rfpText);
 
-  if (!agency) {
+  if (!rawAgency) {
     return {
       agency: null,
       painPoints: [],
@@ -111,9 +187,31 @@ export function buildAgencyContext(rfpText: string, explicitAgency?: string | nu
     };
   }
 
-  const allPainPoints = getPainPointsForAgency(agency);
-  const allPriorities = getPrioritiesForAgency(agency);
-  const budget = getBudgetForAgency(agency);
+  // Normalize the user-supplied or detected agency name to its canonical
+  // form in agency-pain-points.json (e.g. "U.S. Army Marketing and
+  // Advertising Program" → "Department of the Army"). Surface BOTH the
+  // resolved canonical name (used for the data lookup) and keep the
+  // original-looking name for prompt display when we have it.
+  const canonical = resolveAgencyName(rawAgency);
+
+  // Try canonical first; fall back to raw if canonical found nothing
+  // (in case the raw name was already a direct database key).
+  let allPainPoints = getPainPointsForAgency(canonical);
+  let allPriorities = getPrioritiesForAgency(canonical);
+  if (allPainPoints.length === 0 && canonical !== rawAgency) {
+    allPainPoints = getPainPointsForAgency(rawAgency);
+  }
+  if (allPriorities.length === 0 && canonical !== rawAgency) {
+    allPriorities = getPrioritiesForAgency(rawAgency);
+  }
+  const budget = getBudgetForAgency(canonical) || getBudgetForAgency(rawAgency);
+
+  // For display, prefer the more specific raw name if it contains
+  // detail beyond the canonical (e.g. "U.S. Army Marketing and Advertising
+  // Program" is more useful in the prompt than "Department of the Army")
+  const agency = rawAgency.length > canonical.length && rawAgency.toLowerCase().includes(canonical.split(' ').slice(-1)[0].toLowerCase())
+    ? rawAgency
+    : canonical;
 
   // Cap pain points at 6 to keep prompt tight. Categorize lets us
   // prefer mixed coverage (one infrastructure + one cyber + one
