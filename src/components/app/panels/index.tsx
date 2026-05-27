@@ -19,6 +19,7 @@ const PricingIntelPanel = lazy(() => import('./PricingIntelPanel'));
 const MyTargetListPanel = lazy(() => import('./MyTargetListPanel'));
 const GrantsPanel = lazy(() => import('./GrantsPanel'));
 const VaultPanel = lazy(() => import('./VaultPanel'));
+const LibraryPanel = lazy(() => import('./LibraryPanel'));
 
 interface PanelContainerProps {
   activePanel: AppPanel;
@@ -76,6 +77,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <GrantsPanel email={email} tier={tier} />;
       case 'vault':
         return <VaultPanel email={email} tier={tier} />;
+      case 'library':
+        return <LibraryPanel email={email} tier={tier} />;
       default:
         return <DashboardPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
     }

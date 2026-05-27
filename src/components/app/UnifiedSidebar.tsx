@@ -19,6 +19,7 @@ export type AppPanel =
   | 'team'           // Team access and seats
   | 'settings'       // Unified account settings
   | 'vault'          // My Vault — persistent knowledge base (identity, past perf, capabilities, team, boilerplate)
+  | 'library'        // My Library — searchable history of every AI output
   | 'pricing'        // Pricing Intel — labor rates, GSA/SCA wages (Estimating section)
   | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
@@ -208,6 +209,13 @@ const NAV_SECTIONS: NavSection[] = [
         icon: '🗂️',
         description: 'Your past perf, capabilities, team',
         tier: ['free', 'pro', 'team', 'enterprise'],
+      },
+      {
+        id: 'library',
+        label: 'My Library',
+        icon: '📚',
+        description: 'Every AI draft, searchable',
+        tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'settings',

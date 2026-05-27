@@ -26,6 +26,7 @@ import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-
 import { generateV2Draft } from '@/lib/proposal/v2';
 import { SECTION_META } from '@/lib/proposal/sections';
 import type { SectionType } from '@/lib/proposal/types';
+import { archiveContent } from '@/lib/archive/persist';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -87,6 +88,21 @@ export async function POST(request: NextRequest) {
       fileName: body.fileName,
       rfpAgency: body.rfpAgency,
     });
+
+    // Auto-library: fire-and-forget archive of this draft so the user
+    // can recall it later via /app/library. Failure is non-blocking.
+    const isCapStmt = ['company_overview', 'cap_past_performance', 'capabilities', 'differentiators', 'poc'].includes(sectionType);
+    archiveContent({
+      userEmail: email,
+      contentType: isCapStmt ? 'cap_statement' : 'proposal_section',
+      contentSubtype: sectionType,
+      title: `${result.label} — ${body.fileName || 'untitled RFP'}`,
+      content: { draft: result.draft, meta: result.meta, sectionType, label: result.label, wordCount: result.wordCount },
+      contentText: result.draft,
+      agency: result.meta.agencyDetected || undefined,
+      aiProvider: 'groq',
+      aiModel: result.meta.model,
+    }).catch(() => { /* non-fatal — logged inside */ });
 
     return NextResponse.json({
       success: true,
