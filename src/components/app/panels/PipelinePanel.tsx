@@ -41,6 +41,13 @@ interface PipelineOpportunity {
   docs_status?: 'pending' | 'fetching' | 'ready' | 'none' | 'failed';
   docs_count?: number;
   docs_fetched_at?: string;
+  // Draft auto-archive signal (set client-side by the loader from
+  // user_generated_archive matches). Lets the card show "Continue
+  // Draft → ✓ N sections" instead of "Draft Proposal →" when drafts
+  // exist. Per Eric (2026-05-27): "how do we know which ones have
+  // [drafts]".
+  has_drafts?: boolean;
+  draft_count?: number;
 }
 
 type PipelineStage = PipelineOpportunity['stage'];
@@ -132,7 +139,42 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           setError(data.error);
         }
       } else {
-        setOpportunities(data.opportunities || []);
+        const opps: PipelineOpportunity[] = data.opportunities || [];
+        // Annotate has_drafts + draft_count from the library auto-archive.
+        // Per Eric (2026-05-27): "how do we know which ones have [drafts]".
+        // We match library entries to pursuits by title containment since
+        // we don't have a pursuit_id foreign-key on library rows yet.
+        try {
+          const libRes = await fetch(`/api/app/library?email=${encodeURIComponent(email)}&type=proposal_section`, {
+            headers: getAuthHeaders(),
+          });
+          const libData = libRes.ok ? await libRes.json() : null;
+          if (libData?.success && Array.isArray(libData.entries)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const entries: any[] = libData.entries;
+            const countsByTitle = new Map<string, number>();
+            for (const e of entries) {
+              const titleHaystack = (e.title || '').toLowerCase();
+              countsByTitle.set(titleHaystack, (countsByTitle.get(titleHaystack) || 0) + 1);
+            }
+            // For each opp, count library entries whose title CONTAINS the
+            // pursuit's title (library titles look like "Past Performance —
+            // Z--DK - SHADEHILL GATEHOUSE ROOFING")
+            for (const opp of opps) {
+              const oppKey = (opp.title || '').toLowerCase().slice(0, 40);
+              if (!oppKey) continue;
+              let cnt = 0;
+              for (const [libTitle, c] of countsByTitle) {
+                if (libTitle.includes(oppKey)) cnt += c;
+              }
+              if (cnt > 0) {
+                opp.has_drafts = true;
+                opp.draft_count = cnt;
+              }
+            }
+          }
+        } catch { /* non-fatal — cards just won't show drafted badge */ }
+        setOpportunities(opps);
         setStats(data.stats?.byStage || data.stats || {});
       }
     } catch (err) {
@@ -762,7 +804,12 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                     <div className="mt-3 text-xs font-medium text-blue-300">
                       Open details
                     </div>
-                    {onPanelChange && (
+                    {/* Draft Proposal — only shown for pursuing/bidding/submitted
+                        stages. Per Eric (2026-05-27): "if we are tracking do
+                        we need to draft?" — tracking is "watching", drafting
+                        comes after the decision to pursue. Won/lost/no_bid
+                        also hide it (work is done). */}
+                    {onPanelChange && ['pursuing', 'bidding', 'submitted'].includes(opp.stage) && (
                       <button
                         type="button"
                         onClick={(event) => {
@@ -771,22 +818,29 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         }}
                         className="mt-2 w-full rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500"
                         title={
-                          opp.docs_status === 'ready'
-                            ? `${opp.docs_count || 0} doc(s) ready — open Proposal Assist`
-                            : opp.docs_status === 'fetching'
-                              ? 'SAM docs still downloading — Proposal Assist will load what is ready'
-                              : opp.docs_status === 'none'
-                                ? 'No SAM attachments — Proposal Assist will still draft from the notice metadata'
-                                : 'Open Proposal Assist for this pursuit'
+                          opp.has_drafts
+                            ? `Has prior drafts — open Proposal Assist to continue`
+                            : opp.docs_status === 'ready'
+                              ? `${opp.docs_count || 0} doc(s) ready — open Proposal Assist`
+                              : opp.docs_status === 'fetching'
+                                ? 'SAM docs still downloading — Proposal Assist will load what is ready'
+                                : opp.docs_status === 'none'
+                                  ? 'No SAM attachments — Proposal Assist will still draft from the notice metadata'
+                                  : 'Open Proposal Assist for this pursuit'
                         }
                       >
-                        Draft Proposal →
-                        {opp.docs_status === 'ready' && (opp.docs_count || 0) > 0 && (
+                        {opp.has_drafts ? 'Continue Draft →' : 'Draft Proposal →'}
+                        {opp.has_drafts && (
+                          <span className="ml-1 text-[10px] font-normal text-emerald-200">
+                            ✓ {opp.draft_count} {opp.draft_count === 1 ? 'section' : 'sections'}
+                          </span>
+                        )}
+                        {!opp.has_drafts && opp.docs_status === 'ready' && (opp.docs_count || 0) > 0 && (
                           <span className="ml-1 text-[10px] font-normal text-emerald-200">
                             {opp.docs_count} {opp.docs_count === 1 ? 'doc' : 'docs'}
                           </span>
                         )}
-                        {opp.docs_status === 'fetching' && (
+                        {!opp.has_drafts && opp.docs_status === 'fetching' && (
                           <span className="ml-1 text-[10px] font-normal text-emerald-200 animate-pulse">
                             fetching…
                           </span>
