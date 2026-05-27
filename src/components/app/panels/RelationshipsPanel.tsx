@@ -81,6 +81,11 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
   const [activeTab, setActiveTab] = useState<TabId>('network');
   const [savedContacts, setSavedContacts] = useState<RelationshipContact[]>([]);
   const [candidates, setCandidates] = useState<RelationshipContact[]>([]);
+  // Pre-truncation count from the API. When > candidates.length, the
+  // server hit the MAX_DIRECTORY_RESULTS cap. We surface this in the
+  // results header so the user knows they're seeing a slice.
+  const [candidatesTotal, setCandidatesTotal] = useState(0);
+  const [candidatesTruncated, setCandidatesTruncated] = useState(false);
   const [pursuits, setPursuits] = useState<Pursuit[]>([]);
   const [links, setLinks] = useState<ContactLink[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -181,6 +186,8 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Failed to search relationships');
       setCandidates(data.candidates || []);
+      setCandidatesTotal(typeof data.total === 'number' ? data.total : (data.candidates || []).length);
+      setCandidatesTruncated(!!data.truncated);
       if ((data.candidates || []).length === 0 && data.dataSourceStatus) setNotice(data.dataSourceStatus);
     } catch (err) {
       console.error('Relationship search failed:', err);
@@ -538,7 +545,15 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
           <div>
             <h2 className="font-semibold text-white">{activeTabConfig.label}</h2>
             <p className="text-xs text-slate-500 mt-1">
-              {activeTab === 'network' ? `${savedContacts.length} saved contacts` : `${candidates.length} suggested records`}
+              {activeTab === 'network'
+                ? `${savedContacts.length} saved contacts`
+                : candidatesTruncated && candidatesTotal > candidates.length
+                  ? <>
+                      Showing first <span className="text-white">{candidates.length}</span> of{' '}
+                      <span className="text-amber-300 font-semibold">{candidatesTotal.toLocaleString()}+</span> matches
+                      <span className="text-slate-500"> — narrow your search by NAICS or agency to focus</span>
+                    </>
+                  : `${candidates.length} suggested records`}
             </p>
           </div>
         </div>

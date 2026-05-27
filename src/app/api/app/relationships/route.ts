@@ -20,6 +20,16 @@ function getSupabase() {
 
 type RelationshipType = 'government_buyer' | 'osbp' | 'prime' | 'subcontractor' | 'partner' | 'internal';
 
+/**
+ * Cap for "directory" candidate searches (Gov Buyers / OSBP / Find
+ * Partners). Was 40 — Eric (2026-05-27) flagged that Gov Buyers and
+ * OSBP both hit exactly 40 was suspicious (it was). Bumped to 250
+ * so users can actually scan the directory. We also return `total`
+ * (pre-truncation count) so the UI can show "Showing 250 of 1,400 —
+ * narrow your search".
+ */
+const MAX_DIRECTORY_RESULTS = 250;
+
 const BIGQUERY_CONTACTS_PROJECT_ID = process.env.BIGQUERY_CONTACTS_PROJECT_ID || 'fresh-ward-455220-j0';
 const BIGQUERY_CONTACTS_DATASET_ID = process.env.BIGQUERY_CONTACTS_DATASET_ID || 'samgovcons';
 const BIGQUERY_CONTACTS_TABLE_ID = process.env.BIGQUERY_CONTACTS_TABLE_ID || 'AllSamContacts';
@@ -308,7 +318,10 @@ async function queryImportedOpenGovContacts(search: string, agency: string) {
     .from('opengov_iq_contacts')
     .select('id,source_table,source_row_key,contact_fullname,contact_title,contact_email,contact_phone,department_ind_agency,office,sub_tier,posted_date,solicitation_number')
     .order('imported_at', { ascending: false })
-    .limit(80);
+    // Was 80 — too tight when paired with the 40-row cap downstream.
+    // Bumped to 500 so the downstream MAX_DIRECTORY_RESULTS cap actually
+    // gets useful candidates to choose from.
+    .limit(500);
 
   const searchTerm = sanitizeSupabasePattern(search);
   if (searchTerm) {
@@ -337,7 +350,7 @@ async function queryImportedOpenGovContacts(search: string, agency: string) {
   const { data, error } = await query;
   if (error) {
     if (error.code === '42P01' || error.code === '42703') {
-      return { candidates: [] as RelationshipCandidate[], configured: false };
+      return { candidates: [] as RelationshipCandidate[], total: 0, configured: false };
     }
     throw error;
   }
@@ -371,7 +384,11 @@ async function queryImportedOpenGovContacts(search: string, agency: string) {
     }
   }
 
-  return { candidates: candidates.slice(0, 40), configured: true };
+  return {
+    candidates: candidates.slice(0, MAX_DIRECTORY_RESULTS),
+    total: candidates.length,
+    configured: true,
+  };
 }
 
 function mapOSBPContact(
@@ -454,7 +471,7 @@ function mapOSBPCandidates(search: string, agency: string) {
     }
   }
 
-  return candidates.slice(0, 40);
+  return { candidates: candidates.slice(0, MAX_DIRECTORY_RESULTS), total: candidates.length };
 }
 
 function mapContractorCandidates(search: string, naics: string, agency: string) {
@@ -710,7 +727,7 @@ async function mapGovernmentBuyerCandidates(search: string, naics: string, agenc
     });
   }
 
-  return candidates.slice(0, 40);
+  return { candidates: candidates.slice(0, MAX_DIRECTORY_RESULTS), total: candidates.length };
 }
 
 async function getSavedContacts(workspaceId: string, email: string, type?: string, search?: string) {
@@ -767,12 +784,14 @@ export async function GET(request: NextRequest) {
 
     if (mode === 'candidates') {
       let candidates: RelationshipCandidate[] = [];
+      let total = 0;  // pre-truncation count (Eric: surface so user knows when 250 cap kicked in)
       let dataSourceStatus = '';
 
       if (type === 'government_buyer') {
         try {
           const importedResult = await queryImportedOpenGovContacts(search, agency);
           candidates = importedResult.candidates;
+          total = importedResult.total;
           dataSourceStatus = importedResult.configured
             ? 'opengov_iq_contacts_import'
             : 'OpenGov IQ import table is not loaded yet.';
@@ -785,6 +804,10 @@ export async function GET(request: NextRequest) {
           try {
             const bigQueryResult = await queryBigQueryContacts(search, agency);
             candidates = bigQueryResult.candidates;
+            // BigQuery path doesn't surface a pre-truncation count.
+            // Use candidates.length as a best-guess total here. Could
+            // be enhanced by threading total through queryBigQueryContacts.
+            total = bigQueryResult.candidates.length;
             dataSourceStatus = bigQueryResult.configured
               ? 'opengov_iq_all_sam_contacts'
               : `${dataSourceStatus} BigQuery contacts table is identified, but credentials are not configured yet. Showing SAM cache contacts when available.`;
@@ -795,18 +818,23 @@ export async function GET(request: NextRequest) {
         }
 
         if (candidates.length === 0) {
-          candidates = await mapGovernmentBuyerCandidates(search, naics, agency);
+          const fallback = await mapGovernmentBuyerCandidates(search, naics, agency);
+          candidates = fallback.candidates;
+          total = fallback.total;
           dataSourceStatus = candidates.length > 0
             ? `${dataSourceStatus} Fallback: sam_opportunities.`
             : 'No buyer contacts found for this search. Try an agency or broader keyword, or use OSBP contacts for relationship outreach.';
         }
       } else if (type === 'osbp') {
-        candidates = mapOSBPCandidates(search, agency);
+        const osbpResult = mapOSBPCandidates(search, agency);
+        candidates = osbpResult.candidates;
+        total = osbpResult.total;
         dataSourceStatus = candidates.length > 0
           ? 'agency_osbp_directory'
           : 'No OSBP contacts matched this search. Try a parent agency name like VA, DHS, GSA, Navy, or Army.';
       } else if (type === 'prime' || type === 'subcontractor' || type === 'partner') {
         candidates = mapContractorCandidates(search, naics, agency);
+        total = candidates.length;  // mapContractorCandidates wasn't capped; total === candidates.length is correct
         dataSourceStatus = candidates.length > 0
           ? 'contractor_database'
           : 'No partner records matched this search.';
@@ -815,6 +843,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         candidates,
+        total,                       // pre-truncation count
+        truncated: total > candidates.length,
+        cap: MAX_DIRECTORY_RESULTS,
         dataSourceStatus,
       });
     }
