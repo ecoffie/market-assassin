@@ -23,6 +23,7 @@ import {
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
+import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
@@ -1181,6 +1182,30 @@ async function sendDailyAlertEmail(
 
   const moreCount = opportunities.length > 20 ? opportunities.length - 20 : 0;
 
+  // Mindy Insight — pick the dominant notice-type bucket from this
+  // user's batch, fetch one teaching quote for that bucket. The helper
+  // is process-cached, so 500 users across 5 buckets in one cron run
+  // = 5 RAG queries, not 500. Defensive: null insight just renders ''.
+  const bucketCounts = new Map<string, number>();
+  for (const opp of opportunities.slice(0, 20)) {
+    const b = bucketNoticeType(opp.noticeType);
+    bucketCounts.set(b, (bucketCounts.get(b) || 0) + 1);
+  }
+  let dominantNoticeType: string | undefined;
+  let maxCount = 0;
+  for (const opp of opportunities.slice(0, 20)) {
+    const b = bucketNoticeType(opp.noticeType);
+    const c = bucketCounts.get(b) || 0;
+    if (c > maxCount) {
+      maxCount = c;
+      dominantNoticeType = opp.noticeType;
+    }
+  }
+  const mindyInsight = opportunities.length > 0
+    ? await getInsightForNoticeType(dominantNoticeType)
+    : null;
+  const mindyInsightHtml = renderInsightHtml(mindyInsight);
+
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1225,6 +1250,8 @@ async function sendDailyAlertEmail(
       ${user.location_state ? ` • ${user.location_state}` : ''}
     </p>
   </div>
+
+  ${mindyInsightHtml}
 
   ${opportunities.length > 0 ? `
   <!-- Opportunities list -->
