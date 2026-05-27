@@ -96,14 +96,16 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
 
       {/* Loading shimmer */}
       {loading && (
-        <div className="h-[220px] bg-gradient-to-br from-slate-800 to-slate-900 animate-pulse" />
+        <div className="h-[110px] bg-gradient-to-br from-slate-800 to-slate-900 animate-pulse" />
       )}
 
-      {/* The Canvas */}
+      {/* The Canvas — 1200x200 = aspect ratio 6:1, ~half the previous
+          vertical footprint per Eric (2026-05-27): "i think its too
+          large probably half size". */}
       <canvas
         ref={canvasRef}
         width={1200}
-        height={400}
+        height={200}
         className={`block w-full h-auto ${loading ? 'hidden' : ''}`}
         aria-label={insight?.quote || 'Mindy Insight'}
       />
@@ -142,7 +144,7 @@ function drawCard(canvas: HTMLCanvasElement, insight: InsightData) {
   // Honor device pixel ratio for sharper text on retina
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cssWidth = 1200;
-  const cssHeight = 400;
+  const cssHeight = 200;  // halved from 400 per Eric's "too large" feedback
   canvas.width = cssWidth * dpr;
   canvas.height = cssHeight * dpr;
   ctx.scale(dpr, dpr);
@@ -156,26 +158,31 @@ function drawCard(canvas: HTMLCanvasElement, insight: InsightData) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, cssWidth, cssHeight);
 
+  // Compact-layout constants tuned for 200px height
+  const PAD_X = 48;
+  const TOP_Y = 28;
+
   // Subtle accent line top-left
   ctx.fillStyle = theme.accent;
-  ctx.fillRect(60, 60, 60, 4);
+  ctx.fillRect(PAD_X, TOP_Y, 40, 3);
 
-  // Eyebrow label
+  // Eyebrow label — smaller for the compact layout
   ctx.fillStyle = theme.accent;
-  ctx.font = '500 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   ctx.textBaseline = 'top';
-  ctx.fillText('MINDY INSIGHT', 60, 80);
+  ctx.fillText('MINDY INSIGHT', PAD_X, TOP_Y + 12);
 
-  // Quote text — autosize based on length
+  // Quote text — autosize based on length, tighter range for compact card
   const quote = insight.quote;
-  let fontSize = 56;
-  if (quote.length > 80) fontSize = 44;
-  if (quote.length > 120) fontSize = 36;
+  let fontSize = 36;
+  if (quote.length > 60) fontSize = 30;
+  if (quote.length > 100) fontSize = 24;
+  if (quote.length > 140) fontSize = 20;
   ctx.fillStyle = theme.ink;
   ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
 
   // Word-wrap manually
-  const maxWidth = cssWidth - 120;
+  const maxWidth = cssWidth - PAD_X * 2;
   const words = quote.split(' ');
   const lines: string[] = [];
   let current = '';
@@ -190,33 +197,36 @@ function drawCard(canvas: HTMLCanvasElement, insight: InsightData) {
   }
   if (current) lines.push(current);
 
-  // Vertically center the block of lines
-  const lineHeight = fontSize * 1.2;
+  // Vertically center the block of lines below the eyebrow,
+  // above the footer
+  const lineHeight = fontSize * 1.15;
   const blockHeight = lines.length * lineHeight;
-  const startY = (cssHeight - blockHeight) / 2 + 10;
+  const quoteRegionTop = TOP_Y + 32;
+  const quoteRegionBottom = cssHeight - 28;
+  const startY = quoteRegionTop + Math.max(0, (quoteRegionBottom - quoteRegionTop - blockHeight) / 2);
 
   for (let i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], 60, startY + i * lineHeight);
+    ctx.fillText(lines[i], PAD_X, startY + i * lineHeight);
   }
 
-  // Footer brand
+  // Footer brand (smaller, tucked at bottom)
   ctx.fillStyle = theme.sub;
-  ctx.font = '500 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('mindy', 60, cssHeight - 40);
+  ctx.fillText('mindy', PAD_X, cssHeight - 14);
 
-  // Format pill in top-right
+  // Format pill in top-right — smaller
   if (insight.format) {
     const pillText = insight.format.toUpperCase();
-    ctx.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.textBaseline = 'top';
-    const pillW = ctx.measureText(pillText).width + 24;
-    const pillX = cssWidth - 60 - pillW;
+    const pillW = ctx.measureText(pillText).width + 18;
+    const pillX = cssWidth - PAD_X - pillW;
     ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    roundRect(ctx, pillX, 76, pillW, 26, 13);
+    roundRect(ctx, pillX, TOP_Y + 8, pillW, 20, 10);
     ctx.fill();
     ctx.fillStyle = theme.sub;
-    ctx.fillText(pillText, pillX + 12, 82);
+    ctx.fillText(pillText, pillX + 9, TOP_Y + 13);
   }
 }
 
