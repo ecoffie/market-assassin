@@ -629,6 +629,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // weighted SB% across all 96 agencies, not just the 7 that the
   // legacy reportData path returned.
   const [parentSbShareMap, setParentSbShareMap] = useState<Record<string, number>>({});
+  // SBA Goaling lookup is async and can take 5-10s for 50+ agencies.
+  // Tracked separately from chartsReady so the loading banner stays up
+  // until the SB Mix donut actually has its data, not just until tmrRows
+  // arrive. Per Eric (2026-05-27): the moving bar should still be showing
+  // when the donut is still 'Calculating small-business share...'.
+  const [parentSbShareLoading, setParentSbShareLoading] = useState(false);
   const [marketFocuses, setMarketFocuses] = useState<MarketFocus[]>([]);
   const [activeFocusId, setActiveFocusId] = useState<string>('saved-profile');
   const [showSaveFocus, setShowSaveFocus] = useState(false);
@@ -1100,6 +1106,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     if (uniqueAgencies.length === 0) return;
 
     let cancelled = false;
+    setParentSbShareLoading(true);
     fetch('/api/sba-goaling/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1118,6 +1125,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       .catch((sbaErr) => {
         if (cancelled) return;
         console.warn('[MarketResearch parent] SBA bulk fetch failed (non-fatal):', sbaErr);
+      })
+      .finally(() => {
+        if (!cancelled) setParentSbShareLoading(false);
       });
     return () => { cancelled = true; };
   }, [tmrRows]);
@@ -1654,7 +1664,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         </section>
       )}
 
-      {(isGenerating || !chartsReady) && <MarketMapLoadingBanner />}
+      {(isGenerating || !chartsReady || parentSbShareLoading) && <MarketMapLoadingBanner />}
 
       {/* Phase 2 Slice 1 — Market Map flagship view. Shows when
           viewMode === 'map' AND reports have been generated. Slice 1
