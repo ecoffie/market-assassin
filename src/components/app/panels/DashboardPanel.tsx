@@ -10,6 +10,7 @@ import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
+import { MindyInsightCard } from '../MindyInsightCard';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -857,11 +858,17 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
             <button
               onClick={loadBriefings}
               className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
+              aria-label="Refresh briefings"
             >
               Refresh
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Mindy Insight hero card — daily quote, theme rotates by day */}
+      <div className="px-6 pt-5">
+        <MindyInsightCard email={email} />
       </div>
 
       {isLoading ? (
