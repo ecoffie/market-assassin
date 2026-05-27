@@ -54,8 +54,35 @@ const HEADING_BORDER = {
   right: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
 };
 
+/**
+ * Parse inline markdown (**bold**, *italic*) into an array of TextRun
+ * objects with proper bold/italic flags. Mirrors Content Reaper's
+ * parseMarkdownLine (public/content-generator/index.html:3043).
+ *
+ * Survives both **bold** and __bold__, *italic* and _italic_. Order
+ * matters: handle bold first (greedy match) so it doesn't get eaten
+ * by italic.
+ */
+function parseInlineMarkdown(line: string): TextRun[] {
+  if (!line) return [new TextRun({ text: '' })];
+  const runs: TextRun[] = [];
+  // Tokenize: split on bold/italic markers while keeping them
+  const tokens = line.split(/(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/);
+  for (const token of tokens) {
+    if (!token) continue;
+    if (/^\*\*[^*]+\*\*$/.test(token) || /^__[^_]+__$/.test(token)) {
+      runs.push(new TextRun({ text: token.slice(2, -2), bold: true }));
+    } else if (/^\*[^*]+\*$/.test(token) || /^_[^_]+_$/.test(token)) {
+      runs.push(new TextRun({ text: token.slice(1, -1), italics: true }));
+    } else {
+      runs.push(new TextRun({ text: token }));
+    }
+  }
+  return runs.length > 0 ? runs : [new TextRun({ text: line })];
+}
+
 function plain(text: string) {
-  return new Paragraph({ children: [new TextRun({ text })] });
+  return new Paragraph({ children: parseInlineMarkdown(text) });
 }
 
 function heading(text: string, level: typeof HeadingLevel[keyof typeof HeadingLevel] = HeadingLevel.HEADING_1) {
@@ -71,7 +98,7 @@ function paragraphsFromMarkdown(md: string): Paragraph[] {
   const flushBuffer = () => {
     if (buffer.length === 0) return;
     const joined = buffer.join(' ').trim();
-    if (joined) out.push(new Paragraph({ children: [new TextRun({ text: joined })] }));
+    if (joined) out.push(new Paragraph({ children: parseInlineMarkdown(joined) }));
     buffer = [];
   };
 
@@ -96,19 +123,19 @@ function paragraphsFromMarkdown(md: string): Paragraph[] {
       continue;
     }
 
-    // Bullet
+    // Bullet (with inline markdown preserved)
     const bullet = /^[-*]\s+(.*)/.exec(line);
     if (bullet) {
       flushBuffer();
-      out.push(new Paragraph({ children: [new TextRun({ text: bullet[1] })], bullet: { level: 0 } }));
+      out.push(new Paragraph({ children: parseInlineMarkdown(bullet[1]), bullet: { level: 0 } }));
       continue;
     }
 
-    // Numbered
+    // Numbered (with inline markdown preserved)
     const numbered = /^\d+\.\s+(.*)/.exec(line);
     if (numbered) {
       flushBuffer();
-      out.push(new Paragraph({ children: [new TextRun({ text: numbered[1] })], bullet: { level: 0 } }));
+      out.push(new Paragraph({ children: parseInlineMarkdown(numbered[1]), bullet: { level: 0 } }));
       continue;
     }
 
