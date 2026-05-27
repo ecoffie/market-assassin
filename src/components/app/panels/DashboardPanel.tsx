@@ -10,6 +10,7 @@ import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
+import { getNaics } from '@/lib/codes/lookup';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -190,8 +191,13 @@ function buildOpportunityNarrative(item: Record<string, unknown>) {
   const postedDate = text(item.postedDate);
   const solicitationNumber = text(item.solicitationNumber);
 
+  const naicsEntry = naicsCode ? getNaics(naicsCode) : null;
+  const naicsLabel = naicsEntry
+    ? `NAICS ${naicsCode} — ${naicsEntry.title}`
+    : (naicsCode ? `NAICS ${naicsCode}` : '');
+
   const detailParts: string[] = [];
-  if (naicsCode) detailParts.push(`Industry: NAICS ${naicsCode}`);
+  if (naicsLabel) detailParts.push(naicsLabel);
   if (setAside) detailParts.push(`Set-Aside: ${setAside}`);
   if (daysRemaining !== null) {
     if (daysRemaining <= 3) {
@@ -208,7 +214,7 @@ function buildOpportunityNarrative(item: Record<string, unknown>) {
       : agency
         ? `Opportunity from ${agency}`
         : null,
-    naicsCode ? `aligned to NAICS ${naicsCode}` : null,
+    naicsLabel ? `aligned to ${naicsLabel.toLowerCase()}` : null,
     setAside ? `with ${setAside} terms` : 'open for review under the current solicitation terms',
     daysRemaining !== null
       ? daysRemaining <= 3

@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { NaicsPicker } from '@/components/codes/NaicsPicker';
+import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 
 interface Props {
   email: string | null;
@@ -329,12 +331,17 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         placeholder="Small Business, 8(a), SDVOSB, WOSB, HUBZone"
       />
 
-      <Field
-        label="Primary NAICS codes (comma-separated)"
-        value={(form.primary_naics || []).join(', ')}
-        onChange={(v) => onArrayField('primary_naics', v)}
-        placeholder="541512, 541611, 541330"
-      />
+      <div>
+        <label className="block text-sm text-slate-300 mb-1">Primary NAICS codes</label>
+        <NaicsPicker
+          value={form.primary_naics || []}
+          onChange={(codes) => onField('primary_naics', codes)}
+          placeholder='Search NAICS by description (e.g. "consulting") or paste code'
+        />
+        <p className="text-xs text-slate-500 mt-1">
+          The NAICS codes you bid on. Powers opportunity matching across alerts + briefings.
+        </p>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="HQ State" value={form.hq_state || ''} onChange={(v) => onField('hq_state', v)} placeholder="FL" />
@@ -1082,7 +1089,10 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                         <div><span className="text-slate-500">Certifications:</span> {preview.identity.certifications!.join(', ')}</div>
                       )}
                       {(preview.identity.primary_naics || []).length > 0 && (
-                        <div><span className="text-slate-500">NAICS:</span> <span className="font-mono">{preview.identity.primary_naics!.slice(0, 6).join(', ')}{preview.identity.primary_naics!.length > 6 ? ` +${preview.identity.primary_naics!.length - 6}` : ''}</span></div>
+                        <div className="space-y-1">
+                          <span className="text-slate-500">NAICS:</span>
+                          <NaicsBadgeList codes={preview.identity.primary_naics!} max={8} inline inlineTruncate={40} size="sm" />
+                        </div>
                       )}
                       {preview.identity.one_liner && (
                         <div className="pt-2 border-t border-slate-800 mt-2"><span className="text-slate-500">One-liner:</span> <em className="text-emerald-300">&ldquo;{preview.identity.one_liner}&rdquo;</em></div>

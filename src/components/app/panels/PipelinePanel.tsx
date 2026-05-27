@@ -5,6 +5,7 @@ import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
+import { getNaics } from '@/lib/codes/lookup';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -1211,7 +1212,20 @@ function PipelineEditDrawer({
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
               <div className="text-xs text-slate-500">NAICS</div>
-              <div className="text-white font-medium mt-1">{opportunity.naics_code || '-'}</div>
+              {(() => {
+                if (!opportunity.naics_code) return <div className="text-white font-medium mt-1">-</div>;
+                const naicsEntry = getNaics(opportunity.naics_code);
+                return (
+                  <div className="mt-1">
+                    <div className="text-white font-medium font-mono text-sm">{opportunity.naics_code}</div>
+                    {naicsEntry && (
+                      <div className="text-xs text-slate-400 mt-0.5" title={naicsEntry.title}>
+                        {naicsEntry.title}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

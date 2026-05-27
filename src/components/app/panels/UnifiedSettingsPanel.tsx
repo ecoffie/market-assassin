@@ -5,6 +5,7 @@ import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
+import { NaicsPicker } from '@/components/codes/NaicsPicker';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
@@ -235,7 +236,15 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
           </div>
 
           <SectionTitle title="Market Targeting" />
-          <Field label="NAICS Codes" value={form.naics_codes} onChange={(value) => setForm({ ...form, naics_codes: value })} placeholder="541512, 541611, 541330" />
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-300 mb-1">NAICS Codes</label>
+            <NaicsPicker
+              value={parseList(form.naics_codes)}
+              onChange={(codes) => setForm({ ...form, naics_codes: codes.join(', ') })}
+              placeholder='Search by description (e.g. "consulting") or paste a code'
+            />
+            <p className="text-xs text-slate-500 mt-1">Drives matching across alerts, briefings, and forecasts.</p>
+          </div>
           <Field label="Target Agencies" value={form.target_agencies} onChange={(value) => setForm({ ...form, target_agencies: value })} placeholder="VA, DHS, Army, GSA" />
 
           <StatesField

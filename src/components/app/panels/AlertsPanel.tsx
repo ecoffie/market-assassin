@@ -7,6 +7,8 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useToast } from '../Toast';
 import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
+import { getNaics, getPsc } from '@/lib/codes/lookup';
+import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -669,9 +671,9 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           <div className="bg-slate-900 border-t border-slate-800 px-6 py-3 text-xs text-slate-400">
             <span className="font-semibold text-slate-300 mr-2">Filters:</span>
             {searchCriteria.naicsCodes.length > 0 && (
-              <span className="mr-3">
-                NAICS {searchCriteria.naicsCodes.slice(0, 3).join(', ')}
-                {searchCriteria.naicsCodes.length > 3 && ` +${searchCriteria.naicsCodes.length - 3}`}
+              <span className="mr-3 inline-flex items-center gap-1.5 align-middle">
+                <span className="text-slate-300 mr-1">NAICS</span>
+                <NaicsBadgeList codes={searchCriteria.naicsCodes} max={3} size="sm" />
               </span>
             )}
             {searchCriteria.businessType && (
@@ -918,12 +920,24 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
 
                   {/* Meta */}
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-500">
-                    {alert.naicsCode && (
-                      <span>NAICS: {alert.naicsCode}</span>
-                    )}
-                    {alert.pscCode && (
-                      <span>PSC: {alert.pscCode}</span>
-                    )}
+                    {alert.naicsCode && (() => {
+                      const naicsEntry = getNaics(alert.naicsCode);
+                      return (
+                        <span title={naicsEntry?.title || alert.naicsCode}>
+                          NAICS: <span className="text-slate-400 font-mono">{alert.naicsCode}</span>
+                          {naicsEntry && <span className="text-slate-500"> · {naicsEntry.title.length > 40 ? naicsEntry.title.slice(0, 40) + '…' : naicsEntry.title}</span>}
+                        </span>
+                      );
+                    })()}
+                    {alert.pscCode && (() => {
+                      const pscEntry = getPsc(alert.pscCode);
+                      return (
+                        <span title={pscEntry?.title || alert.pscCode}>
+                          PSC: <span className="text-slate-400 font-mono">{alert.pscCode}</span>
+                          {pscEntry && <span className="text-slate-500"> · {pscEntry.title.length > 35 ? pscEntry.title.slice(0, 35) + '…' : pscEntry.title}</span>}
+                        </span>
+                      );
+                    })()}
                     {getAlertLocation(alert) && (
                       <span>📍 {getAlertLocation(alert)}</span>
                     )}
