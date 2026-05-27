@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-errors';
+import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -254,11 +255,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'AI returned empty response' }, { status: 502 });
   }
 
-  let narrative: NarrativeResponse;
-  try {
-    narrative = JSON.parse(content);
-  } catch (err) {
-    console.error('[market-narrative] JSON parse failed:', err, content.slice(0, 200));
+  // safeParseJSON handles code fences, wrapper prose, and 2-pass cleanup
+  const narrative = safeParseJSON<NarrativeResponse | null>(content, {
+    fallback: null,
+    source: 'market-narrative',
+  });
+  if (!narrative) {
     return NextResponse.json({ error: 'AI returned malformed JSON' }, { status: 502 });
   }
 

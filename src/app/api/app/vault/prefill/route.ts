@@ -28,6 +28,7 @@ import { getEntityByUEI } from '@/lib/sam/entity-api';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { getNaics } from '@/lib/codes/lookup';
 import { humanize } from '@/lib/proposal/humanize';
+import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -255,7 +256,15 @@ Draft an initial capability profile that accurately reflects the NAICS MIX above
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;
     if (!content) return null;
-    const parsed = JSON.parse(content);
+    // safeParseJSON tolerates the LLM wrapping JSON in code fences,
+    // prepending prose ('Sure, here is...'), or emitting trailing
+    // commas. Falls back to {} so the user still gets identity even
+    // if the coach section fails.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = safeParseJSON<any>(content, {
+      fallback: {},
+      source: 'vault.prefill.aiCoach',
+    });
     // Run humanization on each string field to strip LLM tells
     // ("world-class", em-dash overuse, generic intros). Same processor
     // used by Proposal Assist v2.

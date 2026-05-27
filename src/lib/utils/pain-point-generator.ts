@@ -3,6 +3,7 @@
 // Preserves existing hand-written pain points and only generates for gaps
 
 import { AgencyOversightContext, formatOversightContextForPrompt } from './federal-oversight-data';
+import { safeParseJSON } from './safe-parse-json';
 
 const GROK_API_KEY = process.env.GROK_API_KEY;
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
@@ -244,41 +245,18 @@ function parseJSONArrayResponse(response: string): string[] {
  * Handles various response formats (pure JSON, markdown-wrapped, etc.)
  */
 function parsePainPointsResponse(response: string): string[] {
-  // Try direct JSON parse first
-  try {
-    const parsed = JSON.parse(response.trim());
-    if (Array.isArray(parsed)) {
-      return parsed.filter((p): p is string => typeof p === 'string' && p.length > 10);
-    }
-  } catch {
-    // Not pure JSON, try extracting
+  // Shared safeParseJSON handles all the JSON extraction cases (pure
+  // JSON, markdown code fences, JSON-array embedded in prose).
+  const parsed = safeParseJSON<unknown>(response, {
+    shape: 'array',
+    fallback: null,
+    source: 'painPointGenerator',
+  });
+  if (Array.isArray(parsed)) {
+    const filtered = parsed.filter((p): p is string => typeof p === 'string' && p.length > 10);
+    if (filtered.length > 0) return filtered;
   }
-
-  // Try extracting JSON array from markdown code block
-  const jsonMatch = response.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
-  if (jsonMatch) {
-    try {
-      const parsed = JSON.parse(jsonMatch[1]);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((p): p is string => typeof p === 'string' && p.length > 10);
-      }
-    } catch {
-      // Continue to fallback
-    }
-  }
-
-  // Try finding a JSON array anywhere in the response
-  const arrayMatch = response.match(/\[[\s\S]*?\]/);
-  if (arrayMatch) {
-    try {
-      const parsed = JSON.parse(arrayMatch[0]);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((p): p is string => typeof p === 'string' && p.length > 10);
-      }
-    } catch {
-      // Continue to line-by-line fallback
-    }
-  }
+  // Fall through to the domain-specific line-by-line fallback below.
 
   // Fallback: parse line-by-line (numbered list or bullet points)
   const lines = response.split('\n')

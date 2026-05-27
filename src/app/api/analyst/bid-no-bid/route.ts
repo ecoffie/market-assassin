@@ -36,6 +36,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
+import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -122,30 +123,14 @@ RULES:
 }
 
 function parseAnalystJson(text: string): AnalystOutput | null {
-  // Try direct parse first.
-  try {
-    const parsed = JSON.parse(text);
-    if (validateShape(parsed)) return parsed;
-  } catch {
-    /* fall through to fence-stripping */
-  }
-  // Some Groq runs wrap output in ```json ... ``` despite the prompt.
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (fenceMatch?.[1]) {
-    try {
-      const parsed = JSON.parse(fenceMatch[1]);
-      if (validateShape(parsed)) return parsed;
-    } catch { /* fall through */ }
-  }
-  // Last resort: find the first balanced { ... } and try that.
-  const braceStart = text.indexOf('{');
-  const braceEnd = text.lastIndexOf('}');
-  if (braceStart >= 0 && braceEnd > braceStart) {
-    try {
-      const parsed = JSON.parse(text.slice(braceStart, braceEnd + 1));
-      if (validateShape(parsed)) return parsed;
-    } catch { /* give up */ }
-  }
+  // Use the shared safeParseJSON helper which handles code fences,
+  // wrapper prose, control chars, newlines-in-strings, and 2-pass
+  // sanitization. Returns null fallback if all attempts fail.
+  const parsed = safeParseJSON<unknown>(text, {
+    fallback: null,
+    source: 'analyst.bidNoBid',
+  });
+  if (parsed && validateShape(parsed)) return parsed;
   return null;
 }
 
