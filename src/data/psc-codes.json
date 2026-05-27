@@ -1,0 +1,5222 @@
+{
+  "lastUpdated": "2026-05-27T01:54:58.060Z",
+  "version": 1,
+  "source": "psc-naics-crosswalk.json (aggregated from historical federal spend)",
+  "totalCodes": 869,
+  "codes": {
+    "1005": {
+      "title": "GUNS, THROUGH 30MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1010": {
+      "title": "GUNS, OVER 30MM UP TO 75MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1015": {
+      "title": "GUNS, 75MM THROUGH 125MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1020": {
+      "title": "GUNS, OVER 125MM THROUGH 150MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1025": {
+      "title": "GUNS, OVER 150MM THROUGH 200MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1055": {
+      "title": "LAUNCHERS, ROCKET AND PYROTECHNIC",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1095": {
+      "title": "MISCELLANEOUS WEAPONS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1140": {
+      "title": "NUCLEAR COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1220": {
+      "title": "FIRE CONTROL COMPUTING SIGHTS AND DEVICES",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1230": {
+      "title": "FIRE CONTROL SYSTEMS, COMPLETE",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1240": {
+      "title": "OPTICAL SIGHTING AND RANGING EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1260": {
+      "title": "FIRE CONTROL DESIGNATING AND INDICATING EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1265": {
+      "title": "FIRE CONTROL TRANSMITTING AND RECEIVING EQUIPMENT, EXCEPT AIRBORNE",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1285": {
+      "title": "FIRE CONTROL RADAR EQUIPMENT, EXCEPT AIRBORNE",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1287": {
+      "title": "FIRE CONTROL SONAR EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1290": {
+      "title": "MISCELLANEOUS FIRE CONTROL EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1305": {
+      "title": "AMMUNITION, THROUGH 30MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1310": {
+      "title": "AMMUNITION, OVER 30MM UP TO 75MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1315": {
+      "title": "AMMUNITION, 75MM THROUGH 125MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1320": {
+      "title": "AMMUNITION, OVER 125MM",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1325": {
+      "title": "BOMBS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1330": {
+      "title": "GRENADES",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1337": {
+      "title": "GUIDED MISSILE AND SPACE VEHICLE EXPLOSIVE PROPULSION UNITS, SOLID FUEL; AND COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1340": {
+      "title": "ROCKETS, ROCKET AMMUNITION AND ROCKET COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1345": {
+      "title": "LAND MINES",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1355": {
+      "title": "TORPEDOS AND COMPONENTS, INERT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1367": {
+      "title": "TACTICAL SETS, KITS, AND OUTFITS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1370": {
+      "title": "PYROTECHNICS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1375": {
+      "title": "DEMOLITION MATERIALS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1376": {
+      "title": "BULK EXPLOSIVES",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1390": {
+      "title": "FUZES AND PRIMERS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1395": {
+      "title": "MISCELLANEOUS AMMUNITION",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1398": {
+      "title": "SPECIALIZED AMMUNITION HANDLING AND SERVICING EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1410": {
+      "title": "GUIDED MISSILES",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1420": {
+      "title": "GUIDED MISSILE COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1425": {
+      "title": "GUIDED MISSILE SYSTEMS, COMPLETE",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1427": {
+      "title": "GUIDED MISSILE SUBSYSTEMS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1430": {
+      "title": "GUIDED MISSILE REMOTE CONTROL SYSTEMS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1440": {
+      "title": "LAUNCHERS, GUIDED MISSILE",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1450": {
+      "title": "GUIDED MISSILE HANDLING AND SERVICING EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1510": {
+      "title": "AIRCRAFT, FIXED WING",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1520": {
+      "title": "AIRCRAFT, ROTARY WING",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1550": {
+      "title": "UNMANNED AIRCRAFT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1555": {
+      "title": "SPACE VEHICLES",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1560": {
+      "title": "AIRFRAME STRUCTURAL COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1610": {
+      "title": "AIRCRAFT PROPELLERS AND COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1615": {
+      "title": "HELICOPTER ROTOR BLADES, DRIVE MECHANISMS AND COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1620": {
+      "title": "AIRCRAFT LANDING GEAR COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1630": {
+      "title": "AIRCRAFT WHEEL AND BRAKE SYSTEMS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1650": {
+      "title": "AIRCRAFT HYDRAULIC, VACUUM, AND DE-ICING SYSTEM COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1670": {
+      "title": "PARACHUTES; AERIAL PICK UP, DELIVERY, RECOVERY SYSTEMS; AND CARGO TIE DOWN EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1675": {
+      "title": "SPACE VEHICLE COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1680": {
+      "title": "MISCELLANEOUS AIRCRAFT ACCESSORIES AND COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1720": {
+      "title": "AIRCRAFT LAUNCHING EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1730": {
+      "title": "AIRCRAFT GROUND SERVICING EQUIPMENT",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1740": {
+      "title": "AIRFIELD SPECIALIZED TRUCKS AND TRAILERS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1820": {
+      "title": "SPACE VEHICLE COMPONENTS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1905": {
+      "title": "COMBAT SHIPS AND LANDING VESSELS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1945": {
+      "title": "PONTOONS AND FLOATING DOCKS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1950": {
+      "title": "FLOATING DRYDOCKS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "1990": {
+      "title": "MISCELLANEOUS VESSELS",
+      "category": "1",
+      "category_name": "Weapons",
+      "level": 4
+    },
+    "2010": {
+      "title": "SHIP AND BOAT PROPULSION COMPONENTS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2040": {
+      "title": "MARINE HARDWARE AND HULL ITEMS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2050": {
+      "title": "BUOYS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2090": {
+      "title": "MISCELLANEOUS SHIP AND MARINE EQUIPMENT",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2230": {
+      "title": "RIGHT-OF-WAY CONSTRUCTION AND MAINTENANCE EQUIPMENT, RAILROAD",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2240": {
+      "title": "LOCOMOTIVE AND RAIL CAR ACCESSORIES AND COMPONENTS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2310": {
+      "title": "PASSENGER MOTOR VEHICLES",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2320": {
+      "title": "TRUCKS AND TRUCK TRACTORS, WHEELED",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2330": {
+      "title": "TRAILERS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2510": {
+      "title": "VEHICULAR CAB, BODY, AND FRAME STRUCTURAL COMPONENTS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2540": {
+      "title": "VEHICULAR FURNITURE AND ACCESSORIES",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2541": {
+      "title": "WEAPONS SYSTEMS SPECIFIC VEHICULAR ACCESSORIES",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2590": {
+      "title": "MISCELLANEOUS VEHICULAR COMPONENTS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2630": {
+      "title": "TIRES, SOLID AND CUSHION",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2835": {
+      "title": "GAS TURBINES AND JET ENGINES; NON-AIRCRAFT PRIME MOVER, AIRCRAFT NON-PRIME MOVER, AND COMPONENTS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2840": {
+      "title": "GAS TURBINES AND JET ENGINES, AIRCRAFT, PRIME MOVING; AND COMPONENTS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2845": {
+      "title": "ROCKET ENGINES AND COMPONENTS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2850": {
+      "title": "GASOLINE ROTARY ENGINES AND COMPONENTS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2915": {
+      "title": "ENGINE FUEL SYSTEM COMPONENTS, AIRCRAFT AND MISSILE PRIME MOVERS",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2930": {
+      "title": "ENGINE COOLING SYSTEM COMPONENTS, NONAIRCRAFT",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "2995": {
+      "title": "MISCELLANEOUS ENGINE ACCESSORIES, AIRCRAFT",
+      "category": "2",
+      "category_name": "Vehicles",
+      "level": 4
+    },
+    "3408": {
+      "title": "MACHINING CENTERS AND WAY-TYPE MACHINES",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3419": {
+      "title": "MISCELLANEOUS MACHINE TOOLS",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3439": {
+      "title": "MISCELLANEOUS WELDING, SOLDERING, AND BRAZING SUPPLIES AND ACCESSORIES",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3470": {
+      "title": "MACHINE SHOP SETS, KITS, AND OUTFITS",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3510": {
+      "title": "LAUNDRY AND DRY CLEANING EQUIPMENT",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3590": {
+      "title": "MISCELLANEOUS SERVICE AND TRADE EQUIPMENT",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3610": {
+      "title": "PRINTING, DUPLICATING, AND BOOKBINDING EQUIPMENT",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3620": {
+      "title": "RUBBER AND PLASTICS WORKING MACHINERY",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3650": {
+      "title": "CHEMICAL AND PHARMACEUTICAL PRODUCTS MANUFACTURING MACHINERY",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3655": {
+      "title": "GAS GENERATING AND DISPENSING SYSTEMS, FIXED OR MOBILE",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3740": {
+      "title": "PEST, DISEASE, AND FROST CONTROL EQUIPMENT",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3750": {
+      "title": "GARDENING IMPLEMENTS AND TOOLS",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3805": {
+      "title": "EARTH MOVING AND EXCAVATING EQUIPMENT",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3825": {
+      "title": "ROAD CLEARING, CLEANING, AND MARKING EQUIPMENT",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3895": {
+      "title": "MISCELLANEOUS CONSTRUCTION EQUIPMENT",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3950": {
+      "title": "WINCHES, HOISTS, CRANES, AND DERRICKS",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "3990": {
+      "title": "MISCELLANEOUS MATERIALS HANDLING EQUIPMENT",
+      "category": "3",
+      "category_name": "Tools / Machinery",
+      "level": 4
+    },
+    "4020": {
+      "title": "FIBER ROPE, CORDAGE, AND TWINE",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4110": {
+      "title": "REFRIGERATION EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4120": {
+      "title": "AIR CONDITIONING EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4130": {
+      "title": "REFRIGERATION AND AIR CONDITIONING COMPONENTS",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4140": {
+      "title": "FANS, AIR CIRCULATORS, AND BLOWER EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4210": {
+      "title": "FIRE FIGHTING EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4220": {
+      "title": "MARINE LIFESAVING AND DIVING EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4235": {
+      "title": "HAZARDOUS MATERIAL SPILL CONTAINMENT AND CLEAN-UP EQUIPMENT AND MATERIAL",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4240": {
+      "title": "SAFETY AND RESCUE EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4250": {
+      "title": "RECYCLING AND RECLAMATION EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4310": {
+      "title": "COMPRESSORS AND VACUUM PUMPS",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4320": {
+      "title": "POWER AND HAND PUMPS",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4420": {
+      "title": "HEAT EXCHANGERS AND STEAM CONDENSERS",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4440": {
+      "title": "DRIERS, DEHYDRATORS, AND ANHYDRATORS",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4470": {
+      "title": "NUCLEAR REACTORS",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4520": {
+      "title": "SPACE AND WATER HEATING EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4530": {
+      "title": "FUEL BURNING EQUIPMENT UNITS",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4540": {
+      "title": "WASTE DISPOSAL EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4610": {
+      "title": "WATER PURIFICATION EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4630": {
+      "title": "SEWAGE TREATMENT EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4730": {
+      "title": "HOSE, PIPE, TUBE, LUBRICATION, AND RAILING FITTINGS",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4910": {
+      "title": "MOTOR VEHICLE MAINTENANCE AND REPAIR SHOP SPECIALIZED EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4920": {
+      "title": "AIRCRAFT MAINTENANCE AND REPAIR SHOP SPECIALIZED EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4930": {
+      "title": "LUBRICATION AND FUEL DISPENSING EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4933": {
+      "title": "WEAPONS MAINTENANCE AND REPAIR SHOP SPECIALIZED EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4935": {
+      "title": "GUIDED MISSILE MAINTENANCE, REPAIR, AND CHECKOUT SPECIALIZED EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "4940": {
+      "title": "MISCELLANEOUS MAINTENANCE AND REPAIR SHOP SPECIALIZED EQUIPMENT",
+      "category": "4",
+      "category_name": "Construction Materials",
+      "level": 4
+    },
+    "5120": {
+      "title": "HAND TOOLS, NONEDGED, NONPOWERED",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5140": {
+      "title": "TOOL AND HARDWARE BOXES",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5305": {
+      "title": "SCREWS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5307": {
+      "title": "STUDS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5310": {
+      "title": "NUTS AND WASHERS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5320": {
+      "title": "RIVETS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5340": {
+      "title": "HARDWARE, COMMERCIAL",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5342": {
+      "title": "HARDWARE, WEAPON SYSTEM",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5410": {
+      "title": "PREFABRICATED AND PORTABLE BUILDINGS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5420": {
+      "title": "BRIDGES, FIXED AND FLOATING",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5430": {
+      "title": "STORAGE TANKS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5610": {
+      "title": "MINERAL CONSTRUCTION MATERIALS, BULK",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5640": {
+      "title": "WALLBOARD, BUILDING PAPER, AND THERMAL INSULATION MATERIALS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5660": {
+      "title": "FENCING, FENCES, GATES AND COMPONENTS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5670": {
+      "title": "BUILDING COMPONENTS, PREFABRICATED",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5675": {
+      "title": "NONWOOD CONSTRUCTION LUMBER AND RELATED MATERIALS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5680": {
+      "title": "MISCELLANEOUS CONSTRUCTION MATERIALS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5805": {
+      "title": "TELEPHONE AND TELEGRAPH EQUIPMENT",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5810": {
+      "title": "COMMUNICATIONS SECURITY EQUIPMENT AND COMPONENTS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5811": {
+      "title": "OTHER CRYPTOLOGIC EQUIPMENT AND COMPONENTS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5820": {
+      "title": "RADIO AND TELEVISION COMMUNICATION EQUIPMENT, EXCEPT AIRBORNE",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5821": {
+      "title": "RADIO AND TELEVISION COMMUNICATION EQUIPMENT, AIRBORNE",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5825": {
+      "title": "RADIO NAVIGATION EQUIPMENT, EXCEPT AIRBORNE",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5826": {
+      "title": "RADIO NAVIGATION EQUIPMENT, AIRBORNE",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5836": {
+      "title": "VIDEO RECORDING AND REPRODUCING EQUIPMENT",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5840": {
+      "title": "RADAR EQUIPMENT, EXCEPT AIRBORNE",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5841": {
+      "title": "RADAR EQUIPMENT, AIRBORNE",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5845": {
+      "title": "UNDERWATER SOUND EQUIPMENT",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5855": {
+      "title": "NIGHT VISION EQUIPMENT, EMITTED AND REFLECTED RADIATION",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5865": {
+      "title": "ELECTRONIC COUNTERMEASURES, COUNTER-COUNTERMEASURES AND QUICK REACTION CAPABILITY EQUIPMENT",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5895": {
+      "title": "MISCELLANEOUS COMMUNICATION EQUIPMENT",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5920": {
+      "title": "FUSES, ARRESTORS, ABSORBERS, AND PROTECTORS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5925": {
+      "title": "CIRCUIT BREAKERS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5935": {
+      "title": "CONNECTORS, ELECTRICAL",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5945": {
+      "title": "RELAYS AND SOLENOIDS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5950": {
+      "title": "COILS AND TRANSFORMERS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5961": {
+      "title": "SEMICONDUCTOR DEVICES AND ASSOCIATED HARDWARE",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5963": {
+      "title": "ELECTRONIC MODULES",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5965": {
+      "title": "HEADSETS, HANDSETS, MICROPHONES AND SPEAKERS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5970": {
+      "title": "ELECTRICAL INSULATORS AND INSULATING MATERIALS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5975": {
+      "title": "ELECTRICAL HARDWARE AND SUPPLIES",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5977": {
+      "title": "ELECTRICAL CONTACT BRUSHES AND ELECTRODES",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5985": {
+      "title": "ANTENNAS, WAVEGUIDES, AND RELATED EQUIPMENT",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5995": {
+      "title": "CABLE, CORD, AND WIRE ASSEMBLIES: COMMUNICATION EQUIPMENT",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5996": {
+      "title": "AMPLIFIERS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5998": {
+      "title": "ELECTRICAL AND ELECTRONIC ASSEMBLIES, BOARDS, CARDS, AND ASSOCIATED HARDWARE",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "5999": {
+      "title": "MISCELLANEOUS ELECTRICAL AND ELECTRONIC COMPONENTS",
+      "category": "5",
+      "category_name": "Materials",
+      "level": 4
+    },
+    "6015": {
+      "title": "FIBER OPTIC CABLES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6110": {
+      "title": "ELECTRICAL CONTROL EQUIPMENT",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6115": {
+      "title": "GENERATORS AND GENERATOR SETS, ELECTRICAL",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6116": {
+      "title": "FUEL CELL POWER UNITS, COMPONENTS, AND ACCESSORIES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6117": {
+      "title": "SOLAR ELECTRIC POWER SYSTEMS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6120": {
+      "title": "TRANSFORMERS: DISTRIBUTION AND POWER STATION",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6130": {
+      "title": "CONVERTERS, ELECTRICAL, NONROTATING",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6140": {
+      "title": "BATTERIES, RECHARGEABLE",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6150": {
+      "title": "MISCELLANEOUS ELECTRIC POWER AND DISTRIBUTION EQUIPMENT",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6210": {
+      "title": "INDOOR AND OUTDOOR ELECTRIC LIGHTING FIXTURES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6220": {
+      "title": "ELECTRIC VEHICULAR LIGHTS AND FIXTURES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6350": {
+      "title": "MISCELLANEOUS ALARM, SIGNAL, AND SECURITY DETECTION SYSTEMS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6505": {
+      "title": "DRUGS AND BIOLOGICALS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6506": {
+      "title": "BLOOD AND BLOOD PRODUCTS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6509": {
+      "title": "DRUGS AND BIOLOGICALS, VETERINARY USE",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6510": {
+      "title": "SURGICAL DRESSING MATERIALS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6515": {
+      "title": "MEDICAL AND SURGICAL INSTRUMENTS, EQUIPMENT, AND SUPPLIES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6525": {
+      "title": "IMAGING EQUIPMENT AND SUPPLIES: MEDICAL, DENTAL, VETERINARY",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6530": {
+      "title": "HOSPITAL FURNITURE, EQUIPMENT, UTENSILS, AND SUPPLIES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6532": {
+      "title": "HOSPITAL AND SURGICAL CLOTHING AND RELATED SPECIAL PURPOSE ITEMS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6540": {
+      "title": "OPHTHALMIC INSTRUMENTS, EQUIPMENT, AND SUPPLIES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6545": {
+      "title": "REPLENISHABLE FIELD MEDICAL SETS, KITS, AND OUTFITS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6550": {
+      "title": "IN VITRO DIAGNOSTIC SUBSTANCES, REAGENTS, TEST KITS AND SETS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6605": {
+      "title": "NAVIGATIONAL INSTRUMENTS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6625": {
+      "title": "ELECTRICAL AND ELECTRONIC PROPERTIES MEASURING AND TESTING INSTRUMENTS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6630": {
+      "title": "CHEMICAL ANALYSIS INSTRUMENTS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6632": {
+      "title": "ANALYSIS INSTRUMENTS, MEDICAL LABORATORY USE",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6635": {
+      "title": "PHYSICAL PROPERTIES TESTING AND INSPECTION",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6636": {
+      "title": "ENVIRONMENTAL CHAMBERS AND RELATED EQUIPMENT",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6640": {
+      "title": "LABORATORY EQUIPMENT AND SUPPLIES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6650": {
+      "title": "OPTICAL INSTRUMENTS, TEST EQUIPMENT, COMPONENTS AND ACCESSORIES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6660": {
+      "title": "METEOROLOGICAL INSTRUMENTS AND APPARATUS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6665": {
+      "title": "HAZARD-DETECTING INSTRUMENTS AND APPARATUS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6680": {
+      "title": "LIQUID AND GAS FLOW, LIQUID LEVEL, AND MECHANICAL MOTION MEASURING INSTRUMENTS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6685": {
+      "title": "PRESSURE, TEMPERATURE, AND HUMIDITY MEASURING AND CONTROLLING INSTRUMENTS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6695": {
+      "title": "COMBINATION AND MISCELLANEOUS INSTRUMENTS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6710": {
+      "title": "CAMERAS, MOTION PICTURE",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6810": {
+      "title": "CHEMICALS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6820": {
+      "title": "DYES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6830": {
+      "title": "GASES: COMPRESSED AND LIQUEFIED",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6835": {
+      "title": "MEDICAL GASES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6840": {
+      "title": "PEST CONTROL AGENTS AND DISINFECTANTS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6850": {
+      "title": "MISCELLANEOUS CHEMICAL SPECIALTIES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6910": {
+      "title": "TRAINING AIDS",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6920": {
+      "title": "ARMAMENT TRAINING DEVICES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "6930": {
+      "title": "OPERATION TRAINING DEVICES",
+      "category": "6",
+      "category_name": "Chemicals / Medical",
+      "level": 4
+    },
+    "7030": {
+      "title": "INFORMATION TECHNOLOGY SOFTWARE",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7110": {
+      "title": "OFFICE FURNITURE",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7210": {
+      "title": "HOUSEHOLD FURNISHINGS",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7240": {
+      "title": "HOUSEHOLD AND COMMERCIAL UTILITY CONTAINERS",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7290": {
+      "title": "MISCELLANEOUS HOUSEHOLD AND COMMERCIAL FURNISHINGS AND APPLIANCES",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7310": {
+      "title": "FOOD COOKING, BAKING, AND SERVING EQUIPMENT",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7320": {
+      "title": "KITCHEN EQUIPMENT AND APPLIANCES",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7460": {
+      "title": "VISIBLE RECORD EQUIPMENT",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7490": {
+      "title": "MISCELLANEOUS OFFICE MACHINES",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7510": {
+      "title": "OFFICE SUPPLIES",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7520": {
+      "title": "OFFICE DEVICES AND ACCESSORIES",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7610": {
+      "title": "BOOKS AND PAMPHLETS",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7690": {
+      "title": "MISCELLANEOUS PRINTED MATTER",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7735": {
+      "title": "PARTS AND ACCESSORIES OF PHONOGRAPHS, RADIOS, AND TELEVISION SET: HOME TYPE",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7910": {
+      "title": "FLOOR POLISHERS AND VACUUM CLEANING EQUIPMENT",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7920": {
+      "title": "BROOMS, BRUSHES, MOPS, AND SPONGES",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7930": {
+      "title": "CLEANING AND POLISHING COMPOUNDS AND PREPARATIONS",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "8010": {
+      "title": "PAINTS, DOPES, VARNISHES, AND RELATED PRODUCTS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8020": {
+      "title": "PAINT AND ARTISTS' BRUSHES",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8030": {
+      "title": "PRESERVATIVE AND SEALING COMPOUNDS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8040": {
+      "title": "ADHESIVES",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8115": {
+      "title": "BOXES, CARTONS, AND CRATES",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8120": {
+      "title": "COMMERCIAL AND INDUSTRIAL GAS CYLINDERS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8135": {
+      "title": "PACKAGING AND PACKING BULK MATERIALS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8145": {
+      "title": "SPECIALIZED SHIPPING AND STORAGE CONTAINERS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8150": {
+      "title": "FREIGHT CONTAINERS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8305": {
+      "title": "TEXTILE FABRICS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8415": {
+      "title": "CLOTHING, SPECIAL PURPOSE",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8465": {
+      "title": "INDIVIDUAL EQUIPMENT",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8470": {
+      "title": "ARMOR, PERSONAL",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8510": {
+      "title": "PERFUMES, TOILET PREPARATIONS, AND POWDERS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8520": {
+      "title": "TOILET SOAP, SHAVING PREPARATIONS, AND DENTIFRICES",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8710": {
+      "title": "FORAGE AND FEED",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8720": {
+      "title": "FERTILIZERS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8820": {
+      "title": "LIVE ANIMALS, NOT RAISED FOR FOOD",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8945": {
+      "title": "FOOD, OILS AND FATS",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "8970": {
+      "title": "COMPOSITE FOOD PACKAGES",
+      "category": "8",
+      "category_name": "Personal Items",
+      "level": 4
+    },
+    "9110": {
+      "title": "FUELS, SOLID",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9130": {
+      "title": "LIQUID PROPELLANTS AND FUELS, PETROLEUM BASE",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9135": {
+      "title": "LIQUID PROPELLANT FUELS AND OXIDIZERS, CHEMICAL BASE",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9140": {
+      "title": "FUEL OILS",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9150": {
+      "title": "OILS AND GREASES: CUTTING, LUBRICATING, AND HYDRAULIC",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9160": {
+      "title": "MISCELLANEOUS WAXES, OILS, AND FATS",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9310": {
+      "title": "PAPER AND PAPERBOARD",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9320": {
+      "title": "RUBBER FABRICATED MATERIALS",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9330": {
+      "title": "PLASTICS FABRICATED MATERIALS",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9390": {
+      "title": "MISCELLANEOUS FABRICATED NONMETALLIC MATERIALS",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9420": {
+      "title": "FIBERS: VEGETABLE, ANIMAL, AND SYNTHETIC",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9430": {
+      "title": "MISCELLANEOUS CRUDE ANIMAL PRODUCTS, INEDIBLE",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9535": {
+      "title": "PLATE, SHEET, STRIP, AND FOIL; NONFERROUS BASE METAL",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9620": {
+      "title": "MINERALS, NATURAL AND SYNTHETIC",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "9905": {
+      "title": "SIGNS, ADVERTISING DISPLAYS, AND IDENTIFICATION PLATES",
+      "category": "9",
+      "category_name": "Industrial Materials",
+      "level": 4
+    },
+    "S112": {
+      "title": "UTILITIES- ELECTRIC",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "Z1MD": {
+      "title": "MAINTENANCE OF EPG FACILITIES - HYDRO",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "J066": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- INSTRUMENTS AND LABORATORY EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "J059": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- ELECTRICAL AND ELECTRONIC EQUIPMENT COMPONENTS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "S119": {
+      "title": "UTILITIES- OTHER",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "S111": {
+      "title": "UTILITIES- GAS",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "M1JZ": {
+      "title": "OPERATION OF MISCELLANEOUS BUILDINGS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "H961": {
+      "title": "OTHER QC/TEST/INSPECT- ELECTRIC WIRE AND POWER DISTRIBUTION EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "S211": {
+      "title": "HOUSEKEEPING- SURVEILLANCE",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "J049": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- MAINTENANCE AND REPAIR SHOP EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "M1NZ": {
+      "title": "OPERATION OF OTHER UTILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "H391": {
+      "title": "INSPECTION- FUELS, LUBRICANTS, OILS, AND WAXES",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "E1NA": {
+      "title": "PURCHASE OF FUEL SUPPLY FACILITIES",
+      "category": "E",
+      "category_name": "Environmental Services",
+      "level": 4
+    },
+    "M2BB": {
+      "title": "HUSBANDING SERVICES—FUEL SERVICES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "S204": {
+      "title": "HOUSEKEEPING- FUELING AND OTHER PETROLEUM",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "W061": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- ELECTRIC WIRE AND POWER DISTRIBUTION EQUIPMENT",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "Z1NA": {
+      "title": "MAINTENANCE OF FUEL SUPPLY FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "R424": {
+      "title": "SUPPORT- PROFESSIONAL: EXPERT WITNESS",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R499": {
+      "title": "SUPPORT- PROFESSIONAL: OTHER",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "AC13": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; DEPARTMENT OF DEFENSE - MILITARY; EXPERIMENTAL DEVELOPMENT",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "J028": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- ENGINES, TURBINES, AND COMPONENTS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "E1MG": {
+      "title": "PURCHASE OF EPG FACILITIES - SOLAR",
+      "category": "E",
+      "category_name": "Environmental Services",
+      "level": 4
+    },
+    "AC12": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; DEPARTMENT OF DEFENSE - MILITARY; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AC33": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; DEFENSE-RELATED ACTIVITIES; EXPERIMENTAL DEVELOPMENT",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "N061": {
+      "title": "INSTALLATION OF EQUIPMENT- ELECTRIC WIRE AND POWER DISTRIBUTION EQUIPMENT",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "Z1MG": {
+      "title": "MAINTENANCE OF EPG FACILITIES - SOLAR",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "C1DA": {
+      "title": "ARCHITECT AND ENGINEERING- CONSTRUCTION: HOSPITALS AND INFIRMARIES",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "Z2MG": {
+      "title": "REPAIR OR ALTERATION OF EPG FACILITIES - SOLAR",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "J061": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- ELECTRIC WIRE AND POWER DISTRIBUTION EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "H261": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- ELECTRIC WIRE AND POWER DISTRIBUTION EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "Y1MZ": {
+      "title": "CONSTRUCTION OF EPG FACILITIES - OTHER, INCLUDING TRANSMISSION",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "J065": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- MEDICAL, DENTAL, AND VETERINARY EQUIPMENT AND SUPPLIES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "N099": {
+      "title": "INSTALLATION OF EQUIPMENT- MISCELLANEOUS",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "Y1NZ": {
+      "title": "CONSTRUCTION OF OTHER UTILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "7B22": {
+      "title": "IT AND TELECOM - COMPUTE: SERVERS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "Z1AA": {
+      "title": "MAINTENANCE OF OFFICE BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "N059": {
+      "title": "INSTALLATION OF EQUIPMENT- ELECTRICAL AND ELECTRONIC EQUIPMENT COMPONENTS",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "J030": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- MECHANICAL POWER TRANSMISSION EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "S114": {
+      "title": "UTILITIES- WATER",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "E1BG": {
+      "title": "PURCHASE OF ELECTRONIC AND COMMUNICATIONS FACILITIES",
+      "category": "E",
+      "category_name": "Environmental Services",
+      "level": 4
+    },
+    "Z1NB": {
+      "title": "MAINTENANCE OF HEATING AND COOLING PLANTS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z1JZ": {
+      "title": "MAINTENANCE OF MISCELLANEOUS BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "N030": {
+      "title": "INSTALLATION OF EQUIPMENT- MECHANICAL POWER TRANSMISSION EQUIPMENT",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "7K20": {
+      "title": "IT AND TELECOM - STORAGE PRODUCTS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "M249": {
+      "title": "OPERATION OF OTHER UTILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "Y249": {
+      "title": "CONSTRUCTION OF OTHER UTILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "S216": {
+      "title": "HOUSEKEEPING- FACILITIES OPERATIONS SUPPORT",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "Y1AA": {
+      "title": "CONSTRUCTION OF OFFICE BUILDINGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "B543": {
+      "title": "SPECIAL STUDIES/ANALYSIS- ENERGY",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "C219": {
+      "title": "ARCHITECT AND ENGINEERING- GENERAL: OTHER",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "S208": {
+      "title": "HOUSEKEEPING- LANDSCAPING/GROUNDSKEEPING",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "Z1NZ": {
+      "title": "MAINTENANCE OF OTHER UTILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2DA": {
+      "title": "REPAIR OR ALTERATION OF HOSPITALS AND INFIRMARIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "C1AZ": {
+      "title": "ARCHITECT AND ENGINEERING- CONSTRUCTION: OTHER ADMINISTRATIVE FACILITIES/SERVICE BUILDINGS",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "L017": {
+      "title": "TECHNICAL REPRESENTATIVE- AIRCRAFT LAUNCHING, LANDING, AND GROUND HANDLING EQUIPMENT",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "J091": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- FUELS, LUBRICANTS, OILS, AND WAXES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "J048": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- VALVES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "J043": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- PUMPS AND COMPRESSORS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "L019": {
+      "title": "TECHNICAL REPRESENTATIVE- SHIPS, SMALL CRAFT, PONTOONS, AND FLOATING DOCKS",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "X1NE": {
+      "title": "LEASE/RENTAL OF WATER SUPPLY FACILITIES",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "Z245": {
+      "title": "MAINT-REP-ALT/WATER SUPPLY",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "J046": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- WATER PURIFICATION AND SEWAGE TREATMENT EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "M1NE": {
+      "title": "OPERATION OF WATER SUPPLY FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "Z2NE": {
+      "title": "REPAIR OR ALTERATION OF WATER SUPPLY FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "F103": {
+      "title": "ENVIRONMENTAL SYSTEMS PROTECTION- WATER QUALITY SUPPORT",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "H946": {
+      "title": "OTHER QC/TEST/INSPECT- WATER PURIFICATION AND SEWAGE TREATMENT EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "N046": {
+      "title": "INSTALLATION OF EQUIPMENT- WATER PURIFICATION AND SEWAGE TREATMENT EQUIPMENT",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "Z1NE": {
+      "title": "MAINTENANCE OF WATER SUPPLY FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1PZ": {
+      "title": "CONSTRUCTION OF OTHER NON-BUILDING FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "C1ND": {
+      "title": "ARCHITECT AND ENGINEERING- CONSTRUCTION: SEWAGE AND WASTE FACILITIES",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "Q201": {
+      "title": "MEDICAL- MANAGED HEALTHCARE",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Z1ND": {
+      "title": "MAINTENANCE OF SEWAGE AND WASTE FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "M1ND": {
+      "title": "OPERATION OF SEWAGE AND WASTE FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "Z1PZ": {
+      "title": "MAINTENANCE OF OTHER NON-BUILDING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "S222": {
+      "title": "HOUSEKEEPING- WASTE TREATMENT/STORAGE",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "Z1PD": {
+      "title": "MAINTENANCE OF WASTE TREATMENT AND STORAGE FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2PZ": {
+      "title": "REPAIR OR ALTERATION OF OTHER NON-BUILDING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "J045": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- PLUMBING, HEATING, AND WASTE DISPOSAL EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "M1PD": {
+      "title": "OPERATION OF WASTE TREATMENT AND STORAGE FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "Z2ND": {
+      "title": "REPAIR OR ALTERATION OF SEWAGE AND WASTE FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "N043": {
+      "title": "INSTALLATION OF EQUIPMENT- PUMPS AND COMPRESSORS",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "Z1DB": {
+      "title": "MAINTENANCE OF LABORATORIES AND CLINICS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "H146": {
+      "title": "QUALITY CONTROL- WATER PURIFICATION AND SEWAGE TREATMENT EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "Z2QA": {
+      "title": "REPAIR OR ALTERATION OF RESTORATION OF REAL PROPERTY (PUBLIC OR PRIVATE)",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "L041": {
+      "title": "TECHNICAL REPRESENTATIVE- REFRIGERATION, AIR CONDITIONING, AND AIR CIRCULATING EQUIPMENT",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "J044": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- FURNACE, STEAM PLANT, AND DRYING EQUIPMENT; NUCLEAR REACTORS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "J047": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- PIPE, TUBING, HOSE, AND FITTINGS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "S201": {
+      "title": "HOUSEKEEPING- CUSTODIAL JANITORIAL",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "J041": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- REFRIGERATION, AIR CONDITIONING, AND AIR CIRCULATING EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "N041": {
+      "title": "INSTALLATION OF EQUIPMENT- REFRIGERATION, AIR CONDITIONING, AND AIR CIRCULATING EQUIPMENT",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "Z2AA": {
+      "title": "REPAIR OR ALTERATION OF OFFICE BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1NB": {
+      "title": "CONSTRUCTION OF HEATING AND COOLING PLANTS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "AR15": {
+      "title": "SPACE R&D SVCS; SPACE FLIGHT, RESEARCH & SUPPORTING ACTIVITIES; R&D FACILITIES & MAJ EQUIP",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "Y1EZ": {
+      "title": "CONSTRUCTION OF OTHER INDUSTRIAL BUILDINGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "AD61": {
+      "title": "R&D- DEFENSE OTHER: CONSTRUCTION (BASIC RESEARCH)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "Y1EA": {
+      "title": "CONSTRUCTION OF AMMUNITION FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1JZ": {
+      "title": "CONSTRUCTION OF MISCELLANEOUS BUILDINGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1DB": {
+      "title": "CONSTRUCTION OF LABORATORIES AND CLINICS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1EB": {
+      "title": "CONSTRUCTION OF MAINTENANCE BUILDINGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2EZ": {
+      "title": "REPAIR OR ALTERATION OF OTHER INDUSTRIAL BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2EC": {
+      "title": "REPAIR OR ALTERATION OF PRODUCTION BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1AZ": {
+      "title": "CONSTRUCTION OF OTHER ADMINISTRATIVE FACILITIES AND SERVICE BUILDINGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2JZ": {
+      "title": "REPAIR OR ALTERATION OF MISCELLANEOUS BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2KA": {
+      "title": "REPAIR OR ALTERATION OF DAMS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2AZ": {
+      "title": "REPAIR OR ALTERATION OF OTHER ADMINISTRATIVE FACILITIES AND SERVICE BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y199": {
+      "title": "CONSTRUCT/MISC BLDGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2ED": {
+      "title": "REPAIR OR ALTERATION OF SHIP CONSTRUCTION AND REPAIR FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2EB": {
+      "title": "REPAIR OR ALTERATION OF MAINTENANCE BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2NZ": {
+      "title": "REPAIR OR ALTERATION OF OTHER UTILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1LB": {
+      "title": "CONSTRUCTION OF HIGHWAYS, ROADS, STREETS, BRIDGES, AND RAILWAYS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1DA": {
+      "title": "CONSTRUCTION OF HOSPITALS AND INFIRMARIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1BZ": {
+      "title": "CONSTRUCTION OF OTHER AIRFIELD STRUCTURES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z1DA": {
+      "title": "MAINTENANCE OF HOSPITALS AND INFIRMARIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1FC": {
+      "title": "CONSTRUCTION OF TROOP HOUSING FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2FC": {
+      "title": "REPAIR OR ALTERATION OF TROOP HOUSING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1DZ": {
+      "title": "CONSTRUCTION OF OTHER HOSPITAL BUILDINGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "C1AA": {
+      "title": "ARCHITECT AND ENGINEERING- CONSTRUCTION: OFFICE BUILDINGS",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "Y1BG": {
+      "title": "CONSTRUCTION OF ELECTRONIC AND COMMUNICATIONS FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1NE": {
+      "title": "CONSTRUCTION OF WATER SUPPLY FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1ND": {
+      "title": "CONSTRUCTION OF SEWAGE AND WASTE FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2PD": {
+      "title": "REPAIR OR ALTERATION OF WASTE TREATMENT AND STORAGE FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1PD": {
+      "title": "CONSTRUCTION OF WASTE TREATMENT AND STORAGE FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1BC": {
+      "title": "CONSTRUCTION OF RADAR AND NAVIGATIONAL FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2FF": {
+      "title": "REPAIR OR ALTERATION OF PENAL FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2NA": {
+      "title": "REPAIR OR ALTERATION OF FUEL SUPPLY FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1GC": {
+      "title": "CONSTRUCTION OF FUEL STORAGE BUILDINGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1NA": {
+      "title": "CONSTRUCTION OF FUEL SUPPLY FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2GC": {
+      "title": "REPAIR OR ALTERATION OF FUEL STORAGE BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "C1NA": {
+      "title": "ARCHITECT AND ENGINEERING- CONSTRUCTION: FUEL SUPPLY FACILITIES",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "Y1QA": {
+      "title": "CONSTRUCTION OF RESTORATION OF REAL PROPERTY (PUBLIC OR PRIVATE)",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "H999": {
+      "title": "OTHER QC/TEST/INSPECT- MISCELLANEOUS",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "Y1MF": {
+      "title": "CONSTRUCTION OF EPG FACILITIES - PETROLEUM",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "R408": {
+      "title": "SUPPORT- PROFESSIONAL: PROGRAM MANAGEMENT/SUPPORT",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "C1GC": {
+      "title": "ARCHITECT AND ENGINEERING- CONSTRUCTION: FUEL STORAGE BUILDINGS",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "Y1BF": {
+      "title": "CONSTRUCTION OF MISSILE SYSTEM FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "DG01": {
+      "title": "IT AND TELECOM - NETWORK SUPPORT SERVICES (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "Y1MG": {
+      "title": "CONSTRUCTION OF EPG FACILITIES - SOLAR",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1BD": {
+      "title": "CONSTRUCTION OF AIRPORT RUNWAYS AND TAXIWAYS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2LB": {
+      "title": "REPAIR OR ALTERATION OF HIGHWAYS/ROADS/STREETS/BRIDGES/RAILWAYS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2BD": {
+      "title": "REPAIR OR ALTERATION OF AIRPORT RUNWAYS AND TAXIWAYS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z1LB": {
+      "title": "MAINTENANCE OF HIGHWAYS/ROADS/STREETS/BRIDGES/RAILWAYS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z1BD": {
+      "title": "MAINTENANCE OF AIRPORT RUNWAYS AND TAXIWAYS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1LA": {
+      "title": "CONSTRUCTION OF AIRPORT SERVICE ROADS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z2LZ": {
+      "title": "REPAIR OR ALTERATION OF PARKING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2BZ": {
+      "title": "REPAIR OR ALTERATION OF OTHER AIRFIELD STRUCTURES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1KA": {
+      "title": "CONSTRUCTION OF DAMS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z1LZ": {
+      "title": "MAINTENANCE OF PARKING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1LZ": {
+      "title": "CONSTRUCTION OF PARKING FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1ED": {
+      "title": "CONSTRUCTION OF SHIP CONSTRUCTION AND REPAIR FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z1KF": {
+      "title": "MAINTENANCE OF DREDGING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1KF": {
+      "title": "CONSTRUCTION OF DREDGING FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1KB": {
+      "title": "CONSTRUCTION OF CANALS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1KZ": {
+      "title": "CONSTRUCTION OF OTHER CONSERVATION AND DEVELOPMENT FACILITIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Z1KB": {
+      "title": "MAINTENANCE OF CANALS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Y1PC": {
+      "title": "CONSTRUCTION OF UNIMPROVED REAL PROPERTY (LAND)",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "R425": {
+      "title": "SUPPORT- PROFESSIONAL: ENGINEERING/TECHNICAL",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "N045": {
+      "title": "INSTALLATION OF EQUIPMENT- PLUMBING, HEATING, AND WASTE DISPOSAL EQUIPMENT",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "Z1AZ": {
+      "title": "MAINTENANCE OF OTHER ADMINISTRATIVE FACILITIES AND SERVICE BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Z2NB": {
+      "title": "REPAIR OR ALTERATION OF HEATING AND COOLING PLANTS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "P400": {
+      "title": "SALVAGE- DEMOLITION OF BUILDINGS",
+      "category": "P",
+      "category_name": "Salvage",
+      "level": 4
+    },
+    "P500": {
+      "title": "SALVAGE- DEMOLITION OF STRUCTURES/FACILITIES (OTHER THAN BUILDINGS)",
+      "category": "P",
+      "category_name": "Salvage",
+      "level": 4
+    },
+    "F021": {
+      "title": "NATURAL RESOURCES/CONSERVATION- SITE PREPARATION",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "F015": {
+      "title": "NATURAL RESOURCES/CONSERVATION- WELL DRILLING/EXPLORATORY",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "Z2BF": {
+      "title": "REPAIR OR ALTERATION OF MISSILE SYSTEM FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "F014": {
+      "title": "NATURAL RESOURCES/CONSERVATION- TREE THINNING",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "Y141": {
+      "title": "CONSTRUCT/HOSPITALS & INFIRMARIES",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y1CA": {
+      "title": "CONSTRUCTION OF SCHOOLS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "J056": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- CONSTRUCTION AND BUILDING MATERIALS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "Z2FA": {
+      "title": "REPAIR OR ALTERATION OF FAMILY HOUSING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "Q999": {
+      "title": "MEDICAL- OTHER",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "M1NA": {
+      "title": "OPERATION OF FUEL SUPPLY FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "W099": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- MISCELLANEOUS",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "W065": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- MEDICAL, DENTAL, AND VETERINARY EQUIPMENT AND SUPPLIES",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "Q702": {
+      "title": "TECHNICAL MEDICAL SUPPORT",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "F999": {
+      "title": "OTHER ENVIRONMENTAL SERVICES",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "N068": {
+      "title": "INSTALLATION OF EQUIPMENT- CHEMICALS AND CHEMICAL PRODUCTS",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "R799": {
+      "title": "SUPPORT- MANAGEMENT: OTHER",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "P999": {
+      "title": "SALVAGE- OTHER",
+      "category": "P",
+      "category_name": "Salvage",
+      "level": 4
+    },
+    "H168": {
+      "title": "QUALITY CONTROL- CHEMICALS AND CHEMICAL PRODUCTS",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "U005": {
+      "title": "EDUCATION/TRAINING- TUITION/REGISTRATION/MEMBERSHIP FEES",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "R706": {
+      "title": "SUPPORT- MANAGEMENT: LOGISTICS SUPPORT",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "7A20": {
+      "title": "IT AND TELECOM - APPLICATION DEVELOPMENT SOFTWARE (PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "AC34": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; DEFENSE-RELATED ACTIVITIES; R&D ADMINISTRATIVE EXPENSES",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "B544": {
+      "title": "SPECIAL STUDIES/ANALYSIS- TECHNOLOGY",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "S207": {
+      "title": "HOUSEKEEPING- INSECT/RODENT CONTROL",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "F105": {
+      "title": "ENVIRONMENTAL SYSTEMS PROTECTION- PESTICIDES SUPPORT",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "S205": {
+      "title": "HOUSEKEEPING- TRASH/GARBAGE COLLECTION",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "F001": {
+      "title": "NATURAL RESOURCES/CONSERVATION- AERIAL FERTILIZATION/SPRAYING",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "F003": {
+      "title": "NATURAL RESOURCES/CONSERVATION- FOREST-RANGE FIRE SUPPRESSION/PRESUPPRESSION",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "F006": {
+      "title": "NATURAL RESOURCES/CONSERVATION- LAND TREATMENT PRACTICES",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "J069": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- TRAINING AIDS AND DEVICES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "AN11": {
+      "title": "HEALTH R&D SERVICES; HEALTH CARE SERVICES; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "Q517": {
+      "title": "PHARMACY SERVICES",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q301": {
+      "title": "REFERENCE LABORATORY TESTING",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "AN17": {
+      "title": "R&D- MEDICAL: BIOMEDICAL (COMMERCIALIZED)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "Q527": {
+      "title": "MEDICAL- NUCLEAR MEDICINE",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "AN13": {
+      "title": "HEALTH R&D SERVICES; HEALTH CARE SERVICES; EXPERIMENTAL DEVELOPMENT",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "Q522": {
+      "title": "MEDICAL- RADIOLOGY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q509": {
+      "title": "FAMILY & INTERNAL MEDICINE SERVICES",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "AN12": {
+      "title": "HEALTH R&D SERVICES; HEALTH CARE SERVICES; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "Q508": {
+      "title": "HEMATOLOGY & ONCOLOGY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "DB01": {
+      "title": "IT AND TELECOM - HIGH PERFORMANCE COMPUTING (HPC) SUPPORT SERVICES (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "AN22": {
+      "title": "HEALTH R&D SERVICES; HEALTH RESEARCH AND TRAINING; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "W066": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- INSTRUMENTS AND LABORATORY EQUIPMENT",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "AN42": {
+      "title": "HEALTH R&D SERVICES; HEALTH CARE - OTHER; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "B529": {
+      "title": "SPECIAL STUDIES/ANALYSIS- SCIENTIFIC DATA",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "N066": {
+      "title": "INSTALLATION OF EQUIPMENT- INSTRUMENTS AND LABORATORY EQUIPMENT",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "AJ12": {
+      "title": "GENERAL SCIENCE AND TECHNOLOGY R&D SERVICES; GENERAL SCIENCE AND TECHNOLOGY; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "T001": {
+      "title": "PHOTO/MAP/PRINT/PUBLICATION- ARTS/GRAPHICS",
+      "category": "T",
+      "category_name": "Photographic / Mapping",
+      "level": 4
+    },
+    "B541": {
+      "title": "SPECIAL STUDIES/ANALYSIS- DEFENSE",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "J999": {
+      "title": "NON-NUCLEAR SHIP REPAIR (WEST)",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "J998": {
+      "title": "NON-NUCLEAR SHIP REPAIR (EAST)",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "Z1BZ": {
+      "title": "MAINTENANCE OF OTHER AIRFIELD STRUCTURES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "J080": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- BRUSHES, PAINTS, SEALERS, AND ADHESIVES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "R707": {
+      "title": "SUPPORT- MANAGEMENT: CONTRACT/PROCUREMENT/ACQUISITION SUPPORT",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "DH01": {
+      "title": "IT AND TELECOM - PLATFORM SUPPORT SERVICES: DATABASE, MAINFRAME, MIDDLEWARE (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "L046": {
+      "title": "TECHNICAL REPRESENTATIVE- WATER PURIFICATION AND SEWAGE TREATMENT EQUIPMENT",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "V121": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: AIR CHARTER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "S299": {
+      "title": "HOUSEKEEPING- OTHER",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "AC23": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; ATOMIC ENERGY DEFENSE ACTIVITIES; EXPERIMENTAL DEVELOPMENT",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "M1EA": {
+      "title": "OPERATION OF AMMUNITION FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "AD14": {
+      "title": "R&D- DEFENSE OTHER: AMMUNITION (ENGINEERING DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "J010": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- WEAPONS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "AR21": {
+      "title": "R&D- SPACE: SCIENCE/APPLICATIONS (BASIC RESEARCH)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "J020": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- SHIP AND MARINE EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "AR14": {
+      "title": "SPACE R&D SERVICES; SPACE FLIGHT, RESEARCH AND SUPPORTING ACTIVITIES; R&D ADMINISTRATIVE EXPENSES",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AC22": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; ATOMIC ENERGY DEFENSE ACTIVITIES; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "K012": {
+      "title": "MODIFICATION OF EQUIPMENT- FIRE CONTROL EQUIPMENT",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "K010": {
+      "title": "MODIFICATION OF EQUIPMENT- WEAPONS",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "Y111": {
+      "title": "CONSTRUCTION OF OFFICE BUILDINGS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "Y237": {
+      "title": "CONSTRUCT/EPG - SOLAR",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "W041": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- REFRIGERATION, AIR CONDITIONING, AND AIR CIRCULATING EQUIPMENT",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "K041": {
+      "title": "MODIFICATION OF EQUIPMENT- REFRIGERATION, AIR CONDITIONING, AND AIR CIRCULATING EQUIPMENT",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "7E20": {
+      "title": "IT and Telecom - End User: Help Desk;Tier 1-2,Workspace,Print,Output,Productivity Tools (HW/Perp SW)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7B20": {
+      "title": "IT AND TELECOM - HIGH PERFORMANCE COMPUTE (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "DA10": {
+      "title": "IT AND TELECOM - BUSINESS APPLICATION/APPLICATION DEVELOPMENT SOFTWARE AS A SERVICE",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "7A21": {
+      "title": "IT AND TELECOM - BUSINESS APPLICATION SOFTWARE (PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7C20": {
+      "title": "IT AND TELECOM - DATA CENTER PRODUCTS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7B21": {
+      "title": "IT AND TELECOM - COMPUTE: MAINFRAME (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7G21": {
+      "title": "IT AND TELECOM - NETWORK: DIGITAL NETWORK PRODUCTS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "DA01": {
+      "title": "IT AND TELECOM - BUSINESS APPLICATION/APPLICATION DEVELOPMENT SUPPORT SERVICES (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "DC10": {
+      "title": "IT AND TELECOM - DATA CENTER AS A SERVICE",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "7E21": {
+      "title": "IT AND TELECOM - MOBILE DEVICE PRODUCTS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7F20": {
+      "title": "IT AND TELECOM - IT MANAGEMENT TOOLS/PRODUCTS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "DE01": {
+      "title": "IT and Telecom - End User: Help Desk; Tier 1-2, Workspace, Print, Output, Productivity Tools (Labor)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "7H20": {
+      "title": "IT AND TELECOM - PLATFORM PRODUCTS: DATABASE, MAINFRAME, MIDDLEWARE (HW, PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7C21": {
+      "title": "IT AND TELECOM - OTHER DATA CENTER FACILITIES PRODUCTS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7G20": {
+      "title": "IT AND TELECOM - NETWORK: ANALOG VOICE PRODUCTS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "7G22": {
+      "title": "IT AND TELECOM - NETWORK: SATELLITE AND RF COMMUNICATIONS PRODUCTS (HW, PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "AC25": {
+      "title": "NATIONAL DEFENSE R&D SVCS; ATOMIC ENERGY DEFENSE ACTIVITIES; R&D FACILITIES & MAJ EQUIP",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "L099": {
+      "title": "TECHNICAL REPRESENTATIVE- MISCELLANEOUS",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "K058": {
+      "title": "MODIFICATION OF EQUIPMENT- COMMUNICATION, DETECTION, AND COHERENT RADIATION EQUIPMENT",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "DE10": {
+      "title": "IT and Telecom - End User as a Service: Help Desk;Tier 1-2,Workspace,Print,Output,Productivity Tools",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "H236": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- SPECIAL INDUSTRY MACHINERY",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "AC32": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; DEFENSE-RELATED ACTIVITIES; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "J014": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- GUIDED MISSILES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "AC15": {
+      "title": "NATIONAL DEFENSE R&D SVCS; DEPARTMENT OF DEFENSE - MILITARY; R&D FACILITIES & MAJ EQUIP",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "H214": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- GUIDED MISSILES",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "K059": {
+      "title": "MODIFICATION OF EQUIPMENT- ELECTRICAL AND ELECTRONIC EQUIPMENT COMPONENTS",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "J016": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- AIRCRAFT COMPONENTS AND ACCESSORIES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "J015": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- AIRCRAFT AND AIRFRAME STRUCTURAL COMPONENTS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "K016": {
+      "title": "MODIFICATION OF EQUIPMENT- AIRCRAFT COMPONENTS AND ACCESSORIES",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "AC14": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; DEPARTMENT OF DEFENSE - MILITARY; R&D ADMINISTRATIVE EXPENSES",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AC11": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; DEPARTMENT OF DEFENSE - MILITARY; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AC24": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; ATOMIC ENERGY DEFENSE ACTIVITIES; R&D ADMINISTRATIVE EXPENSES",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AR11": {
+      "title": "SPACE R&D SERVICES; SPACE FLIGHT, RESEARCH AND SUPPORTING ACTIVITIES; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "V126": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: SPACE TRANSPORTATION/LAUNCH",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "AR62": {
+      "title": "R&D- SPACE: STATION (APPLIED RESEARCH/EXPLORATORY DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "W018": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- SPACE VEHICLES",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "H914": {
+      "title": "OTHER QC/TEST/INSPECT- GUIDED MISSILES",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "AC26": {
+      "title": "R&D- DEFENSE SYSTEM: MISSILE/SPACE SYSTEMS (MANAGEMENT/SUPPORT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AC53": {
+      "title": "R&D- DEFENSE SYSTEM: WEAPONS (ADVANCED DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "V999": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- OTHER: OTHER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "DH10": {
+      "title": "IT AND TELECOM - PLATFORM AS A SERVICE: DATABASE, MAINFRAME, MIDDLEWARE",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "V302": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- RELOCATION: TRAVEL AGENT",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "V124": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: MARINE CHARTER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "D318": {
+      "title": "IT AND TELECOM- INTEGRATED HARDWARE/SOFTWARE/SERVICES SOLUTIONS, PREDOMINANTLY SERVICES",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "V221": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: PASSENGER AIR CHARTER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "DF01": {
+      "title": "IT AND TELECOM - IT MANAGEMENT SUPPORT SERVICES (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "V119": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: OTHER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "N070": {
+      "title": "INSTALLATION OF EQUIPMENT- ADP EQUIPMENT/SOFTWARE/SUPPLIES/SUPPORT EQUIPMENT",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "D302": {
+      "title": "IT AND TELECOM- SYSTEMS DEVELOPMENT",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "V301": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- RELOCATION: RELOCATION",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "V111": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: AIR FREIGHT",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "V003": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- MOTOR POOL AND PACKING/CRATING: PACKING/CRATING",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "V225": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: AMBULANCE",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "V112": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: MOTOR FREIGHT",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "R602": {
+      "title": "SUPPORT- ADMINISTRATIVE: COURIER/MESSENGER",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "V211": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: AIR PASSENGER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "R429": {
+      "title": "SUPPORT- PROFESSIONAL: EMERGENCY RESPONSE/DISASTER PLANNING/PREPAREDNESS SUPPORT",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "W015": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- AIRCRAFT AND AIRFRAME STRUCTURAL COMPONENTS",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "V222": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: PASSENGER MOTOR CHARTER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "Q701": {
+      "title": "SPECIALIZED MEDICAL SUPPORT",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "R699": {
+      "title": "SUPPORT- ADMINISTRATIVE: OTHER",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "AR37": {
+      "title": "R&D- SPACE: FLIGHT (COMMERCIALIZED)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "J018": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- SPACE VEHICLES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "V129": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: OTHER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "V001": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- MOTOR POOL AND PACKING/CRATING: GBL/GTR PROCS",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "U099": {
+      "title": "EDUCATION/TRAINING- OTHER",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "G003": {
+      "title": "SOCIAL- RECREATIONAL",
+      "category": "G",
+      "category_name": "Social Services",
+      "level": 4
+    },
+    "U013": {
+      "title": "EDUCATION/TRAINING- COMBAT",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "H266": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- INSTRUMENTS AND LABORATORY EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "U008": {
+      "title": "EDUCATION/TRAINING- TRAINING/CURRICULUM DEVELOPMENT",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "W039": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- MATERIALS HANDLING EQUIPMENT",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "R604": {
+      "title": "SUPPORT- ADMINISTRATIVE: MAILING/DISTRIBUTION",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "W023": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- GROUND EFFECT VEHICLES, MOTOR VEHICLES, TRAILERS, AND CYCLES",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "M1GZ": {
+      "title": "OPERATION OF OTHER WAREHOUSE BUILDINGS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "R612": {
+      "title": "SUPPORT- ADMINISTRATIVE: INFORMATION RETRIEVAL",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "M2BZ": {
+      "title": "HUSBANDING SERVICES—OTHER PORT SERVICES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "N071": {
+      "title": "INSTALLATION OF EQUIPMENT- FURNITURE",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "V122": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: MOTOR CHARTER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "V127": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: SECURITY VEHICLE",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "S215": {
+      "title": "HOUSEKEEPING- WAREHOUSING/STORAGE",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "V114": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: STEVEDORING",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "Z1FA": {
+      "title": "MAINTENANCE OF FAMILY HOUSING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "W072": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- HOUSEHOLD AND COMMERCIAL FURNISHINGS AND APPLIANCES",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "M1BF": {
+      "title": "OPERATION OF MISSILE SYSTEM FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "V115": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: VESSEL FREIGHT",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "M1AA": {
+      "title": "OPERATION OF OFFICE BUILDINGS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "M2BA": {
+      "title": "HUSBANDING SERVICES—TRANSPORTATION SERVICES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "M1BA": {
+      "title": "OPERATION OF AIR TRAFFIC CONTROL TOWERS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "AD25": {
+      "title": "R&D- DEFENSE OTHER: SERVICES (OPERATIONAL SYSTEMS DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "Z1BG": {
+      "title": "MAINTENANCE OF ELECTRONIC AND COMMUNICATIONS FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "R426": {
+      "title": "SUPPORT- PROFESSIONAL: COMMUNICATIONS",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "M1BZ": {
+      "title": "OPERATION OF OTHER AIRFIELD STRUCTURES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "Y1BA": {
+      "title": "CONSTRUCTION OF AIR TRAFFIC CONTROL TOWERS",
+      "category": "Y",
+      "category_name": "Construction",
+      "level": 4
+    },
+    "M1BE": {
+      "title": "OPERATION OF AIRPORT TERMINALS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "M1BD": {
+      "title": "OPERATION OF AIRPORT RUNWAYS AND TAXIWAYS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "X1BD": {
+      "title": "LEASE/RENTAL OF AIRPORT RUNWAYS AND TAXIWAYS",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "J017": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- AIRCRAFT LAUNCHING, LANDING, AND GROUND HANDLING EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "X1BZ": {
+      "title": "LEASE/RENTAL OF OTHER AIRFIELD STRUCTURES",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "Z1LA": {
+      "title": "MAINTENANCE OF AIRPORT SERVICE ROADS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "H149": {
+      "title": "QUALITY CONTROL- MAINTENANCE AND REPAIR SHOP EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "V227": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: NAVIGATIONAL AID AND PILOTAGE",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "J099": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- MISCELLANEOUS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "H115": {
+      "title": "QUALITY CONTROL- AIRCRAFT AND AIRFRAME STRUCTURAL COMPONENTS",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "K015": {
+      "title": "MODIFICATION OF EQUIPMENT- AIRCRAFT AND AIRFRAME STRUCTURAL COMPONENTS",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "H215": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- AIRCRAFT AND AIRFRAME STRUCTURAL COMPONENTS",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "L015": {
+      "title": "TECHNICAL REPRESENTATIVE- AIRCRAFT AND AIRFRAME STRUCTURAL COMPONENTS",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "J022": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- RAILWAY EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "V113": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: RAIL FREIGHT",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "H322": {
+      "title": "INSPECTION- RAILWAY EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "H922": {
+      "title": "OTHER QC/TEST/INSPECT- RAILWAY EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "AS11": {
+      "title": "TRANSPORTATION R&D SERVICES; SURFACE TRANSPORTATION, PUBLIC TRANSIT, AND RAIL; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AS31": {
+      "title": "TRANSPORTATION R&D SERVICES; WATER TRANSPORTATION; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "J035": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- SERVICE AND TRADE EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "M2CA": {
+      "title": "SHIP HUSBANDING SERVICES—MANAGEMENT/INTEGRATION SERVICE",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "M2AC": {
+      "title": "HUSBANDING SERVICES—REMOVAL SERVICES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "J019": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- SHIPS, SMALL CRAFT, PONTOONS, AND FLOATING DOCKS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "M2AB": {
+      "title": "HUSBANDING SERVICES—FORCE PROTECTION",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "M1PZ": {
+      "title": "OPERATION OF OTHER NON-BUILDING FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "M1KB": {
+      "title": "OPERATION OF CANALS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "V228": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: PORT OPERATIONS",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "M2AA": {
+      "title": "HUSBANDING SERVICES—COMMUNICATIONS SERVICES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "V125": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRANSPORTATION: VESSEL TOWING",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "M1KA": {
+      "title": "OPERATION OF DAMS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "X1GD": {
+      "title": "LEASE/RENTAL OF OPEN STORAGE FACILITIES",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "M2AD": {
+      "title": "HUSBANDING SERVICES—MATERIAL HANDLING",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "F114": {
+      "title": "ENVIRONMENTAL SYSTEMS PROTECTION- ENVIRONMENTAL LICENSING AND PERMITTING",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "W042": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- FIRE FIGHTING/RESCUE/SAFETY EQUIPMENT; ENVIRON PROTECT EQUIPMENT/MATLS",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "C216": {
+      "title": "ARCHITECT AND ENGINEERING- GENERAL: MARINE ENGINEERING",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "X1PZ": {
+      "title": "LEASE/RENTAL OF OTHER NON-BUILDING FACILITIES",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "DG10": {
+      "title": "IT AND TELECOM - NETWORK AS A SERVICE",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "J036": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- SPECIAL INDUSTRY MACHINERY",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "P300": {
+      "title": "SALVAGE- MARINE VESSELS",
+      "category": "P",
+      "category_name": "Salvage",
+      "level": 4
+    },
+    "AS32": {
+      "title": "TRANSPORTATION R&D SERVICES; WATER TRANSPORTATION; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "W046": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- WATER PURIFICATION AND SEWAGE TREATMENT EQUIPMENT",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "H987": {
+      "title": "OTHER QC/TEST/INSPECT- AGRICULTURAL SUPPLIES",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "W019": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- SHIPS, SMALL CRAFT, PONTOONS, AND FLOATING DOCKS",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "V212": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: MOTOR PASSENGER",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "S218": {
+      "title": "HOUSEKEEPING- SNOW REMOVAL/SALT",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "F018": {
+      "title": "NATURAL RESOURCES/CONSERVATION- OTHER FOREST/RANGE IMPROVEMENTS (NON-CONSTRUCTION)",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "M1LB": {
+      "title": "OPERATION OF HIGHWAYS, ROADS, STREETS, BRIDGES, AND RAILWAYS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "E1PZ": {
+      "title": "PURCHASE OF OTHER NON-BUILDING FACILITIES",
+      "category": "E",
+      "category_name": "Environmental Services",
+      "level": 4
+    },
+    "V226": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: TAXICAB",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "C211": {
+      "title": "ARCHITECT AND ENGINEERING- GENERAL: LANDSCAPING, INTERIOR LAYOUT, AND DESIGNING",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "L014": {
+      "title": "TECHNICAL REPRESENTATIVE- GUIDED MISSILES",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "DJ01": {
+      "title": "IT AND TELECOM - SECURITY AND COMPLIANCE SUPPORT SERVICES (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "DD01": {
+      "title": "IT AND TELECOM - SERVICE DELIVERY SUPPORT SERVICES: ITSM, OPERATIONS CENTER, PROJECT/PM (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "D301": {
+      "title": "IT AND TELECOM- FACILITY OPERATION AND MAINTENANCE",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "D305": {
+      "title": "IT AND TELECOM – TELEPROCESSING, TIMESHARE, CLOUD COMPUTING, AND HIGH PERFORMANCE COMPUTING",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "D399": {
+      "title": "IT AND TELECOM- OTHER IT AND TELECOMMUNICATIONS",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "DF10": {
+      "title": "IT AND TELECOM - IT MANAGEMENT AS A SERVICE",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "DC01": {
+      "title": "IT AND TELECOM - DATA CENTER SUPPORT SERVICES (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "D316": {
+      "title": "IT AND TELECOM- TELECOMMUNICATIONS NETWORK MANAGEMENT",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "M1AZ": {
+      "title": "OPERATION OF OTHER ADMINISTRATIVE FACILITIES AND SERVICE BUILDINGS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "DB10": {
+      "title": "IT AND TELECOM - COMPUTE AS A SERVICE: MAINFRAME/SERVERS",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "7J20": {
+      "title": "IT AND TELECOM - SECURITY AND COMPLIANCE PRODUCTS (HARDWARE AND PERPETUAL LICENSE SOFTWARE)",
+      "category": "7",
+      "category_name": "Office Supplies",
+      "level": 4
+    },
+    "R410": {
+      "title": "SUPPORT- PROFESSIONAL: PROGRAM EVALUATION/REVIEW/DEVELOPMENT",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R418": {
+      "title": "SUPPORT- PROFESSIONAL: LEGAL",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R710": {
+      "title": "SUPPORT- MANAGEMENT: FINANCIAL",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R703": {
+      "title": "SUPPORT- MANAGEMENT: ACCOUNTING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R431": {
+      "title": "SUPPORT- PROFESSIONAL: HUMAN RESOURCES",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R405": {
+      "title": "SUPPORT- PROFESSIONAL: OPERATIONS RESEARCH/QUANTITATIVE ANALYSIS",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R704": {
+      "title": "SUPPORT- MANAGEMENT: AUDITING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R615": {
+      "title": "SUPPORT- ADMINISTRATIVE: BACKGROUND INVESTIGATION",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "U002": {
+      "title": "EDUCATION/TRAINING- PERSONNEL TESTING",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "R422": {
+      "title": "SUPPORT- PROFESSIONAL: MARKET RESEARCH/PUBLIC OPINION",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "U009": {
+      "title": "EDUCATION/TRAINING- GENERAL",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "R701": {
+      "title": "SUPPORT- MANAGEMENT: ADVERTISING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "B552": {
+      "title": "SPECIAL STUDIES/ANALYSIS- MANPOWER",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "DB02": {
+      "title": "IT AND TELECOM - COMPUTE SUPPORT SERVICES, NON-HPC (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "W054": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- PREFABRICATED STRUCTURES AND SCAFFOLDING",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "S206": {
+      "title": "HOUSEKEEPING- GUARD",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "C1JZ": {
+      "title": "ARCHITECT AND ENGINEERING- CONSTRUCTION: MISCELLANEOUS BUILDINGS",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "U006": {
+      "title": "EDUCATION/TRAINING- VOCATIONAL/TECHNICAL",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "B546": {
+      "title": "SPECIAL STUDIES/ANALYSIS- SECURITY (PHYSICAL/PERSONAL)",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "B510": {
+      "title": "SPECIAL STUDIES/ANALYSIS- ENVIRONMENTAL ASSESSMENTS",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "AD21": {
+      "title": "R&D- DEFENSE OTHER: SERVICES (BASIC RESEARCH)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "B599": {
+      "title": "SPECIAL STUDIES/ANALYSIS- OTHER",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "R423": {
+      "title": "SUPPORT- PROFESSIONAL: INTELLIGENCE",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "F020": {
+      "title": "NATURAL RESOURCES/CONSERVATION- FISHERIES RESOURCES MANAGEMENT",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "M181": {
+      "title": "OPER OF GOVT R&D GOCO FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "AJ11": {
+      "title": "GENERAL SCIENCE AND TECHNOLOGY R&D SERVICES; GENERAL SCIENCE AND TECHNOLOGY; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AN93": {
+      "title": "R&D- MEDICAL: OTHER (ADVANCED DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AD92": {
+      "title": "R&D- DEFENSE OTHER: OTHER (APPLIED RESEARCH/EXPLORATORY DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AJ56": {
+      "title": "R&D- GENERAL SCIENCE/TECHNOLOGY: LIFE SCIENCES (MANAGEMENT/SUPPORT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "B504": {
+      "title": "SPECIAL STUDIES/ANALYSIS- CHEMICAL/BIOLOGICAL",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "AC61": {
+      "title": "R&D- DEFENSE SYSTEM: ELECTRONICS/COMMUNICATION EQUIPMENT (BASIC RESEARCH)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "M1HA": {
+      "title": "OPERATION OF GOVERNMENT-OWNED CONTRACTOR-OPERATED (GOCO) R&D FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "AC31": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; DEFENSE-RELATED ACTIVITIES; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AB94": {
+      "title": "R&D- COMMUNITY SERVICE/DEVELOPMENT: OTHER (ENGINEERING DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AC27": {
+      "title": "R&D- DEFENSE SYSTEM: MISSILE/SPACE SYSTEMS (COMMERCIALIZED)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AD24": {
+      "title": "R&D- DEFENSE OTHER: SERVICES (ENGINEERING DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AD93": {
+      "title": "R&D- DEFENSE OTHER: OTHER (ADVANCED DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AJ14": {
+      "title": "GENERAL SCIENCE AND TECHNOLOGY R&D SERVICES; GENERAL SCIENCE AND TECHNOLOGY; R&D ADMINISTRATIVE EXPENSES",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "R702": {
+      "title": "SUPPORT- MANAGEMENT: DATA COLLECTION",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "AR13": {
+      "title": "SPACE R&D SERVICES; SPACE FLIGHT, RESEARCH AND SUPPORTING ACTIVITIES; EXPERIMENTAL DEVELOPMENT",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AJ13": {
+      "title": "GENERAL SCIENCE & TECHNOLOGY R&D SVCS; GENERAL SCIENCE & TECHNOLOGY; EXPERIMENTAL DEVELOPMENT",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AN14": {
+      "title": "HEALTH R&D SERVICES; HEALTH CARE SERVICES; R&D ADMINISTRATIVE EXPENSES",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AJ15": {
+      "title": "GENERAL SCIENCE & TECHNOLOGY R&D SVCS; GENERAL SCIENCE & TECHNOLOGY; R&D FACILITIES & MAJ EQUIP",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AN41": {
+      "title": "HEALTH R&D SERVICES; HEALTH CARE - OTHER; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AZ13": {
+      "title": "R&D- OTHER RESEARCH AND DEVELOPMENT (ADVANCED DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AN44": {
+      "title": "HEALTH R&D SERVICES; HEALTH CARE - OTHER; R&D ADMINISTRATIVE EXPENSES",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AR22": {
+      "title": "R&D- SPACE: SCIENCE/APPLICATIONS (APPLIED RESEARCH/EXPLORATORY DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AR12": {
+      "title": "SPACE R&D SERVICES; SPACE FLIGHT, RESEARCH AND SUPPORTING ACTIVITIES; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AR24": {
+      "title": "R&D- SPACE: SCIENCE/APPLICATIONS (ENGINEERING DEVELOPMENT)",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "B506": {
+      "title": "SPECIAL STUDIES/ANALYSIS- DATA (OTHER THAN SCIENTIFIC)",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "K014": {
+      "title": "MODIFICATION OF EQUIPMENT- GUIDED MISSILES",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "B550": {
+      "title": "SPECIAL STUDIES/ANALYSIS- ORGANIZATION/ADMINISTRATIVE/PERSONNEL",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "B542": {
+      "title": "SPECIAL STUDIES/ANALYSIS- EDUCATIONAL",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "B503": {
+      "title": "SPECIAL STUDIES/ANALYSIS- ARCHEOLOGICAL/PALEONTOLOGICAL",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "AF11": {
+      "title": "EDUCATION, TRAINING, EMPLOYMENT, & SOCIAL SVCS R&D SVCS; EDUCATION SVCS R&D; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AB11": {
+      "title": "COMMUNITY AND REGIONAL DEVELOPMENT R&D SERVICES; COMMUNITY DEVELOPMENT; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "R708": {
+      "title": "SUPPORT- MANAGEMENT: PUBLIC RELATIONS",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "T016": {
+      "title": "PHOTO/MAP/PRINT/PUBLICATION- AUDIO/VISUAL",
+      "category": "T",
+      "category_name": "Photographic / Mapping",
+      "level": 4
+    },
+    "T006": {
+      "title": "PHOTO/MAP/PRINT/PUBLICATION- FILM/VIDEO TAPE PRODUCTION",
+      "category": "T",
+      "category_name": "Photographic / Mapping",
+      "level": 4
+    },
+    "X1AB": {
+      "title": "LEASE/RENTAL OF CONFERENCE SPACE AND FACILITIES",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "U012": {
+      "title": "EDUCATION/TRAINING- INFORMATION TECHNOLOGY/TELECOMMUNICATIONS TRAINING",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "AS12": {
+      "title": "TRANSPORTATION R&D SERVICES; SURFACE TRANSPORTATION, PUBLIC TRANSIT, AND RAIL; APPLIED RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "R497": {
+      "title": "SUPPORT- PROFESSIONAL: PERSONAL SERVICES CONTRACTS",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "B553": {
+      "title": "SPECIAL STUDIES/ANALYSIS- COMMUNICATIONS",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "G099": {
+      "title": "SOCIAL- OTHER",
+      "category": "G",
+      "category_name": "Social Services",
+      "level": 4
+    },
+    "T099": {
+      "title": "PHOTO/MAP/PRINT/PUBLICATION- OTHER",
+      "category": "T",
+      "category_name": "Photographic / Mapping",
+      "level": 4
+    },
+    "M1AB": {
+      "title": "OPERATION OF CONFERENCE SPACE AND FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "Z2PB": {
+      "title": "REPAIR OR ALTERATION OF EXHIBIT DESIGN (NON-BUILDING)",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "L054": {
+      "title": "TECHNICAL REPRESENTATIVE- PREFABRICATED STRUCTURES AND SCAFFOLDING",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "K023": {
+      "title": "MODIFICATION OF EQUIPMENT- GROUND EFFECT VEHICLES, MOTOR VEHICLES, TRAILERS, AND CYCLES",
+      "category": "K",
+      "category_name": "Modification of Equipment",
+      "level": 4
+    },
+    "V231": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: LODGING, HOTEL/MOTEL",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "E1PB": {
+      "title": "PURCHASE OF EXHIBIT DESIGN (NON-BUILDING)",
+      "category": "E",
+      "category_name": "Environmental Services",
+      "level": 4
+    },
+    "C1BZ": {
+      "title": "ARCHITECT AND ENGINEERING- CONSTRUCTION: OTHER AIRFIELD STRUCTURES",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "AC21": {
+      "title": "NATIONAL DEFENSE R&D SERVICES; ATOMIC ENERGY DEFENSE ACTIVITIES; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "R427": {
+      "title": "SUPPORT- PROFESSIONAL: WEATHER REPORTING/OBSERVATION",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "Q801": {
+      "title": "MEDICAL APPOINTING SERVICES",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "R616": {
+      "title": "SUPPORT – ADMINISTRATIVE: PHYSICAL RECORDS MANAGEMENT SERVICES",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "Q802": {
+      "title": "CLERICAL MEDICAL SUPPORT",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "R430": {
+      "title": "SUPPORT- PROFESSIONAL: PHYSICAL SECURITY AND BADGING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "Q602": {
+      "title": "MEDICAL RECORDS",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "M159": {
+      "title": "OPER OF GOVT OTHER INDUSTRIAL BLDG",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "J025": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- VEHICULAR EQUIPMENT COMPONENTS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "Q403": {
+      "title": "MEDICAL- EVALUATION/SCREENING",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q401": {
+      "title": "MEDICAL- NURSING",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q515": {
+      "title": "MEDICAL- PATHOLOGY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q501": {
+      "title": "MEDICAL- ANESTHESIOLOGY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q519": {
+      "title": "BEHAVIORAL AND MENTAL HEALTH",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "L080": {
+      "title": "TECHNICAL REPRESENTATIVE- BRUSHES, PAINTS, SEALERS, AND ADHESIVES",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "Q521": {
+      "title": "MEDICAL- PULMONARY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "R401": {
+      "title": "SUPPORT- PROFESSIONAL: PERSONAL CARE (NON-MEDICAL)",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "J071": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- FURNITURE",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "R608": {
+      "title": "SUPPORT- ADMINISTRATIVE: TRANSLATION AND INTERPRETING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R603": {
+      "title": "SUPPORT- ADMINISTRATIVE: TRANSCRIPTION",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R607": {
+      "title": "SUPPORT- ADMINISTRATIVE: WORD PROCESSING/TYPING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R606": {
+      "title": "SUPPORT- ADMINISTRATIVE: COURT REPORTING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "T013": {
+      "title": "PHOTO/MAP/PRINT/PUBLICATION- TECHNICAL WRITING",
+      "category": "T",
+      "category_name": "Photographic / Mapping",
+      "level": 4
+    },
+    "R605": {
+      "title": "SUPPORT- ADMINISTRATIVE: LIBRARY",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "R617": {
+      "title": "SUPPORT – ADMINISTRATIVE: ELECTRONIC RECORDS MANAGEMENT SERVICES",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "D311": {
+      "title": "IT AND TELECOM- DATA CONVERSION",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "D321": {
+      "title": "IT AND TELECOM- HELP DESK",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "DE11": {
+      "title": "IT AND TELECOM - MOBILE DEVICE AS A SERVICE",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "DE02": {
+      "title": "IT AND TELECOM - MOBILE DEVICE SUPPORT SERVICES (LABOR)",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "D304": {
+      "title": "IT AND TELECOM- TELECOMMUNICATIONS AND TRANSMISSION",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "DG11": {
+      "title": "IT and Telecom - Network: Satellite Communications and Telecom Access Services",
+      "category": "D",
+      "category_name": "IT Services",
+      "level": 4
+    },
+    "W074": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- OFFICE MACHINES, TEXT PROCESSING SYSTEMS, AND VISIBLE RECORD EQUIPMENT",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "R613": {
+      "title": "SUPPORT- ADMINISTRATIVE: POST OFFICE",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "H399": {
+      "title": "INSPECTION- MISCELLANEOUS",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "M1FF": {
+      "title": "OPERATION OF PENAL FACILITIES",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "S209": {
+      "title": "HOUSEKEEPING- LAUNDRY/DRYCLEANING",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "R711": {
+      "title": "SUPPORT- MANAGEMENT: BANKING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "J063": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- ALARM, SIGNAL, AND SECURITY DETECTION SYSTEMS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "H363": {
+      "title": "INSPECTION- ALARM, SIGNAL, AND SECURITY DETECTION SYSTEMS",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "J023": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- GROUND EFFECT VEHICLES, MOTOR VEHICLES, TRAILERS, AND CYCLES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "F019": {
+      "title": "NATURAL RESOURCES/CONSERVATION- OTHER WILDLIFE MANAGEMENT",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "Z1DZ": {
+      "title": "MAINTENANCE OF OTHER HOSPITAL BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "H379": {
+      "title": "INSPECTION- CLEANING EQUIPMENT AND SUPPLIES",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "Q901": {
+      "title": "HEALTHCARE ENVIRONMENTAL CLEANING",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "S203": {
+      "title": "HOUSEKEEPING- FOOD",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "Z1FD": {
+      "title": "MAINTENANCE OF DINING FACILITIES",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "L079": {
+      "title": "TECHNICAL REPRESENTATIVE- CLEANING EQUIPMENT AND SUPPLIES",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "S202": {
+      "title": "HOUSEKEEPING- FIRE PROTECTION",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "Z1PA": {
+      "title": "MAINTENANCE OF RECREATION FACILITIES (NON-BUILDING)",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "S214": {
+      "title": "HOUSEKEEPING- CARPET LAYING/CLEANING",
+      "category": "S",
+      "category_name": "Utilities & Housekeeping",
+      "level": 4
+    },
+    "F008": {
+      "title": "NATURAL RESOURCES/CONSERVATION- RECREATION SITE MAINTENANCE (NON-CONSTRUCTION)",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "C213": {
+      "title": "ARCHITECT AND ENGINEERING- GENERAL: INSPECTION (NON-CONSTRUCTION)",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "Z1PC": {
+      "title": "MAINTENANCE OF UNIMPROVED REAL PROPERTY (LAND)",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "F099": {
+      "title": "NATURAL RESOURCES/CONSERVATION- OTHER",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "Z1EB": {
+      "title": "MAINTENANCE OF MAINTENANCE BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "J073": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- FOOD PREPARATION AND SERVING EQUIPMENT",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "J062": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- LIGHTING FIXTURES AND LAMPS",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "N072": {
+      "title": "INSTALLATION OF EQUIPMENT- HOUSEHOLD AND COMMERCIAL FURNISHINGS AND APPLIANCES",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "M1EC": {
+      "title": "OPERATION OF PRODUCTION BUILDINGS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "Z235": {
+      "title": "MAINT-REP-ALT/EPG - NUCLEAR",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "N035": {
+      "title": "INSTALLATION OF EQUIPMENT- SERVICE AND TRADE EQUIPMENT",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "R614": {
+      "title": "SUPPORT- ADMINISTRATIVE: PAPER SHREDDING",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "Z1KA": {
+      "title": "MAINTENANCE OF DAMS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "W045": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- PLUMBING, HEATING, AND WASTE DISPOSAL EQUIPMENT",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "F108": {
+      "title": "ENVIRONMENTAL SYSTEMS PROTECTION- ENVIRONMENTAL REMEDIATION",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "H345": {
+      "title": "INSPECTION- PLUMBING, HEATING, AND WASTE DISPOSAL EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "F107": {
+      "title": "ENVIRONMENTAL SYSTEMS PROTECTION- TOXIC AND HAZARDOUS SUBSTANCE ANALYSIS",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "H945": {
+      "title": "OTHER QC/TEST/INSPECT- PLUMBING, HEATING, AND WASTE DISPOSAL EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "P100": {
+      "title": "SALVAGE- PREPARATION AND DISPOSAL OF EXCESS/SURPLUS PROPERTY",
+      "category": "P",
+      "category_name": "Salvage",
+      "level": 4
+    },
+    "W085": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- TOILETRIES",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "F016": {
+      "title": "NATURAL RESOURCES/CONSERVATION- WILDHORSE/BURRO CONTROL",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "J085": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- TOILETRIES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "M300": {
+      "title": "OPER OF GOVT RESTORATION",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "J079": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- CLEANING EQUIPMENT AND SUPPLIES",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "X1ND": {
+      "title": "LEASE/RENTAL OF SEWAGE AND WASTE FACILITIES",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "H260": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- FIBER OPTICS MATERIALS, COMPONENTS, ASSEMBLIES, AND ACCESSORIES",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "J034": {
+      "title": "MAINT/REPAIR/REBUILD OF EQUIPMENT- METALWORKING MACHINERY",
+      "category": "J",
+      "category_name": "Maintenance / Repair",
+      "level": 4
+    },
+    "H346": {
+      "title": "INSPECTION- WATER PURIFICATION AND SEWAGE TREATMENT EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "F112": {
+      "title": "ENVIRONMENTAL SYSTEMS PROTECTION- OIL SPILL RESPONSE",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "F113": {
+      "title": "ENVIRONMENTAL SYSTEMS PROTECTION- WETLANDS CONSERVATION AND SUPPORT",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "F110": {
+      "title": "ENVIRON SYS PROTECT- DEVELOPMENT OF ENVIRON IMPACT STMTS/ASSESSMENTS, TECH ANALYSIS/ENVIRON AUDITS",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "C214": {
+      "title": "ARCHITECT AND ENGINEERING- GENERAL: MANAGEMENT ENGINEERING",
+      "category": "C",
+      "category_name": "Architecture & Engineering",
+      "level": 4
+    },
+    "F111": {
+      "title": "ENVIRONMENTAL SYSTEMS PROTECTION- MULTIPLE POLLUTANT SUPPORT",
+      "category": "F",
+      "category_name": "Natural Resources",
+      "level": 4
+    },
+    "H256": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- CONSTRUCTION AND BUILDING MATERIALS",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "L085": {
+      "title": "TECHNICAL REPRESENTATIVE- TOILETRIES",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "W079": {
+      "title": "LEASE OR RENTAL OF EQUIPMENT- CLEANING EQUIPMENT AND SUPPLIES",
+      "category": "W",
+      "category_name": "Lease/Rent Equipment",
+      "level": 4
+    },
+    "Z2FB": {
+      "title": "REPAIR OR ALTERATION OF RECREATIONAL BUILDINGS",
+      "category": "Z",
+      "category_name": "Maintenance of Real Property",
+      "level": 4
+    },
+    "B528": {
+      "title": "SPECIAL STUDIES/ANALYSIS- REGULATORY",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "H299": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- MISCELLANEOUS",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "U010": {
+      "title": "EDUCATION/TRAINING- CERTIFICATIONS/ACCREDITATIONS FOR EDUCATIONAL INSTITUTIONS",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "U007": {
+      "title": "EDUCATION/TRAINING- FACULTY SALARIES FOR DEPENDENT SCHOOLS",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "B537": {
+      "title": "SPECIAL STUDIES/ANALYSIS- MEDICAL/HEALTH",
+      "category": "B",
+      "category_name": "Special Studies",
+      "level": 4
+    },
+    "G002": {
+      "title": "SOCIAL- CHAPLAIN",
+      "category": "G",
+      "category_name": "Social Services",
+      "level": 4
+    },
+    "N063": {
+      "title": "INSTALLATION OF EQUIPMENT- ALARM, SIGNAL, AND SECURITY DETECTION SYSTEMS",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "Q523": {
+      "title": "MEDICAL- SURGERY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q502": {
+      "title": "CARDIOLOGY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q510": {
+      "title": "MEDICAL- NEUROLOGY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q529": {
+      "title": "EMERGENCY MEDICINE SERVICES",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q511": {
+      "title": "OPHTHALMOLOGY & OPTOMETRY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q513": {
+      "title": "ORTHOPEDIC SURGERY SERVICES",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q525": {
+      "title": "MEDICAL- UROLOGY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q524": {
+      "title": "CARDIOTHORACIC SURGERY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "U003": {
+      "title": "EDUCATION/TRAINING- RESERVE TRAINING (MILITARY)",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "U001": {
+      "title": "EDUCATION/TRAINING- LECTURES",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "R420": {
+      "title": "SUPPORT- PROFESSIONAL: CERTIFICATIONS AND ACCREDITATIONS (OTHER THAN EDUC OR INFO TECH C&A)",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "U004": {
+      "title": "EDUCATION/TRAINING- SCIENTIFIC/MANAGEMENT",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "R498": {
+      "title": "SUPPORT- PROFESSIONAL: PATENT AND TRADEMARK",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "M1CZ": {
+      "title": "OPERATION OF OTHER EDUCATIONAL BUILDINGS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "L069": {
+      "title": "TECHNICAL REPRESENTATIVE- TRAINING AIDS AND DEVICES",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "L020": {
+      "title": "TECHNICAL REPRESENTATIVE- SHIP AND MARINE EQUIPMENT",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "Q518": {
+      "title": "MEDICAL- PHYSICAL MEDICINE/REHABILITATION",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "G004": {
+      "title": "SOCIAL- SOCIAL REHABILITATION",
+      "category": "G",
+      "category_name": "Social Services",
+      "level": 4
+    },
+    "X1FB": {
+      "title": "LEASE/RENTAL OF RECREATIONAL BUILDINGS",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "U011": {
+      "title": "EDUCATION/TRAINING- AIDS/HIV",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "E1AZ": {
+      "title": "PURCHASE OF OTHER ADMINISTRATIVE FACILITIES AND SERVICE BUILDINGS",
+      "category": "E",
+      "category_name": "Environmental Services",
+      "level": 4
+    },
+    "AN21": {
+      "title": "HEALTH R&D SERVICES; HEALTH RESEARCH AND TRAINING; BASIC RESEARCH",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "AF25": {
+      "title": "EDUCATION, TRAINING, EMPLOYMENT & SOCIAL SVCS R&D; TRAINING & LABOR R&D; R&D FACILITIES & MAJ EQUIP",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "H270": {
+      "title": "EQUIPMENT AND MATERIALS TESTING- ADP EQUIPMENT/SOFTWARE/SUPPLIES/SUPPORT EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "U014": {
+      "title": "EDUCATION/TRAINING- SECURITY",
+      "category": "U",
+      "category_name": "Education & Training",
+      "level": 4
+    },
+    "L058": {
+      "title": "TECHNICAL REPRESENTATIVE- COMMUNICATION, DETECTION, AND COHERENT RADIATION EQUIPMENT",
+      "category": "L",
+      "category_name": "Technical Representation",
+      "level": 4
+    },
+    "R412": {
+      "title": "SUPPORT- PROFESSIONAL: SIMULATION",
+      "category": "R",
+      "category_name": "Professional Services",
+      "level": 4
+    },
+    "AF35": {
+      "title": "EDUCATION, TRAINING, EMPLOYMENT & SOCIAL SVCS R&D SVCS; SOCIAL SVCS R&D; R&D FACILITIES & MAJ EQUIP",
+      "category": "A",
+      "category_name": "R&D",
+      "level": 4
+    },
+    "Q516": {
+      "title": "MEDICAL- PEDIATRIC",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q526": {
+      "title": "MEDICAL- MEDICAL/PSYCHIATRIC CONSULTATION",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q503": {
+      "title": "MEDICAL- DENTISTRY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q601": {
+      "title": "MEDICAL CODING AND AUDITING",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "M1DB": {
+      "title": "OPERATION OF LABORATORIES AND CLINICS",
+      "category": "M",
+      "category_name": "Operation of Facilities",
+      "level": 4
+    },
+    "V251": {
+      "title": "TRANSPORTATION/TRAVEL/RELOCATION- TRAVEL/LODGING/RECRUITMENT: CIVILIAN PERSONNEL RECRUITMENT",
+      "category": "V",
+      "category_name": "Transportation",
+      "level": 4
+    },
+    "Q402": {
+      "title": "NURSING HOME, LONG-TERM & ADULT DAY CARE SERVICES",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "Q528": {
+      "title": "SOCIAL WORK",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "X1FA": {
+      "title": "LEASE/RENTAL OF FAMILY HOUSING FACILITIES",
+      "category": "X",
+      "category_name": "Lease/Rent Facilities",
+      "level": 4
+    },
+    "H965": {
+      "title": "OTHER QC/TEST/INSPECT- MEDICAL, DENTAL, AND VETERINARY EQUIPMENT AND SUPPLIES",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "Q512": {
+      "title": "MEDICAL- OPTOMETRY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    },
+    "H365": {
+      "title": "INSPECTION- MEDICAL, DENTAL, AND VETERINARY EQUIPMENT AND SUPPLIES",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "H166": {
+      "title": "QUALITY CONTROL- INSTRUMENTS AND LABORATORY EQUIPMENT",
+      "category": "H",
+      "category_name": "Quality Control",
+      "level": 4
+    },
+    "N065": {
+      "title": "INSTALLATION OF EQUIPMENT- MEDICAL, DENTAL, AND VETERINARY EQUIPMENT AND SUPPLIES",
+      "category": "N",
+      "category_name": "Installation of Equipment",
+      "level": 4
+    },
+    "Q505": {
+      "title": "MEDICAL- GASTROENTEROLOGY",
+      "category": "Q",
+      "category_name": "Medical Services",
+      "level": 4
+    }
+  }
+}

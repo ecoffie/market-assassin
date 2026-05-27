@@ -26,6 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { getEntityByUEI } from '@/lib/sam/entity-api';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
+import { getNaics } from '@/lib/codes/lookup';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -339,15 +340,18 @@ export async function GET(request: NextRequest) {
   const identity = mapEntityToIdentity(entity);
   const past_performance = awards.slice(0, 20);
 
-  // Build NAICS-with-descriptions list for the AI coach. SAM entity
-  // gives us naicsList directly with descriptions — feed those through
-  // so the AI doesn't have to pattern-match from naked code numbers
-  // (which makes it default to "IT consulting" for any 541xxx code).
-  const naicsWithDescriptions: NaicsWithDescription[] = (entity.naicsList || []).map(n => ({
-    code: n.naicsCode,
-    description: n.naicsDescription || '',
-    isPrimary: n.isPrimary,
-  }));
+  // Build NAICS-with-descriptions list for the AI coach. Prefer SAM's
+  // returned description, fall back to our local NAICS cache for codes
+  // where SAM didn't surface one (happens occasionally for older codes).
+  const naicsWithDescriptions: NaicsWithDescription[] = (entity.naicsList || []).map(n => {
+    const samDesc = (n.naicsDescription || '').trim();
+    const cacheEntry = !samDesc ? getNaics(n.naicsCode) : null;
+    return {
+      code: n.naicsCode,
+      description: samDesc || cacheEntry?.title || '',
+      isPrimary: n.isPrimary,
+    };
+  });
 
   // Now run the AI coaching pass — RAG-grounded capability draft.
   // We run this AFTER SAM so we can feed real NAICS descriptions +
