@@ -27,6 +27,7 @@ import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { getEntityByUEI } from '@/lib/sam/entity-api';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { getNaics } from '@/lib/codes/lookup';
+import { humanize } from '@/lib/proposal/humanize';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -255,11 +256,24 @@ Draft an initial capability profile that accurately reflects the NAICS MIX above
     const content = data.choices?.[0]?.message?.content;
     if (!content) return null;
     const parsed = JSON.parse(content);
+    // Run humanization on each string field to strip LLM tells
+    // ("world-class", em-dash overuse, generic intros). Same processor
+    // used by Proposal Assist v2.
     return {
-      one_liner: parsed.one_liner || '',
-      elevator_pitch: parsed.elevator_pitch || '',
-      capabilities: Array.isArray(parsed.capabilities) ? parsed.capabilities.slice(0, 5) : [],
-      sample_past_performance: Array.isArray(parsed.sample_past_performance) ? parsed.sample_past_performance.slice(0, 3) : [],
+      one_liner: humanize(parsed.one_liner || ''),
+      elevator_pitch: humanize(parsed.elevator_pitch || ''),
+      capabilities: (Array.isArray(parsed.capabilities) ? parsed.capabilities.slice(0, 5) : []).map((c: { capability_name?: string; description?: string; evidence?: string }) => ({
+        capability_name: humanize(c.capability_name || ''),
+        description: humanize(c.description || ''),
+        evidence: c.evidence ? humanize(c.evidence) : undefined,
+      })),
+      sample_past_performance: (Array.isArray(parsed.sample_past_performance) ? parsed.sample_past_performance.slice(0, 3) : []).map((p: { contract_title?: string; agency?: string; contract_value?: string; scope_description?: string; coaching_note?: string }) => ({
+        contract_title: p.contract_title || '',
+        agency: p.agency || '',
+        contract_value: p.contract_value || '',
+        scope_description: humanize(p.scope_description || ''),
+        coaching_note: p.coaching_note || '',
+      })),
     };
   } catch (err) {
     console.error('[vault/prefill] AI coach failed:', err);
