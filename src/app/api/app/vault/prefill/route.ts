@@ -158,9 +158,15 @@ interface AICoachOutput {
   }[];
 }
 
+interface NaicsWithDescription {
+  code: string;
+  description: string;
+  isPrimary?: boolean;
+}
+
 async function draftAICoachContent(
   legal_name: string,
-  primary_naics: string[],
+  naics: NaicsWithDescription[],
   certifications: string[],
 ): Promise<AICoachOutput | null> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -168,10 +174,20 @@ async function draftAICoachContent(
     console.warn('[vault/prefill] GROQ_API_KEY missing; skipping AI coaching');
     return null;
   }
-  if (primary_naics.length === 0) return null;
+  if (naics.length === 0) return null;
 
-  // Pull RAG context grounded in the user's NAICS + 'capability statement'
-  const ragQuery = `capability statement company overview past performance ${primary_naics.slice(0, 3).join(' ')} ${certifications.join(' ')}`;
+  // Format NAICS with descriptions so the model can SEE what the
+  // codes mean, not just pattern-match on the digits. Without
+  // descriptions the model defaults 541xxx → "IT consulting" which
+  // is wrong for management consulting / training / association firms.
+  const naicsLines = naics.slice(0, 8).map(n =>
+    `  ${n.code}${n.isPrimary ? ' (PRIMARY)' : ''} — ${n.description || '(no description)'}`
+  ).join('\n');
+
+  // RAG query uses NAICS descriptions, not codes. Code-only queries
+  // ('541611 541612') don't match teaching content; descriptive text
+  // ('management consulting training') does.
+  const ragQuery = `capability statement company overview ${naics.slice(0, 3).map(n => n.description).filter(Boolean).join(' ')} ${certifications.join(' ')}`;
   const chunks = await retrieveRagContext({
     query: ragQuery,
     docTypes: ['cap_statement', 'proposal_template', 'course_material', 'teaching_handout'],
@@ -184,25 +200,36 @@ async function draftAICoachContent(
     ? `### GovCon Giants curriculum — STYLE references (do NOT copy verbatim):\n${formatChunksForPrompt(chunks)}\n`
     : '';
 
-  const systemPrompt = `You are a senior federal capture writer drafting an INITIAL capability profile for a small business contractor who just registered with the platform. They have a SAM registration but may not have prior prime federal contracts. Your job is to give them a SHAPE — a starting draft they can edit — that reflects best practices for their NAICS.
+  const systemPrompt = `You are a senior federal capture writer drafting an INITIAL capability profile for a small business contractor who just registered with the platform. They have a SAM registration but may not have prior prime federal contracts. Your job is to give them a SHAPE — a starting draft they can edit — that reflects best practices for their actual NAICS mix.
+
+CRITICAL — read the NAICS list LITERALLY:
+- Each NAICS comes with its official description. Use the descriptions to understand what the firm actually does. Do NOT pattern-match on the code numbers alone.
+- A firm with 541611 (Management Consulting) + 611430 (Training) + 813410 (Civic Organizations) is a MANAGEMENT CONSULTING / TRAINING / ASSOCIATION firm — NOT an IT firm. NEVER assume "IT" unless an actual IT-coded NAICS (541511, 541512, 541513, 541519) appears in the list.
+- A firm with 541330 (Engineering Services) is an ENGINEERING firm, not an "IT services" firm.
+- A firm with 541611 + 541612 + 541613 (HR/Marketing/Management consulting) is a MANAGEMENT CONSULTING firm, not "consulting" generically.
+- Anchor your one-liner on what the FULL MIX of NAICS describes — read all of them, not just the first one.
+- The legal name is also a strong signal. "GOVCON GIANTS INC" + management consulting + training NAICS = federal contracting training firm. Read the name carefully.
 
 Output rules:
 - Respond with a JSON object only, no commentary.
 - Fields: one_liner, elevator_pitch, capabilities (array of {capability_name, description, evidence}), sample_past_performance (array of {contract_title, agency, contract_value, scope_description, coaching_note}).
-- one_liner: ≤12 words, plain English, no fluff ("AI-powered cybersecurity for federal" not "world-class cybersecurity solutions").
-- elevator_pitch: 2-3 sentences, captures what the firm does + why an agency would pick them.
-- capabilities: 4-5 entries, each a SPECIFIC capability tied to their NAICS, in their voice, NOT marketing speak.
-- sample_past_performance: 3 entries. Each is a STARTING TEMPLATE with [bracketed placeholders] showing the user what good past perf looks like — coaching_note explains what they should fill in. DO NOT invent specific contracts. Use [placeholders] for everything specific.
-- NO marketing fluff: no "world-class", "best-in-class", "cutting-edge", "synergistic", "innovative solutions".`;
+- one_liner: ≤12 words, plain English, no fluff, accurately reflects the NAICS mix.
+- elevator_pitch: 2-3 sentences, captures what the firm does + why an agency would pick them. Grounded in the actual NAICS descriptions.
+- capabilities: 4-5 entries, each a SPECIFIC capability tied to one of their NAICS descriptions, in their voice, NOT marketing speak.
+- sample_past_performance: 3 entries. Each is a STARTING TEMPLATE with [bracketed placeholders] showing the user what good past perf looks like for THEIR NAICS mix — coaching_note explains what they should fill in. DO NOT invent specific contracts. Use [placeholders] for everything specific.
+- NO marketing fluff: no "world-class", "best-in-class", "cutting-edge", "synergistic", "innovative solutions".
+- NEVER add "IT" or "technology" framing unless an IT-coded NAICS is actually present.`;
 
   const userPrompt = `Bidder context:
 - Legal name: ${legal_name}
-- Primary NAICS: ${primary_naics.slice(0, 5).join(', ')}
 - Certifications: ${certifications.join(', ') || 'none on file'}
+
+NAICS registered with SAM (read each description carefully — do NOT pattern-match on code numbers alone):
+${naicsLines}
 
 ${ragBlock}
 
-Draft an initial capability profile. JSON only.`;
+Draft an initial capability profile that accurately reflects the NAICS MIX above. JSON only.`;
 
   try {
     const res = await fetch(GROQ_API_URL, {
@@ -312,14 +339,24 @@ export async function GET(request: NextRequest) {
   const identity = mapEntityToIdentity(entity);
   const past_performance = awards.slice(0, 20);
 
+  // Build NAICS-with-descriptions list for the AI coach. SAM entity
+  // gives us naicsList directly with descriptions — feed those through
+  // so the AI doesn't have to pattern-match from naked code numbers
+  // (which makes it default to "IT consulting" for any 541xxx code).
+  const naicsWithDescriptions: NaicsWithDescription[] = (entity.naicsList || []).map(n => ({
+    code: n.naicsCode,
+    description: n.naicsDescription || '',
+    isPrimary: n.isPrimary,
+  }));
+
   // Now run the AI coaching pass — RAG-grounded capability draft.
-  // We run this AFTER SAM so we can feed real NAICS + certifications
-  // into the prompt. Failure is non-blocking; user still gets identity
-  // + USASpending past perf if AI is down.
+  // We run this AFTER SAM so we can feed real NAICS descriptions +
+  // certifications into the prompt. Failure is non-blocking; user
+  // still gets identity + USASpending past perf if AI is down.
   const ai_coach = identity
     ? await draftAICoachContent(
         identity.legal_name,
-        identity.primary_naics,
+        naicsWithDescriptions,
         identity.certifications,
       )
     : null;
