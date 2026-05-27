@@ -920,15 +920,29 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
 
                   {/* Meta — keep tight; tooltip via title attr if user wants the description */}
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-500">
-                    {alert.naicsCode && (
-                      <span title={getNaics(alert.naicsCode)?.title || alert.naicsCode}>
-                        NAICS: {alert.naicsCode}
-                      </span>
-                    )}
+                    {alert.naicsCode && (() => {
+                      const naicsEntry = getNaics(alert.naicsCode);
+                      return (
+                        <span title={naicsEntry?.title || alert.naicsCode}>
+                          NAICS: <span className="font-mono">{alert.naicsCode}</span>
+                          {naicsEntry?.title && (
+                            <span className="text-slate-600"> — {naicsEntry.title}</span>
+                          )}
+                        </span>
+                      );
+                    })()}
                     {alert.pscCode && (
-                      <span title={getPsc(alert.pscCode)?.title || alert.pscCode}>
-                        PSC: {alert.pscCode}
-                      </span>
+                      (() => {
+                        const pscEntry = getPsc(alert.pscCode);
+                        return (
+                          <span title={pscEntry?.title || alert.pscCode}>
+                            PSC: <span className="font-mono">{alert.pscCode}</span>
+                            {pscEntry?.title && (
+                              <span className="text-slate-600"> — {pscEntry.title}</span>
+                            )}
+                          </span>
+                        );
+                      })()
                     )}
                     {getAlertLocation(alert) && (
                       <span>📍 {getAlertLocation(alert)}</span>

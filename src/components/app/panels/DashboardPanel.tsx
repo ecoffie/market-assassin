@@ -11,6 +11,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
 import { MindyInsightCard } from '../MindyInsightCard';
+import { getNaics } from '@/lib/codes/lookup';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -192,7 +193,10 @@ function buildOpportunityNarrative(item: Record<string, unknown>) {
   const solicitationNumber = text(item.solicitationNumber);
 
   const detailParts: string[] = [];
-  if (naicsCode) detailParts.push(`Industry: NAICS ${naicsCode}`);
+  if (naicsCode) {
+    const naicsTitle = getNaics(naicsCode)?.title;
+    detailParts.push(`Industry: NAICS ${naicsCode}${naicsTitle ? ` (${naicsTitle})` : ''}`);
+  }
   if (setAside) detailParts.push(`Set-Aside: ${setAside}`);
   if (daysRemaining !== null) {
     if (daysRemaining <= 3) {
@@ -209,7 +213,10 @@ function buildOpportunityNarrative(item: Record<string, unknown>) {
       : agency
         ? `Opportunity from ${agency}`
         : null,
-    naicsCode ? `aligned to NAICS ${naicsCode}` : null,
+    naicsCode ? (() => {
+      const naicsTitle = getNaics(naicsCode)?.title;
+      return naicsTitle ? `aligned to NAICS ${naicsCode} (${naicsTitle})` : `aligned to NAICS ${naicsCode}`;
+    })() : null,
     setAside ? `with ${setAside} terms` : 'open for review under the current solicitation terms',
     daysRemaining !== null
       ? daysRemaining <= 3

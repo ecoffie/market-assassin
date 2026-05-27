@@ -5,6 +5,7 @@ import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
+import { getNaics } from '@/lib/codes/lookup';
 
 interface ContactsPanelProps {
   email: string | null;
@@ -516,7 +517,17 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
                       </div>
                       {partner.naics_codes && partner.naics_codes.length > 0 && (
                         <div className="text-xs text-slate-500 mt-1">
-                          NAICS: {partner.naics_codes.join(', ')}
+                          NAICS:{' '}
+                          {partner.naics_codes.map((code, idx) => {
+                            const entry = getNaics(code);
+                            return (
+                              <span key={code}>
+                                {idx > 0 && ' · '}
+                                <span className="font-mono">{code}</span>
+                                {entry?.title && <span className="text-slate-600"> — {entry.title}</span>}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                       {pursuits.length > 0 && (
