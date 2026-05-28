@@ -276,6 +276,11 @@ interface UnifiedSidebarProps {
   onWorkspaceChange?: (workspaceId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  // Mobile drawer state. When isMobileOpen is true, the sidebar
+  // slides in from the left over the content. When false, it's
+  // hidden below md breakpoint. Desktop ignores this flag.
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 export default function UnifiedSidebar({
@@ -287,6 +292,8 @@ export default function UnifiedSidebar({
   onWorkspaceChange,
   isCollapsed = false,
   onToggleCollapse,
+  isMobileOpen = false,
+  onMobileClose,
 }: UnifiedSidebarProps) {
   const [hoveredItem, setHoveredItem] = useState<AppPanel | null>(null);
 
@@ -347,13 +354,27 @@ export default function UnifiedSidebar({
   };
 
   return (
-    <aside
-      className={`
-        bg-slate-900 border-r border-slate-800 flex flex-col h-screen sticky top-0
-        transition-all duration-300 ease-in-out
-        ${isCollapsed ? 'w-16' : 'w-64'}
-      `}
-    >
+    <>
+      {/* Mobile backdrop. Tap to close. Only when drawer is open. */}
+      {isMobileOpen && (
+        <div
+          onClick={onMobileClose}
+          className="md:hidden fixed inset-0 bg-black/60 z-40"
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`
+          bg-slate-900 border-r border-slate-800 flex flex-col
+          h-screen sticky top-0
+          transition-all duration-300 ease-in-out
+          z-50
+          ${isCollapsed ? 'md:w-16' : 'md:w-64'}
+          ${isMobileOpen
+            ? 'fixed inset-y-0 left-0 w-64 translate-x-0'
+            : 'fixed -translate-x-full md:translate-x-0 md:sticky'}
+        `}
+      >
       {/* Header */}
       <div className="p-4 border-b border-slate-800">
         <div className="flex items-center justify-between">
@@ -470,6 +491,7 @@ export default function UnifiedSidebar({
                     <Link
                       key={item.id}
                       href={item.href}
+                      onClick={() => onMobileClose?.()}
                       onMouseEnter={() => setHoveredItem(item.id)}
                       onMouseLeave={() => setHoveredItem(null)}
                       className={sharedClassName}
@@ -483,7 +505,15 @@ export default function UnifiedSidebar({
                 return (
                   <button
                     key={item.id}
-                    onClick={() => canAccess && onPanelChange(item.id)}
+                    onClick={() => {
+                      if (canAccess) {
+                        onPanelChange(item.id);
+                        // Auto-close the mobile drawer when user taps
+                        // a panel — they expect the chosen panel to
+                        // take focus, not stare at the menu.
+                        onMobileClose?.();
+                      }
+                    }}
                     onMouseEnter={() => setHoveredItem(item.id)}
                     onMouseLeave={() => setHoveredItem(null)}
                     disabled={!canAccess}
@@ -511,6 +541,7 @@ export default function UnifiedSidebar({
           </Link>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

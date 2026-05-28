@@ -624,7 +624,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   ];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Branded header card — mirrors the daily-alert email banner so the
           in-app feed has the same visual rhythm as what users see in
           their inbox: title, date, match count, profile filter summary. */}
@@ -844,7 +844,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 alert.isUrgent ? 'border-red-500/50 bg-red-500/5' : 'border-slate-800'
               }`}
             >
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
                 <div className="flex-1 min-w-0">
                   {/* Badges */}
                   <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -953,18 +953,22 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                   </div>
                 </div>
 
-                {/* Dates */}
-                <div className="text-right shrink-0">
-                  <div className="text-xs text-slate-500">Response Due</div>
-                  <div className={`text-sm font-medium ${
-                    alert.isUrgent ? 'text-red-400' : alert.isClosingSoon ? 'text-amber-400' : 'text-white'
-                  }`}>
-                    {formatDate(alert.responseDeadline)}
+                {/* Dates + actions. On mobile: full-width footer bar
+                    with date left, actions right (44pt tap targets).
+                    On md+: right-aligned column as before. */}
+                <div className="flex flex-row md:flex-col md:text-right md:shrink-0 items-center md:items-end justify-between gap-3 md:gap-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-800/60 md:border-none">
+                  <div className="md:order-1">
+                    <div className="text-xs text-slate-500">Response Due</div>
+                    <div className={`text-sm font-medium ${
+                      alert.isUrgent ? 'text-red-400' : alert.isClosingSoon ? 'text-amber-400' : 'text-white'
+                    }`}>
+                      {formatDate(alert.responseDeadline)}
+                    </div>
+                    <div className="hidden md:block text-xs text-slate-500 mt-2">
+                      Posted {formatDate(alert.postedDate)}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">
-                    Posted {formatDate(alert.postedDate)}
-                  </div>
-                  <div className="mt-2">
+                  <div className="flex items-center gap-1 md:mt-2 md:order-2">
                     {/* Save button only renders for users who can actually
                         save. Free tier gets nothing here — the upgrade
                         pitch lives in the drawer (Mindy Analyst card),
@@ -978,7 +982,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                           saveToPipeline(alert);
                         }}
                         disabled={savingAlertIds.has(alert.id) || savedAlertIds.has(alert.id)}
-                        className="text-xs text-blue-300 hover:text-blue-200 disabled:text-slate-500 disabled:cursor-default mr-3"
+                        className="text-xs text-blue-300 hover:text-blue-200 disabled:text-slate-500 disabled:cursor-default px-3 py-2 md:px-2 md:py-1 hover:bg-blue-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                       >
                         {savedAlertIds.has(alert.id)
                           ? 'Saved'
@@ -993,7 +997,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                       rel="noopener noreferrer"
                       onClick={(event) => event.stopPropagation()}
                       onMouseDown={() => trackAlertEvent('link_click', alert, 'open_sam')}
-                      className="text-xs text-emerald-400 hover:text-emerald-300"
+                      className="text-xs text-emerald-400 hover:text-emerald-300 px-3 py-2 md:px-2 md:py-1 hover:bg-emerald-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                     >
                       SAM.gov →
                     </a>
@@ -1003,7 +1007,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                         event.stopPropagation();
                         dismissAlert(alert);
                       }}
-                      className="ml-3 text-xs text-slate-500 hover:text-slate-300"
+                      className="text-xs text-slate-500 hover:text-slate-300 px-3 py-2 md:px-2 md:py-1 hover:bg-slate-800 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                     >
                       Dismiss
                     </button>

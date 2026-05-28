@@ -6,7 +6,7 @@ import Link from 'next/link';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import PanelContainer from '@/components/app/panels';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
-import { Mic } from 'lucide-react';
+import { Mic, Menu } from 'lucide-react';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { ToastHost } from '@/components/app/Toast';
@@ -70,6 +70,8 @@ function AppDashboard() {
   // via the in-panel button on Pipeline. Single mount so the modal
   // doesn't double up when Pipeline is also showing one.
   const [isVoiceCaptureOpen, setIsVoiceCaptureOpen] = useState(false);
+  // Mobile sidebar drawer state. Desktop ignores this.
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
@@ -893,6 +895,8 @@ function AppDashboard() {
         onWorkspaceChange={setCurrentWorkspaceId}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Settings Panel */}
@@ -912,16 +916,24 @@ function AppDashboard() {
       {/* Main Content */}
       <main className="flex-1 min-h-screen overflow-y-auto">
         {/* Top Bar */}
-        <header className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-slate-400">
+        <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 md:px-6 py-3 md:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Mobile hamburger — opens the sidebar drawer */}
+              <button
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                aria-label="Open menu"
+              >
+                <Menu className="w-5 h-5" strokeWidth={1.75} />
+              </button>
+              <span className="hidden md:inline text-sm text-slate-400 truncate">
                 Logged in as <span className="text-white">{email}</span>
               </span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
               <span className={`
-                px-2 py-1 text-xs rounded
+                hidden sm:inline px-2 py-1 text-xs rounded
                 ${tier === 'free' ? 'bg-slate-700 text-slate-300' : 'bg-emerald-500/20 text-emerald-400'}
               `}>
                 {tier === 'free' ? 'Free' : tier === 'team' ? 'Team' : tier === 'enterprise' ? 'Enterprise' : 'Pro'} Plan
@@ -930,6 +942,7 @@ function AppDashboard() {
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                 title="Settings & Preferences"
+                aria-label="Settings"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -939,14 +952,14 @@ function AppDashboard() {
               <button
                 onClick={handleSignOut}
                 disabled={authLoading}
-                className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                className="hidden lg:inline text-sm text-slate-500 hover:text-slate-300 transition-colors"
               >
                 Switch Account
               </button>
               <button
                 onClick={handleSignOut}
                 disabled={authLoading}
-                className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-red-400/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+                className="hidden md:inline-block rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-red-400/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Sign out
               </button>
