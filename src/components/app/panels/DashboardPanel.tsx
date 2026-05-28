@@ -849,22 +849,22 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         onOpenOpportunities={() => router.push(marketIntelHref)}
       />
 
-      <div className="px-6 py-5 border-b border-slate-800 bg-slate-950">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="px-4 md:px-6 py-4 md:py-5 border-b border-slate-800 bg-slate-950">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Today&apos;s Intel</h1>
-            <p className="text-sm text-slate-400 mt-1">Best-fit opportunities, summaries, and next actions from your saved profile.</p>
+            <h1 className="text-xl md:text-2xl font-bold">Today&apos;s Intel</h1>
+            <p className="text-xs md:text-sm text-slate-400 mt-1">Best-fit opportunities, summaries, and next actions from your saved profile.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Link
               href={marketIntelHref}
-              className="px-4 py-2 bg-purple-600/20 text-purple-200 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors"
+              className="flex-1 md:flex-none text-center px-3 md:px-4 py-2 bg-purple-600/20 text-purple-200 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors text-sm md:text-base"
             >
               Open SAM Dashboard
             </Link>
             <button
               onClick={loadBriefings}
-              className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
+              className="px-3 md:px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors text-sm md:text-base"
               aria-label="Refresh briefings"
             >
               Refresh
@@ -874,7 +874,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
       </div>
 
       {/* Mindy Insight hero card — daily quote, theme rotates by day */}
-      <div className="px-6 pt-5">
+      <div className="px-3 md:px-6 pt-4 md:pt-5">
         <MindyInsightCard email={email} />
       </div>
 

@@ -101,8 +101,8 @@ export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0, on
 
   return (
     <div className="bg-gradient-to-r from-purple-900/30 via-purple-800/20 to-purple-900/30 border-b border-purple-500/20">
-      <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+      <div className="px-3 md:px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-4 md:gap-x-6 gap-y-2">
           {/* Main headline stat - clickable to dashboard with profile filter */}
           {onOpenOpportunities ? (
             <button
