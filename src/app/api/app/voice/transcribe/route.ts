@@ -93,8 +93,14 @@ export async function POST(request: NextRequest) {
   if (!res.ok) {
     const errText = await res.text().catch(() => '(no body)');
     console.error('[voice/transcribe] OpenAI', res.status, errText.slice(0, 300));
+    // Common upstream-error mapping so the UI shows a useful hint
+    // instead of just a number. Mindy users don't know what OpenAI is.
+    let friendly = 'Transcription failed';
+    if (res.status === 401) friendly = 'Voice service not configured — admin needs to set the OpenAI key.';
+    else if (res.status === 429) friendly = 'Voice service is busy. Try again in a minute.';
+    else if (res.status === 413 || res.status === 400) friendly = 'Audio was rejected — try a shorter clip.';
     return NextResponse.json(
-      { error: `Transcription failed (${res.status})`, detail: errText.slice(0, 200) },
+      { error: friendly, detail: errText.slice(0, 200), upstreamStatus: res.status },
       { status: 502 },
     );
   }
