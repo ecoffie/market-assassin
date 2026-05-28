@@ -44,8 +44,15 @@ fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
 });
 
 const supabase = createClient(envVars.NEXT_PUBLIC_SUPABASE_URL, envVars.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+
+// Provider switch: PROVIDER=openai uses OpenAI Whisper (default after
+// 2026-05-27 when Groq Dev Tier became unavailable). PROVIDER=groq
+// keeps the old behaviour for if/when Dev Tier reopens.
+const PROVIDER = (process.env.PROVIDER || 'openai').toLowerCase();
+const OPENAI_API_KEY = envVars.OPENAI_API_KEY;
 const GROQ_API_KEY = envVars.GROQ_API_KEY;
-if (!GROQ_API_KEY) { console.error('GROQ_API_KEY missing from .env.local'); process.exit(1); }
+if (PROVIDER === 'openai' && !OPENAI_API_KEY) { console.error('OPENAI_API_KEY missing from .env.local'); process.exit(1); }
+if (PROVIDER === 'groq' && !GROQ_API_KEY) { console.error('GROQ_API_KEY missing from .env.local'); process.exit(1); }
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
@@ -54,9 +61,33 @@ const limitArg = (args.find(a => a.startsWith('--limit=')) || '').split('=')[1];
 const LIMIT = limitArg ? parseInt(limitArg, 10) : Infinity;
 
 const MAX_ATTEMPTS = 3;
-const SIZE_THRESHOLD = 95 * 1024 * 1024; // 95MB — under 100MB Groq cap with headroom
-const GROQ_MODEL = 'whisper-large-v3-turbo';
-const COST_PER_HOUR = 0.04;
+// Both providers cap at 25MB file size. Both lack reliable URL-fetch
+// behind redirects. So we ALWAYS download + (if needed) downsample
+// before uploading. Threshold below which we skip the downsample
+// (raw download works directly).
+const SIZE_THRESHOLD = 20 * 1024 * 1024;
+
+// Provider-specific endpoint config
+const PROVIDER_CFG = {
+  openai: {
+    endpoint: 'https://api.openai.com/v1/audio/transcriptions',
+    model: 'whisper-1',
+    label: 'whisper-1',
+    apiKey: OPENAI_API_KEY,
+    costPerHour: 0.36,       // $0.006/min = $0.36/hr
+    providerTag: 'openai_whisper_1',
+  },
+  groq: {
+    endpoint: 'https://api.groq.com/openai/v1/audio/transcriptions',
+    model: 'whisper-large-v3-turbo',
+    label: 'whisper-large-v3-turbo',
+    apiKey: GROQ_API_KEY,
+    costPerHour: 0.04,
+    providerTag: 'groq_whisper_v3_turbo',
+  },
+}[PROVIDER];
+
+const COST_PER_HOUR = PROVIDER_CFG.costPerHour;
 const WORDS_PER_CHUNK = 500;
 const OVERLAP_WORDS = 50;
 
@@ -123,40 +154,49 @@ async function downloadToTemp(url) {
 
 // ---- Groq transcription ----------------------------------------
 
-async function transcribeViaUrl(audioUrl) {
-  const fd = new FormData();
-  fd.append('url', audioUrl);
-  fd.append('model', GROQ_MODEL);
-  fd.append('response_format', 'text');
-  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${GROQ_API_KEY}` },
-    body: fd,
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`Groq URL transcribe ${res.status}: ${text.slice(0, 300)}`);
-  }
-  return text.trim();
+// Both providers throw 429 with a "Please try again in N seconds" hint
+// when rate-limited. Parse that hint, sleep, retry. 429 retries DON'T
+// count against the job's attempts cap because they're recoverable.
+function parseRetryAfterSeconds(errText) {
+  const m = errText.match(/try again in (\d+(?:\.\d+)?)m(\d+(?:\.\d+)?)?s/i)
+        || errText.match(/try again in (\d+(?:\.\d+)?)s/i);
+  if (!m) return 30;
+  if (m[2]) return Math.ceil(parseFloat(m[1]) * 60 + parseFloat(m[2]));
+  return Math.ceil(parseFloat(m[1]));
 }
 
-async function transcribeViaUpload(filePath) {
+async function callProvider(fd, label) {
+  // Single POST + 429-aware wait+retry loop (max 5 waits = ~10 min).
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await fetch(PROVIDER_CFG.endpoint, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${PROVIDER_CFG.apiKey}` },
+      body: fd,
+    });
+    const text = await res.text();
+    if (res.ok) return text.trim();
+    if (res.status === 429) {
+      const waitSec = Math.min(parseRetryAfterSeconds(text) + 2, 300);
+      console.log(`  [rate-limit] sleeping ${waitSec}s before retry...`);
+      await new Promise(r => setTimeout(r, waitSec * 1000));
+      continue;
+    }
+    throw new Error(`${PROVIDER} ${label} ${res.status}: ${text.slice(0, 300)}`);
+  }
+  throw new Error(`${PROVIDER} ${label}: rate-limit retries exhausted`);
+}
+
+// OpenAI doesn't accept URLs — always upload. So this helper builds
+// the multipart upload regardless of provider, and the main loop now
+// always downloads then uploads (no URL-fetch path).
+async function transcribeFile(filePath) {
   const fd = new FormData();
   const buf = fs.readFileSync(filePath);
   const blob = new Blob([buf], { type: 'audio/mpeg' });
   fd.append('file', blob, path.basename(filePath));
-  fd.append('model', GROQ_MODEL);
+  fd.append('model', PROVIDER_CFG.model);
   fd.append('response_format', 'text');
-  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${GROQ_API_KEY}` },
-    body: fd,
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`Groq file transcribe ${res.status}: ${text.slice(0, 300)}`);
-  }
-  return text.trim();
+  return callProvider(fd, 'file transcribe');
 }
 
 // ---- doc/chunk update ------------------------------------------
@@ -215,7 +255,7 @@ async function refoldDocument(job, transcriptText) {
 // ---- main loop -------------------------------------------------
 
 async function main() {
-  console.log(`[transcribe] Mode: ${isDryRun ? 'DRY RUN' : 'LIVE'}${retryFailed ? ' (+ retry failed)' : ''}`);
+  console.log(`[transcribe] Provider: ${PROVIDER} (${PROVIDER_CFG.label}) · $${COST_PER_HOUR}/hr · Mode: ${isDryRun ? 'DRY RUN' : 'LIVE'}${retryFailed ? ' (+ retry failed)' : ''}`);
 
   // Pull pending (+ failed if --retry-failed) jobs
   const statusFilter = retryFailed ? ['pending', 'failed'] : ['pending'];
@@ -254,23 +294,26 @@ async function main() {
     try {
       const sizeBytes = job.audio_bytes || 0;
 
-      // Always resolve redirect first — Groq doesn't follow 302s.
+      // Resolve redirect (Libsyn 302→CDN) then always download — OpenAI
+      // requires file upload, no URL support. For files >20MB we
+      // additionally downsample (mono 16kHz 32kbps) to fit under the
+      // 25MB Whisper-1 cap.
       const resolved = await resolveRedirect(job.audio_url);
+      console.log(`  > downloading (${Math.round(sizeBytes / 1024 / 1024) || '?'}MB)…`);
+      const downloaded = await downloadToTemp(resolved);
+      tempFiles.push(downloaded);
+      const downloadedSize = fs.statSync(downloaded).size;
 
-      if (sizeBytes > 0 && sizeBytes > SIZE_THRESHOLD) {
-        // Big file — download + downsample + upload
-        console.log(`  > ${Math.round(sizeBytes / 1024 / 1024)}MB — downloading + downsampling…`);
-        const downloaded = await downloadToTemp(resolved);
-        tempFiles.push(downloaded);
+      let uploadPath = downloaded;
+      if (downloadedSize > SIZE_THRESHOLD) {
         const downsampled = downloaded.replace(/\.mp3$/, '.lo.mp3');
         await downsampleToTemp(downloaded, downsampled);
         tempFiles.push(downsampled);
         const newSize = fs.statSync(downsampled).size;
         console.log(`  downsampled: ${Math.round(newSize / 1024 / 1024)}MB`);
-        transcript = await transcribeViaUpload(downsampled);
-      } else {
-        transcript = await transcribeViaUrl(resolved);
+        uploadPath = downsampled;
       }
+      transcript = await transcribeFile(uploadPath);
 
       if (!transcript || transcript.length < 100) {
         throw new Error(`Empty or too-short transcript (${transcript.length} chars)`);
@@ -285,7 +328,7 @@ async function main() {
         transcript_text: transcript,
         transcript_chars: transcript.length,
         transcribed_at: new Date().toISOString(),
-        provider: 'groq_whisper_v3_turbo',
+        provider: PROVIDER_CFG.providerTag,
         provider_cost_usd: costUsd.toFixed(5),
         last_error: null,
         updated_at: new Date().toISOString(),
