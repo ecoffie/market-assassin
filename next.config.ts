@@ -97,6 +97,51 @@ const nextConfig: NextConfig = {
           has: [{ type: 'host', value: 'getmindy.ai' }],
           destination: '/app/auth/callback',
         },
+        {
+          source: '/market-intelligence',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/market-intelligence',
+        },
+        {
+          source: '/opportunity-hunter',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/opportunity-hunter',
+        },
+        {
+          source: '/expiring-contracts',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/expiring-contracts',
+        },
+        {
+          source: '/forecasts',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/forecasts',
+        },
+        {
+          source: '/bd-assist',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/bd-assist',
+        },
+        {
+          source: '/about',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/about',
+        },
+        {
+          source: '/free-resources',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/free-resources',
+        },
+        {
+          source: '/privacy',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/privacy',
+        },
+        {
+          source: '/terms',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/terms',
+        },
       ],
       afterFiles: [],
       fallback: [],
