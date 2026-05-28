@@ -154,7 +154,7 @@ export function YearlyChart({ data, currentFiscalYear }: Props) {
             <LabelList
               dataKey="total_obligated"
               position="top"
-              formatter={(value: number) => fmtCompactCurrency(Number(value))}
+              formatter={(value) => fmtCompactCurrency(Number(value ?? 0))}
               fill="#e2e8f0"
               fontSize={11}
               fontWeight={600}
