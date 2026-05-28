@@ -30,6 +30,7 @@ import {
   getSimilarRecipients,
   recipientSlug,
 } from '@/lib/bigquery/recipients';
+import { YearlyChart } from '@/components/contractors/YearlyChart';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -137,8 +138,6 @@ export default async function ContractorPage({ params }: PageProps) {
     ? await getSimilarRecipients(uei, topNaicsCode, 8)
     : [];
 
-  const maxYearAmount = Math.max(...yearly.map((y) => Number(y.total_obligated || 0)), 1);
-
   // JSON-LD: Organization + BreadcrumbList. NO `isAccessibleForFree:
   // false` directive — that signal told Google "skip ranking this".
   // The content here IS free. Public sales history is, by definition,
@@ -243,33 +242,18 @@ export default async function ContractorPage({ params }: PageProps) {
 
       {/* Year over Year */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-4">Year-Over-Year Federal Sales</h2>
+        <h2 className="text-2xl font-bold mb-1">Year-Over-Year Federal Sales</h2>
+        <p className="text-sm text-slate-400 mb-4">
+          Annual obligated dollars by fiscal year. Hover any bar for YoY change + award count.
+        </p>
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          {yearly.length === 0 ? (
-            <p className="text-slate-400">No fiscal-year data available.</p>
-          ) : (
-            <div className="space-y-2">
-              {yearly.map((y) => {
-                const pct = (Number(y.total_obligated) / maxYearAmount) * 100;
-                return (
-                  <div
-                    key={y.fiscal_year}
-                    className="grid grid-cols-[4rem_1fr_8rem_5rem] items-center gap-3 text-sm"
-                  >
-                    <span className="font-mono text-slate-400">FY {y.fiscal_year}</span>
-                    <div className="h-5 overflow-hidden rounded-full bg-slate-800">
-                      <div
-                        className="h-full rounded-full bg-purple-500"
-                        style={{ width: `${Math.max(2, pct)}%` }}
-                      />
-                    </div>
-                    <span className="text-right font-bold text-white">{fmtMoney(Number(y.total_obligated))}</span>
-                    <span className="text-right text-xs text-slate-500">{y.award_count} awards</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <YearlyChart
+            data={yearly.map((y) => ({
+              fiscal_year: Number(y.fiscal_year),
+              total_obligated: Number(y.total_obligated),
+              award_count: Number(y.award_count),
+            }))}
+          />
         </div>
       </section>
 
