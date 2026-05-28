@@ -7,6 +7,7 @@ import WorkspaceSwitcher from './WorkspaceSwitcher';
 
 // Panel types for the unified MI platform
 export type AppPanel =
+  | 'chat'           // Mindy Chat - RAG-backed Q&A (v1, #117)
   | 'dashboard'      // AI Briefings - Daily/Weekly/Pursuit
   | 'alerts'         // Daily Alerts - opportunity list
   | 'market-intel'   // /app/market-intel — full-bleed dashboard route (not a panel)
@@ -66,6 +67,16 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Intelligence',
     items: [
+      {
+        // Mindy Chat — flagship v2 entry, top of the sidebar per Eric's
+        // call (decision logged 2026-05-27 in PRD-mindy-chat-v1.md).
+        id: 'chat',
+        label: 'Mindy Chat',
+        icon: '💬',
+        description: 'Ask anything, cited sources',
+        tier: ['free', 'pro', 'team', 'enterprise'],
+        badge: 'BETA',
+      },
       {
         id: 'dashboard',
         label: "Today's Intel",

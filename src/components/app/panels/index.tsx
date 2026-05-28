@@ -4,6 +4,7 @@ import { Suspense, lazy } from 'react';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
 
 // Lazy load panels for better performance
+const MindyChatPanel = lazy(() => import('./MindyChatPanel'));
 const DashboardPanel = lazy(() => import('./DashboardPanel'));
 const AlertsPanel = lazy(() => import('./AlertsPanel'));
 const MarketResearchPanel = lazy(() => import('./MarketResearchPanel'));
@@ -47,6 +48,8 @@ function PanelLoading() {
 export default function PanelContainer({ activePanel, email, tier, onPanelChange, panelContext }: PanelContainerProps) {
   const renderPanel = () => {
     switch (activePanel) {
+      case 'chat':
+        return <MindyChatPanel email={email} tier={tier} />;
       case 'dashboard':
         return <DashboardPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'alerts':
