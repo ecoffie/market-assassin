@@ -119,6 +119,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority,
     });
+
+    // Sub-pages — one per contractor per tab. Each is its own SEO
+    // target (e.g. "lockheed martin contracts"). Slightly lower
+    // priority than overview since overview is the canonical entry
+    // point for brand-search intent.
+    const subPagePriority = Math.max(priority - 0.1, 0.2);
+    for (const tab of ['contracts', 'agencies', 'naics']) {
+      contractorEntries.push({
+        url: `${SITE_URL}/contractors/${slug}/${tab}`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: subPagePriority,
+      });
+    }
   }
 
   // 3) One sitemap entry per glossary term. Priority 0.5 because each

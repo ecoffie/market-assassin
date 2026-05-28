@@ -225,6 +225,33 @@ export default async function ContractorPage({ params }: PageProps) {
         </div>
       </section>
 
+      {/* Tab nav — links to sub-pages */}
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="flex gap-1 border-b border-slate-800 overflow-x-auto">
+          <span className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-purple-500 text-white">
+            Overview
+          </span>
+          <Link
+            href={`/contractors/${slug}/contracts`}
+            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
+          >
+            Contracts
+          </Link>
+          <Link
+            href={`/contractors/${slug}/agencies`}
+            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
+          >
+            Agencies
+          </Link>
+          <Link
+            href={`/contractors/${slug}/naics`}
+            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
+          >
+            NAICS
+          </Link>
+        </div>
+      </div>
+
       {/* Company Profile */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
         <h2 className="text-2xl font-bold mb-4">Company Profile</h2>

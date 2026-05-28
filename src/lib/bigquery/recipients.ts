@@ -258,6 +258,113 @@ export interface YearlyByAgencyRow {
  * drilldown. Returns rows for every (FY, agency) pair where the
  * contractor had activity. Caller rolls up to "top N + Other".
  */
+/**
+ * Paginated full awards list for a recipient — powers the
+ * /contractors/[slug]/contracts/[page] SEO subpages.
+ *
+ * Pagination uses fixed page size + offset. BQ can fetch ~50 rows from
+ * a clustered query in <500ms cold (KV-cached after that), and big
+ * primes (Lockheed) produce ~100 paginated URLs which Google can crawl
+ * over weeks.
+ *
+ * Skips $0 modifications — they're real records but the user-facing
+ * value is "what money moved", not "which admin paperwork was filed".
+ */
+export async function getPaginatedAwardsForRecipient(
+  uei: string,
+  page: number,
+  pageSize: number = 50,
+): Promise<{ rows: RecentAwardRow[]; total: number }> {
+  const offset = (page - 1) * pageSize;
+  const [rows, totalRows] = await Promise.all([
+    queryCached<RecentAwardRow>({
+      cacheKey: `recipient:${uei}:awards-page:${page}:${pageSize}`,
+      query: `
+        SELECT
+          award_id,
+          piid,
+          awarding_agency,
+          awarding_office,
+          naics_code,
+          naics_description,
+          description,
+          obligation_amount,
+          CAST(action_date AS STRING) AS action_date,
+          CAST(pop_start_date AS STRING) AS pop_start_date,
+          CAST(pop_end_date AS STRING) AS pop_end_date,
+          pop_state,
+          set_aside
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_uei = @uei
+          AND obligation_amount > 0
+        ORDER BY action_date DESC
+        LIMIT @pageSize
+        OFFSET @offset
+      `,
+      params: { uei, pageSize, offset },
+    }),
+    queryCached<{ total: number }>({
+      cacheKey: `recipient:${uei}:awards-total`,
+      query: `
+        SELECT COUNT(*) AS total
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_uei = @uei AND obligation_amount > 0
+      `,
+      params: { uei },
+    }),
+  ]);
+  return { rows, total: Number(totalRows[0]?.total ?? 0) };
+}
+
+/**
+ * Full NAICS breakdown for a recipient — used on /contractors/[slug]/naics.
+ * Returns all NAICS the contractor has activity in, not just top N.
+ */
+export async function getAllNaicsForRecipient(uei: string): Promise<TopNaicsRow[]> {
+  return queryCached<TopNaicsRow>({
+    cacheKey: `recipient:${uei}:all-naics`,
+    query: `
+      SELECT
+        naics_code,
+        ANY_VALUE(naics_description) AS naics_description,
+        SUM(obligation_amount) AS total_amount,
+        COUNT(DISTINCT award_id) AS award_count
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei = @uei AND naics_code IS NOT NULL
+      GROUP BY naics_code
+      ORDER BY total_amount DESC
+    `,
+    params: { uei },
+  });
+}
+
+/**
+ * Full agency breakdown for a recipient — used on /contractors/[slug]/agencies.
+ * Returns all agencies, not just top N. Caller can paginate display-side.
+ */
+export async function getAllAgenciesForRecipient(uei: string): Promise<TopAgencyRow[]> {
+  return queryCached<TopAgencyRow>({
+    cacheKey: `recipient:${uei}:all-agencies`,
+    query: `
+      WITH totals AS (
+        SELECT SUM(obligation_amount) AS grand_total
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_uei = @uei
+      )
+      SELECT
+        awarding_agency,
+        SUM(obligation_amount) AS total_amount,
+        COUNT(DISTINCT award_id) AS award_count,
+        SUM(obligation_amount) / (SELECT grand_total FROM totals) AS pct_of_total
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei = @uei AND awarding_agency IS NOT NULL
+      GROUP BY awarding_agency
+      ORDER BY total_amount DESC
+    `,
+    params: { uei },
+  });
+}
+
 export async function getYearlyByAgencyForRecipient(
   uei: string,
 ): Promise<YearlyByAgencyRow[]> {
