@@ -636,7 +636,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 overflow-x-hidden">
       {/* Compact Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-4">

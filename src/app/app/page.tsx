@@ -914,7 +914,7 @@ function AppDashboard() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen overflow-y-auto pb-24 md:pb-0">
+      <main className="flex-1 min-h-screen overflow-y-auto overflow-x-hidden pb-24 md:pb-0 w-full min-w-0">
         {/* Top Bar */}
         <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between gap-3">
