@@ -19,16 +19,38 @@ const DATASET = 'usaspending';
 
 let _client: BigQuery | null = null;
 
+function parseSaJson(raw: string): Record<string, unknown> {
+  // Accept three formats from env:
+  //   1. Raw JSON (works when env doesn't mangle newlines)
+  //   2. Base64-encoded JSON (safest for Vercel — no newline issues)
+  //   3. JSON with escaped \n that need converting to real newlines
+  //      (Vercel sometimes does this with multi-line PEM keys)
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{')) {
+    // Try direct first, fall back to \n unescape for the private_key field
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      // Vercel can double-escape \n inside private_key
+      return JSON.parse(trimmed.replace(/\\n/g, '\n'));
+    }
+  }
+  // Assume base64
+  const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
+  return JSON.parse(decoded);
+}
+
 function getClient(): BigQuery {
   if (_client) return _client;
 
   const saJson = process.env.GCP_SA_JSON;
   if (saJson) {
-    // Vercel / production: service account from env
-    const credentials = JSON.parse(saJson);
+    // Vercel / production: service account from env. Tolerates raw JSON,
+    // base64 JSON, or JSON with escaped \n in private_key.
+    const credentials = parseSaJson(saJson) as { project_id?: string };
     _client = new BigQuery({
       projectId: credentials.project_id ?? PROJECT_ID,
-      credentials,
+      credentials: credentials as never,
     });
   } else {
     // Local dev: Application Default Credentials
