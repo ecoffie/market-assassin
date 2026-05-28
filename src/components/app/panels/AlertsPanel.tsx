@@ -627,18 +627,20 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Branded header card — mirrors the daily-alert email banner so the
           in-app feed has the same visual rhythm as what users see in
-          their inbox: title, date, match count, profile filter summary. */}
+          their inbox: title, date, match count, profile filter summary.
+          Mobile: stack title above buttons, tighter padding so the
+          title doesn't word-wrap to one-word-per-line. */}
       <div className="rounded-xl overflow-hidden border border-slate-800">
-        <div className="bg-gradient-to-br from-slate-950 to-slate-900 px-6 py-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-2xl">🎯</span>
-                <h1 className="text-xl font-bold text-white">
+        <div className="bg-gradient-to-br from-slate-950 to-slate-900 px-4 md:px-6 py-4 md:py-5">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 md:gap-3">
+                <span className="text-2xl shrink-0">🎯</span>
+                <h1 className="text-lg md:text-xl font-bold text-white leading-tight">
                   {isFreeTier ? 'Mindy Daily Alerts' : 'Mindy Saved Search Alert'}
                 </h1>
                 {isFreeTier && (
-                  <span className="px-2 py-0.5 text-xs bg-slate-800 text-slate-300 rounded">Free</span>
+                  <span className="px-2 py-0.5 text-xs bg-slate-800 text-slate-300 rounded shrink-0">Free</span>
                 )}
               </div>
               <p className="text-sm text-slate-400 mt-1">
@@ -646,7 +648,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 {totalCount > 0 && <span className="text-emerald-400 ml-2">• {totalCount} matches found</span>}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 onClick={loadAlerts}
                 disabled={isLoading}
@@ -666,34 +668,38 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           </div>
         </div>
 
-        {/* Filter summary — mirrors the dark band under the email header */}
+        {/* Filter summary — mirrors the dark band under the email header.
+            Mobile: stack as wrapping flex rows so NAICS badges don't
+            squeeze into a 30px column. */}
         {(searchCriteria.naicsCodes.length > 0 || searchCriteria.businessType || searchCriteria.setAsidePreferences.length > 0 || searchCriteria.locationStates.length > 0) && (
-          <div className="bg-slate-900 border-t border-slate-800 px-6 py-3 text-xs text-slate-400">
-            <span className="font-semibold text-slate-300 mr-2">Filters:</span>
-            {searchCriteria.naicsCodes.length > 0 && (
-              <span className="mr-3 inline-flex items-center gap-1.5 align-middle">
-                <span className="text-slate-300 mr-1">NAICS</span>
-                <NaicsBadgeList codes={searchCriteria.naicsCodes} max={3} size="sm" />
-              </span>
-            )}
-            {searchCriteria.businessType && (
-              <span className="mr-3">• {searchCriteria.businessType}</span>
-            )}
-            {searchCriteria.setAsidePreferences.length > 0 && (
-              <span className="mr-3">
-                • Set-asides: {searchCriteria.setAsidePreferences.slice(0, 3).join(', ')}
-              </span>
-            )}
-            {searchCriteria.locationStates.length > 0 && (
-              <span className="mr-3">
-                • States: {searchCriteria.locationStates.length <= 4
-                  ? searchCriteria.locationStates.join(', ')
-                  : `${searchCriteria.locationStates.slice(0, 3).join(', ')} +${searchCriteria.locationStates.length - 3}`}
-              </span>
-            )}
-            {searchCriteria.locationStates.length === 0 && (
-              <span className="mr-3 text-slate-500">• States: all (national)</span>
-            )}
+          <div className="bg-slate-900 border-t border-slate-800 px-4 md:px-6 py-3 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="font-semibold text-slate-300">Filters:</span>
+              {searchCriteria.naicsCodes.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 align-middle flex-wrap">
+                  <span className="text-slate-300">NAICS</span>
+                  <NaicsBadgeList codes={searchCriteria.naicsCodes} max={3} size="sm" />
+                </span>
+              )}
+              {searchCriteria.businessType && (
+                <span>• {searchCriteria.businessType}</span>
+              )}
+              {searchCriteria.setAsidePreferences.length > 0 && (
+                <span>
+                  • Set-asides: {searchCriteria.setAsidePreferences.slice(0, 3).join(', ')}
+                </span>
+              )}
+              {searchCriteria.locationStates.length > 0 && (
+                <span>
+                  • States: {searchCriteria.locationStates.length <= 4
+                    ? searchCriteria.locationStates.join(', ')
+                    : `${searchCriteria.locationStates.slice(0, 3).join(', ')} +${searchCriteria.locationStates.length - 3}`}
+                </span>
+              )}
+              {searchCriteria.locationStates.length === 0 && (
+                <span className="text-slate-500">• States: all (national)</span>
+              )}
+            </div>
           </div>
         )}
       </div>
