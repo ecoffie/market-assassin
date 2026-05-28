@@ -967,15 +967,32 @@ function MarketIntelDashboard() {
                         void loadAnalyst(opp.notice_id);
                       }
                     }}
-                    className="w-full text-left p-4"
+                    className="w-full text-left p-3 md:p-4"
                   >
-                    <div className="flex items-start gap-3">
-                      <span className={`shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded ${colors.bg} ${colors.text} border ${colors.border}`}>
-                        {NOTICE_TYPE_LABELS[opp.notice_type || ''] || opp.notice_type || 'Notice'}
-                      </span>
+                    {/* Mobile: title gets its own row + badge row underneath
+                        (title was truncating to ~15 chars on phones with
+                        the inline badges fighting for space). Desktop:
+                        original 3-column row stays as-is. */}
+                    <div className="flex flex-col md:flex-row md:items-start gap-2 md:gap-3">
+                      {/* Top row on mobile: badges only (title moves below
+                          on its own line). Desktop: notice-type badge left. */}
+                      <div className="flex items-center gap-2 md:gap-3 md:contents">
+                        <span className={`shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded ${colors.bg} ${colors.text} border ${colors.border}`}>
+                          {NOTICE_TYPE_LABELS[opp.notice_type || ''] || opp.notice_type || 'Notice'}
+                        </span>
+                        {/* Mobile-only inline: set-aside + urgency next to notice type */}
+                        <div className="flex items-center gap-2 md:hidden ml-auto">
+                          {opp.set_aside_code && opp.set_aside_code !== 'None' && (
+                            <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                              {SET_ASIDE_LABELS[opp.set_aside_code] || opp.set_aside_code}
+                            </span>
+                          )}
+                          {getUrgencyBadge(opp.urgency_level, opp.days_until_deadline)}
+                        </div>
+                      </div>
 
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm text-white truncate">{opp.title}</h4>
+                        <h4 className="font-medium text-sm md:text-sm text-white md:truncate line-clamp-2 md:line-clamp-1 leading-snug">{opp.title}</h4>
                         <p className="text-xs text-gray-500 mt-0.5 truncate">
                           {opp.department}
                           {opp.naics_code && ` • NAICS ${opp.naics_code}`}
@@ -983,7 +1000,9 @@ function MarketIntelDashboard() {
                         </p>
                       </div>
 
-                      <div className="shrink-0 text-right flex items-center gap-3">
+                      {/* Desktop-only: same badges on the right (mobile already
+                          showed them in the top row above) */}
+                      <div className="hidden md:flex shrink-0 text-right items-center gap-3">
                         {opp.set_aside_code && opp.set_aside_code !== 'None' && (
                           <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
                             {SET_ASIDE_LABELS[opp.set_aside_code] || opp.set_aside_code}
