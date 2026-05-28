@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import PanelContainer from '@/components/app/panels';
+import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
+import { Mic } from 'lucide-react';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { ToastHost } from '@/components/app/Toast';
@@ -64,6 +66,10 @@ function AppDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Voice capture FAB state — mobile-first surface, also reachable
+  // via the in-panel button on Pipeline. Single mount so the modal
+  // doesn't double up when Pipeline is also showing one.
+  const [isVoiceCaptureOpen, setIsVoiceCaptureOpen] = useState(false);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
@@ -957,6 +963,33 @@ function AppDashboard() {
           panelContext={panelContext}
         />
       </main>
+
+      {/* Mobile-first voice capture FAB. Visible on small screens
+          only — desktop users use the in-panel "Add by voice" button
+          on PipelinePanel (#119). Always-accessible because field
+          captures shouldn't require panel-hunting. */}
+      {email && (
+        <>
+          <button
+            onClick={() => setIsVoiceCaptureOpen(true)}
+            className="md:hidden fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-2xl shadow-purple-900/40 flex items-center justify-center transition-transform active:scale-95"
+            aria-label="Voice capture"
+            title="Voice capture"
+          >
+            <Mic className="w-6 h-6" strokeWidth={1.75} />
+          </button>
+          <VoiceCaptureModal
+            email={email}
+            isOpen={isVoiceCaptureOpen}
+            onClose={() => setIsVoiceCaptureOpen(false)}
+            onSaved={() => {
+              // Reload current panel data by switching to pipeline so
+              // the new row is visible immediately.
+              handlePanelChange('pipeline');
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Mic } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { getNaics } from '@/lib/codes/lookup';
+import VoiceCaptureModal from '../voice/VoiceCaptureModal';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -106,6 +108,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // them when the user wants to dig out an old opp.
   const [showArchived, setShowArchived] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false); // Toggle for Won/Lost in list view
+  const [voiceOpen, setVoiceOpen] = useState(false);          // Voice capture modal (#119)
   const [sortField, setSortField] = useState<'deadline' | 'value' | 'stage' | 'priority' | 'title'>('deadline');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [stats, setStats] = useState<Record<string, number>>({});
@@ -674,6 +677,14 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
             </button>
           </div>
           <button
+            onClick={() => setVoiceOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition-colors font-medium"
+            title="Voice capture — talk, Mindy turns it into a pursuit"
+          >
+            <Mic className="w-4 h-4" strokeWidth={1.75} />
+            Add by voice
+          </button>
+          <button
             onClick={loadPipeline}
             className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-sm rounded-lg transition-colors"
           >
@@ -681,6 +692,18 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           </button>
         </div>
       </div>
+
+      {email && (
+        <VoiceCaptureModal
+          email={email}
+          isOpen={voiceOpen}
+          onClose={() => setVoiceOpen(false)}
+          onSaved={() => {
+            showToast({ message: 'Pursuit added from voice capture', variant: 'success' });
+            loadPipeline();
+          }}
+        />
+      )}
 
       {/* Error */}
       {error && (
