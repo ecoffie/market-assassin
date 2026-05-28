@@ -36,7 +36,14 @@ import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loader
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// Swapped from llama-3.3-70b-versatile to 8b-instant 2026-05-28 after
+// the 70b TPD ceiling (100K tokens/day) ran out — chat throughput got
+// blocked while the metadata extraction batch competed for the same
+// budget. The 8b model is in a separate quota bucket and is roughly
+// 2x faster. We trade a small amount of nuance for reliability under
+// Free tier. Flip back to 70b once Dev Tier reopens OR the rolling
+// 24h window clears AND metadata extraction is done.
+const GROQ_MODEL = 'llama-3.1-8b-instant';
 const TEMPERATURE = 0.3;          // citation-faithful per #117 spec
 const MAX_TOKENS = 1024;          // chat responses are conversational, not essays
 const RAG_LIMIT = 6;              // ~6 chunks → ~3000 chars context
