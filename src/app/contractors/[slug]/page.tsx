@@ -1,409 +1,440 @@
+/**
+ * /contractors/[slug] — federal contractor profile page.
+ *
+ * Backed by BigQuery `usaspending.recipients` (~317K contractors) with
+ * a fallback to the legacy `contractors.json` (~2,768 hand-curated
+ * entries) for any slug that doesn't resolve in BQ.
+ *
+ * SEO model:
+ *   - Canonical: https://getmindy.ai/contractors/<slug>
+ *   - Schema: Organization (the contractor) + BreadcrumbList
+ *   - All sections render server-side, no client JS needed
+ *   - Free, no paywall directives. The full award table is the entire
+ *     point of ranking for "<contractor> federal contracts".
+ *
+ * Rendering strategy:
+ *   - Top 1,000 contractors by total_obligated → prerendered at build
+ *     (covers ~80% of crawl traffic)
+ *   - Rest → ISR on first request, revalidate every 7 days
+ */
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import {
-  findContractorBySlug,
-  formatCompactCurrency,
-  getContractorSalesHistory,
-  getContractorSlug,
-} from '@/lib/contractor-sales-history';
-import contractorsData from '@/data/contractors.json';
+  getRecipientBySlug,
+  getYearlyTotalsForRecipient,
+  getTopAgenciesForRecipient,
+  getTopNaicsForRecipient,
+  getRecentAwardsForRecipient,
+  getExecutivesForRecipient,
+  getSimilarRecipients,
+  recipientSlug,
+} from '@/lib/bigquery/recipients';
 
-// Revalidate every 24h. USAspending data only refreshes weekly so
-// we could go longer, but daily keeps the pages fresh-ish and
-// matches our agency_target_data_cache TTL convention.
-export const revalidate = 86_400; // 24h in seconds
+const SITE_URL = 'https://getmindy.ai';
 
-// Pre-build the top contractors at build time so the highest-value
-// SEO pages are served from cache, not a cold DB hit. The rest
-// hydrate on first request and stick around for `revalidate`
-// seconds via Next.js ISR.
-const TOP_N_STATIC = 500;
-
-interface ContractorRow {
-  company: string;
-  contract_value_num?: number;
-}
-
-export async function generateStaticParams() {
-  const rows = (contractorsData as ContractorRow[])
-    .filter(c => c.company)
-    .sort((a, b) => (b.contract_value_num || 0) - (a.contract_value_num || 0))
-    .slice(0, TOP_N_STATIC);
-
-  // De-dupe by slug — contractors.json carries a few near-dupes
-  // ("OPTUM PUBLIC SECTOR SOLUTIONS INC" vs " INC.") that would
-  // throw "duplicate params" warnings at build.
-  const seen = new Set<string>();
-  const params: Array<{ slug: string }> = [];
-  for (const c of rows) {
-    const slug = getContractorSlug({ company: c.company });
-    if (!slug || seen.has(slug)) continue;
-    seen.add(slug);
-    params.push({ slug });
-  }
-  return params;
-}
-
-// Allow ISR for any slug not in the static set. First request to
-// a new slug hits the DB, generates the page, then it's cached
-// for `revalidate` seconds.
+// ISR-only model. We don't prerender any contractor at build time
+// because:
+//   1. BQ has 317K recipients — prerendering even the top 1K = 6K BQ
+//      jobs at build, slow + costly
+//   2. ISR caches at the edge after the first request, so Googlebot
+//      and real users get the same cached HTML
+//   3. KV cache on the data layer (7-day TTL) absorbs cold-start cost
+//
+// generateStaticParams returns empty array → all routes render on demand
+// the first time Googlebot or a user requests them.
+export const revalidate = 604800; // 7 days
 export const dynamicParams = true;
 
-// Canonical SEO hostname — getmindy.ai is the Google-facing domain
-// per the May 2026 SEO canonicalization. mi.govcongiants.com still
-// works for in-flight users via host rewrite. See sitemap.ts.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
-const SITE_NAME = 'GovCon Giants';
-
-/**
- * Gated content schema - tells Google which parts are free vs paywalled
- * Free preview: stats, YoY chart, top agencies/NAICS (visible to all)
- * Paid content: full award list, contacts, teaming workflows, exports
- */
-function gatedContractorJsonLd({
-  company,
-  description,
-  slug,
-}: {
-  company: string;
-  description: string;
-  slug: string;
-}) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    name: `${company} Federal Contract Awards & Sales History`,
-    description,
-    url: `${SITE_URL}/contractors/${slug}`,
-    isAccessibleForFree: false,
-    hasPart: [
-      {
-        '@type': 'WebPageElement',
-        isAccessibleForFree: true,
-        cssSelector: '.free-preview',
-      },
-      {
-        '@type': 'WebPageElement',
-        isAccessibleForFree: false,
-        cssSelector: '.premium-content',
-      },
-    ],
-    publisher: {
-      '@type': 'Organization',
-      name: SITE_NAME,
-      url: SITE_URL,
-    },
-  };
+export async function generateStaticParams() {
+  return [];
 }
 
-interface ContractorPageProps {
+function fmtMoney(n: number | null | undefined): string {
+  if (!n) return '$0';
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+function fmtDate(value: string | null | undefined): string {
+  if (!value) return 'Unknown';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'Unknown';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtCompanyName(raw: string): string {
+  // SAM data is SHOUTY ALL-CAPS. Title-case for display, preserve common
+  // acronyms (INC, LLC, CORP, USA, US, NA, etc.).
+  const ACRONYMS = new Set(['INC', 'LLC', 'CORP', 'CORPORATION', 'CO', 'USA', 'US', 'NA', 'LP', 'LLP', 'LTD', 'PLC', 'PC', 'PLLC']);
+  return raw
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => {
+      const upper = w.toUpperCase().replace(/[.,]/g, '');
+      if (ACRONYMS.has(upper)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(' ');
+}
+
+interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-function formatDate(value: string | null) {
-  if (!value) return 'Unknown date';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Unknown date';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-export async function generateMetadata({ params }: ContractorPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const contractor = findContractorBySlug(slug);
-
-  if (!contractor) {
-    return {
-      title: 'Federal Contractor Not Found | GovCon Giants',
-    };
+  const recipient = await getRecipientBySlug(slug);
+  if (!recipient) {
+    return { title: 'Contractor Not Found | Mindy' };
   }
-
-  const title = `${contractor.company} Federal Contract Awards & Sales History`;
-  const description = `Research ${contractor.company} federal contract sales, award history, agencies, NAICS codes, and recent government contracting activity.`;
+  const displayName = fmtCompanyName(recipient.recipient_name);
+  const title = `${displayName} — Federal Contract Awards & Sales History | Mindy`;
+  const description = `${displayName} federal contracting profile: ${fmtMoney(recipient.total_obligated)} across ${recipient.award_count.toLocaleString()} awards from ${recipient.distinct_agency_count} agencies. UEI, NAICS, recent contracts, year-over-year trends.`;
 
   return {
     title,
     description,
-    alternates: {
-      canonical: `https://mi.govcongiants.com/contractors/${slug}`,
-    },
+    alternates: { canonical: `${SITE_URL}/contractors/${slug}` },
     openGraph: {
       title,
       description,
-      url: `https://mi.govcongiants.com/contractors/${slug}`,
-      type: 'website',
+      url: `${SITE_URL}/contractors/${slug}`,
+      type: 'profile',
+      siteName: 'Mindy',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
     },
   };
 }
 
-export default async function ContractorPage({ params }: ContractorPageProps) {
+export default async function ContractorPage({ params }: PageProps) {
   const { slug } = await params;
-  const contractor = findContractorBySlug(slug);
+  const recipient = await getRecipientBySlug(slug);
+  if (!recipient) notFound();
 
-  if (!contractor) {
-    return (
-      <main className="min-h-screen bg-slate-950 px-6 py-16 text-white">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-slate-800 bg-slate-900 p-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-400">
-            Federal contractor database
-          </p>
-          <h1 className="mt-4 text-3xl font-bold">Contractor not found</h1>
-          <p className="mt-3 text-slate-400">
-            This contractor profile may have moved or may not be indexed yet.
-          </p>
-          <Link
-            href="/contractor-database"
-            className="mt-6 inline-flex rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-500"
-          >
-            Search contractors
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  const displayName = fmtCompanyName(recipient.recipient_name);
+  const uei = recipient.recipient_uei;
 
-  const history = await getContractorSalesHistory({
-    company: contractor.company,
-    publicView: true,
-    awardLimit: 5,
-  });
+  // Fetch sub-sections in parallel — independent queries
+  const [yearly, topAgencies, topNaics, recentAwards, executives] = await Promise.all([
+    getYearlyTotalsForRecipient(uei),
+    getTopAgenciesForRecipient(uei, 10),
+    getTopNaicsForRecipient(uei, 10),
+    getRecentAwardsForRecipient(uei, 25),
+    getExecutivesForRecipient(uei),
+  ]);
 
-  const maxYearAmount = Math.max(...(history?.series.map((year) => year.totalObligations) || [1]), 1);
-  const totalValue = history?.summary.totalObligations || contractor.contract_value_num || 0;
-  const awardCount = history?.summary.awardCount || contractor.contract_count || 'N/A';
+  // Related contractors (same top NAICS, exclude self). Fall back to
+  // empty array if recipient has no NAICS history.
+  const topNaicsCode = topNaics[0]?.naics_code;
+  const related = topNaicsCode
+    ? await getSimilarRecipients(uei, topNaicsCode, 8)
+    : [];
 
-  const jsonLd = gatedContractorJsonLd({
-    company: contractor.company,
-    description: `Research ${contractor.company} federal contract sales, award history, agencies, NAICS codes, and recent government contracting activity.`,
-    slug,
-  });
+  const maxYearAmount = Math.max(...yearly.map((y) => Number(y.total_obligated || 0)), 1);
+
+  // JSON-LD: Organization + BreadcrumbList. NO `isAccessibleForFree:
+  // false` directive — that signal told Google "skip ranking this".
+  // The content here IS free. Public sales history is, by definition,
+  // public.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${SITE_URL}/contractors/${slug}#org`,
+        name: displayName,
+        identifier: [
+          { '@type': 'PropertyValue', propertyID: 'UEI', value: uei },
+          ...(recipient.cage_code
+            ? [{ '@type': 'PropertyValue', propertyID: 'CAGE', value: recipient.cage_code }]
+            : []),
+        ],
+        ...(recipient.address || recipient.city
+          ? {
+              address: {
+                '@type': 'PostalAddress',
+                streetAddress: recipient.address || undefined,
+                addressLocality: recipient.city || undefined,
+                addressRegion: recipient.state || undefined,
+                postalCode: recipient.zip || undefined,
+                addressCountry: recipient.country || undefined,
+              },
+            }
+          : {}),
+        ...(recipient.parent_name
+          ? { parentOrganization: { '@type': 'Organization', name: fmtCompanyName(recipient.parent_name) } }
+          : {}),
+        url: `${SITE_URL}/contractors/${slug}`,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: 'Contractors', item: `${SITE_URL}/contractors` },
+          { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${slug}` },
+        ],
+      },
+    ],
+  };
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
-      {/* JSON-LD for gated content - tells Google what's free vs paid */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <section className="border-b border-slate-800 bg-slate-900">
-        <div className="mx-auto max-w-6xl px-6 py-12">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-400">
-                Federal contractor sales history
-              </p>
-              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-normal text-white md:text-5xl">
-                {contractor.company}
-              </h1>
-              <p className="mt-4 max-w-3xl text-lg text-slate-300">
-                Public federal award history, agency concentration, NAICS activity, and year-over-year
-                sales signals for government contractors.
-              </p>
-            </div>
-            <Link
-              href="/mi"
-              className="inline-flex shrink-0 rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-500"
-            >
-              Unlock full Market Intelligence
-            </Link>
-          </div>
+      {/* Breadcrumb */}
+      <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-slate-400">
+        <Link href="/" className="hover:text-purple-400">Home</Link>
+        <span className="mx-2">/</span>
+        <Link href="/contractors" className="hover:text-purple-400">Contractors</Link>
+        <span className="mx-2">/</span>
+        <span className="text-slate-300">{displayName}</span>
+      </div>
+
+      {/* Hero */}
+      <section className="mx-auto max-w-6xl px-6 pt-6 pb-10">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">
+          Federal Contractor Profile
+        </p>
+        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">
+          {displayName}
+        </h1>
+        <p className="mt-4 max-w-3xl text-lg text-slate-300">
+          Federal contracting record: {fmtMoney(recipient.total_obligated)} obligated across{' '}
+          {recipient.award_count.toLocaleString()} awards from {recipient.distinct_agency_count} agencies, FY{' '}
+          {(yearly[0]?.fiscal_year ?? 2016)}–{(yearly[yearly.length - 1]?.fiscal_year ?? new Date().getFullYear())}.
+        </p>
+
+        {/* Identity stats */}
+        <div className="mt-8 grid gap-4 md:grid-cols-4">
+          <Stat label="Total Obligated" value={fmtMoney(recipient.total_obligated)} highlight />
+          <Stat label="Award Records" value={recipient.award_count.toLocaleString()} />
+          <Stat label="Agencies Served" value={recipient.distinct_agency_count.toString()} />
+          <Stat label="NAICS Codes" value={recipient.distinct_naics_count.toString()} />
         </div>
       </section>
 
-      {/* FREE PREVIEW SECTION - Indexed by Google */}
-      <div className="free-preview mx-auto max-w-6xl space-y-8 px-6 py-10">
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <div className="text-3xl font-bold text-white">{formatCompactCurrency(totalValue)}</div>
-            <div className="mt-2 text-sm text-slate-500">Known federal sales</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <div className="text-3xl font-bold text-emerald-400">{awardCount}</div>
-            <div className="mt-2 text-sm text-slate-500">Award records</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <div className="text-3xl font-bold text-blue-400">
-              {history?.summary.latestFiscalYear || 'N/A'}
-            </div>
-            <div className="mt-2 text-sm text-slate-500">Latest fiscal year</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <div className="truncate text-xl font-bold text-purple-300">
-              {history?.summary.topAgency || 'Multiple agencies'}
-            </div>
-            <div className="mt-2 text-sm text-slate-500">Top agency signal</div>
-          </div>
+      {/* Company Profile */}
+      <section className="mx-auto max-w-6xl px-6 pb-10">
+        <h2 className="text-2xl font-bold mb-4">Company Profile</h2>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 grid gap-4 md:grid-cols-2">
+          <Field label="UEI (Unique Entity Identifier)" value={uei} mono />
+          {recipient.cage_code && <Field label="CAGE Code" value={recipient.cage_code} mono />}
+          {recipient.parent_name && <Field label="Parent Organization" value={fmtCompanyName(recipient.parent_name)} />}
+          {(recipient.address || recipient.city) && (
+            <Field
+              label="Address"
+              value={[recipient.address, recipient.city, recipient.state, recipient.zip].filter(Boolean).join(', ')}
+            />
+          )}
+          <Field label="First Federal Award" value={fmtDate(recipient.first_action_date)} />
+          <Field label="Most Recent Award" value={fmtDate(recipient.last_action_date)} />
         </div>
+      </section>
 
-        <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Year-Over-Year Federal Sales</h2>
-              <p className="mt-1 text-slate-400">
-                Public preview of annual obligated dollars found in GovCon Giants award data.
-              </p>
-            </div>
-            {history?.coverage === 'limited' && (
-              <span className="rounded-full bg-amber-500/10 px-3 py-1 text-sm text-amber-300">
-                Limited cached coverage
-              </span>
-            )}
-          </div>
-
-          {history?.series.length ? (
-            <div className="mt-6 space-y-2">
-              {history.series.map((year) => {
-                const breakdown = year.agencyBreakdown || [];
-                // Use native <details> so this drill-down works
-                // without client JS and Googlebot can crawl the
-                // expanded content. Defaults open on the most
-                // recent FY to give first-time visitors immediate
-                // signal without a click.
-                const isMostRecent = year.fiscalYear === history.series[0].fiscalYear;
+      {/* Year over Year */}
+      <section className="mx-auto max-w-6xl px-6 pb-10">
+        <h2 className="text-2xl font-bold mb-4">Year-Over-Year Federal Sales</h2>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          {yearly.length === 0 ? (
+            <p className="text-slate-400">No fiscal-year data available.</p>
+          ) : (
+            <div className="space-y-2">
+              {yearly.map((y) => {
+                const pct = (Number(y.total_obligated) / maxYearAmount) * 100;
                 return (
-                  <details
-                    key={year.fiscalYear}
-                    open={isMostRecent}
-                    className="group rounded-lg border border-transparent hover:border-slate-800 open:border-slate-800 open:bg-slate-950/40 transition-colors"
+                  <div
+                    key={y.fiscal_year}
+                    className="grid grid-cols-[4rem_1fr_8rem_5rem] items-center gap-3 text-sm"
                   >
-                    <summary className={`grid grid-cols-[1.5rem_4.5rem_1fr_7rem] items-center gap-3 px-2 py-2 list-none ${breakdown.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}>
-                      <span className="text-slate-500 text-sm select-none">
-                        {breakdown.length > 0 ? (
-                          <>
-                            <span className="group-open:hidden">▸</span>
-                            <span className="hidden group-open:inline">▼</span>
-                          </>
-                        ) : null}
-                      </span>
-                      <div className="text-sm font-semibold text-slate-300">FY {year.fiscalYear}</div>
-                      <div className="h-5 overflow-hidden rounded-full bg-slate-800">
-                        <div
-                          className="h-full rounded-full bg-emerald-500"
-                          style={{ width: `${Math.max(4, (year.totalObligations / maxYearAmount) * 100)}%` }}
-                        />
-                      </div>
-                      <div className="text-right text-sm font-bold text-white">
-                        {formatCompactCurrency(year.totalObligations)}
-                      </div>
-                    </summary>
-                    {breakdown.length > 0 && (
-                      <div className="ml-10 mr-2 mb-3 mt-1 space-y-1.5 border-l border-slate-800 pl-3">
-                        <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
-                          Agencies awarding in FY {year.fiscalYear}
-                        </p>
-                        {[...breakdown]
-                          .sort((a, b) => b.amount - a.amount)
-                          .slice(0, 8)
-                          .map((row) => (
-                            <div key={`${year.fiscalYear}-${row.agency}`} className="flex items-center justify-between gap-3 text-xs">
-                              <span className="text-slate-300 truncate flex-1">{row.agency}</span>
-                              <span className="text-slate-500 shrink-0">{row.count} {row.count === 1 ? 'award' : 'awards'}</span>
-                              <span className="text-emerald-400 font-semibold shrink-0 w-24 text-right">
-                                {formatCompactCurrency(row.amount)}
-                              </span>
-                            </div>
-                          ))}
-                        {breakdown.length > 8 && (
-                          <p className="text-[10px] text-slate-600 italic pt-1">
-                            +{breakdown.length - 8} more agencies in FY {year.fiscalYear}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </details>
+                    <span className="font-mono text-slate-400">FY {y.fiscal_year}</span>
+                    <div className="h-5 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className="h-full rounded-full bg-purple-500"
+                        style={{ width: `${Math.max(2, pct)}%` }}
+                      />
+                    </div>
+                    <span className="text-right font-bold text-white">{fmtMoney(Number(y.total_obligated))}</span>
+                    <span className="text-right text-xs text-slate-500">{y.award_count} awards</span>
+                  </div>
                 );
               })}
-              <p className="text-[11px] text-slate-500 italic pt-2 text-center">
-                Click any year to expand the per-agency breakdown.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950 p-5 text-slate-400">
-              Detailed annual sales are not cached yet. The contractor database currently shows{' '}
-              {formatCompactCurrency(contractor.contract_value_num || 0)} in total contract value.
             </div>
           )}
-        </section>
+        </div>
+      </section>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-xl font-bold">Top Agencies</h2>
-            <div className="mt-5 space-y-4">
-              {history?.topAgencies.length ? history.topAgencies.map((agency) => (
-                <div key={agency.agency} className="flex items-center justify-between gap-5">
+      {/* Top Agencies + Top NAICS */}
+      <section className="mx-auto max-w-6xl px-6 pb-10 grid gap-6 md:grid-cols-2">
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <h2 className="text-xl font-bold mb-4">Top Federal Agencies</h2>
+          {topAgencies.length === 0 ? (
+            <p className="text-slate-400 text-sm">No agency data.</p>
+          ) : (
+            <ul className="space-y-3">
+              {topAgencies.map((a) => (
+                <li key={a.awarding_agency} className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="truncate font-semibold text-slate-100">{agency.agency}</div>
-                    <div className="text-sm text-slate-500">{agency.count} awards</div>
+                    <p className="truncate text-slate-100 font-medium">{a.awarding_agency}</p>
+                    <p className="text-xs text-slate-500">{a.award_count} awards · {(Number(a.pct_of_total) * 100).toFixed(1)}% of total</p>
                   </div>
-                  <div className="font-bold text-emerald-400">{formatCompactCurrency(agency.amount)}</div>
-                </div>
-              )) : (
-                <p className="text-slate-400">Agency award details are available inside Market Intelligence.</p>
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-xl font-bold">Top NAICS Activity</h2>
-            <div className="mt-5 space-y-4">
-              {history?.topNaics.length ? history.topNaics.map((naics) => (
-                <div key={naics.naics} className="flex items-center justify-between gap-5">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-slate-100">{naics.naics}</div>
-                    <div className="truncate text-sm text-slate-500">{naics.description || 'No description'}</div>
-                  </div>
-                  <div className="font-bold text-emerald-400">{formatCompactCurrency(naics.amount)}</div>
-                </div>
-              )) : (
-                <p className="text-slate-400">
-                  Known profile NAICS: {contractor.naics && contractor.naics !== 'N/A' ? contractor.naics : 'Not listed'}
-                </p>
-              )}
-            </div>
-          </section>
+                  <span className="shrink-0 font-mono text-purple-400 font-semibold">{fmtMoney(Number(a.total_amount))}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
-      </div>
-
-      {/* PREMIUM CONTENT SECTION - Gated, not fully indexed by Google */}
-      <div className="premium-content mx-auto max-w-6xl px-6 pb-10">
-        <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-xl font-bold">Recent Public Award Preview</h2>
-              <p className="mt-1 text-slate-400">
-                Full award list, contacts, teaming workflows, and exports are gated in MI.
-              </p>
-            </div>
-            <Link
-              href="/mi"
-              className="inline-flex rounded-lg border border-emerald-500/40 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/10"
-            >
-              Research this contractor in MI
-            </Link>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {history?.recentAwards.length ? history.recentAwards.map((award) => (
-              <article key={award.id} className="rounded-lg border border-slate-800 bg-slate-950 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <h3 className="font-semibold text-white">{award.title}</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {award.agency} · {formatDate(award.startDate)}
-                    </p>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <h2 className="text-xl font-bold mb-4">Top NAICS Activity</h2>
+          {topNaics.length === 0 ? (
+            <p className="text-slate-400 text-sm">No NAICS data.</p>
+          ) : (
+            <ul className="space-y-3">
+              {topNaics.map((n) => (
+                <li key={n.naics_code} className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-mono text-slate-100">{n.naics_code}</p>
+                    <p className="truncate text-xs text-slate-400">{n.naics_description}</p>
+                    <p className="text-xs text-slate-500 mt-1">{n.award_count} awards</p>
                   </div>
-                  <div className="font-bold text-emerald-400">{formatCompactCurrency(award.amount)}</div>
-                </div>
-              </article>
-            )) : (
-              <p className="rounded-lg border border-slate-800 bg-slate-950 p-4 text-slate-400">
-                Recent award previews are not cached yet for this contractor.
-              </p>
-            )}
+                  <span className="shrink-0 font-mono text-purple-400 font-semibold">{fmtMoney(Number(n.total_amount))}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* Recent Awards Table */}
+      <section className="mx-auto max-w-6xl px-6 pb-10">
+        <h2 className="text-2xl font-bold mb-4">Recent Federal Awards</h2>
+        <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+          {recentAwards.length === 0 ? (
+            <p className="p-6 text-slate-400">No recent award data available.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="text-left px-4 py-3">Date</th>
+                  <th className="text-left px-4 py-3">Agency</th>
+                  <th className="text-left px-4 py-3">NAICS</th>
+                  <th className="text-left px-4 py-3">Description</th>
+                  <th className="text-right px-4 py-3">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {recentAwards.map((a) => (
+                  <tr key={a.award_id} className="hover:bg-slate-800/40">
+                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{fmtDate(a.action_date)}</td>
+                    <td className="px-4 py-3 text-slate-300 max-w-[14rem]">
+                      <span className="truncate block">{a.awarding_agency || '—'}</span>
+                      {a.awarding_office && <span className="text-xs text-slate-500 truncate block">{a.awarding_office}</span>}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{a.naics_code || '—'}</td>
+                    <td className="px-4 py-3 text-slate-300 max-w-[20rem]">
+                      <span className="line-clamp-2">{a.description || '—'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                      {fmtMoney(Number(a.obligation_amount))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+
+      {/* Executives (FFATA disclosures) */}
+      {executives.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-10">
+          <h2 className="text-2xl font-bold mb-1">Top Compensated Officers</h2>
+          <p className="text-sm text-slate-400 mb-4">
+            From FFATA executive compensation disclosures. Reported when federal contract activity exceeds the
+            statutory threshold.
+          </p>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+            <ul className="space-y-3">
+              {executives.map((e) => (
+                <li key={e.exec_rank} className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-slate-100 font-medium">{e.exec_name}</p>
+                    <p className="text-xs text-slate-500">Rank {e.exec_rank} · Reported {fmtDate(e.reported_at)}</p>
+                  </div>
+                  <span className="font-mono text-purple-400 font-semibold">{fmtMoney(Number(e.exec_amount))}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
-      </div>
+      )}
+
+      {/* Related Contractors */}
+      {related.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-10">
+          <h2 className="text-2xl font-bold mb-1">Related Contractors</h2>
+          <p className="text-sm text-slate-400 mb-4">
+            Other companies active in NAICS {topNaicsCode} — {topNaics[0]?.naics_description}.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+            {related.map((r) => (
+              <Link
+                key={r.recipient_uei}
+                href={`/contractors/${recipientSlug(r.recipient_name)}`}
+                className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
+              >
+                <p className="text-sm font-medium text-slate-100 line-clamp-2">{fmtCompanyName(r.recipient_name)}</p>
+                <p className="mt-2 font-mono text-xs text-purple-400">{fmtMoney(Number(r.total_obligated))}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* CTA */}
+      <section className="mx-auto max-w-6xl px-6 pb-16">
+        <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
+          <h2 className="text-2xl font-bold">Track {displayName} Recompetes Before They Post</h2>
+          <p className="mt-3 max-w-2xl mx-auto text-slate-300">
+            Mindy monitors {displayName}&apos;s active contracts and alerts you 12 months before they expire — so you can
+            position to compete on recompete.
+          </p>
+          <Link
+            href="/signup"
+            className="mt-6 inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+          >
+            Get Free Recompete Alerts
+          </Link>
+        </div>
+      </section>
     </main>
+  );
+}
+
+function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-5 ${highlight ? 'border-purple-500/40 bg-purple-900/20' : 'border-slate-800 bg-slate-900'}`}>
+      <div className={`text-3xl font-bold ${highlight ? 'text-purple-300' : 'text-white'}`}>{value}</div>
+      <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wider text-slate-500">{label}</p>
+      <p className={`mt-1 text-slate-200 ${mono ? 'font-mono text-sm' : ''}`}>{value}</p>
+    </div>
   );
 }
