@@ -19,6 +19,8 @@
 import type { MetadataRoute } from 'next';
 import contractorsData from '@/data/contractors.json';
 import { getContractorSlug } from '@/lib/contractor-sales-history';
+import { glossaryTerms } from '@/data/glossary';
+import { BLOG_POSTS } from '@/data/blog-posts';
 
 // Canonical SEO domain. Per [memory: mindy-domain-routing] updated
 // May 22, 2026: getmindy.ai is the indexable face of the product.
@@ -48,7 +50,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // since they're primary acquisition surfaces for paid + organic.
     { url: `${SITE_URL}/compare/govwin`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${SITE_URL}/compare/sam-gov`,       lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
+    // /pricing — primary conversion surface. Mirrors the SoftwareApplication
+    // offers in JSON-LD so Google can surface price in rich snippets.
+    { url: `${SITE_URL}/pricing`,               lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${SITE_URL}/bd-assist`,             lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    // Glossary index — definition-intent SEO surface. Per-term pages
+    // are emitted below as their own block so Google sees the full
+    // vocabulary, not just the landing page.
+    { url: `${SITE_URL}/glossary`,              lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    // Blog index — top-of-funnel content surface. Daily change freq
+    // because we want Google checking back as we publish; individual
+    // post URLs are emitted below.
+    { url: `${SITE_URL}/blog`,                  lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
     { url: `${SITE_URL}/about`,                 lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },
     { url: `${SITE_URL}/privacy`,               lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
@@ -93,5 +106,28 @@ export default function sitemap(): MetadataRoute.Sitemap {
     });
   }
 
-  return [...topLevel, ...contractorEntries];
+  // 3) One sitemap entry per glossary term. Priority 0.5 because each
+  // page is a focused definition that can independently rank for
+  // "what is X" queries. Monthly because definitions are stable —
+  // we'd rather Google spend crawl budget on the contractor pages.
+  const glossaryEntries: MetadataRoute.Sitemap = glossaryTerms.map((t) => ({
+    url: `${SITE_URL}/glossary/${t.slug}`,
+    lastModified: now,
+    changeFrequency: 'monthly',
+    priority: 0.5,
+  }));
+
+  // 4) One sitemap entry per blog post. Priority 0.7 because long-form
+  // posts are higher-intent SEO surfaces than glossary stubs but lower
+  // priority than the homepage. Weekly change freq matches a realistic
+  // editing cadence — we'll bump lastModified when we substantively
+  // update a post.
+  const blogEntries: MetadataRoute.Sitemap = BLOG_POSTS.map((p) => ({
+    url: `${SITE_URL}/blog/${p.slug}`,
+    lastModified: new Date(p.updatedAt + 'T00:00:00Z'),
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }));
+
+  return [...topLevel, ...contractorEntries, ...glossaryEntries, ...blogEntries];
 }

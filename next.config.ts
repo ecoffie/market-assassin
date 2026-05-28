@@ -133,6 +133,11 @@ const nextConfig: NextConfig = {
           destination: '/compare/sam-gov',
         },
         {
+          source: '/pricing',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/pricing',
+        },
+        {
           source: '/about',
           has: [{ type: 'host', value: 'getmindy.ai' }],
           destination: '/about',
@@ -141,6 +146,18 @@ const nextConfig: NextConfig = {
           source: '/free-resources',
           has: [{ type: 'host', value: 'getmindy.ai' }],
           destination: '/free-resources',
+        },
+        // Glossary — SEO surface targeting "what is a CAGE code"-style
+        // definition queries. Index + per-term detail pages, all static.
+        {
+          source: '/glossary',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/glossary',
+        },
+        {
+          source: '/glossary/:slug*',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/glossary/:slug*',
         },
         {
           source: '/privacy',
@@ -151,6 +168,19 @@ const nextConfig: NextConfig = {
           source: '/terms',
           has: [{ type: 'host', value: 'getmindy.ai' }],
           destination: '/terms',
+        },
+        // Blog — index + dynamic post pages. Pattern mirrors /glossary
+        // above (index + :slug*) so getmindy.ai/blog and
+        // getmindy.ai/blog/<slug> both resolve to the Next routes.
+        {
+          source: '/blog',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/blog',
+        },
+        {
+          source: '/blog/:slug*',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/blog/:slug*',
         },
       ],
       afterFiles: [],
