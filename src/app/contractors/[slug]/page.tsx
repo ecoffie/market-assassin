@@ -23,6 +23,7 @@ import { notFound } from 'next/navigation';
 import {
   getRecipientBySlug,
   getYearlyTotalsForRecipient,
+  getYearlyByAgencyForRecipient,
   getTopAgenciesForRecipient,
   getTopNaicsForRecipient,
   getRecentAwardsForRecipient,
@@ -30,7 +31,7 @@ import {
   getSimilarRecipients,
   recipientSlug,
 } from '@/lib/bigquery/recipients';
-import { YearlyChart } from '@/components/contractors/YearlyChart';
+import { ContractorAnalytics } from '@/components/contractors/ContractorAnalytics';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -123,9 +124,11 @@ export default async function ContractorPage({ params }: PageProps) {
   const uei = recipient.recipient_uei;
 
   // Fetch sub-sections in parallel — independent queries
-  const [yearly, topAgencies, topNaics, recentAwards, executives] = await Promise.all([
+  const [yearly, yearlyByAgency, topAgencies, treemapAgencies, topNaics, recentAwards, executives] = await Promise.all([
     getYearlyTotalsForRecipient(uei),
+    getYearlyByAgencyForRecipient(uei),
     getTopAgenciesForRecipient(uei, 10),
+    getTopAgenciesForRecipient(uei, 25), // wider set for treemap
     getTopNaicsForRecipient(uei, 10),
     getRecentAwardsForRecipient(uei, 25),
     getExecutivesForRecipient(uei),
@@ -240,18 +243,29 @@ export default async function ContractorPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* Year over Year */}
+      {/* Year over Year + Drilldown + Treemap */}
       <section className="mx-auto max-w-6xl px-6 pb-10">
-        <h2 className="text-2xl font-bold mb-1">Year-Over-Year Federal Sales</h2>
+        <h2 className="text-2xl font-bold mb-1">Federal Sales Analytics</h2>
         <p className="text-sm text-slate-400 mb-4">
-          Annual obligated dollars by fiscal year. Hover any bar for YoY change + award count.
+          Toggle between trend, agency drilldown, and treemap. Use the period selector to focus the time window.
         </p>
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <YearlyChart
-            data={yearly.map((y) => ({
+          <ContractorAnalytics
+            yearly={yearly.map((y) => ({
               fiscal_year: Number(y.fiscal_year),
               total_obligated: Number(y.total_obligated),
               award_count: Number(y.award_count),
+            }))}
+            yearlyByAgency={yearlyByAgency.map((r) => ({
+              fiscal_year: Number(r.fiscal_year),
+              awarding_agency: r.awarding_agency,
+              total_amount: Number(r.total_amount),
+              award_count: Number(r.award_count),
+            }))}
+            treemapAgencies={treemapAgencies.map((a) => ({
+              awarding_agency: a.awarding_agency,
+              total_amount: Number(a.total_amount),
+              award_count: Number(a.award_count),
             }))}
           />
         </div>

@@ -230,6 +230,39 @@ export async function getYearlyTotalsForRecipient(uei: string): Promise<YearlyTo
   });
 }
 
+export interface YearlyByAgencyRow {
+  fiscal_year: number;
+  awarding_agency: string;
+  total_amount: number;
+  award_count: number;
+}
+
+/**
+ * Yearly obligations broken out by awarding agency, for stacked-bar
+ * drilldown. Returns rows for every (FY, agency) pair where the
+ * contractor had activity. Caller rolls up to "top N + Other".
+ */
+export async function getYearlyByAgencyForRecipient(
+  uei: string,
+): Promise<YearlyByAgencyRow[]> {
+  return queryCached<YearlyByAgencyRow>({
+    cacheKey: `recipient:${uei}:yearly-by-agency`,
+    query: `
+      SELECT
+        fiscal_year,
+        awarding_agency,
+        SUM(obligation_amount) AS total_amount,
+        COUNT(DISTINCT award_id) AS award_count
+      FROM ${BQ_TABLES.awards}
+      WHERE recipient_uei = @uei
+        AND awarding_agency IS NOT NULL
+      GROUP BY fiscal_year, awarding_agency
+      ORDER BY fiscal_year ASC, total_amount DESC
+    `,
+    params: { uei },
+  });
+}
+
 export interface ExecutiveRow {
   exec_rank: number;
   exec_name: string;
