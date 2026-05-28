@@ -726,8 +726,11 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         </div>
       )}
 
-      {/* Stats Bar - Only active stages + completed toggle */}
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      {/* Stats Bar - Only active stages + completed toggle.
+          Negative mx on mobile so the row can horizontal-scroll
+          edge-to-edge without leaving the first pill clipped behind
+          the panel's p-3 left padding. */}
+      <div className="flex gap-2 md:gap-4 overflow-x-auto pb-2 -mx-3 md:mx-0 px-3 md:px-0">
         {ACTIVE_STAGES.map(stage => (
           <div
             key={stage.id}
@@ -774,9 +777,12 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         )}
       </div>
 
-      {/* Board View - Only 4 active stages for wider columns */}
+      {/* Board View - Only 4 active stages for wider columns.
+          Mobile: stack columns vertically (1 column) so cards stay
+          readable. Tablet: 2 columns. Desktop: 4 columns side-by-side.
+          The mobile cramming-2-columns-into-360px was unreadable. */}
       {viewMode === 'board' && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {ACTIVE_STAGES.map(stage => (
             <div key={stage.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
               <div className={`px-4 py-3 ${stage.color} bg-opacity-20 border-b border-slate-800`}>
