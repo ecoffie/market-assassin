@@ -366,13 +366,13 @@ export default function UnifiedSidebar({
       <aside
         className={`
           bg-slate-900 border-r border-slate-800 flex flex-col
-          h-screen sticky top-0
-          transition-all duration-300 ease-in-out
+          h-screen
+          transition-transform duration-300 ease-in-out
           z-50
+          fixed inset-y-0 left-0 w-64
+          md:sticky md:top-0 md:translate-x-0
           ${isCollapsed ? 'md:w-16' : 'md:w-64'}
-          ${isMobileOpen
-            ? 'fixed inset-y-0 left-0 w-64 translate-x-0'
-            : 'fixed -translate-x-full md:translate-x-0 md:sticky'}
+          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
       {/* Header */}
