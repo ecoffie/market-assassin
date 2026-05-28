@@ -34,13 +34,19 @@ const { createClient } = require('@supabase/supabase-js');
 // ---- env --------------------------------------------------------
 const envPath = path.join(__dirname, '..', '.env.local');
 const envVars = {};
+// Handle both plain KEY=value lines AND Vercel CLI's quoted-with-\n
+// suffix format ("value\n") that's appended when secrets are stored
+// with a trailing newline in the dashboard. Strip the artifact so the
+// JWT / URL parses cleanly.
 fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
   if (!line || line.startsWith('#')) return;
-  const [k, ...rest] = line.split('=');
-  if (!k || !rest.length) return;
-  let v = rest.join('=').trim();
+  const eq = line.indexOf('=');
+  if (eq < 0) return;
+  const k = line.slice(0, eq).trim();
+  let v = line.slice(eq + 1).trim();
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-  envVars[k.trim()] = v;
+  v = v.replace(/\\n$/, '').replace(/\\n/g, '');
+  envVars[k] = v;
 });
 
 const supabase = createClient(envVars.NEXT_PUBLIC_SUPABASE_URL, envVars.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
