@@ -29,7 +29,7 @@
 
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { requireUserAuth } from '@/lib/api-auth';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { retrieveRagContext, type RagChunkResult } from '@/lib/rag/retrieve';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 
@@ -219,12 +219,24 @@ async function persistExchange(params: {
 }
 
 export async function POST(request: NextRequest) {
-  // Parse body first (auth helper consumes it via clone)
+  // Parse body once — Request body is a stream and can't be re-read.
+  // requireUserAuth was clone+json()-parsing it as a fallback, but after
+  // we'd already consumed it the clone returned empty → 401 "Email required".
+  // Same auth bug we hit on the voice routes — fix by pulling email
+  // from the parsed body and calling verifyUserOwnsEmail directly.
   let body: ChatRequest;
   try {
     body = await request.json();
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const email = String(body?.email || '').toLowerCase().trim();
+  if (!email) {
+    return new Response(JSON.stringify({ error: 'email required' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -244,8 +256,9 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Auth — same pattern as every other /app/* route
-  const auth = await requireUserAuth(request);
+  // Auth without re-reading the body. Still validates Supabase session,
+  // MI 2FA token, signed query token, and legacy cookie via the helper.
+  const auth = await verifyUserOwnsEmail(request, email);
   if (!auth.authenticated || !auth.email) {
     return new Response(JSON.stringify({ error: auth.error || 'Unauthorized' }), {
       status: 401,
