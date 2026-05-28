@@ -2,6 +2,27 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import {
+  type LucideIcon,
+  MessageSquare,
+  LineChart,
+  Bell,
+  Compass,
+  TrendingUp,
+  Target,
+  Users,
+  UsersRound,
+  DollarSign,
+  FileText,
+  Telescope,
+  Clock,
+  Banknote,
+  Building2,
+  FolderKanban,
+  Library,
+  Settings,
+  Lock,
+} from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 
@@ -32,7 +53,12 @@ export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
 interface NavItem {
   id: AppPanel;
   label: string;
-  icon: string;
+  // Lucide icon component (was emoji string until 2026-05-27). Rendered
+  // inline as <item.icon ... />. The line-icon system reads as "real
+  // SaaS" vs the vibe-coded-emoji-in-nav tell. Emoji is still fine in
+  // user-generated content (chat bubbles, briefing insights), just not
+  // in system chrome. Pattern: Slack / Notion / Vercel / Linear.
+  icon: LucideIcon;
   description: string;
   tier: AppTier[];
   badge?: string;
@@ -72,7 +98,7 @@ const NAV_SECTIONS: NavSection[] = [
         // call (decision logged 2026-05-27 in PRD-mindy-chat-v1.md).
         id: 'chat',
         label: 'Mindy Chat',
-        icon: '💬',
+        icon: MessageSquare,
         description: 'Ask anything, cited sources',
         tier: ['free', 'pro', 'team', 'enterprise'],
         badge: 'BETA',
@@ -80,7 +106,7 @@ const NAV_SECTIONS: NavSection[] = [
       {
         id: 'dashboard',
         label: "Today's Intel",
-        icon: '📊',
+        icon: LineChart,
         description: 'AI-prioritized opportunities',
         tier: ['pro', 'team', 'enterprise'],
         badge: 'AI',
@@ -88,14 +114,14 @@ const NAV_SECTIONS: NavSection[] = [
       {
         id: 'alerts',
         label: 'Source Feed',
-        icon: '🔔',
+        icon: Bell,
         description: 'Raw SAM.gov matches',
         tier: ['free', 'pro', 'team', 'enterprise'],
       },
       {
         id: 'market-intel',
         label: 'Market Dashboard',
-        icon: '🧭',
+        icon: Compass,
         description: 'Charts, full SAM, CSV export',
         tier: ['free', 'pro', 'team', 'enterprise'],
         href: '/app/market-intel',
@@ -108,7 +134,7 @@ const NAV_SECTIONS: NavSection[] = [
       {
         id: 'pipeline',
         label: 'My Pursuits',
-        icon: '📈',
+        icon: TrendingUp,
         description: 'Track opportunities',
         tier: ['pro', 'team', 'enterprise'],
       },
@@ -119,21 +145,21 @@ const NAV_SECTIONS: NavSection[] = [
         // mode — opps you're chasing + offices you're courting.
         id: 'target-list',
         label: 'My Target List',
-        icon: '🎯',
+        icon: Target,
         description: 'Saved offices to work',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'contacts',
         label: 'My Network',
-        icon: '🤝',
+        icon: Users,
         description: 'Buyers + partners',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'team',
         label: 'Team Access',
-        icon: '👥',
+        icon: UsersRound,
         description: 'Seats + roles',
         tier: ['team', 'enterprise'],
         badge: 'Teams',
@@ -150,14 +176,14 @@ const NAV_SECTIONS: NavSection[] = [
       {
         id: 'pricing',
         label: 'Pricing Intel',
-        icon: '💵',
+        icon: DollarSign,
         description: 'Labor rates, GSA/SCA wages',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'proposals',
         label: 'Proposal Assist',
-        icon: '📝',
+        icon: FileText,
         description: 'AI proposal help',
         tier: ['pro', 'team', 'enterprise'],
         badge: 'AI',
@@ -170,21 +196,23 @@ const NAV_SECTIONS: NavSection[] = [
       {
         id: 'research',
         label: 'Market Research',
-        icon: '🎯',
+        // Compass already used in Intelligence/market-intel — reuse here intentionally:
+        // both are "navigate the market" surfaces, just different views.
+        icon: Compass,
         description: 'Your market map',
         tier: ['free', 'pro', 'team', 'enterprise'],
       },
       {
         id: 'forecasts',
         label: 'Upcoming Buys',
-        icon: '🔮',
+        icon: Telescope,
         description: '7,700+ planned',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'recompetes',
         label: 'Expiring Contracts',
-        icon: '⏰',
+        icon: Clock,
         description: 'Recompete targets',
         tier: ['pro', 'team', 'enterprise'],
       },
@@ -198,14 +226,14 @@ const NAV_SECTIONS: NavSection[] = [
         // category as Forecasts + Recompetes), so it lives here now.
         id: 'grants',
         label: 'Federal Grants',
-        icon: '💰',
+        icon: Banknote,
         description: 'Grants.gov search',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'contractors',
         label: 'Contractors',
-        icon: '🏢',
+        icon: Building2,
         description: 'Prime contractor DB',
         tier: ['pro', 'team', 'enterprise'],
       },
@@ -217,21 +245,21 @@ const NAV_SECTIONS: NavSection[] = [
       {
         id: 'vault',
         label: 'My Vault',
-        icon: '🗂️',
+        icon: FolderKanban,
         description: 'Your past perf, capabilities, team',
         tier: ['free', 'pro', 'team', 'enterprise'],
       },
       {
         id: 'library',
         label: 'My Library',
-        icon: '📚',
+        icon: Library,
         description: 'Every AI draft, searchable',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
         id: 'settings',
         label: 'Settings',
-        icon: '⚙️',
+        icon: Settings,
         description: 'Profile, NAICS, security',
         tier: ['free', 'pro', 'team', 'enterprise'],
       },
@@ -405,9 +433,10 @@ export default function UnifiedSidebar({
                   }
                   ${isCollapsed ? 'justify-center' : ''}
                 `;
+                const Icon = item.icon;
                 const innerContent = (
                   <>
-                    <span className="text-lg">{item.icon}</span>
+                    <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
                     {!isCollapsed && (
                       <>
                         <div className="flex-1 text-left">
@@ -426,7 +455,7 @@ export default function UnifiedSidebar({
                           )}
                         </div>
                         {!canAccess && (
-                          <span className="text-xs text-slate-600">🔒</span>
+                          <Lock className="w-3 h-3 text-slate-600 shrink-0" strokeWidth={1.75} />
                         )}
                       </>
                     )}
