@@ -46,14 +46,18 @@ const force = args.includes('--force');
 const limitArg = (args.find(a => a.startsWith('--limit=')) || '').split('=')[1];
 const LIMIT = limitArg ? parseInt(limitArg, 10) : Infinity;
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
-// Groq Free TPM ceiling on this model is 12,000 tokens/min and a
-// single request hard-caps at ~12K tokens too. The system prompt is
-// ~500 tokens; with safety margin for output, we get ~10K tokens
-// (~7K words) for the transcript input. Most guest interviews put
-// the name, business, and key lessons in the first 25 minutes
-// (~6-7K words spoken) so this cap loses very little signal.
-const MAX_INPUT_WORDS = 6500;
+// Swapped from 70b to 8b 2026-05-28: the 70b's 100K TPD quota is now
+// reserved for Mindy Chat (user-facing). Extraction is structured
+// JSON extraction with explicit schema — 8b handles it fine at lower
+// quality cost than chat would. Flip back to 70b once Dev Tier opens.
+const GROQ_MODEL = 'llama-3.1-8b-instant';
+// Groq Free TPM on llama-3.1-8b-instant is 6,000 tokens/min — half
+// of 70b's 12K. System prompt ~600 tokens, output budget ~800 tokens,
+// leaves ~4,000 tokens (~3,200 words) for the transcript input.
+// Guest intros + the most-cited lessons are in the first 12-15 min
+// of speech (~3K words), so this still captures most of the signal.
+// Bumps up if/when we move back to 70b.
+const MAX_INPUT_WORDS = 2500;
 const MAX_ATTEMPTS = 3;
 
 // Pull a numeric episode number out of "049: Foo" or "Foo | Ep: 49"
