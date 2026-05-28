@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserAuth } from '@/lib/api-auth';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -39,14 +39,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'email required' }, { status: 400 });
   }
 
-  // Build a JSON body for the auth helper so its existing extraction
-  // logic finds the email. Re-wrap as a synthetic JSON request.
-  const authRequest = new Request(request.url, {
-    method: 'POST',
-    headers: request.headers,
-    body: JSON.stringify({ email }),
-  });
-  const auth = await requireUserAuth(authRequest as unknown as NextRequest);
+  // multipart bodies can't be cloned + re-parsed by the auth helper's
+  // default body-reader, so call verifyUserOwnsEmail directly with the
+  // email we've already extracted from formData. Auth still validates
+  // session token, MI 2FA token, signed query token, etc.
+  const auth = await verifyUserOwnsEmail(request, email);
   if (!auth.authenticated || !auth.email) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }

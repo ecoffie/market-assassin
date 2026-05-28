@@ -18,7 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserAuth } from '@/lib/api-auth';
+import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -91,6 +91,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
+  const email = String(body?.email || '').toLowerCase().trim();
+  if (!email) {
+    return NextResponse.json({ error: 'email required' }, { status: 400 });
+  }
+
   const transcript = String(body?.transcript || '').trim();
   if (!transcript) {
     return NextResponse.json({ error: 'transcript required' }, { status: 400 });
@@ -99,7 +104,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'transcript too long (8000 char max)' }, { status: 400 });
   }
 
-  const auth = await requireUserAuth(request);
+  // requireUserAuth's body-reader can't re-parse our already-consumed
+  // JSON body. Call verifyUserOwnsEmail directly with the email we
+  // pulled out, same as the transcribe route.
+  const auth = await verifyUserOwnsEmail(request, email);
   if (!auth.authenticated || !auth.email) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
