@@ -32,6 +32,8 @@ import {
   recipientSlug,
 } from '@/lib/bigquery/recipients';
 import { ContractorAnalytics } from '@/components/contractors/ContractorAnalytics';
+import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
+import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 
 const SITE_URL = 'https://getmindy.ai';
 
@@ -52,13 +54,6 @@ export async function generateStaticParams() {
   return [];
 }
 
-function fmtMoney(n: number | null | undefined): string {
-  if (!n) return '$0';
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
-  return `$${n.toFixed(0)}`;
-}
 
 function fmtDate(value: string | null | undefined): string {
   if (!value) return 'Unknown';
@@ -67,20 +62,6 @@ function fmtDate(value: string | null | undefined): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function fmtCompanyName(raw: string): string {
-  // SAM data is SHOUTY ALL-CAPS. Title-case for display, preserve common
-  // acronyms (INC, LLC, CORP, USA, US, NA, etc.).
-  const ACRONYMS = new Set(['INC', 'LLC', 'CORP', 'CORPORATION', 'CO', 'USA', 'US', 'NA', 'LP', 'LLP', 'LTD', 'PLC', 'PC', 'PLLC']);
-  return raw
-    .toLowerCase()
-    .split(/\s+/)
-    .map((w) => {
-      const upper = w.toUpperCase().replace(/[.,]/g, '');
-      if (ACRONYMS.has(upper)) return w.toUpperCase();
-      return w.charAt(0).toUpperCase() + w.slice(1);
-    })
-    .join(' ');
-}
 
 interface PageProps {
   params: Promise<{ slug: string }>;

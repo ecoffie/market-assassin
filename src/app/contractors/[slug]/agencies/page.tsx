@@ -10,6 +10,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
+import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
   getRecipientBySlug,
   getAllAgenciesForRecipient,
@@ -25,26 +27,7 @@ export async function generateStaticParams() {
   return [];
 }
 
-function fmtMoney(n: number | null | undefined): string {
-  if (!n) return '$0';
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
-  return `$${n.toFixed(0)}`;
-}
 
-function fmtCompanyName(raw: string): string {
-  const ACRONYMS = new Set(['INC', 'LLC', 'CORP', 'CORPORATION', 'CO', 'USA', 'US', 'NA', 'LP', 'LLP', 'LTD', 'PLC', 'PC', 'PLLC']);
-  return raw
-    .toLowerCase()
-    .split(/\s+/)
-    .map((w) => {
-      const upper = w.toUpperCase().replace(/[.,]/g, '');
-      if (ACRONYMS.has(upper)) return w.toUpperCase();
-      return w.charAt(0).toUpperCase() + w.slice(1);
-    })
-    .join(' ');
-}
 
 function agencySlug(name: string): string {
   return name

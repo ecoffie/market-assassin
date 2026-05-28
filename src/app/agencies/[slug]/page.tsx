@@ -35,6 +35,8 @@ import {
   type TopNaicsForAgency,
 } from '@/lib/bigquery/agencies';
 import { recipientSlug } from '@/lib/bigquery/recipients';
+import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
+import { formatMoneyCompact as fmtMoneyCompact } from '@/lib/format-money';
 
 // Pre-compute the set of NAICS codes we have landing pages for so we
 // can conditionally link rather than 404-ing users.
@@ -527,32 +529,7 @@ function SmallBusinessNote({ agency }: { agency: AgencySeo }) {
   );
 }
 
-function fmtMoneyCompact(n: number | null | undefined): string {
-  if (!n || !Number.isFinite(n)) return '$0';
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
-  return `$${n.toFixed(0)}`;
-}
 
-function fmtCompanyName(raw: string): string {
-  // Mirrors the formatter used on /contractors/[slug]/naics so the
-  // names rendered here read consistently with the contractor pages
-  // we're linking out to.
-  const ACRONYMS = new Set([
-    'INC', 'LLC', 'CORP', 'CORPORATION', 'CO', 'USA', 'US', 'NA',
-    'LP', 'LLP', 'LTD', 'PLC', 'PC', 'PLLC',
-  ]);
-  return raw
-    .toLowerCase()
-    .split(/\s+/)
-    .map((w) => {
-      const upper = w.toUpperCase().replace(/[.,]/g, '');
-      if (ACRONYMS.has(upper)) return w.toUpperCase();
-      return w.charAt(0).toUpperCase() + w.slice(1);
-    })
-    .join(' ');
-}
 
 function FederalAwardActivity({
   agency,
