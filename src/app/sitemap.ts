@@ -43,6 +43,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/opportunity-hunter`,    lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
     { url: `${SITE_URL}/expiring-contracts`,    lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
     { url: `${SITE_URL}/forecasts`,             lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    // Comparison pages — target high-volume "alternative" keywords.
+    // Priority 0.8 puts them in the top tier just below the homepage
+    // since they're primary acquisition surfaces for paid + organic.
+    { url: `${SITE_URL}/compare/govwin`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
+    { url: `${SITE_URL}/compare/sam-gov`,       lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${SITE_URL}/bd-assist`,             lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
     { url: `${SITE_URL}/about`,                 lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },

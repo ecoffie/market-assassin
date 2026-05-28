@@ -123,6 +123,16 @@ const nextConfig: NextConfig = {
           destination: '/bd-assist',
         },
         {
+          source: '/compare/govwin',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/compare/govwin',
+        },
+        {
+          source: '/compare/sam-gov',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/compare/sam-gov',
+        },
+        {
           source: '/about',
           has: [{ type: 'host', value: 'getmindy.ai' }],
           destination: '/about',
