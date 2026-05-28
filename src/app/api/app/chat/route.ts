@@ -93,9 +93,13 @@ GROUNDING:
 
 SCOPE:
 - You answer questions about US federal contracting — set-asides, certifications, SAM.gov, capability statements, teaming, proposals, market intel, GovCon BD.
-- For off-topic queries (general business advice, personal stuff, non-federal contracts), redirect: "I'm focused on federal contracting — try [X] for that."
+- For off-topic queries (general business advice, personal stuff, non-federal contracts), redirect: "I'm focused on federal contracting — try [X] for that." Do NOT cite any sources on off-topic redirects — just redirect plainly.
 
-USER PROFILE (use to personalize answers when relevant):
+WRITING STYLE:
+- NEVER use bracketed placeholders like "[Company Name]" or "[Your Business]" in responses. If you don't have the user's company name, write generic advice using "your company" or "your business" instead.
+- Default to second person ("you / your") — you're talking TO the user, not ABOUT a hypothetical bidder.
+
+USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"):
 {userProfile}`;
 
 function buildContextBlock(chunks: RagChunkResult[]): string {
@@ -118,6 +122,41 @@ function chunksToCitations(chunks: RagChunkResult[]): CitedSource[] {
     doc_type: c.doc_type || 'misc',
     source_path: c.source_path,
   }));
+}
+
+/**
+ * Filter chunks to only those Mindy actually cited inline via [→ X].
+ * Fuzzy-matches the bracket label against each chunk's doc_title so
+ * we don't have to worry about exact-match formatting from the LLM.
+ *
+ * Returns empty array when no inline citations were used — that's the
+ * intended behavior for off-topic redirects and "I don't have that"
+ * fallbacks. Better to show nothing than a misleading source chip.
+ */
+function filterUsedCitations(chunks: RagChunkResult[], assistantContent: string): CitedSource[] {
+  const bracketRe = /\[→\s*([^\]]+)\]/g;
+  const labels: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = bracketRe.exec(assistantContent))) {
+    labels.push(m[1].trim().toLowerCase());
+  }
+  if (labels.length === 0) return [];
+
+  const all = chunksToCitations(chunks);
+  const usedKeys = new Set<string>();
+  const used: CitedSource[] = [];
+  for (const label of labels) {
+    const match = all.find(c => {
+      const t = (c.title || '').toLowerCase();
+      // Either side contains the other (handles partial titles + label abbreviations)
+      return t.includes(label) || label.includes(t.slice(0, Math.min(40, t.length)));
+    });
+    if (match && !usedKeys.has(match.title)) {
+      usedKeys.add(match.title);
+      used.push(match);
+    }
+  }
+  return used;
 }
 
 async function persistExchange(params: {
@@ -328,9 +367,13 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Emit citations after the response completes (v1 heuristic:
-        // cite every chunk passed to the model)
-        const citedSources = chunksToCitations(chunks);
+        // Emit citations after the response completes. v1.1 fix: only
+        // surface sources Mindy actually cited inline via [→ X] markers,
+        // not every chunk we passed in. This prevents the bug where an
+        // off-topic redirect ("I'm focused on federal contracting…")
+        // attached a misleading citation chip just because we'd
+        // retrieved something during context-fetch.
+        const citedSources = filterUsedCitations(chunks, assistantContent);
         send({ type: 'citations', sources: citedSources });
         send({ type: 'done' });
         controller.close();
