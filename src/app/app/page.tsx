@@ -914,7 +914,7 @@ function AppDashboard() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen overflow-y-auto">
+      <main className="flex-1 min-h-screen overflow-y-auto pb-24 md:pb-0">
         {/* Top Bar */}
         <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between gap-3">
@@ -985,7 +985,7 @@ function AppDashboard() {
         <>
           <button
             onClick={() => setIsVoiceCaptureOpen(true)}
-            className="md:hidden fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-2xl shadow-purple-900/40 flex items-center justify-center transition-transform active:scale-95"
+            className="md:hidden fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-2xl shadow-black/60 ring-4 ring-slate-950/70 flex items-center justify-center transition-transform active:scale-95"
             aria-label="Voice capture"
             title="Voice capture"
           >
