@@ -28,36 +28,61 @@ const { createClient } = require('@supabase/supabase-js');
 
 const envPath = path.join(__dirname, '..', '.env.local');
 const envVars = {};
+// Reads both quoted/escaped Vercel CLI format ("value\n") AND plain
+// KEY=value lines. The trailing \n artifact appears when vercel env
+// pull --environment=production runs against secrets stored with a
+// final newline in the dashboard.
 fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
   if (!line || line.startsWith('#')) return;
-  const [k, ...rest] = line.split('=');
-  if (!k || !rest.length) return;
-  let v = rest.join('=').trim();
+  const eq = line.indexOf('=');
+  if (eq < 0) return;
+  const k = line.slice(0, eq).trim();
+  let v = line.slice(eq + 1).trim();
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-  envVars[k.trim()] = v;
+  v = v.replace(/\\n$/, '').replace(/\\n/g, '');
+  envVars[k] = v;
 });
 
 const supabase = createClient(envVars.NEXT_PUBLIC_SUPABASE_URL, envVars.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+
+// Provider switch: 2026-05-28 (afternoon) — flipped from Groq 8b
+// to OpenAI gpt-4o-mini after the Groq Free TPM ceiling stalled
+// throughput to ~15-min waits between extractions. gpt-4o-mini is
+// $0.15 per 1M input + $0.60 per 1M output tokens; at ~3.5K input +
+// ~500 output per episode, this is ~$0.0008/episode, ~$0.10 total
+// for the remaining ~103 extractions. Bypasses all rate-limit pain
+// for a one-time spend that's a rounding error.
+const PROVIDER = (process.env.PROVIDER || 'openai').toLowerCase();
+const OPENAI_API_KEY = envVars.OPENAI_API_KEY;
 const GROQ_API_KEY = envVars.GROQ_API_KEY;
-if (!GROQ_API_KEY) { console.error('GROQ_API_KEY missing from .env.local'); process.exit(1); }
+if (PROVIDER === 'openai' && !OPENAI_API_KEY) { console.error('OPENAI_API_KEY missing from .env.local'); process.exit(1); }
+if (PROVIDER === 'groq' && !GROQ_API_KEY) { console.error('GROQ_API_KEY missing from .env.local'); process.exit(1); }
+
+const PROVIDER_CFG = {
+  openai: {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-4o-mini',
+    apiKey: OPENAI_API_KEY,
+    providerTag: 'openai_gpt4o_mini',
+  },
+  groq: {
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.1-8b-instant',
+    apiKey: GROQ_API_KEY,
+    providerTag: 'groq_llama_8b',
+  },
+}[PROVIDER];
 
 const args = process.argv.slice(2);
 const force = args.includes('--force');
 const limitArg = (args.find(a => a.startsWith('--limit=')) || '').split('=')[1];
 const LIMIT = limitArg ? parseInt(limitArg, 10) : Infinity;
 
-// Swapped from 70b to 8b 2026-05-28: the 70b's 100K TPD quota is now
-// reserved for Mindy Chat (user-facing). Extraction is structured
-// JSON extraction with explicit schema — 8b handles it fine at lower
-// quality cost than chat would. Flip back to 70b once Dev Tier opens.
-const GROQ_MODEL = 'llama-3.1-8b-instant';
-// Groq Free TPM on llama-3.1-8b-instant is 6,000 tokens/min — half
-// of 70b's 12K. System prompt ~600 tokens, output budget ~800 tokens,
-// leaves ~4,000 tokens (~3,200 words) for the transcript input.
-// Guest intros + the most-cited lessons are in the first 12-15 min
-// of speech (~3K words), so this still captures most of the signal.
-// Bumps up if/when we move back to 70b.
-const MAX_INPUT_WORDS = 2500;
+// gpt-4o-mini has 128K context. We can send the FULL transcript with
+// huge headroom. Bumped from Groq's 2.5K-word cap → 12K words (~ a
+// 50-min episode's worth of speech), which captures the entire guest
+// arc instead of just the intro.
+const MAX_INPUT_WORDS = 12000;
 const MAX_ATTEMPTS = 3;
 
 // Pull a numeric episode number out of "049: Foo" or "Foo | Ep: 49"
@@ -100,14 +125,14 @@ async function extractFromTranscript(title, transcript) {
 
   const userMsg = `Episode title: ${title}\n\nTranscript (first ~${trimmed.split(' ').length} words):\n${trimmed}`;
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetch(PROVIDER_CFG.endpoint, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Authorization': `Bearer ${PROVIDER_CFG.apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: PROVIDER_CFG.model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userMsg },
@@ -126,7 +151,7 @@ async function extractFromTranscript(title, transcript) {
       const wait = m ? Math.ceil(parseFloat(m[1]) * (m[2] === 'm' ? 60 : 1)) + 2 : 30;
       throw Object.assign(new Error(`429 — retry after ${wait}s`), { retryAfter: wait });
     }
-    throw new Error(`Groq ${res.status}: ${text.slice(0, 300)}`);
+    throw new Error(`${PROVIDER} ${res.status}: ${text.slice(0, 300)}`);
   }
 
   const body = JSON.parse(text);
@@ -239,7 +264,7 @@ async function main() {
       summary_2sent: extracted.summary_2sent || null,
       extraction_status: 'extracted',
       extraction_error: null,
-      extraction_model: GROQ_MODEL,
+      extraction_model: PROVIDER_CFG.providerTag,
       extracted_at: new Date().toISOString(),
       attempts: (existingByDoc.get(doc.id)?.attempts || 0) + 1,
       updated_at: new Date().toISOString(),
