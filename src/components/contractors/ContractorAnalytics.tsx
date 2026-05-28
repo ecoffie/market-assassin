@@ -42,8 +42,9 @@ export interface YearlyByAgencyDatum {
   award_count: number;
 }
 
-export interface AgencyTreemapDatum {
-  awarding_agency: string;
+export interface NaicsTreemapDatum {
+  naics_code: string;
+  naics_description: string;
   total_amount: number;
   award_count: number;
 }
@@ -51,7 +52,7 @@ export interface AgencyTreemapDatum {
 interface Props {
   yearly: YearlyDatum[];
   yearlyByAgency: YearlyByAgencyDatum[];
-  treemapAgencies: AgencyTreemapDatum[];
+  treemapNaics: NaicsTreemapDatum[];
   currentFiscalYear?: number;
 }
 
@@ -367,15 +368,21 @@ function TreemapTooltip({ active, payload }: TreemapTooltipProps) {
   );
 }
 
-function TreemapView({ data }: { data: AgencyTreemapDatum[] }) {
+function TreemapView({ data }: { data: NaicsTreemapDatum[] }) {
+  // Show NAICS rather than agencies — even for contractors with extreme
+  // single-agency concentration (e.g. Lockheed ~99.99% DoD), the NAICS
+  // breakdown reveals genuine line-of-business diversity (aircraft mfg,
+  // engineering services, R&D, IT). Agency-mode treemap was returning
+  // one giant rectangle that looked broken.
   const treemapData = data.map((d) => ({
-    name: d.awarding_agency,
+    name: d.naics_description || `NAICS ${d.naics_code}`,
+    code: d.naics_code,
     value: Number(d.total_amount),
     awards: Number(d.award_count ?? 0),
   }));
 
   if (treemapData.length === 0) {
-    return <p className="text-slate-400 text-sm">No agency data for treemap.</p>;
+    return <p className="text-slate-400 text-sm">No NAICS data for treemap.</p>;
   }
 
   return (
@@ -400,7 +407,7 @@ function TreemapView({ data }: { data: AgencyTreemapDatum[] }) {
 export function ContractorAnalytics({
   yearly,
   yearlyByAgency,
-  treemapAgencies,
+  treemapNaics,
   currentFiscalYear,
 }: Props) {
   const cy = currentFiscalYear ?? new Date().getFullYear();
@@ -415,7 +422,7 @@ export function ContractorAnalytics({
   const views: Array<{ id: View; label: string }> = [
     { id: 'trend', label: 'Trend' },
     { id: 'drilldown', label: 'By Agency' },
-    { id: 'treemap', label: 'Treemap' },
+    { id: 'treemap', label: 'By Industry' },
   ];
 
   return (
@@ -455,13 +462,13 @@ export function ContractorAnalytics({
       {/* Active view */}
       {view === 'trend' && <TrendView data={trendData} currentFiscalYear={cy} />}
       {view === 'drilldown' && <DrilldownView rows={drilldownData} />}
-      {view === 'treemap' && <TreemapView data={treemapAgencies} />}
+      {view === 'treemap' && <TreemapView data={treemapNaics} />}
 
       {/* Footer hint */}
       <p className="mt-3 text-xs text-slate-500">
         {view === 'trend' && 'Hover any bar for YoY change + award count. Current fiscal year shown at reduced opacity (partial year).'}
         {view === 'drilldown' && 'Stacked by top 7 awarding agencies. "Other" rolls up the remainder. Hover for breakdown.'}
-        {view === 'treemap' && 'All-time agency mix. Rectangle area is proportional to total obligated dollars.'}
+        {view === 'treemap' && 'All-time NAICS (line-of-business) mix. Rectangle area is proportional to total obligated dollars.'}
       </p>
     </div>
   );

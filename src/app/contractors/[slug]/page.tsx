@@ -124,11 +124,11 @@ export default async function ContractorPage({ params }: PageProps) {
   const uei = recipient.recipient_uei;
 
   // Fetch sub-sections in parallel — independent queries
-  const [yearly, yearlyByAgency, topAgencies, treemapAgencies, topNaics, recentAwards, executives] = await Promise.all([
+  const [yearly, yearlyByAgency, topAgencies, treemapNaics, topNaics, recentAwards, executives] = await Promise.all([
     getYearlyTotalsForRecipient(uei),
     getYearlyByAgencyForRecipient(uei),
     getTopAgenciesForRecipient(uei, 10),
-    getTopAgenciesForRecipient(uei, 25), // wider set for treemap
+    getTopNaicsForRecipient(uei, 25), // wider NAICS set for treemap (more visual diversity than agencies)
     getTopNaicsForRecipient(uei, 10),
     getRecentAwardsForRecipient(uei, 25),
     getExecutivesForRecipient(uei),
@@ -262,10 +262,11 @@ export default async function ContractorPage({ params }: PageProps) {
               total_amount: Number(r.total_amount),
               award_count: Number(r.award_count),
             }))}
-            treemapAgencies={treemapAgencies.map((a) => ({
-              awarding_agency: a.awarding_agency,
-              total_amount: Number(a.total_amount),
-              award_count: Number(a.award_count),
+            treemapNaics={treemapNaics.map((n) => ({
+              naics_code: n.naics_code,
+              naics_description: n.naics_description,
+              total_amount: Number(n.total_amount),
+              award_count: Number(n.award_count),
             }))}
           />
         </div>

@@ -59,7 +59,7 @@ export interface RecipientProfile {
  */
 export async function getRecipientBySlug(slug: string): Promise<RecipientProfile | null> {
   const rows = await queryCached<RecipientProfile>({
-    cacheKey: `recipient:by-slug:${slug}`,
+    cacheKey: `recipient:by-slug:${slug}:v2`,
     query: `
       WITH slugged AS (
         SELECT
@@ -78,7 +78,10 @@ export async function getRecipientBySlug(slug: string): Promise<RecipientProfile
           ) AS computed_slug
         FROM ${BQ_TABLES.recipients}
       )
-      SELECT * EXCEPT(computed_slug)
+      SELECT
+        * EXCEPT(computed_slug, first_action_date, last_action_date),
+        CAST(first_action_date AS STRING) AS first_action_date,
+        CAST(last_action_date AS STRING) AS last_action_date
       FROM slugged
       WHERE computed_slug = @slug
       ORDER BY total_obligated DESC
@@ -91,8 +94,16 @@ export async function getRecipientBySlug(slug: string): Promise<RecipientProfile
 
 export async function getRecipientByUei(uei: string): Promise<RecipientProfile | null> {
   const rows = await queryCached<RecipientProfile>({
-    cacheKey: `recipient:by-uei:${uei}`,
-    query: `SELECT * FROM ${BQ_TABLES.recipients} WHERE recipient_uei = @uei LIMIT 1`,
+    cacheKey: `recipient:by-uei:${uei}:v2`,
+    query: `
+      SELECT
+        * EXCEPT(first_action_date, last_action_date),
+        CAST(first_action_date AS STRING) AS first_action_date,
+        CAST(last_action_date AS STRING) AS last_action_date
+      FROM ${BQ_TABLES.recipients}
+      WHERE recipient_uei = @uei
+      LIMIT 1
+    `,
     params: { uei },
   });
   return rows[0] ?? null;
@@ -181,8 +192,12 @@ export async function getRecentAwardsForRecipient(
   uei: string,
   limit = 25,
 ): Promise<RecentAwardRow[]> {
+  // CAST DATE columns to STRING so we get 'YYYY-MM-DD' strings back
+  // instead of BigQuery's wrapper objects ({value: 'YYYY-MM-DD'}) which
+  // break our formatDate(). Also filter to dollar-bearing transactions —
+  // $0 modifications dominate the recent timeline but tell users nothing.
   return queryCached<RecentAwardRow>({
-    cacheKey: `recipient:${uei}:recent-awards:${limit}`,
+    cacheKey: `recipient:${uei}:recent-awards:${limit}:v2`,
     query: `
       SELECT
         award_id,
@@ -193,13 +208,14 @@ export async function getRecentAwardsForRecipient(
         naics_description,
         description,
         obligation_amount,
-        action_date,
-        pop_start_date,
-        pop_end_date,
+        CAST(action_date AS STRING) AS action_date,
+        CAST(pop_start_date AS STRING) AS pop_start_date,
+        CAST(pop_end_date AS STRING) AS pop_end_date,
         pop_state,
         set_aside
       FROM ${BQ_TABLES.awards}
       WHERE recipient_uei = @uei
+        AND obligation_amount > 0
       ORDER BY action_date DESC
       LIMIT @limit
     `,
@@ -272,9 +288,13 @@ export interface ExecutiveRow {
 
 export async function getExecutivesForRecipient(uei: string): Promise<ExecutiveRow[]> {
   return queryCached<ExecutiveRow>({
-    cacheKey: `recipient:${uei}:executives`,
+    cacheKey: `recipient:${uei}:executives:v2`,
     query: `
-      SELECT exec_rank, exec_name, exec_amount, reported_at
+      SELECT
+        exec_rank,
+        exec_name,
+        exec_amount,
+        CAST(reported_at AS STRING) AS reported_at
       FROM ${BQ_TABLES.recipientExecutives}
       WHERE recipient_uei = @uei
       ORDER BY exec_rank ASC
