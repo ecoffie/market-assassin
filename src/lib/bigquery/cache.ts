@@ -57,7 +57,12 @@ export async function queryCached<T = Record<string, unknown>>(
     }
   }
 
+  // Log only MISS+BQ events so we have visibility into cost-bearing
+  // queries without spamming logs on every cache HIT (which is the
+  // overwhelming majority on warm contractor pages).
+  const tBq = Date.now();
   const rows = await bqQuery<T>(opts);
+  console.log(`[bq-miss] ${key}  (${Date.now() - tBq}ms, ${Array.isArray(rows) ? rows.length : '?'} rows)`);
 
   try {
     await kv.set(key, rows, { ex: ttl });
