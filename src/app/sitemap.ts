@@ -21,6 +21,8 @@ import contractorsData from '@/data/contractors.json';
 import { getContractorSlug } from '@/lib/contractor-sales-history';
 import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
+import { NAICS_TOP_100 } from '@/data/naics-top100';
+import { AGENCIES_SEO } from '@/data/agencies-seo';
 
 // Canonical SEO domain. Per [memory: mindy-domain-routing] updated
 // May 22, 2026: getmindy.ai is the indexable face of the product.
@@ -58,10 +60,23 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // are emitted below as their own block so Google sees the full
     // vocabulary, not just the landing page.
     { url: `${SITE_URL}/glossary`,              lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    // NAICS index — top-of-funnel for "naics codes" / industry-discovery
+    // queries. Per-code detail pages emitted in their own block below so
+    // Google sees the full set, not just the landing page.
+    { url: `${SITE_URL}/naics`,                 lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
     // Blog index — top-of-funnel content surface. Daily change freq
     // because we want Google checking back as we publish; individual
     // post URLs are emitted below.
     { url: `${SITE_URL}/blog`,                  lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    // Agencies index — buyer-intent SEO surface for "[agency] contract
+    // opportunities" queries. Per-agency detail pages emitted in their
+    // own block below so Google sees the full set of 49 federal agencies.
+    { url: `${SITE_URL}/agencies`,              lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    // Set-asides index — hub for the four SBA program landing pages
+    // (8(a), HUBZone, SDVOSB, WOSB). Priority 0.8 because the program
+    // pages themselves target the highest-intent transactional searches
+    // in GovCon ("8a contracts", "hubzone contracts", etc.).
+    { url: `${SITE_URL}/set-asides`,            lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${SITE_URL}/about`,                 lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },
     { url: `${SITE_URL}/privacy`,               lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
@@ -129,5 +144,49 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
-  return [...topLevel, ...contractorEntries, ...glossaryEntries, ...blogEntries];
+  // 5) One sitemap entry per top-100 NAICS code. Priority 0.5 (matches
+  // glossary terms — they're definition-intent pages that earn their
+  // own long-tail rankings). Monthly because the underlying NAICS
+  // taxonomy is stable; the page content shifts only when contractors.json
+  // refreshes, which is infrequent.
+  const naicsEntries: MetadataRoute.Sitemap = NAICS_TOP_100.map((e) => ({
+    url: `${SITE_URL}/naics/${e.code}`,
+    lastModified: now,
+    changeFrequency: 'monthly',
+    priority: 0.5,
+  }));
+
+  // 6) One sitemap entry per federal agency. Priority 0.6 — higher than
+  // glossary/NAICS (more buyer-intent) but lower than contractor mega-
+  // entries since the cohort is small (49) and each page is medium-depth
+  // content. Monthly because budget figures + pain points shift slowly.
+  const agencyEntries: MetadataRoute.Sitemap = AGENCIES_SEO.map((a) => ({
+    url: `${SITE_URL}/agencies/${a.slug}`,
+    lastModified: now,
+    changeFrequency: 'monthly',
+    priority: 0.6,
+  }));
+
+  // 7) Four SBA set-aside program pages — 8(a), HUBZone, SDVOSB, WOSB.
+  // Priority 0.8 (transactional / very-high-intent searches) with weekly
+  // change freq because the underlying opportunity data Mindy surfaces
+  // moves daily — we want Google rechecking these pages often even
+  // though the page copy itself is stable.
+  const setAsideSlugs = ['8a', 'hubzone', 'sdvosb', 'wosb'];
+  const setAsideEntries: MetadataRoute.Sitemap = setAsideSlugs.map((slug) => ({
+    url: `${SITE_URL}/set-asides/${slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
+
+  return [
+    ...topLevel,
+    ...contractorEntries,
+    ...glossaryEntries,
+    ...blogEntries,
+    ...naicsEntries,
+    ...agencyEntries,
+    ...setAsideEntries,
+  ];
 }

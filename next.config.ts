@@ -182,6 +182,50 @@ const nextConfig: NextConfig = {
           has: [{ type: 'host', value: 'getmindy.ai' }],
           destination: '/blog/:slug*',
         },
+        // NAICS directory — top-100-by-spend index + per-code detail
+        // pages. Static prerender at build; pattern mirrors /glossary
+        // and /blog (index + :code*) so both /naics and /naics/<code>
+        // route to the matching Next surface on the getmindy.ai host.
+        {
+          source: '/naics',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/naics',
+        },
+        {
+          source: '/naics/:code*',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/naics/:code*',
+        },
+        // Agencies directory — buyer-intent SEO surface for
+        // "[agency] contract opportunities" / "who sells to [agency]"
+        // queries. Index + per-agency detail pages, statically
+        // prerendered. Same index + :slug* pattern as /glossary,
+        // /blog, /naics so getmindy.ai/agencies and
+        // getmindy.ai/agencies/<slug> both route to the Next pages.
+        {
+          source: '/agencies',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/agencies',
+        },
+        {
+          source: '/agencies/:slug*',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/agencies/:slug*',
+        },
+        // Set-asides — high-intent SEO for "8a contracts",
+        // "hubzone contracts", "sdvosb contracts", "wosb contracts".
+        // Four explicit program pages (no dynamic route) plus an
+        // index, all statically prerendered.
+        {
+          source: '/set-asides',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/set-asides',
+        },
+        {
+          source: '/set-asides/:program*',
+          has: [{ type: 'host', value: 'getmindy.ai' }],
+          destination: '/set-asides/:program*',
+        },
       ],
       afterFiles: [],
       fallback: [],
