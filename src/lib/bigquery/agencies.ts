@@ -35,8 +35,14 @@ export async function getTopRecipientsForAgency(
   agencyName: string,
   limit = 20,
 ): Promise<TopRecipientForAgency[]> {
+  // awards table is partitioned by fiscal_year and clustered by
+  // recipient_uei. awarding_agency is neither, so this scans the full
+  // partition (~8 GB for DoD which has 137K recipients). Bump cap
+  // from default 5 GiB to 10 GiB; still bounded by the project's
+  // 5 TiB/day quota.
   return queryCached<TopRecipientForAgency>({
     cacheKey: `agency:${agencyName}:top-recipients:${limit}`,
+    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
     query: `
       SELECT
         recipient_uei,
@@ -63,8 +69,10 @@ export async function getTopNaicsForAgency(
   agencyName: string,
   limit = 15,
 ): Promise<TopNaicsForAgency[]> {
+  // Same partition-scan story as getTopRecipientsForAgency.
   return queryCached<TopNaicsForAgency>({
     cacheKey: `agency:${agencyName}:top-naics:${limit}`,
+    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
     query: `
       SELECT
         naics_code,

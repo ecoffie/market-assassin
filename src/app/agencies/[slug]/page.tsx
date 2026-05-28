@@ -24,13 +24,34 @@ import {
   getRelatedAgencies,
   type AgencySeo,
 } from '@/data/agencies-seo';
+import { getBqAgencyName } from '@/data/agency-bq-mapping';
+import { NAICS_TOP_100 } from '@/data/naics-top100';
+import {
+  getAgencyProfile,
+  getTopRecipientsForAgency,
+  getTopNaicsForAgency,
+  type AgencyProfile,
+  type TopRecipientForAgency,
+  type TopNaicsForAgency,
+} from '@/lib/bigquery/agencies';
+import { recipientSlug } from '@/lib/bigquery/recipients';
+
+// Pre-compute the set of NAICS codes we have landing pages for so we
+// can conditionally link rather than 404-ing users.
+const LINKABLE_NAICS = new Set(NAICS_TOP_100.map((n) => n.code));
 
 // Pre-render every agency at build time. 49 entries — cheap, and
-// keeps the route static so it serves from edge cache instead of
-// burning serverless invocations on each crawl.
+// ISR-only — no build-time prerender. Each agency page now makes
+// 3 BQ queries (profile + top 25 recipients + top 15 NAICS). DoD
+// alone scans ~8 GB, so prerendering all 49 agencies at build
+// would burn ~150 GB per Vercel deploy. ISR amortizes that across
+// real Googlebot crawls.
 export async function generateStaticParams() {
-  return AGENCIES_SEO.map((a) => ({ slug: a.slug }));
+  return [];
 }
+
+export const dynamicParams = true;
+export const revalidate = 604800; // 7d
 
 export async function generateMetadata({
   params,
@@ -89,6 +110,20 @@ export default async function AgencyPage({
   if (!agency) notFound();
 
   const related = getRelatedAgencies(agency, 5);
+
+  // Federal Award Activity (BigQuery) — fetched in parallel.
+  // Falls back to nulls/empty arrays on any BQ failure so the static
+  // content above always renders. Section is omitted entirely when the
+  // agency has no BQ counterpart (e.g. TVA, FDIC) or when the profile
+  // row is missing.
+  const bqAgencyName = getBqAgencyName(agency.slug, agency.name);
+  const [bqProfile, bqTopRecipients, bqTopNaics] = bqAgencyName
+    ? await Promise.all([
+        getAgencyProfile(bqAgencyName).catch(() => null),
+        getTopRecipientsForAgency(bqAgencyName, 25).catch(() => []),
+        getTopNaicsForAgency(bqAgencyName, 15).catch(() => []),
+      ])
+    : [null, [], []];
 
   const jsonLd = buildJsonLd(agency);
 
@@ -157,6 +192,12 @@ export default async function AgencyPage({
             <PainPoints agency={agency} />
             <Priorities agency={agency} />
             <SmallBusinessNote agency={agency} />
+            <FederalAwardActivity
+              agency={agency}
+              profile={bqProfile}
+              topRecipients={bqTopRecipients}
+              topNaics={bqTopNaics}
+            />
             <HowMindyTracks agency={agency} />
             <InlineCta agency={agency} />
           </article>
@@ -482,6 +523,201 @@ function SmallBusinessNote({ agency }: { agency: AgencySeo }) {
         Set-aside percentages shift quarterly. Mindy flags every set-aside
         opportunity in your daily briefing.
       </p>
+    </div>
+  );
+}
+
+function fmtMoneyCompact(n: number | null | undefined): string {
+  if (!n || !Number.isFinite(n)) return '$0';
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+function fmtCompanyName(raw: string): string {
+  // Mirrors the formatter used on /contractors/[slug]/naics so the
+  // names rendered here read consistently with the contractor pages
+  // we're linking out to.
+  const ACRONYMS = new Set([
+    'INC', 'LLC', 'CORP', 'CORPORATION', 'CO', 'USA', 'US', 'NA',
+    'LP', 'LLP', 'LTD', 'PLC', 'PC', 'PLLC',
+  ]);
+  return raw
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => {
+      const upper = w.toUpperCase().replace(/[.,]/g, '');
+      if (ACRONYMS.has(upper)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(' ');
+}
+
+function FederalAwardActivity({
+  agency,
+  profile,
+  topRecipients,
+  topNaics,
+}: {
+  agency: AgencySeo;
+  profile: AgencyProfile | null;
+  topRecipients: TopRecipientForAgency[];
+  topNaics: TopNaicsForAgency[];
+}) {
+  // No BQ data at all → omit the whole section. We never render an
+  // empty table; it would look broken and dilute the page's SEO weight.
+  if (!profile && topRecipients.length === 0 && topNaics.length === 0) {
+    return null;
+  }
+
+  const agencyTotal = profile ? Number(profile.total_obligated) : 0;
+  const label = agency.abbreviation || agency.name;
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-white mb-3">
+        Federal Award Activity
+      </h2>
+      <p className="text-slate-300 mb-6 leading-relaxed">
+        Federal contracting activity for {agency.name} across FY2016–FY2026,
+        drawn from USAspending.gov.
+      </p>
+
+      {profile && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+              Total Obligated
+            </div>
+            <div className="text-xl font-bold text-purple-300">
+              {fmtMoneyCompact(Number(profile.total_obligated))}
+            </div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+              Unique Recipients
+            </div>
+            <div className="text-xl font-bold text-purple-300">
+              {Number(profile.recipient_count).toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+              NAICS Codes
+            </div>
+            <div className="text-xl font-bold text-purple-300">
+              {Number(profile.naics_count).toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+              Transactions
+            </div>
+            <div className="text-xl font-bold text-purple-300">
+              {Number(profile.transaction_count).toLocaleString()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {topRecipients.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-3">
+            Top {topRecipients.length} contractors selling to {label}
+          </h3>
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="text-left px-4 py-3">Contractor</th>
+                  <th className="text-right px-4 py-3">Awards</th>
+                  <th className="text-right px-4 py-3">% of Agency</th>
+                  <th className="text-right px-4 py-3">Total Obligated</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {topRecipients.map((r) => {
+                  const display = fmtCompanyName(r.recipient_name);
+                  const slug = recipientSlug(r.recipient_name);
+                  const total = Number(r.total_amount);
+                  const pct =
+                    agencyTotal > 0 ? (total / agencyTotal) * 100 : null;
+                  return (
+                    <tr key={r.recipient_uei} className="hover:bg-slate-800/40">
+                      <td className="px-4 py-3 text-slate-200">
+                        <Link
+                          href={`/contractors/${slug}`}
+                          className="hover:text-purple-300 transition"
+                        >
+                          {display}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-300 whitespace-nowrap">
+                        {Number(r.award_count).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-300 whitespace-nowrap">
+                        {pct !== null
+                          ? `${pct < 0.1 ? '<0.1' : pct.toFixed(1)}%`
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                        {fmtMoneyCompact(total)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {topNaics.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-400 mb-3">
+            Top {topNaics.length} NAICS codes at {label}
+          </h3>
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="text-left px-4 py-3">NAICS</th>
+                  <th className="text-left px-4 py-3">Industry</th>
+                  <th className="text-right px-4 py-3">Total Obligated</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {topNaics.map((n) => {
+                  const codeContent = LINKABLE_NAICS.has(n.naics_code) ? (
+                    <Link
+                      href={`/naics/${n.naics_code}`}
+                      className="hover:text-purple-300 transition"
+                    >
+                      {n.naics_code}
+                    </Link>
+                  ) : (
+                    n.naics_code
+                  );
+                  return (
+                    <tr key={n.naics_code} className="hover:bg-slate-800/40">
+                      <td className="px-4 py-3 font-mono text-slate-200">
+                        {codeContent}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {n.naics_description || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-purple-400 whitespace-nowrap">
+                        {fmtMoneyCompact(Number(n.total_amount))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

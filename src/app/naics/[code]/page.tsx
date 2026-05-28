@@ -25,13 +25,44 @@ import {
   getNaicsTopEntry,
   getRelatedNaics,
 } from '@/data/naics-top100';
+import {
+  getNaicsProfile,
+  getTopRecipientsForNaics,
+  getTopAgenciesForNaics,
+  type TopRecipientForNaics,
+  type TopAgencyForNaics,
+} from '@/lib/bigquery/naics';
+import { recipientSlug } from '@/lib/bigquery/recipients';
+import { AGENCIES_SEO } from '@/data/agencies-seo';
 
 // Prerender every top-100 NAICS at build. 100 entries is cheap and
 // keeps the pages on the edge cache — no serverless invocation per
 // crawler hit, which matters since we're explicitly inviting Google
 // to ingest the whole set via the sitemap.
+// ISR-only — no build-time prerender. Each NAICS page now makes 3 BQ
+// queries (profile + top 25 recipients + top 10 agencies). Big NAICS
+// like 334515 scan ~6 GB each, so prerendering all 100 top codes at
+// build = ~600 GB scanned per deploy = ~$3.75 per Vercel deploy.
+// ISR amortizes that across real Googlebot crawls (each unique page
+// queries BQ exactly once then caches at edge for 7 days).
 export async function generateStaticParams() {
-  return NAICS_TOP_100.map((e) => ({ code: e.code }));
+  return [];
+}
+
+export const dynamicParams = true;
+export const revalidate = 604800; // 7d
+
+// Agencies that have a corresponding /agencies/[slug] landing page.
+// Built once at module load — small constant set (~49 entries).
+const LINKABLE_AGENCIES = new Set(AGENCIES_SEO.map((a) => a.slug));
+
+function agencySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
 }
 
 // USD formatter for contract values. Compact notation ($146.4B, $90.7M)
@@ -98,39 +129,49 @@ export async function generateMetadata({
   const { code } = await params;
   const entry = getNaicsTopEntry(code);
 
+  // Resolve title from either source so codes outside top-100 still
+  // get proper SEO metadata.
+  let resolvedCode = code;
+  let resolvedTitle: string | null = entry?.title ?? null;
   if (!entry) {
-    return {
-      title: 'NAICS code not found | Mindy',
-      description: 'The NAICS code you requested is not in our top 100 directory.',
-    };
+    const profile = await getNaicsProfile(code);
+    if (!profile) {
+      return {
+        title: 'NAICS code not found | Mindy',
+        description: 'The NAICS code you requested has no federal contract activity on record.',
+      };
+    }
+    resolvedCode = profile.naics_code;
+    resolvedTitle = profile.naics_description || `NAICS ${profile.naics_code}`;
   }
 
+  const titleStr = resolvedTitle ?? `NAICS ${resolvedCode}`;
   // Description capped at ~155 chars per Google's snippet truncation.
-  const description = `Federal market intelligence for NAICS ${entry.code} (${entry.title}). Daily opportunity alerts, incumbent tracking, recompete monitoring.`;
+  const description = `Federal market intelligence for NAICS ${resolvedCode} (${titleStr}). Daily opportunity alerts, incumbent tracking, recompete monitoring.`;
   const trimmed =
     description.length > 158
       ? `${description.slice(0, 155).trimEnd()}...`
       : description;
 
   return {
-    title: `NAICS ${entry.code}: ${entry.title} — Federal Contracts | Mindy`,
+    title: `NAICS ${resolvedCode}: ${titleStr} — Federal Contracts | Mindy`,
     description: trimmed,
     alternates: {
-      canonical: `https://getmindy.ai/naics/${entry.code}`,
+      canonical: `https://getmindy.ai/naics/${resolvedCode}`,
     },
     openGraph: {
-      title: `NAICS ${entry.code}: ${entry.title} — Federal Contracts | Mindy`,
+      title: `NAICS ${resolvedCode}: ${titleStr} — Federal Contracts | Mindy`,
       description: trimmed,
       type: 'article',
-      url: `https://getmindy.ai/naics/${entry.code}`,
+      url: `https://getmindy.ai/naics/${resolvedCode}`,
     },
     keywords: [
-      `naics ${entry.code}`,
-      `naics ${entry.code} federal contracts`,
-      `${entry.title.toLowerCase()} government contracts`,
-      `who buys ${entry.title.toLowerCase()}`,
-      `${entry.title.toLowerCase()} federal buyers`,
-      `naics code ${entry.code}`,
+      `naics ${resolvedCode}`,
+      `naics ${resolvedCode} federal contracts`,
+      `${titleStr.toLowerCase()} government contracts`,
+      `who buys ${titleStr.toLowerCase()}`,
+      `${titleStr.toLowerCase()} federal buyers`,
+      `naics code ${resolvedCode}`,
       'federal contract opportunities',
       'mindy naics',
     ],
@@ -143,13 +184,37 @@ export default async function NaicsCodePage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  const entry = getNaicsTopEntry(code);
+  const topEntry = getNaicsTopEntry(code);
+  const isTop100 = !!topEntry;
 
-  if (!entry) notFound();
+  // Pull BQ data in parallel — profile, top recipients, top agencies.
+  // If the code is in top-100 these enrich the page; if not, the
+  // profile becomes the source of truth and the static sections are
+  // skipped.
+  const [bqProfile, bqRecipients, bqAgencies] = await Promise.all([
+    getNaicsProfile(code),
+    getTopRecipientsForNaics(code, 25),
+    getTopAgenciesForNaics(code, 10),
+  ]);
 
-  const related = getRelatedNaics(entry.code, 5);
-  const hasContractors = entry.topContractors.length > 0;
-  const hasAgencies = entry.topAgencies.length > 0;
+  if (!topEntry && !bqProfile) notFound();
+
+  // Synthesize an entry-shaped object when not in top-100, so the
+  // existing JSX (which renders code/title/parent everywhere) stays
+  // untouched. The flags below gate the static-derived sections.
+  const entry = topEntry ?? {
+    code: bqProfile!.naics_code,
+    title: bqProfile!.naics_description || `NAICS ${bqProfile!.naics_code}`,
+    parent: bqProfile!.naics_code.length >= 4 ? bqProfile!.naics_code.slice(0, 4) : null,
+    contractorCount: bqProfile!.recipient_count,
+    topContractors: [] as Array<{ company: string; value: number }>,
+    topAgencies: [] as Array<{ name: string }>,
+  };
+
+  const related = isTop100 ? getRelatedNaics(entry.code, 5) : [];
+  const hasContractors = isTop100 && entry.topContractors.length > 0;
+  const hasAgencies = isTop100 && entry.topAgencies.length > 0;
+  const hasBqData = !!bqProfile && (bqRecipients.length > 0 || bqAgencies.length > 0);
 
   // DefinedTerm JSON-LD — NAICS codes are formal, standardized
   // definitions (NAICS is literally the North American Industry
@@ -349,6 +414,164 @@ export default async function NaicsCodePage({
                   federal contract value (across all of their NAICS codes,
                   not just {entry.code}). Use as a ranking signal, not as a
                   per-NAICS award total.
+                </p>
+              </div>
+            )}
+
+            {/* Federal Award Activity — real BQ-backed USASpending data */}
+            {hasBqData && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-3">
+                  Federal Award Activity
+                </h2>
+                <p className="text-slate-300 mb-6 leading-relaxed">
+                  Real-time federal contracting activity for NAICS {entry.code}{' '}
+                  drawn from USAspending.gov, FY2016–FY2026.
+                </p>
+
+                {/* Headline stats — 3 stats from naics_summary */}
+                {bqProfile && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+                    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                      <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+                        Total Obligated
+                      </div>
+                      <div className="text-2xl font-bold text-purple-300">
+                        {formatCurrency(bqProfile.total_obligated)}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        FY2016–FY2026
+                      </div>
+                    </div>
+                    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                      <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+                        Unique Recipients
+                      </div>
+                      <div className="text-2xl font-bold text-purple-300">
+                        {bqProfile.recipient_count.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        Distinct contractors
+                      </div>
+                    </div>
+                    <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                      <div className="text-xs uppercase tracking-wider text-slate-400 mb-1">
+                        Buying Agencies
+                      </div>
+                      <div className="text-2xl font-bold text-purple-300">
+                        {bqProfile.agency_count.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        Federal agencies
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top 25 contractors */}
+                {bqRecipients.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="text-lg font-semibold text-white mb-3">
+                      Top {bqRecipients.length} Contractors
+                    </h3>
+                    <div className="overflow-x-auto rounded-lg border border-slate-800">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-950/50">
+                          <tr className="text-left text-xs uppercase tracking-wider text-slate-400">
+                            <th className="px-4 py-3 font-semibold">#</th>
+                            <th className="px-4 py-3 font-semibold">Contractor</th>
+                            <th className="px-4 py-3 font-semibold text-right">Awards</th>
+                            <th className="px-4 py-3 font-semibold text-right">Total $</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {bqRecipients.map((r: TopRecipientForNaics, i: number) => {
+                            const slug = recipientSlug(r.recipient_name);
+                            return (
+                              <tr key={r.recipient_uei} className="hover:bg-slate-800/40 transition">
+                                <td className="px-4 py-3 text-slate-500 font-mono">
+                                  {i + 1}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Link
+                                    href={`/contractors/${slug}`}
+                                    className="text-slate-100 hover:text-purple-300 font-medium transition"
+                                  >
+                                    {titleCaseCompany(r.recipient_name)}
+                                  </Link>
+                                </td>
+                                <td className="px-4 py-3 text-right text-slate-300 font-mono">
+                                  {r.award_count.toLocaleString()}
+                                </td>
+                                <td className="px-4 py-3 text-right text-purple-300 font-semibold font-mono">
+                                  {formatCurrency(r.total_amount)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top 10 buying agencies */}
+                {bqAgencies.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-3">
+                      Top {bqAgencies.length} Buying Agencies
+                    </h3>
+                    <div className="overflow-x-auto rounded-lg border border-slate-800">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-950/50">
+                          <tr className="text-left text-xs uppercase tracking-wider text-slate-400">
+                            <th className="px-4 py-3 font-semibold">#</th>
+                            <th className="px-4 py-3 font-semibold">Agency</th>
+                            <th className="px-4 py-3 font-semibold text-right">Recipients</th>
+                            <th className="px-4 py-3 font-semibold text-right">Total $</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {bqAgencies.map((a: TopAgencyForNaics, i: number) => {
+                            const slug = agencySlug(a.awarding_agency);
+                            const linkable = LINKABLE_AGENCIES.has(slug);
+                            return (
+                              <tr key={a.awarding_agency} className="hover:bg-slate-800/40 transition">
+                                <td className="px-4 py-3 text-slate-500 font-mono">
+                                  {i + 1}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {linkable ? (
+                                    <Link
+                                      href={`/agencies/${slug}`}
+                                      className="text-slate-100 hover:text-purple-300 font-medium transition"
+                                    >
+                                      {titleCaseAgency(a.awarding_agency)}
+                                    </Link>
+                                  ) : (
+                                    <span className="text-slate-100 font-medium">
+                                      {titleCaseAgency(a.awarding_agency)}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-right text-slate-300 font-mono">
+                                  {a.recipient_count.toLocaleString()}
+                                </td>
+                                <td className="px-4 py-3 text-right text-purple-300 font-semibold font-mono">
+                                  {formatCurrency(a.total_amount)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-slate-500 text-xs mt-4">
+                  Source: USAspending.gov contract awards, FY2016–FY2026.
+                  Updated regularly via BigQuery sync.
                 </p>
               </div>
             )}

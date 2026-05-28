@@ -39,8 +39,16 @@ export async function getTopRecipientsForNaics(
   code: string,
   limit = 25,
 ): Promise<TopRecipientForNaics[]> {
+  // awards table is partitioned by fiscal_year and clustered by
+  // recipient_uei + recipient_name. naics_code is neither — so this
+  // query scans the full partition (~6 GB for popular NAICS like
+  // 334515 electronic instrument manufacturing). The default 5 GiB
+  // per-query cap rejects those. 10 GiB is plenty headroom and still
+  // protected by the project-wide 5 TiB/day quota cap we set on the
+  // service account.
   return queryCached<TopRecipientForNaics>({
     cacheKey: `naics:${code}:top-recipients:${limit}`,
+    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
     query: `
       SELECT
         recipient_uei,
@@ -67,8 +75,11 @@ export async function getTopAgenciesForNaics(
   code: string,
   limit = 10,
 ): Promise<TopAgencyForNaics[]> {
+  // Same partition-scan story as getTopRecipientsForNaics — bump the
+  // cap from default 5 GiB to 10 GiB for the large NAICS codes.
   return queryCached<TopAgencyForNaics>({
     cacheKey: `naics:${code}:top-agencies:${limit}`,
+    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
     query: `
       SELECT
         awarding_agency,
