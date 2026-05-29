@@ -31,6 +31,17 @@ function getSupabase(): SupabaseClient {
   return _sb;
 }
 
+/**
+ * Repair episode URLs that were stored as `https:libsyn.com/...`
+ * (missing the `//` after the scheme) by an older version of the
+ * metadata extractor. Without this, Safari treats them as
+ * same-origin relative paths and 404s on getmindy.ai.
+ */
+function normalizeEpisodeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return url.replace(/^https:(?!\/\/)/, 'https://').replace(/^http:(?!\/\/)/, 'http://');
+}
+
 export interface PodcastEpisodeCard {
   episode_number: number | null;
   episode_title: string;
@@ -163,7 +174,11 @@ export async function retrievePodcastEpisodes(opts: RetrievePodcastOptions): Pro
     if (s.status !== 'fulfilled' || !s.value.data) continue;
     for (const row of s.value.data) {
       const key = row.episode_title;
-      if (!results.has(key)) results.set(key, row);
+      if (!results.has(key)) {
+        // Repair the URL at the read boundary so all downstream
+        // consumers (chat citations, podcast cards) get clean links.
+        results.set(key, { ...row, episode_url: normalizeEpisodeUrl(row.episode_url) });
+      }
     }
   }
 

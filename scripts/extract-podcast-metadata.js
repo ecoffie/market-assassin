@@ -237,7 +237,7 @@ async function main() {
       await supabase.from('podcast_episode_metadata').upsert({
         document_id: doc.id,
         episode_title: doc.title,
-        episode_url: doc.source_path?.replace(/^libsyn:/, 'https:'),
+        episode_url: doc.source_path?.replace(/^libsyn:/, 'https://'),
         episode_number: parseEpisodeNumber(doc.title),
         extraction_status: 'failed',
         extraction_error: errMsg,
@@ -251,7 +251,7 @@ async function main() {
       document_id: doc.id,
       episode_number: parseEpisodeNumber(doc.title),
       episode_title: doc.title,
-      episode_url: doc.source_path?.replace(/^libsyn:/, 'https:'),
+      episode_url: doc.source_path?.replace(/^libsyn:/, 'https://'),
       guest_name: extracted.guest_name || null,
       guest_company: extracted.guest_company || null,
       guest_role: extracted.guest_role || null,

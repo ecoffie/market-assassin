@@ -134,8 +134,12 @@ function buildContextBlock(chunks: RagChunkResult[], podcastCards: PodcastEpisod
 function chunksToCitations(chunks: RagChunkResult[]): CitedSource[] {
   return chunks.map(c => ({
     title: c.doc_title || c.source_path || 'Source',
+    // Old source_paths use the `libsyn:` prefix as a sentinel. Strip
+    // it to a proper https:// URL — earlier versions wrote `https:`
+    // without the slashes, which Safari treats as same-origin and
+    // 404s on getmindy.ai. Force `https://` here.
     url: c.source_path?.startsWith('libsyn:')
-      ? c.source_path.replace(/^libsyn:/, 'https:')
+      ? c.source_path.replace(/^libsyn:/, 'https://')
       : null,
     doc_type: c.doc_type || 'misc',
     source_path: c.source_path,
