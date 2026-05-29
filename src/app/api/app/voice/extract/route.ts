@@ -31,7 +31,10 @@ interface ExtractRequest {
   transcript: string;
 }
 
+type VoiceIntent = 'pursuit' | 'question' | 'unclear';
+
 interface ExtractedPursuit {
+  intent: VoiceIntent;
   title: string | null;
   agency: string | null;
   sub_agency: string | null;
@@ -50,10 +53,11 @@ interface ExtractedPursuit {
   is_prime: boolean | null;
 }
 
-const SYSTEM_PROMPT = `You extract structured federal-contracting pursuit data from spoken-word transcripts. The user just talked into their phone about an opportunity they want to track. You return ONLY a JSON object — no preamble, no explanation, no markdown fences.
+const SYSTEM_PROMPT = `You classify and extract from voice transcripts of federal-contracting users. The user just held the mic on their phone. They might describe an OPPORTUNITY they want to track in their pipeline, OR they might ask a QUESTION ("how do I get on a GSA Schedule?"), OR they might be rambling about something unrelated. You return ONLY a JSON object — no preamble, no explanation, no markdown fences.
 
 Schema (use null for anything not clearly stated):
 {
+  "intent": "pursuit" | "question" | "unclear",  // REQUIRED. See classification rules below.
   "title": string | null,             // Concise opportunity title. E.g. "Facility maintenance — GSA Region 5". Not the full transcript.
   "agency": string | null,            // Top-level agency (GSA, VA, DOD, DHS, etc.)
   "sub_agency": string | null,        // Specific component (Region 5, NAVFAC Atlantic, Army Corps Mobile District)
@@ -72,11 +76,17 @@ Schema (use null for anything not clearly stated):
   "is_prime": boolean | null          // true if speaker is going after as prime, false if as a sub. null if unstated.
 }
 
+Intent classification (decide BEFORE filling other fields):
+- "pursuit"  — Speaker describes a SPECIFIC opportunity: there's an identifiable contract/RFP/agency/contact, even if some fields are missing. They want to track or remember it. Examples: "Met with Maria from GSA Region 5, she's putting out a facility maintenance RFP next quarter", "Saw a HUBZone set-aside on SAM for IT services in Tampa, due March 15".
+- "question" — Speaker asks how to do something, what something means, who can help, where to find something. They want INFORMATION. Examples: "How do I get on a GSA Schedule?", "What's the difference between 8(a) and HUBZone?", "First steps to start reselling products to the government?", "Can you help me understand sources sought?".
+- "unclear"  — Rambling, off-topic, or so vague nothing useful can be extracted ("uh testing 1 2 3", "I don't know what to say"). Use sparingly.
+
 Rules:
+- If intent="question" or "unclear": set all pursuit fields (title, agency, ..., is_prime) to null. Put a short one-sentence summary of what the user said into "notes" — this is what the UI will pass to chat or show as feedback.
+- If intent="pursuit": fill what you can; title is REQUIRED for a real pursuit.
 - title: extract the OPPORTUNITY, not the speaker's situation. "Facility maintenance for GSA Region 5" not "I just talked to Maria".
 - value_estimate: ONLY include if a dollar figure was spoken. NEVER infer or estimate. If they said "small contract" with no number → null.
 - Federal acronyms: GSA, VA, DOD/DoD, DHS, NIH, SOUTHCOM, NAVFAC, USACE, USAF, etc. Normalize "Department of Defense" → "DOD".
-- If the speaker is clearly venting / off-topic / not describing an opportunity, return all fields null and put a short note in "notes" explaining what was said.
 - Do NOT invent contact info, NAICS, or contract values that weren't in the transcript.`;
 
 function todayIso(): string {
@@ -165,7 +175,15 @@ export async function POST(request: NextRequest) {
 
   // Minor cleanup: trim strings, drop empty-string values to null so
   // the client can rely on `field == null` consistently.
+  const rawIntent = (extracted.intent as string | undefined)?.toLowerCase();
+  const intent: VoiceIntent = rawIntent === 'pursuit' || rawIntent === 'question' || rawIntent === 'unclear'
+    ? (rawIntent as VoiceIntent)
+    // Back-compat: if the model didn't emit intent (older prompt fallthrough),
+    // infer from whether a title was extracted.
+    : (extracted.title ? 'pursuit' : 'unclear');
+
   const normalized: ExtractedPursuit = {
+    intent,
     title: trimOrNull(extracted.title),
     agency: trimOrNull(extracted.agency),
     sub_agency: trimOrNull(extracted.sub_agency),

@@ -19,16 +19,20 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Mic, MicOff, Square, X, Loader2, Check } from 'lucide-react';
+import { Mic, MicOff, Square, X, Loader2, Check, MessageCircle, HelpCircle } from 'lucide-react';
 
 interface VoiceCaptureModalProps {
   email: string;
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;        // called after pursuit successfully posted to /api/pipeline
+  onPivotToChat?: (seedMessage: string) => void;  // called when transcript is a question — parent should switch panel + seed the chat
 }
 
+type VoiceIntent = 'pursuit' | 'question' | 'unclear';
+
 interface ExtractedPursuit {
+  intent: VoiceIntent;
   title: string | null;
   agency: string | null;
   sub_agency: string | null;
@@ -47,7 +51,7 @@ interface ExtractedPursuit {
   is_prime: boolean | null;
 }
 
-type Phase = 'idle' | 'recording' | 'transcribing' | 'extracting' | 'confirm' | 'saving' | 'error';
+type Phase = 'idle' | 'recording' | 'transcribing' | 'extracting' | 'confirm' | 'pivot' | 'saving' | 'error';
 
 const MAX_RECORDING_MS = 120_000;
 
@@ -60,7 +64,7 @@ function pickMimeType(): string {
   return '';
 }
 
-export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved }: VoiceCaptureModalProps) {
+export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onPivotToChat }: VoiceCaptureModalProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>('');
@@ -189,11 +193,31 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved }: V
       setExtracted(ext);
       setEditedTitle(ext.title || '');
       setEditedNotes(ext.notes || '');
-      setPhase('confirm');
+      // Branch by intent: pursuits go to the editable confirm card,
+      // questions/unclear input go to the pivot view that offers
+      // sending to Mindy Chat instead of saving a hollow row.
+      if (ext.intent === 'question' || ext.intent === 'unclear') {
+        setPhase('pivot');
+      } else {
+        setPhase('confirm');
+      }
     } catch (err) {
       setError((err as Error).message || 'Something went wrong.');
       setPhase('error');
     }
+  };
+
+  const handlePivotToChat = () => {
+    const seed = transcript.trim();
+    if (!seed || !onPivotToChat) return;
+    onPivotToChat(seed);
+    onClose();
+  };
+
+  const handleSaveAnyway = () => {
+    // User wants to save even though we classified as question/unclear.
+    // Drop them into the regular confirm card so they can edit fields.
+    setPhase('confirm');
   };
 
   const handleSave = async () => {
@@ -361,6 +385,35 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved }: V
             </div>
           )}
 
+          {phase === 'pivot' && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-lg bg-purple-950/30 border border-purple-900/50 p-4">
+                <HelpCircle className="w-5 h-5 text-purple-300 mt-0.5 shrink-0" strokeWidth={1.75} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-purple-100">
+                    {extracted?.intent === 'question'
+                      ? 'That sounded like a question, not a pursuit.'
+                      : "I couldn't pick out an opportunity to track."}
+                  </p>
+                  <p className="text-xs text-purple-200/70 mt-1">
+                    Want Mindy to answer it in chat instead?
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">What I heard</div>
+                <div className="rounded-md bg-slate-950/60 border border-slate-800 p-3 text-sm text-slate-200 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                  {transcript}
+                </div>
+              </div>
+
+              {extracted?.notes && (
+                <div className="text-xs text-slate-500 italic">{extracted.notes}</div>
+              )}
+            </div>
+          )}
+
           {phase === 'saving' && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mb-4" strokeWidth={1.5} />
@@ -381,6 +434,34 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved }: V
             </div>
           )}
         </div>
+
+        {/* Footer actions — pivot phase */}
+        {phase === 'pivot' && (
+          <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between gap-3">
+            <button
+              onClick={() => { setPhase('idle'); setExtracted(null); setTranscript(''); }}
+              className="text-xs text-slate-400 hover:text-slate-200"
+            >
+              ← Re-record
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveAnyway}
+                className="px-3 py-2 text-xs rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200"
+              >
+                Save anyway
+              </button>
+              <button
+                onClick={handlePivotToChat}
+                disabled={!onPivotToChat || !transcript.trim()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-medium"
+              >
+                <MessageCircle className="w-4 h-4" strokeWidth={2} />
+                Send to Mindy Chat
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Footer actions — only on confirm */}
         {phase === 'confirm' && (

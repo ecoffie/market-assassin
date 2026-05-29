@@ -118,6 +118,10 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
     inputRef.current?.focus();
   }, []);
 
+  // Track whether we've already consumed a voice-pivot seed for this
+  // mount so React StrictMode's double-invoke can't fire it twice.
+  const seedHandledRef = useRef(false);
+
   const sendMessage = useCallback(async (rawText: string) => {
     const text = rawText.trim();
     if (!text || isStreaming || !email) return;
@@ -224,6 +228,30 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
       inputRef.current?.focus();
     }
   }, [email, isStreaming, messages, sessionId]);
+
+  // Voice-pivot handoff: when the voice modal classifies the user's
+  // recording as a question (not a pursuit), it stashes the transcript
+  // in sessionStorage and switches the panel to 'chat'. We pick it up
+  // here on mount and auto-send so the user sees Mindy answering
+  // without having to retype.
+  useEffect(() => {
+    if (seedHandledRef.current || !email) return;
+    let seed: string | null = null;
+    try {
+      seed = sessionStorage.getItem('mindy_chat_seed');
+      if (seed) sessionStorage.removeItem('mindy_chat_seed');
+    } catch {
+      // sessionStorage unavailable (e.g. iOS private browsing) — skip
+    }
+    if (seed && seed.trim()) {
+      seedHandledRef.current = true;
+      // Defer so React commits the state for `messages` before we
+      // start streaming. Without this, sendMessage's history snapshot
+      // sees a stale empty list — fine here, but the defer keeps
+      // behavior predictable if we later add greeting state.
+      setTimeout(() => sendMessage(seed!.trim()), 50);
+    }
+  }, [email, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Cmd/Ctrl+Enter sends; plain Enter inserts newline (Slack-style)

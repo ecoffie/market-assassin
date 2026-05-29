@@ -1000,6 +1000,18 @@ function AppDashboard() {
               // the new row is visible immediately.
               handlePanelChange('pipeline');
             }}
+            onPivotToChat={(seedMessage) => {
+              // Stash the transcript so MindyChatPanel can pick it up
+              // on mount and auto-send. Survives the panel swap without
+              // needing a top-level shared state.
+              try {
+                sessionStorage.setItem('mindy_chat_seed', seedMessage);
+              } catch {
+                // sessionStorage can throw in private mode — fall
+                // through; the chat panel will just open empty.
+              }
+              handlePanelChange('chat');
+            }}
           />
         </>
       )}
