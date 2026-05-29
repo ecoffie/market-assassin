@@ -140,6 +140,63 @@ export async function getTopContractorsByNaics(
 }
 
 /**
+ * Top contractors filtered to a specific awarding SUB-agency.
+ * Powers "/top/army-contractors" (Department of the Army),
+ * "/top/navy-contractors", "/top/air-force-contractors".
+ *
+ * Accepts an array of sub-agency names because some cohorts (e.g.
+ * "military") combine multiple sub-agencies.
+ */
+export async function getTopContractorsBySubAgency(
+  subAgencyNames: string[],
+  limit = 50,
+): Promise<TopContractorRow[]> {
+  const placeholders = subAgencyNames.map((_, i) => `@sub${i}`).join(', ');
+  const params: Record<string, string | number> = { limit };
+  subAgencyNames.forEach((n, i) => {
+    params[`sub${i}`] = n;
+  });
+
+  return queryCached<TopContractorRow>({
+    cacheKey: `top:sub-agency:${subAgencyNames.join('|')}:${limit}:v1`,
+    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
+    query: `
+      WITH per_uei AS (
+        SELECT
+          recipient_uei,
+          recipient_name,
+          SUM(obligation_amount) AS amount,
+          COUNT(DISTINCT award_id) AS awards
+        FROM ${BQ_TABLES.awards}
+        WHERE awarding_sub_agency IN (${placeholders})
+          AND recipient_uei IS NOT NULL
+          AND recipient_name IS NOT NULL
+        GROUP BY recipient_uei, recipient_name
+      ),
+      rolled AS (
+        SELECT
+          recipient_name,
+          SUM(amount) AS total_amount,
+          SUM(awards) AS award_count,
+          ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS top_uei
+        FROM per_uei
+        GROUP BY recipient_name
+      )
+      SELECT
+        top_uei AS recipient_uei,
+        recipient_name,
+        total_amount,
+        award_count,
+        CAST(NULL AS INT64) AS distinct_agency_count
+      FROM rolled
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params,
+  });
+}
+
+/**
  * Top contractors that win a specific set-aside category.
  * Powers "/top/8a-contractors", "/top/hubzone-contractors",
  * "/top/sdvosb-contractors", "/top/wosb-contractors".

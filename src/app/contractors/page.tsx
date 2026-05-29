@@ -32,17 +32,29 @@ export const revalidate = 86_400;
 const SITE_NAME = 'GovCon Giants';
 
 export const metadata: Metadata = {
-  title: 'Federal Contractor Database | Award History & Sales Intelligence',
+  // Title rewrite based on GSC week-1 data (May 2026): the highest-impression
+  // queries are "national database of federal contractors", "federal contracts
+  // awarded", "top government contractors". Lead with "317K" and "Database"
+  // to match how searchers describe what they want. Updated stat from the
+  // stale 2,700 (contractors.json era) to the real BQ count.
+  title: '317,000 Federal Contractors — Award History Database | Mindy',
   description:
-    'Browse 2,700+ federal contractor profiles with year-over-year award history, top agencies, and NAICS coverage. Free preview of federal sales data for every prime + sub-contractor.',
+    'Search 317,000 federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures. Pulled live from USAspending.gov FY2016-FY2026.',
   alternates: {
-    canonical: '/contractors',
+    canonical: 'https://getmindy.ai/contractors',
   },
   openGraph: {
-    title: 'Federal Contractor Database — Award History & Sales Intelligence',
+    title: '317,000 Federal Contractors — Award History Database | Mindy',
     description:
-      'Browse 2,700+ federal contractor profiles with year-over-year award history, top agencies, and NAICS coverage.',
+      'Search 317,000 federal contractors by name. Year-over-year award history, top agencies, NAICS coverage, executive disclosures.',
+    url: 'https://getmindy.ai/contractors',
     type: 'website',
+    siteName: 'Mindy',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '317,000 Federal Contractors — Award History Database | Mindy',
+    description: 'Search 317,000 federal contractors. Real USAspending data, FY2016-FY2026.',
   },
 };
 

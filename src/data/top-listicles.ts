@@ -9,7 +9,7 @@
  * contractors", "top defense contractors", "top 8a contractors", etc.
  */
 
-export type ListicleKind = 'all' | 'agency' | 'naics' | 'set-aside';
+export type ListicleKind = 'all' | 'agency' | 'sub-agency' | 'naics' | 'set-aside';
 
 export interface ListicleSpec {
   slug: string;
@@ -122,6 +122,62 @@ export const LISTICLES: ListicleSpec[] = [
     kind: 'set-aside',
     filterPatterns: ['HUBZONE%'],
     cohort: 'SBA HUBZone-certified contractors',
+  },
+  // Military branch slices — GSC query "military awarded contractors" (3)
+  // plus high-intent branch-specific queries that aren't yet competing.
+  {
+    slug: 'military-contractors',
+    title: 'Top 50 U.S. Military Contractors',
+    shortTitle: 'Top Military Contractors',
+    description:
+      'Largest contractors to the U.S. Army, Navy, Air Force, and Marines by total obligated 2016–2026. Live USAspending data.',
+    intro:
+      'The 50 largest U.S. military contractors by total obligated dollars across the Army, Navy, Air Force, and Marine Corps (FY2016–FY2026).',
+    kind: 'sub-agency',
+    filterPatterns: [
+      'Department of the Army',
+      'Department of the Navy',
+      'Department of the Air Force',
+      'Department of the Marines',
+      'United States Marine Corps',
+    ],
+    cohort: 'U.S. military service branches (Army, Navy, Air Force, Marines)',
+  },
+  {
+    slug: 'army-contractors',
+    title: 'Top 50 U.S. Army Contractors',
+    shortTitle: 'Top Army Contractors',
+    description:
+      'Largest U.S. Army contractors by total obligated 2016–2026. Department of the Army primes ranked from USAspending data.',
+    intro:
+      'The 50 largest contractors to the U.S. Department of the Army by total obligated dollars (FY2016–FY2026).',
+    kind: 'sub-agency',
+    filterPatterns: ['Department of the Army'],
+    cohort: 'U.S. Department of the Army',
+  },
+  {
+    slug: 'navy-contractors',
+    title: 'Top 50 U.S. Navy Contractors',
+    shortTitle: 'Top Navy Contractors',
+    description:
+      'Largest U.S. Navy contractors by total obligated 2016–2026. Includes Marine Corps awards routed through the Department of the Navy.',
+    intro:
+      'The 50 largest contractors to the U.S. Department of the Navy by total obligated dollars (FY2016–FY2026). Includes Marine Corps awards routed through the Navy.',
+    kind: 'sub-agency',
+    filterPatterns: ['Department of the Navy'],
+    cohort: 'U.S. Department of the Navy',
+  },
+  {
+    slug: 'air-force-contractors',
+    title: 'Top 50 U.S. Air Force Contractors',
+    shortTitle: 'Top Air Force Contractors',
+    description:
+      'Largest U.S. Air Force contractors by total obligated 2016–2026. Department of the Air Force primes ranked from USAspending.',
+    intro:
+      'The 50 largest contractors to the U.S. Department of the Air Force by total obligated dollars (FY2016–FY2026).',
+    kind: 'sub-agency',
+    filterPatterns: ['Department of the Air Force'],
+    cohort: 'U.S. Department of the Air Force',
   },
   {
     slug: 'wosb-contractors',

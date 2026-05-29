@@ -22,6 +22,7 @@ import { getListicleBySlug, LISTICLES } from '@/data/top-listicles';
 import {
   getTopContractors,
   getTopContractorsByAgency,
+  getTopContractorsBySubAgency,
   getTopContractorsByNaics,
   getTopContractorsBySetAside,
   type TopContractorRow,
@@ -77,6 +78,8 @@ async function fetchRows(listicle: ReturnType<typeof getListicleBySlug>): Promis
       return getTopContractors(LIMIT);
     case 'agency':
       return getTopContractorsByAgency(listicle.filter || '', LIMIT);
+    case 'sub-agency':
+      return getTopContractorsBySubAgency(listicle.filterPatterns || [], LIMIT);
     case 'naics':
       return getTopContractorsByNaics(listicle.filter || '', LIMIT);
     case 'set-aside':
