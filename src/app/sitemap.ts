@@ -23,6 +23,7 @@ import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
+import { LISTICLES } from '@/data/top-listicles';
 
 // Canonical SEO domain. Per [memory: mindy-domain-routing] updated
 // May 22, 2026: getmindy.ai is the indexable face of the product.
@@ -77,6 +78,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // pages themselves target the highest-intent transactional searches
     // in GovCon ("8a contracts", "hubzone contracts", etc.).
     { url: `${SITE_URL}/set-asides`,            lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
+    // Top contractor lists hub — targets the high-demand listicle queries
+    // GSC surfaced ("top federal system integrators", "largest federal
+    // contractors", "top defense contractors"). Priority 0.8 because the
+    // intent is transactional + the queries already have proven volume.
+    { url: `${SITE_URL}/top`,                   lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${SITE_URL}/about`,                 lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },
     { url: `${SITE_URL}/privacy`,               lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
@@ -194,6 +200,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
+  // 8) Top contractor listicle pages. Priority 0.8 — these target
+  // proven-demand queries from GSC ("top federal system integrators",
+  // "largest federal contractors", etc.).
+  const listicleEntries: MetadataRoute.Sitemap = LISTICLES.map((l) => ({
+    url: `${SITE_URL}/top/${l.slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
+
   return [
     ...topLevel,
     ...contractorEntries,
@@ -202,5 +218,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...naicsEntries,
     ...agencyEntries,
     ...setAsideEntries,
+    ...listicleEntries,
   ];
 }
