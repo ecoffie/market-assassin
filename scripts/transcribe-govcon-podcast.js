@@ -127,15 +127,16 @@ async function resolveRedirect(url) {
 
 // ---- big-file downsample ---------------------------------------
 
-function downsampleToTemp(inputPath, outputPath) {
+function downsampleToTemp(inputPath, outputPath, aggressive = false) {
   return new Promise((resolve, reject) => {
-    // mono, 16kHz, 32kbps — Whisper doesn't care about audio fidelity
-    // and this shrinks an 80MB MP3 to under 20MB.
+    // aggressive=false: mono 16kHz 32kbps (~14MB/hr)
+    // aggressive=true:  mono 8kHz 16kbps  (~7MB/hr) — for 100+ min episodes
+    const args = aggressive
+      ? ['-ac', '1', '-ar', '8000',  '-b:a', '16k']
+      : ['-ac', '1', '-ar', '16000', '-b:a', '32k'];
     const ff = spawn('ffmpeg', [
       '-y', '-i', inputPath,
-      '-ac', '1',
-      '-ar', '16000',
-      '-b:a', '32k',
+      ...args,
       '-loglevel', 'error',
       outputPath,
     ]);
@@ -150,11 +151,28 @@ function downsampleToTemp(inputPath, outputPath) {
 }
 
 async function downloadToTemp(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+  // Use curl for large-file downloads — Node fetch+arrayBuffer buffers the
+  // entire response and breaks on 150MB+ files with mid-stream connection
+  // drops. curl streams to disk, follows redirects, and retries.
   const tmp = path.join(os.tmpdir(), `podcast-${crypto.randomBytes(6).toString('hex')}.mp3`);
-  const arrayBuf = await res.arrayBuffer();
-  fs.writeFileSync(tmp, Buffer.from(arrayBuf));
+  await new Promise((resolve, reject) => {
+    const cu = spawn('curl', [
+      '-sSL',                  // silent, show errors, follow redirects
+      '--max-time', '600',     // 10-min hard cap per download
+      '--retry', '3',
+      '--retry-delay', '5',
+      '--retry-all-errors',
+      '-o', tmp,
+      url,
+    ]);
+    let stderr = '';
+    cu.stderr.on('data', d => { stderr += d.toString(); });
+    cu.on('exit', code => {
+      if (code === 0) resolve();
+      else reject(new Error(`curl exit ${code}: ${stderr.slice(0, 500)}`));
+    });
+    cu.on('error', reject);
+  });
   return tmp;
 }
 
@@ -173,12 +191,35 @@ function parseRetryAfterSeconds(errText) {
 
 async function callProvider(fd, label) {
   // Single POST + 429-aware wait+retry loop (max 5 waits = ~10 min).
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const res = await fetch(PROVIDER_CFG.endpoint, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${PROVIDER_CFG.apiKey}` },
-      body: fd,
-    });
+  // Also retries on network-level failures ("fetch failed") which we
+  // see on large multipart uploads — undici gives up silently with no
+  // status code if the connection stalls.
+  let netRetries = 0;
+  const MAX_NET_RETRIES = 4;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const controller = new AbortController();
+    const timeoutMs = 12 * 60 * 1000; // 12 min hard cap per upload
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(PROVIDER_CFG.endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${PROVIDER_CFG.apiKey}` },
+        body: fd,
+        signal: controller.signal,
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      const msg = String(e?.message || e);
+      if (netRetries++ < MAX_NET_RETRIES) {
+        const backoff = 10 + netRetries * 15;
+        console.log(`  [net-retry ${netRetries}/${MAX_NET_RETRIES}] ${msg} — sleeping ${backoff}s`);
+        await new Promise(r => setTimeout(r, backoff * 1000));
+        continue;
+      }
+      throw new Error(`${PROVIDER} ${label} network: ${msg}`);
+    }
+    clearTimeout(timer);
     const text = await res.text();
     if (res.ok) return text.trim();
     if (res.status === 429) {
@@ -189,7 +230,7 @@ async function callProvider(fd, label) {
     }
     throw new Error(`${PROVIDER} ${label} ${res.status}: ${text.slice(0, 300)}`);
   }
-  throw new Error(`${PROVIDER} ${label}: rate-limit retries exhausted`);
+  throw new Error(`${PROVIDER} ${label}: retries exhausted`);
 }
 
 // OpenAI doesn't accept URLs — always upload. So this helper builds
@@ -260,40 +301,81 @@ async function refoldDocument(job, transcriptText) {
 
 // ---- main loop -------------------------------------------------
 
-async function main() {
-  console.log(`[transcribe] Provider: ${PROVIDER} (${PROVIDER_CFG.label}) · $${COST_PER_HOUR}/hr · Mode: ${isDryRun ? 'DRY RUN' : 'LIVE'}${retryFailed ? ' (+ retry failed)' : ''}`);
-
-  // Pull pending (+ failed if --retry-failed) jobs
+// Atomic claim: pick the next pending job AND flip it to in_progress.
+// Multiple workers may target the same row — the conditional UPDATE
+// (eq attempts, in status) ensures only one wins. Losers loop to the
+// NEXT candidate. Only returns null when the table is empty of
+// claimable rows.
+async function claimNextJob() {
   const statusFilter = retryFailed ? ['pending', 'failed'] : ['pending'];
-  const { data: jobs, error } = await supabase
-    .from('podcast_transcription_jobs')
-    .select('*')
-    .in('status', statusFilter)
-    .lt('attempts', MAX_ATTEMPTS)
-    .order('duration_seconds', { ascending: true })
-    .limit(LIMIT === Infinity ? 1000 : LIMIT);
+  const FETCH_BATCH = 10; // pull a small candidate window so concurrent workers don't all collide on row 1
 
-  if (error) { console.error('Fetch jobs failed:', error.message); process.exit(1); }
-  if (!jobs || jobs.length === 0) {
-    console.log('[transcribe] No pending jobs.');
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: candidates } = await supabase
+      .from('podcast_transcription_jobs')
+      .select('id, attempts')
+      .in('status', statusFilter)
+      .lt('attempts', MAX_ATTEMPTS)
+      .order('duration_seconds', { ascending: true })
+      .limit(FETCH_BATCH);
+    if (!candidates || candidates.length === 0) return null;
+
+    // Randomize order so 4 workers picking the same top-N batch
+    // don't all stampede the smallest-duration row first.
+    const shuffled = candidates.slice().sort(() => Math.random() - 0.5);
+
+    for (const candidate of shuffled) {
+      const { data: claimed } = await supabase
+        .from('podcast_transcription_jobs')
+        .update({
+          status: 'in_progress',
+          attempts: candidate.attempts + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', candidate.id)
+        .eq('attempts', candidate.attempts)
+        .in('status', statusFilter)
+        .select('*')
+        .maybeSingle();
+      if (claimed) return claimed;
+    }
+    // All candidates in this batch were stolen by sibling workers; tiny backoff and refetch.
+    await new Promise(r => setTimeout(r, 200 + Math.random() * 300));
+  }
+  // Couldn't claim anything after 5 rounds — probably truly empty.
+  return null;
+}
+
+const WORKER_ID = process.env.WORKER_ID || String(process.pid);
+
+async function main() {
+  console.log(`[transcribe w${WORKER_ID}] Provider: ${PROVIDER} (${PROVIDER_CFG.label}) · $${COST_PER_HOUR}/hr · Mode: ${isDryRun ? 'DRY RUN' : 'LIVE'}${retryFailed ? ' (+ retry failed)' : ''}`);
+
+  if (isDryRun) {
+    const statusFilter = retryFailed ? ['pending', 'failed'] : ['pending'];
+    const { count } = await supabase
+      .from('podcast_transcription_jobs')
+      .select('id', { count: 'exact', head: true })
+      .in('status', statusFilter)
+      .lt('attempts', MAX_ATTEMPTS);
+    console.log(`[transcribe w${WORKER_ID}] DRY: ${count} jobs would be processed`);
     return;
   }
-  console.log(`[transcribe] Jobs to process: ${jobs.length}`);
 
   let done = 0, failed = 0, totalCost = 0, totalSeconds = 0;
+  let processedCount = 0;
   const startedAt = Date.now();
+  const startLimit = LIMIT === Infinity ? Infinity : LIMIT;
 
-  for (let i = 0; i < jobs.length; i++) {
-    const job = jobs[i];
+  while (processedCount < startLimit) {
+    const job = await claimNextJob();
+    if (!job) break;
+    processedCount++;
+
     const minLabel = `${Math.floor(job.duration_seconds / 60)}m${String(job.duration_seconds % 60).padStart(2, '0')}s`;
-    console.log(`\n[${i + 1}/${jobs.length}] (${minLabel}) ${job.episode_title.slice(0, 70)}`);
+    console.log(`\n[w${WORKER_ID} #${processedCount}] (${minLabel}) ${job.episode_title.slice(0, 70)}`);
 
-    if (isDryRun) { console.log('  DRY: skipped'); continue; }
-
-    // Mark in_progress + bump attempts
-    await supabase.from('podcast_transcription_jobs')
-      .update({ status: 'in_progress', attempts: job.attempts + 1, updated_at: new Date().toISOString() })
-      .eq('id', job.id);
+    // job is already claimed (in_progress, attempts bumped) by claimNextJob
 
     let transcript = '';
     let tempFiles = [];
@@ -311,13 +393,24 @@ async function main() {
       const downloadedSize = fs.statSync(downloaded).size;
 
       let uploadPath = downloaded;
+      const WHISPER_CAP = 25 * 1024 * 1024;
       if (downloadedSize > SIZE_THRESHOLD) {
         const downsampled = downloaded.replace(/\.mp3$/, '.lo.mp3');
         await downsampleToTemp(downloaded, downsampled);
         tempFiles.push(downsampled);
-        const newSize = fs.statSync(downsampled).size;
-        console.log(`  downsampled: ${Math.round(newSize / 1024 / 1024)}MB`);
+        let outSize = fs.statSync(downsampled).size;
+        console.log(`  downsampled: ${Math.round(outSize / 1024 / 1024)}MB`);
         uploadPath = downsampled;
+
+        // Fallback for 100+ min episodes where 16kHz still exceeds Whisper's 25MB cap.
+        if (outSize > WHISPER_CAP) {
+          const lower = downloaded.replace(/\.mp3$/, '.lower.mp3');
+          await downsampleToTemp(downloaded, lower, true);
+          tempFiles.push(lower);
+          outSize = fs.statSync(lower).size;
+          console.log(`  aggressive downsample (8kHz 16kbps): ${Math.round(outSize / 1024 / 1024)}MB`);
+          uploadPath = lower;
+        }
       }
       transcript = await transcribeFile(uploadPath);
 
@@ -358,7 +451,7 @@ async function main() {
   }
 
   const elapsed = ((Date.now() - startedAt) / 60_000).toFixed(1);
-  console.log('\n[transcribe] ✅ Run complete');
+  console.log(`\n[transcribe w${WORKER_ID}] ✅ Run complete`);
   console.log(`  Completed:    ${done}`);
   console.log(`  Failed:       ${failed}`);
   console.log(`  Total audio:  ${(totalSeconds / 3600).toFixed(1)} hrs`);

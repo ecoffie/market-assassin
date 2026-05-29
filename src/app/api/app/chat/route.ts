@@ -31,6 +31,7 @@ import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { retrieveRagContext, type RagChunkResult } from '@/lib/rag/retrieve';
+import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpisodeCard } from '@/lib/rag/podcast-search';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 
 export const dynamic = 'force-dynamic';
@@ -94,8 +95,12 @@ VOICE:
 - Keep responses tight. Most answers are 3-6 sentences or a short numbered list. No essays.
 
 GROUNDING:
-- The CONTEXT block below contains real federal contracting teaching material + podcast interviews with small-business winners. Prefer answers grounded in this material.
-- When you draw on a context chunk, reference it inline as [→ <doc title>]. Example: "Most first-time 8(a) winners start as subs [→ Episode 326]."
+- The CONTEXT block below contains two kinds of material:
+  1. Teaching/transcript chunks — full quotes from federal contracting curriculum + podcast interviews.
+  2. PODCAST EPISODES — structured summary cards (guest, agencies, NAICS, set-asides, lessons) for episode-level discovery.
+- When you draw on a chunk, reference it inline as [→ <doc title>]. When you reference a podcast episode card, use [→ Episode N]. Examples:
+  - "Most first-time 8(a) winners start as subs [→ Episode 326]."
+  - "Several guests on the show have walked through HUBZone certification: [→ Episode 16], [→ Episode 170], [→ Episode 302]."
 - If the context doesn't contain what's needed, say so directly: "I don't have that in my knowledge base — try the [X] panel for that." DO NOT invent federal programs, agency names, or contract values.
 
 SCOPE:
@@ -109,15 +114,21 @@ WRITING STYLE:
 USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"):
 {userProfile}`;
 
-function buildContextBlock(chunks: RagChunkResult[]): string {
-  if (!chunks.length) return '';
-  return chunks
-    .map((c, i) => {
-      const label = c.doc_title || c.source_path || `Source ${i + 1}`;
-      const type = c.doc_type ? `[${c.doc_type}]` : '';
-      return `### Source ${i + 1}: ${label} ${type}\n${c.chunk_text.trim()}`;
-    })
-    .join('\n\n');
+function buildContextBlock(chunks: RagChunkResult[], podcastCards: PodcastEpisodeCard[] = []): string {
+  const parts: string[] = [];
+  if (chunks.length) {
+    parts.push(chunks
+      .map((c, i) => {
+        const label = c.doc_title || c.source_path || `Source ${i + 1}`;
+        const type = c.doc_type ? `[${c.doc_type}]` : '';
+        return `### Source ${i + 1}: ${label} ${type}\n${c.chunk_text.trim()}`;
+      })
+      .join('\n\n'));
+  }
+  if (podcastCards.length) {
+    parts.push(`## PODCAST EPISODES (overview — use for "find episodes about X" type questions):\n\n${formatPodcastCardsForPrompt(podcastCards)}`);
+  }
+  return parts.join('\n\n');
 }
 
 function chunksToCitations(chunks: RagChunkResult[]): CitedSource[] {
@@ -131,6 +142,15 @@ function chunksToCitations(chunks: RagChunkResult[]): CitedSource[] {
   }));
 }
 
+function podcastCardsToCitations(cards: PodcastEpisodeCard[]): CitedSource[] {
+  return cards.map(c => ({
+    title: c.episode_number ? `Episode ${c.episode_number}` : c.episode_title,
+    url: c.episode_url,
+    doc_type: 'podcast_interview',
+    source_path: c.episode_url,
+  }));
+}
+
 /**
  * Filter chunks to only those Mindy actually cited inline via [→ X].
  * Fuzzy-matches the bracket label against each chunk's doc_title so
@@ -140,7 +160,7 @@ function chunksToCitations(chunks: RagChunkResult[]): CitedSource[] {
  * intended behavior for off-topic redirects and "I don't have that"
  * fallbacks. Better to show nothing than a misleading source chip.
  */
-function filterUsedCitations(chunks: RagChunkResult[], assistantContent: string): CitedSource[] {
+function filterUsedCitations(chunks: RagChunkResult[], podcastCards: PodcastEpisodeCard[], assistantContent: string): CitedSource[] {
   const bracketRe = /\[→\s*([^\]]+)\]/g;
   const labels: string[] = [];
   let m: RegExpExecArray | null;
@@ -149,7 +169,7 @@ function filterUsedCitations(chunks: RagChunkResult[], assistantContent: string)
   }
   if (labels.length === 0) return [];
 
-  const all = chunksToCitations(chunks);
+  const all = [...chunksToCitations(chunks), ...podcastCardsToCitations(podcastCards)];
   const usedKeys = new Set<string>();
   const used: CitedSource[] = [];
   for (const label of labels) {
@@ -295,18 +315,23 @@ export async function POST(request: NextRequest) {
         // Tell client which session this exchange belongs to right away
         send({ type: 'session', sessionId });
 
-        // Parallel-fetch context: RAG + bidder profile
-        const [chunks, profile] = await Promise.all([
+        // Parallel-fetch context: chunk-level RAG + episode-level
+        // podcast metadata + bidder profile. The podcast helper searches
+        // structured fields (guest, agency, NAICS, set-aside, summary)
+        // and is cheap — empty result when no podcast-shaped tokens
+        // appear in the query.
+        const [chunks, podcastCards, profile] = await Promise.all([
           retrieveRagContext({
             query: message,
             limit: RAG_LIMIT,
             maxChars: RAG_MAX_CHARS,
             maxPerDoc: 1,
           }),
+          retrievePodcastEpisodes({ query: message, limit: 4 }),
           loadBidderProfile(auth.email!),
         ]);
 
-        const contextBlock = buildContextBlock(chunks);
+        const contextBlock = buildContextBlock(chunks, podcastCards);
         const userProfileBlock = formatProfileForPrompt(profile);
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{userProfile}', userProfileBlock);
 
@@ -325,7 +350,7 @@ export async function POST(request: NextRequest) {
         // The current user message — append CONTEXT to it (not as separate
         // turn) so Mindy sees it as "for THIS question, here's the corpus".
         const userTurn = contextBlock
-          ? `${message}\n\n---\nCONTEXT (real federal contracting teaching + podcast quotes):\n${contextBlock}`
+          ? `${message}\n\n---\nCONTEXT (federal contracting teaching + podcast quotes + episode summaries):\n${contextBlock}`
           : message;
         messages.push({ role: 'user', content: userTurn });
 
@@ -393,7 +418,7 @@ export async function POST(request: NextRequest) {
         // off-topic redirect ("I'm focused on federal contracting…")
         // attached a misleading citation chip just because we'd
         // retrieved something during context-fetch.
-        const citedSources = filterUsedCitations(chunks, assistantContent);
+        const citedSources = filterUsedCitations(chunks, podcastCards, assistantContent);
         send({ type: 'citations', sources: citedSources });
         send({ type: 'done' });
         controller.close();
