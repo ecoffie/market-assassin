@@ -54,6 +54,10 @@ export interface PodcastEpisodeCard {
   set_asides_mentioned: string[];
   key_lessons: string[];
   summary_2sent: string | null;
+  // Layer-2 fields, null until the re-extraction has run for an episode.
+  business_type?: 'product' | 'service' | 'both' | null;
+  transcript_keywords?: string[] | null;
+  personas?: string[] | null;
 }
 
 const SET_ASIDE_VOCAB = ['8(a)', 'HUBZone', 'WOSB', 'EDWOSB', 'SDVOSB', 'VOSB', 'SDB'];
@@ -78,6 +82,13 @@ const AGENCY_TOKENS: Array<{ token: string; matches: string[] }> = [
   { token: 'sba',   matches: ['Small Business Administration', 'SBA'] },
 ];
 
+// Words that signal "this episode is about selling PRODUCTS to the
+// government" (reseller, distributor, hardware on a GSA Schedule)
+// vs "this episode is about selling SERVICES" (consulting, labor).
+// Used to route queries like "product sales" → business_type=product.
+const PRODUCT_SIGNALS = ['product', 'products', 'reseller', 'resell', 'reselling', 'distributor', 'distribution', 'hardware', 'equipment', 'wholesale', 'catalog', 'gsa schedule', 'schedule contract', 'commodity'];
+const SERVICE_SIGNALS = ['service', 'services', 'consulting', 'labor', 'staffing', 'janitorial', 'maintenance contract', 'professional services'];
+
 /**
  * Pull search tokens out of a free-text user message.
  * Returns whichever structured filters look applicable. If none, we
@@ -99,16 +110,43 @@ function parseFilters(message: string) {
     if (lower.includes(a.token)) agencyValues.push(...a.matches);
   }
 
+  // Guest-name detection. Two heuristics:
+  //  1. Two-word capitalized sequences in the ORIGINAL casing —
+  //     "Ryan Atencio", "Megan Sheckles" — typical when a user names
+  //     a guest. We split into individual tokens for the trigram
+  //     search; matching on either word produces a hit, then the
+  //     intersection wins the dedup.
+  //  2. Single capitalized last-name-shaped token (4+ chars) so
+  //     "Atencio" alone still pulls Ryan.
+  const guestNameTokens: string[] = [];
+  const properRe = /\b([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})\b/g;
+  let m: RegExpExecArray | null;
+  while ((m = properRe.exec(message))) {
+    guestNameTokens.push(m[1], m[2]);
+  }
+  // De-dupe + drop obvious non-guest proper nouns that collide
+  // with our agency / vocab tables.
+  const guestBlacklist = new Set(['Veterans', 'Affairs', 'Defense', 'Energy', 'Justice', 'State', 'Homeland', 'Security', 'Services', 'Administration', 'Department', 'United', 'States', 'Army', 'Navy', 'Air', 'Force', 'Coast', 'Guard', 'Marine', 'Corps', 'Small', 'Business', 'Sources', 'Sought']);
+  const guestNames = Array.from(new Set(guestNameTokens)).filter(t => !guestBlacklist.has(t));
+
+  // Business-type signal: product vs service. Only fires when the
+  // query is clearly one-sided. Mixed signals → null (don't filter).
+  const productHit = PRODUCT_SIGNALS.some(s => lower.includes(s));
+  const serviceHit = SERVICE_SIGNALS.some(s => lower.includes(s));
+  let businessType: 'product' | 'service' | null = null;
+  if (productHit && !serviceHit) businessType = 'product';
+  else if (serviceHit && !productHit) businessType = 'service';
+
   // Title/summary keywords — take meaningful words >= 4 chars,
   // strip stopwords. The 6+ word cap keeps the OR clause tight.
-  const stop = new Set(['what', 'when', 'where', 'which', 'about', 'with', 'this', 'that', 'have', 'find', 'show', 'tell', 'episode', 'episodes', 'guest', 'guests', 'podcast', 'mindy', 'please', 'there', 'these', 'those', 'their', 'them', 'they', 'from']);
+  const stop = new Set(['what', 'when', 'where', 'which', 'about', 'with', 'this', 'that', 'have', 'find', 'show', 'tell', 'episode', 'episodes', 'guest', 'guests', 'podcast', 'mindy', 'please', 'there', 'these', 'those', 'their', 'them', 'they', 'from', 'discussed', 'discuss', 'another', 'where', 'talked', 'said']);
   const words = lower
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length >= 4 && !stop.has(w));
   const keywords = Array.from(new Set(words)).slice(0, 6);
 
-  return { naicsMatches, setAsides, agencyValues, keywords };
+  return { naicsMatches, setAsides, agencyValues, guestNames, businessType, keywords };
 }
 
 export interface RetrievePodcastOptions {
@@ -128,61 +166,114 @@ export async function retrievePodcastEpisodes(opts: RetrievePodcastOptions): Pro
 
   const f = parseFilters(trimmed);
   const sb = getSupabase();
-  const results = new Map<string, PodcastEpisodeCard>();
+  // Use a scored Map: key = episode_title, value = { row, score }
+  // so we can rank by how many filters agreed instead of just dedup.
+  const scored = new Map<string, { row: PodcastEpisodeCard; score: number }>();
+  const addHits = (rows: PodcastEpisodeCard[] | null | undefined, points: number) => {
+    if (!rows) return;
+    for (const r of rows) {
+      const key = r.episode_title;
+      const prev = scored.get(key);
+      if (prev) prev.score += points;
+      else scored.set(key, { row: r, score: points });
+    }
+  };
 
-  const baseCols = 'episode_number, episode_title, episode_url, guest_name, guest_company, topics, agencies_mentioned, naics_mentioned, set_asides_mentioned, key_lessons, summary_2sent';
+  const baseCols = 'episode_number, episode_title, episode_url, guest_name, guest_company, topics, agencies_mentioned, naics_mentioned, set_asides_mentioned, key_lessons, summary_2sent, business_type, transcript_keywords, personas';
 
   // Run each filter as its own query; merge by episode_title. This is
   // ~5 lightweight indexed lookups, cheaper than building one giant
-  // disjunction client-side.
-  const queries: Promise<{ data: PodcastEpisodeCard[] | null }>[] = [];
+  // disjunction client-side. Scores per filter type — guest match is
+  // the strongest signal because "Ryan Atencio" is a specific ask.
+  const queries: Array<{ p: Promise<{ data: PodcastEpisodeCard[] | null }>; points: number }> = [];
+
+  // Guest name search — runs per token via ILIKE (the trigram index
+  // makes this fast). One hit per token contributes; episodes that
+  // match both first AND last name end up with the highest score.
+  for (const name of f.guestNames) {
+    queries.push({
+      p: sb.from('podcast_episode_metadata')
+        .select(baseCols)
+        .ilike('guest_name', `%${name}%`)
+        .eq('extraction_status', 'extracted')
+        .limit(limit * 2) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>,
+      points: 50,  // dominant signal
+    });
+  }
+
+  // business_type filter — pre-Layer-2 episodes don't have this
+  // column populated yet, so this query returns nothing until the
+  // re-extraction runs. Harmless meanwhile.
+  if (f.businessType) {
+    queries.push({
+      p: sb.from('podcast_episode_metadata')
+        .select(baseCols)
+        .eq('business_type', f.businessType)
+        .eq('extraction_status', 'extracted')
+        .limit(limit * 2) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>,
+      points: 20,
+    });
+  }
 
   if (f.naicsMatches.length) {
-    queries.push(sb.from('podcast_episode_metadata')
-      .select(baseCols)
-      .overlaps('naics_mentioned', f.naicsMatches)
-      .eq('extraction_status', 'extracted')
-      .limit(limit) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>);
+    queries.push({
+      p: sb.from('podcast_episode_metadata')
+        .select(baseCols)
+        .overlaps('naics_mentioned', f.naicsMatches)
+        .eq('extraction_status', 'extracted')
+        .limit(limit * 2) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>,
+      points: 15,
+    });
   }
   if (f.setAsides.length) {
-    queries.push(sb.from('podcast_episode_metadata')
-      .select(baseCols)
-      .overlaps('set_asides_mentioned', f.setAsides)
-      .eq('extraction_status', 'extracted')
-      .limit(limit) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>);
+    queries.push({
+      p: sb.from('podcast_episode_metadata')
+        .select(baseCols)
+        .overlaps('set_asides_mentioned', f.setAsides)
+        .eq('extraction_status', 'extracted')
+        .limit(limit * 2) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>,
+      points: 15,
+    });
   }
   if (f.agencyValues.length) {
-    queries.push(sb.from('podcast_episode_metadata')
-      .select(baseCols)
-      .overlaps('agencies_mentioned', f.agencyValues)
-      .eq('extraction_status', 'extracted')
-      .limit(limit) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>);
+    queries.push({
+      p: sb.from('podcast_episode_metadata')
+        .select(baseCols)
+        .overlaps('agencies_mentioned', f.agencyValues)
+        .eq('extraction_status', 'extracted')
+        .limit(limit * 2) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>,
+      points: 10,
+    });
   }
   // Fallback: ILIKE the summary and the title for the first 2 keywords.
   for (const kw of f.keywords.slice(0, 2)) {
-    queries.push(sb.from('podcast_episode_metadata')
-      .select(baseCols)
-      .or(`summary_2sent.ilike.%${kw}%,episode_title.ilike.%${kw}%`)
-      .eq('extraction_status', 'extracted')
-      .limit(limit) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>);
+    queries.push({
+      p: sb.from('podcast_episode_metadata')
+        .select(baseCols)
+        .or(`summary_2sent.ilike.%${kw}%,episode_title.ilike.%${kw}%`)
+        .eq('extraction_status', 'extracted')
+        .limit(limit) as unknown as Promise<{ data: PodcastEpisodeCard[] | null }>,
+      points: 5,  // weakest signal
+    });
   }
 
   if (queries.length === 0) return [];
 
-  const settled = await Promise.allSettled(queries);
-  for (const s of settled) {
+  const settled = await Promise.allSettled(queries.map(q => q.p));
+  for (let i = 0; i < settled.length; i++) {
+    const s = settled[i];
     if (s.status !== 'fulfilled' || !s.value.data) continue;
-    for (const row of s.value.data) {
-      const key = row.episode_title;
-      if (!results.has(key)) {
-        // Repair the URL at the read boundary so all downstream
-        // consumers (chat citations, podcast cards) get clean links.
-        results.set(key, { ...row, episode_url: normalizeEpisodeUrl(row.episode_url) });
-      }
-    }
+    // Repair URL on the way in; only the first sighting per episode
+    // counts toward addHits, but score accumulates across queries.
+    const rows = s.value.data.map(r => ({ ...r, episode_url: normalizeEpisodeUrl(r.episode_url) }));
+    addHits(rows, queries[i].points);
   }
 
-  return Array.from(results.values()).slice(0, limit);
+  // Sort by score desc and return top-N
+  return Array.from(scored.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(x => x.row);
 }
 
 /**
@@ -196,9 +287,11 @@ export function formatPodcastCardsForPrompt(cards: PodcastEpisodeCard[]): string
       const epLabel = c.episode_number ? `Episode ${c.episode_number}` : c.episode_title;
       const guest = c.guest_name ? ` — ${c.guest_name}${c.guest_company ? ` (${c.guest_company})` : ''}` : '';
       const tags: string[] = [];
+      if (c.business_type) tags.push(`type: ${c.business_type}`);
       if (c.agencies_mentioned?.length) tags.push(`agencies: ${c.agencies_mentioned.slice(0, 3).join(', ')}`);
       if (c.set_asides_mentioned?.length) tags.push(`set-asides: ${c.set_asides_mentioned.slice(0, 3).join(', ')}`);
       if (c.naics_mentioned?.length) tags.push(`NAICS: ${c.naics_mentioned.slice(0, 3).join(', ')}`);
+      if (c.personas?.length) tags.push(`for: ${c.personas.slice(0, 3).join(', ')}`);
       const tagLine = tags.length ? `  ${tags.join(' | ')}\n` : '';
       const summary = c.summary_2sent ? `  ${c.summary_2sent.trim()}\n` : '';
       const lessons = c.key_lessons?.length

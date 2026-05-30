@@ -104,7 +104,10 @@ Output format (use null for unknown fields, empty array [] for empty lists):
   "set_asides_mentioned": string[],    // Set-aside programs named (e.g. "8(a)", "WOSB", "HUBZone", "SDVOSB")
   "contract_size_mentioned": string | null,  // Largest specific contract value the guest mentions winning. E.g. "$4.2M", "$50K", "8-figure". NULL if no specific dollar figure.
   "key_lessons": string[],             // 3-5 concrete lessons/takeaways from the guest's experience. Each lesson should be one sentence, actionable, and specific. NOT generic platitudes.
-  "summary_2sent": string              // 2-3 sentences (max 60 words) capturing the episode's core story or argument. Write it as a search-result snippet — would help a user decide if this episode is relevant.
+  "summary_2sent": string,             // 2-3 sentences (max 60 words) capturing the episode's core story or argument. Write it as a search-result snippet — would help a user decide if this episode is relevant.
+  "business_type": "product" | "service" | "both" | null,  // Is the GUEST's business primarily selling PRODUCTS (hardware, equipment, reselling, distribution, GSA Schedule catalogs) or SERVICES (consulting, labor, IT services, construction, janitorial)? "both" if they meaningfully do both. null only if there's no business discussed.
+  "transcript_keywords": string[],     // 10-15 DISTINCTIVE nouns/short phrases that appear in this episode and would help retrieval. Prefer specific terms over generic ones. E.g. ["GSA Schedule", "distributor agreement", "Cisco reseller", "DOD CAGE code"] not ["business", "company", "contract"]. Lowercase, no duplicates.
+  "personas": string[]                 // Who would benefit MOST from this episode? 2-4 short labels from this controlled vocabulary: ["first-time-bidder", "veteran-owned", "woman-owned", "minority-owned", "product-reseller", "service-provider", "construction-contractor", "it-services", "8a-applicant", "experienced-prime", "subcontractor", "tribal-entity", "alaska-native", "hubzone-business"]. Only include personas the episode CLEARLY speaks to.
 }
 
 Rules:
@@ -115,6 +118,8 @@ Rules:
 - For agencies, prefer the official name. Skip vague references like "the government" or "federal agencies".
 - Lessons must be ACTIONABLE and SPECIFIC to this episode, not generic federal contracting advice. If the episode has no actionable lessons, return [].
 - summary_2sent should be a hook — what makes this episode worth listening to?
+- business_type: products = physical things being sold (hardware, electronics, supplies, equipment, GSA Schedule catalog items, reselling/distributor model). services = labor or expertise (consulting, IT staffing, construction labor, janitorial). Most guests sell one or the other; "both" only when they explicitly run both lines.
+- transcript_keywords should be terms that DISTINGUISH this episode from a generic federal contracting episode. If every guest could've said it, it's not distinctive.
 `;
 
 async function extractFromTranscript(title, transcript) {
@@ -262,6 +267,9 @@ async function main() {
       contract_size_mentioned: extracted.contract_size_mentioned || null,
       key_lessons: normalizeArray(extracted.key_lessons),
       summary_2sent: extracted.summary_2sent || null,
+      business_type: ['product', 'service', 'both'].includes(extracted.business_type) ? extracted.business_type : null,
+      transcript_keywords: normalizeArray(extracted.transcript_keywords).map(s => String(s).toLowerCase()),
+      personas: normalizeArray(extracted.personas).map(s => String(s).toLowerCase()),
       extraction_status: 'extracted',
       extraction_error: null,
       extraction_model: PROVIDER_CFG.providerTag,
