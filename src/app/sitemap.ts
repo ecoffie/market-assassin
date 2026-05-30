@@ -83,6 +83,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // contractors", "top defense contractors"). Priority 0.8 because the
     // intent is transactional + the queries already have proven volume.
     { url: `${SITE_URL}/top`,                   lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
+    // Awards database landing — targets "federal contract awards
+    // database", "federal contracts awarded", "government contract
+    // awards" query cluster (26+ impressions in GSC week 1).
+    // Individual /awards/[id] detail pages are NOT in the sitemap
+    // (63M possible URLs would explode the sitemap); they're
+    // discoverable via the landing page's tables and ISR-render
+    // on first crawl.
+    { url: `${SITE_URL}/awards`,                lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
     { url: `${SITE_URL}/about`,                 lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/free-resources`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.5 },
     { url: `${SITE_URL}/privacy`,               lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
