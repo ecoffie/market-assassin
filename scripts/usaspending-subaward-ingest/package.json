@@ -1,0 +1,13 @@
+{
+  "name": "usaspending-subaward-ingest",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node worker.js"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.14.0",
+    "unzipper": "^0.12.3"
+  }
+}

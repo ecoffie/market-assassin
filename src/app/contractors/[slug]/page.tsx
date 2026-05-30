@@ -32,6 +32,12 @@ import {
   recipientSlug,
 } from '@/lib/bigquery/recipients';
 import { ContractorAnalytics } from '@/components/contractors/ContractorAnalytics';
+import {
+  getSubawardsPaidOutSummary,
+  getSubawardsReceivedSummary,
+  getTopSubawardeesForPrime,
+  getTopPrimesForSubawardee,
+} from '@/lib/bigquery/subawards';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 
@@ -105,7 +111,17 @@ export default async function ContractorPage({ params }: PageProps) {
   const uei = recipient.recipient_uei;
 
   // Fetch sub-sections in parallel — independent queries
-  const [yearly, yearlyByAgency, topAgencies, treemapNaics, topNaics, recentAwards, executives] = await Promise.all([
+  const [
+    yearly,
+    yearlyByAgency,
+    topAgencies,
+    treemapNaics,
+    topNaics,
+    recentAwards,
+    executives,
+    subPaidOutSummary,
+    subReceivedSummary,
+  ] = await Promise.all([
     getYearlyTotalsForRecipient(uei),
     getYearlyByAgencyForRecipient(uei),
     getTopAgenciesForRecipient(uei, 10),
@@ -113,6 +129,16 @@ export default async function ContractorPage({ params }: PageProps) {
     getTopNaicsForRecipient(uei, 10),
     getRecentAwardsForRecipient(uei, 25),
     getExecutivesForRecipient(uei),
+    getSubawardsPaidOutSummary(uei),
+    getSubawardsReceivedSummary(uei),
+  ]);
+
+  // If the contractor has any subaward activity (in either direction),
+  // fetch the top partners. We do this conditionally because most
+  // contractors have neither — no point burning BQ on empty queries.
+  const [topSubawardees, topPrimes] = await Promise.all([
+    subPaidOutSummary ? getTopSubawardeesForPrime(uei, 15) : Promise.resolve([]),
+    subReceivedSummary ? getTopPrimesForSubawardee(uei, 15) : Promise.resolve([]),
   ]);
 
   // Related contractors (same top NAICS, exclude self). Fall back to
@@ -379,6 +405,80 @@ export default async function ContractorPage({ params }: PageProps) {
                     <p className="text-xs text-slate-500">Rank {e.exec_rank} · Reported {fmtDate(e.reported_at)}</p>
                   </div>
                   <span className="font-mono text-purple-400 font-semibold">{fmtMoney(Number(e.exec_amount))}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {/* Subawards Paid Out (this contractor as prime) */}
+      {subPaidOutSummary && topSubawardees.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-10">
+          <h2 className="text-2xl font-bold mb-1">Subawards Paid Out</h2>
+          <p className="text-sm text-slate-400 mb-4">
+            {displayName} acts as a prime contractor and pays subcontractors on federal awards. Aggregated from
+            USAspending sub-award reporting (FY2016-FY2026).
+          </p>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+            <div className="grid gap-4 md:grid-cols-3 mb-6">
+              <Stat label="Total Paid to Subs" value={fmtMoney(subPaidOutSummary.total_amount)} highlight />
+              <Stat label="Sub Awards" value={subPaidOutSummary.count.toLocaleString()} />
+              <Stat label="Distinct Subawardees" value={subPaidOutSummary.partner_count.toLocaleString()} />
+            </div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">
+              Top {topSubawardees.length} Subawardees
+            </h3>
+            <ul className="divide-y divide-slate-800">
+              {topSubawardees.map((s) => (
+                <li key={s.partner_uei} className="flex items-center justify-between gap-4 py-2.5">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/contractors/${recipientSlug(s.partner_name)}`}
+                      className="text-slate-200 hover:text-purple-400 font-medium"
+                    >
+                      {fmtCompanyName(s.partner_name)}
+                    </Link>
+                    <p className="text-xs text-slate-500">{Number(s.count).toLocaleString()} subawards</p>
+                  </div>
+                  <span className="font-mono text-purple-400 font-semibold shrink-0">{fmtMoney(Number(s.total_amount))}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {/* Subawards Received (this contractor as sub) */}
+      {subReceivedSummary && topPrimes.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 pb-10">
+          <h2 className="text-2xl font-bold mb-1">Subawards Received</h2>
+          <p className="text-sm text-slate-400 mb-4">
+            {displayName} also receives subaward dollars from other prime contractors. Aggregated from USAspending
+            sub-award reporting (FY2016-FY2026).
+          </p>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+            <div className="grid gap-4 md:grid-cols-3 mb-6">
+              <Stat label="Total Received" value={fmtMoney(subReceivedSummary.total_amount)} highlight />
+              <Stat label="Sub Awards" value={subReceivedSummary.count.toLocaleString()} />
+              <Stat label="Distinct Primes" value={subReceivedSummary.partner_count.toLocaleString()} />
+            </div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">
+              Top {topPrimes.length} Primes Paying {displayName}
+            </h3>
+            <ul className="divide-y divide-slate-800">
+              {topPrimes.map((p) => (
+                <li key={p.partner_uei} className="flex items-center justify-between gap-4 py-2.5">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/contractors/${recipientSlug(p.partner_name)}`}
+                      className="text-slate-200 hover:text-purple-400 font-medium"
+                    >
+                      {fmtCompanyName(p.partner_name)}
+                    </Link>
+                    <p className="text-xs text-slate-500">{Number(p.count).toLocaleString()} subawards</p>
+                  </div>
+                  <span className="font-mono text-purple-400 font-semibold shrink-0">{fmtMoney(Number(p.total_amount))}</span>
                 </li>
               ))}
             </ul>
