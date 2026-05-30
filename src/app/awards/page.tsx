@@ -23,8 +23,15 @@ import { recipientSlug } from '@/lib/bigquery/recipients';
 
 const SITE_URL = 'https://getmindy.ai';
 
-export const revalidate = 86_400; // 24h — freshness matters more for this page
-export const dynamicParams = true;
+// IMPORTANT: do NOT prerender at build. The two queries this page makes
+// scan ~17 GB of the awards table; prerendering at build crashes the
+// build when the per-query maximumBytesBilled cap rejects the scan.
+//
+// force-dynamic skips build-time prerender. Page renders on demand.
+// Cost is bounded because our queryCached() wrapper hits Vercel KV
+// in front of BQ — typical request scans 0 GB (cache hit) and runs
+// the BQ query only after the 7-day KV TTL expires.
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Federal Contract Awards Database — Latest & Largest | Mindy',

@@ -53,10 +53,11 @@ export interface AwardDetailRow extends AwardListRow {
 export async function getLatestAwards(limit = 50): Promise<AwardListRow[]> {
   return queryCached<AwardListRow>({
     cacheKey: `awards:latest:${limit}`,
-    // Latest awards span all partitions but the LIMIT 50 + ORDER BY
-    // action_date DESC + partition pruning on recent FYs keeps scans
-    // ~1 GB cold. Cache hit cost is zero.
-    maximumBytesBilled: String(3 * 1024 * 1024 * 1024),
+    // Even with the fiscal_year >= currentYear-1 filter, ORDER BY
+    // action_date DESC on dollar-bearing rows scans the recent
+    // partitions fully (~10-15 GB). Cache hit cost is zero —
+    // queryCached + KV means this runs once per 24h max.
+    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
     query: `
       SELECT
         award_id,
@@ -89,7 +90,10 @@ export async function getLatestAwards(limit = 50): Promise<AwardListRow[]> {
 export async function getLargestAwards(limit = 50): Promise<AwardListRow[]> {
   return queryCached<AwardListRow>({
     cacheKey: `awards:largest:${limit}`,
-    maximumBytesBilled: String(5 * 1024 * 1024 * 1024),
+    // Full-table sort by obligation_amount across 63M rows scans
+    // ~17 GB. Bumped from default 5 GiB. Cache hit cost is zero,
+    // and KV TTL is 7 days so this runs ~weekly.
+    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
     query: `
       SELECT
         award_id,
@@ -119,7 +123,11 @@ export async function getLargestAwards(limit = 50): Promise<AwardListRow[]> {
 export async function getAwardById(awardId: string): Promise<AwardDetailRow | null> {
   const rows = await queryCached<AwardDetailRow>({
     cacheKey: `awards:detail:${awardId}`,
-    maximumBytesBilled: String(5 * 1024 * 1024 * 1024),
+    // award_id is a globally-unique string and the WHERE clause is
+    // a single equality filter, but award_id isn't in the cluster
+    // key so this still scans 10-15 GB per cold lookup. Bumped from
+    // default 5 GiB.
+    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
     query: `
       SELECT
         award_id,
@@ -168,7 +176,7 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
 export async function getTopAwardIdsForStatic(limit = 10000): Promise<string[]> {
   const rows = await queryCached<{ award_id: string }>({
     cacheKey: `awards:top-ids:${limit}`,
-    maximumBytesBilled: String(5 * 1024 * 1024 * 1024),
+    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
     ttlSeconds: 30 * 24 * 60 * 60, // 30d (this list is stable enough)
     query: `
       SELECT award_id
