@@ -214,15 +214,18 @@ export async function POST(request: NextRequest) {
         const age = Date.now() - new Date(cacheRow.generated_at).getTime();
         const rows = (cacheRow.agencies || []) as TargetMarketResearchRow[];
 
-        // Recovery check — treat cache rows with all-zero satSpending
-        // as stale regardless of age. This catches the case where an
-        // earlier broken code path wrote satSpending=0 for every
-        // agency; without this, the chart would show empty SAT data
-        // for 24h after we deploy a fix. Pattern mirrored from
-        // /api/usaspending/fpds-top-n.
-        const cacheHasSatData = rows.some((r) => (r.satSpending || 0) > 0);
+        // Freshness gate. We used to ALSO force-refetch any cache whose
+        // rows all had satSpending=0, to recover from an old broken code
+        // path that wrote zeros for everyone. But that wrongly rejects
+        // LEGITIMATE no-SAT results — e.g. PSC D316 (IT/cyber data
+        // backup) buys above the $350K SAT threshold, so every row
+        // genuinely has satSpending=0 and the cache could never hit.
+        // The all-zero bug is moot now that the cache is psc-keyed on a
+        // freshly-created table, so we trust any NON-EMPTY cached row
+        // set and only treat an empty payload as stale.
+        const cacheUsable = rows.length > 0;
 
-        if (age < CACHE_TTL_MS && cacheHasSatData) {
+        if (age < CACHE_TTL_MS && cacheUsable) {
           const sliced = isFree ? rows.slice(0, FREE_TIER_ROW_LIMIT) : rows;
           return NextResponse.json({
             success: true,
