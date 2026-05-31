@@ -24,6 +24,7 @@ import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
+import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
@@ -468,6 +469,16 @@ async function runDailyAlertJob(options?: {
         console.error(`[Daily Alerts] Guardrail triggered: ${guardrailCheck.reason}`);
         await guardrails.logEvent('trip', guardrailCheck.reason!);
         metrics.recordCircuitBreakerTripped();
+        // Surface to tool_errors so the throughput-regression detector
+        // and the operations dashboard both see this — previously
+        // guardrail trips only landed in console.error which nobody
+        // reads until they go investigating after a 4-day outage.
+        await logToolError({
+          tool: ToolNames.ALERTS,
+          errorType: ErrorTypes.INTERNAL,
+          errorMessage: `Guardrail tripped: ${guardrailCheck.reason}. Loop stopped after ${results.sent + results.failed + results.skipped} users processed.`,
+          requestPath: '/api/cron/daily-alerts',
+        }).catch(() => {});
         break; // Stop processing more users
       }
 
@@ -1206,13 +1217,18 @@ async function sendDailyAlertEmail(
     }
   }
   // Mindy Insights (#91) — process-cached RAG quote per bucket.
-  // Toggled off by default after the May 28 deploy correlated with
-  // the daily-alerts batch throughput collapsing from ~1000 sends/day
-  // to 2 sends/day. We'll re-enable per-user once we've identified
-  // the failure mode (timeout / exception escaping the try-catch /
-  // memory issue). Set ENABLE_MINDY_INSIGHTS=true to opt back in.
-  const mindyInsightEnabled = process.env.ENABLE_MINDY_INSIGHTS === 'true';
-  const mindyInsight = mindyInsightEnabled && opportunities.length > 0
+  // Gated by ENABLE_MINDY_INSIGHTS=true AND a per-user rollout percent
+  // (MINDY_INSIGHTS_ROLLOUT_PERCENT, default 0). When the May 28-31
+  // outage hit, *all* users saw the new feature → 100% of cron runs
+  // tripped the guardrail. With per-user bucketing, a future
+  // regression only affects MINDY_INSIGHTS_ROLLOUT_PERCENT% of users
+  // and the throughput-regression detector catches it the next morning.
+  const insightsRollout = parseInt(process.env.MINDY_INSIGHTS_ROLLOUT_PERCENT || '0', 10);
+  const insightsEnvOn = process.env.ENABLE_MINDY_INSIGHTS === 'true';
+  const mindyInsightEnabled = insightsEnvOn
+    && opportunities.length > 0
+    && userInRollout(email, insightsRollout, 'mindy-insights-v1');
+  const mindyInsight = mindyInsightEnabled
     ? await getInsightForNoticeType(dominantNoticeType).catch(err => {
         console.error('[daily-alerts] mindy-insights threw:', err);
         return null;

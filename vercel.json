@@ -282,6 +282,10 @@
       "schedule": "45 12 * * *"
     },
     {
+      "path": "/api/cron/check-alert-throughput",
+      "schedule": "0 14 * * *"
+    },
+    {
       "path": "/api/cron/daily-alerts",
       "schedule": "0 5 * * *"
     },

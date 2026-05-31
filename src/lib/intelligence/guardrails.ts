@@ -24,9 +24,14 @@ function getSupabase(): SupabaseClient | null {
 
 // Configuration
 const GUARDRAIL_CONFIG = {
-  // Stop if too many failures
-  maxConsecutiveFailures: 5,
-  maxTotalFailures: 50,
+  // Stop if too many failures. Raised 2026-05-31 from 5 → 25 after
+  // the May 28-31 daily-alerts outage. The old threshold tripped on
+  // the FIRST batch when a new bug hit every user identically (Mindy
+  // Insights throw escaping its catch). 25 gives the loop room to
+  // log to tool_errors for the next deploy's debugging while still
+  // bailing on a genuine system-wide failure.
+  maxConsecutiveFailures: 25,
+  maxTotalFailures: 100,
 
   // Stop if API is down
   maxApiErrors: 10,
