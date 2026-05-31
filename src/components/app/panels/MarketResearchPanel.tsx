@@ -3506,6 +3506,11 @@ function AgencyTable({
           pain_point_count: row.painPointCount,
           open_opp_count: row.openOppCount,
           upcoming_event_count: row.upcomingEventCount,
+          // Provenance — the active search filters that surfaced this
+          // office. naicsCode/pscCode are AgencyTable props. Lets My
+          // Target List show "surfaced from PSC D316" (roadmap Slice 5b).
+          source_naics: naicsCode || null,
+          source_psc: pscCode || null,
           added_from: 'research_drawer',
         }),
       });
@@ -3572,7 +3577,7 @@ function AgencyTable({
   // closure of useCallback's stale-deps lint. Adding to deps later if
   // the linter complains.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email, savedTargets, showAgencyToast]);
+  }, [email, savedTargets, showAgencyToast, naicsCode, pscCode]);
 
   // Slice 3B — remove from my target list. Used by the drawer Remove
   // button AND by the Undo action on the success toast.

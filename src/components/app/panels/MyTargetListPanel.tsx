@@ -33,6 +33,11 @@ interface TargetRow {
   status: 'targeting' | 'contacted' | 'qualified' | 'passed' | 'won';
   priority: 'low' | 'medium' | 'high' | 'critical';
   notes: string | null;
+  // Provenance (roadmap Slice 5b) — the NAICS/PSC search that surfaced
+  // this office. Comma-joined; null for targets saved before the
+  // provenance migration or when the user searched without that code.
+  source_naics: string | null;
+  source_psc: string | null;
   added_at: string;
   updated_at: string;
 }
@@ -417,6 +422,25 @@ export default function MyTargetListPanel({
                         {t.upcoming_event_count > 0 && (
                           <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-300">
                             {t.upcoming_event_count} events
+                          </span>
+                        )}
+                        {/* Provenance (roadmap Slice 5b) — which code
+                            surfaced this office. PSC shown first since
+                            it's the more precise classifier. */}
+                        {t.source_psc && (
+                          <span
+                            className="px-2 py-0.5 rounded bg-sky-500/10 text-sky-300"
+                            title="The PSC code you were searching when you saved this office. PSC is a tighter match than NAICS for what an office actually buys."
+                          >
+                            from PSC {t.source_psc}
+                          </span>
+                        )}
+                        {t.source_naics && !t.source_psc && (
+                          <span
+                            className="px-2 py-0.5 rounded bg-slate-700/40 text-slate-300"
+                            title="The NAICS code you were searching when you saved this office."
+                          >
+                            from NAICS {t.source_naics}
                           </span>
                         )}
                       </div>

@@ -135,6 +135,13 @@ export async function POST(request: NextRequest) {
     office_name: body.office_name,
     location: body.location || null,
 
+    // Provenance (roadmap Slice 5b) — remember the NAICS/PSC the user
+    // was searching when this office surfaced, so My Target List can
+    // show "surfaced from PSC D316". Comma-joined strings; null when the
+    // search omitted that classifier.
+    source_naics: typeof body.source_naics === 'string' ? body.source_naics.trim() || null : null,
+    source_psc: typeof body.source_psc === 'string' ? body.source_psc.trim() || null : null,
+
     set_aside_spending: num(body.set_aside_spending),
     contract_count: num(body.contract_count),
     sat_ratio: num(body.sat_ratio),
