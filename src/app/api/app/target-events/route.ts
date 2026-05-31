@@ -56,7 +56,7 @@ interface TargetRow {
 }
 
 interface EventCard {
-  source: 'sam' | 'static_series' | 'static_conference';
+  source: 'sam' | 'ai' | 'static_series' | 'static_conference';
   title: string;
   event_type: string;
   event_date: string | null;   // YYYY-MM-DD when known
@@ -64,6 +64,7 @@ interface EventCard {
   url: string | null;
   description: string | null;
   matched_agency: string;      // which alias triggered the match
+  confidence?: number | null;  // AI-discovered events only (Slice 5)
 }
 
 interface StaticEventSource {
@@ -201,7 +202,7 @@ export async function GET(request: NextRequest) {
 
     const { data: samEventsAll, error: eErr } = await supabase
       .from('sam_events')
-      .select('notice_id, title, event_type, agency, event_date, event_location, description, registration_url, source_notice_type')
+      .select('notice_id, title, event_type, agency, event_date, event_location, description, registration_url, source_notice_type, source, confidence')
       .gte('event_date', today.toISOString().slice(0, 10))
       .lte('event_date', horizon.toISOString().slice(0, 10))
       .order('event_date', { ascending: true });
@@ -233,8 +234,12 @@ export async function GET(request: NextRequest) {
         const key = `sam:${row.notice_id}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        // AI-discovered rows (Slice 5) carry source='ai_web_search' +
+        // confidence — surface them as 'ai' so the UI badges them
+        // "Mindy found this — verify date". SAM.gov rows stay 'sam'.
+        const isAi = row.source === 'ai_web_search';
         events.push({
-          source: 'sam',
+          source: isAi ? 'ai' : 'sam',
           title: row.title,
           event_type: row.event_type || 'event',
           event_date: row.event_date,
@@ -242,6 +247,7 @@ export async function GET(request: NextRequest) {
           url: row.registration_url,
           description: row.description,
           matched_agency: matched,
+          confidence: isAi && typeof row.confidence === 'number' ? row.confidence : null,
         });
       }
 

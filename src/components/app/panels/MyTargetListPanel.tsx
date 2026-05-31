@@ -48,7 +48,7 @@ interface TargetRow {
 // annual conferences (typical_month only). The 3 source types
 // surface distinct UI cues so the user knows which is which.
 interface TargetEvent {
-  source: 'sam' | 'static_series' | 'static_conference';
+  source: 'sam' | 'ai' | 'static_series' | 'static_conference';
   title: string;
   event_type: string;
   event_date: string | null;
@@ -56,6 +56,7 @@ interface TargetEvent {
   url: string | null;
   description: string | null;
   matched_agency: string;
+  confidence?: number | null;  // AI-discovered events only (Slice 5)
 }
 
 const STATUS_OPTIONS: Array<{ id: TargetRow['status']; label: string; color: string }> = [
@@ -95,6 +96,10 @@ export default function MyTargetListPanel({
   // fetch covers every target (the endpoint loops server-side so the
   // client makes a single round trip regardless of list size).
   const [eventsByTarget, setEventsByTarget] = useState<Record<string, TargetEvent[]>>({});
+  // Slice 5 — AI event discovery. Tracks which target is mid-discovery
+  // (spinner on its button) so the user gets feedback during the
+  // ~3-5s Serper + Groq round trip.
+  const [discoveringId, setDiscoveringId] = useState<string | null>(null);
   // Track which targets have events expanded vs collapsed. Distinct
   // from expandedId (outreach log) so users can have both views open
   // on the same card at the same time. Scheduled events (industry
@@ -156,6 +161,67 @@ export default function MyTargetListPanel({
   // shrinks. The endpoint reads from saved targets anyway, so this
   // is the right granularity.
   }, [email, targets.length]);
+
+  // Slice 5 — AI event discovery. Fires the open-web search agent for
+  // one target's agency, merges the discovered events into that
+  // target's list, and tells the user what happened. Throttled
+  // server-side (7-day TTL per agency) so repeat clicks are cheap.
+  const discoverEvents = useCallback(async (target: TargetRow) => {
+    if (!email || discoveringId) return;
+    setDiscoveringId(target.id);
+    try {
+      const res = await fetch('/api/app/discover-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, target_id: target.id }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.status === 402 && data?.upgrade_required) {
+        showToast({ message: data.message || 'AI event discovery is a Mindy Pro feature', variant: 'info' });
+        return;
+      }
+      if (!res.ok || !data?.success) {
+        showToast({ message: data?.error || 'Could not search for events', variant: 'error' });
+        return;
+      }
+
+      const found = (data.events || []) as TargetEvent[];
+      if (found.length > 0) {
+        // Merge into this target's events, de-duping by title so a
+        // re-run doesn't double-list. AI events sit alongside SAM +
+        // static ones; the filters (scheduled / sources-sought) and
+        // the card badges handle display.
+        setEventsByTarget(prev => {
+          const existing = prev[target.id] || [];
+          const seen = new Set(existing.map(e => e.title.toLowerCase()));
+          const merged = [...existing];
+          for (const ev of found) {
+            if (!seen.has(ev.title.toLowerCase())) {
+              seen.add(ev.title.toLowerCase());
+              merged.push(ev);
+            }
+          }
+          return { ...prev, [target.id]: merged };
+        });
+        // Auto-open the scheduled panel so the new events are visible.
+        setScheduledExpandedId(target.id);
+        showToast({
+          message: data.cached
+            ? `Showing ${found.length} event${found.length === 1 ? '' : 's'} Mindy found earlier`
+            : `Mindy found ${found.length} event${found.length === 1 ? '' : 's'} — verify dates before relying on them`,
+          variant: 'success',
+        });
+      } else {
+        showToast({ message: 'No new events found on the web for this agency right now', variant: 'info' });
+      }
+    } catch (err) {
+      console.error('[MyTargetList] discover events failed:', err);
+      showToast({ message: 'Network error searching for events', variant: 'error' });
+    } finally {
+      setDiscoveringId(null);
+    }
+  }, [email, discoveringId, showToast]);
 
   // PATCH a single target field. Optimistic update with rollback.
   const updateTarget = useCallback(async (id: string, changes: Partial<TargetRow>) => {
@@ -547,9 +613,33 @@ export default function MyTargetListPanel({
                         accent="purple"
                         events={(eventsByTarget[t.id] || []).filter(isScheduledEvent)}
                       />
+                      {/* Slice 5 — AI event discovery. Searches the open
+                          web for events this agency is running that
+                          aren't in SAM.gov or our static catalog. */}
+                      <div className="mt-3 flex items-center gap-3 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => discoverEvents(t)}
+                          disabled={discoveringId === t.id}
+                          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 hover:text-sky-200 transition-colors disabled:opacity-60 disabled:cursor-wait"
+                          title="Mindy searches the open web for industry days, conferences, and matchmaking events this agency is running."
+                        >
+                          {discoveringId === t.id ? (
+                            <>
+                              <span className="inline-block w-3 h-3 border-2 border-sky-300/40 border-t-sky-300 rounded-full animate-spin" />
+                              Mindy is searching…
+                            </>
+                          ) : (
+                            <>🔍 Find more events with Mindy</>
+                          )}
+                        </button>
+                        <span className="text-[10px] text-slate-600">
+                          Searches the open web — verify dates before relying on them.
+                        </span>
+                      </div>
                       <p className="text-[10px] text-slate-600 italic mt-3">
                         Sources: SAM.gov Special Notices (dated) + curated industry
-                        catalog (recurring series, annual conferences).
+                        catalog (recurring series, annual conferences) + Mindy AI web search.
                       </p>
                     </div>
                   )}
@@ -752,14 +842,22 @@ function EventSection({
           const icon = EVENT_TYPE_ICONS[ev.event_type] || EVENT_TYPE_ICONS.other;
           const sourceLabel = ev.source === 'sam'
             ? 'SAM.gov'
-            : ev.source === 'static_conference'
-              ? 'Annual conference'
-              : 'Event series';
+            : ev.source === 'ai'
+              ? '✨ Mindy found'
+              : ev.source === 'static_conference'
+                ? 'Annual conference'
+                : 'Event series';
           const sourceColor = ev.source === 'sam'
             ? 'text-emerald-400'
-            : ev.source === 'static_conference'
-              ? 'text-amber-300'
-              : 'text-purple-300';
+            : ev.source === 'ai'
+              ? 'text-sky-300'
+              : ev.source === 'static_conference'
+                ? 'text-amber-300'
+                : 'text-purple-300';
+          // Slice 5 — AI events get an explicit "verify" cue. Low
+          // confidence (<0.6) gets a stronger amber warning.
+          const showVerify = ev.source === 'ai';
+          const lowConfidence = ev.source === 'ai' && typeof ev.confidence === 'number' && ev.confidence < 0.6;
           return (
             <li
               key={`${ev.source}-${ev.title}-${idx}`}
@@ -781,6 +879,18 @@ function EventSection({
                     {ev.matched_agency && (
                       <span className="text-[10px] text-slate-500">
                         matched: <span className="text-slate-400">{ev.matched_agency}</span>
+                      </span>
+                    )}
+                    {showVerify && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          lowConfidence
+                            ? 'bg-amber-500/15 text-amber-300'
+                            : 'bg-sky-500/10 text-sky-300'
+                        }`}
+                        title="Found by Mindy via open-web search. Confirm the date and details on the official site before you commit."
+                      >
+                        {lowConfidence ? '⚠ verify date' : 'verify date'}
                       </span>
                     )}
                   </div>
