@@ -169,50 +169,181 @@ function normalizeArray(v) {
   return v.map(x => String(x).trim()).filter(Boolean);
 }
 
-async function main() {
-  console.log(`[extract] Mode: ${force ? 'FORCE re-extract' : 'pending only'}`);
+// Worker-safe claim: pick the next document needing extraction AND
+// atomically mark its metadata row as in_progress. Multiple workers
+// can run in parallel; the conditional UPDATE (eq attempts, in
+// extraction_status) ensures only one wins each row.
+// Documents this worker has already successfully processed in the
+// current run. Prevents --force mode from re-claiming our own output
+// (the row goes back to status='extracted' which is claimable in
+// force mode, so without this guard we'd keep re-processing the
+// biggest episodes that always lead the word_count-sorted batch).
+const SEEN_DOC_IDS = new Set();
 
-  // Find candidate documents: podcast_interview docs with a transcript
-  // (full_text contains "## Transcript") that don't already have
-  // 'extracted' metadata.
-  const { data: docs, error } = await supabase
-    .from('mindy_rag_documents')
-    .select('id, title, source_path, full_text, word_count')
-    .eq('doc_type', 'podcast_interview')
-    .like('full_text', '%## Transcript%')
-    .order('word_count', { ascending: false })
-    .limit(2000);
+// Wall-clock when this worker started. We use it as a horizon for
+// --force mode: don't re-claim any row whose extracted_at is after
+// our run start, because that means some worker (us or a sibling)
+// already extracted it in this batch run.
+const RUN_STARTED_AT = new Date().toISOString();
 
-  if (error) { console.error('Fetch docs failed:', error.message); process.exit(1); }
-  console.log(`[extract] Candidates with transcripts: ${docs?.length || 0}`);
+async function claimNextDoc() {
+  // Find a candidate doc that has no metadata row yet OR has one in
+  // pending/failed (or any non-extracted state when --force).
+  // Strategy: pull a small batch of candidate documents, shuffle, try
+  // to claim each by upserting status=in_progress with an attempts
+  // increment guarded against the current attempts value.
+  const FETCH_BATCH = 12;
 
-  // Pull existing metadata rows
-  const { data: existing } = await supabase
-    .from('podcast_episode_metadata')
-    .select('document_id, extraction_status, attempts');
-  const existingByDoc = new Map();
-  (existing || []).forEach(e => existingByDoc.set(e.document_id, e));
+  for (let attempt = 0; attempt < 12; attempt++) {
+    // 1. Pull candidate documents — pull the full pool since
+    // cross-worker dedup filters them down to actually-claimable.
+    // 414 podcasts total, so 600 is well above the ceiling.
+    // Order by id (stable but uncorrelated with word_count) so
+    // workers spread across the long tail instead of stampeding
+    // the top-N largest episodes.
+    const { data: docs } = await supabase
+      .from('mindy_rag_documents')
+      .select('id, title, source_path, full_text, word_count')
+      .eq('doc_type', 'podcast_interview')
+      .like('full_text', '%## Transcript%')
+      .order('id', { ascending: true })
+      .limit(600);
+    if (!docs || docs.length === 0) return null;
 
-  const todo = [];
-  for (const doc of docs || []) {
-    const meta = existingByDoc.get(doc.id);
-    if (!force && meta && meta.extraction_status === 'extracted') continue;
-    if (meta && meta.attempts >= MAX_ATTEMPTS) continue;
-    todo.push(doc);
-    if (todo.length >= LIMIT) break;
+    // 2. Pull their existing metadata. PostgREST has a URL length cap
+    // that 414 UUIDs blow past, so chunk the .in() query.
+    // Also pull business_type so we can skip rows that already have
+    // Layer-2 fields populated in --force mode.
+    const docIds = docs.map(d => d.id);
+    const metaByDoc = new Map();
+    const CHUNK = 80;
+    for (let off = 0; off < docIds.length; off += CHUNK) {
+      const slice = docIds.slice(off, off + CHUNK);
+      const { data: metas } = await supabase
+        .from('podcast_episode_metadata')
+        .select('document_id, extraction_status, attempts, extracted_at, business_type')
+        .in('document_id', slice);
+      (metas || []).forEach(m => metaByDoc.set(m.document_id, m));
+    }
+
+    // 3. Filter to claimable docs based on --force flag + state
+    const claimable = [];
+    for (const doc of docs) {
+      // Skip docs we've already done in this run (prevents force-mode
+      // from re-claiming our own freshly-extracted output)
+      if (SEEN_DOC_IDS.has(doc.id)) continue;
+      const meta = metaByDoc.get(doc.id);
+      // Skip if currently in_progress by another worker
+      if (meta && meta.extraction_status === 'in_progress') continue;
+      // Skip if at attempts cap (and not in --force mode — force resets)
+      if (meta && (meta.attempts || 0) >= MAX_ATTEMPTS && !force) continue;
+      // Skip if already extracted and we're NOT forcing
+      if (!force && meta && meta.extraction_status === 'extracted') continue;
+      // In --force mode, the goal of this run is to backfill rows
+      // missing the Layer-2 schema (business_type, transcript_keywords,
+      // personas). Once a row has business_type populated, it's done
+      // — skip it. This is the per-run dedup that ACTUALLY works
+      // across workers because it's based on durable DB state, not
+      // ephemeral run timestamps.
+      if (force && meta && meta.business_type) continue;
+      // Cross-worker dedup is handled atomically by (a) the
+      // in_progress status check above and (b) the conditional UPDATE
+      // in step 5b, which races on (eq attempts, in status).
+      claimable.push({ doc, meta });
+      if (claimable.length >= FETCH_BATCH) break;
+    }
+    if (claimable.length === 0) return null;
+
+    // 4. Shuffle so 4 workers don't all stampede the first candidate
+    const shuffled = claimable.slice().sort(() => Math.random() - 0.5);
+
+    // 5. Try to claim each one with a CONDITIONAL UPDATE. If the row
+    // doesn't exist yet we create it first as pending; the real claim
+    // is the second-step UPDATE that races on (eq attempts, eq status).
+    // PostgREST's update with filter clauses gives us SQL-level
+    // atomicity: only one worker's UPDATE matches the row.
+    for (const { doc, meta } of shuffled) {
+      const prevAttempts = meta?.attempts || 0;
+      const prevStatus = meta?.extraction_status || null;
+      const claimStamp = `${WORKER_ID}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+      // 5a. If no meta row exists yet, create one in 'pending' state
+      // so we have something to race on. This insert can race too —
+      // we use onConflict=ignore (via upsert + ignoreDuplicates).
+      if (!meta) {
+        await supabase.from('podcast_episode_metadata').upsert({
+          document_id: doc.id,
+          episode_title: doc.title,
+          episode_url: doc.source_path?.replace(/^libsyn:/, 'https://'),
+          episode_number: parseEpisodeNumber(doc.title),
+          extraction_status: 'pending',
+          attempts: 0,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'document_id', ignoreDuplicates: true });
+      }
+
+      // 5b. Conditional UPDATE — atomic at the PG level. Only matches
+      // if status AND attempts are unchanged since our read. Returns
+      // the row if we won, empty if a sibling worker beat us.
+      const validPriorStatuses = force
+        ? ['extracted', 'pending', 'failed']
+        : ['pending', 'failed'];
+      const { data: claimed, error: updErr } = await supabase
+        .from('podcast_episode_metadata')
+        .update({
+          extraction_status: 'in_progress',
+          extraction_error: claimStamp,
+          attempts: prevAttempts + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('document_id', doc.id)
+        .eq('attempts', prevAttempts)
+        .in('extraction_status', validPriorStatuses)
+        .select('document_id')
+        .maybeSingle();
+
+      if (!updErr && claimed) {
+        // Mark as seen so we don't re-claim it in this run after
+        // we mark it 'extracted' (force-mode would otherwise loop).
+        SEEN_DOC_IDS.add(doc.id);
+        return { doc, prevAttempts, prevStatus };
+      }
+      // Lost the race; try next candidate
+    }
+    // All candidates in this batch were stolen; brief backoff, refetch
+    await new Promise(r => setTimeout(r, 200 + Math.random() * 300));
   }
-  console.log(`[extract] To process: ${todo.length}`);
+  return null;
+}
 
-  let done = 0, failed = 0;
-  for (let i = 0; i < todo.length; i++) {
-    const doc = todo[i];
-    console.log(`\n[${i + 1}/${todo.length}] ${doc.title.slice(0, 70)}`);
+const WORKER_ID = process.env.WORKER_ID || String(process.pid);
+
+async function main() {
+  console.log(`[extract w${WORKER_ID}] Mode: ${force ? 'FORCE re-extract' : 'pending only'}`);
+
+  let done = 0, failed = 0, processed = 0;
+  const startedAt = Date.now();
+
+  while (processed < (LIMIT === Infinity ? 100000 : LIMIT)) {
+    const claimed = await claimNextDoc();
+    if (!claimed) break;
+    const { doc, prevAttempts, prevStatus } = claimed;
+    processed++;
+
+    console.log(`\n[w${WORKER_ID} #${processed}] ${doc.title.slice(0, 70)}`);
 
     // Strip the header before sending; keep just the transcript body
     const tMatch = doc.full_text.match(/## Transcript\s*([\s\S]+)$/);
     const transcript = tMatch ? tMatch[1].trim() : '';
     if (transcript.length < 1000) {
       console.log('  (skip — transcript too short)');
+      // Revert claim so it doesn't sit as in_progress forever
+      await supabase.from('podcast_episode_metadata').update({
+        extraction_status: prevStatus || 'pending',
+        extraction_error: 'transcript too short',
+        attempts: prevAttempts,
+        updated_at: new Date().toISOString(),
+      }).eq('document_id', doc.id);
       continue;
     }
 
@@ -239,16 +370,13 @@ async function main() {
       failed++;
       const errMsg = String(lastErr?.message || 'unknown').slice(0, 500);
       console.error(`  ✗ ${errMsg}`);
-      await supabase.from('podcast_episode_metadata').upsert({
-        document_id: doc.id,
-        episode_title: doc.title,
-        episode_url: doc.source_path?.replace(/^libsyn:/, 'https://'),
-        episode_number: parseEpisodeNumber(doc.title),
+      // Claim row already has attempts=prevAttempts+1; keep that value
+      // when transitioning to 'failed'.
+      await supabase.from('podcast_episode_metadata').update({
         extraction_status: 'failed',
         extraction_error: errMsg,
-        attempts: (existingByDoc.get(doc.id)?.attempts || 0) + 1,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'document_id' });
+      }).eq('document_id', doc.id);
       continue;
     }
 
@@ -274,7 +402,7 @@ async function main() {
       extraction_error: null,
       extraction_model: PROVIDER_CFG.providerTag,
       extracted_at: new Date().toISOString(),
-      attempts: (existingByDoc.get(doc.id)?.attempts || 0) + 1,
+      attempts: prevAttempts + 1,
       updated_at: new Date().toISOString(),
     };
 
@@ -285,12 +413,14 @@ async function main() {
       continue;
     }
     done++;
-    console.log(`  ✓ guest=${extracted.guest_name || '(solo)'} | agencies=${row.agencies_mentioned.length} | naics=${row.naics_mentioned.length} | lessons=${row.key_lessons.length}`);
+    console.log(`  ✓ guest=${extracted.guest_name || '(solo)'} | type=${row.business_type || '-'} | kw=${row.transcript_keywords.length} | personas=${row.personas.length}`);
   }
 
-  console.log('\n[extract] ✅ Run complete');
-  console.log(`  Done:   ${done}`);
-  console.log(`  Failed: ${failed}`);
+  const elapsed = ((Date.now() - startedAt) / 60_000).toFixed(1);
+  console.log(`\n[extract w${WORKER_ID}] ✅ Run complete`);
+  console.log(`  Done:    ${done}`);
+  console.log(`  Failed:  ${failed}`);
+  console.log(`  Elapsed: ${elapsed} min`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
