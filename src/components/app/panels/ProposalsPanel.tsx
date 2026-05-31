@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import ProposalWizardBrief from '../proposal-wizard/ProposalWizardBrief';
+import ProposalWizardCompliance from '../proposal-wizard/ProposalWizardCompliance';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -142,6 +143,17 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
+
+  // Proposal Wizard stage navigation. Only meaningful when the user
+  // landed on this panel via PipelinePanel's Draft Proposal button —
+  // panelContext.pursuit_id is set in that path. Stages 3-4 are not
+  // built yet; for now the matrix's Continue button is a no-op stub.
+  const [wizardStage, setWizardStage] = useState<'brief' | 'compliance'>('brief');
+  // Reset to Stage 1 when the user switches to a different pursuit so
+  // they always see the brief first.
+  useEffect(() => {
+    setWizardStage('brief');
+  }, [panelContext?.pursuit_id]);
 
   // Vault summary — drives the "add to vault for better drafts" nudge
   // shown above the draft sections. Fetched once on mount; if user
@@ -755,19 +767,42 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </button>
       </div>
 
-      {/* Proposal Wizard — Stage 1 (RFP Brief). Mounted when the user
-          landed here from PipelinePanel's Draft Proposal button (which
-          sets panelContext.pursuit_id). Stages 2-4 land in follow-up
-          commits and the wizard shell wires them together; for now
-          Stage 1 sits above the legacy Proposal Assist surface so the
-          user gets the structured brief before the section-drafting UI. */}
+      {/* Proposal Wizard — Stages 1 (RFP Brief) + 2 (Compliance Matrix).
+          Mounted when the user landed here from PipelinePanel's Draft
+          Proposal button (which sets panelContext.pursuit_id). Stages
+          3-4 land in follow-up commits. The wizard sits above the
+          legacy Proposal Assist surface so the user gets the structured
+          brief + compliance matrix before the section-drafting UI. */}
       {email && typeof panelContext?.pursuit_id === 'string' && (
-        <ProposalWizardBrief
-          email={email}
-          pursuitId={panelContext.pursuit_id}
-          authHeaders={getAuthHeaders}
-          onContinue={undefined /* TODO: wire to Stage 2 (Compliance Matrix) in a follow-up commit */}
-        />
+        <>
+          {wizardStage === 'brief' && (
+            <ProposalWizardBrief
+              email={email}
+              pursuitId={panelContext.pursuit_id}
+              authHeaders={getAuthHeaders}
+              onContinue={() => setWizardStage('compliance')}
+            />
+          )}
+          {wizardStage === 'compliance' && (
+            <>
+              <div className="flex items-center gap-2 mb-3 text-xs text-slate-400">
+                <button
+                  type="button"
+                  onClick={() => setWizardStage('brief')}
+                  className="text-slate-400 hover:text-purple-300"
+                >
+                  ← Back to RFP Brief
+                </button>
+              </div>
+              <ProposalWizardCompliance
+                email={email}
+                pursuitId={panelContext.pursuit_id}
+                authHeaders={getAuthHeaders}
+                onContinue={undefined /* TODO: Stage 3 (Win Themes, optional) lands next */}
+              />
+            </>
+          )}
+        </>
       )}
 
       {/* RFP Upload */}

@@ -99,6 +99,40 @@ interface BriefArtifact {
   next_action: string;
 }
 
+// Compliance Matrix item — one row per "shall/must/will" requirement
+// pulled from the RFP. The UI renders these as a checklist the user
+// can hand to a writer or sub.
+//
+// Field choices match how DoD/civilian proposal shops actually structure
+// a compliance matrix:
+//   source        — where in the RFP this came from ("Section L.3.2", "PWS para 4.1")
+//   requirement   — the verbatim or near-verbatim shall/must clause
+//   category      — for grouping in the UI (technical / management /
+//                   past_performance / pricing / admin / other)
+//   priority      — critical (no-bid if you can't meet) | important | minor
+//   notes         — any 1-line guidance Mindy wants to add (e.g. "tie to
+//                   Section M evaluation factor 2")
+interface ComplianceItem {
+  source: string;
+  requirement: string;
+  category: 'technical' | 'management' | 'past_performance' | 'pricing' | 'admin' | 'other';
+  priority: 'critical' | 'important' | 'minor';
+  notes: string;
+}
+
+interface ComplianceArtifact {
+  stage: 'compliance';
+  generated_at: string;
+  ai_model: string;
+  pursuit_id: string;
+  items: ComplianceItem[];
+  // Quick summary header for the UI
+  total_count: number;
+  critical_count: number;
+  // Honest disclosure when no RFP text was available
+  generated_from_metadata_only: boolean;
+}
+
 async function loadPipeline(pipelineId: string, email: string): Promise<PipelineRow | null> {
   const { data } = await getSupabase()
     .from('user_pipeline')
@@ -120,7 +154,9 @@ async function loadPursuitDocs(pipelineId: string): Promise<PursuitDocRow[]> {
   return (data || []) as PursuitDocRow[];
 }
 
-async function loadCached(email: string, pipelineId: string, stage: WizardStage): Promise<BriefArtifact | null> {
+type StageArtifact = BriefArtifact | ComplianceArtifact;
+
+async function loadCached(email: string, pipelineId: string, stage: WizardStage): Promise<StageArtifact | null> {
   // Get the newest archived entry for this pursuit + stage. Older
   // versions stay in the archive (user history); we just return the
   // most recent so re-renders are deterministic.
@@ -134,7 +170,7 @@ async function loadCached(email: string, pipelineId: string, stage: WizardStage)
     .limit(1)
     .maybeSingle();
   if (!data?.content) return null;
-  return data.content as BriefArtifact;
+  return data.content as StageArtifact;
 }
 
 function joinPursuitText(docs: PursuitDocRow[]): string {
@@ -250,6 +286,56 @@ function normalizeBrief(raw: unknown, pursuitId: string): BriefArtifact {
   };
 }
 
+const VALID_CATEGORIES: ComplianceItem['category'][] = [
+  'technical', 'management', 'past_performance', 'pricing', 'admin', 'other',
+];
+const VALID_PRIORITIES: ComplianceItem['priority'][] = ['critical', 'important', 'minor'];
+
+function normalizeComplianceItems(raw: unknown): ComplianceItem[] {
+  if (!Array.isArray(raw)) return [];
+  const items: ComplianceItem[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    const requirement = typeof e.requirement === 'string' ? e.requirement.trim() : '';
+    if (!requirement) continue;
+    const categoryRaw = typeof e.category === 'string' ? e.category.toLowerCase().trim() : 'other';
+    const priorityRaw = typeof e.priority === 'string' ? e.priority.toLowerCase().trim() : 'important';
+    items.push({
+      source: typeof e.source === 'string' ? e.source.slice(0, 200) : '',
+      requirement: requirement.slice(0, 1000),
+      category: (VALID_CATEGORIES as string[]).includes(categoryRaw)
+        ? (categoryRaw as ComplianceItem['category'])
+        : 'other',
+      priority: (VALID_PRIORITIES as string[]).includes(priorityRaw)
+        ? (priorityRaw as ComplianceItem['priority'])
+        : 'important',
+      notes: typeof e.notes === 'string' ? e.notes.slice(0, 400) : '',
+    });
+    if (items.length >= 80) break;  // hard cap so a runaway LLM doesn't blow up the UI
+  }
+  return items;
+}
+
+function normalizeCompliance(
+  raw: unknown,
+  pursuitId: string,
+  metadataOnly: boolean,
+): ComplianceArtifact {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const items = normalizeComplianceItems(r.items);
+  return {
+    stage: 'compliance',
+    generated_at: new Date().toISOString(),
+    ai_model: GROQ_MODEL,
+    pursuit_id: pursuitId,
+    items,
+    total_count: items.length,
+    critical_count: items.filter(i => i.priority === 'critical').length,
+    generated_from_metadata_only: metadataOnly,
+  };
+}
+
 function jsonError(message: string, status: number) {
   return NextResponse.json({ success: false, error: message }, { status });
 }
@@ -292,6 +378,83 @@ async function generateBrief(email: string, pipeline: PipelineRow, docs: Pursuit
   return artifact;
 }
 
+const COMPLIANCE_SYSTEM_PROMPT = `You are a senior federal proposal compliance specialist. Your job is to read an RFP and extract EVERY "shall / must / will / required / is required to" clause into a structured compliance matrix the proposal team can use as a checklist.
+
+Rules:
+- Respond with a JSON object ONLY. No prose, no markdown, no commentary.
+- Shape: { "items": Array<{ "source": string, "requirement": string, "category": string, "priority": string, "notes": string }> }
+- Extract every distinct requirement. Aim for 15-40 items on a typical RFP. Do NOT cap yourself if the RFP genuinely has more.
+- source: Where in the RFP this came from. Use the section reference verbatim ("Section L.3.2", "PWS para 4.1.2", "Section M, factor 2", "FAR 52.204-24"). If the source is unclear, write "Unspecified".
+- requirement: The actual shall/must/will/required clause, paraphrased to 1-2 short sentences. Preserve the binding verb ("shall provide", "must hold").
+- category: one of "technical" | "management" | "past_performance" | "pricing" | "admin" | "other". Use:
+  - technical = scope, performance specs, deliverables, technical approach requirements
+  - management = staffing, org chart, key personnel, transition plans, schedule
+  - past_performance = past perf citations, references, CPARS, similar contracts
+  - pricing = cost volume, CLIN structure, ceiling, fixed-fee, labor categories
+  - admin = page limits, font, file format, submission method, registration (SAM/UEI), section L mechanics
+  - other = anything that doesn't fit above
+- priority: one of "critical" | "important" | "minor". Use:
+  - critical = miss this and the proposal is non-responsive / rejected (e.g. wrong file format, missing required section, no required cert)
+  - important = significant scoring impact or evaluation factor
+  - minor = cosmetic / nice-to-have / formatting nit
+- notes: ONE optional line tying the requirement to its evaluation context (e.g. "scored under Factor 2 — Technical Approach", "submit via PIEE only — no email"). Empty string if no useful note.
+- Reference actual text. Do NOT invent FAR clauses, section numbers, or page limits that aren't in the source.
+- If the document is a Sources Sought / RFI rather than a full RFP, the matrix will be short. Capture what's there (response format, submission method, page limits, capability statement requirements) and don't pad.
+- If there is NO source text and only metadata, return { "items": [] } and let the UI tell the user to upload the RFP.`;
+
+function buildComplianceUserPrompt(pipeline: PipelineRow, docText: string, hasDocs: boolean): string {
+  const metaLines: string[] = [];
+  if (pipeline.title) metaLines.push(`Pursuit title: ${pipeline.title}`);
+  if (pipeline.agency) metaLines.push(`Agency: ${pipeline.agency}`);
+  if (pipeline.naics_code) metaLines.push(`NAICS: ${pipeline.naics_code}`);
+  if (pipeline.set_aside) metaLines.push(`Set-aside: ${pipeline.set_aside}`);
+  if (pipeline.notice_id) metaLines.push(`Notice ID: ${pipeline.notice_id}`);
+  const meta = metaLines.length ? `Pursuit metadata:\n${metaLines.join('\n')}\n\n` : '';
+
+  if (!hasDocs) {
+    return `${meta}This pursuit has NO RFP document attached. Return { "items": [] }. JSON only.`;
+  }
+  return `${meta}RFP source text (truncated to first ${docText.length} chars):
+${docText}
+
+Extract every shall/must/will/required clause into the compliance matrix. JSON only.`;
+}
+
+async function generateCompliance(
+  email: string,
+  pipeline: PipelineRow,
+  docs: PursuitDocRow[],
+): Promise<ComplianceArtifact> {
+  const docText = joinPursuitText(docs);
+  const hasDocs = docText.length > 200;
+  const userPrompt = buildComplianceUserPrompt(pipeline, docText, hasDocs);
+
+  const { content, tokens } = await callGroq(COMPLIANCE_SYSTEM_PROMPT, userPrompt);
+  const parsed = safeParseJSON<Record<string, unknown>>(content, {
+    fallback: { items: [] },
+    source: 'proposal.wizard.compliance',
+  });
+  const artifact = normalizeCompliance(parsed, pipeline.id, !hasDocs);
+
+  await archiveContent({
+    userEmail: email,
+    contentType: archiveType('compliance'),
+    contentSubtype: 'compliance_matrix',
+    title: `Compliance Matrix — ${pipeline.title?.slice(0, 80) || 'Untitled'}`,
+    content: artifact as unknown as Record<string, unknown>,
+    contentText: artifact.items.map(i => `[${i.priority}] ${i.source}: ${i.requirement}`).join('\n'),
+    pursuitId: pipeline.id,
+    sourceNoticeId: pipeline.notice_id || undefined,
+    agency: pipeline.agency || undefined,
+    naicsCode: pipeline.naics_code || undefined,
+    aiProvider: 'groq',
+    aiModel: GROQ_MODEL,
+    tags: ['proposal-wizard', 'compliance', `tokens-${tokens ?? 'unknown'}`, `items-${artifact.total_count}`],
+  });
+
+  return artifact;
+}
+
 // ---- GET: hydrate ---------------------------------------------------
 
 export async function GET(request: NextRequest) {
@@ -302,9 +465,9 @@ export async function GET(request: NextRequest) {
   if (!email || !pipelineId || !stage) {
     return jsonError('email, pipeline_id, and stage are required', 400);
   }
-  // Only stage=brief is implemented in this version — Stage 2-4 land
-  // in subsequent commits.
-  if (stage !== 'brief') {
+  // Stages 1 (brief) + 2 (compliance) ship together. Stages 3-4 still
+  // 501 until built.
+  if (stage !== 'brief' && stage !== 'compliance') {
     return jsonError(`stage '${stage}' not implemented yet`, 501);
   }
 
@@ -347,7 +510,7 @@ export async function POST(request: NextRequest) {
   if (!email || !pipelineId || !stage) {
     return jsonError('email, pipeline_id, and stage are required', 400);
   }
-  if (stage !== 'brief') {
+  if (stage !== 'brief' && stage !== 'compliance') {
     return jsonError(`stage '${stage}' not implemented yet`, 501);
   }
 
@@ -374,7 +537,9 @@ export async function POST(request: NextRequest) {
 
   const docs = await loadPursuitDocs(pipelineId);
   try {
-    const artifact = await generateBrief(email, pipeline, docs);
+    const artifact: StageArtifact = stage === 'brief'
+      ? await generateBrief(email, pipeline, docs)
+      : await generateCompliance(email, pipeline, docs);
     return NextResponse.json({ success: true, cached: false, artifact });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -385,8 +550,8 @@ export async function POST(request: NextRequest) {
       aiProvider: AIProviders.GROQ,
       aiModel: GROQ_MODEL,
       userEmail: email,
-      requestPath: '/api/app/proposal/wizard',
+      requestPath: `/api/app/proposal/wizard?stage=${stage}`,
     }).catch(() => {});
-    return jsonError(`Brief generation failed: ${message}`, 500);
+    return jsonError(`${stage} generation failed: ${message}`, 500);
   }
 }
