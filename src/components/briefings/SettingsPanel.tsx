@@ -99,7 +99,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
   const [customAgencies, setCustomAgencies] = useState('');
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
-  type AlertFrequency = 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'paused';
+  type AlertFrequency = 'daily' | 'weekdays' | 'weekends' | 'mwf' | 'tth' | 'weekly' | 'paused';
   const [frequency, setFrequency] = useState<AlertFrequency>('daily');
   const [briefingsEnabled, setBriefingsEnabled] = useState(true);
   const [showStateSelector, setShowStateSelector] = useState(false);
@@ -159,7 +159,7 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
         setSelectedStates(settings.locationStates || []);
 
         // Load frequency — accept any of the 5 valid values, default to 'daily'.
-        const validFreqs: AlertFrequency[] = ['daily', 'weekdays', 'weekends', 'weekly', 'paused'];
+        const validFreqs: AlertFrequency[] = ['daily', 'weekdays', 'weekends', 'mwf', 'tth', 'weekly', 'paused'];
         const incomingFreq: AlertFrequency = validFreqs.includes(settings.frequency as AlertFrequency)
           ? (settings.frequency as AlertFrequency)
           : 'daily';
@@ -881,6 +881,8 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
                 {([
                   { opt: 'daily', label: 'Daily', desc: 'Every morning at 7 AM' },
                   { opt: 'weekdays', label: 'Weekdays only', desc: 'Mon–Fri at 7 AM, skip weekends' },
+                  { opt: 'mwf', label: 'Mon / Wed / Fri', desc: 'Every other weekday — less inbox, still timely' },
+                  { opt: 'tth', label: 'Tue / Thu', desc: 'Twice a week — for light readers' },
                   { opt: 'weekends', label: 'Weekends only', desc: 'Sat & Sun at 7 AM' },
                   { opt: 'weekly', label: 'Weekly', desc: 'Sunday digest' },
                   { opt: 'paused', label: 'Paused', desc: 'Keep settings but pause emails' },

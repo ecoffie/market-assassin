@@ -365,14 +365,18 @@ async function runDailyAlertJob(options?: {
     }
 
     // Build query for daily alert users (unified table).
-    // 'daily' = every day; 'weekdays' = Mon-Fri; 'weekends' = Sat-Sun.
+    //   daily    = every day
+    //   weekdays = Mon-Fri
+    //   weekends = Sat-Sun
+    //   mwf      = Mon/Wed/Fri (every other day, BD-friendly)
+    //   tth      = Tue/Thu (twice a week)
     // Per-user day check happens inside the loop below.
     let query = getSupabase()
       .from('user_notification_settings')
       .select('*')
       .eq('is_active', true)
       .eq('alerts_enabled', true)
-      .in('alert_frequency', ['daily', 'weekdays', 'weekends']);
+      .in('alert_frequency', ['daily', 'weekdays', 'weekends', 'mwf', 'tth']);
 
     // If test email specified, only process that user
     if (options?.testEmail) {
@@ -475,17 +479,17 @@ async function runDailyAlertJob(options?: {
         //   continue;
         // }
 
-        // Day-of-week skip for weekdays-only / weekends-only users.
-        // 0 = Sun, 1-5 = Mon-Fri, 6 = Sat.
+        // Day-of-week skip for partial-week frequencies.
+        // 0 = Sun, 1 = Mon, 2 = Tue, ... 6 = Sat.
         if (!options?.testEmail) {
           const dayOfWeek = new Date().getUTCDay();
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-          if (user.alert_frequency === 'weekdays' && isWeekend) {
-            continue;
-          }
-          if (user.alert_frequency === 'weekends' && !isWeekend) {
-            continue;
-          }
+          const isMWF = dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5;
+          const isTTh = dayOfWeek === 2 || dayOfWeek === 4;
+          if (user.alert_frequency === 'weekdays' && isWeekend) continue;
+          if (user.alert_frequency === 'weekends' && !isWeekend) continue;
+          if (user.alert_frequency === 'mwf' && !isMWF) continue;
+          if (user.alert_frequency === 'tth' && !isTTh) continue;
         }
 
         // BETA MODE: Skip tier check for users with alert_frequency='daily' (Apr 19, 2026)
@@ -1201,8 +1205,18 @@ async function sendDailyAlertEmail(
       dominantNoticeType = opp.noticeType;
     }
   }
-  const mindyInsight = opportunities.length > 0
-    ? await getInsightForNoticeType(dominantNoticeType)
+  // Mindy Insights (#91) — process-cached RAG quote per bucket.
+  // Toggled off by default after the May 28 deploy correlated with
+  // the daily-alerts batch throughput collapsing from ~1000 sends/day
+  // to 2 sends/day. We'll re-enable per-user once we've identified
+  // the failure mode (timeout / exception escaping the try-catch /
+  // memory issue). Set ENABLE_MINDY_INSIGHTS=true to opt back in.
+  const mindyInsightEnabled = process.env.ENABLE_MINDY_INSIGHTS === 'true';
+  const mindyInsight = mindyInsightEnabled && opportunities.length > 0
+    ? await getInsightForNoticeType(dominantNoticeType).catch(err => {
+        console.error('[daily-alerts] mindy-insights threw:', err);
+        return null;
+      })
     : null;
   const mindyInsightHtml = renderInsightHtml(mindyInsight);
 

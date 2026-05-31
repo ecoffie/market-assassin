@@ -198,9 +198,16 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    // Alert frequency: daily, weekdays (Mon-Fri only), weekends (Sat-Sun only), weekly, paused.
+    // Alert frequency:
+    //   daily       — every day
+    //   weekdays    — Mon-Fri only
+    //   weekends    — Sat-Sun only
+    //   mwf         — Mon/Wed/Fri ("every other day", BD-friendly)
+    //   tth         — Tue/Thu ("twice a week")
+    //   weekly      — Sunday-only digest (handled by separate weekly-alerts cron)
+    //   paused      — no sends
     if (frequency !== undefined) {
-      const valid = ['daily', 'weekdays', 'weekends', 'weekly', 'paused'];
+      const valid = ['daily', 'weekdays', 'weekends', 'mwf', 'tth', 'weekly', 'paused'];
       if (!valid.includes(frequency)) {
         return NextResponse.json(
           { success: false, error: `Invalid frequency. Use one of: ${valid.join(', ')}` },
