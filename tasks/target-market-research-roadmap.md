@@ -1,6 +1,7 @@
 # Target Market Research + Event Radar — Roadmap
 
-**Status:** Planning, May 22 2026
+**Status:** Slices 1.5–5 shipped + verified in production (May 31 2026).
+Remaining: Slice 5b PSC-input audit, Slice 6+ (far future).
 **Owner:** Eric / Claude
 **Phase 2 reframe:** Mindy's "Market Research" surface evolves into a
 **Target Market Research workspace** for federal BD. Not just a one-time
@@ -50,7 +51,7 @@ That's the full BD funnel.
 
 ## Build sequence
 
-### Slice 1.5 — Foundation (this session)
+### ✅ Slice 1.5 — Foundation (SHIPPED)
 
 - Remove Recommended Opportunities from Market Research (duplicates
   Today's Intel)
@@ -64,7 +65,7 @@ That's the full BD funnel.
 - Drawer shows full office detail: sub-agency, office ID, contracting
   office, OSBP contact, SAM + USAspending deep links
 
-### Slice 2 — Charts on top of the research workspace (next session, ~3 hrs)
+### ✅ Slice 2 — Charts on top of the research workspace (SHIPPED)
 
 Now that the data is right, the original Phase 2 charts ship:
 - Spending by Agency (highlights user's saved targets vs. all)
@@ -75,7 +76,13 @@ Now that the data is right, the original Phase 2 charts ship:
 The hero metric becomes "8 of your 30 target agencies grew 15%+ YoY"
 instead of generic market analytics.
 
-### Slice 3 — Saved Target Lists (1 week, ~6 hrs)
+### ✅ Slice 3 — Saved Target Lists (SHIPPED)
+
+> Tables `user_target_list` + `user_target_outreach` live. My Targets
+> sidebar panel + "Add to Targets" wired. PSC/NAICS provenance added
+> May 31 (`source_naics`/`source_psc` columns + "from PSC D316" chip) —
+> closes Slice 5b item #3.
+
 
 Database:
 
@@ -125,7 +132,13 @@ UI:
 - Per-target page: account brief, activity timeline, "Log activity" button
 - "Add to Targets" button on every agency row in Market Research
 
-### Slice 4 — Event Radar v0 (1 week)
+### ✅ Slice 4 — Event Radar v0 (SHIPPED)
+
+> `/api/app/target-events` joins `sam_events` (cron-populated SAM
+> Special Notices) + static catalog (`federal-events-sources.json`),
+> matched per-target via agency-alias variants. Rendered in My Targets
+> as Scheduled Events + Sources Sought panels.
+
 
 Surface SAM.gov special notice types as events tied to target agencies.
 
@@ -140,7 +153,40 @@ const EVENT_NOTICE_TYPES = [
 
 UI: "Upcoming events for your targets" section in My Targets panel.
 
-### Slice 5 — Event Radar v1: AI Web Discovery (replaces scraper plan)
+### ✅ Slice 5 — Event Radar v1: AI Web Discovery (SHIPPED May 31 2026)
+
+> **Status: live + verified in production.** A real discovery run for
+> "Department of the Air Force" returned 8 events from 38 web results,
+> all persisted to `sam_events`; second call hit the 7-day cache
+> (`cached:true`, zero re-spend). Serper + Groq both confirmed healthy
+> in prod.
+>
+> **What shipped (commit `5db736d`):**
+> - `src/lib/events/ai-event-discovery.ts` — `searchEventsViaAI()`:
+>   builds 4 targeted queries → Serper web search → **grounded** Groq
+>   extraction (extracts only from returned snippets, no hallucinated
+>   dates) → confidence-scored `DiscoveredEvent[]`.
+> - `src/app/api/app/discover-events/route.ts` — POST endpoint:
+>   Pro-gated, 7-day throttle per agency via `ai_event_discovery_runs`,
+>   upserts into `sam_events` with `source='ai_web_search'` +
+>   `confidence`, records each run.
+> - `target-events` route surfaces AI rows as `source:'ai'` with
+>   confidence so the UI badges them distinctly.
+> - `MyTargetListPanel` — "🔍 Find more events with Mindy" button +
+>   spinner; AI events render `✨ Mindy found` + `verify date` badge
+>   (amber `⚠ verify date` when confidence < 0.6).
+> - Migration `20260531_sam_events_ai_discovery.sql` — adds `source` /
+>   `confidence` / `discovered_via` to `sam_events` (defaults keep the
+>   SAM cron unaffected) + the `ai_event_discovery_runs` throttle table.
+>
+> **Product decisions baked in:** explicit button (not auto-fire on
+> page load — cheaper, user-controlled); show-all-and-badge (persist
+> every event, flag low-confidence) rather than hard confidence cutoff.
+>
+> **Differences from the original design below:** trigger is an
+> explicit button, not auto-on-<3-events. `currentYear` is a constant
+> (2026) passed into the lib since `Date.now()` context varies — bump
+> annually. Otherwise matches the plan as written.
 
 **Original plan:** Scrape AFCEA / ACT-IAC / NDIA / WID / etc. public
 calendars. ~150 sources × maintenance forever.
