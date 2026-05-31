@@ -80,6 +80,11 @@ interface CitedSource {
   url: string | null;
   doc_type: string;
   source_path: string | null;
+  // For internal docs (course_material, etc) where we don't have a
+  // public URL but DO have the full text in mindy_rag_documents, the
+  // client can fetch /api/app/rag-doc?id=<document_id> to render the
+  // doc in an inline drawer.
+  document_id: string | null;
 }
 
 function sseEvent(obj: unknown): string {
@@ -98,9 +103,8 @@ GROUNDING:
 - The CONTEXT block below contains two kinds of material:
   1. Teaching/transcript chunks — full quotes from federal contracting curriculum + podcast interviews.
   2. PODCAST EPISODES — structured summary cards (guest, agencies, NAICS, set-asides, lessons) for episode-level discovery.
-- When you draw on a chunk, reference it inline as [→ <doc title>]. When you reference a podcast episode card, use [→ Episode N]. Examples:
-  - "Most first-time 8(a) winners start as subs [→ Episode 326]."
-  - "Several guests on the show have walked through HUBZone certification: [→ Episode 16], [→ Episode 170], [→ Episode 302]."
+- Use this context to ground your answers. DO NOT add inline citation markers (no [→ Episode 326], no [→ Day 14], no bracket refs at all). The UI surfaces the sources you used as clickable chips below your answer automatically — that's the user's path to the docs.
+- Write naturally as if you read the material and are explaining it. Reference podcasts by guest name when natural ("Ryan Atencio explains how to..."), not by episode number.
 - If the context doesn't contain what's needed, say so directly: "I don't have that in my knowledge base — try the [X] panel for that." DO NOT invent federal programs, agency names, or contract values.
 
 SCOPE:
@@ -143,6 +147,7 @@ function chunksToCitations(chunks: RagChunkResult[]): CitedSource[] {
       : null,
     doc_type: c.doc_type || 'misc',
     source_path: c.source_path,
+    document_id: c.document_id,
   }));
 }
 
@@ -152,6 +157,10 @@ function podcastCardsToCitations(cards: PodcastEpisodeCard[]): CitedSource[] {
     url: c.episode_url,
     doc_type: 'podcast_interview',
     source_path: c.episode_url,
+    // Podcast cards don't carry the underlying mindy_rag_documents.id
+    // here — the libsyn URL is the click target. document_id stays null
+    // so the chip falls through to opening the libsyn link.
+    document_id: null,
   }));
 }
 
@@ -164,30 +173,30 @@ function podcastCardsToCitations(cards: PodcastEpisodeCard[]): CitedSource[] {
  * intended behavior for off-topic redirects and "I don't have that"
  * fallbacks. Better to show nothing than a misleading source chip.
  */
-function filterUsedCitations(chunks: RagChunkResult[], podcastCards: PodcastEpisodeCard[], assistantContent: string): CitedSource[] {
-  const bracketRe = /\[→\s*([^\]]+)\]/g;
-  const labels: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = bracketRe.exec(assistantContent))) {
-    labels.push(m[1].trim().toLowerCase());
-  }
-  if (labels.length === 0) return [];
-
+/**
+ * Build the "Documents referenced" chip set the UI shows under the
+ * answer. We no longer use Mindy's inline brackets (they confused the
+ * UX — users clicked refs that didn't navigate). Instead we surface
+ * the top retrieved sources directly: chunks first (since they're
+ * ranked by relevance), then podcast cards if they're new.
+ *
+ * Deduped by title + capped at MAX_CITATIONS so the chip strip stays
+ * tight on mobile. Off-topic redirects skip retrieval entirely so
+ * `chunks`+`podcastCards` will be empty in that case and we return [].
+ */
+const MAX_CITATIONS = 6;
+function buildCitationChips(chunks: RagChunkResult[], podcastCards: PodcastEpisodeCard[]): CitedSource[] {
   const all = [...chunksToCitations(chunks), ...podcastCardsToCitations(podcastCards)];
-  const usedKeys = new Set<string>();
-  const used: CitedSource[] = [];
-  for (const label of labels) {
-    const match = all.find(c => {
-      const t = (c.title || '').toLowerCase();
-      // Either side contains the other (handles partial titles + label abbreviations)
-      return t.includes(label) || label.includes(t.slice(0, Math.min(40, t.length)));
-    });
-    if (match && !usedKeys.has(match.title)) {
-      usedKeys.add(match.title);
-      used.push(match);
-    }
+  const seen = new Set<string>();
+  const out: CitedSource[] = [];
+  for (const c of all) {
+    const key = (c.title || '').toLowerCase().trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(c);
+    if (out.length >= MAX_CITATIONS) break;
   }
-  return used;
+  return out;
 }
 
 async function persistExchange(params: {
@@ -416,13 +425,18 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Emit citations after the response completes. v1.1 fix: only
-        // surface sources Mindy actually cited inline via [→ X] markers,
-        // not every chunk we passed in. This prevents the bug where an
-        // off-topic redirect ("I'm focused on federal contracting…")
-        // attached a misleading citation chip just because we'd
-        // retrieved something during context-fetch.
-        const citedSources = filterUsedCitations(chunks, podcastCards, assistantContent);
+        // Emit citations after the response completes. v2 (May 31): no
+        // longer parse inline [→ X] markers from the response — those
+        // confused users when the underlying doc had no public URL.
+        // Instead we surface the top retrieved sources as clickable
+        // chips below the answer. Suppress chips on off-topic redirects
+        // (lowercase substring match on the canonical redirect phrase)
+        // so we don't attach misleading sources to "I'm focused on
+        // federal contracting" responses.
+        const lowerResp = assistantContent.toLowerCase();
+        const isRedirect = lowerResp.includes("i'm focused on federal contracting") ||
+                           lowerResp.includes("i don't have that in my knowledge base");
+        const citedSources = isRedirect ? [] : buildCitationChips(chunks, podcastCards);
         send({ type: 'citations', sources: citedSources });
         send({ type: 'done' });
         controller.close();

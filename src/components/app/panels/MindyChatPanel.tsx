@@ -29,6 +29,9 @@ interface CitedSource {
   url: string | null;
   doc_type: string;
   source_path: string | null;
+  // Set for internal docs (course_material etc) — opens the doc in
+  // the inline drawer instead of navigating to an external URL.
+  document_id: string | null;
 }
 
 interface ChatMessage {
@@ -47,54 +50,17 @@ const STARTER_PROMPTS = [
   'Draft me a one-paragraph capability statement intro',
 ];
 
-// Renders text with [→ Citation] markers turned into clickable links.
-// Cheap inline replacement — splits on the bracket pattern, walks
-// segments. v1 doesn't try to be markdown-smart beyond that.
-function renderMessageContent(content: string, citations?: CitedSource[]) {
-  const re = /\[→ ([^\]]+)\]/g;
-  const segments: Array<{ kind: 'text' | 'cite'; value: string; href?: string | null }> = [];
-  let lastIdx = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content))) {
-    if (m.index > lastIdx) {
-      segments.push({ kind: 'text', value: content.slice(lastIdx, m.index) });
-    }
-    const label = m[1];
-    const matched = citations?.find(c =>
-      (c.title || '').toLowerCase().includes(label.toLowerCase()) ||
-      label.toLowerCase().includes((c.title || '').toLowerCase().slice(0, 30))
-    );
-    segments.push({ kind: 'cite', value: label, href: matched?.url || null });
-    lastIdx = m.index + m[0].length;
-  }
-  if (lastIdx < content.length) {
-    segments.push({ kind: 'text', value: content.slice(lastIdx) });
-  }
-
-  return segments.map((seg, i) => {
-    if (seg.kind === 'text') {
-      // Render as whitespace-preserving plain text (newlines matter for lists)
-      return <span key={i} className="whitespace-pre-wrap">{seg.value}</span>;
-    }
-    if (seg.href) {
-      return (
-        <a
-          key={i}
-          href={seg.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-0.5 text-purple-300 hover:text-purple-200 underline decoration-purple-500/50 underline-offset-2"
-        >
-          [→ {seg.value}]
-        </a>
-      );
-    }
-    return (
-      <span key={i} className="inline-flex items-center gap-0.5 text-purple-300/80">
-        [→ {seg.value}]
-      </span>
-    );
-  });
+// Strip [→ X] markers from the message body — the server stopped
+// emitting them as of v2 (May 31), but old messages persisted to
+// mindy_chat_messages still have them. Cleaning at render keeps the
+// chat history readable without a backfill migration. Also collapses
+// any trailing space or double-space the strip leaves behind.
+function renderMessageContent(content: string) {
+  const cleaned = content
+    .replace(/\s*\[→\s*[^\]]+\]\s*/g, ' ')
+    .replace(/ {2,}/g, ' ')
+    .replace(/ ([.,;:!?])/g, '$1');
+  return <span className="whitespace-pre-wrap">{cleaned}</span>;
 }
 
 export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelProps) {
@@ -102,6 +68,9 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Document drawer state: when set, opens RagDocDrawer with the
+  // requested mindy_rag_documents.id loaded from /api/app/rag-doc.
+  const [drawerDocId, setDrawerDocId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -341,36 +310,56 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
                   )}
                   <div className={`text-[14.5px] leading-relaxed ${msg.errored ? 'text-red-300' : msg.role === 'user' ? 'text-slate-100' : 'text-slate-200'}`}>
                     {msg.content
-                      ? renderMessageContent(msg.content, msg.citations)
+                      ? renderMessageContent(msg.content)
                       : msg.isStreaming
                         ? <span className="text-slate-500 italic">Thinking…</span>
                         : null}
                   </div>
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
                     <div className="mt-3 pt-3 border-t border-slate-800/50">
-                      <div className="text-[10px] font-semibold tracking-wider text-slate-500 mb-1.5">SOURCES</div>
+                      <div className="text-[10px] font-semibold tracking-wider text-slate-500 mb-1.5">DOCUMENTS REFERENCED</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {msg.citations.slice(0, 6).map((c, i) => (
-                          c.url ? (
-                            <a
-                              key={i}
-                              href={c.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-300 hover:border-purple-500/40 hover:text-purple-200 transition-colors"
-                            >
-                              {c.title.slice(0, 50)}{c.title.length > 50 ? '…' : ''}
-                            </a>
-                          ) : (
+                        {msg.citations.slice(0, 6).map((c, i) => {
+                          const label = c.title.slice(0, 50) + (c.title.length > 50 ? '…' : '');
+                          // Internal doc (course material etc) — open in drawer
+                          if (c.document_id) {
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => setDrawerDocId(c.document_id)}
+                                className="text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-300 hover:border-purple-500/40 hover:text-purple-200 transition-colors cursor-pointer text-left"
+                                title={c.doc_type}
+                              >
+                                {label}
+                              </button>
+                            );
+                          }
+                          // External URL (podcast libsyn) — open in new tab
+                          if (c.url) {
+                            return (
+                              <a
+                                key={i}
+                                href={c.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-300 hover:border-purple-500/40 hover:text-purple-200 transition-colors"
+                              >
+                                {label}
+                              </a>
+                            );
+                          }
+                          // No URL, no document_id — render plain so it
+                          // doesn't look interactive when nothing happens.
+                          return (
                             <span
                               key={i}
                               className="text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-400"
                               title={c.doc_type}
                             >
-                              {c.title.slice(0, 50)}{c.title.length > 50 ? '…' : ''}
+                              {label}
                             </span>
-                          )
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -419,6 +408,120 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
             <span>Press <span className="text-slate-400 font-mono">⌘ Enter</span> to send</span>
             <span>{input.length} / 2000</span>
           </div>
+        </div>
+      </div>
+
+      {/* Inline doc drawer — opens when a citation chip targets an
+          internal mindy_rag_documents row (course material etc) */}
+      {drawerDocId && email && (
+        <RagDocDrawer
+          docId={drawerDocId}
+          email={email}
+          onClose={() => setDrawerDocId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface RagDocDrawerProps {
+  docId: string;
+  email: string;
+  onClose: () => void;
+}
+
+interface RagDoc {
+  id: string;
+  title: string;
+  doc_type: string | null;
+  folder: string | null;
+  source_path: string | null;
+  full_text: string;
+  word_count: number | null;
+}
+
+/**
+ * Right-anchored drawer that fetches and displays a single
+ * mindy_rag_documents row. Lazy load: only fires the API call when
+ * docId changes. ESC to close, click backdrop to close.
+ */
+function RagDocDrawer({ docId, email, onClose }: RagDocDrawerProps) {
+  const [doc, setDoc] = useState<RagDoc | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setDoc(null);
+    fetch(`/api/app/rag-doc?email=${encodeURIComponent(email)}&id=${encodeURIComponent(docId)}`)
+      .then(async res => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `Load failed (${res.status})`);
+        }
+        return res.json();
+      })
+      .then((data: RagDoc) => { if (!cancelled) { setDoc(data); setLoading(false); } })
+      .catch((e: Error) => { if (!cancelled) { setError(e.message); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [docId, email]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      {/* Backdrop */}
+      <div
+        className="flex-1 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label="Close drawer"
+      />
+      {/* Drawer */}
+      <div className="w-full max-w-xl bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl">
+        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <div className="min-w-0 pr-3">
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+              {doc?.folder || doc?.doc_type || 'Document'}
+            </div>
+            <div className="text-sm font-semibold text-white truncate">
+              {doc?.title || (loading ? 'Loading…' : 'Document')}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-white text-xl leading-none px-2"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">
+          {loading && (
+            <div className="text-sm text-slate-400">Loading document…</div>
+          )}
+          {error && (
+            <div className="rounded border border-red-900/60 bg-red-950/30 text-red-200 text-sm p-3">
+              {error}
+            </div>
+          )}
+          {doc && !loading && (
+            <>
+              {doc.word_count && (
+                <div className="text-[11px] text-slate-500 mb-3">
+                  {doc.word_count.toLocaleString()} words
+                </div>
+              )}
+              <div className="text-[14.5px] text-slate-200 whitespace-pre-wrap leading-relaxed">
+                {doc.full_text}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
