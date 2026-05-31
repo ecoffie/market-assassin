@@ -9,7 +9,7 @@
  * contractors", "top defense contractors", "top 8a contractors", etc.
  */
 
-export type ListicleKind = 'all' | 'agency' | 'sub-agency' | 'naics' | 'set-aside';
+export type ListicleKind = 'all' | 'agency' | 'sub-agency' | 'naics' | 'set-aside' | 'state';
 
 export interface ListicleSpec {
   slug: string;
@@ -195,6 +195,50 @@ export const LISTICLES: ListicleSpec[] = [
     cohort: 'Women-Owned Small Business contractors',
   },
 ];
+
+// State-based listicles. recipient_state is a 2-letter code in BQ.
+// Adds 51 new listicle URLs (50 states + DC) like:
+//   /top/contractors-in-virginia
+//   /top/contractors-in-texas
+// Geographic SEO is high-intent BD use case ("who's in my market").
+// Auto-generated below so adding a state is one line in this map.
+const US_STATES: Array<[string, string]> = [
+  ['AL', 'Alabama'], ['AK', 'Alaska'], ['AZ', 'Arizona'], ['AR', 'Arkansas'],
+  ['CA', 'California'], ['CO', 'Colorado'], ['CT', 'Connecticut'], ['DE', 'Delaware'],
+  ['DC', 'District of Columbia'], ['FL', 'Florida'], ['GA', 'Georgia'], ['HI', 'Hawaii'],
+  ['ID', 'Idaho'], ['IL', 'Illinois'], ['IN', 'Indiana'], ['IA', 'Iowa'],
+  ['KS', 'Kansas'], ['KY', 'Kentucky'], ['LA', 'Louisiana'], ['ME', 'Maine'],
+  ['MD', 'Maryland'], ['MA', 'Massachusetts'], ['MI', 'Michigan'], ['MN', 'Minnesota'],
+  ['MS', 'Mississippi'], ['MO', 'Missouri'], ['MT', 'Montana'], ['NE', 'Nebraska'],
+  ['NV', 'Nevada'], ['NH', 'New Hampshire'], ['NJ', 'New Jersey'], ['NM', 'New Mexico'],
+  ['NY', 'New York'], ['NC', 'North Carolina'], ['ND', 'North Dakota'], ['OH', 'Ohio'],
+  ['OK', 'Oklahoma'], ['OR', 'Oregon'], ['PA', 'Pennsylvania'], ['RI', 'Rhode Island'],
+  ['SC', 'South Carolina'], ['SD', 'South Dakota'], ['TN', 'Tennessee'], ['TX', 'Texas'],
+  ['UT', 'Utah'], ['VT', 'Vermont'], ['VA', 'Virginia'], ['WA', 'Washington'],
+  ['WV', 'West Virginia'], ['WI', 'Wisconsin'], ['WY', 'Wyoming'],
+];
+
+function stateSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+const STATE_LISTICLES: ListicleSpec[] = US_STATES.map(([code, name]) => {
+  const slug = `contractors-in-${stateSlug(name)}`;
+  return {
+    slug,
+    title: `Top 50 Federal Contractors in ${name}`,
+    shortTitle: `Top Contractors in ${name}`,
+    description: `Largest federal contractors headquartered in ${name} by total obligated FY2016–FY2026. Live USAspending data ranked by Mindy.`,
+    intro: `The 50 largest federal contractors headquartered in ${name} by total obligated dollars (FY2016–FY2026), based on recipient state address from USAspending.gov.`,
+    kind: 'state' as const,
+    filter: code,
+    cohort: `Contractors headquartered in ${name}`,
+  };
+});
+
+// Push state listicles into the main LISTICLES array so they get
+// picked up by the /top hub page, sitemap, and route handler.
+LISTICLES.push(...STATE_LISTICLES);
 
 export function getListicleBySlug(slug: string): ListicleSpec | undefined {
   return LISTICLES.find((l) => l.slug === slug);

@@ -59,19 +59,40 @@ export default function TopHubPage() {
         </p>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-16">
+      {/* Featured rankings (agency / NAICS / set-aside / branch) */}
+      <section className="mx-auto max-w-6xl px-6 pb-12">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">By Sector</h2>
         <div className="grid gap-4 md:grid-cols-2">
-          {LISTICLES.map((l) => (
+          {LISTICLES.filter((l) => l.kind !== 'state').map((l) => (
             <Link
               key={l.slug}
               href={`/top/${l.slug}`}
               className="block rounded-xl border border-slate-800 bg-slate-900 p-6 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
             >
-              <h2 className="text-lg font-bold text-white">{l.title}</h2>
+              <h3 className="text-lg font-bold text-white">{l.title}</h3>
               <p className="mt-2 text-sm text-slate-400">{l.description}</p>
               <p className="mt-3 text-xs uppercase tracking-wider text-purple-300">
                 View ranking →
               </p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* State rankings — 51 entries, dense grid */}
+      <section className="mx-auto max-w-6xl px-6 pb-16">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">By State</h2>
+        <p className="text-sm text-slate-400 mb-4">
+          The 50 largest federal contractors headquartered in each U.S. state plus DC.
+        </p>
+        <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {LISTICLES.filter((l) => l.kind === 'state').map((l) => (
+            <Link
+              key={l.slug}
+              href={`/top/${l.slug}`}
+              className="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
+            >
+              {l.shortTitle.replace('Top Contractors in ', '')}
             </Link>
           ))}
         </div>

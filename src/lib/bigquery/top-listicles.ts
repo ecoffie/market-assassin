@@ -197,6 +197,59 @@ export async function getTopContractorsBySubAgency(
 }
 
 /**
+ * Top contractors filtered by recipient state (2-letter code).
+ * Powers "/top/contractors-in-virginia", "/top/contractors-in-texas",
+ * etc. Same rolled-up-by-name pattern as the others.
+ *
+ * recipient_state isn't in the cluster key — full partition scan
+ * ~6-8 GB. Bumped cap. Each state has wildly different volume
+ * (VA = 20K recipients, WY = 50ish) but the LIMIT 50 + cache means
+ * the cost story is the same per-state.
+ */
+export async function getTopContractorsByState(
+  stateCode: string,
+  limit = 50,
+): Promise<TopContractorRow[]> {
+  return queryCached<TopContractorRow>({
+    cacheKey: `top:state:${stateCode}:${limit}:v1`,
+    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
+    query: `
+      WITH per_uei AS (
+        SELECT
+          recipient_uei,
+          recipient_name,
+          SUM(obligation_amount) AS amount,
+          COUNT(DISTINCT award_id) AS awards
+        FROM ${BQ_TABLES.awards}
+        WHERE recipient_state = @state
+          AND recipient_uei IS NOT NULL
+          AND recipient_name IS NOT NULL
+        GROUP BY recipient_uei, recipient_name
+      ),
+      rolled AS (
+        SELECT
+          recipient_name,
+          SUM(amount) AS total_amount,
+          SUM(awards) AS award_count,
+          ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS top_uei
+        FROM per_uei
+        GROUP BY recipient_name
+      )
+      SELECT
+        top_uei AS recipient_uei,
+        recipient_name,
+        total_amount,
+        award_count,
+        CAST(NULL AS INT64) AS distinct_agency_count
+      FROM rolled
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { state: stateCode, limit },
+  });
+}
+
+/**
  * Top contractors that win a specific set-aside category.
  * Powers "/top/8a-contractors", "/top/hubzone-contractors",
  * "/top/sdvosb-contractors", "/top/wosb-contractors".

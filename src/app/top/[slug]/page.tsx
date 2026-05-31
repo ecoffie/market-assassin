@@ -25,6 +25,7 @@ import {
   getTopContractorsBySubAgency,
   getTopContractorsByNaics,
   getTopContractorsBySetAside,
+  getTopContractorsByState,
   type TopContractorRow,
 } from '@/lib/bigquery/top-listicles';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
@@ -84,6 +85,8 @@ async function fetchRows(listicle: ReturnType<typeof getListicleBySlug>): Promis
       return getTopContractorsByNaics(listicle.filter || '', LIMIT);
     case 'set-aside':
       return getTopContractorsBySetAside(listicle.filterPatterns || [], LIMIT);
+    case 'state':
+      return getTopContractorsByState(listicle.filter || '', LIMIT);
     default:
       return [];
   }
