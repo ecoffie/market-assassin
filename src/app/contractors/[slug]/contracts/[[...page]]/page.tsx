@@ -149,7 +149,18 @@ export default async function ContractorContractsPage({ params }: PageProps) {
                     <span className="truncate block">{a.awarding_agency || '—'}</span>
                     {a.awarding_office && <span className="text-xs text-slate-500 truncate block">{a.awarding_office}</span>}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-400">{a.piid || '—'}</td>
+                  <td className="px-4 py-3 font-mono text-xs">
+                    {a.piid ? (
+                      <Link
+                        href={`/contracts/${encodeURIComponent(a.piid)}`}
+                        className="text-slate-400 hover:text-purple-400"
+                      >
+                        {a.piid}
+                      </Link>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-400">{a.naics_code || '—'}</td>
                   <td className="px-4 py-3 text-slate-300 max-w-[24rem]">
                     <span className="line-clamp-2">{a.description || '—'}</span>

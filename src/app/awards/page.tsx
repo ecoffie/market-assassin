@@ -212,7 +212,11 @@ export default async function AwardsLanding() {
                     {fmtCompanyName(a.recipient_name)}
                   </Link>
                   <Link
-                    href={`/awards/${encodeURIComponent(a.award_id)}`}
+                    href={
+                      a.piid
+                        ? `/contracts/${encodeURIComponent(a.piid)}`
+                        : `/awards/${encodeURIComponent(a.award_id)}`
+                    }
                     className="text-xs text-slate-500 hover:text-purple-400"
                   >
                     {a.piid || a.award_id.slice(0, 40)}

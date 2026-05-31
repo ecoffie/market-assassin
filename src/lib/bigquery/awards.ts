@@ -170,6 +170,51 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
 }
 
 /**
+ * Look up the canonical award_id for a given PIID.
+ *
+ * Powers /contracts/[piid] — the URL pattern searchers actually type
+ * (e.g. "n0018925fz703"). A PIID can appear on multiple transactions
+ * (the award + modifications); we return the canonical contract_award
+ * _unique_key with the largest obligation_amount.
+ *
+ * Case-insensitive match because GSC traffic comes in lowercase.
+ */
+export async function getAwardIdByPiid(piid: string): Promise<{
+  award_id: string;
+  piid: string;
+  recipient_name: string;
+} | null> {
+  const rows = await queryCached<{
+    award_id: string;
+    piid: string;
+    recipient_name: string;
+  }>({
+    cacheKey: `awards:by-piid:${piid.toUpperCase()}`,
+    // Full-table scan on piid (not in cluster key) — bumped cap
+    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
+    query: `
+      SELECT
+        award_id,
+        piid,
+        ANY_VALUE(recipient_name) AS recipient_name,
+        SUM(obligation_amount) AS total
+      FROM ${BQ_TABLES.awards}
+      WHERE UPPER(piid) = @piid
+      GROUP BY award_id, piid
+      ORDER BY total DESC
+      LIMIT 1
+    `,
+    params: { piid: piid.toUpperCase() },
+  });
+  if (!rows[0]) return null;
+  return {
+    award_id: rows[0].award_id,
+    piid: rows[0].piid,
+    recipient_name: rows[0].recipient_name,
+  };
+}
+
+/**
  * Slugs for the top 10K awards — fed to generateStaticParams so
  * each is prerendered as a stable URL in the sitemap.
  */
