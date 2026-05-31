@@ -1,7 +1,8 @@
 # Target Market Research + Event Radar — Roadmap
 
-**Status:** Slices 1.5–5 shipped + verified in production (May 31 2026).
-Remaining: Slice 5b PSC-input audit, Slice 6+ (far future).
+**Status:** Slices 1.5–5 + Slice 5b core (items 1–3) shipped + verified
+in production (May 31 2026). Remaining: Slice 5b items 4–5 (AI-Analyst
+PSC weighting, OpenAPI/MCP `psc` params — v3), Slice 6+ (far future).
 **Owner:** Eric / Claude
 **Phase 2 reframe:** Mindy's "Market Research" surface evolves into a
 **Target Market Research workspace** for federal BD. Not just a one-time
@@ -249,7 +250,27 @@ date" badges and we can audit accuracy over time.
 
 ---
 
-### Slice 5b — Beyond NAICS: PSC code support throughout
+### 🟡 Slice 5b — Beyond NAICS: PSC code support throughout (CORE SHIPPED May 31 2026)
+
+> **Items 1–3 shipped + verified in production.** Items 4–5 remain
+> (AI-Analyst PSC weighting, OpenAPI/MCP `psc` params — v3 work).
+>
+> **Item 1 — PSC input + PSC-only (commit `79ba14b`):** Market Research
+> form now has a PSC input next to NAICS (4-col row: Business type ·
+> NAICS · PSC · Agency). Server requires NAICS **or** PSC (was: NAICS
+> hard-required). Verified live: PSC-only `D316` (no NAICS) → 94
+> agencies / $23.1B.
+> **Item 2 — PSC in cache key (commits `79ba14b`, `3f9b8d8`, `11672df`):**
+> `psc_code` added to `agency_target_data_cache` composite key so
+> NAICS+PSC and PSC-only cache distinctly (`541512+D316`→81 agencies vs
+> PSC-only→94, no collision). Two bugs surfaced + fixed along the way:
+> the cache table was **never created in prod** (route fail-softs on a
+> missing table, so Market Research worked but never cached — now it
+> does), and the SAT-recovery freshness guard wrongly rejected
+> legitimate no-SAT results (e.g. above-threshold PSC buys) so they
+> never cache-hit — now trusts any non-empty payload.
+> **Item 3 — PSC provenance on saved targets:** done earlier (see Slice
+> 3 note) — `source_naics`/`source_psc` columns + "from PSC D316" chip.
 
 **Eric, May 22 2026:** "PSC codes are closer indicator of precise
 business offering versus NAICS or often times too broad. We need to
@@ -266,16 +287,17 @@ Backup" = 500 companies. BD precision lives at the PSC layer.
 
 **What needs to change:**
 
-1. **Slice 1.5C agency table UI** — surface PSC input alongside NAICS
+1. ✅ **Slice 1.5C agency table UI** — surface PSC input alongside NAICS
    as a top-level filter. Two-column input: NAICS [_____] PSC [_____].
-   At least one required.
-2. **Slice 1.5B endpoint** — already wired (just pass `pscCode`
+   At least one required. **(shipped — NAICS or PSC required)**
+2. ✅ **Slice 1.5B endpoint** — already wired (just pass `pscCode`
    through). Cache key currently `(naics, business_type, veteran)` —
-   add `psc_code` to the composite key.
-3. **Saved-targets table** (Slice 3) — store the PSC code that
+   add `psc_code` to the composite key. **(shipped — psc_code in the key)**
+3. ✅ **Saved-targets table** (Slice 3) — store the PSC code that
    surfaced the target, not just NAICS. So a user with 5 saved
    targets can see "3 surfaced from PSC D316, 2 from NAICS 541512".
-4. **AI Analyst prompt** — when generating bid/no-bid analysis, weight
+   **(shipped — source_naics/source_psc + chip)**
+4. ⬜ **AI Analyst prompt** — when generating bid/no-bid analysis, weight
    PSC alignment higher than NAICS match (since PSC is more precise).
 5. **OpenAPI / MCP** (v3 work, see `PRD-mindy-as-ai-data-layer.md`) —
    every endpoint that accepts `naics` should also accept `psc`. AI
