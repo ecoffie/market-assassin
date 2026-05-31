@@ -22,7 +22,10 @@ import { bqQuery, type BqQueryParams } from './client';
 // Bump this string whenever the source data is refreshed (monthly
 // ingest, schema change, derived-table rebuild). All cached keys
 // become unreachable immediately — no scan-and-delete needed.
-const DATA_VERSION = 'v1-2026-05';
+// Bumped 2026-05-31 to invalidate KV cache after Round 2 subaward
+// ingest brought subawards from 903K → 1,001,345 rows and added
+// 340 new primes + 8,765 new subawardees to the rollups.
+const DATA_VERSION = 'v2-2026-05';
 
 const DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
