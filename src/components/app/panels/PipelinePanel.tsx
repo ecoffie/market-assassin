@@ -837,45 +837,68 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         stages. Per Eric (2026-05-27): "if we are tracking do
                         we need to draft?" — tracking is "watching", drafting
                         comes after the decision to pursue. Won/lost/no_bid
-                        also hide it (work is done). */}
-                    {onPanelChange && ['pursuing', 'bidding', 'submitted'].includes(opp.stage) && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onPanelChange('proposals', { pursuit_id: opp.id });
-                        }}
-                        className="mt-2 w-full rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500"
-                        title={
-                          opp.has_drafts
-                            ? `Has prior drafts — open Proposal Assist to continue`
-                            : opp.docs_status === 'ready'
-                              ? `${opp.docs_count || 0} doc(s) ready — open Proposal Assist`
-                              : opp.docs_status === 'fetching'
-                                ? 'SAM docs still downloading — Proposal Assist will load what is ready'
-                                : opp.docs_status === 'none'
-                                  ? 'No SAM attachments — Proposal Assist will still draft from the notice metadata'
+                        also hide it (work is done).
+                        Per Eric (2026-05-31): hide entirely when the SAM
+                        notice has no attachments AND the user hasn't manually
+                        uploaded a draft yet. Drafting from metadata alone
+                        produces generic content that confused users into
+                        thinking the tool was broken. We replace it with an
+                        explicit "Upload an RFP" link so the next action is
+                        clear. */}
+                    {onPanelChange && ['pursuing', 'bidding', 'submitted'].includes(opp.stage) && (() => {
+                      const noAttachmentsAndNoDraft = opp.docs_status === 'none' && !opp.has_drafts;
+                      if (noAttachmentsAndNoDraft) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onPanelChange('proposals', { pursuit_id: opp.id });
+                            }}
+                            className="mt-2 w-full rounded-md border border-amber-700/60 bg-amber-950/30 px-2 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-amber-900/40"
+                            title="No SAM attachments — open Proposal Assist to upload an RFP manually"
+                          >
+                            Upload an RFP →
+                          </button>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onPanelChange('proposals', { pursuit_id: opp.id });
+                          }}
+                          className="mt-2 w-full rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500"
+                          title={
+                            opp.has_drafts
+                              ? `Has prior drafts — open Proposal Assist to continue`
+                              : opp.docs_status === 'ready'
+                                ? `${opp.docs_count || 0} doc(s) ready — open Proposal Assist`
+                                : opp.docs_status === 'fetching'
+                                  ? 'SAM docs still downloading — Proposal Assist will load what is ready'
                                   : 'Open Proposal Assist for this pursuit'
-                        }
-                      >
-                        {opp.has_drafts ? 'Continue Draft →' : 'Draft Proposal →'}
-                        {opp.has_drafts && (
-                          <span className="ml-1 text-[10px] font-normal text-emerald-200">
-                            ✓ {opp.draft_count} {opp.draft_count === 1 ? 'section' : 'sections'}
-                          </span>
-                        )}
-                        {!opp.has_drafts && opp.docs_status === 'ready' && (opp.docs_count || 0) > 0 && (
-                          <span className="ml-1 text-[10px] font-normal text-emerald-200">
-                            {opp.docs_count} {opp.docs_count === 1 ? 'doc' : 'docs'}
-                          </span>
-                        )}
-                        {!opp.has_drafts && opp.docs_status === 'fetching' && (
-                          <span className="ml-1 text-[10px] font-normal text-emerald-200 animate-pulse">
-                            fetching…
-                          </span>
-                        )}
-                      </button>
-                    )}
+                          }
+                        >
+                          {opp.has_drafts ? 'Continue Draft →' : 'Draft Proposal →'}
+                          {opp.has_drafts && (
+                            <span className="ml-1 text-[10px] font-normal text-emerald-200">
+                              ✓ {opp.draft_count} {opp.draft_count === 1 ? 'section' : 'sections'}
+                            </span>
+                          )}
+                          {!opp.has_drafts && opp.docs_status === 'ready' && (opp.docs_count || 0) > 0 && (
+                            <span className="ml-1 text-[10px] font-normal text-emerald-200">
+                              {opp.docs_count} {opp.docs_count === 1 ? 'doc' : 'docs'}
+                            </span>
+                          )}
+                          {!opp.has_drafts && opp.docs_status === 'fetching' && (
+                            <span className="ml-1 text-[10px] font-normal text-emerald-200 animate-pulse">
+                              fetching…
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })()}
                     <label
                       className="mt-3 block"
                       onClick={(event) => event.stopPropagation()}
@@ -1086,27 +1109,43 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                           {/* Draft Proposal — same action as on the
                               Board view cards. Opens Proposal Assist
                               with this pursuit's docs auto-loaded. */}
-                          {onPanelChange && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onPanelChange('proposals', { pursuit_id: opp.id });
-                              }}
-                              title={
-                                opp.docs_status === 'ready'
-                                  ? `Draft Proposal — ${opp.docs_count || 0} doc(s) ready`
-                                  : opp.docs_status === 'fetching'
-                                    ? 'Draft Proposal — SAM docs still downloading'
-                                    : opp.docs_status === 'none'
-                                      ? 'Draft Proposal — no SAM attachments'
+                          {onPanelChange && (() => {
+                            const noAttachmentsAndNoDraft = opp.docs_status === 'none' && !opp.has_drafts;
+                            if (noAttachmentsAndNoDraft) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onPanelChange('proposals', { pursuit_id: opp.id });
+                                  }}
+                                  title="No SAM attachments — open Proposal Assist to upload an RFP"
+                                  className="rounded border border-amber-700/60 bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-200 hover:bg-amber-900/50"
+                                >
+                                  📎
+                                </button>
+                              );
+                            }
+                            return (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onPanelChange('proposals', { pursuit_id: opp.id });
+                                }}
+                                title={
+                                  opp.docs_status === 'ready'
+                                    ? `Draft Proposal — ${opp.docs_count || 0} doc(s) ready`
+                                    : opp.docs_status === 'fetching'
+                                      ? 'Draft Proposal — SAM docs still downloading'
                                       : 'Draft Proposal'
-                              }
-                              className="rounded bg-emerald-600/80 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-500"
-                            >
-                              📝
-                            </button>
-                          )}
+                                }
+                                className="rounded bg-emerald-600/80 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-500"
+                              >
+                                📝
+                              </button>
+                            );
+                          })()}
                           <button
                             type="button"
                             onClick={(event) => {
