@@ -171,16 +171,27 @@ export async function POST(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
-    if (!naicsCode || !naicsCode.trim()) {
-      return NextResponse.json({ error: 'naicsCode is required' }, { status: 400 });
+    // At least one classifier required — NAICS OR PSC (roadmap Slice
+    // 5b: PSC is first-class, not a NAICS add-on). find-agencies
+    // crosswalks PSC→NAICS when NAICS is absent, so PSC-only is valid.
+    const hasNaics = !!(naicsCode && naicsCode.trim());
+    const hasPsc = !!(pscCode && pscCode.trim());
+    if (!hasNaics && !hasPsc) {
+      return NextResponse.json({ error: 'naicsCode or pscCode is required' }, { status: 400 });
     }
+    // Normalize to definite strings for all downstream uses (cache key
+    // + find-agencies bodies). Either may be '' now that PSC-only is
+    // valid — find-agencies crosswalks PSC→NAICS when NAICS is blank.
+    const naics = (naicsCode || '').trim();
+    const psc = (pscCode || '').trim();
 
     // Tier check. Free users still see data, just fewer rows.
     const access = await verifyMIAccess(email);
     const isFree = access.tier === 'free' && !access.isStaff;
 
     const cacheKey = {
-      naics_code: naicsCode.trim(),
+      naics_code: naics,
+      psc_code: psc,
       business_type: businessType || '',
       veteran_status: veteranStatus || '',
     };
@@ -194,6 +205,7 @@ export async function POST(request: NextRequest) {
         .from('agency_target_data_cache')
         .select('*')
         .eq('naics_code', cacheKey.naics_code)
+        .eq('psc_code', cacheKey.psc_code)
         .eq('business_type', cacheKey.business_type)
         .eq('veteran_status', cacheKey.veteran_status)
         .maybeSingle();
@@ -246,12 +258,12 @@ export async function POST(request: NextRequest) {
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ naicsCode, businessType, veteranStatus, zipCode, pscCode, excludeDOD }),
+        body: JSON.stringify({ naicsCode: naics, businessType, veteranStatus, zipCode, pscCode: psc, excludeDOD }),
       }),
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ naicsCode, businessType: '', veteranStatus: '', zipCode, pscCode, excludeDOD }),
+        body: JSON.stringify({ naicsCode: naics, businessType: '', veteranStatus: '', zipCode, pscCode: psc, excludeDOD }),
       }),
     ]);
     const findData = (await findRes.json()) as FindAgenciesPayload;
@@ -335,8 +347,11 @@ export async function POST(request: NextRequest) {
     // agencies have NAICS-aligned pain points specifically (vs any
     // pain point logged at the agency).
     const painStart = Date.now();
+    // PSC-only searches have no NAICS — getPainPointsByNaics('')
+    // returns nothing, which is the right behavior (pain points are
+    // NAICS-indexed; PSC alignment isn't available here).
     const naicsAlignedPainAgencies = new Set(
-      getPainPointsByNaics(naicsCode.trim()).map((r) => r.agency.toLowerCase())
+      naics ? getPainPointsByNaics(naics).map((r) => r.agency.toLowerCase()) : []
     );
     const painMs = Date.now() - painStart;
 
@@ -523,6 +538,7 @@ export async function POST(request: NextRequest) {
         .from('agency_target_data_cache')
         .upsert({
           naics_code: cacheKey.naics_code,
+          psc_code: cacheKey.psc_code,
           business_type: cacheKey.business_type,
           veteran_status: cacheKey.veteran_status,
           agencies: rows,
@@ -537,7 +553,7 @@ export async function POST(request: NextRequest) {
             events_ms: eventsMs,
             pain_ms: painMs,
           },
-        }, { onConflict: 'naics_code,business_type,veteran_status' });
+        }, { onConflict: 'naics_code,psc_code,business_type,veteran_status' });
     } catch (cacheWriteErr) {
       console.warn('[target-market-research] cache write failed:', cacheWriteErr);
     }

@@ -1563,7 +1563,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <label className="block">
               <span className="text-sm text-slate-400">Business type</span>
               <select
@@ -1578,12 +1578,25 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               </select>
             </label>
             <label className="block">
-              <span className="text-sm text-slate-400">Industry codes</span>
+              <span className="text-sm text-slate-400">NAICS codes</span>
               <input
                 type="text"
                 value={formData.naicsCode}
                 onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
                 placeholder="236, 541512"
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm text-slate-400">
+                PSC codes
+                <span className="ml-1 text-[11px] text-slate-500">(more precise)</span>
+              </span>
+              <input
+                type="text"
+                value={formData.pscCode}
+                onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
+                placeholder="D316, R425"
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
               />
             </label>
