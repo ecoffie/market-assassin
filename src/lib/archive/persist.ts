@@ -42,7 +42,13 @@ export type ArchiveContentType =
   | 'briefing'
   | 'proposal_section'
   | 'cap_statement'
-  | 'vault_ai_coach';
+  | 'vault_ai_coach'
+  // Proposal Wizard artifacts (one per stage). content_subtype carries
+  // the specific stage when finer filtering is needed in the UI.
+  | 'proposal_wizard_brief'
+  | 'proposal_wizard_compliance'
+  | 'proposal_wizard_themes'
+  | 'proposal_wizard_outline';
 
 export interface ArchiveInput {
   userEmail: string;

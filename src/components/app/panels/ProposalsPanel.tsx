@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import ProposalWizardBrief from '../proposal-wizard/ProposalWizardBrief';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -753,6 +754,21 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           {loading ? 'Refreshing...' : 'Refresh Pursuits'}
         </button>
       </div>
+
+      {/* Proposal Wizard — Stage 1 (RFP Brief). Mounted when the user
+          landed here from PipelinePanel's Draft Proposal button (which
+          sets panelContext.pursuit_id). Stages 2-4 land in follow-up
+          commits and the wizard shell wires them together; for now
+          Stage 1 sits above the legacy Proposal Assist surface so the
+          user gets the structured brief before the section-drafting UI. */}
+      {email && typeof panelContext?.pursuit_id === 'string' && (
+        <ProposalWizardBrief
+          email={email}
+          pursuitId={panelContext.pursuit_id}
+          authHeaders={getAuthHeaders}
+          onContinue={undefined /* TODO: wire to Stage 2 (Compliance Matrix) in a follow-up commit */}
+        />
+      )}
 
       {/* RFP Upload */}
       <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
