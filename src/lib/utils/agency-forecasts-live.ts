@@ -75,6 +75,37 @@ function toLegacyFormat(f: LiveForecast): Forecast {
  * - Show forecasts from THOSE agencies matching their NAICS
  * - This is targeted intelligence, not a broad search
  */
+// agency_forecasts.source_agency holds abbreviations. Map a full agency
+// name (or abbreviation) to the form used in the forecast dataset.
+// Returns null when the agency isn't represented in the forecast data
+// (e.g. DOD — the current dataset is civilian-heavy: DOJ/DOI/DOE/DHS/
+// NASA/VA/GSA/NRC/DOT/SSA/NSF/DOL/ONR/NRL).
+function fullNameToForecastAgency(name: string): string | null {
+  const n = name.toLowerCase().trim();
+  const MAP: Array<[RegExp, string]> = [
+    [/justice|doj/, 'DOJ'],
+    [/interior|doi/, 'DOI'],
+    [/\benergy\b|doe/, 'DOE'],
+    [/homeland|dhs/, 'DHS'],
+    [/nasa|aeronautic|space admin/, 'NASA'],
+    [/veterans|\bva\b/, 'VA'],
+    [/general services|\bgsa\b/, 'GSA'],
+    [/nuclear regulatory|\bnrc\b/, 'NRC'],
+    [/transportation|\bdot\b/, 'DOT'],
+    [/social security|\bssa\b/, 'SSA'],
+    [/national science|\bnsf\b/, 'NSF'],
+    [/\blabor\b|\bdol\b/, 'DOL'],
+    [/naval research|\bonr\b|\bnrl\b/, 'ONR'],
+  ];
+  for (const [re, abbr] of MAP) {
+    if (re.test(n)) return abbr;
+  }
+  // If the caller already passed a known abbreviation, use it as-is.
+  const upper = name.trim().toUpperCase();
+  if (/^[A-Z]{2,5}$/.test(upper)) return upper;
+  return null;
+}
+
 export async function getLiveForecastsForSelectedAgencies(
   selectedAgencies: string[],
   naicsCode?: string,
@@ -88,16 +119,26 @@ export async function getLiveForecastsForSelectedAgencies(
     .order('anticipated_award_date', { ascending: true, nullsFirst: false })
     .limit(100);
 
-  // Filter by selected agencies
+  // Filter by selected agencies — BUT source_agency is stored as
+  // abbreviations (DOJ, DOI, DOE, DHS, NASA, VA, GSA, ...), while callers
+  // pass full names ("Department of Defense"). The old word-match
+  // ("department") matched none of the abbreviations → 0 results.
+  //
+  // Map full names → abbreviations where we can; if NONE of the selected
+  // agencies map to something in this forecast dataset, SKIP the agency
+  // filter entirely (show NAICS-relevant forecasts across all agencies)
+  // rather than returning nothing.
   if (selectedAgencies.length > 0) {
-    const agencyFilters = selectedAgencies.map(agency => {
-      const words = agency.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-      return words[0] || agency.toLowerCase();
-    });
-
-    query = query.or(
-      agencyFilters.map(a => `source_agency.ilike.%${a}%`).join(',')
-    );
+    const abbrevs = selectedAgencies
+      .map(a => fullNameToForecastAgency(a))
+      .filter((a): a is string => !!a);
+    if (abbrevs.length > 0) {
+      query = query.or(
+        abbrevs.map(a => `source_agency.ilike.%${a}%`).join(',')
+      );
+    }
+    // else: no mappable agency in the forecast dataset — don't filter by
+    // agency, just return NAICS/recency-relevant forecasts.
   }
 
   // Filter by NAICS — but INCLUSIVELY. Most agency_forecasts rows have
