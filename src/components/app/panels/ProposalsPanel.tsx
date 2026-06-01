@@ -146,13 +146,20 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
   // Proposal Wizard stage navigation. Only meaningful when the user
   // landed on this panel via PipelinePanel's Draft Proposal button —
-  // panelContext.pursuit_id is set in that path. Stages 3-4 are not
-  // built yet; for now the matrix's Continue button is a no-op stub.
-  const [wizardStage, setWizardStage] = useState<'brief' | 'compliance'>('brief');
+  // panelContext.pursuit_id is set in that path. Flow is
+  // brief → compliance → draft, auto-advancing (see runWizardDraft).
+  const [wizardStage, setWizardStage] = useState<'brief' | 'compliance' | 'draft'>('brief');
+  // Draft-stage status for the auto-advance runner.
+  const [wizardDraftStatus, setWizardDraftStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
+  const [wizardDraftError, setWizardDraftError] = useState<string | null>(null);
+  const [wizardDraftMeta, setWizardDraftMeta] = useState<{ count: number; metadataOnly: boolean } | null>(null);
   // Reset to Stage 1 when the user switches to a different pursuit so
   // they always see the brief first.
   useEffect(() => {
     setWizardStage('brief');
+    setWizardDraftStatus('idle');
+    setWizardDraftError(null);
+    setWizardDraftMeta(null);
   }, [panelContext?.pursuit_id]);
 
   // Vault summary — drives the "add to vault for better drafts" nudge
@@ -439,6 +446,76 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       setDraftAllLoading(false);
     }
   }, [email, uploadedRfp, getAuthHeaders]);
+
+  // Wizard Stage 3 — draft the full proposal for the pursuit. Calls the
+  // wizard 'draft' stage (which reuses the draft-all engine, sourced from
+  // the pursuit's attached docs) and merges the sections into the shared
+  // `drafts` state so the existing section UI + .docx export light up.
+  // This is the auto-advance terminus: brief → compliance → here.
+  const runWizardDraft = useCallback(async (pursuitId: string) => {
+    if (!email) return;
+    setWizardDraftStatus('running');
+    setWizardDraftError(null);
+    try {
+      const res = await fetch(
+        `/api/app/proposal/wizard?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pursuitId)}&stage=draft`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({}),
+        },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setWizardDraftError(data?.error || 'Could not draft the proposal.');
+        setWizardDraftStatus('error');
+        return;
+      }
+      const artifact = data.artifact as {
+        sections?: Array<{ section: string; draft: string; wordCount: number; targetWords: number; profileGrounded?: boolean }>;
+        generated_from_metadata_only?: boolean;
+      };
+      const sections = artifact?.sections || [];
+
+      if (sections.length > 0) {
+        setDrafts(prev => {
+          const next = { ...prev };
+          for (const s of sections) {
+            next[s.section as SectionType] = {
+              draft: s.draft,
+              wordCount: s.wordCount,
+              targetWords: s.targetWords,
+              profileGrounded: s.profileGrounded,
+              generatedAt: Date.now(),
+            };
+          }
+          return next;
+        });
+        if (sections[0]?.section) setActiveSection(sections[0].section as SectionType);
+      }
+
+      setWizardDraftMeta({
+        count: sections.length,
+        metadataOnly: !!artifact?.generated_from_metadata_only,
+      });
+      setWizardDraftStatus('done');
+    } catch (err) {
+      console.error('[wizard] draft stage failed:', err);
+      setWizardDraftError('Request failed. Try again.');
+      setWizardDraftStatus('error');
+    }
+  }, [email, getAuthHeaders]);
+
+  // Auto-advance terminus: when the user reaches the draft stage, kick
+  // off drafting once (idle → running). Guarded so re-renders don't
+  // re-fire; switching pursuits resets status to idle above. Declared
+  // after runWizardDraft so the callback reference is initialized.
+  useEffect(() => {
+    const pursuitId = panelContext?.pursuit_id;
+    if (wizardStage === 'draft' && wizardDraftStatus === 'idle' && typeof pursuitId === 'string') {
+      void runWizardDraft(pursuitId);
+    }
+  }, [wizardStage, wizardDraftStatus, panelContext?.pursuit_id, runWizardDraft]);
 
   const updateDraftText = useCallback((sectionType: SectionType, text: string) => {
     setDrafts(prev => {
@@ -767,14 +844,43 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </button>
       </div>
 
-      {/* Proposal Wizard — Stages 1 (RFP Brief) + 2 (Compliance Matrix).
+      {/* Proposal Wizard — brief → compliance → draft, auto-advancing.
           Mounted when the user landed here from PipelinePanel's Draft
-          Proposal button (which sets panelContext.pursuit_id). Stages
-          3-4 land in follow-up commits. The wizard sits above the
-          legacy Proposal Assist surface so the user gets the structured
-          brief + compliance matrix before the section-drafting UI. */}
+          Proposal button (which sets panelContext.pursuit_id). The wizard
+          sits above the legacy Proposal Assist surface so the user gets
+          the structured brief + compliance matrix before the full draft. */}
       {email && typeof panelContext?.pursuit_id === 'string' && (
         <>
+          {/* 3-step progress indicator */}
+          <div className="flex items-center gap-2 mb-4 text-xs">
+            {([
+              { key: 'brief', label: '1 · RFP Brief' },
+              { key: 'compliance', label: '2 · Compliance' },
+              { key: 'draft', label: '3 · Draft' },
+            ] as const).map((step, i) => {
+              const order = ['brief', 'compliance', 'draft'];
+              const current = order.indexOf(wizardStage);
+              const mine = order.indexOf(step.key);
+              const state = mine < current ? 'done' : mine === current ? 'active' : 'upcoming';
+              return (
+                <span key={step.key} className="flex items-center gap-2">
+                  <span
+                    className={`px-2.5 py-1 rounded-full border ${
+                      state === 'active'
+                        ? 'border-purple-500/50 bg-purple-500/15 text-purple-200'
+                        : state === 'done'
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                          : 'border-slate-700 bg-slate-800/40 text-slate-500'
+                    }`}
+                  >
+                    {state === 'done' ? '✓ ' : ''}{step.label}
+                  </span>
+                  {i < 2 && <span className="text-slate-600">→</span>}
+                </span>
+              );
+            })}
+          </div>
+
           {wizardStage === 'brief' && (
             <ProposalWizardBrief
               email={email}
@@ -798,9 +904,55 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 email={email}
                 pursuitId={panelContext.pursuit_id}
                 authHeaders={getAuthHeaders}
-                onContinue={undefined /* TODO: Stage 3 (Win Themes, optional) lands next */}
+                onContinue={() => setWizardStage('draft')}
               />
             </>
+          )}
+          {wizardStage === 'draft' && (
+            <section className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-4">
+              <div className="flex items-center gap-2 mb-3 text-xs text-slate-400">
+                <button
+                  type="button"
+                  onClick={() => setWizardStage('compliance')}
+                  className="text-slate-400 hover:text-purple-300"
+                >
+                  ← Back to Compliance
+                </button>
+              </div>
+              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 3 · Draft</p>
+              <h2 className="text-lg font-semibold text-white mb-1">Full proposal draft</h2>
+
+              {wizardDraftStatus === 'running' && (
+                <div className="flex items-center gap-3 mt-4 text-sm text-blue-200">
+                  <span className="inline-block w-4 h-4 border-2 border-blue-300/40 border-t-blue-300 rounded-full animate-spin" />
+                  Mindy is drafting every section from your RFP — this takes ~30–60 seconds.
+                </div>
+              )}
+              {wizardDraftStatus === 'error' && (
+                <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                  {wizardDraftError || 'Draft failed.'}
+                  <button
+                    type="button"
+                    onClick={() => panelContext?.pursuit_id && runWizardDraft(panelContext.pursuit_id as string)}
+                    className="ml-3 underline hover:text-red-100"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {wizardDraftStatus === 'done' && wizardDraftMeta?.metadataOnly && (
+                <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+                  No RFP document is attached to this pursuit, so there&apos;s nothing to draft from.
+                  Upload the solicitation below and Mindy will draft every section.
+                </div>
+              )}
+              {wizardDraftStatus === 'done' && !wizardDraftMeta?.metadataOnly && (
+                <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+                  Drafted {wizardDraftMeta?.count ?? 0} section{(wizardDraftMeta?.count ?? 0) === 1 ? '' : 's'}.
+                  Review and edit them below, then export to .docx.
+                </div>
+              )}
+            </section>
           )}
         </>
       )}

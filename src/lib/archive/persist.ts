@@ -47,6 +47,10 @@ export type ArchiveContentType =
   // the specific stage when finer filtering is needed in the UI.
   | 'proposal_wizard_brief'
   | 'proposal_wizard_compliance'
+  | 'proposal_wizard_draft'
+  // themes/outline were placeholder stages — never built. The shipped
+  // wizard flow is brief → compliance → draft. Kept here so any old
+  // archived rows still type-check.
   | 'proposal_wizard_themes'
   | 'proposal_wizard_outline';
 

@@ -32,10 +32,11 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { archiveContent, type ArchiveContentType } from '@/lib/archive/persist';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { generateAllSections } from '@/lib/proposal/draft-all';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 90;
+export const maxDuration = 120;  // the draft stage runs the full parallel section pipeline (~30-60s)
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -45,8 +46,11 @@ const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
 // model to identify scope + show-stoppers.
 const MAX_INPUT_CHARS = 30_000;
 
-type WizardStage = 'brief' | 'compliance' | 'themes' | 'outline';
-const VALID_STAGES: WizardStage[] = ['brief', 'compliance', 'themes', 'outline'];
+// Shipped flow: brief → compliance → draft. (themes/outline were
+// placeholder stages, never built — dropped in favor of going straight
+// to a full drafted proposal.)
+type WizardStage = 'brief' | 'compliance' | 'draft';
+const VALID_STAGES: WizardStage[] = ['brief', 'compliance', 'draft'];
 
 // Maps the wizard stage to a content_type stored in the archive so
 // future fetches find the right row.
@@ -133,6 +137,31 @@ interface ComplianceArtifact {
   generated_from_metadata_only: boolean;
 }
 
+// Stage 3 — full drafted proposal. Reuses the draft-all engine
+// (generateAllSections) so the wizard and the standalone "Draft Entire
+// Proposal" button share one drafting pipeline. One DraftSection per
+// RFP section; the panel renders these into its existing draft UI.
+interface DraftSection {
+  section: string;        // SectionType ('exec_summary' | 'technical' | ...)
+  label: string;
+  draft: string;
+  wordCount: number;
+  targetWords: number;
+  profileGrounded: boolean;
+}
+
+interface DraftArtifact {
+  stage: 'draft';
+  generated_at: string;
+  ai_model: string;
+  pursuit_id: string;
+  sections: DraftSection[];
+  section_count: number;
+  errors: Array<{ sectionType: string; error: string }>;
+  // Honest disclosure when no RFP text was available to draft from.
+  generated_from_metadata_only: boolean;
+}
+
 async function loadPipeline(pipelineId: string, email: string): Promise<PipelineRow | null> {
   const { data } = await getSupabase()
     .from('user_pipeline')
@@ -154,7 +183,7 @@ async function loadPursuitDocs(pipelineId: string): Promise<PursuitDocRow[]> {
   return (data || []) as PursuitDocRow[];
 }
 
-type StageArtifact = BriefArtifact | ComplianceArtifact;
+type StageArtifact = BriefArtifact | ComplianceArtifact | DraftArtifact;
 
 async function loadCached(email: string, pipelineId: string, stage: WizardStage): Promise<StageArtifact | null> {
   // Get the newest archived entry for this pursuit + stage. Older
@@ -455,6 +484,86 @@ async function generateCompliance(
   return artifact;
 }
 
+// Stage 3 — draft the full proposal. Reuses the draft-all engine
+// (generateAllSections) so the wizard shares the exact drafting pipeline
+// as the standalone "Draft Entire Proposal" button — one engine, two
+// entry points. Source text comes from the pursuit's attached docs.
+async function generateDraft(
+  email: string,
+  pipeline: PipelineRow,
+  docs: PursuitDocRow[],
+): Promise<DraftArtifact> {
+  const sourceText = joinPursuitText(docs);
+  const hasDocs = sourceText.length > 200;
+  const fileName = docs.find(d => d.filename)?.filename || pipeline.title || 'pursuit RFP';
+
+  // No RFP text → return an honest empty artifact instead of letting the
+  // model invent a whole proposal from a one-line title. The panel shows
+  // an "upload the RFP to draft" nudge in this case.
+  if (!hasDocs) {
+    const empty: DraftArtifact = {
+      stage: 'draft',
+      generated_at: new Date().toISOString(),
+      ai_model: GROQ_MODEL,
+      pursuit_id: pipeline.id,
+      sections: [],
+      section_count: 0,
+      errors: [],
+      generated_from_metadata_only: true,
+    };
+    return empty;
+  }
+
+  const result = await generateAllSections({
+    email,
+    sourceText,
+    fileName,
+    rfpAgency: pipeline.agency,
+    // sectionTypes omitted → draft-all defaults to the 5 RFP sections.
+  });
+
+  const sections: DraftSection[] = result.sections.map(s => ({
+    section: s.section,
+    label: s.label,
+    draft: s.draft,
+    wordCount: s.wordCount,
+    targetWords: s.targetWords,
+    profileGrounded: s.meta.profileGrounded,
+  }));
+
+  const artifact: DraftArtifact = {
+    stage: 'draft',
+    generated_at: new Date().toISOString(),
+    ai_model: GROQ_MODEL,
+    pursuit_id: pipeline.id,
+    sections,
+    section_count: sections.length,
+    errors: result.errors.map(e => ({ sectionType: e.sectionType, error: e.error })),
+    generated_from_metadata_only: false,
+  };
+
+  // generateAllSections already auto-archives each section individually
+  // (proposal_section / cap_statement). We ALSO archive the wizard-draft
+  // bundle so loadCached('draft') can hydrate the whole set on revisit.
+  await archiveContent({
+    userEmail: email,
+    contentType: archiveType('draft'),
+    contentSubtype: 'proposal_draft',
+    title: `Proposal Draft — ${pipeline.title?.slice(0, 80) || 'Untitled'}`,
+    content: artifact as unknown as Record<string, unknown>,
+    contentText: sections.map(s => `## ${s.label}\n${s.draft}`).join('\n\n'),
+    pursuitId: pipeline.id,
+    sourceNoticeId: pipeline.notice_id || undefined,
+    agency: pipeline.agency || undefined,
+    naicsCode: pipeline.naics_code || undefined,
+    aiProvider: 'groq',
+    aiModel: GROQ_MODEL,
+    tags: ['proposal-wizard', 'draft', `sections-${sections.length}`],
+  });
+
+  return artifact;
+}
+
 // ---- GET: hydrate ---------------------------------------------------
 
 export async function GET(request: NextRequest) {
@@ -464,11 +573,6 @@ export async function GET(request: NextRequest) {
   const stage = VALID_STAGES.includes(stageRaw as WizardStage) ? (stageRaw as WizardStage) : null;
   if (!email || !pipelineId || !stage) {
     return jsonError('email, pipeline_id, and stage are required', 400);
-  }
-  // Stages 1 (brief) + 2 (compliance) ship together. Stages 3-4 still
-  // 501 until built.
-  if (stage !== 'brief' && stage !== 'compliance') {
-    return jsonError(`stage '${stage}' not implemented yet`, 501);
   }
 
   const auth = requireMIAuthSession(request, email);
@@ -510,9 +614,6 @@ export async function POST(request: NextRequest) {
   if (!email || !pipelineId || !stage) {
     return jsonError('email, pipeline_id, and stage are required', 400);
   }
-  if (stage !== 'brief' && stage !== 'compliance') {
-    return jsonError(`stage '${stage}' not implemented yet`, 501);
-  }
 
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
@@ -537,9 +638,14 @@ export async function POST(request: NextRequest) {
 
   const docs = await loadPursuitDocs(pipelineId);
   try {
-    const artifact: StageArtifact = stage === 'brief'
-      ? await generateBrief(email, pipeline, docs)
-      : await generateCompliance(email, pipeline, docs);
+    let artifact: StageArtifact;
+    if (stage === 'brief') {
+      artifact = await generateBrief(email, pipeline, docs);
+    } else if (stage === 'compliance') {
+      artifact = await generateCompliance(email, pipeline, docs);
+    } else {
+      artifact = await generateDraft(email, pipeline, docs);
+    }
     return NextResponse.json({ success: true, cached: false, artifact });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
