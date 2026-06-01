@@ -155,3 +155,30 @@ All four items shipped May 20, 2026:
 2. Compliance matrix (`ce32310`) — Groq llama-3.3-70b extracts every shall/must with category, section, owner, status
 3. Drafted sections (`90394c9`) — 5 sections (Exec / Technical / Management / Past Performance / Pricing), grounded in user profile, output to editable textarea
 4. Review checklist + .docx export (`87ed30d`) — 11-item compliance review + Word document with title page, TOC, compliance table, drafted sections, checklist appendix
+
+## Completed feature: Proposal Wizard — staged auto-advancing flow (May 31–Jun 1, 2026)
+
+Turns the standalone Proposal Assist pieces above into a guided,
+pursuit-specific flow that fires when the user taps "Draft Proposal" on
+a Pipeline card (`panelContext.pursuit_id`). Each stage is cached per
+pursuit in `user_generated_archive`, so revisits are instant.
+
+- **Stage 1 — RFP Brief** (`77eca67`) — structured brief: summary,
+  what-they-want, hard-parts, required, deadlines, single next action.
+- **Stage 2 — Compliance Matrix** (`77d65b7`) — every shall/must/required
+  clause, categorized + prioritized.
+- **Stage 3 — Draft, auto-advancing** (`407d681`) — reuses the
+  `draft-all` engine (`generateAllSections`) sourced from the pursuit's
+  attached docs; drafts all 5 RFP sections in ~30–60s and drops them
+  into the existing editable section UI + .docx export. Auto-runs on
+  reaching the stage. 3-step progress indicator. Honest metadata-only
+  nudge when no RFP is attached.
+
+The placeholder `themes` / `outline` stages were dropped — the shipped
+flow is **brief → compliance → draft**. New archive content type:
+`proposal_wizard_draft`. Wizard route `maxDuration` 90→120s for the
+section pipeline.
+
+**Verified in prod (Jun 1):** `stage=draft` reaches auth (no longer
+501s); `themes`/`outline` correctly rejected as invalid stages. Full
+in-browser draft generation pending a logged-in QA pass.
