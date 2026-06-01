@@ -27,7 +27,14 @@ import { bqQuery, type BqQueryParams } from './client';
 // 340 new primes + 8,765 new subawardees to the rollups.
 const DATA_VERSION = 'v2-2026-05';
 
-const DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+// 30 days. Contractor/award data refreshes ~weekly, but a fresh ingest
+// bumps DATA_VERSION (see above) which invalidates every key instantly —
+// so TTL only governs how long a STALE-but-same-version result lives.
+// Longer TTL = far fewer cold-miss BQ scans (the agency breakdown alone
+// was 82% of daily scan and helped exhaust the 20 TiB/day quota → 5xx).
+// 30d means a given contractor page's heavy query runs ~4x less often
+// than at 7d, with no accuracy cost between ingests.
+const DEFAULT_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
 export interface QueryCacheOptions<T> extends BqQueryParams {
   cacheKey: string;

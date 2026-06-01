@@ -108,7 +108,6 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
             <thead className="bg-slate-950/50 text-xs uppercase tracking-wider text-slate-400">
               <tr>
                 <th className="text-left px-4 py-3">Agency</th>
-                <th className="text-right px-4 py-3">Awards</th>
                 <th className="text-right px-4 py-3">% of Total</th>
                 <th className="text-right px-4 py-3">Total Obligated</th>
               </tr>
@@ -124,7 +123,6 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
                       {a.awarding_agency}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-300 whitespace-nowrap">{a.award_count.toLocaleString()}</td>
                   <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">
                     {(Number(a.pct_of_total) * 100).toFixed(1)}%
                   </td>

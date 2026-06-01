@@ -121,7 +121,6 @@ export async function getRecipientByUei(uei: string): Promise<RecipientProfile |
 export interface TopAgencyRow {
   awarding_agency: string;
   total_amount: number;
-  award_count: number;
   pct_of_total: number;
 }
 
@@ -130,21 +129,27 @@ export async function getTopAgenciesForRecipient(
   limit = 10,
 ): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
-    cacheKey: `recipient:${uei}:top-agencies:${limit}`,
+    cacheKey: `recipient:${uei}:top-agencies:${limit}:v3`,
+    // Single-pass, and deliberately NO COUNT(DISTINCT award_id): that
+    // column is the widest read in the query and ~doubled the scan
+    // (5.9→3.0 GiB on mega-primes). The agency breakdown shows $ + %
+    // share; the contractor's total award count still comes from the
+    // recipients row (free). pct_of_total = share across this
+    // contractor's agencies, via window sum before the LIMIT.
     query: `
-      WITH totals AS (
-        SELECT SUM(obligation_amount) AS grand_total
+      WITH per_agency AS (
+        SELECT
+          awarding_agency,
+          SUM(obligation_amount) AS total_amount
         FROM ${BQ_TABLES.awards}
-        WHERE recipient_uei = @uei
+        WHERE recipient_uei = @uei AND awarding_agency IS NOT NULL
+        GROUP BY awarding_agency
       )
       SELECT
         awarding_agency,
-        SUM(obligation_amount) AS total_amount,
-        COUNT(DISTINCT award_id) AS award_count,
-        SUM(obligation_amount) / (SELECT grand_total FROM totals) AS pct_of_total
-      FROM ${BQ_TABLES.awards}
-      WHERE recipient_uei = @uei AND awarding_agency IS NOT NULL
-      GROUP BY awarding_agency
+        total_amount,
+        SAFE_DIVIDE(total_amount, SUM(total_amount) OVER ()) AS pct_of_total
+      FROM per_agency
       ORDER BY total_amount DESC
       LIMIT @limit
     `,
@@ -360,21 +365,30 @@ export async function getAllNaicsForRecipient(uei: string): Promise<TopNaicsRow[
  */
 export async function getAllAgenciesForRecipient(uei: string): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
-    cacheKey: `recipient:${uei}:all-agencies`,
+    cacheKey: `recipient:${uei}:all-agencies:v3`,
+    // Heaviest query on the site (82% of daily BQ scan per
+    // INFORMATION_SCHEMA). Two fixes vs. the original:
+    //  1) removed the correlated `WITH totals` subquery that scanned
+    //     the cluster a SECOND time for the grand total — now a window
+    //     SUM() over the grouped rows.
+    //  2) dropped COUNT(DISTINCT award_id) — that wide column ~doubled
+    //     the scan (5.9→3.0 GiB on mega-primes). The breakdown shows
+    //     $ + % share; the contractor's total award count comes from
+    //     the recipients row (free).
     query: `
-      WITH totals AS (
-        SELECT SUM(obligation_amount) AS grand_total
+      WITH per_agency AS (
+        SELECT
+          awarding_agency,
+          SUM(obligation_amount) AS total_amount
         FROM ${BQ_TABLES.awards}
-        WHERE recipient_uei = @uei
+        WHERE recipient_uei = @uei AND awarding_agency IS NOT NULL
+        GROUP BY awarding_agency
       )
       SELECT
         awarding_agency,
-        SUM(obligation_amount) AS total_amount,
-        COUNT(DISTINCT award_id) AS award_count,
-        SUM(obligation_amount) / (SELECT grand_total FROM totals) AS pct_of_total
-      FROM ${BQ_TABLES.awards}
-      WHERE recipient_uei = @uei AND awarding_agency IS NOT NULL
-      GROUP BY awarding_agency
+        total_amount,
+        SAFE_DIVIDE(total_amount, SUM(total_amount) OVER ()) AS pct_of_total
+      FROM per_agency
       ORDER BY total_amount DESC
     `,
     params: { uei },

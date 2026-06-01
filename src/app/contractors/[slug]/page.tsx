@@ -318,7 +318,7 @@ export default async function ContractorPage({ params }: PageProps) {
                 <li key={a.awarding_agency} className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <p className="truncate text-slate-100 font-medium">{a.awarding_agency}</p>
-                    <p className="text-xs text-slate-500">{a.award_count} awards · {(Number(a.pct_of_total) * 100).toFixed(1)}% of total</p>
+                    <p className="text-xs text-slate-500">{(Number(a.pct_of_total) * 100).toFixed(1)}% of total obligations</p>
                   </div>
                   <span className="shrink-0 font-mono text-purple-400 font-semibold">{fmtMoney(Number(a.total_amount))}</span>
                 </li>
