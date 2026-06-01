@@ -112,6 +112,12 @@ export default function MyTargetListPanel({
   // cached so the second click is instant. Keyed by target.id.
   const [painExpandedId, setPainExpandedId] = useState<string | null>(null);
   const [painByTarget, setPainByTarget] = useState<Record<string, { painPoints: string[]; priorities: string[]; loading: boolean; error?: string }>>({});
+  // Add-agency search — lets users add a target directly from this panel
+  // instead of having to go to Market Research, search, and use a drawer.
+  const [agencyQuery, setAgencyQuery] = useState('');
+  const [agencyResults, setAgencyResults] = useState<Array<{ name: string; parent?: string }>>([]);
+  const [searchingAgencies, setSearchingAgencies] = useState(false);
+  const [addingAgency, setAddingAgency] = useState<string | null>(null);
   const { showToast } = useToast();
   const track = useAppTracker(email);
 
@@ -140,6 +146,69 @@ export default function MyTargetListPanel({
   useEffect(() => {
     loadTargets();
   }, [loadTargets]);
+
+  // Search agencies to add directly from this panel.
+  const searchAgencies = useCallback(async (q: string) => {
+    const query = q.trim();
+    if (query.length < 2) { setAgencyResults([]); return; }
+    setSearchingAgencies(true);
+    try {
+      const res = await fetch(`/api/agency-hierarchy?search=${encodeURIComponent(query)}&limit=8`);
+      const data = await res.json().catch(() => null);
+      const results = Array.isArray(data?.results) ? data.results : [];
+      setAgencyResults(results.map((r: { name?: string; parent?: string }) => ({
+        name: r.name || '', parent: r.parent,
+      })).filter((r: { name: string }) => r.name));
+    } catch {
+      setAgencyResults([]);
+    } finally {
+      setSearchingAgencies(false);
+    }
+  }, []);
+
+  // Debounce the search as the user types.
+  useEffect(() => {
+    const t = setTimeout(() => searchAgencies(agencyQuery), 300);
+    return () => clearTimeout(t);
+  }, [agencyQuery, searchAgencies]);
+
+  // Add a searched agency to the target list. Agency-level target
+  // (office_name = agency name) — the user can refine to a specific
+  // office later from Market Research.
+  const addAgencyTarget = useCallback(async (name: string, parent?: string) => {
+    if (!email || addingAgency) return;
+    setAddingAgency(name);
+    try {
+      const res = await fetch('/api/app/target-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: email,
+          agency_name: parent || name,
+          sub_agency_name: parent ? name : null,
+          office_name: name,
+          added_from: 'target_list_search',
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.status === 402) {
+        showToast({ message: data?.message || 'Target lists are a Mindy Pro feature', variant: 'info' });
+      } else if (res.status === 409 || data?.already_saved) {
+        showToast({ message: `${name} is already on your list`, variant: 'info' });
+      } else if (!res.ok || !data?.success) {
+        showToast({ message: data?.error || 'Could not add agency', variant: 'error' });
+      } else {
+        showToast({ message: `Added ${name} to your target list`, variant: 'success' });
+        setAgencyQuery('');
+        setAgencyResults([]);
+        loadTargets();
+      }
+    } catch {
+      showToast({ message: 'Network error — could not add', variant: 'error' });
+    } finally {
+      setAddingAgency(null);
+    }
+  }, [email, addingAgency, showToast, loadTargets]);
 
   // Slice 4 — load all target events in a single call after the
   // target list itself is ready. Fires whenever targets change so
@@ -377,9 +446,50 @@ export default function MyTargetListPanel({
       <div>
         <h1 className="text-2xl font-bold text-white">My Target List</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Offices you saved from Market Research. Use this to plan multi-month BD outreach.
+          Agencies and offices you&apos;re working for multi-month BD outreach.
         </p>
       </div>
+
+      {/* Add-agency search — add a target right here, no need to detour
+          through Market Research. Type an agency name → click to add. */}
+      {!isFree && (
+        <div className="relative">
+          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-lg p-3">
+            <span className="text-slate-500">🔍</span>
+            <input
+              type="text"
+              value={agencyQuery}
+              onChange={(e) => setAgencyQuery(e.target.value)}
+              placeholder="Add an agency — type a name (e.g. Air Force, VA, FEMA, NASA)"
+              className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
+            />
+            {searchingAgencies && <span className="text-xs text-slate-500">searching…</span>}
+          </div>
+          {agencyResults.length > 0 && (
+            <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 shadow-xl max-h-72 overflow-y-auto">
+              {agencyResults.map((r, i) => (
+                <button
+                  key={`${r.name}-${i}`}
+                  type="button"
+                  onClick={() => addAgencyTarget(r.name, r.parent)}
+                  disabled={addingAgency === r.name}
+                  className="w-full text-left px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/60 last:border-0 flex items-center justify-between gap-3 disabled:opacity-50"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm text-white truncate">{r.name}</span>
+                    {r.parent && r.parent !== r.name && (
+                      <span className="block text-xs text-slate-500 truncate">{r.parent}</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-xs text-emerald-400">
+                    {addingAgency === r.name ? 'adding…' : '+ Add'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
@@ -407,8 +517,8 @@ export default function MyTargetListPanel({
         <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-8 text-center">
           <p className="text-slate-200 mb-2">Your target list is empty.</p>
           <p className="text-xs text-slate-500">
-            Go to <span className="text-emerald-400">Market Research</span> → click any agency row
-            → <span className="text-purple-300">+ Add</span> in the drawer.
+            Use the <span className="text-emerald-400">search box above</span> to add an agency,
+            or open <span className="text-purple-300">Market Research</span> to add a specific office.
           </p>
         </div>
       )}
