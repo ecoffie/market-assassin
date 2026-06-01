@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   const displayName = fmtCompanyName(recipient.recipient_name);
   const title = `${displayName} — Federal Contract Awards & Sales History | Mindy`;
-  const description = `${displayName} federal contracting profile: ${fmtMoney(recipient.total_obligated)} across ${recipient.award_count.toLocaleString()} awards from ${recipient.distinct_agency_count} agencies. UEI, NAICS, recent contracts, year-over-year trends.`;
+  const description = `${displayName} federal contracting profile: ${fmtMoney(recipient.total_obligated)} across ${Number(recipient.award_count || 0).toLocaleString()} awards from ${Number(recipient.distinct_agency_count || 0)} agencies. UEI, NAICS, recent contracts, year-over-year trends.`;
 
   return {
     title,
@@ -219,16 +219,16 @@ export default async function ContractorPage({ params }: PageProps) {
         </h1>
         <p className="mt-4 max-w-3xl text-lg text-slate-300">
           Federal contracting record: {fmtMoney(recipient.total_obligated)} obligated across{' '}
-          {recipient.award_count.toLocaleString()} awards from {recipient.distinct_agency_count} agencies, FY{' '}
+          {Number(recipient.award_count || 0).toLocaleString()} awards from {Number(recipient.distinct_agency_count || 0)} agencies, FY{' '}
           {(yearly[0]?.fiscal_year ?? 2016)}–{(yearly[yearly.length - 1]?.fiscal_year ?? new Date().getFullYear())}.
         </p>
 
         {/* Identity stats */}
         <div className="mt-8 grid gap-4 md:grid-cols-4">
           <Stat label="Total Obligated" value={fmtMoney(recipient.total_obligated)} highlight />
-          <Stat label="Award Records" value={recipient.award_count.toLocaleString()} />
-          <Stat label="Agencies Served" value={recipient.distinct_agency_count.toString()} />
-          <Stat label="NAICS Codes" value={recipient.distinct_naics_count.toString()} />
+          <Stat label="Award Records" value={Number(recipient.award_count || 0).toLocaleString()} />
+          <Stat label="Agencies Served" value={Number(recipient.distinct_agency_count || 0).toString()} />
+          <Stat label="NAICS Codes" value={Number(recipient.distinct_naics_count || 0).toString()} />
         </div>
       </section>
 
