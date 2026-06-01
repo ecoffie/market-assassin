@@ -9,18 +9,45 @@ export function MindySignupForm() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
+  const [password, setPassword] = useState('');
   // Sign in vs. create account — a toggle right here so EXISTING users
-  // can get back in from the landing page without hunting for a link.
-  // OAuth (Google/Microsoft) works for both; the email path differs.
+  // can get back in from the landing page WITHOUT being re-routed.
+  // Defaults to 'signup' (Create account). OAuth works for both modes.
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
 
-  function handleEmailSignin(e: React.FormEvent) {
+  // Inline email+password sign-in — no reroute. Logs in via mindy-login,
+  // stores the session token, then lands the user directly in /app
+  // (Today's Intel) already authenticated.
+  async function handleEmailSignin(e: React.FormEvent) {
     e.preventDefault();
-    if (!email) return;
-    // Hand off to the /app sign-in with the email prefilled, so the user
-    // continues with their existing credentials (password / code) there
-    // without retyping. No separate sign-in form to maintain here.
-    window.location.href = `/app?email=${encodeURIComponent(email)}`;
+    if (!email || !password || isSubmitting) return;
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/mindy-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.toLowerCase().trim(), password }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) {
+        setError(data?.error || 'Invalid email or password.');
+        return;
+      }
+      if (typeof window !== 'undefined' && data.sessionToken) {
+        localStorage.setItem('mi_beta_auth_token', data.sessionToken);
+        if (data.authenticatedAt) localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt);
+        // Land authenticated on the app — no retyping.
+        window.location.href = `/app?email=${encodeURIComponent(email.toLowerCase().trim())}`;
+      } else {
+        // No token returned (e.g. 2FA required) — continue on /app.
+        window.location.href = `/app?email=${encodeURIComponent(email.toLowerCase().trim())}`;
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   async function handleGoogleSignup() {
@@ -159,8 +186,21 @@ export function MindySignupForm() {
           placeholder="you@company.com"
           required
           aria-label="Email address"
+          autoComplete="email"
           className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500/50 text-base"
         />
+        {mode === 'signin' && (
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            required
+            aria-label="Password"
+            autoComplete="current-password"
+            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500/50 text-base"
+          />
+        )}
         <button
           type="submit"
           disabled={isSubmitting || oauthLoading !== null}
@@ -177,11 +217,15 @@ export function MindySignupForm() {
         {error && (
           <p className="text-red-400 text-sm pt-1">{error}</p>
         )}
-        <p className="text-slate-500 text-xs text-center pt-2">
-          {mode === 'signin'
-            ? 'Use the email you signed up with.'
-            : 'Free forever · No credit card required'}
-        </p>
+        {mode === 'signin' ? (
+          <p className="text-slate-500 text-xs text-center pt-2">
+            <a href="/app/forgot-password" className="text-emerald-400 hover:text-emerald-300">Forgot password?</a>
+          </p>
+        ) : (
+          <p className="text-slate-500 text-xs text-center pt-2">
+            Free forever · No credit card required
+          </p>
+        )}
       </form>
     </div>
   );
