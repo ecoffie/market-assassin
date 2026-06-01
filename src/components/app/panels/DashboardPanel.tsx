@@ -53,6 +53,10 @@ interface BriefingItem {
   // card, same as the Market Dashboard. Only present for items sourced
   // from the live opportunities feed.
   attachments?: unknown[];
+  // SAM notice type ("Solicitation", "Sources Sought", "Combined
+  // Synopsis/Solicitation", "Presolicitation", etc.) — rendered as a
+  // color-coded badge on the card.
+  noticeType?: string;
 }
 
 type BriefingFilter = 'all' | 'urgent' | 'opportunity' | 'teaming';
@@ -132,6 +136,24 @@ function getSolicitationFromSignals(signals: string[]) {
 // using it as notice_id let the same opp be added repeatedly. Prefer the
 // solicitation number (real, stable across briefings); fall back to a
 // normalized title so at least same-title items collapse.
+// Color-coded badge style per SAM notice type. Mirrors the canonical
+// scheme (RFP/Solicitation=green, RFQ=blue, Sources Sought=purple,
+// Pre-Sol=orange, Combined=teal). Unknown types get a neutral slate.
+function noticeTypeBadge(noticeType?: string): { label: string; cls: string } | null {
+  if (!noticeType) return null;
+  const t = noticeType.toLowerCase();
+  if (t.includes('sources sought')) return { label: 'Sources Sought', cls: 'bg-purple-500/15 text-purple-300 border-purple-500/30' };
+  if (t.includes('combined')) return { label: 'Combined', cls: 'bg-teal-500/15 text-teal-300 border-teal-500/30' };
+  if (t.includes('presol') || t.includes('pre-sol') || t.includes('pre sol')) return { label: 'Pre-Solicitation', cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' };
+  if (t.includes('rfq') || t.includes('quot')) return { label: 'RFQ', cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30' };
+  if (t.includes('rfi') || t.includes('information')) return { label: 'RFI', cls: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' };
+  if (t.includes('award')) return { label: 'Award', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
+  if (t.includes('special')) return { label: 'Special Notice', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
+  if (t.includes('solicitation') || t.includes('rfp')) return { label: 'Solicitation', cls: 'bg-green-500/15 text-green-300 border-green-500/30' };
+  // Fall back to the raw type, trimmed.
+  return { label: noticeType.length > 24 ? noticeType.slice(0, 24) + '…' : noticeType, cls: 'bg-slate-700/40 text-slate-300 border-slate-600/40' };
+}
+
 function getStableNoticeId(item: BriefingItem): string {
   const sol = getSolicitationFromSignals(item.signals);
   if (sol) return sol;
@@ -358,6 +380,7 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: 'View on SAM.gov',
+      noticeType: text(item.noticeType) || undefined,
       signals: [
         text(item.noticeType),
         text(item.setAside),
@@ -422,6 +445,7 @@ function collectLegacyItems(content: Record<string, unknown>): BriefingItem[] {
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: text(item.samLink) ? 'View on SAM.gov' : 'View details',
+      noticeType: text(item.noticeType) || undefined,
       signals: [text(item.noticeType), text(item.setAside)].filter(Boolean),
       // Surface incumbent as a structured field too so the renderer
       // can wrap it with ContractorLink. The subtitle still includes
@@ -453,13 +477,25 @@ function collectLegacyItems(content: Record<string, unknown>): BriefingItem[] {
 function getBriefingItems(entry: BriefingEntry | null): BriefingItem[] {
   if (!entry?.content) return [];
   const content = asRecord(entry.content);
+
+  let items: BriefingItem[];
   const generatedItems = collectGeneratedItems(content);
-  if (generatedItems.length > 0) return generatedItems;
+  if (generatedItems.length > 0) {
+    items = generatedItems;
+  } else {
+    const greenItems = collectGreenItems(content);
+    items = greenItems.length > 0 ? greenItems : collectLegacyItems(content);
+  }
 
-  const greenItems = collectGreenItems(content);
-  if (greenItems.length > 0) return greenItems;
-
-  return collectLegacyItems(content);
+  // Namespace each item id with the briefing key. The collectors
+  // generate ids like `legacy-0` / `opp-{sol}` that REPEAT across
+  // briefings for the same opportunity — so dismissing an item in one
+  // briefing wrongly hid the same-id item in every other briefing, and
+  // toggling between briefings looked like "nothing changed". A
+  // per-briefing prefix isolates dismissal + gives React stable,
+  // distinct keys per briefing.
+  const prefix = getBriefingKey(entry);
+  return items.map((it) => ({ ...it, id: `${prefix}::${it.id}` }));
 }
 
 function getBriefingSummary(entry: BriefingEntry | null) {
@@ -1072,6 +1108,14 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
+                          {(() => {
+                            const badge = noticeTypeBadge(item.noticeType);
+                            return badge ? (
+                              <span className={`inline-block mb-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.cls}`}>
+                                {badge.label}
+                              </span>
+                            ) : null;
+                          })()}
                           <h4 className="font-semibold text-white">{item.title}</h4>
                           {itemBuyer.primary && itemBuyer.primary !== 'Unknown agency' && (
                             <p className="text-sm text-slate-400 mt-1">
