@@ -68,13 +68,21 @@ export async function GET(request: NextRequest) {
   const today = new Date().toISOString().split('T')[0];
   const themeIndex = new Date().getDay() % TOTAL_THEMES;
 
-  // 1. Check cache
-  const { data: cached } = await supabase
-    .from('dashboard_insights')
-    .select('quote, quote_format, source, attribution, theme_index, insight_date')
-    .eq('user_email', userEmail)
-    .eq('insight_date', today)
-    .maybeSingle();
+  // refresh=1 forces a NEW insight on demand (the "Refresh" control on
+  // the card). It skips the daily cache read and overwrites the cached
+  // row with a fresh pick. The AI extraction runs at temperature 0.7,
+  // so a re-run naturally surfaces a different stat/quote.
+  const forceRefresh = request.nextUrl.searchParams.get('refresh') === '1';
+
+  // 1. Check cache (unless forcing a refresh)
+  const { data: cached } = forceRefresh
+    ? { data: null }
+    : await supabase
+        .from('dashboard_insights')
+        .select('quote, quote_format, source, attribution, theme_index, insight_date')
+        .eq('user_email', userEmail)
+        .eq('insight_date', today)
+        .maybeSingle();
 
   if (cached) {
     return NextResponse.json({
@@ -102,7 +110,11 @@ export async function GET(request: NextRequest) {
   // 3. Deterministic fallback: top opportunity or NAICS stat
   if (!insight) {
     try {
-      insight = await deterministicFallback(userEmail, themeIndex, today);
+      // On a forced refresh, seed the pick with the current minute so
+      // repeated refreshes cycle through the quote list instead of
+      // returning the same day-indexed one.
+      const rotateSeed = forceRefresh ? (new Date().getMinutes() + 1) : 0;
+      insight = await deterministicFallback(userEmail, themeIndex, today, rotateSeed);
     } catch (err) {
       console.warn('[dashboard/insight] deterministic fallback failed:', err);
     }
@@ -240,7 +252,11 @@ Extract ONE shareable insight as JSON.`;
 async function deterministicFallback(
   userEmail: string,
   themeIndex: number,
-  today: string
+  today: string,
+  // When the user forces a refresh, vary the pick so it doesn't return
+  // the same day-indexed quote. Caller passes the current minute so
+  // consecutive refreshes differ. Default 0 = the stable daily pick.
+  rotateSeed = 0,
 ): Promise<InsightResponse | null> {
   const supabase = getSupabase();
 
@@ -284,7 +300,7 @@ async function deterministicFallback(
     { quote: 'Your NAICS profile is your federal calling card.', format: 'fragment' },
   ];
   const dayIdx = new Date().getDay();
-  const pick = PROFILE_LESS_QUOTES[dayIdx % PROFILE_LESS_QUOTES.length];
+  const pick = PROFILE_LESS_QUOTES[(dayIdx + rotateSeed) % PROFILE_LESS_QUOTES.length];
   return {
     quote: pick.quote,
     format: pick.format,

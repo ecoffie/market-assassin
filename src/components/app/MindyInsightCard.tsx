@@ -11,7 +11,7 @@
  * layout — variety comes from the theme rotation, not 5 layout shapes.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getMIApiHeaders } from './authHeaders';
 
 interface InsightData {
@@ -44,35 +44,40 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [insight, setInsight] = useState<InsightData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [hidden, setHidden] = useState(false);
 
-  // Fetch today's insight
-  useEffect(() => {
+  const fetchInsight = useCallback(async (force = false) => {
     if (!email) {
       setLoading(false);
       return;
     }
+    try {
+      const url = `/api/app/dashboard/insight?email=${encodeURIComponent(email)}${force ? '&refresh=1' : ''}`;
+      const res = await fetch(url, { headers: getMIApiHeaders(email) });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && data.insight) setInsight(data.insight);
+    } catch {
+      // silently fail — card just won't render
+    }
+  }, [email]);
+
+  // Fetch today's insight on mount
+  useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`/api/app/dashboard/insight?email=${encodeURIComponent(email)}`, {
-          headers: getMIApiHeaders(email),
-        });
-        if (!res.ok) {
-          setLoading(false);
-          return;
-        }
-        const data = await res.json();
-        if (cancelled) return;
-        if (data.success && data.insight) setInsight(data.insight);
-      } catch {
-        // silently fail — card just won't render
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      await fetchInsight(false);
+      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [email]);
+  }, [fetchInsight]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchInsight(true);
+    setRefreshing(false);
+  }, [fetchInsight]);
 
   // Render the canvas whenever insight changes
   useEffect(() => {
@@ -84,6 +89,17 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
 
   return (
     <div className="relative rounded-2xl overflow-hidden shadow-lg shadow-purple-900/20 border border-white/5 mb-6 bg-slate-900">
+      {/* Refresh — force a new insight on demand (bypasses the daily
+          cache). The card is otherwise pinned per-day by design. */}
+      <button
+        onClick={handleRefresh}
+        disabled={refreshing}
+        className="absolute top-2 right-10 z-10 text-white/60 hover:text-white text-sm leading-none w-6 h-6 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50 disabled:opacity-50"
+        aria-label="New insight"
+        title="Show a different insight"
+      >
+        <span className={refreshing ? 'inline-block animate-spin' : ''}>↻</span>
+      </button>
       {/* Dismiss */}
       <button
         onClick={() => setHidden(true)}
