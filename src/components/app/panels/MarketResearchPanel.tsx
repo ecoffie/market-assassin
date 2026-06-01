@@ -631,6 +631,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // The TMR endpoint is independently cacheable (24h) and idempotent
   // so firing it eagerly costs nothing.
   const [tmrRows, setTmrRows] = useState<AgencyTableRow[]>([]);
+  // Agencies the user STARRED in the agency table. When non-empty, the
+  // reports (pain points / OSBP / buyers / needs) generate for THESE
+  // instead of the typed/recommended set — so report content matches
+  // the user's Market Map selection.
+  const [starredAgencies, setStarredAgencies] = useState<string[]>([]);
   // Charts-ready signal — gates the MarketMapLoadingBanner so it stays
   // visible past isGenerating=false, until child charts (AgencyTable
   // rows + FPDS leaderboards + SBA goaling lookups) have settled.
@@ -780,7 +785,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       // NAICS markets (DOD IT services has 60-80 distinct
       // contracting offices). Generate-all already caps per-report
       // work internally; the chart limits handle slicing for visuals.
-      const rawReportAgencyNames = selectedAgencies.length > 0 && selectedAgencyData.length > 0
+      // Priority order for which agencies the reports cover:
+      //   1. STARRED agencies (the user's explicit Market Map selection)
+      //   2. typed "Target agency" field
+      //   3. agencies resolved from the profile lookup
+      //   4. recommended, then profile defaults
+      // Starred wins so reports (pain points / OSBP / buyers / needs)
+      // match exactly what the user selected.
+      const rawReportAgencyNames = starredAgencies.length > 0
+        ? starredAgencies.slice(0, 100)
+        : selectedAgencies.length > 0 && selectedAgencyData.length > 0
         ? selectedAgencies
         : selectedAgencyData.length > 0
           ? uniqueStrings(selectedAgencyData.map((agency) => agency.parentAgency || agency.subAgency || agency.name)).slice(0, 100)
@@ -877,7 +891,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     } finally {
       setIsGenerating(false);
     }
-  }, [canAccessReport, email, formData, getAuthHeaders, loadRecommendedOpportunities, selectedAgency, validateForm, showToast, tier, track]);
+  }, [canAccessReport, email, formData, getAuthHeaders, loadRecommendedOpportunities, selectedAgency, starredAgencies, validateForm, showToast, tier, track]);
 
   const applySavedProfile = useCallback((profile: SavedResearchProfile) => {
     setFormData((current) => ({
@@ -1785,6 +1799,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               zipCode={formData.zipCode}
               excludeDOD={formData.excludeDOD}
               onRowsChange={setTmrRows}
+              onSelectedAgenciesChange={setStarredAgencies}
               parentAgencyFilter={parentAgencyFilter}
               onClearParentFilter={() => setParentAgencyFilter(null)}
             />
@@ -3329,6 +3344,7 @@ function AgencyTable({
   zipCode,
   excludeDOD,
   onRowsChange,
+  onSelectedAgenciesChange,
   parentAgencyFilter,
   onClearParentFilter,
 }: {
@@ -3344,6 +3360,9 @@ function AgencyTable({
   // can render from the same 96-row data this table uses, not the
   // legacy 7-row reportData.governmentBuyers path.
   onRowsChange?: (rows: AgencyTableRow[]) => void;
+  /** Fires with the parent-agency names the user has STARRED, so the
+   *  parent can scope report generation to the user's selection. */
+  onSelectedAgenciesChange?: (agencies: string[]) => void;
   /** Set by FpdsLeaderboards click. Filters rows to a single parent
    *  agency (substring-matched against row.parentAgency or row.subAgency).
    *  Null = no filter. */
@@ -3380,6 +3399,21 @@ function AgencyTable({
   // GET /api/app/target-list. We update the map optimistically when
   // the user clicks Add / Remove inside the drawer.
   const [savedTargets, setSavedTargets] = useState<Record<string, string>>({});
+
+  // Report the distinct PARENT AGENCIES of starred rows up to the
+  // parent, so report generation can scope to the user's selection.
+  // Keyed lookup matches how savedTargets is keyed (office || name).
+  useEffect(() => {
+    if (!onSelectedAgenciesChange) return;
+    const starred = rows.filter(r => savedTargets[r.contractingOffice || r.name]);
+    const agencies = uniqueStrings(
+      starred.map(r => r.parentAgency || r.subAgency || r.name).filter(Boolean)
+    );
+    onSelectedAgenciesChange(agencies);
+    // rows + savedTargets are the inputs; callback is stable from parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, savedTargets]);
+
   // Triage flow state. Modal opens via 'Start Tracking' CTA. Dismissed
   // set comes from /api/app/triage GET — agencies the user has already
   // skipped or deferred for this NAICS profile so the modal doesn't
