@@ -672,8 +672,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         return;
       }
 
-      const active = (data.opportunities || []).filter((opp: PipelineOpportunity) => (
-        !['won', 'lost', 'archived'].includes(opp.stage || '')
+      // Proposal Assist only drafts for LIVE pursuits. Exclude every
+      // terminal stage (won / lost / no_bid / archived) AND the
+      // is_archived soft-delete flag — you don't write a proposal for a
+      // finished or shelved pursuit. (Previously no_bid + is_archived
+      // leaked through, so the picker showed non-bidding pursuits.)
+      const active = (data.opportunities || []).filter((opp: PipelineOpportunity & { is_archived?: boolean }) => (
+        !opp.is_archived && !['won', 'lost', 'no_bid', 'archived'].includes(opp.stage || '')
       ));
       setOpportunities(active);
       setSelectedId(current => current || active[0]?.id || '');
