@@ -66,6 +66,12 @@ export const BQ_TABLES = {
   recipientExecutives: `\`${PROJECT_ID}.${DATASET}.recipient_executives\``,
   naicsSummary: `\`${PROJECT_ID}.${DATASET}.naics_summary\``,
   agencySummary: `\`${PROJECT_ID}.${DATASET}.agency_summary\``,
+  // Pre-aggregated agency breakdowns (built monthly by
+  // scripts/bq-build-agency-rollups.sql) so per-agency recipient/NAICS
+  // queries read ~MB instead of scanning the full awards table. The big
+  // BQ-quota saver.
+  agencyTopRecipients: `\`${PROJECT_ID}.${DATASET}.agency_top_recipients\``,
+  agencyTopNaics: `\`${PROJECT_ID}.${DATASET}.agency_top_naics\``,
 } as const;
 
 export interface BqQueryParams {

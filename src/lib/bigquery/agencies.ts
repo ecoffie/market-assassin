@@ -35,49 +35,18 @@ export async function getTopRecipientsForAgency(
   agencyName: string,
   limit = 20,
 ): Promise<TopRecipientForAgency[]> {
-  // awards table is partitioned by fiscal_year and clustered by
-  // recipient_uei. awarding_agency is neither, so this scans the full
-  // partition (~8 GB for DoD which has 137K recipients). Bump cap
-  // from default 5 GiB to 10 GiB; still bounded by the project's
-  // 5 TiB/day quota.
-  //
-  // Roll up by recipient_name (not UEI). The same brand can have
-  // multiple UEIs (parent + subsidiary registrations) and showing
-  // "Lockheed Martin Corporation" twice in the top 5 looks like a
-  // data bug. Picks the highest-spending UEI as the canonical one
-  // for the /contractors/[slug] link.
+  // Reads the pre-aggregated agency_top_recipients rollup (clustered by
+  // awarding_agency) — a few MB — instead of scanning the full ~10 GiB
+  // awards table on every cold miss. This was the dominant BQ-quota
+  // burner. Rollup is rebuilt monthly (scripts/bq-build-agency-rollups.sql).
+  // Pre-rolled by recipient_name with the canonical (highest-spend) UEI.
   return queryCached<TopRecipientForAgency>({
-    cacheKey: `agency:${agencyName}:top-recipients-by-name:${limit}:v2`,
-    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
+    cacheKey: `agency:${agencyName}:top-recipients-rollup:${limit}:v1`,
     query: `
-      WITH per_uei AS (
-        SELECT
-          recipient_uei,
-          recipient_name,
-          SUM(obligation_amount) AS amount,
-          COUNT(DISTINCT award_id) AS awards
-        FROM ${BQ_TABLES.awards}
-        WHERE awarding_agency = @agency
-          AND recipient_uei IS NOT NULL
-          AND recipient_name IS NOT NULL
-        GROUP BY recipient_uei, recipient_name
-      ),
-      rolled AS (
-        SELECT
-          recipient_name,
-          SUM(amount) AS total_amount,
-          SUM(awards) AS award_count,
-          ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS top_uei
-        FROM per_uei
-        GROUP BY recipient_name
-      )
-      SELECT
-        top_uei AS recipient_uei,
-        recipient_name,
-        total_amount,
-        award_count
-      FROM rolled
-      ORDER BY total_amount DESC
+      SELECT recipient_uei, recipient_name, total_amount, award_count
+      FROM ${BQ_TABLES.agencyTopRecipients}
+      WHERE awarding_agency = @agency
+      ORDER BY rank
       LIMIT @limit
     `,
     params: { agency: agencyName, limit },
@@ -94,19 +63,15 @@ export async function getTopNaicsForAgency(
   agencyName: string,
   limit = 15,
 ): Promise<TopNaicsForAgency[]> {
-  // Same partition-scan story as getTopRecipientsForAgency.
+  // Reads the agency_top_naics rollup (clustered by awarding_agency)
+  // instead of scanning the full awards table. See getTopRecipientsForAgency.
   return queryCached<TopNaicsForAgency>({
-    cacheKey: `agency:${agencyName}:top-naics:${limit}`,
-    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
+    cacheKey: `agency:${agencyName}:top-naics-rollup:${limit}:v1`,
     query: `
-      SELECT
-        naics_code,
-        ANY_VALUE(naics_description) AS naics_description,
-        SUM(obligation_amount) AS total_amount
-      FROM ${BQ_TABLES.awards}
-      WHERE awarding_agency = @agency AND naics_code IS NOT NULL
-      GROUP BY naics_code
-      ORDER BY total_amount DESC
+      SELECT naics_code, naics_description, total_amount
+      FROM ${BQ_TABLES.agencyTopNaics}
+      WHERE awarding_agency = @agency
+      ORDER BY rank
       LIMIT @limit
     `,
     params: { agency: agencyName, limit },
