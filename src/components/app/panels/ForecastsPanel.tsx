@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import { useAppTracker } from '../track';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
@@ -454,10 +455,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
-            <input
-              type="text"
+            <NaicsAutocompleteInput
               value={naicsFilter}
-              onChange={(e) => setNaicsFilter(e.target.value)}
+              onChange={setNaicsFilter}
               placeholder="541512, 236, 238"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none"
             />

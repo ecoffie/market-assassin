@@ -11,6 +11,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
+import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import StartTrackingModal, { type TriageAgencyCard } from './triage/StartTrackingModal';
 import { EntryAccessibilityCard } from './EntryAccessibilityCard';
 import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market-assassin';
@@ -1620,10 +1621,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             </label>
             <label className="block">
               <span className="text-sm text-slate-400">NAICS codes</span>
-              <input
-                type="text"
+              <NaicsAutocompleteInput
                 value={formData.naicsCode}
-                onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
+                onChange={(v) => setFormData({ ...formData, naicsCode: v })}
                 placeholder="236, 541512"
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
               />

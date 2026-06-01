@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
+import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import ContractorSalesHistoryDrawer from '../contractors/ContractorSalesHistoryDrawer';
 import { getMIApiHeaders } from '../authHeaders';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
@@ -325,10 +326,9 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
           {/* NAICS Filter */}
           <div>
             <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
-            <input
-              type="text"
+            <NaicsAutocompleteInput
               value={naicsFilter}
-              onChange={(e) => setNaicsFilter(e.target.value)}
+              onChange={setNaicsFilter}
               placeholder="541512, 236, 238"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
             />
