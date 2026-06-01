@@ -87,6 +87,7 @@ export default function MindyLandingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">

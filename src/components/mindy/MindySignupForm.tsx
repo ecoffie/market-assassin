@@ -9,6 +9,19 @@ export function MindySignupForm() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
+  // Sign in vs. create account — a toggle right here so EXISTING users
+  // can get back in from the landing page without hunting for a link.
+  // OAuth (Google/Microsoft) works for both; the email path differs.
+  const [mode, setMode] = useState<'signup' | 'signin'>('signup');
+
+  function handleEmailSignin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email) return;
+    // Hand off to the /app sign-in with the email prefilled, so the user
+    // continues with their existing credentials (password / code) there
+    // without retyping. No separate sign-in form to maintain here.
+    window.location.href = `/app?email=${encodeURIComponent(email)}`;
+  }
 
   async function handleGoogleSignup() {
     setOauthLoading('google');
@@ -69,6 +82,27 @@ export function MindySignupForm() {
 
   return (
     <div className="max-w-md mx-auto mb-8 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-6 sm:p-8 shadow-2xl shadow-purple-900/20">
+      {/* Sign in / Create account toggle — like the /app screen. */}
+      <div className="flex gap-1 mb-5 p-1 rounded-lg bg-white/5 border border-white/10">
+        <button
+          type="button"
+          onClick={() => { setMode('signin'); setError(''); }}
+          className={`flex-1 py-2 rounded-md text-sm font-semibold transition-colors ${
+            mode === 'signin' ? 'bg-emerald-600 text-white' : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          Sign in
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode('signup'); setError(''); }}
+          className={`flex-1 py-2 rounded-md text-sm font-semibold transition-colors ${
+            mode === 'signup' ? 'bg-purple-600 text-white' : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          Create free account
+        </button>
+      </div>
       <div className="space-y-3">
         <button
           type="button"
@@ -117,7 +151,7 @@ export function MindySignupForm() {
         </div>
       </div>
 
-      <form onSubmit={handleFreeSignup} className="space-y-3">
+      <form onSubmit={mode === 'signin' ? handleEmailSignin : handleFreeSignup} className="space-y-3">
         <input
           type="email"
           value={email}
@@ -130,15 +164,23 @@ export function MindySignupForm() {
         <button
           type="submit"
           disabled={isSubmitting || oauthLoading !== null}
-          className="w-full px-5 py-3.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-semibold text-base shadow-lg shadow-purple-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`w-full px-5 py-3.5 text-white rounded-xl font-semibold text-base shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            mode === 'signin'
+              ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'
+              : 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20'
+          }`}
         >
-          {isSubmitting ? 'Creating your briefing…' : 'Get Your First Briefing Free'}
+          {mode === 'signin'
+            ? 'Sign in with email'
+            : isSubmitting ? 'Creating your briefing…' : 'Get Your First Briefing Free'}
         </button>
         {error && (
           <p className="text-red-400 text-sm pt-1">{error}</p>
         )}
         <p className="text-slate-500 text-xs text-center pt-2">
-          Free forever · No credit card required
+          {mode === 'signin'
+            ? 'Use the email you signed up with.'
+            : 'Free forever · No credit card required'}
         </p>
       </form>
     </div>
