@@ -71,7 +71,27 @@ export async function queryCached<T = Record<string, unknown>>(
   // queries without spamming logs on every cache HIT (which is the
   // overwhelming majority on warm contractor pages).
   const tBq = Date.now();
-  const rows = await bqQuery<T>(opts);
+  let rows: T[];
+  try {
+    rows = await bqQuery<T>(opts);
+  } catch (err) {
+    // BQ can fail hard — most importantly "Custom quota exceeded"
+    // (daily QueryUsagePerDay cap), which previously 500'd every
+    // contractor page once the quota was hit. Degrade gracefully:
+    //   1. Serve a stale/long-lived cached copy if one exists.
+    //   2. Otherwise return [] so the page can render its empty/
+    //      "temporarily unavailable" state instead of crashing.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[bq-cache] BQ query failed for ${key}: ${msg}`);
+    try {
+      const stale = await kv.get<T[]>(key);
+      if (stale !== null && stale !== undefined) {
+        console.warn(`[bq-cache] serving STALE cache for ${key} after BQ failure`);
+        return stale;
+      }
+    } catch { /* KV also down — fall through to empty */ }
+    return [];
+  }
   console.log(`[bq-miss] ${key}  (${Date.now() - tBq}ms, ${Array.isArray(rows) ? rows.length : '?'} rows)`);
 
   try {
