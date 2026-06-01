@@ -26,6 +26,10 @@ interface PipelineOpportunity {
   value_estimate?: string;
   naics_code?: string;
   set_aside?: string;
+  // SAM notice type (Solicitation / Sources Sought / Combined / etc.),
+  // enriched server-side from sam_opportunities by notice_id. Lets the
+  // list filter/group by solicitation type.
+  notice_type?: string | null;
   response_deadline?: string;
   stage: 'tracking' | 'pursuing' | 'bidding' | 'submitted' | 'no_bid' | 'won' | 'lost' | 'archived';
   is_archived?: boolean;
@@ -108,6 +112,9 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // them when the user wants to dig out an old opp.
   const [showArchived, setShowArchived] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false); // Toggle for Won/Lost in list view
+  // Filter by SAM notice type (Solicitation / Sources Sought / etc.).
+  // 'all' = no filter. Lets the user categorize pursuits by sol type.
+  const [noticeTypeFilter, setNoticeTypeFilter] = useState<string>('all');
   const [voiceOpen, setVoiceOpen] = useState(false);          // Voice capture modal (#119)
   const [sortField, setSortField] = useState<'deadline' | 'value' | 'stage' | 'priority' | 'title'>('deadline');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -273,7 +280,31 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   const nonArchivedOpps = showArchived ? opportunities : opportunities.filter(opp => !opp.is_archived);
   const activeOpportunities = nonArchivedOpps.filter(opp => !['won', 'lost', 'no_bid'].includes(opp.stage));
   const completedOpportunities = nonArchivedOpps.filter(opp => ['won', 'lost', 'no_bid'].includes(opp.stage));
-  const filteredOpportunities = showCompleted ? nonArchivedOpps : activeOpportunities;
+  const stageScoped = showCompleted ? nonArchivedOpps : activeOpportunities;
+
+  // Notice-type categorization. Bucket the free-text sam notice_type
+  // into clean labels so the filter dropdown is short + the badge is
+  // consistent. Pursuits with no known type bucket as "Other".
+  const noticeBucket = (nt?: string | null): string => {
+    if (!nt) return 'Other';
+    const t = nt.toLowerCase();
+    if (t.includes('sources sought')) return 'Sources Sought';
+    if (t.includes('combined')) return 'Combined';
+    if (t.includes('presol') || t.includes('pre-sol') || t.includes('pre sol')) return 'Pre-Solicitation';
+    if (t.includes('rfq') || t.includes('quot')) return 'RFQ';
+    if (t.includes('rfi') || t.includes('information')) return 'RFI';
+    if (t.includes('award')) return 'Award';
+    if (t.includes('special')) return 'Special Notice';
+    if (t.includes('solicitation') || t.includes('rfp')) return 'Solicitation';
+    return 'Other';
+  };
+  // Distinct notice-type buckets present in the user's pursuits, for the
+  // filter dropdown (only show types they actually have).
+  const availableNoticeTypes = [...new Set(stageScoped.map(o => noticeBucket(o.notice_type)))].sort();
+
+  const filteredOpportunities = noticeTypeFilter === 'all'
+    ? stageScoped
+    : stageScoped.filter(o => noticeBucket(o.notice_type) === noticeTypeFilter);
 
   // Sorted opportunities for list view
   const sortedOpportunities = [...filteredOpportunities].sort((a, b) => {
@@ -762,6 +793,21 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
             <span className="text-white font-semibold">{getOpportunitiesByStage(stage.id).length}</span>
           </div>
         ))}
+        {/* Notice-type filter — categorize pursuits by solicitation type.
+            Only shown when the pursuits span more than one type. */}
+        {availableNoticeTypes.length > 1 && (
+          <select
+            value={noticeTypeFilter}
+            onChange={(e) => setNoticeTypeFilter(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-slate-800 bg-slate-900 text-sm text-slate-300 shrink-0 outline-none focus:border-purple-500"
+            title="Filter by solicitation type"
+          >
+            <option value="all">All types</option>
+            {availableNoticeTypes.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        )}
         {/* Completed toggle (Won + Lost + No-Bid) */}
         {completedOpportunities.length > 0 && (
           <button
@@ -1016,7 +1062,14 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                           name (was truncating at 1 line / 300px). */}
                       <td className="px-4 py-3 max-w-[420px]">
                         <div className="text-sm text-white font-medium line-clamp-2" title={opp.title}>{opp.title}</div>
-                        <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{opp.agency || 'Unknown Agency'}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {opp.notice_type && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300 shrink-0" title={opp.notice_type}>
+                              {noticeBucket(opp.notice_type)}
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-500 line-clamp-1">{opp.agency || 'Unknown Agency'}</span>
+                        </div>
                         {opp.teaming_partners && opp.teaming_partners.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1">
                             {opp.teaming_partners.slice(0, 2).map(partner => (

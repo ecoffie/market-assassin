@@ -121,6 +121,35 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
+    // Enrich each pursuit with its SAM notice_type (Solicitation /
+    // Sources Sought / Combined / etc.) by looking it up from the
+    // sam_opportunities cache by notice_id. user_pipeline doesn't store
+    // it, so deriving it here lets My Pursuits group/filter by notice
+    // type without a schema migration + backfill.
+    if (opportunities && opportunities.length > 0) {
+      const noticeIds = [...new Set(
+        opportunities.map((o: { notice_id?: string }) => o.notice_id).filter(Boolean)
+      )] as string[];
+      if (noticeIds.length > 0) {
+        try {
+          const { data: samRows } = await getSupabase()
+            .from('sam_opportunities')
+            .select('notice_id, notice_type')
+            .in('notice_id', noticeIds);
+          const typeByNotice = new Map<string, string>();
+          for (const r of samRows || []) {
+            if (r.notice_type) typeByNotice.set(r.notice_id, r.notice_type);
+          }
+          opportunities = opportunities.map((o: Record<string, unknown>) => ({
+            ...o,
+            notice_type: typeByNotice.get(o.notice_id as string) || null,
+          }));
+        } catch (e) {
+          console.warn('[Pipeline GET] notice_type enrichment failed:', e);
+        }
+      }
+    }
+
     const result: {
       opportunities: typeof opportunities;
       stats?: ReturnType<typeof calculateStats>;
