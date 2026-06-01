@@ -867,7 +867,17 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         explicit "Upload an RFP" link so the next action is
                         clear. */}
                     {onPanelChange && ['pursuing', 'bidding', 'submitted'].includes(opp.stage) && (() => {
-                      const noAttachmentsAndNoDraft = opp.docs_status === 'none' && !opp.has_drafts;
+                      // "No docs" = explicit 'none'/'failed' OR no status at
+                      // all (pursuits saved before the doc pipeline, or whose
+                      // fetch never ran) OR a zero count. The old check only
+                      // matched the literal 'none', so legacy/undefined-status
+                      // pursuits wrongly showed "Draft Proposal" despite having
+                      // nothing to draft from.
+                      const hasDocs = (opp.docs_count || 0) > 0
+                        || opp.docs_status === 'ready'
+                        || opp.docs_status === 'fetching'
+                        || opp.docs_status === 'pending';
+                      const noAttachmentsAndNoDraft = !hasDocs && !opp.has_drafts;
                       if (noAttachmentsAndNoDraft) {
                         return (
                           <button
@@ -1131,7 +1141,14 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                               Board view cards. Opens Proposal Assist
                               with this pursuit's docs auto-loaded. */}
                           {onPanelChange && (() => {
-                            const noAttachmentsAndNoDraft = opp.docs_status === 'none' && !opp.has_drafts;
+                            // Same "no docs" logic as the Board card — treat
+                            // missing/undefined status as no docs, not just
+                            // the literal 'none'.
+                            const hasDocs = (opp.docs_count || 0) > 0
+                              || opp.docs_status === 'ready'
+                              || opp.docs_status === 'fetching'
+                              || opp.docs_status === 'pending';
+                            const noAttachmentsAndNoDraft = !hasDocs && !opp.has_drafts;
                             if (noAttachmentsAndNoDraft) {
                               return (
                                 <button
@@ -1346,6 +1363,53 @@ function PipelineEditDrawer({
         </div>
 
         <div className="p-5 space-y-5">
+          {/* Source & Documents — lets the user verify on SAM.gov and see
+              whether RFP docs are attached BEFORE entering the proposal
+              wizard. Previously the drawer showed neither, so users
+              walked into "no attachments" blind. */}
+          <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-slate-500">Source</div>
+              {(() => {
+                const samUrl = opportunity.external_url
+                  || (opportunity.notice_id ? `https://sam.gov/opp/${opportunity.notice_id}/view` : null);
+                return samUrl ? (
+                  <a
+                    href={samUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Verify on SAM.gov ↗
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-600">No SAM link</span>
+                );
+              })()}
+            </div>
+            {opportunity.notice_id && (
+              <div className="text-[11px] font-mono text-slate-500 break-all">
+                Notice: {opportunity.notice_id}
+              </div>
+            )}
+            {/* Doc-attached status */}
+            {(() => {
+              const count = opportunity.docs_count || 0;
+              const status = opportunity.docs_status;
+              if (status === 'fetching' || status === 'pending') {
+                return <div className="text-xs text-amber-300">⏳ Fetching documents from SAM…</div>;
+              }
+              if (count > 0) {
+                return <div className="text-xs text-emerald-300">📎 {count} document{count === 1 ? '' : 's'} attached — ready to draft</div>;
+              }
+              return (
+                <div className="text-xs text-slate-400">
+                  📭 No documents attached — the proposal wizard will work from metadata only.
+                </div>
+              );
+            })()}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
               <div className="text-xs text-slate-500">Response Due</div>
