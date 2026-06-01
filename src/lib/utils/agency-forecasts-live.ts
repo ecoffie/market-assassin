@@ -100,19 +100,26 @@ export async function getLiveForecastsForSelectedAgencies(
     );
   }
 
-  // Filter by NAICS - support prefix matching
+  // Filter by NAICS — but INCLUSIVELY. Most agency_forecasts rows have
+  // a NULL naics_code (the source procurement-forecast docs rarely tag
+  // NAICS), so a strict naics filter returned 0 results even when there
+  // were plenty of relevant agency forecasts. Match the NAICS prefix OR
+  // rows with no NAICS at all, so agency-relevant forecasts still show.
   if (naicsCode) {
     const trimmedNaics = naicsCode.trim();
-    if (trimmedNaics.length <= 4) {
-      query = query.ilike('naics_code', `${trimmedNaics}%`);
-    } else {
-      query = query.eq('naics_code', trimmedNaics);
-    }
+    const prefix = trimmedNaics.length <= 4 ? trimmedNaics : trimmedNaics.slice(0, 4);
+    // PostgREST OR: naics_code LIKE '2362%'  OR  naics_code IS NULL
+    query = query.or(`naics_code.ilike.${prefix}%,naics_code.is.null`);
   }
 
-  // Filter by set-aside
-  if (setAsideType) {
-    query = query.ilike('set_aside_type', `%${setAsideType}%`);
+  // Set-aside: only filter on an ACTUAL set-aside type, not the generic
+  // business type. "Small Business" was being passed in as setAsideType
+  // and ilike-matched against set_aside_type, over-filtering to ~0.
+  const realSetAside = setAsideType && !/^small business$/i.test(setAsideType.trim())
+    ? setAsideType.trim()
+    : null;
+  if (realSetAside) {
+    query = query.ilike('set_aside_type', `%${realSetAside}%`);
   }
 
   const { data, error } = await query;
