@@ -153,6 +153,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [wizardDraftStatus, setWizardDraftStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [wizardDraftError, setWizardDraftError] = useState<string | null>(null);
   const [wizardDraftMeta, setWizardDraftMeta] = useState<{ count: number; metadataOnly: boolean } | null>(null);
+  // The pursuit the wizard is working. Defaults to whatever the Pipeline
+  // "Draft Proposal" button passed in (panelContext.pursuit_id), but can
+  // also be set IN-PANEL via the "Start from a saved pursuit" picker, so
+  // users who open Proposal Assist directly can still begin a draft.
+  const [localPursuitId, setLocalPursuitId] = useState<string | null>(null);
+  const contextPursuitId = typeof panelContext?.pursuit_id === 'string' ? panelContext.pursuit_id : null;
+  const activePursuitId = localPursuitId || contextPursuitId;
   // Reset to Stage 1 when the user switches to a different pursuit so
   // they always see the brief first.
   useEffect(() => {
@@ -160,7 +167,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setWizardDraftStatus('idle');
     setWizardDraftError(null);
     setWizardDraftMeta(null);
-  }, [panelContext?.pursuit_id]);
+  }, [activePursuitId]);
 
   // Vault summary — drives the "add to vault for better drafts" nudge
   // shown above the draft sections. Fetched once on mount; if user
@@ -511,11 +518,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // re-fire; switching pursuits resets status to idle above. Declared
   // after runWizardDraft so the callback reference is initialized.
   useEffect(() => {
-    const pursuitId = panelContext?.pursuit_id;
-    if (wizardStage === 'draft' && wizardDraftStatus === 'idle' && typeof pursuitId === 'string') {
-      void runWizardDraft(pursuitId);
+    if (wizardStage === 'draft' && wizardDraftStatus === 'idle' && activePursuitId) {
+      void runWizardDraft(activePursuitId);
     }
-  }, [wizardStage, wizardDraftStatus, panelContext?.pursuit_id, runWizardDraft]);
+  }, [wizardStage, wizardDraftStatus, activePursuitId, runWizardDraft]);
 
   const updateDraftText = useCallback((sectionType: SectionType, text: string) => {
     setDrafts(prev => {
@@ -707,8 +713,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // detectedNoticeType moved up near currentSectionTabs declaration
   // so we can derive isCapStatementMode before any consumer needs it.
   useEffect(() => {
-    const pursuitId = panelContext?.pursuit_id;
-    if (!pursuitId || typeof pursuitId !== 'string' || !email) return;
+    const pursuitId = activePursuitId;
+    if (!pursuitId || !email) return;
 
     let cancelled = false;
     setAutoLoadStatus('loading');
@@ -809,7 +815,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       });
 
     return () => { cancelled = true; };
-  }, [panelContext, email, getAuthHeaders]);
+  }, [activePursuitId, email, getAuthHeaders]);
 
   if (tier === 'free') {
     return (
@@ -849,12 +855,49 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </button>
       </div>
 
+      {/* Start from a saved pursuit — entry point for users who open
+          Proposal Assist directly (no Pipeline "Draft Proposal" click).
+          Pick a saved pursuit and the wizard begins drafting for it. */}
+      {email && !activePursuitId && opportunities.length > 0 && (
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Start here</p>
+          <h2 className="text-lg font-semibold text-white mb-1">Draft from a saved pursuit</h2>
+          <p className="text-sm text-slate-400 mb-3">
+            Pick one of your live pursuits and Mindy will pull its RFP and start the brief → compliance → draft flow.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={selectedId}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="flex-1 min-w-[240px] rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+            >
+              <option value="">Choose a pursuit…</option>
+              {opportunities.map(opp => (
+                <option key={opp.id} value={opp.id}>
+                  {opp.title}{opp.agency ? ` — ${opp.agency}` : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => { if (selectedId) setLocalPursuitId(selectedId); }}
+              disabled={!selectedId}
+              className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-400 text-sm font-semibold text-white"
+            >
+              Start drafting →
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">
+            Or upload an RFP below to draft for an opportunity that isn&apos;t saved yet.
+          </p>
+        </section>
+      )}
+
       {/* Proposal Wizard — brief → compliance → draft, auto-advancing.
-          Mounted when the user landed here from PipelinePanel's Draft
-          Proposal button (which sets panelContext.pursuit_id). The wizard
-          sits above the legacy Proposal Assist surface so the user gets
-          the structured brief + compliance matrix before the full draft. */}
-      {email && typeof panelContext?.pursuit_id === 'string' && (
+          Mounted from the Pipeline "Draft Proposal" button OR the saved-
+          pursuit picker above. Sits over the legacy surface so the user
+          gets the structured brief + compliance before the full draft. */}
+      {email && activePursuitId && (
         <>
           {/* 3-step progress indicator */}
           <div className="flex items-center gap-2 mb-4 text-xs">
@@ -889,7 +932,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           {wizardStage === 'brief' && (
             <ProposalWizardBrief
               email={email}
-              pursuitId={panelContext.pursuit_id}
+              pursuitId={activePursuitId}
               authHeaders={getAuthHeaders}
               onContinue={() => setWizardStage('compliance')}
             />
@@ -907,7 +950,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
               <ProposalWizardCompliance
                 email={email}
-                pursuitId={panelContext.pursuit_id}
+                pursuitId={activePursuitId}
                 authHeaders={getAuthHeaders}
                 onContinue={() => setWizardStage('draft')}
               />
@@ -938,7 +981,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   {wizardDraftError || 'Draft failed.'}
                   <button
                     type="button"
-                    onClick={() => panelContext?.pursuit_id && runWizardDraft(panelContext.pursuit_id as string)}
+                    onClick={() => activePursuitId && runWizardDraft(activePursuitId)}
                     className="ml-3 underline hover:text-red-100"
                   >
                     Retry
