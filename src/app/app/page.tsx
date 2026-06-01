@@ -308,6 +308,17 @@ function AppDashboard() {
     }
   }, []);
 
+  // Switch Account = sign out, but land the user directly on the sign-in
+  // form with a clear message, rather than silently doing the exact same
+  // thing as "Sign out" (which read as "it just logged me out"). Runs
+  // handleSignOut, then surfaces a switch-account prompt.
+  const handleSwitchAccount = useCallback(async () => {
+    await handleSignOut();
+    setAuthStep('credentials');
+    setIsSignUpMode(false);
+    setAuthMessage('Signed out. Enter a different account to switch.');
+  }, [handleSignOut]);
+
   useEffect(() => {
     activePanelRef.current = activePanel;
   }, [activePanel]);
@@ -950,7 +961,7 @@ function AppDashboard() {
                 </svg>
               </button>
               <button
-                onClick={handleSignOut}
+                onClick={handleSwitchAccount}
                 disabled={authLoading}
                 className="hidden lg:inline text-sm text-slate-500 hover:text-slate-300 transition-colors"
               >
