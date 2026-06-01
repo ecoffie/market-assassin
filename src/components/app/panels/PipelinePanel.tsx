@@ -649,9 +649,18 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-2xl font-bold text-white">My Pursuits</h1>
           <div className="flex items-center gap-2">
+            {/* "Tracking" = active pursuits the user is working now, NOT
+                lifetime history. Completed (won/lost/no-bid) and archived
+                pursuits are shown as a separate, muted count so the
+                headline number reflects the actual live workload. */}
             <span className="rounded bg-slate-800 px-2 py-1 text-sm text-slate-300">
-              {opportunities.length} tracked
+              {activeOpportunities.length} active
             </span>
+            {completedOpportunities.length > 0 && (
+              <span className="rounded bg-slate-800/60 px-2 py-1 text-sm text-slate-500">
+                {completedOpportunities.length} completed
+              </span>
+            )}
             {urgentOpportunities.length > 0 && (
               <span className="rounded bg-amber-500/20 px-2 py-1 text-sm text-amber-300">
                 ⚡ {urgentOpportunities.length} due soon
