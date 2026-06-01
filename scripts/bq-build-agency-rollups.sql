@@ -79,3 +79,60 @@ ranked AS (
 SELECT awarding_agency, naics_code, naics_description, total_amount, rank
 FROM ranked
 WHERE rank <= 50;
+
+-- ---------------------------------------------------------------------
+-- 3) Top contractors per listicle dimension (agency / naics / sub_agency
+--    / state / set_aside) — one unified table for all /top/[slug] pages.
+-- ---------------------------------------------------------------------
+-- Each /top page filters awards on a dimension that isn't a cluster key
+-- and scanned the full table. This pre-rolls the top 50 contractors for
+-- every value of each dimension into one clustered table.
+CREATE OR REPLACE TABLE `PROJECT.DATASET.top_contractors_by_dimension`
+CLUSTER BY dimension, dimension_value
+AS
+WITH base AS (
+  SELECT
+    recipient_uei, recipient_name, award_id, obligation_amount,
+    awarding_agency, naics_code, awarding_sub_agency, recipient_state, set_aside
+  FROM `PROJECT.DATASET.awards`
+  WHERE recipient_uei IS NOT NULL AND recipient_name IS NOT NULL
+),
+-- Unpivot the relevant dimensions into (dimension, dimension_value) rows.
+exploded AS (
+  SELECT 'agency'     AS dimension, awarding_agency     AS dimension_value, * EXCEPT(awarding_agency, naics_code, awarding_sub_agency, recipient_state, set_aside) FROM base WHERE awarding_agency IS NOT NULL
+  UNION ALL
+  SELECT 'naics'      AS dimension, naics_code          AS dimension_value, * EXCEPT(awarding_agency, naics_code, awarding_sub_agency, recipient_state, set_aside) FROM base WHERE naics_code IS NOT NULL
+  UNION ALL
+  SELECT 'sub_agency' AS dimension, awarding_sub_agency AS dimension_value, * EXCEPT(awarding_agency, naics_code, awarding_sub_agency, recipient_state, set_aside) FROM base WHERE awarding_sub_agency IS NOT NULL
+  UNION ALL
+  SELECT 'state'      AS dimension, recipient_state     AS dimension_value, * EXCEPT(awarding_agency, naics_code, awarding_sub_agency, recipient_state, set_aside) FROM base WHERE recipient_state IS NOT NULL
+  UNION ALL
+  SELECT 'set_aside'  AS dimension, set_aside           AS dimension_value, * EXCEPT(awarding_agency, naics_code, awarding_sub_agency, recipient_state, set_aside) FROM base WHERE set_aside IS NOT NULL
+),
+per_uei AS (
+  SELECT
+    dimension, dimension_value, recipient_uei, recipient_name,
+    SUM(obligation_amount) AS amount,
+    COUNT(DISTINCT award_id) AS awards
+  FROM exploded
+  GROUP BY dimension, dimension_value, recipient_uei, recipient_name
+),
+rolled AS (
+  SELECT
+    dimension, dimension_value, recipient_name,
+    SUM(amount) AS total_amount,
+    SUM(awards) AS award_count,
+    ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS recipient_uei
+  FROM per_uei
+  GROUP BY dimension, dimension_value, recipient_name
+),
+ranked AS (
+  SELECT
+    dimension, dimension_value, recipient_uei, recipient_name, total_amount, award_count,
+    ROW_NUMBER() OVER (PARTITION BY dimension, dimension_value ORDER BY total_amount DESC) AS rank
+  FROM rolled
+)
+SELECT dimension, dimension_value, recipient_uei, recipient_name, total_amount, award_count, rank
+FROM ranked
+WHERE rank <= 50;
+

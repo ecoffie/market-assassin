@@ -72,6 +72,9 @@ export const BQ_TABLES = {
   // BQ-quota saver.
   agencyTopRecipients: `\`${PROJECT_ID}.${DATASET}.agency_top_recipients\``,
   agencyTopNaics: `\`${PROJECT_ID}.${DATASET}.agency_top_naics\``,
+  // Unified rollup for the /top/[slug] listicle pages (top contractors by
+  // agency / naics / sub_agency / state / set_aside). Same monthly build.
+  topContractorsByDimension: `\`${PROJECT_ID}.${DATASET}.top_contractors_by_dimension\``,
 } as const;
 
 export interface BqQueryParams {

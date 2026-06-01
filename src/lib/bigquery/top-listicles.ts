@@ -45,51 +45,59 @@ export async function getTopContractors(limit = 50): Promise<TopContractorRow[]>
 }
 
 /**
+ * Generic reader over the pre-aggregated top_contractors_by_dimension
+ * rollup (clustered by dimension, dimension_value). All the /top pages
+ * now read a few MB from here instead of scanning the full awards table
+ * — the BQ-quota fix. The rollup is rebuilt monthly
+ * (scripts/bq-build-agency-rollups.sql). Supports multiple values per
+ * call (sub-agency / set-aside cohorts) by OR-ing dimension_value.
+ */
+async function getTopFromRollup(
+  dimension: 'agency' | 'naics' | 'sub_agency' | 'state' | 'set_aside',
+  values: string[],
+  cacheKey: string,
+  limit: number,
+): Promise<TopContractorRow[]> {
+  const placeholders = values.map((_, i) => `@v${i}`).join(', ');
+  const params: Record<string, string | number> = { dim: dimension, limit };
+  values.forEach((v, i) => { params[`v${i}`] = v; });
+
+  return queryCached<TopContractorRow>({
+    cacheKey,
+    query: `
+      WITH merged AS (
+        SELECT
+          recipient_name,
+          SUM(total_amount) AS total_amount,
+          SUM(award_count) AS award_count,
+          ARRAY_AGG(recipient_uei ORDER BY total_amount DESC LIMIT 1)[OFFSET(0)] AS recipient_uei
+        FROM ${BQ_TABLES.topContractorsByDimension}
+        WHERE dimension = @dim AND dimension_value IN (${placeholders})
+        GROUP BY recipient_name
+      )
+      SELECT
+        recipient_uei,
+        recipient_name,
+        total_amount,
+        award_count,
+        CAST(NULL AS INT64) AS distinct_agency_count
+      FROM merged
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params,
+  });
+}
+
+/**
  * Top contractors filtered to a specific awarding agency.
  * Powers "/top/defense-contractors" (DoD), "/top/va-contractors", etc.
- * Rolled up by recipient_name to merge parent + subsidiary UEIs.
  */
 export async function getTopContractorsByAgency(
   agencyName: string,
   limit = 50,
 ): Promise<TopContractorRow[]> {
-  return queryCached<TopContractorRow>({
-    cacheKey: `top:agency:${agencyName}:${limit}:v2`,
-    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
-    query: `
-      WITH per_uei AS (
-        SELECT
-          recipient_uei,
-          recipient_name,
-          SUM(obligation_amount) AS amount,
-          COUNT(DISTINCT award_id) AS awards
-        FROM ${BQ_TABLES.awards}
-        WHERE awarding_agency = @agency
-          AND recipient_uei IS NOT NULL
-          AND recipient_name IS NOT NULL
-        GROUP BY recipient_uei, recipient_name
-      ),
-      rolled AS (
-        SELECT
-          recipient_name,
-          SUM(amount) AS total_amount,
-          SUM(awards) AS award_count,
-          ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS top_uei
-        FROM per_uei
-        GROUP BY recipient_name
-      )
-      SELECT
-        top_uei AS recipient_uei,
-        recipient_name,
-        total_amount,
-        award_count,
-        CAST(NULL AS INT64) AS distinct_agency_count
-      FROM rolled
-      ORDER BY total_amount DESC
-      LIMIT @limit
-    `,
-    params: { agency: agencyName, limit },
-  });
+  return getTopFromRollup('agency', [agencyName], `top:agency:${agencyName}:${limit}:rollup`, limit);
 }
 
 /**
@@ -100,43 +108,7 @@ export async function getTopContractorsByNaics(
   naicsCode: string,
   limit = 50,
 ): Promise<TopContractorRow[]> {
-  return queryCached<TopContractorRow>({
-    cacheKey: `top:naics:${naicsCode}:${limit}:v2`,
-    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
-    query: `
-      WITH per_uei AS (
-        SELECT
-          recipient_uei,
-          recipient_name,
-          SUM(obligation_amount) AS amount,
-          COUNT(DISTINCT award_id) AS awards
-        FROM ${BQ_TABLES.awards}
-        WHERE naics_code = @naics
-          AND recipient_uei IS NOT NULL
-          AND recipient_name IS NOT NULL
-        GROUP BY recipient_uei, recipient_name
-      ),
-      rolled AS (
-        SELECT
-          recipient_name,
-          SUM(amount) AS total_amount,
-          SUM(awards) AS award_count,
-          ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS top_uei
-        FROM per_uei
-        GROUP BY recipient_name
-      )
-      SELECT
-        top_uei AS recipient_uei,
-        recipient_name,
-        total_amount,
-        award_count,
-        CAST(NULL AS INT64) AS distinct_agency_count
-      FROM rolled
-      ORDER BY total_amount DESC
-      LIMIT @limit
-    `,
-    params: { naics: naicsCode, limit },
-  });
+  return getTopFromRollup('naics', [naicsCode], `top:naics:${naicsCode}:${limit}:rollup`, limit);
 }
 
 /**
@@ -151,49 +123,7 @@ export async function getTopContractorsBySubAgency(
   subAgencyNames: string[],
   limit = 50,
 ): Promise<TopContractorRow[]> {
-  const placeholders = subAgencyNames.map((_, i) => `@sub${i}`).join(', ');
-  const params: Record<string, string | number> = { limit };
-  subAgencyNames.forEach((n, i) => {
-    params[`sub${i}`] = n;
-  });
-
-  return queryCached<TopContractorRow>({
-    cacheKey: `top:sub-agency:${subAgencyNames.join('|')}:${limit}:v1`,
-    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
-    query: `
-      WITH per_uei AS (
-        SELECT
-          recipient_uei,
-          recipient_name,
-          SUM(obligation_amount) AS amount,
-          COUNT(DISTINCT award_id) AS awards
-        FROM ${BQ_TABLES.awards}
-        WHERE awarding_sub_agency IN (${placeholders})
-          AND recipient_uei IS NOT NULL
-          AND recipient_name IS NOT NULL
-        GROUP BY recipient_uei, recipient_name
-      ),
-      rolled AS (
-        SELECT
-          recipient_name,
-          SUM(amount) AS total_amount,
-          SUM(awards) AS award_count,
-          ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS top_uei
-        FROM per_uei
-        GROUP BY recipient_name
-      )
-      SELECT
-        top_uei AS recipient_uei,
-        recipient_name,
-        total_amount,
-        award_count,
-        CAST(NULL AS INT64) AS distinct_agency_count
-      FROM rolled
-      ORDER BY total_amount DESC
-      LIMIT @limit
-    `,
-    params,
-  });
+  return getTopFromRollup('sub_agency', subAgencyNames, `top:sub-agency:${subAgencyNames.join('|')}:${limit}:rollup`, limit);
 }
 
 /**
@@ -210,43 +140,7 @@ export async function getTopContractorsByState(
   stateCode: string,
   limit = 50,
 ): Promise<TopContractorRow[]> {
-  return queryCached<TopContractorRow>({
-    cacheKey: `top:state:${stateCode}:${limit}:v1`,
-    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
-    query: `
-      WITH per_uei AS (
-        SELECT
-          recipient_uei,
-          recipient_name,
-          SUM(obligation_amount) AS amount,
-          COUNT(DISTINCT award_id) AS awards
-        FROM ${BQ_TABLES.awards}
-        WHERE recipient_state = @state
-          AND recipient_uei IS NOT NULL
-          AND recipient_name IS NOT NULL
-        GROUP BY recipient_uei, recipient_name
-      ),
-      rolled AS (
-        SELECT
-          recipient_name,
-          SUM(amount) AS total_amount,
-          SUM(awards) AS award_count,
-          ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS top_uei
-        FROM per_uei
-        GROUP BY recipient_name
-      )
-      SELECT
-        top_uei AS recipient_uei,
-        recipient_name,
-        total_amount,
-        award_count,
-        CAST(NULL AS INT64) AS distinct_agency_count
-      FROM rolled
-      ORDER BY total_amount DESC
-      LIMIT @limit
-    `,
-    params: { state: stateCode, limit },
-  });
+  return getTopFromRollup('state', [stateCode], `top:state:${stateCode}:${limit}:rollup`, limit);
 }
 
 /**
@@ -262,47 +156,36 @@ export async function getTopContractorsBySetAside(
   setAsidePatterns: string[],
   limit = 50,
 ): Promise<TopContractorRow[]> {
-  // Build the WHERE clause from pattern array
-  const orClauses = setAsidePatterns
-    .map((_, i) => `set_aside LIKE @pattern${i}`)
+  // set_aside is stored as many variants ("8(A) SOLE SOURCE", "8A
+  // COMPETED", ...), so we LIKE-match the patterns against the rollup's
+  // dimension_value (instead of scanning awards). Reads the dimension
+  // rollup — a few MB.
+  const likeClauses = setAsidePatterns
+    .map((_, i) => `dimension_value LIKE @pattern${i}`)
     .join(' OR ');
   const params: Record<string, string | number> = { limit };
-  setAsidePatterns.forEach((p, i) => {
-    params[`pattern${i}`] = p;
-  });
+  setAsidePatterns.forEach((p, i) => { params[`pattern${i}`] = p; });
 
   return queryCached<TopContractorRow>({
-    cacheKey: `top:set-aside:${setAsidePatterns.join('|')}:${limit}:v2`,
-    maximumBytesBilled: String(10 * 1024 * 1024 * 1024),
+    cacheKey: `top:set-aside:${setAsidePatterns.join('|')}:${limit}:rollup`,
     query: `
-      WITH per_uei AS (
-        SELECT
-          recipient_uei,
-          recipient_name,
-          SUM(obligation_amount) AS amount,
-          COUNT(DISTINCT award_id) AS awards
-        FROM ${BQ_TABLES.awards}
-        WHERE (${orClauses})
-          AND recipient_uei IS NOT NULL
-          AND recipient_name IS NOT NULL
-        GROUP BY recipient_uei, recipient_name
-      ),
-      rolled AS (
+      WITH merged AS (
         SELECT
           recipient_name,
-          SUM(amount) AS total_amount,
-          SUM(awards) AS award_count,
-          ARRAY_AGG(recipient_uei ORDER BY amount DESC LIMIT 1)[OFFSET(0)] AS top_uei
-        FROM per_uei
+          SUM(total_amount) AS total_amount,
+          SUM(award_count) AS award_count,
+          ARRAY_AGG(recipient_uei ORDER BY total_amount DESC LIMIT 1)[OFFSET(0)] AS recipient_uei
+        FROM ${BQ_TABLES.topContractorsByDimension}
+        WHERE dimension = 'set_aside' AND (${likeClauses})
         GROUP BY recipient_name
       )
       SELECT
-        top_uei AS recipient_uei,
+        recipient_uei,
         recipient_name,
         total_amount,
         award_count,
         CAST(NULL AS INT64) AS distinct_agency_count
-      FROM rolled
+      FROM merged
       ORDER BY total_amount DESC
       LIMIT @limit
     `,
