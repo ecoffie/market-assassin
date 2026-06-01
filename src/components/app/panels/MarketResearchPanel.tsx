@@ -1930,6 +1930,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           reportId={activeReportId}
           reportData={getReportContent(activeReportId)}
           isGenerating={isGenerating}
+          email={email}
+          naicsCode={formData.naicsCode}
           recommendedOpportunities={recommendedOpportunities}
           onClose={() => setActiveReportId(null)}
           formatCurrency={formatCurrency}
@@ -4791,6 +4793,8 @@ interface ReportViewerProps {
   reportId: string;
   reportData: ReportData[keyof ReportData] | null;
   isGenerating: boolean;
+  email: string | null;
+  naicsCode: string;
   recommendedOpportunities: RecommendedOpportunity[];
   onClose: () => void;
   formatCurrency: (value?: number) => string;
@@ -4888,10 +4892,89 @@ function LiveOpportunityFallback({
   );
 }
 
+// Expandable "recent awards" for a competitor — Competitor Intel intel.
+// Lazy-fetches the competitor's recent federal awards from the BQ
+// recipient engine (same data as the /contractors SEO pages) on demand.
+interface CompetitorAward {
+  awardId: string; description: string; amount: number; agency: string;
+  naicsCode: string; actionDate: string; popEndDate: string | null;
+}
+function CompetitorAwardsExpander({ email, name }: { email: string | null; name: string }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [awards, setAwards] = useState<CompetitorAward[]>([]);
+  const [recipient, setRecipient] = useState<{ totalObligated: number; awardCount: number; distinctAgencyCount: number } | null>(null);
+  const [found, setFound] = useState(true);
+
+  const load = async () => {
+    if (loaded || loading || !email) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/app/competitor-awards?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`);
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        setFound(!!data.found);
+        setAwards(data.awards || []);
+        setRecipient(data.recipient || null);
+      }
+    } catch { /* non-fatal */ } finally {
+      setLoading(false);
+      setLoaded(true);
+    }
+  };
+
+  const fmt = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}K` : `$${Math.round(n)}`;
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => { setOpen(o => !o); if (!loaded) load(); }}
+        className="text-xs text-blue-400 hover:text-blue-300 underline"
+      >
+        {open ? 'Hide recent awards' : '📊 See what they’ve won'}
+      </button>
+      {open && (
+        <div className="mt-2 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
+          {loading && <div className="text-[11px] text-slate-500">Loading award history…</div>}
+          {!loading && loaded && !found && (
+            <div className="text-[11px] text-slate-500">No federal award history found for this name.</div>
+          )}
+          {!loading && found && recipient && (
+            <div className="flex flex-wrap gap-3 mb-2 text-[11px]">
+              <span className="text-emerald-300">{fmt(recipient.totalObligated)} total obligated</span>
+              <span className="text-slate-400">{recipient.awardCount.toLocaleString()} awards</span>
+              <span className="text-slate-400">{recipient.distinctAgencyCount} agencies</span>
+            </div>
+          )}
+          {!loading && awards.length > 0 && (
+            <ul className="space-y-1.5">
+              {awards.map((a, i) => (
+                <li key={`${a.awardId}-${i}`} className="text-xs flex items-start justify-between gap-3 border-b border-slate-800/60 pb-1.5 last:border-0">
+                  <span className="min-w-0">
+                    <span className="text-slate-200 line-clamp-1">{a.description || a.awardId}</span>
+                    <span className="text-slate-500 text-[10px]">
+                      {a.agency}{a.naicsCode ? ` · NAICS ${a.naicsCode}` : ''}{a.actionDate ? ` · ${a.actionDate.slice(0, 10)}` : ''}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-mono text-emerald-400">{fmt(a.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReportViewer({
   reportId,
   reportData,
   isGenerating,
+  email,
+  naicsCode,
   recommendedOpportunities,
   onClose,
   formatCurrency,
@@ -5134,6 +5217,8 @@ function ReportViewer({
                     {prime.naicsCategories && prime.naicsCategories.length > 0 && (
                       <div className="text-xs text-slate-500 mt-1">NAICS: {prime.naicsCategories.slice(0, 3).join(', ')}</div>
                     )}
+                    {/* Real competitor intel — what they've won recently */}
+                    <CompetitorAwardsExpander email={email} name={prime.name} />
                   </div>
                   {tier !== 'free' && (
                     <button
