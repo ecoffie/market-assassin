@@ -3914,7 +3914,20 @@ function AgencyTable({
         );
       })
     : sortedRows;
-  const visibleRows = showAll ? filteredRows : filteredRows.slice(0, 10);
+
+  // "Selected first, then toggle to all" — like the rest of Market
+  // Research. The agencies the user starred (savedTargets) float to the
+  // top and are always visible; "Show all" reveals the full list. When
+  // nothing is starred yet, fall back to the prior top-10 preview.
+  const isRowSelected = (r: AgencyTableRow) => !!savedTargets[r.contractingOffice || r.name];
+  const selectedRows = filteredRows.filter(isRowSelected);
+  const unselectedRows = filteredRows.filter(r => !isRowSelected(r));
+  const hasSelection = selectedRows.length > 0;
+  const visibleRows = showAll
+    ? [...selectedRows, ...unselectedRows]
+    : hasSelection
+      ? selectedRows                                  // selected agencies only, until "Show all"
+      : filteredRows.slice(0, 10);                    // no selection → top-10 preview
 
   // (triageCandidates + handleTriageAction were defined above, before
   // the early returns, to avoid the React 'rendered more hooks than
@@ -3979,7 +3992,9 @@ function AgencyTable({
         <div className="border-b border-slate-800 p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">
-              All Agencies ({filteredRows.length}{parentAgencyFilter ? ` of ${rows.length}` : ''} found)
+              {hasSelection && !showAll
+                ? `Your Selected Agencies (${selectedRows.length})`
+                : `All Agencies (${filteredRows.length}${parentAgencyFilter ? ` of ${rows.length}` : ''} found)`}
             </h3>
             <p className="text-xs text-slate-500">
               Sort lenses re-rank the same data — no re-fetch.
@@ -4143,14 +4158,27 @@ function AgencyTable({
           </table>
         </div>
 
-        {!showAll && sortedRows.length > 10 && (
+        {!showAll && (hasSelection ? unselectedRows.length > 0 : sortedRows.length > 10) && (
           <div className="border-t border-slate-800 p-3 text-center">
             <button
               type="button"
               onClick={() => setShowAll(true)}
               className="text-xs text-emerald-400 hover:text-emerald-300 underline"
             >
-              Show all {sortedRows.length} agencies
+              {hasSelection
+                ? `Showing your ${selectedRows.length} selected — show all ${filteredRows.length} agencies`
+                : `Show all ${sortedRows.length} agencies`}
+            </button>
+          </div>
+        )}
+        {showAll && hasSelection && (
+          <div className="border-t border-slate-800 p-3 text-center">
+            <button
+              type="button"
+              onClick={() => setShowAll(false)}
+              className="text-xs text-slate-400 hover:text-slate-200 underline"
+            >
+              Show only my {selectedRows.length} selected
             </button>
           </div>
         )}
