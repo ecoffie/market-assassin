@@ -42,10 +42,11 @@ interface PipelineOpportunity {
   id: string;
   title: string;
   agency?: string;
-  stage?: 'tracking' | 'pursuing' | 'bidding' | 'submitted' | 'won' | 'lost' | 'archived';
+  stage?: 'tracking' | 'pursuing' | 'bidding' | 'submitted' | 'no_bid' | 'won' | 'lost' | 'archived';
   priority?: 'low' | 'medium' | 'high' | 'critical';
   response_deadline?: string;
   teaming_partners?: string[];
+  is_archived?: boolean;
 }
 
 const PARTNER_TYPES = [
@@ -646,7 +647,14 @@ function PartnerModal({
   };
 
   const attachedIds = new Set(attachedPursuits.map(opp => opp.id));
-  const activePipeline = pipeline.filter(opp => opp.stage !== 'lost' && opp.stage !== 'archived');
+  // Only live pursuits are pickable — you don't attach a contact to a
+  // finished pursuit. Exclude every terminal stage (won / lost /
+  // no_bid / archived) + the is_archived soft-delete flag, matching the
+  // active-pursuit definition used on My Pursuits.
+  const TERMINAL_STAGES = ['won', 'lost', 'no_bid', 'archived'];
+  const activePipeline = pipeline.filter(opp =>
+    !opp.is_archived && !TERMINAL_STAGES.includes(opp.stage || '')
+  );
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
