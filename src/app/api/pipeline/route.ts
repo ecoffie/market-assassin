@@ -192,6 +192,32 @@ export async function POST(request: NextRequest) {
       body.value_estimate = undefined;
     }
 
+    // Backfill response_deadline from the SAM cache when the caller
+    // didn't supply one but we have a valid notice_id. Several save
+    // paths (Today's Intel, Source Feed, Alerts) can hand us an
+    // opportunity object whose response_deadline was empty/expired in
+    // their feed, so the pursuit lands with "No deadline" even though
+    // SAM has the date. One lookup here fixes every save path at once.
+    if ((!body.response_deadline) && body.notice_id && isValidSamNoticeId(body.notice_id)) {
+      try {
+        const { data: samRow } = await getSupabase()
+          .from('sam_opportunities')
+          .select('response_deadline')
+          .eq('notice_id', body.notice_id)
+          .maybeSingle();
+        if (samRow?.response_deadline) {
+          const d = new Date(samRow.response_deadline);
+          if (!Number.isNaN(d.getTime())) {
+            body.response_deadline = d.toISOString();
+          }
+        }
+      } catch (e) {
+        // Non-fatal — a missing deadline just means the drawer shows
+        // "No deadline", same as before this backfill existed.
+        console.warn('[Pipeline POST] deadline backfill lookup failed:', e);
+      }
+    }
+
     const { data, error } = await getSupabase()
       .from('user_pipeline')
       .insert(body)
