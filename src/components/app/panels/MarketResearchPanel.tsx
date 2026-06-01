@@ -218,13 +218,40 @@ interface ReportData {
     summary?: { totalOpportunities: number };
   };
   budgetCheckup?: {
+    agencyBudgets?: Array<{
+      agency: string;
+      fy2025?: { budgetAuthority?: number };
+      fy2026?: { budgetAuthority?: number };
+      change?: { amount?: number; percent?: number; trend?: string };
+    }>;
+    winners?: Array<{
+      agency: string;
+      fy2025?: { budgetAuthority?: number };
+      fy2026?: { budgetAuthority?: number };
+      change?: { amount?: number; percent?: number; trend?: string };
+    }>;
+    losers?: Array<{
+      agency: string;
+      fy2025?: { budgetAuthority?: number };
+      fy2026?: { budgetAuthority?: number };
+      change?: { amount?: number; percent?: number; trend?: string };
+    }>;
     agencies?: Array<{
       name: string;
       fy2025?: number;
       fy2026?: number;
       change?: { absolute: number; percent: number };
     }>;
-    summary?: { averageChange: number };
+    summary?: {
+      averageChange?: number;
+      totalFY2025?: number;
+      totalFY2026?: number;
+      overallChange?: number;
+      agenciesGrowing?: number;
+      agenciesDeclining?: number;
+      biggestWinner?: string;
+      biggestLoser?: string;
+    };
   };
   idvContracts?: {
     contracts?: Array<{
@@ -4845,6 +4872,30 @@ function ReportViewer({
   const liveAgencyNames = uniqueStrings(
     liveOpportunities.map((opportunity) => opportunity.buyerDisplay || opportunity.office || opportunity.subTier || opportunity.department)
   );
+  const budgetReport = reportData as ReportData['budgetCheckup'];
+  const budgetRows = reportId === 'budget'
+    ? (
+        budgetReport?.agencyBudgets?.map((agency) => ({
+          name: agency.agency,
+          fy2025: agency.fy2025?.budgetAuthority || 0,
+          fy2026: agency.fy2026?.budgetAuthority || 0,
+          changePercent: typeof agency.change?.percent === 'number'
+            ? (agency.change.percent - 1) * 100
+            : 0,
+          trend: agency.change?.trend || '',
+        })) ||
+        budgetReport?.agencies?.map((agency) => ({
+          name: agency.name,
+          fy2025: agency.fy2025 || 0,
+          fy2026: agency.fy2026 || 0,
+          changePercent: agency.change?.percent || 0,
+          trend: '',
+        })) ||
+        []
+      )
+    : [];
+  const analyticsReport = reportData as ReportData['simplifiedAcquisition'];
+  const analyticsRows = reportId === 'analytics' ? analyticsReport?.agencies || [] : [];
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -5139,39 +5190,58 @@ function ReportViewer({
       )}
 
       {/* Budget Checkup */}
-      {reportId === 'budget' && 'agencies' in reportData && (
+      {reportId === 'budget' && (
         <div className="space-y-3">
-          {(reportData as ReportData['budgetCheckup'])?.agencies?.slice(0, 10).map((agency, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
-              <div className="font-medium text-white">{agency.name}</div>
-              <div className="flex gap-4 mt-2 text-sm">
-                <span className="text-slate-400">FY25: {formatCurrency(agency.fy2025)}</span>
-                <span className="text-white">FY26: {formatCurrency(agency.fy2026)}</span>
-                {agency.change && (
-                  <span className={agency.change.percent > 0 ? 'text-emerald-400' : 'text-red-400'}>
-                    {agency.change.percent > 0 ? '↑' : '↓'} {Math.abs(agency.change.percent).toFixed(1)}%
-                  </span>
-                )}
+          {budgetReport?.summary && (
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-lg font-bold text-white">{formatCurrency(budgetReport.summary.totalFY2026)}</div>
+                <div className="text-xs text-slate-500">FY26 Budget Authority</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <div className="text-lg font-bold text-emerald-400">{budgetReport.summary.agenciesGrowing || 0}</div>
+                <div className="text-xs text-slate-500">Agencies Growing</div>
               </div>
             </div>
-          ))}
+          )}
+          {budgetRows.slice(0, 10).map((agency, idx) => {
+            const isGrowing = agency.changePercent >= 0;
+            return (
+              <div key={`${agency.name}-${idx}`} className="p-3 bg-slate-800/50 rounded-lg">
+                <div className="font-medium text-white">{agency.name}</div>
+                <div className="flex flex-wrap gap-4 mt-2 text-sm">
+                  <span className="text-slate-400">FY25: {formatCurrency(agency.fy2025)}</span>
+                  <span className="text-white">FY26: {formatCurrency(agency.fy2026)}</span>
+                  <span className={isGrowing ? 'text-emerald-400' : 'text-red-400'}>
+                    {isGrowing ? '↑' : '↓'} {Math.abs(agency.changePercent).toFixed(1)}%
+                    {agency.trend ? ` ${agency.trend}` : ''}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+          {budgetRows.length === 0 && (
+            <p className="rounded-lg border border-slate-800 bg-slate-800/40 p-3 text-sm text-slate-400">
+              No cached budget-authority matches were found for this agency set. Try a parent agency name such as Department of Defense, Department of Veterans Affairs, or General Services Administration.
+            </p>
+          )}
         </div>
       )}
 
       {/* Simplified Acquisition */}
-      {reportId === 'analytics' && 'agencies' in reportData && (
+      {reportId === 'analytics' && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-emerald-400">{formatCurrency((reportData as ReportData['simplifiedAcquisition'])?.summary?.totalSATSpending)}</div>
+              <div className="text-lg font-bold text-emerald-400">{formatCurrency(analyticsReport?.summary?.totalSATSpending)}</div>
               <div className="text-xs text-slate-500">SAT Spending</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{(reportData as ReportData['simplifiedAcquisition'])?.summary?.totalSATContracts || 0}</div>
+              <div className="text-lg font-bold text-white">{analyticsReport?.summary?.totalSATContracts || 0}</div>
               <div className="text-xs text-slate-500">SAT Contracts</div>
             </div>
           </div>
-          {(reportData as ReportData['simplifiedAcquisition'])?.agencies?.slice(0, 10).map((agency, idx) => (
+          {analyticsRows.slice(0, 10).map((agency, idx) => (
             <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="font-medium text-white">{agency.agency}</div>
@@ -5189,6 +5259,11 @@ function ReportViewer({
               </div>
             </div>
           ))}
+          {analyticsRows.length === 0 && (
+            <p className="rounded-lg border border-slate-800 bg-slate-800/40 p-3 text-sm text-slate-400">
+              No simplified-acquisition rows came back for this profile. The main Market Map above can still show spending and buyer charts from target-market research data.
+            </p>
+          )}
         </div>
       )}
 
