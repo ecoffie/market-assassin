@@ -143,10 +143,29 @@ export default function PricingIntelPanel({ email, tier }: Props) {
       <div>
         <h1 className="text-2xl font-bold text-white">Pricing Intel</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Labor category rates, GSA/SCA wage analysis, and price-to-win guidance for any NAICS.
-          {' '}
-          <span className="text-slate-500">Data source: GSA CALC+ API.</span>
+          What the government actually pays for labor in your industry — so you can price a bid to win.
         </p>
+      </div>
+
+      {/* Plain-language "what is this / how to use it" panel. Users said
+          the tool was confusing — it jumped straight to a NAICS box with
+          no explanation of what it does or what the numbers mean. */}
+      <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300 space-y-2">
+        <p>
+          <span className="font-semibold text-white">What it does:</span> enter your industry
+          code (NAICS) and Mindy pulls real hourly labor rates the government has paid — by job
+          title — from awarded contracts (GSA CALC+ data).
+        </p>
+        <p>
+          <span className="font-semibold text-white">How to use it:</span> when you&apos;re building a
+          bid, check the rate for each role you&apos;ll staff. The three targets below tell you where
+          to land:
+        </p>
+        <ul className="list-disc list-inside text-slate-400 ml-1">
+          <li><span className="text-amber-300 font-medium">Aggressive</span> — price low to win on cost (thin margin).</li>
+          <li><span className="text-emerald-300 font-medium">Competitive</span> — the market median; a safe, defensible rate.</li>
+          <li><span className="text-purple-300 font-medium">Premium</span> — charge more when you bring differentiated value.</li>
+        </ul>
       </div>
 
       {/* Query bar — NAICS in, "Run" out. Defaults to user's primary
@@ -238,6 +257,10 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           </div>
 
           {/* Price-to-win row — 3 target rates side by side */}
+          <div>
+          <h3 className="text-sm font-semibold text-white mb-2">
+            Your price-to-win targets <span className="font-normal text-slate-500">— blended hourly labor rate</span>
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <RateTile
               label="Aggressive"
@@ -257,6 +280,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
               hint="differentiated value"
               tone="purple"
             />
+          </div>
           </div>
 
           {/* Labor categories — the meat of the report. Sortable later. */}
