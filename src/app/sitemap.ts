@@ -6,7 +6,9 @@
  *
  * Strategy:
  *   - Root + key marketing pages first (highest priority)
- *   - All 2,768 contractor SEO pages (the acquisition flywheel)
+ *   - Top contractor SEO pages sourced from BigQuery (the acquisition
+ *     flywheel) — see contractor block for why this is BQ-sourced, not
+ *     contractors.json
  *   - Static pages from /public are auto-discovered by Google so
  *     we don't enumerate them here
  *
@@ -17,8 +19,10 @@
  * each URL organically.
  */
 import type { MetadataRoute } from 'next';
-import contractorsData from '@/data/contractors.json';
-import { getContractorSlug } from '@/lib/contractor-sales-history';
+import {
+  getTopRecipientsForSitemap,
+  recipientSlug,
+} from '@/lib/bigquery/recipients';
 import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
@@ -32,12 +36,13 @@ import { LISTICLES } from '@/data/top-listicles';
 // don't fragment domain authority across two hostnames.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 
-interface ContractorRow {
-  company: string;
-  contract_value_num?: number;
-}
+// Regenerate the sitemap at most once a day. The contractor block hits
+// BigQuery (via the KV-cached getTopRecipientsForSitemap), so we don't
+// want a fresh query on every crawler request. Daily matches the
+// weekly-ish USAspending refresh cadence with margin to spare.
+export const revalidate = 86400;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1) Top-level marketing + intro pages. Priority 1.0 because
   // these are the entry points where Google sends people first.
   const now = new Date();
@@ -97,26 +102,34 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/terms`,                 lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
   ];
 
-  // 2) Every contractor page. Priority graded by spend so Google
-  // crawls the biggest contractors first.
+  // 2) Top contractor pages, sourced from BigQuery (the same
+  // `recipients` table the pages query). Priority graded by spend so
+  // Google crawls the biggest contractors first.
   //
-  // De-duplicate by slug — contractors.json has a few near-duplicate
-  // rows ("OPTUM PUBLIC SECTOR SOLUTIONS INC" vs "OPTUM PUBLIC
-  // SECTOR SOLUTIONS  INC.") that would otherwise emit two entries
-  // for the same URL.
-  const rows = contractorsData as ContractorRow[];
+  // Why BigQuery, not contractors.json: the legacy JSON source held
+  // 2,768 hand-curated names, ~529 of which had NO matching recipient
+  // row in BigQuery (parent/holding companies like "AECOM TECHNOLOGY
+  // CORPORATION" whose awards land under subsidiary legal names). The
+  // sitemap emitted main + 3 sub-page URLs for each, so Googlebot
+  // crawled ~2,116 URLs straight into notFound() 404s. Sourcing from
+  // the recipients table guarantees every emitted URL resolves, and
+  // unlocks the full set of real award recipients (capped by spend).
+  //
+  // recipientSlug() must match getRecipientBySlug()'s in-DB slug logic
+  // exactly, or these URLs would 404 the same way.
+  const recipients = await getTopRecipientsForSitemap();
   const seenSlugs = new Set<string>();
   const contractorEntries: MetadataRoute.Sitemap = [];
 
-  for (const c of rows) {
-    if (!c.company) continue;
-    const slug = getContractorSlug({ company: c.company });
+  for (const c of recipients) {
+    if (!c.recipient_name) continue;
+    const slug = recipientSlug(c.recipient_name);
     if (!slug || seenSlugs.has(slug)) continue;
     seenSlugs.add(slug);
 
     // Priority graded by spend tier. Google's "priority" field is
     // a hint relative to OTHER URLs in the sitemap, not absolute.
-    const spend = c.contract_value_num || 0;
+    const spend = c.total_obligated || 0;
     const priority =
       spend >= 1_000_000_000 ? 0.8 :  // billion-dollar primes
       spend >= 100_000_000   ? 0.6 :
