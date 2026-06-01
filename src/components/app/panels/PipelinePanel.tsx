@@ -1312,6 +1312,28 @@ function PipelineEditDrawer({
   }, [email, opportunity.id, authHeaders]);
   useEffect(() => { loadDocList(); }, [loadDocList]);
 
+  // Full SAM solicitation description — lazy-loaded on demand (it can be
+  // long). Public endpoint, no auth. Shown in the drawer because this is
+  // where the user actually works the pursuit.
+  const [fullDescription, setFullDescription] = useState<string | null>(null);
+  const [descLoading, setDescLoading] = useState(false);
+  const [descError, setDescError] = useState<string | null>(null);
+  const loadFullDescription = useCallback(async () => {
+    if (!opportunity.notice_id || fullDescription || descLoading) return;
+    setDescLoading(true);
+    setDescError(null);
+    try {
+      const res = await fetch(`/api/sam-description?noticeId=${encodeURIComponent(opportunity.notice_id)}`);
+      const data = await res.json().catch(() => null);
+      if (data?.success && data.description) setFullDescription(data.description);
+      else setDescError('Full description not available for this notice.');
+    } catch {
+      setDescError('Could not load the description.');
+    } finally {
+      setDescLoading(false);
+    }
+  }, [opportunity.notice_id, fullDescription, descLoading]);
+
   // Docs re-fetch recovery. Pursuits can get stuck at docs_status
   // 'fetching' if the one-time cold fetch was orphaned. This re-runs it
   // and refreshes the file list.
@@ -1530,6 +1552,30 @@ function PipelineEditDrawer({
             )}
             {docsLoading && docList.length === 0 && (
               <div className="mt-2 text-[11px] text-slate-600">Loading documents…</div>
+            )}
+
+            {/* Full SAM solicitation text — lazy-loaded on demand since
+                it can be long. This is the working surface, so the full
+                description belongs here. */}
+            {opportunity.notice_id && (
+              <div className="mt-2 border-t border-slate-800 pt-2">
+                {!fullDescription && !descLoading && (
+                  <button
+                    type="button"
+                    onClick={loadFullDescription}
+                    className="text-xs text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Read full solicitation
+                  </button>
+                )}
+                {descLoading && <div className="text-[11px] text-slate-600">Loading description…</div>}
+                {descError && <div className="text-[11px] text-amber-400">{descError}</div>}
+                {fullDescription && (
+                  <div className="max-h-64 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-slate-300">
+                    {fullDescription}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
