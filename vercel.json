@@ -10,6 +10,10 @@
   ],
   "crons": [
     {
+      "path": "/api/cron/refresh-bq-rollups",
+      "schedule": "0 8 5 * *"
+    },
+    {
       "path": "/api/cron/sync-sam-opportunities",
       "schedule": "0 1 * * *"
     },
