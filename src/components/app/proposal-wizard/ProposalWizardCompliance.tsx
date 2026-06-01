@@ -56,8 +56,8 @@ interface PursuitSummary {
 interface Props {
   email: string;
   pursuitId: string;
-  /** Called when user advances past Compliance Matrix. Stage 3 (Win
-   *  Themes) is opt-in, so the parent may offer "Skip to Outline". */
+  /** Called when user advances past Compliance Matrix to Stage 3
+   *  (Draft), which drafts every proposal section. */
   onContinue?: () => void;
   authHeaders: () => Headers | Record<string, string>;
 }
@@ -187,7 +187,7 @@ export default function ProposalWizardCompliance({ email, pursuitId, onContinue,
       <div className="border-b border-slate-800 px-5 py-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-purple-300 font-semibold">
-            <span>Step 2 of 4</span>
+            <span>Step 2 of 3</span>
             <span className="text-slate-700">·</span>
             <span>Proposal Wizard</span>
           </div>
@@ -339,9 +339,9 @@ export default function ProposalWizardCompliance({ email, pursuitId, onContinue,
                 onClick={onContinue}
                 disabled={!onContinue}
                 className="inline-flex items-center gap-2 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400 px-4 py-2 text-sm font-semibold text-white"
-                title={onContinue ? 'Continue to Win Themes (optional) or Section Outline' : 'Stage 3 coming next'}
+                title={onContinue ? 'Continue to Draft (Stage 3) — Mindy drafts every section' : 'Draft stage unavailable'}
               >
-                Continue
+                Continue to Draft
                 <ArrowRight className="w-4 h-4" strokeWidth={2} />
               </button>
             </div>

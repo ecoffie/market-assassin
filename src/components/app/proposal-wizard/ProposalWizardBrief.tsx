@@ -144,7 +144,7 @@ export default function ProposalWizardBrief({ email, pursuitId, onContinue, auth
       <div className="border-b border-slate-800 px-5 py-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-purple-300 font-semibold">
-            <span>Step 1 of 4</span>
+            <span>Step 1 of 3</span>
             <span className="text-slate-700">·</span>
             <span>Proposal Wizard</span>
           </div>
