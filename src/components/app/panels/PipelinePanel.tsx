@@ -111,7 +111,6 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   const [voiceOpen, setVoiceOpen] = useState(false);          // Voice capture modal (#119)
   const [sortField, setSortField] = useState<'deadline' | 'value' | 'stage' | 'priority' | 'title'>('deadline');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [stats, setStats] = useState<Record<string, number>>({});
   const [selectedOpportunity, setSelectedOpportunity] = useState<PipelineOpportunity | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
@@ -137,7 +136,6 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         if (data.error.includes('42P01')) {
           // Table doesn't exist yet
           setOpportunities([]);
-          setStats({});
         } else {
           setError(data.error);
         }
@@ -178,7 +176,10 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           }
         } catch { /* non-fatal — cards just won't show drafted badge */ }
         setOpportunities(opps);
-        setStats(data.stats?.byStage || data.stats || {});
+        // (Per-stage counts are derived client-side from `opportunities`
+        // so the stat strip and board columns can't diverge — see the
+        // stat strip render. The server stats.byStage counted archived
+        // rows and is no longer used.)
       }
     } catch (err) {
       console.error('Failed to load pipeline:', err);
@@ -754,7 +755,11 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           >
             <span>{stage.icon}</span>
             <span className="text-slate-400 text-sm">{stage.label}:</span>
-            <span className="text-white font-semibold">{stats[stage.id] || getOpportunitiesByStage(stage.id).length}</span>
+            {/* Use the SAME archive-aware client count as the board
+                columns. The server stats.byStage counts archived rows
+                too, so an archived 'tracking' pursuit showed Tracking: 1
+                in the strip while the column correctly showed 0. */}
+            <span className="text-white font-semibold">{getOpportunitiesByStage(stage.id).length}</span>
           </div>
         ))}
         {/* Completed toggle (Won + Lost + No-Bid) */}
