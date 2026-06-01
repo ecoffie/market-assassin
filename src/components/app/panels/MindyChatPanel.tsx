@@ -455,7 +455,12 @@ function RagDocDrawer({ docId, email, onClose }: RagDocDrawerProps) {
     setLoading(true);
     setError(null);
     setDoc(null);
-    fetch(`/api/app/rag-doc?email=${encodeURIComponent(email)}&id=${encodeURIComponent(docId)}`)
+    // Must send the MI auth headers — /api/app/rag-doc is gated by
+    // verifyUserOwnsEmail. Without them the fetch 401'd and clicking a
+    // citation chip "went nowhere".
+    fetch(`/api/app/rag-doc?email=${encodeURIComponent(email)}&id=${encodeURIComponent(docId)}`, {
+      headers: getMIApiHeaders(email),
+    })
       .then(async res => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
