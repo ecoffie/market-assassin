@@ -49,6 +49,10 @@ interface BriefingItem {
   // from `subtitle` so the wrapper can target just the name.
   incumbent?: string;
   targetPrimes?: string[];
+  // SAM attachment file links (resourceLinks). Rendered in the expanded
+  // card, same as the Market Dashboard. Only present for items sourced
+  // from the live opportunities feed.
+  attachments?: unknown[];
 }
 
 type BriefingFilter = 'all' | 'urgent' | 'opportunity' | 'teaming';
@@ -138,6 +142,21 @@ function getBriefingItemLocation(item: BriefingItem, liveLocations: Record<strin
   }
 
   return '';
+}
+
+// Look up the SAM attachment list for an item — first from the item
+// itself, then matched against the live opportunities feed by id /
+// solicitation / title (same keying as locations/buyers).
+function getBriefingItemAttachments(item: BriefingItem, liveAttachments: Record<string, unknown[]>): unknown[] {
+  if (Array.isArray(item.attachments) && item.attachments.length > 0) return item.attachments;
+
+  const solicitation = getSolicitationFromSignals(item.signals);
+  const lookupKeys = [item.id, solicitation, normalizeLookupKey(item.title)].filter(Boolean);
+  for (const key of lookupKeys) {
+    const att = liveAttachments[key] || liveAttachments[normalizeLookupKey(key)];
+    if (att && att.length > 0) return att;
+  }
+  return [];
 }
 
 function getBriefingItemBuyer(item: BriefingItem, liveBuyers: Record<string, ReturnType<typeof getBuyerAgencyParts>>) {
@@ -466,6 +485,10 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set());
   const [liveLocations, setLiveLocations] = useState<Record<string, string>>({});
   const [liveBuyers, setLiveBuyers] = useState<Record<string, ReturnType<typeof getBuyerAgencyParts>>>({});
+  // SAM attachment links per opportunity, keyed the same way as
+  // liveLocations, so the expanded card can list the document files
+  // (same as the Market Dashboard does).
+  const [liveAttachments, setLiveAttachments] = useState<Record<string, unknown[]>>({});
 
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
@@ -553,8 +576,10 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
         const next: Record<string, string> = {};
         const nextBuyers: Record<string, ReturnType<typeof getBuyerAgencyParts>> = {};
+        const nextAttachments: Record<string, unknown[]> = {};
         for (const raw of asArray(data.opportunities)) {
           const opportunity = asRecord(raw);
+          const oppAttachments = Array.isArray(opportunity.attachments) ? opportunity.attachments : [];
           const location = formatOpportunityLocation({
             popCity: text(opportunity.popCity),
             popState: text(opportunity.popState),
@@ -575,11 +600,13 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           ].filter(Boolean).forEach(key => {
             if (location) next[key] = location;
             if (buyer.primary && buyer.primary !== 'Unknown agency') nextBuyers[key] = buyer;
+            if (oppAttachments.length > 0) nextAttachments[key] = oppAttachments;
           });
         }
 
         setLiveLocations(next);
         setLiveBuyers(nextBuyers);
+        setLiveAttachments(nextAttachments);
       } catch (err) {
         console.warn('Failed to load live opportunity locations:', err);
       }
@@ -976,6 +1003,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                   const isExpanded = expandedItems.has(item.id);
                   const itemLocation = getBriefingItemLocation(item, liveLocations);
                   const itemBuyer = getBriefingItemBuyer(item, liveBuyers);
+                  const itemAttachments = getBriefingItemAttachments(item, liveAttachments)
+                    .filter((a) => a && !(a as Record<string, unknown>)._no_attachments);
                   const itemMetaLine = getBriefingMetaLine(item, itemBuyer);
 
                   return (
@@ -1081,7 +1110,9 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                       </div>
 
                       <div className={`transition-all duration-200 overflow-hidden ${
-                        isExpanded ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0'
+                        isExpanded
+                          ? `${itemAttachments.length > 0 ? 'max-h-[40rem] overflow-y-auto' : 'max-h-96'} opacity-100 mt-4`
+                          : 'max-h-0 opacity-0'
                       }`}>
                         {item.description && <p className="text-sm leading-relaxed text-slate-300">{item.description}</p>}
                         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1118,6 +1149,57 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                             </a>
                           )}
                         </div>
+
+                        {/* Attachments — the actual SAM document files, same
+                            as the Market Dashboard. Downloads route through
+                            the /api/sam-attachment proxy (raw SAM URLs need
+                            our API key). Only shows when the item has them. */}
+                        {itemAttachments.length > 0 && (
+                          <div className="mt-4 border-t border-slate-800 pt-4">
+                            <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+                              Attachments ({itemAttachments.length})
+                            </p>
+                            <ul className="space-y-1.5">
+                              {itemAttachments.map((raw, idx) => {
+                                const att = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+                                const url = typeof raw === 'string'
+                                  ? raw
+                                  : (att.url || att.link || att.resourceLink) as string | undefined;
+                                if (!url) return null;
+                                const givenName = (att.name || att.fileName || att.title) as string | undefined;
+                                let name = givenName && givenName.toLowerCase() !== 'download' ? givenName : undefined;
+                                if (!name) {
+                                  try {
+                                    const parts = new URL(url).pathname.split('/').filter(Boolean);
+                                    const last = parts[parts.length - 1];
+                                    const fileId = last && last.toLowerCase() !== 'download'
+                                      ? last
+                                      : (parts.length >= 2 ? parts[parts.length - 2] : undefined);
+                                    name = fileId && fileId.length <= 24 ? `Document ${idx + 1} (${fileId})` : `Document ${idx + 1}`;
+                                  } catch { name = `Document ${idx + 1}`; }
+                                }
+                                const downloadHref = /(^|\.)sam\.gov\//i.test(url)
+                                  ? `/api/sam-attachment?url=${encodeURIComponent(url)}`
+                                  : url;
+                                return (
+                                  <li key={idx}>
+                                    <a
+                                      href={downloadHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(event) => event.stopPropagation()}
+                                      className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
+                                    >
+                                      <span className="shrink-0">📄</span>
+                                      <span className="truncate">{name}</span>
+                                    </a>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        )}
+
                         <div className="mt-4 border-t border-slate-800 pt-4">
                           <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Tune Mindy</p>
                           <div className="flex flex-wrap gap-2">
