@@ -567,12 +567,17 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
     async function loadLiveLocations() {
       try {
+        // Use /api/mi-dashboard (the same source the Market Dashboard
+        // uses) instead of /api/app/opportunities. The latter is
+        // 2FA-gated and was returning 0 rows in this context, so the
+        // location/buyer/attachment enrichment silently never matched.
+        // mi-dashboard returns snake_case fields + attachments reliably.
         const params = new URLSearchParams({ email: userEmail, limit: '100' });
-        const res = await fetch(`/api/app/opportunities?${params.toString()}`, {
+        const res = await fetch(`/api/mi-dashboard?${params.toString()}`, {
           headers: getAuthHeaders(),
         });
         const data = await res.json().catch(() => null);
-        if (!res.ok || !data?.success || cancelled) return;
+        if (!res.ok || cancelled || !Array.isArray(data?.opportunities)) return;
 
         const next: Record<string, string> = {};
         const nextBuyers: Record<string, ReturnType<typeof getBuyerAgencyParts>> = {};
@@ -580,22 +585,24 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         for (const raw of asArray(data.opportunities)) {
           const opportunity = asRecord(raw);
           const oppAttachments = Array.isArray(opportunity.attachments) ? opportunity.attachments : [];
+          // Fields come back snake_case from mi-dashboard; fall back to
+          // camelCase so this still works if the source ever changes.
           const location = formatOpportunityLocation({
-            popCity: text(opportunity.popCity),
-            popState: text(opportunity.popState),
-            popZip: text(opportunity.popZip),
-            popCountry: text(opportunity.popCountry),
+            popCity: text(opportunity.pop_city, text(opportunity.popCity)),
+            popState: text(opportunity.pop_state, text(opportunity.popState)),
+            popZip: text(opportunity.pop_zip, text(opportunity.popZip)),
+            popCountry: text(opportunity.pop_country, text(opportunity.popCountry)),
           });
           const buyer = getBuyerAgencyParts({
-            agency: text(opportunity.buyerName),
-            department: text(opportunity.parentAgency, text(opportunity.department)),
-            subTier: text(opportunity.subTier),
-            office: text(opportunity.buyerOffice, text(opportunity.office)),
+            agency: text(opportunity.buyerName, text(opportunity.department)),
+            department: text(opportunity.department, text(opportunity.parentAgency)),
+            subTier: text(opportunity.sub_tier, text(opportunity.subTier)),
+            office: text(opportunity.office, text(opportunity.buyerOffice)),
           });
 
           [
-            text(opportunity.id),
-            text(opportunity.solicitationNumber),
+            text(opportunity.notice_id, text(opportunity.id)),
+            text(opportunity.solicitation_number, text(opportunity.solicitationNumber)),
             normalizeLookupKey(text(opportunity.title)),
           ].filter(Boolean).forEach(key => {
             if (location) next[key] = location;
@@ -608,7 +615,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         setLiveBuyers(nextBuyers);
         setLiveAttachments(nextAttachments);
       } catch (err) {
-        console.warn('Failed to load live opportunity locations:', err);
+        console.warn('Failed to load live opportunity enrichment:', err);
       }
     }
 
