@@ -623,15 +623,22 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
     );
   }
 
-  // Urgency computation
+  // Urgency computation. Only ACTIVE pursuits can be urgent/overdue — a
+  // won / lost / no-bid / archived pursuit is done, so a past deadline on
+  // it isn't something the user is "late" on. (Previously these counted
+  // every stage, so the header showed e.g. "7 overdue" that were all
+  // completed pursuits with past deadlines.)
+  const isActivePursuit = (opp: PipelineOpportunity): boolean =>
+    !opp.is_archived && !['won', 'lost', 'no_bid'].includes(opp.stage);
+
   const urgentOpportunities = opportunities.filter(opp => {
-    if (!opp.response_deadline) return false;
+    if (!isActivePursuit(opp) || !opp.response_deadline) return false;
     const daysUntil = Math.ceil((new Date(opp.response_deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     return daysUntil <= 7 && daysUntil > 0;
   });
 
   const overdueOpportunities = opportunities.filter(opp => {
-    if (!opp.response_deadline) return false;
+    if (!isActivePursuit(opp) || !opp.response_deadline) return false;
     return new Date(opp.response_deadline) < new Date();
   });
 
