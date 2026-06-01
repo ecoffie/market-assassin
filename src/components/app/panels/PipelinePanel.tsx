@@ -1288,9 +1288,33 @@ function PipelineEditDrawer({
   onCreatePartner,
   onDocsUpdated,
 }: PipelineEditDrawerProps) {
+  // Load the actual document list for this pursuit so the drawer can
+  // show the files (name + size + SAM link), not just a count. Fetched
+  // when the drawer opens; re-fetched after a retry.
+  const [docList, setDocList] = useState<Array<{
+    id: string; filename: string; sam_url: string | null; size_bytes: number | null;
+    char_count: number | null; extraction_error: string | null;
+  }>>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const loadDocList = useCallback(async () => {
+    if (!email || !opportunity.id) return;
+    setDocsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
+        { headers: authHeaders() },
+      );
+      const data = await res.json().catch(() => null);
+      if (data?.success) setDocList(data.documents || []);
+    } catch { /* non-fatal */ } finally {
+      setDocsLoading(false);
+    }
+  }, [email, opportunity.id, authHeaders]);
+  useEffect(() => { loadDocList(); }, [loadDocList]);
+
   // Docs re-fetch recovery. Pursuits can get stuck at docs_status
   // 'fetching' if the one-time cold fetch was orphaned. This re-runs it
-  // (now dedup-backed, so it usually resolves from cache instantly).
+  // and refreshes the file list.
   const [refetching, setRefetching] = useState(false);
   const [refetchMsg, setRefetchMsg] = useState<string | null>(null);
   const retryDocsFetch = useCallback(async () => {
@@ -1309,13 +1333,15 @@ function PipelineEditDrawer({
         const st = data.docs_status;
         setRefetchMsg(st === 'ready' ? 'Documents loaded.' : st === 'none' ? 'SAM has no attachments for this notice.' : 'Done.');
         onDocsUpdated();
+        loadDocList();  // refresh the file list now that docs may exist
       }
     } catch {
       setRefetchMsg('Network error.');
     } finally {
       setRefetching(false);
     }
-  }, [email, opportunity.id, refetching, authHeaders, onDocsUpdated]);
+  }, [email, opportunity.id, refetching, authHeaders, onDocsUpdated, loadDocList]);
+
   const [stage, setStage] = useState<PipelineStage>(opportunity.stage);
   const [priority, setPriority] = useState<PipelinePriority>(opportunity.priority || 'medium');
   const [winProbability, setWinProbability] = useState(opportunity.win_probability?.toString() || '');
@@ -1469,6 +1495,42 @@ function PipelineEditDrawer({
                 </div>
               );
             })()}
+
+            {/* The actual files. Each row: filename + size, link to view
+                on SAM. This is what users expect to "see the documents". */}
+            {docList.length > 0 && (
+              <ul className="mt-2 space-y-1.5 border-t border-slate-800 pt-2">
+                {docList.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between gap-3 text-xs">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="shrink-0">📄</span>
+                      <span className="truncate text-slate-200" title={d.filename}>{d.filename}</span>
+                      {d.extraction_error && (
+                        <span className="shrink-0 text-amber-400" title={d.extraction_error}>⚠</span>
+                      )}
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0 text-slate-500">
+                      {typeof d.size_bytes === 'number' && d.size_bytes > 0 && (
+                        <span>{(d.size_bytes / 1024).toFixed(0)} KB</span>
+                      )}
+                      {d.sam_url && (
+                        <a
+                          href={d.sam_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 underline"
+                        >
+                          view ↗
+                        </a>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {docsLoading && docList.length === 0 && (
+              <div className="mt-2 text-[11px] text-slate-600">Loading documents…</div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
