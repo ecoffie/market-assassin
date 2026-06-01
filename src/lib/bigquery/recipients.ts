@@ -13,6 +13,15 @@
 import { BQ_TABLES } from './client';
 import { queryCached } from './cache';
 
+// Queries that scan the full `awards` table filtered by recipient_uei
+// can exceed the BQ client's 5 GiB default maximumBytesBilled for
+// mega-primes (Lockheed/RTX/McKesson scan >5 GiB), which BigQuery
+// rejects → the page 500s. GSC flagged ~94 such server errors. Raise
+// the per-query cap to 20 GiB (matching awards.ts) for every
+// recipient query that touches the awards table. Cache hits are free;
+// this only governs the cold-miss query that actually scans.
+const AWARDS_SCAN_MAX_BYTES = String(20 * 1024 * 1024 * 1024); // 20 GiB
+
 // Convert a display name into a URL-safe slug. Must exactly match
 // slugifyContractorName() in src/lib/contractor-sales-history.ts so
 // contractor URLs work identically whether the page was rendered
@@ -140,6 +149,7 @@ export async function getTopAgenciesForRecipient(
       LIMIT @limit
     `,
     params: { uei, limit },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
 
@@ -169,6 +179,7 @@ export async function getTopNaicsForRecipient(
       LIMIT @limit
     `,
     params: { uei, limit },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
 
@@ -220,6 +231,7 @@ export async function getRecentAwardsForRecipient(
       LIMIT @limit
     `,
     params: { uei, limit },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
 
@@ -243,6 +255,7 @@ export async function getYearlyTotalsForRecipient(uei: string): Promise<YearlyTo
       ORDER BY fiscal_year ASC
     `,
     params: { uei },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
 
@@ -302,6 +315,7 @@ export async function getPaginatedAwardsForRecipient(
         OFFSET @offset
       `,
       params: { uei, pageSize, offset },
+      maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
     }),
     queryCached<{ total: number }>({
       cacheKey: `recipient:${uei}:awards-total`,
@@ -311,6 +325,7 @@ export async function getPaginatedAwardsForRecipient(
         WHERE recipient_uei = @uei AND obligation_amount > 0
       `,
       params: { uei },
+      maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
     }),
   ]);
   return { rows, total: Number(totalRows[0]?.total ?? 0) };
@@ -335,6 +350,7 @@ export async function getAllNaicsForRecipient(uei: string): Promise<TopNaicsRow[
       ORDER BY total_amount DESC
     `,
     params: { uei },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
 
@@ -362,6 +378,7 @@ export async function getAllAgenciesForRecipient(uei: string): Promise<TopAgency
       ORDER BY total_amount DESC
     `,
     params: { uei },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
 
@@ -383,6 +400,7 @@ export async function getYearlyByAgencyForRecipient(
       ORDER BY fiscal_year ASC, total_amount DESC
     `,
     params: { uei },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
 
