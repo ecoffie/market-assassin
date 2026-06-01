@@ -44,6 +44,9 @@ tasks/logs/
 
 # Service-account JSON keys (never commit credentials)
 market-asasin-*.json
+market-assasin-*.json
 *-service-account*.json
 *serviceaccount*.json
 *-sa-key*.json
+# GCP service-account keys have this exact shape — catch any stray one
+*[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].json

@@ -1242,10 +1242,13 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           opportunity={selectedOpportunity}
           savedPartners={partners}
           isSaving={isSaving}
+          email={email || ''}
+          authHeaders={getAuthHeaders}
           onClose={() => setSelectedOpportunity(null)}
           onSave={updateOpportunity}
           onRemove={removeOpportunity}
           onCreatePartner={createPartner}
+          onDocsUpdated={loadPipeline}
         />
       )}
     </div>
@@ -1256,10 +1259,14 @@ interface PipelineEditDrawerProps {
   opportunity: PipelineOpportunity;
   savedPartners: TeamingPartner[];
   isSaving: boolean;
+  email: string;
+  authHeaders: (init?: HeadersInit) => HeadersInit;
   onClose: () => void;
   onSave: (updates: Partial<PipelineOpportunity>) => void;
   onRemove: () => void;
   onCreatePartner: (partnerName: string) => Promise<TeamingPartner | null>;
+  /** Called after a docs re-fetch so the parent can refresh the row. */
+  onDocsUpdated: () => void;
 }
 
 function toDateInputValue(dateStr?: string) {
@@ -1273,11 +1280,42 @@ function PipelineEditDrawer({
   opportunity,
   savedPartners,
   isSaving,
+  email,
+  authHeaders,
   onClose,
   onSave,
   onRemove,
   onCreatePartner,
+  onDocsUpdated,
 }: PipelineEditDrawerProps) {
+  // Docs re-fetch recovery. Pursuits can get stuck at docs_status
+  // 'fetching' if the one-time cold fetch was orphaned. This re-runs it
+  // (now dedup-backed, so it usually resolves from cache instantly).
+  const [refetching, setRefetching] = useState(false);
+  const [refetchMsg, setRefetchMsg] = useState<string | null>(null);
+  const retryDocsFetch = useCallback(async () => {
+    if (!email || !opportunity.id || refetching) return;
+    setRefetching(true);
+    setRefetchMsg(null);
+    try {
+      const res = await fetch(
+        `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
+        { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }) },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setRefetchMsg(data?.error || 'Re-fetch failed.');
+      } else {
+        const st = data.docs_status;
+        setRefetchMsg(st === 'ready' ? 'Documents loaded.' : st === 'none' ? 'SAM has no attachments for this notice.' : 'Done.');
+        onDocsUpdated();
+      }
+    } catch {
+      setRefetchMsg('Network error.');
+    } finally {
+      setRefetching(false);
+    }
+  }, [email, opportunity.id, refetching, authHeaders, onDocsUpdated]);
   const [stage, setStage] = useState<PipelineStage>(opportunity.stage);
   const [priority, setPriority] = useState<PipelinePriority>(opportunity.priority || 'medium');
   const [winProbability, setWinProbability] = useState(opportunity.win_probability?.toString() || '');
@@ -1392,19 +1430,42 @@ function PipelineEditDrawer({
                 Notice: {opportunity.notice_id}
               </div>
             )}
-            {/* Doc-attached status */}
+            {/* Doc-attached status + recovery. A 'Retry' link re-runs the
+                (dedup-backed) fetch — used when a pursuit got stuck at
+                'fetching' or 'failed'. */}
             {(() => {
               const count = opportunity.docs_count || 0;
               const status = opportunity.docs_status;
-              if (status === 'fetching' || status === 'pending') {
-                return <div className="text-xs text-amber-300">⏳ Fetching documents from SAM…</div>;
-              }
+              const canRetry = !!opportunity.notice_id;
+              const RetryLink = canRetry ? (
+                <button
+                  type="button"
+                  onClick={retryDocsFetch}
+                  disabled={refetching}
+                  className="ml-2 underline text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                >
+                  {refetching ? 'fetching…' : 'Retry'}
+                </button>
+              ) : null;
+
+              let body: React.ReactNode;
               if (count > 0) {
-                return <div className="text-xs text-emerald-300">📎 {count} document{count === 1 ? '' : 's'} attached — ready to draft</div>;
+                body = <span className="text-emerald-300">📎 {count} document{count === 1 ? '' : 's'} attached — ready to draft</span>;
+              } else if (status === 'fetching' || status === 'pending') {
+                body = <span className="text-amber-300">⏳ Fetching documents from SAM…{RetryLink}</span>;
+              } else if (status === 'failed') {
+                body = <span className="text-red-300">⚠ Document fetch failed.{RetryLink}</span>;
+              } else {
+                body = (
+                  <span className="text-slate-400">
+                    📭 No documents attached — the wizard works from metadata only.{RetryLink}
+                  </span>
+                );
               }
               return (
-                <div className="text-xs text-slate-400">
-                  📭 No documents attached — the proposal wizard will work from metadata only.
+                <div className="text-xs">
+                  {body}
+                  {refetchMsg && <div className="mt-1 text-[11px] text-slate-500">{refetchMsg}</div>}
                 </div>
               );
             })()}

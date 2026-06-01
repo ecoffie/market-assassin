@@ -238,6 +238,59 @@ export async function fetchPursuitDocs(opts: {
   const { pipelineId, userEmail, noticeId } = opts;
   const supabase = getSupabase();
 
+  // --- Dedup by notice_id (scalability) -----------------------------
+  // Documents for a SAM notice are IDENTICAL for every user who saves
+  // it. Downloading + PDF-extracting the same RFP once per pursuit
+  // doesn't scale (100K users × the same popular notice = 100K wasted
+  // downloads + extractions, plus SAM rate-limit blowup). So before any
+  // SAM call, reuse extracted docs that ANY pursuit already fetched for
+  // this notice_id. First saver pays the cost once; everyone after hits
+  // this cache. This also means the common path makes ZERO live calls,
+  // which is why "stuck fetching" effectively goes away.
+  const { data: cachedDocs } = await supabase
+    .from('pursuit_documents')
+    .select('sam_file_id, sam_url, filename, mime_type, size_bytes, page_count, char_count, extracted_text, extraction_error')
+    .eq('notice_id', noticeId)
+    .not('extracted_text', 'is', null)
+    .neq('pipeline_id', pipelineId)
+    .order('char_count', { ascending: false });
+
+  if (cachedDocs && cachedDocs.length > 0) {
+    // Copy the cached docs onto this pursuit. Dedup by sam_file_id so a
+    // notice that already has N distinct files yields N rows here.
+    const seen = new Set<string>();
+    const rows = [];
+    for (const d of cachedDocs) {
+      if (seen.has(d.sam_file_id)) continue;
+      seen.add(d.sam_file_id);
+      rows.push({
+        pipeline_id: pipelineId,
+        user_email: userEmail,
+        notice_id: noticeId,
+        sam_file_id: d.sam_file_id,
+        sam_url: d.sam_url,
+        filename: d.filename,
+        mime_type: d.mime_type,
+        size_bytes: d.size_bytes,
+        page_count: d.page_count,
+        char_count: d.char_count,
+        extracted_text: d.extracted_text,
+        extraction_error: d.extraction_error,
+        downloaded_at: new Date().toISOString(),
+        extracted_at: new Date().toISOString(),
+      });
+    }
+    if (rows.length > 0) {
+      await supabase.from('pursuit_documents')
+        .upsert(rows, { onConflict: 'pipeline_id,sam_file_id', ignoreDuplicates: true });
+      await supabase.from('user_pipeline')
+        .update({ docs_status: 'ready', docs_count: rows.length, docs_fetched_at: new Date().toISOString() })
+        .eq('id', pipelineId);
+      return { attempted: rows.length, succeeded: rows.length, failed: 0, status: 'ready' };
+    }
+  }
+  // --- End dedup. Cold path: no one has fetched this notice yet. -----
+
   const apiKey = getRotatedSAMKey();
   if (!apiKey) {
     await supabase.from('user_pipeline')
