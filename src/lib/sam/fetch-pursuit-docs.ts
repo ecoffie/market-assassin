@@ -251,6 +251,10 @@ export async function fetchPursuitDocs(opts: {
     .from('pursuit_documents')
     .select('sam_file_id, sam_url, filename, mime_type, size_bytes, page_count, char_count, extracted_text, extraction_error')
     .eq('notice_id', noticeId)
+    // SAFETY: only ever copy PUBLIC SAM attachments across users. Rows
+    // with any other doc_source (e.g. a future user-uploaded RFP) are
+    // private and must never be deduped into another user's pursuit.
+    .eq('doc_source', 'sam_public')
     .not('extracted_text', 'is', null)
     .neq('pipeline_id', pipelineId)
     .order('char_count', { ascending: false });
@@ -276,6 +280,7 @@ export async function fetchPursuitDocs(opts: {
         char_count: d.char_count,
         extracted_text: d.extracted_text,
         extraction_error: d.extraction_error,
+        doc_source: 'sam_public',  // copied from a public SAM file → still public
         downloaded_at: new Date().toISOString(),
         extracted_at: new Date().toISOString(),
       });
@@ -404,6 +409,7 @@ export async function fetchPursuitDocs(opts: {
           extracted_text: extractedText || null,
           page_count: pageCount,
           char_count: extractedText.length,
+          doc_source: 'sam_public',  // a public SAM attachment — safe to dedup
           downloaded_at: new Date().toISOString(),
           extracted_at: extractionError ? null : new Date().toISOString(),
           extraction_error: extractionError,
