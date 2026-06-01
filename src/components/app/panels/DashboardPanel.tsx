@@ -126,6 +126,19 @@ function getSolicitationFromSignals(signals: string[]) {
   return signal ? signal.replace(/^Sol#\s*/i, '').trim() : '';
 }
 
+// A STABLE identifier for an opportunity, used to dedup pipeline saves.
+// The render id (item.id) is a synthetic per-list index (`legacy-N`,
+// `opp-N`) that differs between briefings for the SAME opportunity — so
+// using it as notice_id let the same opp be added repeatedly. Prefer the
+// solicitation number (real, stable across briefings); fall back to a
+// normalized title so at least same-title items collapse.
+function getStableNoticeId(item: BriefingItem): string {
+  const sol = getSolicitationFromSignals(item.signals);
+  if (sol) return sol;
+  const title = normalizeLookupKey(item.title);
+  return title ? `title:${title}` : item.id;
+}
+
 function getBriefingItemLocation(item: BriefingItem, liveLocations: Record<string, string>) {
   if (item.location) return item.location;
 
@@ -621,6 +634,30 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
     void loadLiveLocations();
 
+    // Pre-seed pipelineSaved with what's ALREADY in the user's pipeline,
+    // keyed by the same stable id, so "+ Track" shows "✓ Tracking" for
+    // opportunities saved in a previous session (and can't be re-added).
+    async function loadExistingPipeline() {
+      try {
+        const res = await fetch(`/api/pipeline?email=${encodeURIComponent(userEmail)}`, {
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json().catch(() => null);
+        if (cancelled || !data) return;
+        const rows = asArray(data.opportunities ?? data.pipeline ?? data.data);
+        const ids = new Set<string>();
+        for (const raw of rows) {
+          const row = asRecord(raw);
+          const nid = text(row.notice_id);
+          if (nid) ids.add(nid);
+          const t = normalizeLookupKey(text(row.title));
+          if (t) ids.add(`title:${t}`);
+        }
+        if (ids.size > 0) setPipelineSaved(prev => new Set([...prev, ...ids]));
+      } catch { /* non-fatal — button just won't pre-mark */ }
+    }
+    void loadExistingPipeline();
+
     return () => {
       cancelled = true;
     };
@@ -680,12 +717,16 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
   const handleTrackInPipeline = useCallback(async (item: BriefingItem) => {
     if (!email) return;
-    if (pipelineSaved.has(item.id)) return; // already tracked
+    // Dedup by a STABLE id (solicitation/title), not the synthetic
+    // render id — the same opportunity appears across briefings with
+    // different render ids, which previously let it be added twice.
+    const stableId = getStableNoticeId(item);
+    if (pipelineSaved.has(stableId)) return; // already tracked
 
     // Optimistic: flip button to "✓ Tracking" BEFORE the network call
     // settles. Linear / Notion pattern — the user sees the action took
     // immediately. If the server rejects, we roll back below.
-    setPipelineSaved(prev => new Set(prev).add(item.id));
+    setPipelineSaved(prev => new Set(prev).add(stableId));
 
     try {
       // Schema gotchas that caused the original "Failed to add to
@@ -708,7 +749,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
-          notice_id: item.id,
+          notice_id: stableId,
           title: item.title,
           agency: item.buyerName || item.subtitle?.split(' • ')[0] || '',
           naics_code: item.signals.find(s => s.startsWith('NAICS'))?.replace('NAICS ', '') || '',
@@ -736,7 +777,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         } else {
           setPipelineSaved(prev => {
             const next = new Set(prev);
-            next.delete(item.id);
+            next.delete(stableId);
             return next;
           });
           // Log full error payload to the console so we can debug
@@ -772,7 +813,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                 // Roll back UI first (optimistic undo).
                 setPipelineSaved(prev => {
                   const next = new Set(prev);
-                  next.delete(item.id);
+                  next.delete(stableId);
                   return next;
                 });
                 setPipelineRowByItem(prev => {
@@ -798,7 +839,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
       // Network error — roll back and tell the user.
       setPipelineSaved(prev => {
         const next = new Set(prev);
-        next.delete(item.id);
+        next.delete(stableId);
         return next;
       });
       showToast({
@@ -1086,23 +1127,34 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               visible action row. Legacy /briefings showed
                               "+ Track" inline on the card; hiding it
                               behind a Review Fit click was a regression. */}
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleTrackInPipeline(item);
-                            }}
-                            disabled={savingPipeline.has(item.id) || pipelineSaved.has(item.id)}
-                            className={`ml-2 mt-3 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-                              pipelineSaved.has(item.id)
-                                ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
-                                : savingPipeline.has(item.id)
-                                  ? 'bg-slate-800 text-slate-400 cursor-wait'
-                                  : 'bg-purple-600 text-white hover:bg-purple-500'
-                            }`}
-                          >
-                            {pipelineSaved.has(item.id) ? '✓ Tracking' : savingPipeline.has(item.id) ? 'Adding…' : '+ Track'}
-                          </button>
+                          {(() => {
+                            // Track-state keyed by the STABLE id so the
+                            // button shows "✓ Tracking" on EVERY card for
+                            // the same opportunity, and a duplicate can't
+                            // be added once one instance is saved.
+                            const stableId = getStableNoticeId(item);
+                            const isSaved = pipelineSaved.has(stableId);
+                            const isSaving = savingPipeline.has(item.id);
+                            return (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleTrackInPipeline(item);
+                                }}
+                                disabled={isSaving || isSaved}
+                                className={`ml-2 mt-3 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                                  isSaved
+                                    ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
+                                    : isSaving
+                                      ? 'bg-slate-800 text-slate-400 cursor-wait'
+                                      : 'bg-purple-600 text-white hover:bg-purple-500'
+                                }`}
+                              >
+                                {isSaved ? '✓ Tracking' : isSaving ? 'Adding…' : '+ Track'}
+                              </button>
+                            );
+                          })()}
                           <button
                             type="button"
                             onClick={(event) => {
