@@ -41,3 +41,9 @@ yarn-error.log*
 next-env.d.ts
 .env*.local
 tasks/logs/
+
+# Service-account JSON keys (never commit credentials)
+market-asasin-*.json
+*-service-account*.json
+*serviceaccount*.json
+*-sa-key*.json

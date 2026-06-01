@@ -421,6 +421,42 @@ export interface SimilarRecipientRow {
   total_obligated: number;
 }
 
+/**
+ * Top recipients for the sitemap — name + spend, ordered by spend.
+ *
+ * The sitemap MUST source from the same table the pages query
+ * (recipients), or it emits URLs that 404. The legacy contractors.json
+ * source had ~529 names with no matching recipient row (parent/holding
+ * companies whose awards land under subsidiary legal names), which
+ * Googlebot crawled into thousands of 404s.
+ *
+ * Capped: Google allows 50k URLs per sitemap file. We emit 4 URLs per
+ * contractor (overview + contracts/agencies/naics), so the cap keeps
+ * the contractor block under 48k and leaves room for the other blocks.
+ * Top-by-spend is also the right SEO call — the biggest primes are what
+ * people brand-search for.
+ */
+export interface SitemapRecipientRow {
+  recipient_name: string;
+  total_obligated: number;
+}
+
+export async function getTopRecipientsForSitemap(
+  limit = 12000,
+): Promise<SitemapRecipientRow[]> {
+  return queryCached<SitemapRecipientRow>({
+    cacheKey: `sitemap:top-recipients:${limit}`,
+    query: `
+      SELECT recipient_name, total_obligated
+      FROM ${BQ_TABLES.recipients}
+      WHERE recipient_name IS NOT NULL AND recipient_name != ''
+      ORDER BY total_obligated DESC
+      LIMIT @limit
+    `,
+    params: { limit },
+  });
+}
+
 export async function getSimilarRecipients(
   uei: string,
   topNaicsCode: string,
