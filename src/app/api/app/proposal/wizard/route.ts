@@ -222,6 +222,53 @@ function joinPursuitText(docs: PursuitDocRow[]): string {
   return chunks.join('\n\n');
 }
 
+// Minimum extracted-text length to consider the attachments "real
+// source" rather than empty/garbage. Below this we reach for the
+// cached SAM description fallback.
+const MIN_SOURCE_CHARS = 200;
+
+// Build the best-available source text for a pursuit, layered:
+//   1. Attached docs (pursuit_documents extracted_text) — ALWAYS used
+//      when present. This is the full RFP/SOW the user could see before.
+//   2. Cached SAM description (sam_opportunities.description) — a
+//      fetch-free fallback already in our 24K+ cache. Used when there
+//      are no usable attachments, so a pursuit can still brief/draft
+//      without anyone having run the (fragile, rate-limited) attachment
+//      fetch. Many notices — especially Sources Sought / simpler RFPs —
+//      carry full scope in the description.
+//
+// Attachments NEVER get replaced by the description; the description is
+// purely additive backup for the empty case.
+async function buildSourceText(
+  pipeline: PipelineRow,
+  docs: PursuitDocRow[],
+): Promise<{ text: string; hasDocs: boolean; source: 'attachments' | 'sam_description' | 'none' }> {
+  const docText = joinPursuitText(docs);
+  if (docText.length >= MIN_SOURCE_CHARS) {
+    return { text: docText, hasDocs: true, source: 'attachments' };
+  }
+
+  // No usable attachments — try the cached SAM description.
+  if (pipeline.notice_id) {
+    try {
+      const { data } = await getSupabase()
+        .from('sam_opportunities')
+        .select('description')
+        .eq('notice_id', pipeline.notice_id)
+        .maybeSingle();
+      const desc = (data?.description || '').trim();
+      if (desc.length >= MIN_SOURCE_CHARS) {
+        const block = `=== SAM.gov solicitation description ===\n${desc.slice(0, MAX_INPUT_CHARS)}`;
+        return { text: block, hasDocs: true, source: 'sam_description' };
+      }
+    } catch (err) {
+      console.warn('[wizard] SAM description fallback lookup failed:', err);
+    }
+  }
+
+  return { text: docText, hasDocs: false, source: 'none' };
+}
+
 const BRIEF_SYSTEM_PROMPT = `You are a senior federal capture analyst reading a brand new RFP for a small business contractor. Your job is to extract a structured, actionable brief in JSON — NOT to write proposal prose, NOT to summarize the whole document, NOT to invent details.
 
 Rules:
@@ -370,8 +417,7 @@ function jsonError(message: string, status: number) {
 }
 
 async function generateBrief(email: string, pipeline: PipelineRow, docs: PursuitDocRow[]): Promise<BriefArtifact> {
-  const docText = joinPursuitText(docs);
-  const hasDocs = docText.length > 200;
+  const { text: docText, hasDocs } = await buildSourceText(pipeline, docs);
   const userPrompt = buildUserPrompt(pipeline, docText, hasDocs);
 
   const { content, tokens } = await callGroq(BRIEF_SYSTEM_PROMPT, userPrompt);
@@ -454,8 +500,7 @@ async function generateCompliance(
   pipeline: PipelineRow,
   docs: PursuitDocRow[],
 ): Promise<ComplianceArtifact> {
-  const docText = joinPursuitText(docs);
-  const hasDocs = docText.length > 200;
+  const { text: docText, hasDocs } = await buildSourceText(pipeline, docs);
   const userPrompt = buildComplianceUserPrompt(pipeline, docText, hasDocs);
 
   const { content, tokens } = await callGroq(COMPLIANCE_SYSTEM_PROMPT, userPrompt);
@@ -493,9 +538,9 @@ async function generateDraft(
   pipeline: PipelineRow,
   docs: PursuitDocRow[],
 ): Promise<DraftArtifact> {
-  const sourceText = joinPursuitText(docs);
-  const hasDocs = sourceText.length > 200;
-  const fileName = docs.find(d => d.filename)?.filename || pipeline.title || 'pursuit RFP';
+  const { text: sourceText, hasDocs, source } = await buildSourceText(pipeline, docs);
+  const fileName = docs.find(d => d.filename)?.filename
+    || (source === 'sam_description' ? `${pipeline.title || 'pursuit'} (SAM description)` : pipeline.title || 'pursuit RFP');
 
   // No RFP text → return an honest empty artifact instead of letting the
   // model invent a whole proposal from a one-line title. The panel shows
