@@ -68,6 +68,10 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Conversation history sidebar.
+  const [sessions, setSessions] = useState<Array<{ id: string; title: string | null; message_count: number; updated_at: string }>>([]);
+  const [loadingSession, setLoadingSession] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   // Document drawer state: when set, opens RagDocDrawer with the
   // requested mindy_rag_documents.id loaded from /api/app/rag-doc.
   const [drawerDocId, setDrawerDocId] = useState<string | null>(null);
@@ -198,6 +202,71 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
     }
   }, [email, isStreaming, messages, sessionId]);
 
+  // --- Conversation history ----------------------------------------
+  const loadSessions = useCallback(async () => {
+    if (!email) return;
+    try {
+      const res = await fetch(`/api/app/chat-sessions?email=${encodeURIComponent(email)}`, {
+        headers: getMIApiHeaders(email),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success) setSessions(data.sessions || []);
+    } catch { /* non-fatal */ }
+  }, [email]);
+
+  // Load the session list on mount.
+  useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  // Refresh the list when a stream finishes (a new session may have been
+  // created, or an existing one's title/updated_at changed).
+  useEffect(() => {
+    if (!isStreaming) loadSessions();
+  }, [isStreaming, loadSessions]);
+
+  // Open a past conversation: load its messages into the view.
+  const openSession = useCallback(async (sid: string) => {
+    if (!email || loadingSession || sid === sessionId) return;
+    setLoadingSession(true);
+    try {
+      const res = await fetch(`/api/app/chat-sessions?email=${encodeURIComponent(email)}&sessionId=${encodeURIComponent(sid)}`, {
+        headers: getMIApiHeaders(email),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        setMessages((data.messages || []).map((m: { id: string; role: 'user' | 'assistant'; content: string; cited_sources?: CitedSource[] }) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          citations: Array.isArray(m.cited_sources) ? m.cited_sources : undefined,
+        })));
+        setSessionId(sid);
+      }
+    } catch { /* non-fatal */ } finally {
+      setLoadingSession(false);
+    }
+  }, [email, loadingSession, sessionId]);
+
+  // Start a fresh conversation.
+  const startNewChat = useCallback(() => {
+    setMessages([]);
+    setSessionId(null);
+    inputRef.current?.focus();
+  }, []);
+
+  // Delete a conversation from history.
+  const deleteSession = useCallback(async (sid: string) => {
+    if (!email) return;
+    setSessions(prev => prev.filter(s => s.id !== sid));  // optimistic
+    if (sid === sessionId) startNewChat();
+    try {
+      await fetch('/api/app/chat-sessions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        body: JSON.stringify({ email, sessionId: sid }),
+      });
+    } catch { loadSessions(); /* rollback by refetch */ }
+  }, [email, sessionId, startNewChat, loadSessions]);
+
   // Voice-pivot handoff: when the voice modal classifies the user's
   // recording as a question (not a pursuit), it stashes the transcript
   // in sessionStorage and switches the panel to 'chat'. We pick it up
@@ -244,22 +313,76 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-73px)] bg-slate-950 text-white">
+    <div className="flex h-[calc(100vh-73px)] bg-slate-950 text-white">
+      {/* Conversation history sidebar */}
+      {sidebarOpen && (
+        <aside className="w-60 shrink-0 border-r border-slate-800 bg-slate-900/40 flex flex-col">
+          <div className="p-3 shrink-0">
+            <button
+              onClick={startNewChat}
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-purple-600 hover:bg-purple-500 px-3 py-2 text-sm font-medium text-white transition-colors"
+            >
+              + New chat
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
+            <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-slate-600">History</div>
+            {sessions.length === 0 ? (
+              <div className="px-2 py-2 text-xs text-slate-600">No saved conversations yet.</div>
+            ) : (
+              sessions.map(s => (
+                <div
+                  key={s.id}
+                  className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors ${
+                    s.id === sessionId ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800/60'
+                  }`}
+                  onClick={() => openSession(s.id)}
+                >
+                  <span className="min-w-0 flex-1 truncate" title={s.title || 'Untitled'}>
+                    {s.title || 'Untitled'}
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                    className="shrink-0 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs px-1"
+                    title="Delete conversation"
+                    aria-label="Delete conversation"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+      )}
+
+      {/* Main chat column */}
+      <div className="flex flex-col flex-1 min-w-0">
       {/* Header */}
       <header className="px-6 py-3 border-b border-slate-800 bg-slate-950/95 backdrop-blur shrink-0">
         <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold">💬 Mindy Chat</h1>
-              <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">BETA</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(o => !o)}
+              className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors"
+              title={sidebarOpen ? 'Hide history' : 'Show history'}
+              aria-label="Toggle conversation history"
+            >
+              ☰
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold">💬 Mindy Chat</h1>
+                <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">BETA</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Ask anything about federal contracting. Mindy cites her sources from your 8-year knowledge base.
+              </p>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Ask anything about federal contracting. Mindy cites her sources from your 8-year knowledge base.
-            </p>
           </div>
           {messages.length > 0 && !isStreaming && (
             <button
-              onClick={() => { setMessages([]); setSessionId(null); inputRef.current?.focus(); }}
+              onClick={startNewChat}
               className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-600 transition-colors"
             >
               New chat
@@ -410,6 +533,7 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
           </div>
         </div>
       </div>
+      </div>{/* end main chat column */}
 
       {/* Inline doc drawer — opens when a citation chip targets an
           internal mindy_rag_documents row (course material etc) */}
