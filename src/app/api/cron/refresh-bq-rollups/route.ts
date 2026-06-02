@@ -19,7 +19,7 @@
  * Mirrors scripts/bq-build-agency-rollups.sql — keep the two in sync.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
+import { bqQuery, BQ_TABLES, getServiceAccountEmail } from '@/lib/bigquery/client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -139,14 +139,10 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Surface which service account prod is actually using, so we know
-  // which principal needs BigQuery Data Editor on the dataset.
-  let serviceAccount = 'unknown';
-  try {
-    const raw = process.env.GCP_SA_JSON;
-    if (raw) serviceAccount = (JSON.parse(raw) as { client_email?: string }).client_email || 'no client_email';
-    else serviceAccount = 'GCP_SA_JSON not set (using ADC)';
-  } catch { serviceAccount = 'GCP_SA_JSON parse error'; }
+  // Surface which service account prod is actually using (parsed the
+  // SAME way the BQ client parses it), so we know which principal needs
+  // BigQuery Data Editor on the dataset.
+  const serviceAccount = getServiceAccountEmail();
 
   const results: Array<{ label: string; ok: boolean; ms: number; error?: string }> = [];
   for (const stmt of STATEMENTS) {

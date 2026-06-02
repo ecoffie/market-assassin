@@ -40,6 +40,19 @@ function parseSaJson(raw: string): Record<string, unknown> {
   return JSON.parse(decoded);
 }
 
+// Returns the client_email of the service account the BQ client is
+// authenticating with — parsed the same way getClient() parses it.
+// For diagnosing which principal needs dataset write access.
+export function getServiceAccountEmail(): string {
+  const raw = process.env.GCP_SA_JSON;
+  if (!raw) return 'ADC (no GCP_SA_JSON)';
+  try {
+    return (parseSaJson(raw) as { client_email?: string }).client_email || 'no client_email in SA';
+  } catch (e) {
+    return `parse failed: ${e instanceof Error ? e.message : 'unknown'}`;
+  }
+}
+
 function getClient(): BigQuery {
   if (_client) return _client;
 
