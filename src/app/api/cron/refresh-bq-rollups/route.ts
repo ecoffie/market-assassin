@@ -139,6 +139,15 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Surface which service account prod is actually using, so we know
+  // which principal needs BigQuery Data Editor on the dataset.
+  let serviceAccount = 'unknown';
+  try {
+    const raw = process.env.GCP_SA_JSON;
+    if (raw) serviceAccount = (JSON.parse(raw) as { client_email?: string }).client_email || 'no client_email';
+    else serviceAccount = 'GCP_SA_JSON not set (using ADC)';
+  } catch { serviceAccount = 'GCP_SA_JSON parse error'; }
+
   const results: Array<{ label: string; ok: boolean; ms: number; error?: string }> = [];
   for (const stmt of STATEMENTS) {
     const t = Date.now();
@@ -153,7 +162,7 @@ async function handle(request: NextRequest) {
   }
 
   const allOk = results.every(r => r.ok);
-  return NextResponse.json({ success: allOk, results }, { status: allOk ? 200 : 500 });
+  return NextResponse.json({ success: allOk, serviceAccount, results }, { status: allOk ? 200 : 500 });
 }
 
 export async function GET(request: NextRequest) { return handle(request); }
