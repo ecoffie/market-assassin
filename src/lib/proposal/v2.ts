@@ -6,7 +6,7 @@
  *
  *   1. Bidder profile + vault           (FACTUAL — who's writing)
  *   2. Agency context (pain points)     (TARGET — who it's FOR)
- *   3. RAG style references             (HOW good GovCon writing reads)
+ *   3. RAG style references             (HOW strong federal response writing reads)
  *   4. Section-specific lens            (FRAMING — variety across runs)
  *   5. Section-specific writer voice    (PERSONA — exec summary writer
  *                                        ≠ pricing writer)
@@ -47,7 +47,7 @@ export async function buildV2Prompt(opts: {
 
   // RAG query uses the output section, notice type, and source head snippet.
   // This makes Proposal Assist retrieve format-specific examples (LOI, RFI,
-  // RFQ, technical volume, pricing volume) instead of generic GovCon text.
+  // RFQ, technical volume, pricing volume) instead of generic response text.
   const ragQuery = buildTemplateCorpusQuery({
     sectionLabel: sectionMeta.label,
     sectionType,
@@ -117,7 +117,7 @@ General rules:
   parts.push(`### Bidder profile (NAICS / agencies / set-asides)\n${profileBlock}`);
   if (vaultBlock) parts.push(vaultBlock);
   if (agencyBlock) parts.push(agencyBlock);
-  if (ragBlock) parts.push(`### GovCon Giants curriculum — STYLE references (do NOT copy verbatim)\n${ragBlock}`);
+  if (ragBlock) parts.push(`### Curated proposal corpus — STYLE references (do NOT copy verbatim)\n${ragBlock}`);
 
   if (lens) {
     parts.push(`### Lens for THIS draft\n${lens.framing}\n\n(Use this framing. A different lens may be used on a future run to produce a different framing — this is intentional.)`);

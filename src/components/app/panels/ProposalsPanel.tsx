@@ -1297,7 +1297,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 title={isRfqMode ? 'Export RFQ response template' : 'Export LOI response template'}
                 description={isRfqMode
                   ? 'Create a Word response template with blanks for pricing, attachments, and submission details.'
-                  : 'Create a Word LOI from the built-in GovCon EDU template, with blanks for anything the user must complete.'}
+                  : 'Create a Word LOI from Mindy\'s curated response-template library, with blanks for anything the user must complete.'}
                 status={exporting ? 'Working...' : 'Ready'}
                 buttonLabel={exporting ? 'Assembling...' : isRfqMode ? 'Export RFQ .docx' : 'Export LOI .docx'}
                 disabled={exporting}
@@ -1360,7 +1360,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   <p className="text-sm text-slate-400 mt-1">
                     {isRfqMode
                       ? 'RFQs usually need a clean quote/response document with blanks for pricing, submission details, and attachments — not a full compliance matrix.'
-                      : 'Sources Sought and RFI responses use the built-in GovCon EDU LOI structure. Mindy leaves user-specific details blank and reminds the user to attach an existing capability statement only when requested.'}
+                      : 'Sources Sought and RFI responses use Mindy\'s curated LOI response structure. Mindy leaves user-specific details blank and reminds the user to attach an existing capability statement only when requested.'}
                   </p>
                 </div>
                 <button
@@ -1383,12 +1383,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   <li>• LOI opening modeled after your sample</li>
                   <li>• Submittal intention, requested response content, and attachment checklist</li>
                   <li>• Company profile, UEI, CAGE, NAICS, small-business status, and responsible contact</li>
-                  <li>• Three relevant experience blocks modeled after the GovCon EDU LOI template</li>
+                  <li>• Three relevant experience blocks modeled after the curated LOI response pattern</li>
                   {isRfqMode && <li>• Quote / pricing fields that the user must complete manually</li>}
                 </ul>
                 {!isRfqMode && (
                   <a
-                    href="/templates/loi-govcon-edu-template.docx"
+                    href="/templates/loi-response-template.docx"
                     className="mt-3 inline-flex text-xs font-medium text-purple-300 underline decoration-purple-400/50 underline-offset-4 hover:text-purple-200"
                   >
                     View source LOI template
