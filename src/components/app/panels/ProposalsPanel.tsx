@@ -984,13 +984,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             const styles =
               respondability === 'bid'
                 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                : respondability === 'non_bid'
+                : respondability === 'response'
                 ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                 : 'bg-slate-600/20 text-slate-300 border-slate-500/40';
             const hint =
               respondability === 'bid'
                 ? 'Biddable solicitation — Mindy drafts a full proposal. Check the matching RFP briefing.'
-                : respondability === 'non_bid'
+                : respondability === 'response'
                 ? 'Not a priced bid — you respond with a capability statement / letter of intent. Check the Sources Sought briefing.'
                 : /presol/i.test(label)
                 ? 'Pre-solicitation — no response yet. Track it; you’ll be alerted when the solicitation drops.'

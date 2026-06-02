@@ -3,19 +3,22 @@
  *
  * SAM's free-text `notice_type` drives two things in the product:
  *   1. A short, human label (for badges / table cells / filters).
- *   2. "Respondability" — can the user actually submit something, and if so
- *      what KIND of response. This gates the Proposal Assist wizard.
+ *   2. "Respondability" — can the user submit something, and if so what KIND
+ *      of document. This gates the Proposal Assist wizard.
  *
- * Respondability tiers (per Eric, 2026-06-02):
- *   - 'bid'        — Solicitation / Combined Synopsis/Solicitation /
- *                    Consolidate-Bundle. A real priced proposal/quote.
- *   - 'non_bid'    — Sources Sought / RFI. You DO respond, but it's a
- *                    capability statement / letter of intent / market-research
- *                    response, NOT a priced bid.
- *   - 'none'       — Presolicitation / Special Notice / Award Notice /
- *                    Justification / Sale of Surplus Property. Nothing to
- *                    submit. Presol is a heads-up that a solicitation is
- *                    coming — the action is to TRACK it, not respond.
+ * Respondability tiers (per Eric, 2026-06-02). NOTE: both 'bid' AND 'response'
+ * mean the user writes (and Mindy drafts) a document — the difference is whether
+ * it's PRICED. Only 'none' has nothing to submit.
+ *   - 'bid'        — You submit a PRICED proposal/quote. Mindy drafts the full
+ *                    proposal. Solicitation / RFP / RFQ / Combined Synopsis /
+ *                    Consolidate-Bundle.
+ *   - 'response'   — You DO respond (and Mindy drafts it), but it's NOT priced:
+ *                    a capability statement / letter of intent / market-research
+ *                    response. Sources Sought / RFI.
+ *   - 'none'       — Nothing to submit. Presolicitation / Special Notice /
+ *                    Award Notice / Justification / Sale of Surplus Property.
+ *                    Presol is a heads-up that a solicitation is coming — the
+ *                    action is to TRACK it, not respond.
  *
  * Keep this list aligned with SAM's Notice Type dropdown:
  *   Special Notice · Sources Sought · Presolicitation ·
@@ -24,7 +27,7 @@
  *   Sale of Surplus Property · Intent to Bundle Requirements (DoD-Funded)
  */
 
-export type Respondability = 'bid' | 'non_bid' | 'none';
+export type Respondability = 'bid' | 'response' | 'none';
 
 export interface NoticeTypeInfo {
   /** Short label for UI ("Sources Sought", "Solicitation / RFP", …). null when
@@ -65,9 +68,9 @@ export function classifyNoticeType(nt?: string | null): NoticeTypeInfo {
   }
 
   // --- Respondable, but NOT a priced bid (cap statement / LOI / RFI) --------
-  if (t.includes('sources sought')) return { label: 'Sources Sought', respondability: 'non_bid' };
+  if (t.includes('sources sought')) return { label: 'Sources Sought', respondability: 'response' };
   if (t.includes('rfi') || t.includes('request for information') || t.includes('information')) {
-    return { label: 'RFI', respondability: 'non_bid' };
+    return { label: 'RFI', respondability: 'response' };
   }
 
   // --- Biddable: real priced proposal / quote ------------------------------
@@ -98,7 +101,7 @@ export function noticeTypeToDetected(
 ): 'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown' {
   const { label, respondability } = classifyNoticeType(nt);
   if (!label) return 'unknown';
-  if (respondability === 'non_bid') {
+  if (respondability === 'response') {
     if (/rfi/i.test(label)) return 'rfi';
     return 'sources_sought'; // Sources Sought uses capability-statement tabs
   }
