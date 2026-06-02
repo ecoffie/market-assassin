@@ -148,6 +148,7 @@ function findReclassCandidates(docs: RagDocRow[], typeFilter = ''): ReclassCandi
   const candidates: ReclassCandidate[] = [];
 
   docs.forEach((d) => {
+    if ((d.text_length || 0) < 200) return;
     const suggestion = classifyRagDocCandidate({
       filename: d.filename,
       title: d.title,

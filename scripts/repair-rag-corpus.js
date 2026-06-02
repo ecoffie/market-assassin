@@ -79,6 +79,8 @@ function hasLoiIntent(text) {
 }
 
 function classifyDoc(doc) {
+  if ((doc.text_length || 0) < 200) return null;
+
   const filename = String(doc.filename || '').toLowerCase();
   const title = String(doc.title || '').toLowerCase();
   const sourcePath = String(doc.source_path || '').toLowerCase();
