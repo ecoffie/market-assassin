@@ -125,20 +125,19 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     ],
   },
 
-  // ---- Capability statement sections -----------------------------
+  // ---- LOI / market-research response sections -------------------
   company_overview: {
-    label: 'Company Overview',
+    label: 'LOI Opening',
     targetWords: 150,
     voice:
-      'You are a senior capture writer who has written hundreds of capability statements. ' +
-      'Your Company Overviews land in 2 paragraphs — what the firm does + cert posture + ' +
-      'why this agency.',
+      'You are a senior capture writer who has written hundreds of Sources Sought and RFI ' +
+      'letters of intent. Your openings are direct: interest, fit, small-business posture, ' +
+      'and the specific agency need.',
     basePrompt:
-      'Draft a Company Overview for a Capability Statement (Sources Sought / RFI response). ' +
-      'Two paragraphs max. Lead with what the company does + business type / certifications ' +
-      '(SDVOSB, 8(a), WOSB, HUBZone, Small Business). Include UEI, CAGE, NAICS, primary ' +
-      'geographic capability. End with 1 sentence on why this agency\'s mission aligns with ' +
-      'the company\'s specialty. Target ~150 words.',
+      'Draft the opening section of a Letter of Intent / Sources Sought response. Two ' +
+      'paragraphs max. State the company\'s interest in the requirement, summarize the fit, ' +
+      'and mention business type / certifications (SDVOSB, 8(a), WOSB, HUBZone, Small Business) ' +
+      'only if provided. Do NOT draft a standalone capability statement. Target ~150 words.',
     antiPatterns: [
       'opening with "Founded in [year]" before saying what the company does',
       'listing every NAICS the bidder is registered for',
@@ -146,18 +145,16 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     ],
   },
   cap_past_performance: {
-    label: 'Relevant Past Performance',
+    label: 'Relevant Experience',
     targetWords: 300,
     voice:
-      'You are a senior capability statement writer. Your past-perf sections are scannable ' +
-      'tables, never paragraphs, and you only show contracts that map directly to the ' +
-      'agency\'s described scope.',
+      'You are a senior Sources Sought response writer. Your relevant-experience sections ' +
+      'show evidence that the agency can use for market research without sounding like a full proposal.',
     basePrompt:
-      'Draft a Relevant Past Performance section for a Capability Statement. NOT the full ' +
-      'past-performance narrative of an RFP — a scannable list of 3-5 directly relevant ' +
-      'contracts. Format each as: \'**[Contract Title]** — [Agency], [Period], [Value], ' +
-      '[Prime/Sub]. [One-line scope description tying to this scope].\' Use vault past ' +
-      'performance if present. End with 1 sentence summarizing the pattern of relevance. ' +
+      'Draft the Relevant Experience section for a Letter of Intent / Sources Sought response. ' +
+      'Use 3-5 directly relevant proof points from the vault if present. Keep it concise and ' +
+      'response-oriented, not a full RFP past-performance volume. If the notice asks for a ' +
+      'capability statement attachment, reference that it is attached rather than recreating it. ' +
       'Target ~300 words.',
     antiPatterns: [
       'turning the citations into prose paragraphs',
@@ -166,17 +163,16 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     ],
   },
   capabilities: {
-    label: 'Capabilities',
+    label: 'Capability Fit',
     targetWords: 250,
     voice:
-      'You are a senior capability statement writer. Your Capabilities sections are scannable ' +
-      'bullets that mirror the agency\'s scope language, each bullet anchored in real evidence ' +
-      'from the bidder\'s vault.',
+      'You are a senior market-research response writer. Your capability-fit sections answer ' +
+      'the notice directly and point to the attached capability statement for the broader profile.',
     basePrompt:
-      'Draft a Capabilities section for a Capability Statement. Bullet list of 6-10 core ' +
-      'capabilities scoped to what the source document is asking about. Each bullet: 1-2 lines ' +
-      'max, capability + brief evidence (tools, methodologies, certifications). Mirror language ' +
-      'from the source document. Use vault capabilities if present. Target ~250 words.',
+      'Draft the Capability Fit section for a Letter of Intent / Sources Sought response. ' +
+      'Answer the specific capability areas or questions in the notice using concise bullets. ' +
+      'Use confirmed vault capabilities when present. Do NOT generate a standalone capability statement; ' +
+      'assume the user can attach an existing capability statement separately. Target ~250 words.',
     antiPatterns: [
       'long paragraph-style capabilities instead of bullets',
       'using "world-class", "best-in-class", "cutting-edge", "innovative"',
@@ -184,16 +180,15 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     ],
   },
   differentiators: {
-    label: 'Differentiators',
+    label: 'Why Us',
     targetWords: 200,
     voice:
-      'You are a senior capture lead. Differentiators are 3-5 bullets explaining why THIS ' +
-      'bidder, anchored in concrete evidence, never generic claims.',
+      'You are a senior capture lead. Sources Sought differentiators are brief evidence points ' +
+      'that help the agency understand why this firm belongs in the market research pool.',
     basePrompt:
-      'Draft a Differentiators section. 3-5 short bullets explaining what makes this company ' +
-      'a better fit than typical competitors for the agency\'s described need. Anchor each in ' +
-      'concrete evidence: years of experience, agency-specific past performance, proprietary ' +
-      'methods, certifications competitors lack, geographic advantage. Target ~200 words.',
+      'Draft the Why Us section for a Letter of Intent / Sources Sought response. 3-5 short ' +
+      'bullets explaining why this company is relevant to the described need. Anchor each in ' +
+      'concrete evidence where available. Target ~200 words.',
     antiPatterns: [
       'using "passionate", "dedicated", "committed" as differentiators (everyone says that)',
       'differentiators that any small business could claim',

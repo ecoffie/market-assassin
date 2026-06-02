@@ -17,7 +17,7 @@ export type RfpSectionType =
   | 'past_performance'
   | 'pricing';
 
-/** Capability statement sections — Sources Sought / RFI responses. */
+/** LOI / market-research response sections — Sources Sought / RFI responses. */
 export type CapStatementSectionType =
   | 'company_overview'
   | 'cap_past_performance'

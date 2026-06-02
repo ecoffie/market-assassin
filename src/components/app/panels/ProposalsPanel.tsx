@@ -95,7 +95,7 @@ const STATUS_LABELS: Record<ComplianceStatus, string> = {
 type SectionType =
   // RFP / Proposal sections
   | 'exec_summary' | 'technical' | 'management' | 'past_performance' | 'pricing'
-  // Capability Statement sections (SS / RFI responses)
+  // LOI / market-research response sections (SS / RFI responses)
   | 'company_overview' | 'cap_past_performance' | 'capabilities' | 'differentiators' | 'poc';
 
 const RFP_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: number }> = [
@@ -106,14 +106,14 @@ const RFP_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: num
   { id: 'pricing', label: 'Pricing', targetWords: 300 },
 ];
 
-// Capability-statement tabs surface when detectedNoticeType === 'sources_sought'
-// or 'rfi'. Shorter sections, different prompts on the server. Per Eric
-// 2026-05-26: 'proposal assist is working but it is still saying RFP things'.
+// LOI / market-research response tabs surface when detectedNoticeType ===
+// 'sources_sought' or 'rfi'. Users attach their existing capability statement;
+// Mindy drafts the cover/LOI response around the notice.
 const CAP_STATEMENT_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: number }> = [
-  { id: 'company_overview', label: 'Company Overview', targetWords: 150 },
-  { id: 'cap_past_performance', label: 'Past Performance', targetWords: 300 },
-  { id: 'capabilities', label: 'Capabilities', targetWords: 250 },
-  { id: 'differentiators', label: 'Differentiators', targetWords: 200 },
+  { id: 'company_overview', label: 'LOI Opening', targetWords: 150 },
+  { id: 'cap_past_performance', label: 'Relevant Experience', targetWords: 300 },
+  { id: 'capabilities', label: 'Capability Fit', targetWords: 250 },
+  { id: 'differentiators', label: 'Why Us', targetWords: 200 },
   { id: 'poc', label: 'Point of Contact', targetWords: 80 },
 ];
 
@@ -144,6 +144,12 @@ const DEFAULT_CHECKLIST: ChecklistItemState[] = [
   { id: 'signed-dated', label: 'Cover letter and authorized representative pages are signed and dated.', checked: false },
   { id: 'red-team', label: 'Red team / second-reader review is complete and findings are incorporated.', checked: false },
   { id: 'submission-time', label: 'Submission is ready at least 24 hours before the deadline (portal upload buffer + amendment check).', checked: false },
+];
+
+const SS_RFI_PACKAGE_NOTES = [
+  'Attach your existing capability statement as a separate PDF if the notice asks for one.',
+  'Confirm the LOI answers the specific questions or requested information in the Sources Sought / RFI.',
+  'Keep the response within the notice page limit and submit using the named email, portal, or deadline.',
 ];
 
 export default function ProposalsPanel({ email, tier, panelContext }: ProposalsPanelProps) {
@@ -354,7 +360,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     });
   }, [compliance, statusFilter, categoryFilter]);
 
-  // Section drafts (Step 3). Holds slots for BOTH RFP + capability-statement
+  // Section drafts (Step 3). Holds slots for BOTH RFP + LOI/response
   // sections; only the active tab set is shown at any time based on
   // detectedNoticeType.
   const [drafts, setDrafts] = useState<Record<SectionType, SectionDraft | undefined>>({
@@ -392,9 +398,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   }, [activePursuitNoticeType]);
 
   // Pick the right tab set based on what we detected from the loaded
-  // doc. SS/RFI = capability statement tabs. Everything else
+  // doc. SS/RFI = LOI/response tabs. Everything else
   // (RFP/RFQ/unknown) = traditional proposal tabs.
   const isCapStatementMode = detectedNoticeType === 'sources_sought' || detectedNoticeType === 'rfi';
+  const isRfqMode = detectedNoticeType === 'rfq';
+  const isSimpleResponseMode = isCapStatementMode || isRfqMode;
   // Memoized so its identity is stable across renders (it only flips when the
   // detected mode changes). This lets the hooks below list it as a dependency
   // without re-running every render.
@@ -653,7 +661,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             source_quote: c.source_quote,
           })),
           drafts: draftsForExport,
-          checklist: checklist.map(c => ({ label: c.label, checked: c.checked })),
+          sectionOrder: currentSectionTabs.map(tab => tab.id),
+          checklist: isSimpleResponseMode ? [] : checklist.map(c => ({ label: c.label, checked: c.checked })),
+          packageType: isCapStatementMode ? 'sources_sought_loi' : isRfqMode ? 'rfq_response' : 'proposal',
         }),
       });
 
@@ -680,7 +690,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     } finally {
       setExporting(false);
     }
-  }, [email, uploadedRfp, compliance, drafts, checklist, getAuthHeaders, currentSectionTabs]);
+  }, [email, uploadedRfp, compliance, drafts, checklist, getAuthHeaders, currentSectionTabs, isCapStatementMode, isRfqMode, isSimpleResponseMode]);
 
   const exportComplianceCsv = useCallback(() => {
     if (compliance.length === 0) return;
@@ -975,7 +985,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </div>
           {/* Colored notice-type cue for the highlighted pursuit. Three tiers:
               biddable (emerald), respondable-but-not-a-bid (amber: Sources
-              Sought / RFI / Presol — capability statement / LOI), and not
+              Sought / RFI — LOI / market-research response), and not
               respondable at all (slate: Special / Award / Justification). */}
           {(() => {
             const picked = opportunities.find(o => o.id === selectedId);
@@ -991,7 +1001,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               respondability === 'bid'
                 ? 'Biddable solicitation — Mindy drafts a full proposal. Check the matching RFP briefing.'
                 : respondability === 'response'
-                ? 'Not a priced bid — you respond with a capability statement / letter of intent. Check the Sources Sought briefing.'
+                ? 'Not a priced bid — Mindy drafts the LOI / response narrative; attach your capability statement separately if requested.'
                 : /presol/i.test(label)
                 ? 'Pre-solicitation — no response yet. Track it; you’ll be alerted when the solicitation drops.'
                 : /award/i.test(label)
@@ -1226,11 +1236,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         )}
 
         {/* Notice type warning — when the loaded doc is a Sources
-            Sought or RFI, this panel's RFP-centric flow (compliance
-            matrix, exec summary, technical/management drafts,
-            pricing narrative) is the WRONG playbook. SS/RFI responses
-            are 2-3 page capability statements. Honest disclaimer +
-            user can still proceed if they want. */}
+            Sought or RFI, switch the user into an LOI / market-research
+            response workflow. Users attach their existing capability
+            statement separately if the notice requests one. */}
         {uploadedRfp && (detectedNoticeType === 'sources_sought' || detectedNoticeType === 'rfi') && (
           <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
             <div className="font-semibold mb-1">
@@ -1238,8 +1246,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </div>
             <div className="text-xs text-amber-200/90">
               {detectedNoticeType === 'sources_sought'
-                ? 'Sources Sought notices are market research — the agency wants to know who can do the work. You respond with a capability statement (2-3 pages), not a full proposal. The compliance-matrix + drafting steps below were built for RFPs and will produce content that does not fit a Sources Sought response. Use the extracted text as research; write a capability statement separately.'
-                : 'RFIs ask for information about your capabilities, methods, or pricing. You respond with a short white paper or capability statement, not a full proposal. The drafting steps below assume an RFP and will not match an RFI response format.'}
+                ? 'Sources Sought notices are market research — the agency wants to know who can do the work. Mindy drafts the LOI / response narrative. Attach your existing capability statement separately if the notice requests it.'
+                : 'RFIs ask for information about your capabilities, methods, or pricing. Mindy drafts the response narrative and requested answers, not a full proposal or Section L/M compliance package.'}
             </div>
           </div>
         )}
@@ -1320,7 +1328,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </details>
 
             <p className="text-xs text-slate-500">
-              Compliance matrix and section drafting coming next — for now this text is held in your session.
+              Requirement extraction and drafting coming next — for now this text is held in your session.
             </p>
 
             <input
@@ -1340,61 +1348,107 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         )}
       </section>
 
-      {/* Step 2 · Compliance Matrix */}
+      {/* Step 2 · Compliance Matrix / Response Requirements */}
       {uploadedRfp && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 2 · Compliance Matrix</p>
-              <h2 className="text-lg font-semibold text-white">Extract every shall / must / required</h2>
-              <p className="text-sm text-slate-400 mt-1">
-                Mindy reads the source doc and lists each obligation so you can assign owners and track status before drafting.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {compliance.length > 0 && (
+          {isSimpleResponseMode ? (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 2 · Word Response Template</p>
+                  <h2 className="text-lg font-semibold text-white">
+                    {isRfqMode ? 'Create RFQ response template' : 'Create LOI response template'}
+                  </h2>
+                  <p className="text-sm text-slate-400 mt-1">
+                    {isRfqMode
+                      ? 'RFQs usually need a clean quote/response document with blanks for pricing, submission details, and attachments — not a full compliance matrix.'
+                      : 'Sources Sought and RFI responses should follow your LOI structure with blanks for user-specific details. Attach the existing capability statement separately when requested.'}
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={exportComplianceCsv}
-                  className="px-3 py-2 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                  onClick={exportProposalPackage}
+                  disabled={exporting}
+                  className="px-4 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors flex items-center gap-2"
                 >
-                  Export CSV
+                  {exporting && (
+                    <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {exporting ? 'Assembling…' : isRfqMode ? 'Export RFQ Template (.docx)' : 'Export LOI Template (.docx)'}
                 </button>
+              </div>
+
+              <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3 text-sm text-slate-400">
+                <p className="text-slate-200 font-medium mb-2">Template includes blanks for:</p>
+                <ul className="space-y-1">
+                  <li>• Date, attention line, agency address, reference / solicitation number</li>
+                  <li>• Submission instructions, required attachments, and requested response content</li>
+                  <li>• Company profile, UEI, CAGE, small-business status, and responsible contact</li>
+                  <li>• Relevant experience blocks modeled after the LOI sample</li>
+                  {isRfqMode && <li>• Quote / pricing fields that the user must complete manually</li>}
+                </ul>
+              </div>
+
+              {exportError && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 mt-3">
+                  {exportError}
+                </div>
               )}
-              <button
-                type="button"
-                onClick={generateCompliance}
-                disabled={complianceLoading}
-                className="px-4 py-2 text-sm rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white transition-colors flex items-center gap-2"
-              >
-                {complianceLoading && (
-                  <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                )}
-                {complianceLoading
-                  ? 'Extracting…'
-                  : compliance.length > 0
-                  ? 'Regenerate'
-                  : 'Generate Compliance Matrix'}
-              </button>
-            </div>
-          </div>
-
-          {complianceError && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 mb-3">
-              {complianceError}
-            </div>
-          )}
-
-          {complianceMeta?.truncated && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 mb-3">
-              Source doc was truncated to {complianceMeta.inputChars?.toLocaleString()} chars of {complianceMeta.originalChars?.toLocaleString()} for this pass. Long documents may miss late-section requirements — split big PDFs by volume if you need full coverage.
-            </div>
-          )}
-
-          {compliance.length > 0 && (
+            </>
+          ) : (
             <>
-              <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
-                <span className="text-slate-500">{compliance.length} requirements</span>
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 2 · Compliance Matrix</p>
+                  <h2 className="text-lg font-semibold text-white">Extract every shall / must / required</h2>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Mindy reads the source doc and lists each obligation so you can assign owners and track status before drafting.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {compliance.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={exportComplianceCsv}
+                      className="px-3 py-2 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                    >
+                      Export CSV
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={generateCompliance}
+                    disabled={complianceLoading}
+                    className="px-4 py-2 text-sm rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white transition-colors flex items-center gap-2"
+                  >
+                    {complianceLoading && (
+                      <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {complianceLoading
+                      ? 'Extracting…'
+                      : compliance.length > 0
+                      ? 'Regenerate'
+                      : 'Generate Compliance Matrix'}
+                  </button>
+                </div>
+              </div>
+
+              {complianceError && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 mb-3">
+                  {complianceError}
+                </div>
+              )}
+
+              {complianceMeta?.truncated && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 mb-3">
+                  Source doc was truncated to {complianceMeta.inputChars?.toLocaleString()} chars of {complianceMeta.originalChars?.toLocaleString()} for this pass. Long documents may miss late-section requirements — split big PDFs by volume if you need full coverage.
+                </div>
+              )}
+
+              {compliance.length > 0 && (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
+                    <span className="text-slate-500">{compliance.length} requirement{compliance.length === 1 ? '' : 's'}</span>
                 <span className="text-slate-700">·</span>
                 <select
                   value={categoryFilter}
@@ -1481,36 +1535,38 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 </table>
               </div>
 
-              <p className="text-xs text-slate-500 mt-3">
-                Owner and status edits live in this session only. CSV export captures the full table.
-              </p>
-            </>
-          )}
+                  <p className="text-xs text-slate-500 mt-3">
+                    Owner and status edits live in this session only. CSV export captures the full table.
+                  </p>
+                </>
+              )}
 
-          {!complianceLoading && compliance.length === 0 && !complianceError && (
-            <p className="text-sm text-slate-500">
-              Click <strong className="text-slate-300">Generate Compliance Matrix</strong> to pull every shall / must / required from the uploaded document.
-            </p>
+              {!complianceLoading && compliance.length === 0 && !complianceError && (
+                <p className="text-sm text-slate-500">
+                  Click <strong className="text-slate-300">Generate Compliance Matrix</strong> to pull every shall / must / required from the uploaded document.
+                </p>
+              )}
+            </>
           )}
         </section>
       )}
 
       {/* Step 3 · Draft Sections */}
-      {uploadedRfp && (
+      {uploadedRfp && !isRfqMode && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">
-                Step 3 · {isCapStatementMode ? 'Capability Statement Sections' : 'Draft Sections'}
+                Step 3 · {isCapStatementMode ? 'LOI Response Sections' : 'Draft Sections'}
               </p>
               <h2 className="text-lg font-semibold text-white">
                 {isCapStatementMode
-                  ? 'Capability statement drafts grounded in the notice + your profile'
+                  ? 'LOI drafts grounded in the notice + your profile'
                   : 'First drafts grounded in the RFP + your profile'}
               </h2>
               <p className="text-sm text-slate-400 mt-1">
                 {isCapStatementMode
-                  ? 'Pick a section. Mindy uses the Sources Sought / RFI text and your saved profile (NAICS, certifications, agencies worked) to write capability-statement copy — short, scannable, evidence-focused.'
+                  ? 'Pick a section. Mindy uses the Sources Sought / RFI text and your saved profile to draft the letter of intent / response narrative. Attach your existing capability statement separately when the notice asks for one.'
                   : 'Pick a section. Mindy uses the source doc and your saved profile (NAICS, set-asides, target agencies) to write a first pass with [placeholders] for facts it shouldn\'t invent.'}
               </p>
             </div>
@@ -1525,7 +1581,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             >
               {draftAllLoading
                 ? <>⏳ Drafting all sections…</>
-                : <>✨ Draft Entire {isCapStatementMode ? 'Capability Statement' : 'Proposal'}</>}
+                : <>✨ Draft Entire {isCapStatementMode ? 'LOI Response' : 'Proposal'}</>}
             </button>
           </div>
 
@@ -1565,7 +1621,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
             )}
 
-          {/* Section tabs — RFP set OR capability-statement set
+          {/* Section tabs — RFP set OR LOI/response set
               based on detected notice type. */}
           <div className="flex flex-wrap items-center gap-1 border-b border-slate-800 mb-4 -mx-1 px-1">
             {currentSectionTabs.map(tab => {
@@ -1674,45 +1730,58 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       )}
 
       {/* Step 4 · Review Checklist + Export */}
-      {uploadedRfp && (
+      {uploadedRfp && !isRfqMode && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 4 · Review &amp; Export</p>
               <h2 className="text-lg font-semibold text-white">
                 {isCapStatementMode
-                  ? 'Final review + capability statement export'
+                  ? 'Export LOI response package'
                   : 'Final compliance review + Word export'}
               </h2>
               <p className="text-sm text-slate-400 mt-1">
                 {isCapStatementMode
-                  ? 'Walk the checklist before you submit. Then export a 2-3 page capability statement .docx with company overview, past performance, capabilities, differentiators, and POC.'
+                  ? 'Export the LOI / Sources Sought response draft. If the notice asks for a capability statement, attach your existing capability statement as a separate document.'
                   : 'Walk the checklist before you ship. Then export a single .docx containing the compliance matrix, drafted sections, and the checklist appendix.'}
               </p>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-white">{checklistChecked}<span className="text-slate-500 text-base font-normal">/{checklist.length}</span></div>
-              <div className="text-xs text-slate-500">items confirmed</div>
-            </div>
+            {!isCapStatementMode && (
+              <div className="text-right">
+                <div className="text-2xl font-bold text-white">{checklistChecked}<span className="text-slate-500 text-base font-normal">/{checklist.length}</span></div>
+                <div className="text-xs text-slate-500">items confirmed</div>
+              </div>
+            )}
           </div>
 
-          <ul className="space-y-2 mb-4">
-            {checklist.map(item => (
-              <li key={item.id}>
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={item.checked}
-                    onChange={() => toggleChecklistItem(item.id)}
-                    className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-900 accent-purple-500 cursor-pointer"
-                  />
-                  <span className={`text-sm leading-relaxed ${item.checked ? 'text-slate-500 line-through' : 'text-slate-200 group-hover:text-white'}`}>
-                    {item.label}
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
+          {isCapStatementMode ? (
+            <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3 mb-4">
+              <p className="text-sm font-medium text-slate-200 mb-2">Before submitting:</p>
+              <ul className="space-y-1 text-sm text-slate-400">
+                {SS_RFI_PACKAGE_NOTES.map(note => (
+                  <li key={note}>• {note}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <ul className="space-y-2 mb-4">
+              {checklist.map(item => (
+                <li key={item.id}>
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={item.checked}
+                      onChange={() => toggleChecklistItem(item.id)}
+                      className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-900 accent-purple-500 cursor-pointer"
+                    />
+                    <span className={`text-sm leading-relaxed ${item.checked ? 'text-slate-500 line-through' : 'text-slate-200 group-hover:text-white'}`}>
+                      {item.label}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div className="border-t border-slate-800 pt-4 mt-4">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
@@ -1720,9 +1789,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <p className="text-slate-300 font-medium mb-1">Package will include:</p>
                 <ul className="space-y-0.5 text-xs">
                   <li>• Title page + table of contents</li>
-                  <li className={compliance.length > 0 ? 'text-emerald-400' : 'text-slate-600'}>
-                    {compliance.length > 0 ? '✓' : '○'} Compliance Matrix ({compliance.length} requirements)
-                  </li>
+                  {!isCapStatementMode && (
+                    <li className={compliance.length > 0 ? 'text-emerald-400' : 'text-slate-600'}>
+                      {compliance.length > 0 ? '✓' : '○'} Compliance Matrix ({compliance.length} requirements)
+                    </li>
+                  )}
                   {currentSectionTabs.map(tab => {
                     const has = !!drafts[tab.id]?.draft;
                     return (
@@ -1731,15 +1802,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       </li>
                     );
                   })}
-                  <li className="text-emerald-400">
-                    ✓ Review Checklist ({checklistChecked}/{checklist.length} complete)
-                  </li>
+                  {isCapStatementMode ? (
+                    <li className="text-slate-400">• Attach existing capability statement separately if required</li>
+                  ) : (
+                    <li className="text-emerald-400">
+                      ✓ Review Checklist ({checklistChecked}/{checklist.length} complete)
+                    </li>
+                  )}
                 </ul>
               </div>
               <button
                 type="button"
                 onClick={exportProposalPackage}
-                disabled={exporting || (!hasAnyDraft && compliance.length === 0)}
+                disabled={exporting || (!hasAnyDraft && (!compliance.length || isCapStatementMode))}
                 className="px-5 py-2.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium flex items-center gap-2 transition-colors"
               >
                 {exporting && (
@@ -1755,9 +1830,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
             )}
 
-            {!hasAnyDraft && compliance.length === 0 && !exporting && (
+            {!hasAnyDraft && (isCapStatementMode || compliance.length === 0) && !exporting && (
               <p className="text-xs text-slate-500">
-                Generate at least the compliance matrix or one section before exporting.
+                {isCapStatementMode
+                  ? 'Draft at least one LOI response section before exporting.'
+                  : 'Generate at least the compliance matrix or one section before exporting.'}
               </p>
             )}
           </div>

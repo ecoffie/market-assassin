@@ -95,7 +95,7 @@ ${banList}
 
 General rules:
 - ${isCapStmt
-    ? 'This is a CAPABILITY STATEMENT section (Sources Sought / RFI response) — short, scannable, 2-3 pages total. NOT a proposal volume.'
+    ? 'This is a Letter of Intent / market-research response section for a Sources Sought or RFI. Draft the response narrative; assume the user attaches an existing capability statement separately if requested. NOT a proposal volume.'
     : 'This is an RFP PROPOSAL section — compliant, evaluation-factor aware, federal capture voice.'}
 - Mirror language from the source document where it shows you understand the scope.
 - Use bracketed [placeholders] ONLY for facts not in the bidder profile or vault.

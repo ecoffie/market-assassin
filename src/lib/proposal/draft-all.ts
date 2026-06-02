@@ -205,7 +205,7 @@ export async function generateAllSections(opts: DraftAllOpts): Promise<DraftAllR
   const startTime = Date.now();
   const sectionTypes = opts.sectionTypes || (() => {
     // Auto-pick based on first content signal: if source mentions
-    // "Sources Sought" / "RFI" / "market research", use cap-statement
+    // "Sources Sought" / "RFI" / "market research", use LOI/response
     // sections; otherwise full RFP set.
     const lower = opts.sourceText.slice(0, 3000).toLowerCase();
     const isCapStmt = lower.includes('sources sought') || lower.includes('request for information') || /\brfi\b/.test(lower);

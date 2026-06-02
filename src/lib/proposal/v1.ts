@@ -62,7 +62,7 @@ export async function generateV1Draft(opts: {
 
   // v1's single generic system prompt
   const systemPrompt = isCapStmt
-    ? `You are a senior federal capture writer. Draft a SHORT capability-statement section for a Sources Sought or RFI response — NOT a proposal. Capability statements are 2-3 pages total, scanned in 30 seconds by agency staff doing market research.
+    ? `You are a senior federal capture writer. Draft a SHORT Letter of Intent / market-research response section for a Sources Sought or RFI — NOT a proposal. The user should attach their existing capability statement separately if the notice requests one.
 
 How to use the context you'll receive:
 - Bidder profile + vault data = FACTS about this bidder. Use them verbatim (real UEI, real past performance, real capabilities, real team). Do NOT use [placeholders] for anything the vault provides.
@@ -74,7 +74,7 @@ Rules:
 - Use bracketed [placeholders] ONLY for facts not in the bidder profile or vault.
 - Never invent facts about the bidder beyond what is provided.
 - Never use 'world-class', 'best-in-class', 'cutting-edge'.
-- Do NOT use proposal section labels like 'Executive Summary' — this is a capability statement section.
+- Do NOT use proposal section labels like 'Executive Summary' — this is an LOI / response section.
 - Output plain markdown only. No JSON. No commentary about what you wrote.`
     : `You are a senior federal proposal writer. Draft proposal section copy that is compliant, specific to the source solicitation, and grounded in the bidder's saved profile + vault.
 

@@ -13,7 +13,7 @@
  *                    proposal. Solicitation / RFP / RFQ / Combined Synopsis /
  *                    Consolidate-Bundle.
  *   - 'response'   — You DO respond (and Mindy drafts it), but it's NOT priced:
- *                    a capability statement / letter of intent / market-research
+ *                    a letter of intent / market-research
  *                    response. Sources Sought / RFI.
  *   - 'none'       — Nothing to submit. Presolicitation / Special Notice /
  *                    Award Notice / Justification / Sale of Surplus Property.
@@ -103,7 +103,7 @@ export function noticeTypeToDetected(
   if (!label) return 'unknown';
   if (respondability === 'response') {
     if (/rfi/i.test(label)) return 'rfi';
-    return 'sources_sought'; // Sources Sought uses capability-statement tabs
+    return 'sources_sought'; // Sources Sought uses LOI / response tabs
   }
   if (/rfq/i.test(label)) return 'rfq';
   if (respondability === 'bid') return 'rfp';

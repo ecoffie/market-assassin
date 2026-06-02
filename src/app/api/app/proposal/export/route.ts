@@ -44,6 +44,8 @@ interface ExportBody {
   compliance?: ComplianceRow[];
   drafts?: Record<string, DraftSection>;
   checklist?: ChecklistItem[];
+  sectionOrder?: string[];
+  packageType?: 'proposal' | 'sources_sought_loi' | 'rfq_response';
   rfpFileName?: string;
 }
 
@@ -176,6 +178,94 @@ function buildComplianceTable(rows: ComplianceRow[]): Table {
   });
 }
 
+function blank(label: string) {
+  return `${label}: ______________________________`;
+}
+
+function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: string; draft: string }> {
+  const isRfq = kind === 'rfq';
+  return [
+    {
+      label: isRfq ? 'RFQ Response Cover' : 'Letter of Intent',
+      draft: [
+        blank('Date'),
+        '',
+        blank('Attention'),
+        blank('Agency / Office'),
+        blank('Street Address'),
+        blank('City, State ZIP'),
+        '',
+        blank('Reference / Solicitation Number'),
+        blank('Project / Requirement Title'),
+        '',
+        'To whom it may concern,',
+        '',
+        `[Company Name] is pleased to submit this ${isRfq ? 'RFQ response' : 'Letter of Intent / Statement of Capability'} for the above-referenced requirement.`,
+        '',
+        blank('One-sentence summary of fit'),
+        blank('Primary NAICS / business designation'),
+        blank('Capability statement attached? Yes / No / N/A'),
+      ].join('\n'),
+    },
+    {
+      label: 'Submittal Requirements',
+      draft: [
+        blank('Submission deadline'),
+        blank('Submission email / portal'),
+        blank('Page limit / format instructions'),
+        blank('Required attachments'),
+        blank('Questions or requested information from notice'),
+        isRfq ? blank('Quoted price / rates / CLIN references') : blank('Intent statement / teaming posture'),
+      ].join('\n'),
+    },
+    {
+      label: 'Company Profile',
+      draft: [
+        blank('Company legal name'),
+        blank('Office location'),
+        blank('Number of employees'),
+        blank('UEI number'),
+        blank('CAGE code'),
+        blank('Small business designation / status claimed'),
+        blank('Bonding capacity / insurance information if requested'),
+      ].join('\n'),
+    },
+    {
+      label: 'Responsible Office / Contact Person',
+      draft: [
+        blank('Responsible office'),
+        blank('Contact person'),
+        blank('Title'),
+        blank('Phone'),
+        blank('Email'),
+        blank('Website'),
+      ].join('\n'),
+    },
+    {
+      label: 'Relevant Experience',
+      draft: [
+        'Project 1',
+        blank('Contract / project title'),
+        blank('Role: Prime / Sub'),
+        blank('Agency / customer'),
+        blank('Contract value'),
+        blank('Period of performance'),
+        blank('Point of contact'),
+        blank('Scope and relevance to this requirement'),
+        '',
+        'Project 2',
+        blank('Contract / project title'),
+        blank('Role: Prime / Sub'),
+        blank('Agency / customer'),
+        blank('Contract value'),
+        blank('Period of performance'),
+        blank('Point of contact'),
+        blank('Scope and relevance to this requirement'),
+      ].join('\n'),
+    },
+  ];
+}
+
 export async function POST(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   if (!email) {
@@ -196,12 +286,20 @@ export async function POST(request: NextRequest) {
   const drafts = body.drafts || {};
   const compliance = body.compliance || [];
   const checklist = body.checklist || [];
+  const sectionOrder = body.sectionOrder || ['exec_summary', 'technical', 'management', 'past_performance', 'pricing'];
+  const isLoiPackage = body.packageType === 'sources_sought_loi';
+  const isRfqPackage = body.packageType === 'rfq_response';
+  const isSimpleResponsePackage = isLoiPackage || isRfqPackage;
   const rfpName = body.rfpFileName || 'RFP';
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  // Section order in the final doc — only include sections that have draft content.
-  const orderedSections = ['exec_summary', 'technical', 'management', 'past_performance', 'pricing'];
+  // Section order in the final doc — caller sends the tab order currently shown
+  // in the UI so SS/RFI LOI sections export correctly too.
+  const orderedSections = sectionOrder.filter(id => drafts[id]?.draft);
+  const templateSections = orderedSections.length === 0 && isSimpleResponsePackage
+    ? buildResponseTemplateSections(isRfqPackage ? 'rfq' : 'loi')
+    : [];
 
   const children: (Paragraph | Table)[] = [];
 
@@ -210,7 +308,13 @@ export async function POST(request: NextRequest) {
     new Paragraph({
       heading: HeadingLevel.TITLE,
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: 'Proposal Package', bold: true, size: 56 })],
+      children: [new TextRun({
+        text: isSimpleResponsePackage
+          ? isRfqPackage ? 'RFQ Response Template' : 'LOI Response Template'
+          : 'Proposal Package',
+        bold: true,
+        size: 56,
+      })],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -231,11 +335,16 @@ export async function POST(request: NextRequest) {
   );
 
   const tocItems: string[] = [];
-  if (compliance.length > 0) tocItems.push(`Compliance Matrix (${compliance.length} requirements)`);
+  if (compliance.length > 0) {
+    tocItems.push(isSimpleResponsePackage
+      ? `Response Requirements (${compliance.length} items)`
+      : `Compliance Matrix (${compliance.length} requirements)`);
+  }
   for (const id of orderedSections) {
     const s = drafts[id];
     if (s && s.draft) tocItems.push(s.label);
   }
+  for (const s of templateSections) tocItems.push(s.label);
   if (checklist.length > 0) tocItems.push(`Review Checklist (${checklist.filter(c => c.checked).length}/${checklist.length} complete)`);
 
   for (const item of tocItems) {
@@ -246,10 +355,16 @@ export async function POST(request: NextRequest) {
 
   // --- Compliance matrix ---
   if (compliance.length > 0) {
-    children.push(heading('Compliance Matrix'));
+    children.push(heading(isSimpleResponsePackage ? 'Response Requirements' : 'Compliance Matrix'));
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: `${compliance.length} requirements extracted from ${rfpName}.`, italics: true, color: '666666' })],
+        children: [new TextRun({
+          text: isLoiPackage
+            ? `${compliance.length} response instructions / requested content items extracted from ${rfpName}.`
+            : `${compliance.length} requirements extracted from ${rfpName}.`,
+          italics: true,
+          color: '666666',
+        })],
       })
     );
     children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
@@ -269,6 +384,20 @@ export async function POST(request: NextRequest) {
         })
       );
     }
+    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
+    children.push(...paragraphsFromMarkdown(s.draft));
+    children.push(new Paragraph({ children: [new PageBreak()] }));
+  }
+
+  for (const s of templateSections) {
+    children.push(heading(s.label));
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: 'Complete the blanks before submission. Attach your existing capability statement separately if the notice requests it.',
+        italics: true,
+        color: '666666',
+      })],
+    }));
     children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
     children.push(...paragraphsFromMarkdown(s.draft));
     children.push(new Paragraph({ children: [new PageBreak()] }));
@@ -295,8 +424,10 @@ export async function POST(request: NextRequest) {
 
   const doc = new Document({
     creator: 'Mindy',
-    title: `Proposal Package — ${rfpName}`,
-    description: 'Compliance matrix, draft sections, and review checklist for federal proposal.',
+    title: `${isSimpleResponsePackage ? isRfqPackage ? 'RFQ Response Template' : 'LOI Response Template' : 'Proposal Package'} — ${rfpName}`,
+    description: isSimpleResponsePackage
+      ? 'Fillable response template generated by Mindy from the LOI structure.'
+      : 'Compliance matrix, draft sections, and review checklist for federal proposal.',
     sections: [{ children }],
   });
 
