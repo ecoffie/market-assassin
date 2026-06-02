@@ -62,6 +62,18 @@ export async function ensureAppWorkspaceSchema() {
         CONSTRAINT unique_mi_beta_user_settings UNIQUE (user_email)
       );
 
+      CREATE TABLE IF NOT EXISTS mi_beta_workspace_settings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id TEXT NOT NULL,
+        company_name TEXT,
+        default_naics_codes TEXT[],
+        default_agencies TEXT[],
+        updated_by TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT unique_mi_beta_workspace_settings UNIQUE (workspace_id)
+      );
+
       CREATE TABLE IF NOT EXISTS mi_beta_activity (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         workspace_id TEXT NOT NULL,
@@ -122,30 +134,70 @@ export async function ensureAppWorkspaceSchema() {
 
 export async function ensureWorkspaceMember(email: string) {
   const normalized = normalizeEmail(email);
-  const workspaceId = getWorkspaceId(normalized);
+  const personalWorkspaceId = getWorkspaceId(normalized);
   await ensureAppWorkspaceSchema();
 
   const supabase = getAppSupabase();
-  const { data: existing } = await supabase
+
+  // Look at ALL of this user's memberships, not just their personal workspace.
+  // A user invited to someone else's team has a row in THAT team's workspace
+  // (keyed by the team's domain), which getWorkspaceId(theirEmail) would never
+  // return. Without this, cross-domain invitees always landed in their own
+  // personal workspace and the invite was never accepted.
+  const { data: memberships } = await supabase
     .from('mi_beta_team_members')
     .select('*')
-    .eq('workspace_id', workspaceId)
     .eq('user_email', normalized)
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
-  if (existing) return { workspaceId, member: existing };
+  const all = (memberships || []) as Array<{
+    workspace_id: string;
+    status: string;
+    role: string;
+    id: string;
+  }>;
 
+  // Pending invite to a TEAM workspace (i.e. not the user's own personal one).
+  // Accept it: flip invited -> active, stamp accepted_at, and make that team
+  // the user's active workspace.
+  const pendingTeamInvite = all.find(
+    (m) => m.status === 'invited' && m.workspace_id !== personalWorkspaceId
+  );
+  if (pendingTeamInvite) {
+    const { data: accepted } = await supabase
+      .from('mi_beta_team_members')
+      .update({ status: 'active', accepted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', pendingTeamInvite.id)
+      .select()
+      .single();
+    return { workspaceId: pendingTeamInvite.workspace_id, member: accepted || pendingTeamInvite };
+  }
+
+  // Already an ACTIVE member of a team workspace — prefer that over personal.
+  const activeTeam = all.find(
+    (m) => m.status === 'active' && m.workspace_id !== personalWorkspaceId
+  );
+  if (activeTeam) {
+    return { workspaceId: activeTeam.workspace_id, member: activeTeam };
+  }
+
+  // Existing membership in the personal workspace — return it as-is.
+  const personal = all.find((m) => m.workspace_id === personalWorkspaceId);
+  if (personal) return { workspaceId: personalWorkspaceId, member: personal };
+
+  // Brand-new user: create their personal workspace. First member of a fresh
+  // workspace is the owner.
   const { data: teamMembers } = await supabase
     .from('mi_beta_team_members')
     .select('id')
-    .eq('workspace_id', workspaceId)
+    .eq('workspace_id', personalWorkspaceId)
     .limit(1);
 
   const role = teamMembers && teamMembers.length > 0 ? 'member' : 'owner';
   const { data: member } = await supabase
     .from('mi_beta_team_members')
     .upsert({
-      workspace_id: workspaceId,
+      workspace_id: personalWorkspaceId,
       user_email: normalized,
       role,
       status: 'active',
@@ -154,7 +206,7 @@ export async function ensureWorkspaceMember(email: string) {
     .select()
     .single();
 
-  return { workspaceId, member };
+  return { workspaceId: personalWorkspaceId, member };
 }
 
 export async function recordAppActivity({

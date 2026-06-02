@@ -26,9 +26,15 @@ export async function GET(request: NextRequest) {
   const supabase = getAppSupabase();
   const normalizedEmail = normalizeEmail(email);
 
-  const [{ data: members }, { data: settings }, { data: notificationProfile }, { data: briefingProfile }, { data: activity }, { data: pipeline }] = await Promise.all([
+  const [{ data: members }, { data: settings }, { data: workspaceSettings }, { data: notificationProfile }, { data: briefingProfile }, { data: activity }, { data: pipeline }] = await Promise.all([
     supabase.from('mi_beta_team_members').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
     supabase.from('mi_beta_user_settings').select('*').eq('user_email', normalizedEmail).maybeSingle(),
+    // Workspace-level defaults (company, NAICS, agencies) shared by all members —
+    // distinct from the per-user mi_beta_user_settings row above. Tolerate the
+    // table not existing yet (migration 20260602_workspace_settings.sql) so the
+    // rest of the workspace still loads — degrade to null.
+    supabase.from('mi_beta_workspace_settings').select('*').eq('workspace_id', workspaceId).maybeSingle()
+      .then((r: { data: unknown }) => r, () => ({ data: null })),
     supabase
       .from('user_notification_settings')
       .select('user_email, naics_codes, agencies, keywords, business_type, company_name, aggregated_profile, zip_codes')
@@ -76,6 +82,16 @@ export async function GET(request: NextRequest) {
     currentMember: member,
     members: members || [],
     settings,
+    // Workspace-level defaults for TeamPanel (company_name, naics_codes,
+    // target_agencies), shared across all members. Mapped to the field names
+    // TeamPanel's WorkspaceSettings expects.
+    workspaceSettings: workspaceSettings
+      ? {
+          company_name: workspaceSettings.company_name,
+          naics_codes: workspaceSettings.default_naics_codes,
+          target_agencies: workspaceSettings.default_agencies,
+        }
+      : null,
     profile: {
       notification: notificationProfile || null,
       briefing: briefingProfile || null,
@@ -118,7 +134,7 @@ export async function POST(request: NextRequest) {
 
   if ((seatCount || 0) >= TEAM_SEAT_LIMIT) {
     return NextResponse.json(
-      { success: false, error: `MI Team includes ${TEAM_SEAT_LIMIT} seats. Upgrade to Enterprise for more users.` },
+      { success: false, error: `Mindy Team includes ${TEAM_SEAT_LIMIT} seats. Upgrade to Enterprise for more users.` },
       { status: 403 }
     );
   }
@@ -155,7 +171,7 @@ export async function POST(request: NextRequest) {
 
   await sendEmail({
     to: invitedEmail,
-    subject: `You've been invited to join ${workspaceName} on Market Intelligence`,
+    subject: `You've been invited to join ${workspaceName} on Mindy`,
     html: generateTeamInviteEmail({
       invitedEmail,
       inviterEmail: email,
@@ -220,13 +236,13 @@ function generateTeamInviteEmail({
           <tr>
             <td style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 12px 12px 0 0; padding: 32px 24px; text-align: center;">
               <div style="width: 48px; height: 48px; margin: 0 auto 16px; background-color: rgba(255,255,255,0.2); border-radius: 12px; line-height: 48px;">
-                <span style="color: white; font-weight: bold; font-size: 18px;">MI</span>
+                <span style="color: white; font-weight: bold; font-size: 18px;">M</span>
               </div>
               <h1 style="margin: 0 0 8px; color: white; font-size: 24px; font-weight: 700;">
                 You're Invited to Join a Team
               </h1>
               <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px;">
-                Market Intelligence • GovCon Giants
+                Mindy • GovCon Giants
               </p>
             </td>
           </tr>
@@ -271,7 +287,7 @@ function generateTeamInviteEmail({
           <tr>
             <td style="background-color: #0f172a; border-top: 1px solid #334155; padding: 24px; text-align: center;">
               <p style="margin: 0 0 8px; color: #64748b; font-size: 12px;">
-                GovCon Giants AI • Market Intelligence
+                Mindy • GovCon Giants
               </p>
               <p style="margin: 0; color: #475569; font-size: 11px;">
                 Helping federal contractors win government business
@@ -298,6 +314,24 @@ export async function PATCH(request: NextRequest) {
 
   const schema = await ensureAppWorkspaceSchema();
   if (!schema.ready) return NextResponse.json({ success: false, error: schema.error }, { status: 500 });
+
+  // Member role change: { action: 'set_role', member_id, role }. Owner/admin
+  // only; the active workspace is resolved from the caller's membership so a
+  // user can only mutate members of their OWN team.
+  if (body.action === 'set_role') {
+    return setMemberRole(email, String(body.member_id || ''), String(body.role || ''));
+  }
+
+  // Workspace-level defaults (shared by all members), saved to
+  // mi_beta_workspace_settings — NOT the caller's personal settings row.
+  // Owner/admin only.
+  if (body.action === 'workspace_defaults') {
+    return saveWorkspaceDefaults(email, {
+      company_name: body.company_name ?? null,
+      naics_codes: Array.isArray(body.naics_codes) ? body.naics_codes : [],
+      target_agencies: Array.isArray(body.target_agencies) ? body.target_agencies : [],
+    });
+  }
 
   const workspaceId = getWorkspaceId(email);
   const updates = {
@@ -332,4 +366,158 @@ export async function PATCH(request: NextRequest) {
   });
 
   return NextResponse.json({ success: true, settings: data });
+}
+
+// Save workspace-level defaults (one row per workspace, shared by all members).
+// Owner/admin only. The active workspace is resolved from the caller's
+// membership so they can only edit their own team's defaults.
+async function saveWorkspaceDefaults(
+  callerEmail: string,
+  defaults: { company_name: string | null; naics_codes: string[]; target_agencies: string[] }
+) {
+  const { workspaceId, member: caller } = await ensureWorkspaceMember(callerEmail);
+  if (!['owner', 'admin'].includes(caller?.role)) {
+    return NextResponse.json({ success: false, error: 'Only owners and admins can edit workspace defaults' }, { status: 403 });
+  }
+
+  const { data, error } = await getAppSupabase()
+    .from('mi_beta_workspace_settings')
+    .upsert({
+      workspace_id: workspaceId,
+      company_name: defaults.company_name,
+      default_naics_codes: defaults.naics_codes,
+      default_agencies: defaults.target_agencies,
+      updated_by: callerEmail,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id' })
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+  await recordAppActivity({
+    workspaceId,
+    userEmail: callerEmail,
+    actorEmail: callerEmail,
+    entityType: 'settings',
+    action: 'workspace_defaults_updated',
+    summary: 'Updated workspace defaults',
+  });
+
+  return NextResponse.json({
+    success: true,
+    workspaceSettings: {
+      company_name: data.company_name,
+      naics_codes: data.default_naics_codes,
+      target_agencies: data.default_agencies,
+    },
+  });
+}
+
+const ASSIGNABLE_ROLES = ['admin', 'member', 'viewer'];
+
+// Promote / demote a teammate. Owner/admin only. Cannot change the workspace
+// owner's role, and only an owner can grant 'admin'.
+async function setMemberRole(callerEmail: string, memberId: string, role: string) {
+  if (!memberId || !ASSIGNABLE_ROLES.includes(role)) {
+    return NextResponse.json({ success: false, error: 'member_id and a valid role are required' }, { status: 400 });
+  }
+
+  const { workspaceId, member: caller } = await ensureWorkspaceMember(callerEmail);
+  if (!['owner', 'admin'].includes(caller?.role)) {
+    return NextResponse.json({ success: false, error: 'Only owners and admins can change roles' }, { status: 403 });
+  }
+  if (role === 'admin' && caller.role !== 'owner') {
+    return NextResponse.json({ success: false, error: 'Only the owner can grant admin' }, { status: 403 });
+  }
+
+  const supabase = getAppSupabase();
+  const { data: target } = await supabase
+    .from('mi_beta_team_members')
+    .select('*')
+    .eq('id', memberId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+
+  if (!target) return NextResponse.json({ success: false, error: 'Member not found in your workspace' }, { status: 404 });
+  if (target.role === 'owner') {
+    return NextResponse.json({ success: false, error: 'The workspace owner role cannot be changed' }, { status: 403 });
+  }
+
+  const { data, error } = await supabase
+    .from('mi_beta_team_members')
+    .update({ role, updated_at: new Date().toISOString() })
+    .eq('id', memberId)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+  await recordAppActivity({
+    workspaceId,
+    userEmail: callerEmail,
+    actorEmail: callerEmail,
+    entityType: 'team_member',
+    entityId: memberId,
+    action: 'role_changed',
+    summary: `Changed ${target.user_email}'s role to ${role}`,
+  });
+
+  return NextResponse.json({ success: true, member: data });
+}
+
+// Remove a teammate / cancel a pending invite. Owner/admin only. Cannot remove
+// the workspace owner.
+export async function DELETE(request: NextRequest) {
+  const email = normalizeEmail(String(request.nextUrl.searchParams.get('email') || ''));
+  const memberId = String(request.nextUrl.searchParams.get('member_id') || '');
+  if (!email || !memberId) {
+    return NextResponse.json({ success: false, error: 'email and member_id are required' }, { status: 400 });
+  }
+
+  const authSession = requireMIAuthSession(request, email);
+  if (!authSession.ok) return authSession.response;
+
+  const schema = await ensureAppWorkspaceSchema();
+  if (!schema.ready) return NextResponse.json({ success: false, error: schema.error }, { status: 500 });
+
+  const { workspaceId, member: caller } = await ensureWorkspaceMember(email);
+  if (!['owner', 'admin'].includes(caller?.role)) {
+    return NextResponse.json({ success: false, error: 'Only owners and admins can remove members' }, { status: 403 });
+  }
+
+  const supabase = getAppSupabase();
+  const { data: target } = await supabase
+    .from('mi_beta_team_members')
+    .select('*')
+    .eq('id', memberId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+
+  if (!target) return NextResponse.json({ success: false, error: 'Member not found in your workspace' }, { status: 404 });
+  if (target.role === 'owner') {
+    return NextResponse.json({ success: false, error: 'The workspace owner cannot be removed' }, { status: 403 });
+  }
+
+  const { error } = await supabase
+    .from('mi_beta_team_members')
+    .delete()
+    .eq('id', memberId)
+    .eq('workspace_id', workspaceId);
+
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+  await recordAppActivity({
+    workspaceId,
+    userEmail: email,
+    actorEmail: email,
+    entityType: 'team_member',
+    entityId: memberId,
+    action: target.status === 'invited' ? 'invite_revoked' : 'removed',
+    summary: target.status === 'invited'
+      ? `Revoked invite for ${target.user_email}`
+      : `Removed ${target.user_email} from the workspace`,
+  });
+
+  return NextResponse.json({ success: true });
 }

@@ -82,12 +82,13 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
       setReminders(data.reminders || []);
       setWorkspaceName(data.workspace?.name || 'Workspace');
       setCurrentRole(data.currentMember?.role || 'member');
-      // Load workspace settings from settings if available
-      if (data.settings) {
+      // Workspace-level defaults (shared by all members), from the dedicated
+      // mi_beta_workspace_settings record — NOT the admin's personal settings.
+      if (data.workspaceSettings) {
         const settings: WorkspaceSettings = {
-          company_name: data.settings.company_name,
-          default_naics_codes: data.settings.naics_codes,
-          default_agencies: data.settings.target_agencies,
+          company_name: data.workspaceSettings.company_name,
+          default_naics_codes: data.workspaceSettings.naics_codes,
+          default_agencies: data.workspaceSettings.target_agencies,
         };
         setWorkspaceSettings(settings);
         setSettingsForm(settings);
@@ -139,6 +140,48 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
   const hasSeatCapacity = seatsUsed < TEAM_SEAT_LIMIT || tier === 'enterprise';
   const canInvite = ['owner', 'admin'].includes(currentRole) && hasSeatCapacity;
   const canEditSettings = ['owner', 'admin'].includes(currentRole);
+  const canManageMembers = ['owner', 'admin'].includes(currentRole);
+
+  const changeRole = async (memberId: string, role: string) => {
+    if (!email) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/app/workspace', {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email, action: 'set_role', member_id: memberId, role }),
+      });
+      const data = await res.json();
+      if (!data.success) setError(data.error || 'Failed to change role');
+      else await loadWorkspace();
+    } catch {
+      setError('Failed to change role');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeMember = async (member: TeamMember) => {
+    if (!email) return;
+    const verb = member.status === 'invited' ? 'revoke this invite' : 'remove this member';
+    if (!window.confirm(`Are you sure you want to ${verb}? (${member.user_email})`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/app/workspace?email=${encodeURIComponent(email)}&member_id=${encodeURIComponent(member.id)}`,
+        { method: 'DELETE', headers: getAuthHeaders() },
+      );
+      const data = await res.json();
+      if (!data.success) setError(data.error || 'Failed to remove member');
+      else await loadWorkspace();
+    } catch {
+      setError('Failed to remove member');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const saveWorkspaceSettings = async () => {
     if (!email) return;
@@ -151,6 +194,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email,
+          action: 'workspace_defaults',
           company_name: settingsForm.company_name,
           naics_codes: settingsForm.default_naics_codes,
           target_agencies: settingsForm.default_agencies,
@@ -231,10 +275,38 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="px-2 py-1 rounded bg-slate-800 text-xs text-slate-300 capitalize">{member.role}</span>
+                  {/* Owner/admin can change a non-owner member's role inline.
+                      The owner row + your own row stay read-only badges. */}
+                  {canManageMembers && member.role !== 'owner' && member.user_email !== email ? (
+                    <select
+                      value={member.role}
+                      onChange={(e) => changeRole(member.id, e.target.value)}
+                      disabled={saving}
+                      className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs text-slate-300 capitalize outline-none focus:border-blue-500 disabled:opacity-50"
+                      aria-label={`Role for ${member.user_email}`}
+                    >
+                      {/* Only the owner can grant admin (API enforces this too) */}
+                      {currentRole === 'owner' && <option value="admin">Admin</option>}
+                      <option value="member">Member</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                  ) : (
+                    <span className="px-2 py-1 rounded bg-slate-800 text-xs text-slate-300 capitalize">{member.role}</span>
+                  )}
                   <span className={`px-2 py-1 rounded text-xs ${member.status === 'active' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
                     {member.status}
                   </span>
+                  {canManageMembers && member.role !== 'owner' && member.user_email !== email && (
+                    <button
+                      onClick={() => removeMember(member)}
+                      disabled={saving}
+                      title={member.status === 'invited' ? 'Revoke invite' : 'Remove member'}
+                      aria-label={member.status === 'invited' ? 'Revoke invite' : 'Remove member'}
+                      className="p-1 rounded text-slate-500 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
