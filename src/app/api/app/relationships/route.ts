@@ -771,15 +771,24 @@ export async function GET(request: NextRequest) {
     const { workspaceId } = await ensureWorkspaceMember(normalizedEmail);
 
     if (mode === 'pursuits') {
+      // Only LIVE pursuits should appear in the "Save + attach to:" dropdown.
+      // Attaching a contact to a won/lost/no-bid or archived pursuit is never
+      // what the user wants — those are closed out. Filter terminal stages and
+      // archived rows here so every consumer of mode=pursuits stays clean
+      // (mirrors the live-only filter in ContactsPanel / ProposalsPanel).
       const { data, error } = await getSupabase()
         .from('user_pipeline')
-        .select('id,title,agency,stage,response_deadline')
+        .select('id,title,agency,stage,response_deadline,is_archived')
         .or(`workspace_id.eq.${workspaceId},user_email.eq.${normalizedEmail}`)
+        .not('stage', 'in', '("won","lost","no_bid","archived")')
         .order('updated_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      return NextResponse.json({ success: true, pursuits: data || [] });
+      const livePursuits = (data || []).filter(
+        (p: { is_archived?: boolean }) => !p.is_archived
+      );
+      return NextResponse.json({ success: true, pursuits: livePursuits });
     }
 
     if (mode === 'candidates') {

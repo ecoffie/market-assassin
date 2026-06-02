@@ -27,6 +27,24 @@ function agencySlug(name: string): string {
     .replace(/^-+|-+$/g, '') || 'agency';
 }
 
+// Remove duplicate rows from the pain-point / need / priority lists. The same
+// agency can appear more than once in the selection (e.g. picked both as a
+// parent agency and as a sub-office that resolves to the same name), and
+// flatMap then repeats every pain point / need for it — surfacing identical
+// "AGENCY / same text" rows in the report cards. Key on the normalized
+// (agency + text) pair and keep the first occurrence.
+function dedupeBy<T>(items: T[], key: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const k = key(item).toLowerCase().replace(/\s+/g, ' ').trim();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
+}
+
 function buildFallbackAgencyData(selectedAgencies: string[]): Agency[] {
   const uniqueAgencies = [...new Set(selectedAgencies.map((agency) => agency.trim()).filter(Boolean))];
 
@@ -294,12 +312,18 @@ export async function POST(request: NextRequest) {
     };
 
     // Generate Agency Pain Points & Spending Priorities Report (Enhanced)
-    const allPainPoints = agenciesWithPainPoints.flatMap(a =>
-      a.painPoints.map(pp => ({ agency: a.name, painPoint: pp }))
+    const allPainPoints = dedupeBy(
+      agenciesWithPainPoints.flatMap(a =>
+        a.painPoints.map(pp => ({ agency: a.name, painPoint: pp }))
+      ),
+      x => `${x.agency}|${x.painPoint}`
     );
 
-    const allPriorities = agenciesWithPainPoints.flatMap(a =>
-      (a.priorities || []).map(pr => ({ agency: a.name, priority: pr }))
+    const allPriorities = dedupeBy(
+      agenciesWithPainPoints.flatMap(a =>
+        (a.priorities || []).map(pr => ({ agency: a.name, priority: pr }))
+      ),
+      x => `${x.agency}|${x.priority}`
     );
 
     // NAICS-to-keyword mapping for relevance scoring
@@ -660,6 +684,10 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        // Same agency selected twice (parent + sub-office) repeats identical
+        // "AGENCY / requirement" rows — dedupe so the card and the count agree.
+        needs = dedupeBy(needs, n => `${n.agency}|${n.requirement}`);
+
         const totalNeeds = needs.length;
         const matchedNeeds = needs.filter(n =>
           n.capabilityMatch !== 'General capabilities align with agency needs'
@@ -672,7 +700,10 @@ export async function POST(request: NextRequest) {
         ).length;
 
         return {
-          needs: needs.slice(0, 20), // Top 20 needs
+          // Expose `need` (the field the dashboard card + type expect) alongside
+          // the original `requirement`, so the second line renders instead of
+          // showing blank. Keep the rest of the shape intact.
+          needs: needs.slice(0, 20).map(n => ({ ...n, need: n.requirement })), // Top 20 needs
           summary: {
             totalNeeds,
             matchRate,
