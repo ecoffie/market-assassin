@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
+import { ensureWorkspaceMember } from '@/lib/app/workspace';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,26 @@ function getSupabase() {
     );
   }
   return _supabase;
+}
+
+// A pursuit belongs to the caller if their email matches OR it lives in their
+// workspace. The pipeline LIST endpoint scopes the same way, so a workspace
+// pursuit shows up in the picker — matching only on user_email here 403'd those
+// rows ("not your pursuit") even though the user could see them.
+async function ownsPursuit(
+  row: { user_email?: string | null; workspace_id?: string | null },
+  email: string
+): Promise<boolean> {
+  if (row.user_email?.toLowerCase() === email.toLowerCase()) return true;
+  if (row.workspace_id) {
+    try {
+      const { workspaceId } = await ensureWorkspaceMember(email.toLowerCase());
+      if (workspaceId && row.workspace_id === workspaceId) return true;
+    } catch {
+      // Workspace lookup unavailable — deny.
+    }
+  }
+  return false;
 }
 
 export async function GET(request: NextRequest) {
@@ -54,7 +75,7 @@ export async function GET(request: NextRequest) {
   // pursuit context for the UI in one round-trip).
   const { data: pipelineRow, error: pipelineErr } = await supabase
     .from('user_pipeline')
-    .select('id, user_email, title, agency, notice_id, naics_code, set_aside, response_deadline, docs_status, docs_count, docs_fetched_at')
+    .select('id, user_email, workspace_id, title, agency, notice_id, naics_code, set_aside, response_deadline, docs_status, docs_count, docs_fetched_at')
     .eq('id', pipelineId)
     .single();
 
@@ -64,7 +85,7 @@ export async function GET(request: NextRequest) {
       { status: 404 }
     );
   }
-  if (pipelineRow.user_email !== email) {
+  if (!(await ownsPursuit(pipelineRow, email))) {
     return NextResponse.json(
       { success: false, error: 'not your pursuit' },
       { status: 403 }
@@ -132,14 +153,14 @@ export async function POST(request: NextRequest) {
 
   const { data: pipelineRow, error: pipelineErr } = await supabase
     .from('user_pipeline')
-    .select('id, user_email, notice_id, title')
+    .select('id, user_email, workspace_id, notice_id, title')
     .eq('id', pipelineId)
     .single();
 
   if (pipelineErr || !pipelineRow) {
     return NextResponse.json({ success: false, error: 'pursuit not found' }, { status: 404 });
   }
-  if (pipelineRow.user_email !== email) {
+  if (!(await ownsPursuit(pipelineRow, email))) {
     return NextResponse.json({ success: false, error: 'not your pursuit' }, { status: 403 });
   }
   if (!pipelineRow.notice_id) {

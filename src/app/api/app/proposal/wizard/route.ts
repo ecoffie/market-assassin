@@ -30,6 +30,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { archiveContent, type ArchiveContentType } from '@/lib/archive/persist';
+import { ensureWorkspaceMember } from '@/lib/app/workspace';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { generateAllSections } from '@/lib/proposal/draft-all';
@@ -165,14 +166,33 @@ interface DraftArtifact {
 async function loadPipeline(pipelineId: string, email: string): Promise<PipelineRow | null> {
   const { data } = await getSupabase()
     .from('user_pipeline')
-    .select('id, user_email, title, agency, notice_id, naics_code, set_aside, response_deadline, docs_status, docs_count')
+    .select('id, user_email, workspace_id, title, agency, notice_id, naics_code, set_aside, response_deadline, docs_status, docs_count')
     .eq('id', pipelineId)
     .single();
   if (!data) return null;
-  // Pipeline rows are user-scoped — block cross-user reads even with
-  // service role (RLS equivalent).
-  if (data.user_email?.toLowerCase() !== email.toLowerCase()) return null;
-  return data as PipelineRow;
+
+  // Ownership check (service-role RLS equivalent). A pursuit belongs to the
+  // caller if their email matches OR it lives in their workspace. The pipeline
+  // LIST endpoint (/api/pipeline) scopes the same way —
+  // .or(workspace_id.eq.<ws>, user_email.eq.<email>) — so a workspace-owned
+  // pursuit shows up in the picker. Matching only on user_email here meant the
+  // wizard couldn't find those rows: the panel listed the pursuit but the brief
+  // / docs calls 404'd with "pursuit not found".
+  const normalizedEmail = email.toLowerCase();
+  if (data.user_email?.toLowerCase() === normalizedEmail) {
+    return data as PipelineRow;
+  }
+  if (data.workspace_id) {
+    try {
+      const { workspaceId } = await ensureWorkspaceMember(normalizedEmail);
+      if (workspaceId && data.workspace_id === workspaceId) {
+        return data as PipelineRow;
+      }
+    } catch {
+      // Workspace lookup unavailable — fall through to deny.
+    }
+  }
+  return null;
 }
 
 async function loadPursuitDocs(pipelineId: string): Promise<PursuitDocRow[]> {
