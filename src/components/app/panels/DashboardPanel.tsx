@@ -524,6 +524,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [savingPipeline, setSavingPipeline] = useState<Set<string>>(new Set());
   const [pipelineSaved, setPipelineSaved] = useState<Set<string>>(new Set());
+  // Collapse the Past Briefings rail to give the briefing content full width.
+  const [briefingsCollapsed, setBriefingsCollapsed] = useState(false);
   // briefing item id -> pipeline row id, so the toast's Undo action
   // can DELETE the row that was just inserted. Populated only after
   // the API returns success.
@@ -1008,10 +1010,33 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr]">
+        <div className={`grid grid-cols-1 ${briefingsCollapsed ? 'lg:grid-cols-[44px_1fr]' : 'lg:grid-cols-[280px_1fr]'}`}>
+          {briefingsCollapsed ? (
+            // Collapsed: a slim rail with a button to bring the list back.
+            <aside className="hidden lg:flex flex-col items-center border-r border-slate-800 bg-slate-950/80 lg:min-h-[calc(100vh-202px)] py-4">
+              <button
+                onClick={() => setBriefingsCollapsed(false)}
+                title="Show past briefings"
+                aria-label="Show past briefings"
+                className="p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+              >
+                <span className="block text-lg leading-none">»</span>
+              </button>
+            </aside>
+          ) : (
           <aside className="border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-950/80 lg:min-h-[calc(100vh-202px)]">
             <div className="p-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Past Briefings</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Past Briefings</p>
+                <button
+                  onClick={() => setBriefingsCollapsed(true)}
+                  title="Collapse past briefings"
+                  aria-label="Collapse past briefings"
+                  className="hidden lg:block p-1 rounded text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
+                >
+                  <span className="block text-sm leading-none">«</span>
+                </button>
+              </div>
               <div className="flex lg:block gap-2 overflow-x-auto">
                 {briefings.map(entry => {
                   const key = getBriefingKey(entry);
@@ -1040,6 +1065,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
               </div>
             </div>
           </aside>
+          )}
 
           <main className="p-4 lg:p-8 max-w-6xl">
             <div className="mb-5">

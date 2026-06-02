@@ -379,27 +379,42 @@ export default function UnifiedSidebar({
       >
       {/* Header */}
       <div className="p-4 border-b border-slate-800">
-        <div className="flex items-center justify-between">
-          {!isCollapsed && (
+        {isCollapsed ? (
+          // Collapsed: the logo IS the expand control. Clicking it reopens the
+          // sidebar — guarantees a reachable expand action in the narrow rail
+          // (the old layout pushed the arrow off the 64px edge, leaving no way
+          // to reopen). PanelLeftOpen hint shows on hover.
+          <button
+            onClick={onToggleCollapse}
+            className="group relative w-full flex items-center justify-center hover:bg-slate-800 rounded-lg py-1 transition-colors"
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+          >
+            <MindyLogo size={32} />
+            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+              Expand sidebar
+            </span>
+          </button>
+        ) : (
+          <div className="flex items-center justify-between">
             <Link href="/app" className="flex items-center gap-2">
               <MindyLogo size={32} />
               <div>
                 <span className="font-semibold text-white text-sm">Mindy</span>
               </div>
             </Link>
-          )}
-          {isCollapsed && (
-            <MindyLogo size={32} className="mx-auto" />
-          )}
-          {onToggleCollapse && (
-            <button
-              onClick={onToggleCollapse}
-              className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
-            >
-              {isCollapsed ? '→' : '←'}
-            </button>
-          )}
-        </div>
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+                title="Collapse sidebar"
+                aria-label="Collapse sidebar"
+              >
+                ←
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Tier Badge */}
         {!isCollapsed && (
@@ -419,12 +434,13 @@ export default function UnifiedSidebar({
         />
       )}
 
-      {/* Navigation */}
-      {/* When collapsed, allow horizontal overflow so the hover tooltips can
-          escape past the narrow w-16 rail. overflow-y-auto forces x to hidden,
-          which would clip them — so use overflow-visible in collapsed mode.
-          The compact icon list rarely needs y-scroll when collapsed anyway. */}
-      <nav className={`flex-1 py-4 ${isCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
+      {/* Navigation — always vertically scrollable so the nav list can never
+          push the footer (and its controls) off-screen. (A previous
+          overflow-visible-when-collapsed tweak for tooltip escape did exactly
+          that, leaving no reachable expand control on short viewports — the
+          collapsed expand action now lives on the header logo, which is always
+          visible regardless of nav scroll.) */}
+      <nav className="flex-1 py-4 overflow-y-auto">
         {NAV_SECTIONS.map((section) => {
           // SaaS-standard ordering (Linear / Notion pattern): items the
           // current user can actually use come first, locked items after.
