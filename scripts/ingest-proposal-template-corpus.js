@@ -108,13 +108,20 @@ function hasAny(text, needles) {
   return needles.some((needle) => text.includes(needle));
 }
 
-function classifyDocType(filePath, filename) {
+function classifyDocType(filePath, filename, fullText = '') {
   const p = filePath.toLowerCase();
   const n = filename.toLowerCase();
+  const head = fullText.slice(0, 1500).toLowerCase();
   const combined = `${p} ${n}`;
 
   if (n.includes('eda rfi response') || n.includes('rfi response')) return 'rfi_response';
+  if (n.includes('gcg eda national pilot program')) return 'rfi_response';
   if (n.includes('rfq') && hasAny(n, ['response', 'proposal', 'quote'])) return 'rfq_response';
+  if (hasAny(n, ['cap statement', 'capability statement'])) return 'cap_statement';
+  if (
+    hasAny(head.slice(0, 500), ['capability statement', 'capabilities statement']) &&
+    !head.includes('dear ')
+  ) return 'cap_statement';
 
   if (
     p.includes('sample loi') ||
@@ -124,7 +131,6 @@ function classifyDocType(filePath, filename) {
     return 'sources_sought_loi';
   }
 
-  if (hasAny(n, ['cap statement', 'capability statement'])) return 'cap_statement';
   if (hasAny(n, ['past performance', 'volume ii_past performance'])) return 'past_performance';
 
   if (
@@ -235,12 +241,12 @@ async function main() {
       const buffer = fs.readFileSync(file.path);
       const { text, pageCount } = await extractText(file.path, file.ext);
       const cleanText = (text || '').slice(0, 1_500_000);
-      if (!cleanText.trim()) {
-        failed.push({ path: file.path, error: 'empty extraction' });
+      if (cleanText.trim().length < 200) {
+        failed.push({ path: file.path, error: `too little extracted text (${cleanText.trim().length} chars)` });
         continue;
       }
       const filename = path.basename(file.path);
-      const docType = classifyDocType(file.path, filename);
+      const docType = classifyDocType(file.path, filename, cleanText);
       const wordCount = cleanText.split(/\s+/).filter(Boolean).length;
       docs.push({
         sourcePath: file.path,
@@ -278,6 +284,7 @@ async function main() {
 
   console.log(`\nPosting ${docs.length} docs in batches...`);
   const totals = { batches: 0, updatedDocuments: 0, insertedChunks: 0, failed: 0 };
+  const failedResults = [];
   for (let i = 0; i < docs.length; i += 5) {
     const batch = docs.slice(i, i + 5);
     const result = await postBatch(batch);
@@ -285,6 +292,9 @@ async function main() {
     totals.updatedDocuments += result.updatedDocuments || 0;
     totals.insertedChunks += result.insertedChunks || 0;
     totals.failed += result.failed || 0;
+    if (Array.isArray(result.results)) {
+      failedResults.push(...result.results.filter((item) => item.status === 'failed'));
+    }
     console.log(`[${String(i + batch.length).padStart(3)}/${docs.length}]`, {
       received: result.received,
       updatedDocuments: result.updatedDocuments,
@@ -295,6 +305,12 @@ async function main() {
   }
 
   console.log('\nComplete:', totals);
+  if (failedResults.length > 0) {
+    console.log('Failed admin upserts:');
+    failedResults.forEach((item) => {
+      console.log(`  ${item.docType || '?'} ${item.filename || item.sourcePath}: ${item.error || 'unknown error'}`);
+    });
+  }
   if (!APPLY) console.log('Dry run only. Re-run with --apply to write documents and chunks.');
 }
 

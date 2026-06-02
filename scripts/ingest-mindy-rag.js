@@ -146,13 +146,22 @@ function hasResponseIntent(name) {
   );
 }
 
+function hasLoiIntent(name) {
+  return (
+    /\bss\s*-\s*loi\b/.test(name) ||
+    /\bloi\b/.test(name) ||
+    name.includes('letter of intent') ||
+    name.includes('sample_loi') ||
+    name.includes('sources sought template') ||
+    name.includes('sources sought tempate')
+  );
+}
+
 function classifyDocType(filePath, filename) {
   const p = filePath.toLowerCase();
   const n = filename.toLowerCase();
   if (
-    n.includes('loi') ||
-    n.includes('letter of intent') ||
-    p.includes('sample loi') ||
+    hasLoiIntent(n) ||
     (n.includes('statement of capability') && (p.includes('sources sought') || p.includes('source sought')))
   ) return 'sources_sought_loi';
   if (n.includes('sources sought') || n.includes('source sought')) return 'sources_sought_loi';

@@ -29,14 +29,6 @@ const PROTECTED_TEACHING_TYPES = new Set([
   'ebook',
 ]);
 
-function textFor(input: ClassifyInput): string {
-  return [
-    input.filename || '',
-    input.title || '',
-    input.sourcePath || '',
-  ].join(' ').toLowerCase();
-}
-
 function isProtectedTeachingDoc(input: ClassifyInput): boolean {
   const current = input.currentDocType || '';
   const sourcePath = (input.sourcePath || '').toLowerCase();
@@ -54,8 +46,18 @@ function hasResponseIntent(text: string): boolean {
   );
 }
 
+function hasLoiIntent(text: string): boolean {
+  return (
+    /\bss\s*-\s*loi\b/.test(text) ||
+    /\bloi\b/.test(text) ||
+    text.includes('letter of intent') ||
+    text.includes('sample_loi') ||
+    text.includes('sources sought template') ||
+    text.includes('sources sought tempate')
+  );
+}
+
 export function classifyRagDocCandidate(input: ClassifyInput): RagDocTypeSuggestion | null {
-  const haystack = textFor(input);
   const fileTitle = [input.filename || '', input.title || ''].join(' ').toLowerCase();
   const protectedTeaching = isProtectedTeachingDoc(input);
 
@@ -64,7 +66,7 @@ export function classifyRagDocCandidate(input: ClassifyInput): RagDocTypeSuggest
     return suggestion;
   };
 
-  if (/\bss\s*-\s*loi\b/.test(fileTitle) || fileTitle.includes('letter of intent') || haystack.includes('sample loi')) {
+  if (hasLoiIntent(fileTitle)) {
     return actualDocumentOnly({
       suggestedDocType: 'sources_sought_loi',
       confidence: 'high',

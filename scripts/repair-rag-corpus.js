@@ -67,6 +67,17 @@ function hasResponseIntent(text) {
   );
 }
 
+function hasLoiIntent(text) {
+  return (
+    /\bss\s*-\s*loi\b/.test(text) ||
+    /\bloi\b/.test(text) ||
+    text.includes('letter of intent') ||
+    text.includes('sample_loi') ||
+    text.includes('sources sought template') ||
+    text.includes('sources sought tempate')
+  );
+}
+
 function classifyDoc(doc) {
   const filename = String(doc.filename || '').toLowerCase();
   const title = String(doc.title || '').toLowerCase();
@@ -80,7 +91,7 @@ function classifyDoc(doc) {
     return { suggestedDocType, confidence, reason };
   };
 
-  if (/\bss\s*-\s*loi\b/.test(fileTitle) || fileTitle.includes('letter of intent') || sourcePath.includes('sample loi')) {
+  if (hasLoiIntent(fileTitle)) {
     return actualDocumentOnly('sources_sought_loi', 'high', 'filename/title indicates an LOI or Sources Sought LOI document');
   }
 
