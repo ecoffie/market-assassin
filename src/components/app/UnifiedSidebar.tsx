@@ -22,6 +22,8 @@ import {
   Library,
   Settings,
   Lock,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
@@ -556,7 +558,7 @@ export default function UnifiedSidebar({
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-4 border-t border-slate-800 space-y-2">
         {!isCollapsed && userTier === 'free' && (
           <Link
             href="/market-intelligence"
@@ -564,6 +566,23 @@ export default function UnifiedSidebar({
           >
             Upgrade to Pro
           </Link>
+        )}
+        {/* Collapse / expand control — pinned at the bottom of the sidebar
+            (SaaS standard: Firecrawl, Gamma, Linear). The header arrow was
+            easy to miss when collapsed, so surface an obvious, labeled toggle
+            here that works in both states. */}
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className={`w-full flex items-center rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-white transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed
+              ? <PanelLeftOpen className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+              : <PanelLeftClose className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />}
+            {!isCollapsed && <span>Collapse</span>}
+          </button>
         )}
       </div>
       </aside>
