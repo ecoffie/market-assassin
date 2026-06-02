@@ -42,6 +42,15 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 // weekly-ish USAspending refresh cadence with margin to spare.
 export const revalidate = 86400;
 
+// Minimum distinct agencies / NAICS codes a contractor needs before we
+// emit its /agencies or /naics sub-page in the sitemap. Below this the
+// table is near-empty (1-2 rows) and Google parks it as "Crawled -
+// currently not indexed", burning crawl budget. 5 is the knee where the
+// page has enough unique data to read as substantive. /contracts is
+// never gated — every recipient has award rows and it's the primary
+// brand-search SEO target.
+const SUBPAGE_MIN_ROWS = 5;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1) Top-level marketing + intro pages. Priority 1.0 because
   // these are the entry points where Google sends people first.
@@ -151,8 +160,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // target (e.g. "lockheed martin contracts"). Slightly lower
     // priority than overview since overview is the canonical entry
     // point for brand-search intent.
+    //
+    // Thin-page gate: a contractor with only 1-2 agencies (or NAICS
+    // codes) renders a near-empty table on /agencies (or /naics).
+    // Google crawls those, sees almost no unique content, and parks
+    // them under "Crawled - currently not indexed" — wasting crawl
+    // budget that should go to the pages that can actually rank. So we
+    // only emit a tab when the contractor has enough rows to make it a
+    // substantive page. /contracts always emits: every recipient has
+    // award rows by definition, and it's the core brand-search target.
     const subPagePriority = Math.max(priority - 0.1, 0.2);
-    for (const tab of ['contracts', 'agencies', 'naics']) {
+    const tabs = ['contracts'];
+    if ((c.distinct_agency_count || 0) >= SUBPAGE_MIN_ROWS) tabs.push('agencies');
+    if ((c.distinct_naics_count || 0) >= SUBPAGE_MIN_ROWS) tabs.push('naics');
+    for (const tab of tabs) {
       contractorEntries.push({
         url: `${SITE_URL}/contractors/${slug}/${tab}`,
         lastModified: now,

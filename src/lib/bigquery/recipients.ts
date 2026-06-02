@@ -471,15 +471,28 @@ export interface SimilarRecipientRow {
 export interface SitemapRecipientRow {
   recipient_name: string;
   total_obligated: number;
+  // Used to gate thin sub-pages out of the sitemap. A contractor with
+  // only 1-2 agencies (or NAICS codes) renders a near-empty /agencies
+  // (or /naics) sub-page that Google crawls and then parks as
+  // "Crawled - currently not indexed". Emitting those URLs just wastes
+  // crawl budget, so the sitemap skips them below SUBPAGE_MIN_ROWS.
+  distinct_agency_count: number;
+  distinct_naics_count: number;
 }
 
 export async function getTopRecipientsForSitemap(
   limit = 12000,
 ): Promise<SitemapRecipientRow[]> {
   return queryCached<SitemapRecipientRow>({
-    cacheKey: `sitemap:top-recipients:${limit}`,
+    // cache key bumped to :v2 — the v1 cached payload predates the
+    // distinct_*_count columns, so the old entry would be missing them.
+    cacheKey: `sitemap:top-recipients:${limit}:v2`,
     query: `
-      SELECT recipient_name, total_obligated
+      SELECT
+        recipient_name,
+        total_obligated,
+        distinct_agency_count,
+        distinct_naics_count
       FROM ${BQ_TABLES.recipients}
       WHERE recipient_name IS NOT NULL AND recipient_name != ''
       ORDER BY total_obligated DESC
