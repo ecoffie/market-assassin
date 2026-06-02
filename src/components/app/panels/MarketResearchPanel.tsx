@@ -4839,6 +4839,10 @@ function getOpportunityDueDate(opportunity: RecommendedOpportunity): string | nu
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function formatCount(value?: number | null): string {
+  return Math.round(value || 0).toLocaleString('en-US');
+}
+
 function LiveOpportunityFallback({
   title,
   emptyCopy,
@@ -5065,7 +5069,7 @@ function ReportViewer({
               <div className="text-xs text-slate-500">Total Spending</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{(reportData as ReportData['governmentBuyers'])?.summary?.totalContracts || 0}</div>
+              <div className="text-lg font-bold text-white">{formatCount((reportData as ReportData['governmentBuyers'])?.summary?.totalContracts)}</div>
               <div className="text-xs text-slate-500">Contracts</div>
             </div>
           </div>
@@ -5081,7 +5085,7 @@ function ReportViewer({
                     {agency.parentAgency && <div className="text-xs text-slate-500">{agency.parentAgency}</div>}
                     <div className="flex gap-4 mt-2 text-sm">
                       <span className="text-emerald-400">{formatCurrency(agency.spending)}</span>
-                      <span className="text-slate-400">{agency.contractCount} contracts</span>
+                      <span className="text-slate-400">{formatCount(agency.contractCount)} contracts</span>
                     </div>
                   </div>
                   {tier !== 'free' && (
@@ -5308,7 +5312,7 @@ function ReportViewer({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{(reportData as ReportData['idvContracts'])?.summary?.totalContracts || 0}</div>
+              <div className="text-lg font-bold text-white">{formatCount((reportData as ReportData['idvContracts'])?.summary?.totalContracts)}</div>
               <div className="text-xs text-slate-500">IDV Contracts</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-3">
@@ -5384,7 +5388,7 @@ function ReportViewer({
               <div className="text-xs text-slate-500">SAT Spending</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{analyticsReport?.summary?.totalSATContracts || 0}</div>
+              <div className="text-lg font-bold text-white">{formatCount(analyticsReport?.summary?.totalSATContracts)}</div>
               <div className="text-xs text-slate-500">SAT Contracts</div>
             </div>
           </div>
@@ -5402,7 +5406,7 @@ function ReportViewer({
               </div>
               <div className="flex gap-4 mt-2 text-sm">
                 <span className="text-emerald-400">{formatCurrency(agency.satSpending)}</span>
-                <span className="text-slate-400">{agency.satContractCount} contracts</span>
+                <span className="text-slate-400">{formatCount(agency.satContractCount)} contracts</span>
               </div>
             </div>
           ))}
