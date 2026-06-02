@@ -33,6 +33,14 @@ interface PipelineOpportunity {
   win_probability?: number;
 }
 
+function isTerminalPipelineStage(stage?: string | null): boolean {
+  return ['won', 'lost', 'no_bid', 'archived'].includes(stage || '');
+}
+
+function isMissingPursuitError(error?: string | null): boolean {
+  return (error || '').toLowerCase().includes('pursuit not found');
+}
+
 const QUESTION_PROMPTS = [
   'What evaluation factors matter most, and are any more important than price?',
   'Are there incumbent performance issues or delivery risks we should address directly?',
@@ -136,6 +144,7 @@ const DEFAULT_CHECKLIST: ChecklistItemState[] = [
 export default function ProposalsPanel({ email, tier, panelContext }: ProposalsPanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [selectedId, setSelectedId] = useState('');
+  const [pipelineLoaded, setPipelineLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedRfp, setUploadedRfp] = useState<UploadedRfp | null>(null);
@@ -159,7 +168,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // users who open Proposal Assist directly can still begin a draft.
   const [localPursuitId, setLocalPursuitId] = useState<string | null>(null);
   const contextPursuitId = typeof panelContext?.pursuit_id === 'string' ? panelContext.pursuit_id : null;
-  const activePursuitId = localPursuitId || contextPursuitId;
+  const livePursuitIds = useMemo(() => new Set(opportunities.map((opp) => opp.id)), [opportunities]);
+  const contextPursuitIsLive = Boolean(contextPursuitId && livePursuitIds.has(contextPursuitId));
+  const activePursuitId = localPursuitId || (contextPursuitIsLive ? contextPursuitId : null);
+  const staleContextPursuit = Boolean(pipelineLoaded && contextPursuitId && !contextPursuitIsLive && !localPursuitId);
   // Reset to Stage 1 when the user switches to a different pursuit so
   // they always see the brief first.
   useEffect(() => {
@@ -684,17 +696,24 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       // finished or shelved pursuit. (Previously no_bid + is_archived
       // leaked through, so the picker showed non-bidding pursuits.)
       const active = (data.opportunities || []).filter((opp: PipelineOpportunity & { is_archived?: boolean }) => (
-        !opp.is_archived && !['won', 'lost', 'no_bid', 'archived'].includes(opp.stage || '')
+        !opp.is_archived && !isTerminalPipelineStage(opp.stage)
       ));
       setOpportunities(active);
-      setSelectedId(current => current || active[0]?.id || '');
+      const activeIds = new Set(active.map((opp: PipelineOpportunity) => opp.id));
+      setLocalPursuitId((current) => (current && activeIds.has(current) ? current : null));
+      setSelectedId((current) => {
+        if (current && activeIds.has(current)) return current;
+        if (contextPursuitId && activeIds.has(contextPursuitId)) return contextPursuitId;
+        return active[0]?.id || '';
+      });
     } catch (err) {
       console.error('Failed to load proposal pursuits:', err);
       setError('Failed to load pursuits');
     } finally {
+      setPipelineLoaded(true);
       setLoading(false);
     }
-  }, [email, getAuthHeaders, tier]);
+  }, [contextPursuitId, email, getAuthHeaders, tier]);
 
   useEffect(() => {
     loadPipeline();
@@ -723,9 +742,23 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     fetch(`/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pursuitId)}`, {
       headers: getAuthHeaders(),
     })
-      .then(r => r.ok ? r.json() : null)
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data?.success) {
+          return { success: false, error: data?.error || `HTTP ${r.status}` };
+        }
+        return data;
+      })
       .then(data => {
-        if (cancelled || !data?.success) {
+        if (cancelled) return;
+        if (!data?.success) {
+          if (isMissingPursuitError(data?.error)) {
+            setLocalPursuitId(null);
+            setSelectedId(opportunities[0]?.id || '');
+            setAutoLoadStatus('idle');
+            setAutoLoadMessage(null);
+            return;
+          }
           if (!cancelled) {
             setAutoLoadStatus('error');
             setAutoLoadMessage('Could not load pursuit docs');
@@ -815,7 +848,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       });
 
     return () => { cancelled = true; };
-  }, [activePursuitId, email, getAuthHeaders]);
+  }, [activePursuitId, email, getAuthHeaders, opportunities]);
 
   if (tier === 'free') {
     return (
@@ -854,6 +887,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           {loading ? 'Refreshing...' : 'Refresh Pursuits'}
         </button>
       </div>
+
+      {staleContextPursuit && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+          That saved pursuit is no longer available. Choose another live pursuit below, or upload an RFP manually.
+        </div>
+      )}
 
       {/* Start from a saved pursuit — entry point for users who open
           Proposal Assist directly (no Pipeline "Draft Proposal" click).
