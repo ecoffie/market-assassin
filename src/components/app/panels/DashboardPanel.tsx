@@ -179,6 +179,48 @@ function getBriefingItemLocation(item: BriefingItem, liveLocations: Record<strin
   return '';
 }
 
+// Resolve a value (NAICS / set-aside) for a briefing item from a live SAM
+// lookup map, keyed by id / solicitation# / normalized title — same scheme as
+// getBriefingItemLocation. Used to backfill the Industry/Set-Aside detail line
+// on items stored without those fields.
+function resolveFromLive(item: BriefingItem, map: Record<string, string>): string {
+  const keys = [
+    item.id,
+    getSolicitationFromSignals(item.signals),
+    normalizeLookupKey(item.title),
+  ].filter(Boolean);
+  for (const key of keys) {
+    const v = map[key] || map[normalizeLookupKey(key)];
+    if (v) return v;
+  }
+  return '';
+}
+
+// Build the Industry/Set-Aside detail line, falling back to live SAM data when
+// the briefing item lacks it. Returns '' if nothing is available so the caller
+// can hide the line rather than show a generic placeholder.
+function buildItemDetailLine(
+  item: BriefingItem,
+  liveNaics: Record<string, string>,
+  liveSetAside: Record<string, string>,
+): string {
+  // If the item already has a real (non-placeholder) detail line, keep it.
+  const existing = (item.detailLine || '').trim();
+  const isPlaceholder = /click to view full details/i.test(existing) || /active opportunity matching your profile\.?$/i.test(existing);
+  if (existing && !isPlaceholder) return existing;
+
+  const naics = resolveFromLive(item, liveNaics);
+  const setAside = resolveFromLive(item, liveSetAside);
+  const parts: string[] = [];
+  if (naics) {
+    const title = getNaics(naics)?.title;
+    parts.push(`Industry: NAICS ${naics}${title ? ` (${title})` : ''}`);
+  }
+  if (setAside) parts.push(`Set-Aside: ${setAside}`);
+  if (parts.length > 0) return parts.join(' • ');
+  return existing; // keep placeholder only if we found nothing better
+}
+
 // Look up the SAM attachment list for an item — first from the item
 // itself, then matched against the live opportunities feed by id /
 // solicitation / title (same keying as locations/buyers).
@@ -559,6 +601,11 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   // liveLocations, so the expanded card can list the document files
   // (same as the Market Dashboard does).
   const [liveAttachments, setLiveAttachments] = useState<Record<string, unknown[]>>({});
+  // NAICS + set-aside per opportunity from the live SAM feed, keyed the same
+  // way. Lets us backfill the Industry/Set-Aside line on briefing items that
+  // were stored without those fields (e.g. older deadlinesThisWeek entries).
+  const [liveNaics, setLiveNaics] = useState<Record<string, string>>({});
+  const [liveSetAside, setLiveSetAside] = useState<Record<string, string>>({});
 
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
@@ -652,9 +699,13 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         const next: Record<string, string> = {};
         const nextBuyers: Record<string, ReturnType<typeof getBuyerAgencyParts>> = {};
         const nextAttachments: Record<string, unknown[]> = {};
+        const nextNaics: Record<string, string> = {};
+        const nextSetAside: Record<string, string> = {};
         for (const raw of asArray(data.opportunities)) {
           const opportunity = asRecord(raw);
           const oppAttachments = Array.isArray(opportunity.attachments) ? opportunity.attachments : [];
+          const oppNaics = text(opportunity.naics_code, text(opportunity.naicsCode));
+          const oppSetAside = text(opportunity.set_aside_description, text(opportunity.setAsideDescription, text(opportunity.set_aside, text(opportunity.setAside))));
           // Fields come back snake_case from mi-dashboard; fall back to
           // camelCase so this still works if the source ever changes.
           const location = formatOpportunityLocation({
@@ -678,12 +729,16 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
             if (location) next[key] = location;
             if (buyer.primary && buyer.primary !== 'Unknown agency') nextBuyers[key] = buyer;
             if (oppAttachments.length > 0) nextAttachments[key] = oppAttachments;
+            if (oppNaics) nextNaics[key] = oppNaics;
+            if (oppSetAside) nextSetAside[key] = oppSetAside;
           });
         }
 
         setLiveLocations(next);
         setLiveBuyers(nextBuyers);
         setLiveAttachments(nextAttachments);
+        setLiveNaics(nextNaics);
+        setLiveSetAside(nextSetAside);
       } catch (err) {
         console.warn('Failed to load live opportunity enrichment:', err);
       }
@@ -1135,6 +1190,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                   const itemAttachments = getBriefingItemAttachments(item, liveAttachments)
                     .filter((a) => a && !(a as Record<string, unknown>)._no_attachments);
                   const itemMetaLine = getBriefingMetaLine(item, itemBuyer);
+                  const itemDetailLine = buildItemDetailLine(item, liveNaics, liveSetAside);
 
                   return (
                     <article
@@ -1196,7 +1252,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               📍 Place of performance: {itemLocation}
                             </p>
                           )}
-                          {item.detailLine && <p className="text-sm text-slate-400 mt-2">{item.detailLine}</p>}
+                          {itemDetailLine && <p className="text-sm text-slate-400 mt-2">{itemDetailLine}</p>}
                         </div>
                         <div className="max-w-md text-right">
                           {item.amount && <p className="text-sm font-semibold text-emerald-400">{item.amount}</p>}
