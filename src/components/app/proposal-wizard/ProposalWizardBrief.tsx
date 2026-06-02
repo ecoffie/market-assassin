@@ -170,7 +170,7 @@ export default function ProposalWizardBrief({ email, pursuitId, noticeType, onCo
           </div>
           <p className="mt-0.5 text-xs text-slate-400 max-w-xl">
             {noticeType && /sources sought|rfi/i.test(noticeType)
-              ? 'This is a pre-solicitation notice — not a biddable RFP yet. Mindy briefs it as a capability-statement opportunity.'
+              ? 'Not a priced bid — Mindy briefs this as a capability-statement / letter-of-intent response.'
               : 'Mindy reads the RFP and tells you what it actually says — in plain English. 2 minutes here saves an hour of skimming.'}
           </p>
         </div>

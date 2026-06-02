@@ -5,6 +5,7 @@ import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import ProposalWizardBrief from '../proposal-wizard/ProposalWizardBrief';
 import ProposalWizardCompliance from '../proposal-wizard/ProposalWizardCompliance';
+import { classifyNoticeType, noticeTypeLabel, noticeTypeToDetected } from '@/lib/utils/notice-type';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -38,37 +39,8 @@ function isTerminalPipelineStage(stage?: string | null): boolean {
   return ['won', 'lost', 'no_bid', 'archived'].includes(stage || '');
 }
 
-// Classify SAM's free-text notice_type into a short label so the user knows
-// up front whether a pursuit is a Sources Sought, RFP, RFQ, etc. — and can
-// check the right briefing. Mirrors PipelinePanel's noticeBucket. Returns null
-// when the type is unknown so callers can hide the badge rather than show "Other".
-function noticeTypeLabel(nt?: string | null): string | null {
-  if (!nt) return null;
-  const t = nt.toLowerCase();
-  if (t.includes('sources sought')) return 'Sources Sought';
-  if (t.includes('combined')) return 'Combined Synopsis';
-  if (t.includes('presol') || t.includes('pre-sol') || t.includes('pre sol')) return 'Pre-Solicitation';
-  if (t.includes('rfq') || t.includes('quot')) return 'RFQ';
-  if (t.includes('rfi') || t.includes('information')) return 'RFI';
-  if (t.includes('award')) return 'Award Notice';
-  if (t.includes('special')) return 'Special Notice';
-  if (t.includes('solicitation') || t.includes('rfp')) return 'Solicitation / RFP';
-  return null;
-}
-
-// Map a notice_type to the wizard's detectedNoticeType enum so the correct tab
-// set (capability statement vs full proposal) shows BEFORE any doc is parsed.
-function noticeTypeToDetected(
-  nt?: string | null
-): 'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown' {
-  if (!nt) return 'unknown';
-  const t = nt.toLowerCase();
-  if (t.includes('sources sought')) return 'sources_sought';
-  if (t.includes('rfi') || t.includes('information')) return 'rfi';
-  if (t.includes('rfq') || t.includes('quot')) return 'rfq';
-  if (t.includes('solicitation') || t.includes('rfp') || t.includes('combined')) return 'rfp';
-  return 'unknown';
-}
+// Notice-type classification (label + respondability) lives in a shared util so
+// PipelinePanel, the picker, and the wizard all agree. See classifyNoticeType.
 
 function isMissingPursuitError(error?: string | null): boolean {
   return (error || '').toLowerCase().includes('pursuit not found');
@@ -211,6 +183,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const activePursuitNoticeType = useMemo(
     () => opportunities.find((opp) => opp.id === activePursuitId)?.notice_type ?? null,
     [opportunities, activePursuitId]
+  );
+  // Respondability of the active pursuit's notice type. 'none' (Special / Award
+  // / Justification / Sale of Surplus) means there is nothing to submit, so the
+  // wizard is blocked with an explanation instead of the draft flow.
+  const activePursuitNotice = useMemo(
+    () => classifyNoticeType(activePursuitNoticeType),
+    [activePursuitNoticeType]
   );
   // Reset to Stage 1 when the user switches to a different pursuit so
   // they always see the brief first.
@@ -978,39 +957,52 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 );
               })}
             </select>
-            <button
-              type="button"
-              onClick={() => { if (selectedId) setLocalPursuitId(selectedId); }}
-              disabled={!selectedId}
-              className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-400 text-sm font-semibold text-white"
-            >
-              Start drafting →
-            </button>
+            {(() => {
+              const picked = opportunities.find(o => o.id === selectedId);
+              const respondable = classifyNoticeType(picked?.notice_type).respondability !== 'none';
+              return (
+                <button
+                  type="button"
+                  onClick={() => { if (selectedId && respondable) setLocalPursuitId(selectedId); }}
+                  disabled={!selectedId || !respondable}
+                  title={!respondable ? 'This notice type has nothing to submit — you cannot draft a response.' : undefined}
+                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-sm font-semibold text-white"
+                >
+                  Start drafting →
+                </button>
+              );
+            })()}
           </div>
-          {/* Colored notice-type cue for the highlighted pursuit, so the user
-              knows whether it's a biddable RFP vs a pre-solicitation Sources
-              Sought BEFORE starting the draft flow. */}
+          {/* Colored notice-type cue for the highlighted pursuit. Three tiers:
+              biddable (emerald), respondable-but-not-a-bid (amber: Sources
+              Sought / RFI / Presol — capability statement / LOI), and not
+              respondable at all (slate: Special / Award / Justification). */}
           {(() => {
             const picked = opportunities.find(o => o.id === selectedId);
-            const nt = noticeTypeLabel(picked?.notice_type);
-            if (!nt) return null;
-            const isPreSol = /sources sought|rfi/i.test(nt);
+            const { label, respondability } = classifyNoticeType(picked?.notice_type);
+            if (!label) return null;
+            const styles =
+              respondability === 'bid'
+                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                : respondability === 'non_bid'
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                : 'bg-slate-600/20 text-slate-300 border-slate-500/40';
+            const hint =
+              respondability === 'bid'
+                ? 'Biddable solicitation — Mindy drafts a full proposal. Check the matching RFP briefing.'
+                : respondability === 'non_bid'
+                ? 'Not a priced bid — you respond with a capability statement / letter of intent. Check the Sources Sought briefing.'
+                : /presol/i.test(label)
+                ? 'Pre-solicitation — no response yet. Track it; you’ll be alerted when the solicitation drops.'
+                : /award/i.test(label)
+                ? 'Already awarded — no bid. Add the awardee to Relationships for subcontracting.'
+                : 'Informational notice — there is nothing to submit for this type.';
             return (
               <div className="mt-3">
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${
-                    isPreSol
-                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                      : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                  }`}
-                >
-                  {nt}
+                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider border ${styles}`}>
+                  {label}
                 </span>
-                <span className="ml-2 text-[11px] text-slate-400">
-                  {isPreSol
-                    ? 'Pre-solicitation — not a biddable RFP yet. Check the Sources Sought briefing.'
-                    : 'Biddable solicitation. Check the matching RFP briefing.'}
-                </span>
+                <span className="ml-2 text-[11px] text-slate-400">{hint}</span>
               </div>
             );
           })()}
@@ -1020,11 +1012,75 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </section>
       )}
 
+      {/* Non-respondable notice type (Special Notice, Award Notice,
+          Justification, Sale of Surplus Property): you cannot write a response,
+          so block the wizard with a clear, TYPE-SPECIFIC next step instead of
+          letting the user draft a bid that has nowhere to go.
+            - Award Notice → add the awardee to Relationships (subcontracting).
+            - Everything else → use as market intel + track the real solicitation. */}
+      {email && activePursuitId && activePursuitNotice.respondability === 'none' && (() => {
+        const label = activePursuitNotice.label || 'Notice';
+        const isAward = /award/i.test(label);
+        const isPresol = /presol/i.test(label);
+        return (
+          <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <div className="rounded-lg border border-slate-600/40 bg-slate-600/15 p-4">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider border bg-slate-600/20 text-slate-300 border-slate-500/40">
+                  {label}
+                </span>
+                <span className="text-sm font-medium text-slate-200">
+                  {isPresol ? 'Nothing to submit yet' : 'No response to draft'}
+                </span>
+              </div>
+              {isAward ? (
+                <p className="mt-2 text-sm text-slate-400">
+                  This contract has already been awarded — there&apos;s no bid to write. But it&apos;s a
+                  strong <span className="text-slate-200">subcontracting lead</span>: add the awardee to
+                  Relationships and reach out about teaming on the work, or track the recompete.
+                </p>
+              ) : isPresol ? (
+                <p className="mt-2 text-sm text-slate-400">
+                  A pre-solicitation is a heads-up that a solicitation is coming — you don&apos;t respond yet.
+                  Keep <span className="text-slate-200">tracking this pursuit</span> so you&apos;re notified the
+                  moment the solicitation posts, then come back here to draft your bid.
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-slate-400">
+                  This is an informational <span className="text-slate-200">{label}</span> —
+                  nothing to submit, so Mindy can&apos;t draft a bid. Use it for market intelligence
+                  (incumbent, agency, timing).
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {isAward && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md bg-emerald-600/20 text-emerald-200 border border-emerald-500/30">
+                    → Add awardee to Relationships for subcontracting
+                  </span>
+                )}
+                {isPresol && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md bg-amber-600/15 text-amber-200 border border-amber-500/30">
+                    ⏱ Tracked — you&apos;ll be alerted when the solicitation drops
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setLocalPursuitId(null); }}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200"
+                >
+                  ← Pick a different pursuit
+                </button>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
+
       {/* Proposal Wizard — brief → compliance → draft, auto-advancing.
           Mounted from the Pipeline "Draft Proposal" button OR the saved-
           pursuit picker above. Sits over the legacy surface so the user
           gets the structured brief + compliance before the full draft. */}
-      {email && activePursuitId && (
+      {email && activePursuitId && activePursuitNotice.respondability !== 'none' && (
         <>
           {/* 3-step progress indicator */}
           <div className="flex items-center gap-2 mb-4 text-xs">

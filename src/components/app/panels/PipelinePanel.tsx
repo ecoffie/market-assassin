@@ -7,6 +7,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { getNaics } from '@/lib/codes/lookup';
+import { classifyNoticeType } from '@/lib/utils/notice-type';
 import VoiceCaptureModal from '../voice/VoiceCaptureModal';
 
 interface PipelinePanelProps {
@@ -1037,7 +1038,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                   {showOwnerColumn && (
                     <th className="text-center px-2 py-3 text-xs text-slate-500 font-medium w-16">Owner</th>
                   )}
-                  <SortHeader field="value">Value</SortHeader>
+                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Notice Type</th>
                   <SortHeader field="stage">Stage</SortHeader>
                   <SortHeader field="deadline">Deadline</SortHeader>
                   <SortHeader field="priority">Priority</SortHeader>
@@ -1104,22 +1105,31 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         </td>
                       )}
 
-                      {/* Value — capped + truncated. Some rows have
-                          deadline countdowns or Mindy notes stuffed
-                          into value_estimate upstream (DATA BUG to
-                          fix separately); cap stops them from
-                          blowing out the column width. */}
-                      <td className="px-4 py-3 max-w-[140px]">
-                        {opp.value_estimate ? (
-                          <span
-                            className="text-sm font-semibold text-emerald-400 line-clamp-1 block"
-                            title={opp.value_estimate}
-                          >
-                            {opp.value_estimate}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-600">-</span>
-                        )}
+                      {/* Notice Type — replaces the old (manually-entered,
+                          usually blank) Value column. Tells the user at a
+                          glance whether a pursuit is biddable (emerald),
+                          respondable-but-not-a-bid (amber: Sources Sought /
+                          RFI / Presol) or informational (slate: Special /
+                          Award / Justification). */}
+                      <td className="px-4 py-3 max-w-[160px]">
+                        {(() => {
+                          const { label, respondability } = classifyNoticeType(opp.notice_type);
+                          if (!label) return <span className="text-xs text-slate-600">-</span>;
+                          const styles =
+                            respondability === 'bid'
+                              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                              : respondability === 'non_bid'
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : 'bg-slate-600/20 text-slate-300 border-slate-500/40';
+                          return (
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide border line-clamp-1 ${styles}`}
+                              title={opp.notice_type || label}
+                            >
+                              {label}
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* Stage Dropdown */}
