@@ -157,23 +157,35 @@ const US_STATES = [
 function MarketIntelDashboard() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState<string>('');
+  // Whether the async email resolution (URL / localStorage) has finished.
+  // Distinguishes "still loading email" from "genuinely no email" so we don't
+  // fire an ALL-SAM stats fetch while a profile-filtered view is intended —
+  // which flashed the full 9,952 counts under the "Your Profile" toggle.
+  const [emailResolved, setEmailResolved] = useState(false);
 
   // Resolve email: ?email= takes precedence, otherwise read from localStorage (set by /app sign-in)
   useEffect(() => {
     const fromUrl = searchParams.get('email');
     if (fromUrl) {
       setEmail(fromUrl);
+      setEmailResolved(true);
       return;
     }
     if (typeof window !== 'undefined') {
       const stored = window.localStorage.getItem('mi_beta_email');
       if (stored) setEmail(stored);
     }
+    // Either way, email resolution is now complete (stored value or none).
+    setEmailResolved(true);
   }, [searchParams]);
 
   const initialScope = searchParams.get('scope');
   const [profileFilterActive, setProfileFilterActive] = useState(initialScope !== 'all');
   const isProfileFiltered = !!email && profileFilterActive;
+  // We INTEND a profile-filtered view but the email hasn't resolved yet — hold
+  // off fetching so we don't briefly show ALL-SAM counts under the "Your
+  // Profile" toggle. Once email resolves, isProfileFiltered drives the fetch.
+  const awaitingProfileEmail = profileFilterActive && !emailResolved;
 
   // Engagement tracker — fires page_view on mount + tool_use on filter
   // changes / attachment downloads / SAM link clicks. All fire-and-
@@ -462,12 +474,17 @@ function MarketIntelDashboard() {
   }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, email, isProfileFiltered]);
 
   useEffect(() => {
+    // Don't fetch while we're still resolving the email for a profile-filtered
+    // view — otherwise the first fetch runs unscoped (ALL SAM) and flashes the
+    // wrong counts under the "Your Profile" toggle.
+    if (awaitingProfileEmail) return;
     fetchStats().then(() => setLoading(false));
-  }, [fetchStats]);
+  }, [fetchStats, awaitingProfileEmail]);
 
   useEffect(() => {
+    if (awaitingProfileEmail) return;
     fetchOpportunities();
-  }, [fetchOpportunities]);
+  }, [fetchOpportunities, awaitingProfileEmail]);
 
   // page_view fires once per email resolution. Profile-filter mode and
   // initial scope are included so we can see how users land on the
