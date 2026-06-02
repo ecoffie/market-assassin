@@ -461,6 +461,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const isRfqMode = effectiveNoticeType === 'rfq';
   const isSimpleResponseMode = isLoiResponseMode || isRfqMode;
   const proposalFlowName = isLoiResponseMode ? 'LOI Response' : isRfqMode ? 'RFQ Response' : 'Proposal';
+  const canUseTemplateWithoutSource = Boolean(activePursuitId && isSimpleResponseMode);
+  const responseOutputsReady = Boolean(uploadedRfp || canUseTemplateWithoutSource);
+  const exportContextName = useMemo(
+    () => uploadedRfp?.fileName || activePursuit?.title || proposalFlowName,
+    [activePursuit?.title, proposalFlowName, uploadedRfp?.fileName]
+  );
   // Memoized so its identity is stable across renders (it only flips when the
   // detected mode changes). This lets the hooks below list it as a dependency
   // without re-running every render.
@@ -622,7 +628,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   );
 
   const exportProposalPackage = useCallback(async () => {
-    if (!email || !uploadedRfp) return;
+    if (!email) return;
+    if (!uploadedRfp && !isSimpleResponseMode) return;
     setExporting(true);
     setExportError(null);
     try {
@@ -638,8 +645,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
-          fileName: (uploadedRfp.fileName.replace(/\.(pdf|docx|txt)$/i, '') || 'proposal') + '-package',
-          rfpFileName: uploadedRfp.fileName,
+          fileName: (exportContextName.replace(/\.(pdf|docx|txt)$/i, '') || 'proposal') + '-package',
+          rfpFileName: exportContextName,
           compliance: compliance.map(c => ({
             id: c.id,
             requirement: c.requirement,
@@ -665,7 +672,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       const blob = await res.blob();
       const cd = res.headers.get('content-disposition') || '';
       const match = /filename="([^"]+)"/.exec(cd);
-      const fallback = `${uploadedRfp.fileName.replace(/\.(pdf|docx|txt)$/i, '') || 'proposal'}-package-${new Date().toISOString().split('T')[0]}.docx`;
+      const fallback = `${exportContextName.replace(/\.(pdf|docx|txt)$/i, '') || 'proposal'}-package-${new Date().toISOString().split('T')[0]}.docx`;
       const fileName = match?.[1] || fallback;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -679,7 +686,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     } finally {
       setExporting(false);
     }
-  }, [email, uploadedRfp, compliance, drafts, checklist, getAuthHeaders, currentSectionTabs, isLoiResponseMode, isRfqMode, isSimpleResponseMode]);
+  }, [email, uploadedRfp, isSimpleResponseMode, currentSectionTabs, drafts, getAuthHeaders, exportContextName, compliance, checklist, isLoiResponseMode, isRfqMode]);
 
   const exportComplianceCsv = useCallback(() => {
     if (compliance.length === 0) return;
@@ -1131,6 +1138,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </div>
         )}
 
+        {!uploadedRfp && canUseTemplateWithoutSource && (
+          <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+            <span className="font-semibold">✓ {proposalFlowName} template ready.</span>{' '}
+            Use the built-in template below now, or upload source documents if you want Mindy to draft custom narrative from the notice.
+          </div>
+        )}
+
         {/* Notice type warning — when the loaded doc is a Sources
             Sought or RFI, switch the user into an LOI / market-research
             response workflow. Users attach their existing capability
@@ -1259,14 +1273,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         )}
       </section>
 
-      {uploadedRfp && (
+      {responseOutputsReady && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Available Outputs</p>
               <h2 className="text-lg font-semibold text-white">Choose what Mindy should produce</h2>
               <p className="text-sm text-slate-400 mt-1">
-                No forced order. Generate the artifact you need, review it below, then export.
+                {uploadedRfp
+                  ? 'No forced order. Generate the artifact you need, review it below, then export.'
+                  : 'The built-in response template is ready now. Upload the notice only if you want custom AI-drafted sections.'}
               </p>
             </div>
             <span className="rounded-full border border-slate-700 bg-slate-800/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
@@ -1303,12 +1319,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               <OutputActionCard
                 eyebrow={isLoiResponseMode ? 'Narrative' : 'Draft'}
                 title={isLoiResponseMode ? 'Draft LOI response sections' : 'Draft proposal sections'}
-                description={isLoiResponseMode
-                  ? 'Draft the LOI opening, relevant experience, capability fit, differentiators, and POC sections.'
-                  : 'Draft the first proposal sections from the extracted documents and saved profile.'}
-                status={draftAllSummary ? `${draftAllSummary.count} sections drafted` : draftAllLoading ? 'Drafting...' : 'Not generated'}
-                buttonLabel={draftAllLoading ? 'Drafting...' : draftAllSummary ? 'Regenerate drafts' : 'Draft sections'}
-                disabled={draftAllLoading || !!draftLoading}
+                description={!uploadedRfp
+                  ? 'Upload the notice or attachments first if you want Mindy to draft custom narrative from source text.'
+                  : isLoiResponseMode
+                    ? 'Draft the LOI opening, relevant experience, capability fit, differentiators, and POC sections.'
+                    : 'Draft the first proposal sections from the extracted documents and saved profile.'}
+                status={!uploadedRfp ? 'Needs source doc' : draftAllSummary ? `${draftAllSummary.count} sections drafted` : draftAllLoading ? 'Drafting...' : 'Not generated'}
+                buttonLabel={!uploadedRfp ? 'Upload docs to draft' : draftAllLoading ? 'Drafting...' : draftAllSummary ? 'Regenerate drafts' : 'Draft sections'}
+                disabled={!uploadedRfp || draftAllLoading || !!draftLoading}
                 onClick={generateAllDrafts}
               />
             )}
@@ -1329,7 +1347,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       )}
 
       {/* Output · Compliance Matrix / Response Requirements */}
-      {uploadedRfp && (
+      {responseOutputsReady && (
         <section id={isSimpleResponseMode ? 'proposal-response-template' : undefined} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           {isSimpleResponseMode ? (
             <>
@@ -1362,7 +1380,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <p className="text-slate-200 font-medium mb-2">Template includes blanks for:</p>
                 <ul className="space-y-1">
                   <li>• Date, attention line, agency address, reference / solicitation number</li>
-                  <li>• LOI / Statement of Capability opening modeled after your sample</li>
+                  <li>• LOI opening modeled after your sample</li>
                   <li>• Submittal intention, requested response content, and attachment checklist</li>
                   <li>• Company profile, UEI, CAGE, NAICS, small-business status, and responsible contact</li>
                   <li>• Three relevant experience blocks modeled after the GovCon EDU LOI template</li>

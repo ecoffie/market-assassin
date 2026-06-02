@@ -187,7 +187,7 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
   if (!isRfq) {
     return [
       {
-        label: 'Letter of Intent / Statement of Capability',
+        label: 'Letter of Intent',
         draft: [
           blank('Date'),
           '',
@@ -201,7 +201,7 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
           '',
           'To whom it may concern,',
           '',
-          '[Company Name], a [City / State]-based [small-business designation(s)], is pleased to submit this Letter of Intent / Statement of Capability to demonstrate its intention and ability to support the above-referenced requirement.',
+          '[Company Name], a [City / State]-based [small-business designation(s)], is pleased to submit this Letter of Intent to demonstrate its intention and ability to support the above-referenced requirement.',
           '',
           '[Company Name] has successfully completed work of similar scope and size for [agency / customer types]. We specialize in [core services relevant to this notice]. Our team is prepared to provide the personnel, management, and technical capability required for this effort.',
           '',
@@ -315,7 +315,7 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
         '',
         'To whom it may concern,',
         '',
-        `[Company Name] is pleased to submit this ${isRfq ? 'RFQ response' : 'Letter of Intent / Statement of Capability'} for the above-referenced requirement.`,
+        `[Company Name] is pleased to submit this ${isRfq ? 'RFQ response' : 'Letter of Intent'} for the above-referenced requirement.`,
         '',
         blank('One-sentence summary of fit'),
         blank('Primary NAICS / business designation'),
