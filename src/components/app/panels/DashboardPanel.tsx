@@ -1263,7 +1263,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                       }}
                       className="cursor-pointer overflow-hidden border-l-4 border-purple-500 bg-slate-900 border-y border-r border-slate-800 p-4 transition-colors hover:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
                         <div className="min-w-0 flex-1">
                           {(() => {
                             const badge = noticeTypeBadge(itemNoticeType);
@@ -1273,9 +1273,9 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               </span>
                             ) : null;
                           })()}
-                          <h4 className="font-semibold text-white">{item.title}</h4>
+                          <h4 className="font-semibold text-white leading-snug break-words">{item.title}</h4>
                           {itemBuyer.primary && itemBuyer.primary !== 'Unknown agency' && (
-                            <p className="text-sm text-slate-400 mt-1">
+                            <p className="text-sm text-slate-400 mt-1 leading-relaxed break-words">
                               {itemBuyer.primary}
                               {itemBuyer.secondary && <span className="text-slate-500"> • {itemBuyer.secondary}</span>}
                               {itemBuyer.parent && <span className="text-slate-600"> • {itemBuyer.parent}</span>}
@@ -1308,21 +1308,24 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               📍 Place of performance: {itemLocation}
                             </p>
                           )}
-                          {itemDetailLine && <p className="text-sm text-slate-400 mt-2">{itemDetailLine}</p>}
+                          {itemDetailLine && <p className="text-sm text-slate-400 mt-2 leading-relaxed break-words">{itemDetailLine}</p>}
                         </div>
-                        <div className="max-w-md text-right">
-                          {item.amount && <p className="text-sm font-semibold text-emerald-400">{item.amount}</p>}
-                          {item.deadline && <p className="text-sm text-slate-500 mt-1">{item.deadline}</p>}
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              toggleItem(item.id);
-                            }}
-                            className="mt-3 rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
-                          >
-                            {isExpanded ? 'Hide Fit' : 'Review Fit'}
-                          </button>
+                        <div className="w-full min-w-0 md:w-auto md:max-w-md md:text-right">
+                          <div className="text-right">
+                            {item.amount && <p className="text-sm font-semibold text-emerald-400 break-words">{item.amount}</p>}
+                            {item.deadline && <p className="text-sm text-slate-500 mt-1 break-words">{item.deadline}</p>}
+                          </div>
+                          <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleItem(item.id);
+                              }}
+                              className="inline-flex min-h-[44px] items-center justify-center rounded bg-emerald-600 px-2.5 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 sm:px-3 md:min-h-0 md:py-1.5"
+                            >
+                              {isExpanded ? 'Hide Fit' : 'Review Fit'}
+                            </button>
                           {/* Track in Pipeline — promoted from inside the
                               expanded Review Fit section to the always-
                               visible action row. Legacy /briefings showed
@@ -1344,7 +1347,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                                   handleTrackInPipeline(item);
                                 }}
                                 disabled={isSaving || isSaved}
-                                className={`ml-2 mt-3 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                                className={`inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded px-2.5 py-2 text-sm font-medium transition-colors sm:px-3 md:min-h-0 md:py-1.5 ${
                                   isSaved
                                     ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
                                     : isSaving
@@ -1356,16 +1359,17 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               </button>
                             );
                           })()}
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              dismissItem(item);
-                            }}
-                            className="ml-2 mt-3 rounded bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-                          >
-                            Dismiss
-                          </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                dismissItem(item);
+                              }}
+                              className="inline-flex min-h-[44px] items-center justify-center rounded bg-slate-800 px-2.5 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200 sm:px-3 md:min-h-0 md:py-1.5"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
                         </div>
                       </div>
 
