@@ -16,6 +16,7 @@ import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { sanitizeValueEstimate } from '@/lib/pipeline/value-estimate';
+import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,9 +90,17 @@ export async function GET(request: NextRequest) {
     // Reject malformed notice_id values before persisting. React render
     // keys like 'deadline-140R6026Q0068' have been leaking in via email
     // action URLs, which then breaks downstream SAM lookups.
-    const cleanNoticeId = notice_id && isValidSamNoticeId(notice_id)
+    let cleanNoticeId = notice_id && isValidSamNoticeId(notice_id)
       ? notice_id
       : (notice_id ? (console.warn(`[add-to-pipeline GET] dropping malformed notice_id "${notice_id}" for "${title}"`), null) : null);
+    const samMatch = await lookupSamOpportunityForPipeline(getSupabase(), {
+      noticeId: cleanNoticeId,
+      title: decodeURIComponent(title),
+      agency: agency ? decodeURIComponent(agency) : null,
+    });
+    if (!cleanNoticeId && samMatch?.noticeId) {
+      cleanNoticeId = samMatch.noticeId;
+    }
 
     // Add to pipeline
     const pipelineEntry = {
@@ -103,7 +112,7 @@ export async function GET(request: NextRequest) {
       // 6 days" or "Open market research window..." that leaked from
       // briefing UIs (audit 2026-05-26).
       value_estimate: sanitizeValueEstimate(value ? decodeURIComponent(value) : null),
-      response_deadline: deadline || null,
+      response_deadline: deadline || samMatch?.responseDeadline || null,
       naics_code: naics || null,
       set_aside: setAside ? decodeURIComponent(setAside) : null,
       stage: stage as 'tracking' | 'pursuing' | 'bidding' | 'submitted',
@@ -216,9 +225,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Same validation as the GET path — reject React-key garbage.
-    const cleanNoticeIdPost = notice_id && isValidSamNoticeId(notice_id)
+    let cleanNoticeIdPost = notice_id && isValidSamNoticeId(notice_id)
       ? notice_id
       : (notice_id ? (console.warn(`[add-to-pipeline POST] dropping malformed notice_id "${notice_id}" for "${title}"`), null) : null);
+    const samMatch = await lookupSamOpportunityForPipeline(getSupabase(), {
+      noticeId: cleanNoticeIdPost,
+      title,
+      agency,
+    });
+    if (!cleanNoticeIdPost && samMatch?.noticeId) {
+      cleanNoticeIdPost = samMatch.noticeId;
+    }
 
     // Insert
     const { data, error } = await getSupabase()
@@ -229,7 +246,7 @@ export async function POST(request: NextRequest) {
         title,
         agency: agency || null,
         value_estimate: sanitizeValueEstimate(value),
-        response_deadline: deadline || null,
+        response_deadline: deadline || samMatch?.responseDeadline || null,
         naics_code: naics || null,
         set_aside: setAside || null,
         stage,

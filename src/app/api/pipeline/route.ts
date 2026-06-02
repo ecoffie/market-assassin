@@ -16,6 +16,7 @@ import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
+import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -33,6 +34,7 @@ export interface PipelineOpportunity {
   id?: string;
   user_email: string;
   notice_id?: string;
+  notice_type?: string | null;
   source?: string;
   external_url?: string;
   title: string;
@@ -122,31 +124,69 @@ export async function GET(request: NextRequest) {
     }
 
     // Enrich each pursuit with its SAM notice_type (Solicitation /
-    // Sources Sought / Combined / etc.) by looking it up from the
-    // sam_opportunities cache by notice_id. user_pipeline doesn't store
-    // it, so deriving it here lets My Pursuits group/filter by notice
-    // type without a schema migration + backfill.
+    // Sources Sought / Combined / etc.). user_pipeline doesn't store it,
+    // so derive it from the SAM cache at read time. We first match by
+    // notice_id/solicitation number, then use exact title + agency for older
+    // briefing saves that landed without any notice_id.
     if (opportunities && opportunities.length > 0) {
       const noticeIds = [...new Set(
         opportunities.map((o: { notice_id?: string }) => o.notice_id).filter(Boolean)
       )] as string[];
-      if (noticeIds.length > 0) {
-        try {
-          const { data: samRows } = await getSupabase()
+      try {
+        const sb = getSupabase();
+        const typeById = new Map<string, string>();
+
+        if (noticeIds.length > 0) {
+          // typeById maps a pursuit notice_id -> its SAM notice_type. We try
+          // TWO joins because the pursuit's notice_id field is overloaded: for
+          // SAM-sourced opps it's the internal UUID, but many pursuits store a
+          // solicitation/contract number there instead (e.g. "36C77626R0003").
+
+          // Pass 1 — match on sam_opportunities.notice_id (the UUID case).
+          const { data: byNoticeId } = await sb
             .from('sam_opportunities')
             .select('notice_id, notice_type')
             .in('notice_id', noticeIds);
-          const typeByNotice = new Map<string, string>();
-          for (const r of samRows || []) {
-            if (r.notice_type) typeByNotice.set(r.notice_id, r.notice_type);
+          for (const r of byNoticeId || []) {
+            if (r.notice_type) typeById.set(r.notice_id, r.notice_type);
           }
-          opportunities = opportunities.map((o: Record<string, unknown>) => ({
-            ...o,
-            notice_type: typeByNotice.get(o.notice_id as string) || null,
-          }));
-        } catch (e) {
-          console.warn('[Pipeline GET] notice_type enrichment failed:', e);
+
+          // Pass 2 — for the ones still unmatched, match the SAME value against
+          // sam_opportunities.solicitation_number. Recovers pursuits whose
+          // notice_id is actually a solicitation number.
+          const stillMissing = noticeIds.filter((id) => !typeById.has(id));
+          if (stillMissing.length > 0) {
+            const { data: bySolNum } = await sb
+              .from('sam_opportunities')
+              .select('solicitation_number, notice_type')
+              .in('solicitation_number', stillMissing);
+            for (const r of bySolNum || []) {
+              if (r.notice_type && r.solicitation_number && !typeById.has(r.solicitation_number)) {
+                typeById.set(r.solicitation_number, r.notice_type);
+              }
+            }
+          }
         }
+
+        const fallbackTypes = new Map<string, string>();
+        const fallbackRows = opportunities.filter((o: Record<string, unknown>) => (
+          !o.notice_id || !typeById.has(o.notice_id as string)
+        ));
+
+        await Promise.all(fallbackRows.map(async (o: Record<string, unknown>) => {
+          const match = await lookupSamOpportunityForPipeline(sb, {
+            title: o.title as string | null,
+            agency: o.agency as string | null,
+          });
+          if (match?.noticeType && o.id) fallbackTypes.set(o.id as string, match.noticeType);
+        }));
+
+        opportunities = opportunities.map((o: Record<string, unknown>) => ({
+          ...o,
+          notice_type: typeById.get(o.notice_id as string) || fallbackTypes.get(o.id as string) || null,
+        }));
+      } catch (e) {
+        console.warn('[Pipeline GET] notice_type enrichment failed:', e);
       }
     }
 
@@ -209,6 +249,27 @@ export async function POST(request: NextRequest) {
     if (body.notice_id && !isValidSamNoticeId(body.notice_id)) {
       console.warn(`[Pipeline POST] rejecting malformed notice_id "${body.notice_id}" for "${body.title}"`);
       body.notice_id = undefined;
+    }
+
+    // user_pipeline has no notice_type column; clients may still send the
+    // SAM type for display. Drop it before insert, then recover canonical SAM
+    // data from notice_id/solicitation/title so future reads and doc fetches
+    // have the strongest possible key.
+    delete (body as unknown as Record<string, unknown>).notice_type;
+
+    const samMatch = await lookupSamOpportunityForPipeline(getSupabase(), {
+      noticeId: body.notice_id,
+      title: body.title,
+      agency: body.agency,
+    });
+    if (samMatch?.noticeId && !body.notice_id) {
+      body.notice_id = samMatch.noticeId;
+    }
+    if (samMatch?.responseDeadline && !body.response_deadline) {
+      const d = new Date(samMatch.responseDeadline);
+      if (!Number.isNaN(d.getTime())) {
+        body.response_deadline = d.toISOString();
+      }
     }
 
     // Reject value_estimate strings that are display labels ("Due in
