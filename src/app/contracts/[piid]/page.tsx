@@ -16,8 +16,23 @@
  * Dynamic — never prerender. Cache hits the BQ-side queryCached
  * layer (7-day TTL on the PIID→award_id mapping).
  */
-import { permanentRedirect, notFound } from 'next/navigation';
-import { getAwardIdByPiid } from '@/lib/bigquery/awards';
+import { redirect, notFound } from 'next/navigation';
+
+// EMERGENCY STOP (2026-06-01): the per-PIID lookup below was full-table
+// scanning the 63M-row awards table on every bot crawl (piid is not in the
+// awards cluster key). ~55K crawls/day × ~830 MB = ~46 TiB/day — 2.3× the
+// 20 TiB daily BQ quota — blowing the quota by ~1 AM PT and 500-ing the whole
+// site. Until the piid_lookup table (Option A) is built, do NOT call BQ here:
+// bounce every /contracts/* to /awards with no scan.
+//
+// 307 (temporary) on purpose — this is a stopgap, not the permanent mapping.
+// Restore the 308-to-/awards/[award_id] resolution once piid_lookup ships.
+//
+//   import { permanentRedirect } from 'next/navigation';
+//   import { getAwardIdByPiid } from '@/lib/bigquery/awards';
+//   const match = await getAwardIdByPiid(decodeURIComponent(piid));
+//   if (!match) notFound();
+//   permanentRedirect(`/awards/${encodeURIComponent(match.award_id)}`);
 
 export const dynamic = 'force-dynamic';
 
@@ -29,13 +44,5 @@ export default async function ContractByPiid({ params }: PageProps) {
   const { piid } = await params;
   if (!piid) notFound();
 
-  const match = await getAwardIdByPiid(decodeURIComponent(piid));
-  if (!match) notFound();
-
-  // 308 permanent redirect. Next.js's redirect() defaults to 307
-  // (temporary) which tells Google "this might change" and slows
-  // link-equity transfer. permanentRedirect() emits 308 (permanent)
-  // — the right signal for "this URL is a permanent alias for
-  // /awards/X".
-  permanentRedirect(`/awards/${encodeURIComponent(match.award_id)}`);
+  redirect('/awards');
 }
