@@ -88,3 +88,61 @@ export function looksLikeHtml(input: string): boolean {
   // Anything with a closing-tag pattern or common entities is HTML.
   return /<\/?[a-z][a-z0-9]*\b[^>]*>|&[a-z]+;|&#\d+;/i.test(input);
 }
+
+/**
+ * Many sam_opportunities rows store the description column as a SAM API URL
+ * pointer (https://api.sam.gov/.../noticedesc?noticeid=...) rather than the
+ * resolved text — the real scope lives behind that endpoint. This detects the
+ * pointer so callers know to resolve it.
+ */
+export function isSamDescriptionUrl(value?: string | null): boolean {
+  const v = (value || '').trim();
+  return /^https?:\/\//i.test(v) && /noticedesc|opportunities\/v\d/i.test(v);
+}
+
+/**
+ * Resolve a SAM noticedesc URL to clean plain text on-demand. Returns null on
+ * any failure (network, non-OK, empty) so callers can fall back gracefully.
+ * Shared by the backfill cron and the Proposal Assist wizard so a pursuit with
+ * no attachments can still brief from the SAM description even before the
+ * nightly backfill has resolved it.
+ */
+export async function resolveSamDescriptionUrl(
+  url: string,
+  apiKey: string,
+  maxChars = 30_000,
+): Promise<string | null> {
+  let upstream: URL;
+  try {
+    upstream = new URL(url);
+    if (!upstream.searchParams.has('api_key') && apiKey) {
+      upstream.searchParams.set('api_key', apiKey);
+    }
+  } catch {
+    return null;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(upstream.toString(), { headers: { Accept: 'application/json' } });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const payload = await res.json().catch(() => null);
+    if (payload && typeof payload === 'object') {
+      const p = payload as { description?: unknown; body?: unknown; text?: unknown };
+      const text =
+        typeof p.description === 'string' ? p.description
+        : typeof p.body === 'string' ? p.body
+        : typeof p.text === 'string' ? p.text
+        : null;
+      if (text) return samHtmlToText(text).slice(0, maxChars);
+    }
+  }
+  const text = await res.text().catch(() => '');
+  return text ? samHtmlToText(text).slice(0, maxChars) : null;
+}

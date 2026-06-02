@@ -20,15 +20,17 @@ export interface SamOpportunityRow {
   department: string | null;
   sub_tier: string | null;
   office: string | null;
+  description: string | null;
 }
 
 export interface SamOpportunityLookup {
   noticeId: string | null;
   noticeType: string | null;
   responseDeadline: string | null;
+  description: string | null;
 }
 
-const SAM_SELECT = 'notice_id, solicitation_number, notice_type, response_deadline, title, department, sub_tier, office';
+const SAM_SELECT = 'notice_id, solicitation_number, notice_type, response_deadline, title, department, sub_tier, office, description';
 
 function normalize(value?: string | null): string {
   return String(value || '')
@@ -64,6 +66,7 @@ function toLookup(row: SamOpportunityRow | null): SamOpportunityLookup | null {
     noticeId: row.notice_id || null,
     noticeType: row.notice_type || null,
     responseDeadline: row.response_deadline || null,
+    description: row.description || null,
   };
 }
 

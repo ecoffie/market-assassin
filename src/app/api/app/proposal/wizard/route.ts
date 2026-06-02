@@ -31,6 +31,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { archiveContent, type ArchiveContentType } from '@/lib/archive/persist';
 import { ensureWorkspaceMember } from '@/lib/app/workspace';
+import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
+import { isSamDescriptionUrl, resolveSamDescriptionUrl } from '@/lib/sam/description-text';
+import { getRotatedSAMKey } from '@/lib/sam/utils';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { generateAllSections } from '@/lib/proposal/draft-all';
@@ -268,22 +271,44 @@ async function buildSourceText(
     return { text: docText, hasDocs: true, source: 'attachments' };
   }
 
-  // No usable attachments — try the cached SAM description.
-  if (pipeline.notice_id) {
-    try {
-      const { data } = await getSupabase()
-        .from('sam_opportunities')
-        .select('description')
-        .eq('notice_id', pipeline.notice_id)
-        .maybeSingle();
-      const desc = (data?.description || '').trim();
-      if (desc.length >= MIN_SOURCE_CHARS) {
-        const block = `=== SAM.gov solicitation description ===\n${desc.slice(0, MAX_INPUT_CHARS)}`;
-        return { text: block, hasDocs: true, source: 'sam_description' };
+  // No usable attachments — try the cached SAM description. Use the robust
+  // pipeline lookup (notice_id -> solicitation_number -> exact title+agency)
+  // instead of a bare notice_id match: many pursuits have a null or
+  // solicitation-number-shaped notice_id, so the old `eq('notice_id', …)`
+  // lookup was skipped entirely and the brief wrongly said "no details
+  // available" even though SAM had a full description in our cache.
+  try {
+    // Cast: the helper accepts a narrow SupabaseLike shape; the wizard's
+    // getSupabase() is the fully-typed client which TS can't structurally
+    // match without an excessively-deep instantiation.
+    const match = await lookupSamOpportunityForPipeline(
+      getSupabase() as unknown as Parameters<typeof lookupSamOpportunityForPipeline>[0],
+      {
+        noticeId: pipeline.notice_id,
+        title: pipeline.title,
+        agency: pipeline.agency,
+      },
+    );
+    let desc = (match?.description || '').trim();
+
+    // The cached description is often a SAM noticedesc URL pointer, not the
+    // actual text (the real scope lives behind that endpoint). Resolve it
+    // on-demand so a pursuit with no attachments still briefs from the full
+    // SAM description instead of wrongly reporting "no details available".
+    if (isSamDescriptionUrl(desc)) {
+      const apiKey = getRotatedSAMKey();
+      const resolved = apiKey ? await resolveSamDescriptionUrl(desc, apiKey, MAX_INPUT_CHARS) : null;
+      if (resolved && resolved.trim().length >= MIN_SOURCE_CHARS) {
+        desc = resolved.trim();
       }
-    } catch (err) {
-      console.warn('[wizard] SAM description fallback lookup failed:', err);
     }
+
+    if (desc.length >= MIN_SOURCE_CHARS && !isSamDescriptionUrl(desc)) {
+      const block = `=== SAM.gov solicitation description ===\n${desc.slice(0, MAX_INPUT_CHARS)}`;
+      return { text: block, hasDocs: true, source: 'sam_description' };
+    }
+  } catch (err) {
+    console.warn('[wizard] SAM description fallback lookup failed:', err);
   }
 
   return { text: docText, hasDocs: false, source: 'none' };
