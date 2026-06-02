@@ -287,6 +287,10 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         <div className="space-y-4">
           <BillingCard email={email} tier={tier} getAuthHeaders={getAuthHeaders} />
 
+          {/* Solo -> Team upgrade. Shown to paid (pro) solo users; free users
+              upgrade to Pro first via the Billing card above. */}
+          {tier === 'pro' && <TeamUpgradeCard email={email} getAuthHeaders={getAuthHeaders} />}
+
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <h2 className="font-semibold text-white">Onboarding</h2>
             <div className="mt-4 space-y-3">
@@ -447,6 +451,115 @@ function BillingCard({
           >
             Upgrade to Pro
           </a>
+        </div>
+      )}
+
+      {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+    </div>
+  );
+}
+
+// Solo -> Team upgrade card. Pro users see "Upgrade to Team": they go to the
+// Team Stripe checkout, and on return (?team_upgraded=1) we finish provisioning
+// the team workspace (which also migrates their personal pipeline/contacts).
+function TeamUpgradeCard({
+  email,
+  getAuthHeaders,
+}: {
+  email: string | null;
+  getAuthHeaders: (init?: HeadersInit) => HeadersInit;
+}) {
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [hasTeam, setHasTeam] = useState(false);
+  const [configured, setConfigured] = useState(true);
+  const [provisioning, setProvisioning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!email) return;
+    let cancelled = false;
+
+    (async () => {
+      // Returning from Team checkout? Finish provisioning the workspace.
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('team_upgraded') === '1') {
+        setProvisioning(true);
+        try {
+          const res = await fetch('/api/app/team/upgrade', {
+            method: 'POST',
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json();
+          if (!cancelled) {
+            if (data?.success) setDone(true);
+            else setErr(data?.error || 'Could not finish team setup.');
+          }
+        } catch {
+          if (!cancelled) setErr('Could not finish team setup.');
+        } finally {
+          if (!cancelled) setProvisioning(false);
+        }
+      }
+
+      // Load upgrade availability + checkout URL.
+      try {
+        const res = await fetch(`/api/app/team/upgrade?email=${encodeURIComponent(email)}`, {
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (!cancelled && data?.success) {
+          setHasTeam(!!data.hasTeam);
+          setCheckoutUrl(data.checkoutUrl || null);
+          setConfigured(!!data.configured);
+        }
+      } catch { /* non-fatal */ }
+    })();
+
+    return () => { cancelled = true; };
+  }, [email, getAuthHeaders]);
+
+  // Already on a team — nothing to upsell.
+  if (hasTeam || done) {
+    if (!done) return null;
+    return (
+      <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-5">
+        <h2 className="font-semibold text-white mb-1">You&apos;re on a team 🎉</h2>
+        <p className="text-sm text-slate-400">
+          Your team workspace is ready and your pursuits moved over. Invite teammates from Team Access.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+      <h2 className="font-semibold text-white mb-1">Work as a team</h2>
+      <p className="text-sm text-slate-400 mb-3">
+        Add teammates, share your pipeline and contacts, and manage pursuits together.
+        Your existing work comes with you.
+      </p>
+      <ul className="text-xs text-slate-500 space-y-1 mb-4">
+        <li>• Up to 5 seats</li>
+        <li>• Shared pipeline, contacts &amp; target list</li>
+        <li>• Roles: owner, admin, member, viewer</li>
+      </ul>
+
+      {provisioning ? (
+        <div className="w-full px-3 py-2 text-center text-sm text-slate-300 bg-slate-800 rounded-lg">
+          Setting up your team…
+        </div>
+      ) : checkoutUrl ? (
+        <a
+          href={checkoutUrl}
+          className="block w-full px-3 py-2 text-center text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+        >
+          Upgrade to Team
+        </a>
+      ) : (
+        <div className="w-full px-3 py-2 text-center text-sm text-slate-400 bg-slate-800 rounded-lg">
+          {configured ? 'Team upgrade unavailable right now.' : 'Team plan coming soon — contact us to get set up.'}
         </div>
       )}
 

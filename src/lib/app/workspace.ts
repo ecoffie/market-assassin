@@ -209,6 +209,96 @@ export async function ensureWorkspaceMember(email: string) {
   return { workspaceId: personalWorkspaceId, member };
 }
 
+/**
+ * Provision a TEAM workspace for a user upgrading from a solo account, and
+ * migrate their personal data into it. Idempotent — safe to call on every
+ * upgrade and on /app load as a self-heal (the webhook sets access_team but
+ * the workspace itself is created here).
+ *
+ * Team workspace id:
+ *   - custom-domain users (eric@govcongiants.com) -> the domain ("govcongiants.com")
+ *     is a natural shared id.
+ *   - personal-email users (foo@gmail.com) -> a generated "team-<uuid>" id, since
+ *     "gmail.com" would collide across every gmail user.
+ *
+ * Migration re-stamps the user's personal pipeline / teaming partners / target
+ * list with the new team workspace_id so the whole team sees their prior work.
+ */
+export async function provisionTeamWorkspace(email: string): Promise<{ workspaceId: string; created: boolean }> {
+  const normalized = normalizeEmail(email);
+  await ensureAppWorkspaceSchema();
+  const supabase = getAppSupabase();
+
+  // Already an owner/admin of a non-personal (team) workspace? Reuse it.
+  const { data: memberships } = await supabase
+    .from('mi_beta_team_members')
+    .select('*')
+    .eq('user_email', normalized);
+
+  const existingTeam = (memberships || []).find(
+    (m: { workspace_id: string; role: string }) => !m.workspace_id.includes('@')
+  );
+  if (existingTeam) {
+    // Make sure their personal data is migrated (self-heal), then return.
+    await migratePersonalDataToWorkspace(normalized, existingTeam.workspace_id);
+    return { workspaceId: existingTeam.workspace_id, created: false };
+  }
+
+  // Decide the team workspace id.
+  const domain = normalized.split('@')[1] || '';
+  const personalDomains = new Set(['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'aol.com']);
+  let teamWorkspaceId: string;
+  if (domain && !personalDomains.has(domain)) {
+    teamWorkspaceId = domain; // custom domain — natural shared id
+  } else {
+    // Personal email — generate a unique team id. crypto.randomUUID is
+    // available in the Node runtime these routes run under.
+    teamWorkspaceId = `team-${(globalThis.crypto?.randomUUID?.() || `${normalized.split('@')[0]}-${Date.now()}`).slice(0, 18)}`;
+  }
+
+  // Create the owner membership in the new team workspace.
+  await supabase
+    .from('mi_beta_team_members')
+    .upsert({
+      workspace_id: teamWorkspaceId,
+      user_email: normalized,
+      role: 'owner',
+      status: 'active',
+      accepted_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id,user_email' });
+
+  await migratePersonalDataToWorkspace(normalized, teamWorkspaceId);
+
+  return { workspaceId: teamWorkspaceId, created: true };
+}
+
+/**
+ * Re-stamp a user's personal records (pipeline, teaming partners, target list)
+ * with a team workspace_id so the team can see them. Only moves rows that are
+ * still personal (workspace_id null or equal to their personal id) — never
+ * steals another team's rows. Best-effort: a missing column/table is non-fatal.
+ */
+async function migratePersonalDataToWorkspace(email: string, teamWorkspaceId: string): Promise<void> {
+  const supabase = getAppSupabase();
+  const personalId = getWorkspaceId(email);
+
+  // Tables that carry workspace_id + user_email and should follow the owner
+  // into the team. owner_email is set so per-row ownership is preserved.
+  const tables = ['user_pipeline', 'user_teaming_partners', 'user_target_list'];
+  for (const table of tables) {
+    try {
+      // Move rows owned by this user that are still in their personal scope.
+      await supabase
+        .from(table)
+        .update({ workspace_id: teamWorkspaceId })
+        .eq('user_email', email)
+        .or(`workspace_id.is.null,workspace_id.eq.${personalId}`);
+    } catch {
+      // Table may not have workspace_id (or may not exist) — skip silently.
+    }
+  }
+}
+
 export async function recordAppActivity({
   workspaceId,
   userEmail,

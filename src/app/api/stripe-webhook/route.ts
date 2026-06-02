@@ -172,6 +172,21 @@ export async function POST(request: NextRequest) {
       await grantBriefingsAccess(email);
     }
 
+    // Team purchase: provision the team workspace + migrate the buyer's
+    // personal pipeline/contacts/targets into it. updateAccessFlags already
+    // set access_team; this creates the actual shared workspace so they land
+    // in a team (not their personal one) on next load. Idempotent + non-fatal
+    // so a provisioning hiccup never fails the webhook (the /app self-heal and
+    // POST /api/app/team/upgrade also call it).
+    if (accessUpdates.access_team || tier === 'team_monthly' || tier === 'team_annual') {
+      try {
+        const { provisionTeamWorkspace } = await import('@/lib/app/workspace');
+        await provisionTeamWorkspace(email);
+      } catch (provisionErr) {
+        console.error('[stripe-webhook] team workspace provisioning failed (non-fatal):', provisionErr);
+      }
+    }
+
     // Get/create profile
     const profile = await getOrCreateProfile(email);
     const customerName = session.customer_details?.name || undefined;
