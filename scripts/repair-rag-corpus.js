@@ -101,10 +101,14 @@ function classifyDoc(doc) {
   }
 
   if (
-    fileTitle.includes('price proposal') ||
-    fileTitle.includes('pricing volume') ||
-    fileTitle.includes('price volume') ||
-    fileTitle.includes('cost volume')
+    !fileTitle.includes('non-price proposal') &&
+    !fileTitle.includes('non price proposal') &&
+    (
+      fileTitle.includes('price proposal') ||
+      fileTitle.includes('pricing volume') ||
+      fileTitle.includes('price volume') ||
+      fileTitle.includes('cost volume')
+    )
   ) {
     return actualDocumentOnly('pricing_volume', 'high', 'filename/title indicates pricing or cost proposal material');
   }
