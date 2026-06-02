@@ -1341,4 +1341,16 @@ done
 
 ---
 
-*Last Updated: May 20, 2026 — Mindy OAuth custom domain cutover (auth.getmindy.ai), Proposal Assist V2 complete, mi-beta → app folder rename, session TTL 30d, onboarding/profile-persistence bug class fixed*
+## Sales Attribution (June 2, 2026 — PR #5)
+
+getmindy.ai purchases feed a **unified cross-site dashboard** hosted at `govcongiants.com/admin/purchases`, alongside govcongiants.com sales. Both write to the same shared Upstash store (`market-assassin-codes`) with an identical key format.
+
+- **`src/lib/purchase-attribution.ts`** — `@vercel/kv`-backed; key builder + `gfd:purchase:purchases` index-member format (`<site>:<id>`) MUST stay in sync with `govcon-funnels/src/lib/purchase-attribution.ts`.
+- **`src/components/AttributionTracker.tsx`** — in root layout; writes the shared `gca_attr` cookie (first/last touch, UTM, click-ids).
+- **`src/app/checkout/[product]/route.ts`** — maps Mindy Pro monthly/annual links, records a `CheckoutStart`, forwards `client_reference_id`.
+- **`src/app/api/stripe-webhook/route.ts`** — ONE non-fatal `savePurchase()` call inside the existing `checkout.session.completed` handler (after Supabase dedup, before access provisioning). Joins `client_reference_id` → stored attribution. Do NOT move it before access provisioning.
+- **Env:** `PURCHASE_SITE=mindy` (set in Vercel); KV vars already present (this project owns the store).
+
+---
+
+*Last Updated: June 2, 2026 — Mindy purchase attribution → unified cross-site sales dashboard (PR #5, PURCHASE_SITE=mindy). Prev May 20: Mindy OAuth custom domain cutover (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d, onboarding/profile-persistence fixes*
