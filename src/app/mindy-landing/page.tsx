@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 
-const CHECKOUT_MONTHLY = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C'; // $149/mo
-const CHECKOUT_ANNUAL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';  // $1,490/yr
+// Route paid CTAs through /checkout first so purchase attribution (UTM /
+// referrer captured pre-checkout) is joined to the Stripe purchase event.
+const CHECKOUT_MONTHLY = '/checkout/mindy-pro-monthly'; // $149/mo
+const CHECKOUT_ANNUAL = '/checkout/mindy-pro-annual';   // $1,490/yr
 const FREE_SIGNUP_URL = '/signup';
 const DASHBOARD_URL = '/app';
 
