@@ -16,25 +16,21 @@
  * Dynamic — never prerender. Cache hits the BQ-side queryCached
  * layer (7-day TTL on the PIID→award_id mapping).
  */
-import { redirect, notFound } from 'next/navigation';
+import { permanentRedirect, redirect, notFound } from 'next/navigation';
+import { getAwardIdByPiid } from '@/lib/bigquery/awards';
 
-// EMERGENCY STOP (2026-06-01): the per-PIID lookup below was full-table
-// scanning the 63M-row awards table on every bot crawl (piid is not in the
-// awards cluster key). ~55K crawls/day × ~830 MB = ~46 TiB/day — 2.3× the
-// 20 TiB daily BQ quota — blowing the quota by ~1 AM PT and 500-ing the whole
-// site. Until the piid_lookup table (Option A) is built, do NOT call BQ here:
-// bounce every /contracts/* to /awards with no scan.
+// Resolution restored 2026-06-01 after the piid_lookup table (build-derived.sql)
+// replaced the full-table scan that drained the BQ quota. getAwardIdByPiid now
+// reads a clustered-by-piid_upper table (~MB/lookup), validates+normalizes the
+// PIID before BQ, and negatively caches misses — so this route is safe to crawl.
 //
-// 307 (temporary) on purpose — this is a stopgap, not the permanent mapping.
-// Restore the 308-to-/awards/[award_id] resolution once piid_lookup ships.
-//
-//   import { permanentRedirect } from 'next/navigation';
-//   import { getAwardIdByPiid } from '@/lib/bigquery/awards';
-//   const match = await getAwardIdByPiid(decodeURIComponent(piid));
-//   if (!match) notFound();
-//   permanentRedirect(`/awards/${encodeURIComponent(match.award_id)}`);
-
-export const dynamic = 'force-dynamic';
+// ISR instead of force-dynamic: cache each resolved redirect at the edge for
+// 30 days. generateStaticParams returns [] so nothing prerenders at build
+// (63M+ PIIDs can't be enumerated); pages render on first hit, then cache.
+export const revalidate = 2592000; // 30d
+export function generateStaticParams() {
+  return [];
+}
 
 interface PageProps {
   params: Promise<{ piid: string }>;
@@ -44,5 +40,14 @@ export default async function ContractByPiid({ params }: PageProps) {
   const { piid } = await params;
   if (!piid) notFound();
 
-  redirect('/awards');
+  const match = await getAwardIdByPiid(decodeURIComponent(piid));
+
+  // Unknown PIID: don't 404 (kills the page for a plausibly-real contract
+  // number) and don't dead-end. Send to /awards. 307 (temporary) so Google
+  // doesn't permanently bind a bad alias — a later ingest may add the PIID.
+  if (!match) redirect('/awards');
+
+  // 308 permanent redirect for a resolved PIID: this URL is a permanent alias
+  // for /awards/[award_id], and 308 passes link equity through cleanly.
+  permanentRedirect(`/awards/${encodeURIComponent(match.award_id)}`);
 }

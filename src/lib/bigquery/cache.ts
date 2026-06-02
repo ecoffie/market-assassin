@@ -25,7 +25,11 @@ import { bqQuery, type BqQueryParams } from './client';
 // Bumped 2026-05-31 to invalidate KV cache after Round 2 subaward
 // ingest brought subawards from 903K → 1,001,345 rows and added
 // 340 new primes + 8,765 new subawardees to the rollups.
-const DATA_VERSION = 'v2-2026-05';
+// Bumped 2026-06-01 (v3) alongside the piid_lookup / award_detail_lookup
+// clustered tables — invalidates the old full-table-scan KV entries for
+// awards:by-piid:* and awards:detail:* so resolved redirects re-populate
+// from the new cheap lookups.
+const DATA_VERSION = 'v3-2026-06';
 
 // 30 days. Contractor/award data refreshes ~weekly, but a fresh ingest
 // bumps DATA_VERSION (see above) which invalidates every key instantly —

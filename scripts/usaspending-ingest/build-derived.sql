@@ -169,3 +169,114 @@ SELECT
 FROM `market-assasin.usaspending.awards`
 WHERE awarding_agency IS NOT NULL
 GROUP BY awarding_agency;
+
+-- 6) PIID lookup  (BQ-quota saver — powers /contracts/[piid])
+-- The awards table is clustered on (recipient_uei, recipient_name), NOT piid,
+-- so `WHERE UPPER(piid)=@x` was a ~830 MB FULL-TABLE SCAN per request. Bots
+-- crawl tens of thousands of unique PIIDs → 45.9 TiB/day → quota blown daily.
+-- This clustered lookup makes each resolve scan ~MB instead of the full table.
+--
+-- Aggregation semantics (matches old getAwardIdByPiid intent, hardened):
+-- a PIID can span many transactions across multiple award_ids (mods, etc).
+-- We pick the award_id with the largest TOTAL obligation for that PIID, and
+-- carry the recipient_name FROM THAT SAME award_id (not ANY_VALUE across the
+-- whole PIID, which could surface an unrelated recipient). Two-step:
+--   per_award: collapse to one row per (piid_upper, award_id) with its total
+--   then: pick the winning award per piid_upper via STRUCT ARRAY_AGG.
+CREATE OR REPLACE TABLE `market-assasin.usaspending.piid_lookup`
+CLUSTER BY piid_upper
+AS
+WITH per_award AS (
+  SELECT
+    UPPER(TRIM(piid))                                            AS piid_upper,
+    ARRAY_AGG(piid ORDER BY action_date DESC LIMIT 1)[OFFSET(0)] AS piid,
+    award_id,
+    ARRAY_AGG(recipient_name ORDER BY obligation_amount DESC NULLS LAST,
+                                      action_date DESC LIMIT 1)[OFFSET(0)] AS recipient_name,
+    SUM(obligation_amount)  AS total_obligation,
+    MAX(obligation_amount)  AS max_obligation,
+    MAX(action_date)        AS latest_action_date
+  FROM `market-assasin.usaspending.awards`
+  WHERE piid IS NOT NULL AND TRIM(piid) != ''
+  GROUP BY piid_upper, award_id
+)
+SELECT
+  piid_upper,
+  winner.piid          AS piid,
+  winner.award_id      AS award_id,
+  winner.recipient_name AS recipient_name
+FROM (
+  SELECT
+    piid_upper,
+    ARRAY_AGG(
+      STRUCT(piid, award_id, recipient_name)
+      ORDER BY total_obligation DESC NULLS LAST,
+               max_obligation   DESC NULLS LAST,
+               latest_action_date DESC NULLS LAST
+      LIMIT 1
+    )[OFFSET(0)] AS winner
+  FROM per_award
+  GROUP BY piid_upper
+);
+
+-- 7) Award detail lookup  (BQ-quota saver — powers /awards/[id])
+-- Same disease as PIID: award_id is NOT in the awards cluster key, so
+-- `WHERE award_id=@id` scans 10-15 GB per cold lookup (see getAwardById).
+-- If we restore /contracts→/awards/[id] redirects WITHOUT this, the drain
+-- just moves to award-detail crawls. This clustered table holds one row per
+-- award_id with everything the detail page renders. Cold lookups scan ~MB.
+-- One row per award_id: pick the latest transaction's attributes (ORDER BY
+-- action_date DESC) and SUM obligation across the award's transactions.
+CREATE OR REPLACE TABLE `market-assasin.usaspending.award_detail_lookup`
+CLUSTER BY award_id
+AS
+SELECT
+  award_id,
+  -- scalar attributes taken from the most-recent transaction of the award
+  latest.piid,
+  latest.recipient_uei,
+  latest.recipient_name,
+  latest.parent_uei,
+  latest.parent_name,
+  latest.cage_code,
+  latest.recipient_city,
+  latest.recipient_state,
+  latest.awarding_agency,
+  latest.awarding_sub_agency,
+  latest.awarding_office,
+  latest.funding_agency,
+  latest.funding_office,
+  latest.naics_code,
+  latest.naics_description,
+  latest.psc_code,
+  latest.psc_description,
+  latest.contract_pricing_type,
+  latest.set_aside,
+  total_obligation AS obligation_amount,
+  latest.action_date,
+  latest.pop_start_date,
+  latest.pop_end_date,
+  latest.pop_state,
+  latest.pop_city,
+  latest.pop_country,
+  latest.fiscal_year,
+  latest.description
+FROM (
+  SELECT
+    award_id,
+    SUM(obligation_amount) AS total_obligation,
+    ARRAY_AGG(
+      STRUCT(
+        piid, recipient_uei, recipient_name, parent_uei, parent_name, cage_code,
+        recipient_city, recipient_state, awarding_agency, awarding_sub_agency,
+        awarding_office, funding_agency, funding_office, naics_code,
+        naics_description, psc_code, psc_description, contract_pricing_type,
+        set_aside, action_date, pop_start_date, pop_end_date, pop_state,
+        pop_city, pop_country, fiscal_year, description
+      )
+      ORDER BY action_date DESC LIMIT 1
+    )[OFFSET(0)] AS latest
+  FROM `market-assasin.usaspending.awards`
+  WHERE award_id IS NOT NULL
+  GROUP BY award_id
+);

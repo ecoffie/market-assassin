@@ -31,6 +31,11 @@ export default function robots(): MetadataRoute.Robots {
           '/admin/',
           '/app/',
           '/_next/',
+          // /contracts/* is a redirect-only vanity surface (→ /awards/[id]),
+          // not an indexable destination. Blocking it protects crawl budget
+          // and prevents bots from hammering the PIID lookup at scale — the
+          // canonical award pages under /awards/ stay fully crawlable.
+          '/contracts/',
         ],
       },
     ],
