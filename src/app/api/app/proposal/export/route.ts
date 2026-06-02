@@ -69,8 +69,28 @@ async function loadCompanyProfile(email: string): Promise<CompanyProfile> {
   const id = (idRes.data || {}) as Record<string, unknown>;
   const settings = (settingsRes.data || {}) as Record<string, unknown>;
   const pp = Array.isArray(ppRes.data) ? ppRes.data as Array<Record<string, unknown>> : [];
-  const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
-  const arr = (v: unknown): string[] | undefined => (Array.isArray(v) && v.length ? v.map(String) : undefined);
+  // Treat bracket-placeholder text ("[Contract Title]", "[Briefly describe…]")
+  // as empty. The AI coach seeds sample past-performance rows with these — they
+  // are prompts for the user, not real data. Returning undefined makes the
+  // export render a clean fill-in blank ("Contract / project title: ______")
+  // instead of dumping the raw "[Contract Title]" text into the document.
+  const isPlaceholder = (t: string): boolean => {
+    // Whole-string bracket ("[Contract Title]"), a value that STARTS with a
+    // bracket prompt ("[Briefly describe…]\n\n📝 Fill in…"), or the AI coach's
+    // "📝 Fill in / Use this section…" guidance text.
+    return /^\[[^\]]*\]/.test(t) || /📝|^fill in\b|^use this section\b|^describe\b/i.test(t);
+  };
+  const str = (v: unknown): string | undefined => {
+    if (typeof v !== 'string') return undefined;
+    const t = v.trim();
+    if (!t || isPlaceholder(t)) return undefined;
+    return t;
+  };
+  const arr = (v: unknown): string[] | undefined => {
+    if (!Array.isArray(v) || !v.length) return undefined;
+    const cleaned = v.map(String).map(s => s.trim()).filter(s => s && !isPlaceholder(s));
+    return cleaned.length ? cleaned : undefined;
+  };
 
   return {
     legalName: str(id.legal_name) || str(settings.company_name),
