@@ -237,11 +237,6 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
     return opportunities.filter(opp => opp.stage === stage && !opp.is_archived);
   };
 
-  // Derived list for the table view, respecting the showArchived toggle.
-  const visibleOpportunities = showArchived
-    ? opportunities
-    : opportunities.filter(opp => !opp.is_archived);
-
   // Parse value estimate to number for sorting (e.g., "$3.5M" -> 3500000)
   const parseValue = (val?: string): number => {
     if (!val) return 0;
@@ -1375,6 +1370,45 @@ function PipelineEditDrawer({
   }, [email, opportunity.id, authHeaders]);
   useEffect(() => { loadDocList(); }, [loadDocList]);
 
+  // Poll while the SAM doc fetch is still running. The background fetcher
+  // (Pipeline POST -> after() -> fetchPursuitDocs) updates docs_status server-
+  // side from 'fetching'/'pending' -> 'ready'/'none'/'failed', but the drawer
+  // reads docs_status only at load time. Without this poll the "⏳ Fetching
+  // documents from SAM…" label sticks forever even after the fetch finished —
+  // which looks broken. Re-pull the live status every 4s and refresh the
+  // pipeline (-> drawer re-renders with the resolved status) once it settles.
+  // Capped so a genuinely stuck row stops polling and falls back to Retry.
+  useEffect(() => {
+    const status = opportunity.docs_status;
+    if (status !== 'fetching' && status !== 'pending') return;
+    if (!email || !opportunity.id) return;
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 10; // ~40s, then give up and let the user hit Retry
+    let cancelled = false;
+
+    const timer = setInterval(async () => {
+      attempts += 1;
+      try {
+        const res = await fetch(
+          `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
+          { headers: authHeaders() },
+        );
+        const data = await res.json().catch(() => null);
+        const liveStatus = data?.pursuit?.docs_status;
+        // Settled — refresh so the drawer shows ready/none/failed + the files.
+        if (liveStatus && liveStatus !== 'fetching' && liveStatus !== 'pending') {
+          if (!cancelled) { onDocsUpdated(); loadDocList(); }
+          clearInterval(timer);
+          return;
+        }
+      } catch { /* transient — keep polling */ }
+      if (attempts >= MAX_ATTEMPTS) clearInterval(timer);
+    }, 4000);
+
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [opportunity.docs_status, opportunity.id, email, authHeaders, onDocsUpdated, loadDocList]);
+
   // Full SAM solicitation description — lazy-loaded on demand (it can be
   // long). Public endpoint, no auth. Shown in the drawer because this is
   // where the user actually works the pursuit.
@@ -1563,13 +1597,18 @@ function PipelineEditDrawer({
               if (count > 0) {
                 body = <span className="text-emerald-300">📎 {count} document{count === 1 ? '' : 's'} attached — ready to draft</span>;
               } else if (status === 'fetching' || status === 'pending') {
-                body = <span className="text-amber-300">⏳ Fetching documents from SAM…{RetryLink}</span>;
+                body = (
+                  <span className="text-amber-300 inline-flex items-center gap-1">
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-amber-300/40 border-t-amber-300 animate-spin" />
+                    Checking SAM.gov for attachments… updates automatically.{RetryLink}
+                  </span>
+                );
               } else if (status === 'failed') {
-                body = <span className="text-red-300">⚠ Document fetch failed.{RetryLink}</span>;
+                body = <span className="text-red-300">⚠ Couldn&apos;t reach SAM.gov for attachments.{RetryLink}</span>;
               } else {
                 body = (
                   <span className="text-slate-400">
-                    📭 No documents attached — the wizard works from metadata only.{RetryLink}
+                    📭 No attachments on this notice — that&apos;s normal for many notice types. The wizard works from the metadata.{RetryLink}
                   </span>
                 );
               }
