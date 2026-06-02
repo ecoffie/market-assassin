@@ -364,7 +364,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // doc. SS/RFI = capability statement tabs. Everything else
   // (RFP/RFQ/unknown) = traditional proposal tabs.
   const isCapStatementMode = detectedNoticeType === 'sources_sought' || detectedNoticeType === 'rfi';
-  const currentSectionTabs = isCapStatementMode ? CAP_STATEMENT_SECTION_TABS : RFP_SECTION_TABS;
+  // Memoized so its identity is stable across renders (it only flips when the
+  // detected mode changes). This lets the hooks below list it as a dependency
+  // without re-running every render.
+  const currentSectionTabs = useMemo(
+    () => (isCapStatementMode ? CAP_STATEMENT_SECTION_TABS : RFP_SECTION_TABS),
+    [isCapStatementMode]
+  );
 
   // When the detected mode flips (e.g., user loads a different doc),
   // make sure activeSection isn't pointing to a tab that no longer
@@ -569,7 +575,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     link.download = `${safeName}-${label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.md`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [drafts, uploadedRfp]);
+  }, [drafts, uploadedRfp, currentSectionTabs]);
 
   // Review checklist (Step 4)
   const [checklist, setChecklist] = useState<ChecklistItemState[]>(DEFAULT_CHECKLIST);
@@ -584,7 +590,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
   const hasAnyDraft = useMemo(
     () => currentSectionTabs.some(t => !!drafts[t.id]?.draft),
-    [drafts]
+    [drafts, currentSectionTabs]
   );
 
   const exportProposalPackage = useCallback(async () => {
@@ -643,7 +649,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     } finally {
       setExporting(false);
     }
-  }, [email, uploadedRfp, compliance, drafts, checklist, getAuthHeaders]);
+  }, [email, uploadedRfp, compliance, drafts, checklist, getAuthHeaders, currentSectionTabs]);
 
   const exportComplianceCsv = useCallback(() => {
     if (compliance.length === 0) return;
