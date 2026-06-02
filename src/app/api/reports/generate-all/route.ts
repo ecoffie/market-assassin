@@ -15,6 +15,7 @@ import { getEmailFromRequest, verifyMIAccess, type MIAccessTier } from '@/lib/ap
 import { validateReportInputs } from '@/lib/validate';
 import { trackGeneration, isUserBlocked } from '@/lib/abuse-detection';
 import { getMarketAssassinTier } from '@/lib/access-codes';
+import { getAgencySpending } from '@/lib/agency-hierarchy/spending-stats';
 
 // Free reports available to all users (4 reports)
 const FREE_REPORT_KEYS = ['simplifiedAcquisition', 'budgetCheckup', 'governmentBuyers'];
@@ -45,41 +46,67 @@ function dedupeBy<T>(items: T[], key: (item: T) => string): T[] {
   return out;
 }
 
-function buildFallbackAgencyData(selectedAgencies: string[]): Agency[] {
+async function buildFallbackAgencyData(selectedAgencies: string[]): Promise<Agency[]> {
   const uniqueAgencies = [...new Set(selectedAgencies.map((agency) => agency.trim()).filter(Boolean))];
 
-  return uniqueAgencies.map((agencyName) => {
-    const budget = getBudgetForAgency(agencyName);
-    const estimatedSpending =
-      budget?.fy2025?.obligated ||
-      budget?.fy2026?.obligated ||
-      budget?.fy2025?.budgetAuthority ||
-      budget?.fy2026?.budgetAuthority ||
-      0;
-    const enhancedInfo = getEnhancedAgencyInfo(agencyName, agencyName, agencyName);
+  // Cap live lookups so a 100-agency market doesn't fan out 100 USASpending
+  // calls. The Gov Buyers card shows the top agencies anyway; the rest keep
+  // their cached-budget estimate.
+  const LIVE_LOOKUP_CAP = 25;
 
-    return {
-      id: `fallback-${agencySlug(agencyName)}`,
-      name: agencyName,
-      contractingOffice: agencyName,
-      subAgency: agencyName,
-      parentAgency: agencyName,
-      setAsideSpending: estimatedSpending,
-      contractCount: 0,
-      satSpending: 0,
-      satContractCount: 0,
-      microSpending: 0,
-      microContractCount: 0,
-      location: 'Nationwide',
-      hasSpecificOffice: false,
-      isEstimated: true,
-      command: enhancedInfo?.command || undefined,
-      website: enhancedInfo?.website || null,
-      forecastUrl: enhancedInfo?.forecastUrl || null,
-      samForecastUrl: enhancedInfo?.samForecastUrl || undefined,
-      osbp: enhancedInfo?.smallBusinessContact || null,
-    };
-  });
+  return Promise.all(
+    uniqueAgencies.map(async (agencyName, idx) => {
+      const budget = getBudgetForAgency(agencyName);
+      const budgetEstimate =
+        budget?.fy2025?.obligated ||
+        budget?.fy2026?.obligated ||
+        budget?.fy2025?.budgetAuthority ||
+        budget?.fy2026?.budgetAuthority ||
+        0;
+
+      // Pull REAL obligations + contract counts from USASpending so the Gov
+      // Buyers card doesn't show "$0 / 0 contracts" for every agency. Without
+      // this the fallback hardcoded contractCount: 0 and only agencies present
+      // in the cached budget file (e.g. GSA) showed any dollar value.
+      let liveSpending = 0;
+      let liveContracts = 0;
+      if (idx < LIVE_LOOKUP_CAP) {
+        try {
+          const spending = await getAgencySpending(agencyName);
+          if (spending) {
+            liveSpending = spending.totalObligations || 0;
+            liveContracts = spending.contractCount || 0;
+          }
+        } catch {
+          // Non-fatal — fall back to the cached budget estimate below.
+        }
+      }
+
+      const enhancedInfo = getEnhancedAgencyInfo(agencyName, agencyName, agencyName);
+
+      return {
+        id: `fallback-${agencySlug(agencyName)}`,
+        name: agencyName,
+        contractingOffice: agencyName,
+        subAgency: agencyName,
+        parentAgency: agencyName,
+        setAsideSpending: liveSpending || budgetEstimate,
+        contractCount: liveContracts,
+        satSpending: 0,
+        satContractCount: 0,
+        microSpending: 0,
+        microContractCount: 0,
+        location: 'Nationwide',
+        hasSpecificOffice: false,
+        isEstimated: true,
+        command: enhancedInfo?.command || undefined,
+        website: enhancedInfo?.website || null,
+        forecastUrl: enhancedInfo?.forecastUrl || null,
+        samForecastUrl: enhancedInfo?.samForecastUrl || undefined,
+        osbp: enhancedInfo?.smallBusinessContact || null,
+      };
+    })
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -489,7 +516,7 @@ export async function POST(request: NextRequest) {
 
     const buyerAgencyData = selectedAgencyData && selectedAgencyData.length > 0
       ? selectedAgencyData
-      : buildFallbackAgencyData(selectedAgencies);
+      : await buildFallbackAgencyData(selectedAgencies);
     const usingEstimatedBuyerData = (!selectedAgencyData || selectedAgencyData.length === 0) && buyerAgencyData.length > 0;
 
     // Generate Government Buyers Report using real USAspending data with enhanced command info.

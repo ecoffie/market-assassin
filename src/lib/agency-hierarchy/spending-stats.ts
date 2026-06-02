@@ -260,6 +260,29 @@ async function getToptierAgencyCode(agencyName: string): Promise<string | null> 
     return knownCodes[normalized];
   }
 
+  // SAM.gov / USASpending often invert the agency name ("HOMELAND SECURITY,
+  // DEPARTMENT OF" instead of "Department of Homeland Security") and use
+  // "DEPT OF" abbreviations. Rewrite those into the forward form so they hit
+  // the knownCodes map above — otherwise these agencies resolve to null and
+  // the Gov Buyers card shows $0 / 0 contracts for them.
+  const candidates = new Set<string>([normalized]);
+  // "x, department of [the]" -> "department of [the] x"
+  const inverted = normalized.match(/^(.*?),\s*(department of(?: the)?|dept\.? of)\s*$/);
+  if (inverted) {
+    candidates.add(`department of ${inverted[1].trim()}`);
+    candidates.add(`department of the ${inverted[1].trim()}`);
+  }
+  // "dept of x" / "dept. of x" -> "department of x"
+  candidates.add(normalized.replace(/^dept\.?\s+of\s+/, 'department of '));
+  // strip a leading "the "
+  candidates.add(normalized.replace(/\bdepartment of the\b/, 'department of'));
+
+  for (const candidate of candidates) {
+    if (knownCodes[candidate]) {
+      return knownCodes[candidate];
+    }
+  }
+
   // Try API lookup
   try {
     const response = await fetch(
