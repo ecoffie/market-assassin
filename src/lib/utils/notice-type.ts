@@ -39,7 +39,13 @@ export interface NoticeTypeInfo {
  * "presol.", "RFP", "Request for Quote", etc.).
  */
 export function classifyNoticeType(nt?: string | null): NoticeTypeInfo {
-  if (!nt || !nt.trim()) return { label: null, respondability: 'none' };
+  // Unknown / blank notice_type: we have NO label to show (badge hidden), but
+  // respondability MUST default to 'bid' — never block drafting on uncertainty.
+  // Many pursuits predate notice_type enrichment and have a null value; treating
+  // those as 'none' wrongly disabled "Start drafting" for every such pursuit.
+  // Only an EXPLICITLY classified non-respondable type (Presol / Special /
+  // Award / Justification / Surplus) should block.
+  if (!nt || !nt.trim()) return { label: null, respondability: 'bid' };
   const t = nt.toLowerCase();
 
   // --- Not respondable: informational only ---------------------------------
