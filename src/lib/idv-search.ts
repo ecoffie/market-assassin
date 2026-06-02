@@ -114,13 +114,20 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
     }];
   }
 
-  // Add NAICS filter
+  // Add NAICS filter - handle comma-separated codes
   if (naicsCode) {
-    let cleanNaics = naicsCode.replace(/0+$/, '') || naicsCode;
-    if (cleanNaics.length === 1) cleanNaics = cleanNaics + '0';
-    else if (cleanNaics.length === 3) cleanNaics = cleanNaics.substring(0, 2);
-    else if (cleanNaics.length === 5) cleanNaics = cleanNaics + '0';
-    filters.naics_codes = { require: [cleanNaics] };
+    // Split comma-separated codes and clean each one
+    const codes = naicsCode.split(/[,\s]+/).filter(c => c.trim());
+    const cleanedCodes = codes.map(code => {
+      let cleanNaics = code.trim().replace(/0+$/, '') || code.trim();
+      // Normalize to 2-digit prefix for broader matching
+      if (cleanNaics.length >= 3) cleanNaics = cleanNaics.substring(0, 2);
+      else if (cleanNaics.length === 1) cleanNaics = cleanNaics + '0';
+      return cleanNaics;
+    });
+    // Dedupe the prefixes (e.g., 236, 237, 238 all become 23)
+    const uniqueCodes = [...new Set(cleanedCodes)];
+    filters.naics_codes = { require: uniqueCodes };
   }
 
   // Add PSC code filter
