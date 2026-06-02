@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { dateSeed, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +43,9 @@ const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
 // Mindy palette themes — single layout, themes cycle by day-of-week.
 // Index 0-6 maps Sun-Sat. Frontend uses this to pick gradient + accent.
 const TOTAL_THEMES = 4;
+const RECENT_DEDUPE_DAYS = 5;
+const MAX_GENERATION_ATTEMPTS = 3;
+const INSIGHT_FORMATS = ['stat', 'question', 'contrarian', 'fragment', 'sentence'] as const;
 
 interface InsightResponse {
   quote: string;
@@ -80,9 +84,9 @@ export async function GET(request: NextRequest) {
 
   // refresh=1 forces a NEW insight on demand (the "Refresh" control on
   // the card). It skips the daily cache read and overwrites the cached
-  // row with a fresh pick. The AI extraction runs at temperature 0.7,
-  // so a re-run naturally surfaces a different stat/quote.
+  // row with a fresh pick.
   const forceRefresh = request.nextUrl.searchParams.get('refresh') === '1';
+  const refreshSeed = forceRefresh ? (new Date().getUTCMinutes() + 1) : 0;
 
   // 1. Check cache (unless forcing a refresh)
   const { data: cached } = forceRefresh
@@ -109,24 +113,32 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  const recentQuotes = await loadRecentInsightQuotes(userEmail, today);
+
   // 2. Try AI extraction from user's most recent briefing
   let insight: InsightResponse | null = null;
-  try {
-    insight = await extractFromBriefing(userEmail, themeIndex, today);
-  } catch (err) {
-    console.warn('[dashboard/insight] AI extraction failed:', err);
+  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !insight; attempt++) {
+    try {
+      const candidate = await extractFromBriefing(userEmail, themeIndex, today, refreshSeed + attempt);
+      if (candidate && !isSimilarToRecent(candidate.quote, recentQuotes)) {
+        insight = candidate;
+      }
+    } catch (err) {
+      console.warn('[dashboard/insight] AI extraction failed:', err);
+    }
   }
 
   // 3. Deterministic fallback: top opportunity or NAICS stat
   if (!insight) {
-    try {
-      // On a forced refresh, seed the pick with the current minute so
-      // repeated refreshes cycle through the quote list instead of
-      // returning the same day-indexed one.
-      const rotateSeed = forceRefresh ? (new Date().getMinutes() + 1) : 0;
-      insight = await deterministicFallback(userEmail, themeIndex, today, rotateSeed);
-    } catch (err) {
-      console.warn('[dashboard/insight] deterministic fallback failed:', err);
+    for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !insight; attempt++) {
+      try {
+        const candidate = await deterministicFallback(userEmail, themeIndex, today, refreshSeed + attempt, recentQuotes);
+        if (candidate && !isSimilarToRecent(candidate.quote, recentQuotes)) {
+          insight = candidate;
+        }
+      } catch (err) {
+        console.warn('[dashboard/insight] deterministic fallback failed:', err);
+      }
     }
   }
 
@@ -164,7 +176,8 @@ export async function GET(request: NextRequest) {
 async function extractFromBriefing(
   userEmail: string,
   themeIndex: number,
-  today: string
+  today: string,
+  rotateSeed = 0
 ): Promise<InsightResponse | null> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
@@ -192,14 +205,17 @@ async function extractFromBriefing(
 
   if (!template?.briefing_content) return null;
 
-  // Build a tight prompt around the briefing's top opportunities
+  // Build a tight prompt around a date-rotated focus opportunity. Briefing
+  // templates change slowly, so always sending the top five makes the model
+  // keep extracting the same #1 opportunity day after day.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const briefing = template.briefing_content as any;
-  const opps = (briefing.opportunities || []).slice(0, 5);
+  const opps = selectInsightOpportunities(briefing.opportunities || [], today, rotateSeed, 5);
   if (opps.length === 0) return null;
+  const angle = INSIGHT_FORMATS[(dateSeed(today) + rotateSeed) % INSIGHT_FORMATS.length];
 
-  const oppSummary = opps.map((o: { contractName?: string; agency?: string; value?: unknown; window?: string }) =>
-    `- ${o.contractName || 'Unnamed'} @ ${o.agency || 'unknown agency'} (${o.value || 'TBD'})`
+  const oppSummary = opps.map((o, index) =>
+    `${index === 0 ? 'FOCUS' : 'Context'}: ${o.contractName || 'Unnamed'} @ ${o.agency || 'unknown agency'} (${o.value || 'TBD'})`
   ).join('\n');
 
   const systemPrompt = `You are extracting ONE shareable insight from a federal contracting briefing for a small business user. Output JSON only.
@@ -210,6 +226,8 @@ Rules:
 - Quote ≤15 words. Punchy, scannable, makes the user want to look at the briefing.
 - format: pick ONE that fits the quote shape.
 - Anchor in REAL data from the briefing — agency name, $ value, opportunity count, NAICS — not generic federal-speak.
+- Prefer the FOCUS opportunity. Do not default to the first opportunity from yesterday's briefing.
+- Today's angle should be "${angle}" unless the data strongly fits a better shape.
 - NO "world-class", "best-in-class", "cutting-edge", "leverage", "innovative".
 - NO "In today's federal landscape..." style intros.`;
 
@@ -267,6 +285,7 @@ async function deterministicFallback(
   // the same day-indexed quote. Caller passes the current minute so
   // consecutive refreshes differ. Default 0 = the stable daily pick.
   rotateSeed = 0,
+  recentQuotes: string[] = [],
 ): Promise<InsightResponse | null> {
   const supabase = getSupabase();
 
@@ -309,8 +328,11 @@ async function deterministicFallback(
     { quote: '40% of FY26 spending goes to small business — if they apply.', format: 'stat' },
     { quote: 'Your NAICS profile is your federal calling card.', format: 'fragment' },
   ];
-  const dayIdx = new Date().getDay();
-  const pick = PROFILE_LESS_QUOTES[(dayIdx + rotateSeed) % PROFILE_LESS_QUOTES.length];
+  const dayIdx = dateSeed(today);
+  let pick = PROFILE_LESS_QUOTES[(dayIdx + rotateSeed) % PROFILE_LESS_QUOTES.length];
+  for (let offset = 1; offset < PROFILE_LESS_QUOTES.length && isSimilarToRecent(pick.quote, recentQuotes); offset++) {
+    pick = PROFILE_LESS_QUOTES[(dayIdx + rotateSeed + offset) % PROFILE_LESS_QUOTES.length];
+  }
   return {
     quote: pick.quote,
     format: pick.format,
@@ -318,4 +340,19 @@ async function deterministicFallback(
     themeIndex,
     insightDate: today,
   };
+}
+
+async function loadRecentInsightQuotes(userEmail: string, today: string): Promise<string[]> {
+  try {
+    const { data } = await getSupabase()
+      .from('dashboard_insights')
+      .select('quote')
+      .eq('user_email', userEmail)
+      .lt('insight_date', today)
+      .order('insight_date', { ascending: false })
+      .limit(RECENT_DEDUPE_DAYS);
+    return (data || []).map((row: { quote?: string | null }) => row.quote || '').filter(Boolean);
+  } catch {
+    return [];
+  }
 }
