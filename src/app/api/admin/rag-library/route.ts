@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 import { classifyRagDocCandidate, FORMAT_DOC_TYPES } from '@/lib/rag/doc-classifier';
 import { buildLooseRagSearchQuery } from '@/lib/rag/query';
 
@@ -65,6 +66,69 @@ interface ReclassCandidate {
   confidence: string;
   reason: string;
   textLength: number | null;
+}
+
+interface AdminIngestDoc {
+  sourcePath?: string;
+  filename?: string;
+  fileExtension?: string;
+  sizeBytes?: number;
+  fileMtime?: string;
+  fileSha256?: string;
+  docType?: string;
+  topLevelFolder?: string | null;
+  folderPath?: string | null;
+  title?: string | null;
+  fullText?: string;
+  pageCount?: number | null;
+  wordCount?: number;
+  topicTags?: string[];
+  usageRights?: string;
+}
+
+const ADMIN_INGEST_DOC_TYPES = new Set([
+  'sources_sought_loi',
+  'rfi_response',
+  'rfq_response',
+  'technical_volume',
+  'management_volume',
+  'pricing_volume',
+  'cap_statement',
+  'past_performance',
+  'proposal_template',
+  'course_material',
+  'teaching_handout',
+  'webinar_resource',
+  'misc',
+]);
+
+const WORDS_PER_CHUNK = 500;
+const OVERLAP_WORDS = 50;
+
+function chunkText(text: string): string[] {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return [];
+  const words = cleaned.split(' ');
+  if (words.length <= WORDS_PER_CHUNK) return [cleaned];
+
+  const chunks: string[] = [];
+  let i = 0;
+  while (i < words.length) {
+    chunks.push(words.slice(i, i + WORDS_PER_CHUNK).join(' '));
+    if (i + WORDS_PER_CHUNK >= words.length) break;
+    i += WORDS_PER_CHUNK - OVERLAP_WORDS;
+  }
+  return chunks;
+}
+
+function safeDocType(docType: string | undefined): string {
+  if (docType && ADMIN_INGEST_DOC_TYPES.has(docType)) return docType;
+  return 'misc';
+}
+
+function safeSha(doc: AdminIngestDoc): string {
+  if (doc.fileSha256 && /^[a-f0-9]{64}$/i.test(doc.fileSha256)) return doc.fileSha256.toLowerCase();
+  return crypto.createHash('sha256').update(doc.fullText || '').digest('hex');
 }
 
 async function fetchAllRows<T>(queryFactory: (from: number, to: number) => Promise<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
@@ -295,6 +359,8 @@ export async function POST(request: NextRequest) {
     confirm?: string;
     limit?: number;
     type?: string;
+    dedupeByHash?: boolean;
+    docs?: AdminIngestDoc[];
   };
   try {
     body = await request.json();
@@ -303,8 +369,195 @@ export async function POST(request: NextRequest) {
   }
 
   const action = body.action || 'repair-doc-types';
-  if (action !== 'repair-doc-types') {
+  if (!['repair-doc-types', 'upsert-rag-docs'].includes(action)) {
     return NextResponse.json({ success: false, error: 'unknown action' }, { status: 400 });
+  }
+
+  if (action === 'upsert-rag-docs') {
+    const dryRun = body.dryRun !== false;
+    if (!dryRun && body.confirm !== 'upsert-rag-docs') {
+      return NextResponse.json({
+        success: false,
+        error: 'confirm must be "upsert-rag-docs" when dryRun is false',
+      }, { status: 400 });
+    }
+
+    const docs = Array.isArray(body.docs) ? body.docs.slice(0, 25) : [];
+    const dedupeByHash = body.dedupeByHash !== false;
+    if (docs.length === 0) {
+      return NextResponse.json({ success: false, error: 'docs[] required' }, { status: 400 });
+    }
+
+    const normalized = docs.map((doc) => {
+      const fullText = (doc.fullText || '').slice(0, 1_500_000);
+      const filename = doc.filename || doc.sourcePath?.split('/').pop() || 'untitled';
+      const fileExtension = (doc.fileExtension || filename.split('.').pop() || 'txt').toLowerCase();
+      const docType = safeDocType(doc.docType);
+      const wordCount = Number.isFinite(doc.wordCount) ? Math.floor(doc.wordCount || 0) : fullText.split(/\s+/).filter(Boolean).length;
+      return {
+        ...doc,
+        fullText,
+        filename,
+        fileExtension,
+        docType,
+        wordCount,
+        fileSha256: safeSha({ ...doc, fullText }),
+        sourcePath: doc.sourcePath || `admin-upload:${filename}:${Date.now()}`,
+        title: doc.title || filename.replace(/\.[^.]+$/, '').slice(0, 200),
+        topicTags: Array.isArray(doc.topicTags) ? doc.topicTags.slice(0, 20) : [],
+      };
+    });
+
+    const byDocType = normalized.reduce<Record<string, number>>((acc, doc) => {
+      acc[doc.docType] = (acc[doc.docType] || 0) + 1;
+      return acc;
+    }, {});
+
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        received: normalized.length,
+        byDocType,
+        sample: normalized.slice(0, 10).map((doc) => ({
+          filename: doc.filename,
+          docType: doc.docType,
+          textLength: doc.fullText.length,
+          chunks: chunkText(doc.fullText).length,
+          sourcePath: doc.sourcePath,
+        })),
+      });
+    }
+
+    const supabase = getSupabase();
+    const results: Array<{
+      sourcePath: string;
+      filename: string;
+      docType: string;
+      status: 'inserted_or_updated' | 'deduped_updated' | 'skipped' | 'failed';
+      documentId?: string;
+      chunksInserted: number;
+      error?: string;
+    }> = [];
+
+    for (const doc of normalized) {
+      try {
+        const chunks = chunkText(doc.fullText);
+        if (chunks.length === 0) {
+          results.push({
+            sourcePath: doc.sourcePath,
+            filename: doc.filename,
+            docType: doc.docType,
+            status: 'skipped',
+            chunksInserted: 0,
+            error: 'empty extracted text',
+          });
+          continue;
+        }
+
+        let existingByHash: { id: string; source_path: string | null } | null = null;
+        if (dedupeByHash && doc.fileSha256) {
+          const { data: existing } = await supabase
+            .from('mindy_rag_documents')
+            .select('id, source_path')
+            .eq('file_sha256', doc.fileSha256)
+            .limit(1)
+            .maybeSingle();
+          existingByHash = existing || null;
+        }
+
+        const row = {
+          source_path: existingByHash?.source_path || doc.sourcePath,
+          filename: doc.filename,
+          file_extension: doc.fileExtension,
+          size_bytes: doc.sizeBytes || null,
+          file_mtime: doc.fileMtime || null,
+          file_sha256: doc.fileSha256,
+          doc_type: doc.docType,
+          top_level_folder: doc.topLevelFolder || 'proposal-template-corpus',
+          folder_path: doc.folderPath || null,
+          title: doc.title,
+          full_text: doc.fullText,
+          text_length: doc.fullText.length,
+          page_count: doc.pageCount || null,
+          word_count: doc.wordCount,
+          topic_tags: doc.topicTags,
+          has_pii: false,
+          usage_rights: doc.usageRights || 'eric_owned',
+          ingestion_status: 'extracted',
+          ingestion_error: null,
+          ingested_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        let documentId = existingByHash?.id;
+        if (documentId) {
+          const { error: updateError } = await supabase
+            .from('mindy_rag_documents')
+            .update(row)
+            .eq('id', documentId);
+          if (updateError) throw updateError;
+        } else {
+          const { data: upserted, error: upsertError } = await supabase
+            .from('mindy_rag_documents')
+            .upsert(row, { onConflict: 'source_path' })
+            .select('id')
+            .single();
+          if (upsertError) throw upsertError;
+          documentId = upserted.id;
+        }
+
+        await supabase.from('mindy_rag_chunks').delete().eq('document_id', documentId);
+
+        const chunkRows = chunks.map((chunk, index) => ({
+          document_id: documentId,
+          chunk_index: index,
+          chunk_text: chunk,
+          doc_type: doc.docType,
+          doc_title: doc.title,
+          doc_top_level_folder: row.top_level_folder,
+          source_path: row.source_path,
+          word_count: chunk.split(/\s+/).filter(Boolean).length,
+          char_count: chunk.length,
+        }));
+
+        for (let i = 0; i < chunkRows.length; i += 100) {
+          const { error: chunkError } = await supabase
+            .from('mindy_rag_chunks')
+            .insert(chunkRows.slice(i, i + 100));
+          if (chunkError) throw chunkError;
+        }
+
+        results.push({
+          sourcePath: doc.sourcePath,
+          filename: doc.filename,
+          docType: doc.docType,
+          status: existingByHash ? 'deduped_updated' : 'inserted_or_updated',
+          documentId,
+          chunksInserted: chunkRows.length,
+        });
+      } catch (err) {
+        results.push({
+          sourcePath: doc.sourcePath,
+          filename: doc.filename,
+          docType: doc.docType,
+          status: 'failed',
+          chunksInserted: 0,
+          error: err instanceof Error ? err.message : 'unknown error',
+        });
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      dryRun: false,
+      received: normalized.length,
+      byDocType,
+      updatedDocuments: results.filter((result) => ['inserted_or_updated', 'deduped_updated'].includes(result.status)).length,
+      insertedChunks: results.reduce((sum, result) => sum + result.chunksInserted, 0),
+      failed: results.filter((result) => result.status === 'failed').length,
+      results,
+    });
   }
 
   const dryRun = body.dryRun !== false;
