@@ -45,10 +45,12 @@ export interface SamDailyBriefing {
     title: string;
     fullTitle: string;
     deadline: string;
+    responseDeadline?: string;
     daysRemaining: number;
     samLink: string;
     noticeType: string;
     noticeId: string;
+    solicitationNumber?: string;
     agency: string;
     parentAgency?: string;
     buyerOffice?: string;
@@ -613,16 +615,25 @@ Return ONLY valid JSON.`;
       return {
         title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
         fullTitle: o.title,
-        deadline: o.responseDeadline,
+        // Format the deadline (was raw ISO — rendered inconsistently next to
+        // the formatted `opportunities` list). responseDeadline mirrors it so
+        // consumers reading either key get the same formatted value.
+        deadline: formatSamDate(o.responseDeadline),
+        responseDeadline: formatSamDate(o.responseDeadline),
         daysRemaining: getDaysUntil(o.responseDeadline),
         samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
         noticeType: o.noticeType || 'Notice',
         noticeId: o.solicitationNumber || o.noticeId || '',
+        solicitationNumber: o.solicitationNumber,
         agency: buyer.primary,
         parentAgency: buyer.parent,
         buyerOffice: buyer.secondary,
         naicsCode: o.naicsCode || '',
-        setAside: o.setAside || '',
+        // Prefer the human-readable set-aside DESCRIPTION (e.g. "Total Small
+        // Business Set-Aside (FAR 19.5)") like the rich opportunities list —
+        // the short `setAside` code is often empty, which left these cards
+        // with no Industry/Set-Aside line.
+        setAside: o.setAsideDescription || o.setAside || '',
         popCity: o.placeOfPerformance?.city,
         popState: o.placeOfPerformance?.state,
         popZip: o.placeOfPerformance?.zip,
@@ -711,16 +722,25 @@ export function buildSamGreenBriefing(
       return {
         title: o.title.slice(0, 60) + (o.title.length > 60 ? '...' : ''),
         fullTitle: o.title,
-        deadline: o.responseDeadline,
+        // Format the deadline (was raw ISO — rendered inconsistently next to
+        // the formatted `opportunities` list). responseDeadline mirrors it so
+        // consumers reading either key get the same formatted value.
+        deadline: formatSamDate(o.responseDeadline),
+        responseDeadline: formatSamDate(o.responseDeadline),
         daysRemaining: getDaysUntil(o.responseDeadline),
         samLink: o.uiLink || `https://sam.gov/opp/${o.noticeId}/view`,
         noticeType: o.noticeType || 'Notice',
         noticeId: o.solicitationNumber || o.noticeId || '',
+        solicitationNumber: o.solicitationNumber,
         agency: buyer.primary,
         parentAgency: buyer.parent,
         buyerOffice: buyer.secondary,
         naicsCode: o.naicsCode || '',
-        setAside: o.setAside || '',
+        // Prefer the human-readable set-aside DESCRIPTION (e.g. "Total Small
+        // Business Set-Aside (FAR 19.5)") like the rich opportunities list —
+        // the short `setAside` code is often empty, which left these cards
+        // with no Industry/Set-Aside line.
+        setAside: o.setAsideDescription || o.setAside || '',
         popCity: o.placeOfPerformance?.city,
         popState: o.placeOfPerformance?.state,
         popZip: o.placeOfPerformance?.zip,
