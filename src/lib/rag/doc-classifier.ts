@@ -43,6 +43,17 @@ function isProtectedTeachingDoc(input: ClassifyInput): boolean {
   return PROTECTED_TEACHING_TYPES.has(current) || sourcePath.includes('govcon-giants-podcast');
 }
 
+function hasResponseIntent(text: string): boolean {
+  return (
+    text.includes('response') ||
+    text.includes('responding') ||
+    text.includes('proposal') ||
+    text.includes('submittal') ||
+    text.includes('template') ||
+    text.includes('sample')
+  );
+}
+
 export function classifyRagDocCandidate(input: ClassifyInput): RagDocTypeSuggestion | null {
   const haystack = textFor(input);
   const fileTitle = [input.filename || '', input.title || ''].join(' ').toLowerCase();
@@ -69,7 +80,10 @@ export function classifyRagDocCandidate(input: ClassifyInput): RagDocTypeSuggest
     });
   }
 
-  if (/\brfi\b/.test(fileTitle) || fileTitle.includes('request for information')) {
+  if (
+    hasResponseIntent(fileTitle) &&
+    (/\brfi\b/.test(fileTitle) || fileTitle.includes('request for information'))
+  ) {
     return actualDocumentOnly({
       suggestedDocType: 'rfi_response',
       confidence: 'medium',
@@ -77,7 +91,14 @@ export function classifyRagDocCandidate(input: ClassifyInput): RagDocTypeSuggest
     });
   }
 
-  if (/\brfq\b/.test(fileTitle) || fileTitle.includes('request for quotation') || fileTitle.includes('quote response')) {
+  if (
+    fileTitle.includes('quote response') ||
+    fileTitle.includes('quote proposal') ||
+    (
+      hasResponseIntent(fileTitle) &&
+      (/\brfq\b/.test(fileTitle) || fileTitle.includes('request for quotation'))
+    )
+  ) {
     return actualDocumentOnly({
       suggestedDocType: 'rfq_response',
       confidence: 'high',

@@ -135,6 +135,17 @@ function walk(dir, files = []) {
 }
 
 // ---- Doc-type classifier -----------------------------------------------
+function hasResponseIntent(name) {
+  return (
+    name.includes('response') ||
+    name.includes('responding') ||
+    name.includes('proposal') ||
+    name.includes('submittal') ||
+    name.includes('template') ||
+    name.includes('sample')
+  );
+}
+
 function classifyDocType(filePath, filename) {
   const p = filePath.toLowerCase();
   const n = filename.toLowerCase();
@@ -145,8 +156,12 @@ function classifyDocType(filePath, filename) {
     (n.includes('statement of capability') && (p.includes('sources sought') || p.includes('source sought')))
   ) return 'sources_sought_loi';
   if (n.includes('sources sought') || n.includes('source sought')) return 'sources_sought_loi';
-  if (n.includes('rfi') || n.includes('request for information')) return 'rfi_response';
-  if (n.includes('rfq') || n.includes('request for quotation') || n.includes('quote response')) return 'rfq_response';
+  if (hasResponseIntent(n) && (n.includes('rfi') || n.includes('request for information'))) return 'rfi_response';
+  if (
+    n.includes('quote response') ||
+    n.includes('quote proposal') ||
+    (hasResponseIntent(n) && (n.includes('rfq') || n.includes('request for quotation')))
+  ) return 'rfq_response';
   if (n.includes('technical volume') || n.includes('technical approach')) return 'technical_volume';
   if (n.includes('management volume') || n.includes('management approach') || n.includes('staffing plan')) return 'management_volume';
   if (n.includes('pricing volume') || n.includes('price volume') || n.includes('cost volume')) return 'pricing_volume';

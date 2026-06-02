@@ -56,6 +56,17 @@ const PROTECTED_TEACHING_TYPES = new Set([
   'ebook',
 ]);
 
+function hasResponseIntent(text) {
+  return (
+    text.includes('response') ||
+    text.includes('responding') ||
+    text.includes('proposal') ||
+    text.includes('submittal') ||
+    text.includes('template') ||
+    text.includes('sample')
+  );
+}
+
 function classifyDoc(doc) {
   const filename = String(doc.filename || '').toLowerCase();
   const title = String(doc.title || '').toLowerCase();
@@ -77,11 +88,21 @@ function classifyDoc(doc) {
     return actualDocumentOnly('sources_sought_loi', 'high', 'statement-of-capability document tied to Sources Sought language');
   }
 
-  if (/\brfi\b/.test(fileTitle) || fileTitle.includes('request for information')) {
+  if (
+    hasResponseIntent(fileTitle) &&
+    (/\brfi\b/.test(fileTitle) || fileTitle.includes('request for information'))
+  ) {
     return actualDocumentOnly('rfi_response', 'medium', 'filename/title indicates RFI response material');
   }
 
-  if (/\brfq\b/.test(fileTitle) || fileTitle.includes('request for quotation') || fileTitle.includes('quote response')) {
+  if (
+    fileTitle.includes('quote response') ||
+    fileTitle.includes('quote proposal') ||
+    (
+      hasResponseIntent(fileTitle) &&
+      (/\brfq\b/.test(fileTitle) || fileTitle.includes('request for quotation'))
+    )
+  ) {
     return actualDocumentOnly('rfq_response', 'high', 'filename/title indicates RFQ or quote response material');
   }
 
