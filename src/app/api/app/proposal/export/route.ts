@@ -480,6 +480,154 @@ function buildResponseTemplateSections(
   ];
 }
 
+// ---- Template-faithful LOI / Statement of Capability builder ----------------
+// Mirrors public/templates/loi-govcon-edu-template.docx: a real letter (no
+// title/contents page), with aligned label/value rows rendered as borderless
+// 2-column tables so the colons line up, and bold per-project experience
+// headers. blank fields stay as fill-in lines for the user.
+
+const NO_BORDERS = {
+  top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+};
+
+// A borderless 2-column table: left = label, right = ": value" (value or a
+// fill-in underline when empty). Colons align because the label column has a
+// fixed width.
+function labelValueTable(rows: Array<[string, string | undefined]>): Table {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NO_BORDERS,
+    rows: rows.map(([label, value]) => new TableRow({
+      children: [
+        new TableCell({
+          width: { size: 38, type: WidthType.PERCENTAGE },
+          borders: NO_BORDERS,
+          children: [new Paragraph({ children: [new TextRun({ text: label, bold: false })] })],
+        }),
+        new TableCell({
+          width: { size: 62, type: WidthType.PERCENTAGE },
+          borders: NO_BORDERS,
+          children: [new Paragraph({
+            children: [new TextRun({
+              text: value && value.trim() ? `:  ${value.trim()}` : ':  ______________________________',
+            })],
+          })],
+        }),
+      ],
+    })),
+  });
+}
+
+function sectionHeader(text: string): Paragraph {
+  return new Paragraph({
+    spacing: { before: 240, after: 80 },
+    children: [new TextRun({ text, bold: true, size: 24 })],
+  });
+}
+
+function bodyPara(text: string): Paragraph {
+  return new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text })] });
+}
+
+// Build the whole LOI / Statement of Capability body matching the template.
+function buildLoiChildren(profile: CompanyProfile, rfpName: string): (Paragraph | Table)[] {
+  const company = profile.legalName || '____________________';
+  const cityState = [profile.hqCity, profile.hqState].filter(Boolean).join(', ');
+  const cityStateLabel = cityState || '____________';
+  const designation = (profile.certifications && profile.certifications.length)
+    ? profile.certifications.join(', ')
+    : 'Small Business';
+  const services = profile.oneLiner || '____________________________';
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const out: (Paragraph | Table)[] = [];
+
+  out.push(bodyPara(today));
+  out.push(new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: 'Attention:', bold: true })] }));
+  out.push(bodyPara('______________________________  (Agency / Contracting Office)'));
+  out.push(bodyPara('______________________________  (Address)'));
+  out.push(new Paragraph({
+    spacing: { after: 120 },
+    children: [
+      new TextRun({ text: 'Reference:  ', bold: true }),
+      new TextRun({ text: `${rfpName || '__________'}  (Solicitation / Notice number)` }),
+    ],
+  }));
+  out.push(bodyPara('To whom it may concern,'));
+
+  // Intro prose — the cover letter.
+  out.push(bodyPara(`${company}, a ${cityStateLabel}-based ${designation} firm, is pleased to submit this Statement of Capability to demonstrate its intention and ability to provide professional services for the above-referenced requirement.`));
+  out.push(bodyPara(`${company} has successfully completed work of similar scope and size for federal and commercial customers. We specialize in ${services}. Our team is prepared to provide the personnel, management, and technical capability required for this effort. Following is a Summary of Qualifications along with the requested submittal information.`));
+
+  // SUBMITTAL REQUIREMENTS
+  out.push(sectionHeader('SUBMITTAL REQUIREMENTS:'));
+  out.push(new Paragraph({
+    spacing: { after: 120 },
+    children: [
+      new TextRun({ text: 'Submittal Intention:  ', bold: true }),
+      new TextRun({ text: `${company} has reviewed this opportunity and is interested in providing services for the above-referenced project. Our team has relevant experience in ${services}.` }),
+    ],
+  }));
+
+  // Company Profile
+  out.push(sectionHeader('Company Profile:'));
+  out.push(labelValueTable([
+    ['Number of employees', undefined],
+    ['Office location', cityState || undefined],
+    ['Single bonding capacity', undefined],
+    ['Aggregate bonding capacity', undefined],
+    ['UEI number', profile.uei],
+    ['CAGE code', profile.cageCode],
+    ['Primary NAICS code', profile.primaryNaics],
+    ['Small business designation / status claimed', profile.certifications?.join(', ')],
+  ]));
+
+  // Responsible Office / Contact Person
+  out.push(sectionHeader('Responsible Office / Contact Person:'));
+  out.push(labelValueTable([
+    ['Company / address', cityState || undefined],
+    ['Contact person', profile.contactName],
+    ['Title', undefined],
+    ['Phone', profile.phone],
+    ['Email', profile.contactEmail],
+    ['Website', profile.website],
+  ]));
+
+  // Relevant Experience — one block per past-performance record (pad to 3).
+  out.push(sectionHeader('Relevant Experience:'));
+  const pp = profile.pastPerformance || [];
+  const count = Math.max(3, pp.length);
+  for (let i = 0; i < count; i++) {
+    const p = pp[i];
+    out.push(new Paragraph({
+      spacing: { before: 160, after: 40 },
+      children: [new TextRun({ text: p?.title || `Project ${i + 1} — ____________________________`, bold: true })],
+    }));
+    out.push(labelValueTable([
+      ['Role: Prime / Subcontractor', p?.role],
+      ['Agency / customer', p?.customer],
+      ['Contract value', p?.value],
+      ['Period of performance', p?.pop],
+      ['Point of contact', undefined],
+      ['Telephone / email', undefined],
+      ['Timeliness of performance', undefined],
+      ['Customer satisfaction / CPARS', undefined],
+      ['Scope and relevance to this requirement', p?.scope],
+    ]));
+  }
+
+  // Attachment reminder
+  out.push(sectionHeader('Attachment Reminder:'));
+  out.push(bodyPara('Attach the company capability statement as a separate document only if the Sources Sought / RFI requests or requires it.'));
+
+  return out;
+}
+
 export async function POST(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   if (!email) {
@@ -524,6 +672,30 @@ export async function POST(request: NextRequest) {
     : [];
 
   const children: (Paragraph | Table)[] = [];
+
+  // Pure LOI / Statement of Capability (Sources Sought / RFI with no AI-drafted
+  // sections): render the template-faithful letter (no title/contents page).
+  // Mirrors public/templates/loi-govcon-edu-template.docx.
+  const useLoiTemplate = isLoiPackage && orderedSections.length === 0;
+  if (useLoiTemplate) {
+    children.push(...buildLoiChildren(companyProfile, rfpName));
+    const loiDoc = new Document({
+      creator: 'Mindy',
+      title: `Statement of Capability — ${rfpName}`,
+      description: 'Statement of Capability / Letter of Intent generated by Mindy from your profile.',
+      sections: [{ children }],
+    });
+    const loiBuffer = await Packer.toBuffer(loiDoc);
+    const loiFileName = `${fileNameBase}-${new Date().toISOString().split('T')[0]}.docx`;
+    return new NextResponse(new Uint8Array(loiBuffer), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${loiFileName}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
 
   // --- Title page ---
   children.push(
