@@ -14,9 +14,86 @@ import {
   PageBreak,
 } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  }
+  return _supabase;
+}
+
+// The subset of the user's Vault + profile we merge into the LOI / RFQ
+// response template so it doesn't export as all-blank placeholders.
+interface CompanyProfile {
+  legalName?: string;
+  oneLiner?: string;
+  elevatorPitch?: string;
+  uei?: string;
+  cageCode?: string;
+  primaryNaics?: string;
+  certifications?: string[];
+  hqCity?: string;
+  hqState?: string;
+  serviceStates?: string[];
+  website?: string;
+  phone?: string;
+  contactName?: string;
+  contactEmail?: string;
+  pastPerformance?: Array<{
+    title?: string;
+    customer?: string;
+    value?: string;
+    pop?: string;
+    role?: string;
+    scope?: string;
+  }>;
+}
+
+// Load identity profile + past performance + the user's display contact info so
+// the response template pre-fills everything we already know about them.
+async function loadCompanyProfile(email: string): Promise<CompanyProfile> {
+  const sb = getSupabase();
+  const userEmail = email.toLowerCase().trim();
+  const [idRes, ppRes, settingsRes] = await Promise.all([
+    sb.from('user_identity_profile').select('*').eq('user_email', userEmail).maybeSingle().then((r: { data: unknown }) => r, () => ({ data: null })),
+    sb.from('user_past_performance').select('*').eq('user_email', userEmail).is('archived_at', null).order('updated_at', { ascending: false }).limit(3).then((r: { data: unknown }) => r, () => ({ data: [] })),
+    sb.from('mi_beta_user_settings').select('display_name, company_name, role_title').eq('user_email', userEmail).maybeSingle().then((r: { data: unknown }) => r, () => ({ data: null })),
+  ]);
+
+  const id = (idRes.data || {}) as Record<string, unknown>;
+  const settings = (settingsRes.data || {}) as Record<string, unknown>;
+  const pp = Array.isArray(ppRes.data) ? ppRes.data as Array<Record<string, unknown>> : [];
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const arr = (v: unknown): string[] | undefined => (Array.isArray(v) && v.length ? v.map(String) : undefined);
+
+  return {
+    legalName: str(id.legal_name) || str(settings.company_name),
+    oneLiner: str(id.one_liner),
+    elevatorPitch: str(id.elevator_pitch),
+    uei: str(id.uei),
+    cageCode: str(id.cage_code),
+    primaryNaics: arr(id.primary_naics)?.[0],
+    certifications: arr(id.certifications),
+    hqCity: str(id.hq_city),
+    hqState: str(id.hq_state),
+    serviceStates: arr(id.service_states),
+    contactName: str(settings.display_name),
+    pastPerformance: pp.map((p) => ({
+      title: str(p.contract_title) || str(p.project_title) || str(p.title),
+      customer: [str(p.agency), str(p.sub_agency)].filter(Boolean).join(' — ') || str(p.customer),
+      value: str(p.contract_value) || str(p.value),
+      pop: [str(p.period_start), str(p.period_end)].filter(Boolean).join(' to ') || str(p.period_of_performance),
+      role: str(p.role),
+      scope: str(p.scope_description) || str(p.scope) || str(p.outcomes),
+    })),
+  };
+}
 
 interface ComplianceRow {
   id: string;
@@ -182,14 +259,31 @@ function blank(label: string) {
   return `${label}: ______________________________`;
 }
 
-function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: string; draft: string }> {
+// Pre-fill a label with a known value when we have it, else leave a blank line.
+// "Company legal name: GOVCON GIANTS INC" vs "Company legal name: ______".
+function fill(label: string, value?: string | null) {
+  const v = (value || '').trim();
+  return v ? `${label}: ${v}` : blank(label);
+}
+
+function buildResponseTemplateSections(
+  kind: 'loi' | 'rfq',
+  profile: CompanyProfile = {},
+): Array<{ label: string; draft: string }> {
   const isRfq = kind === 'rfq';
+  const company = profile.legalName || '[Company Name]';
+  const cityState = [profile.hqCity, profile.hqState].filter(Boolean).join(', ');
+  const designation = (profile.certifications && profile.certifications.length)
+    ? profile.certifications.join(', ')
+    : '[small-business designation(s)]';
+  const services = profile.oneLiner || '[core services relevant to this notice]';
+  const cityStateLabel = cityState || '[City / State]';
   if (!isRfq) {
     return [
       {
         label: 'Letter of Intent',
         draft: [
-          blank('Date'),
+          fill('Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })),
           '',
           blank('Attention'),
           blank('Agency / Office'),
@@ -201,9 +295,9 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
           '',
           'To whom it may concern,',
           '',
-          '[Company Name], a [City / State]-based [small-business designation(s)], is pleased to submit this Letter of Intent to demonstrate its intention and ability to support the above-referenced requirement.',
+          `${company}, a ${cityStateLabel}-based ${designation} firm, is pleased to submit this Letter of Intent to demonstrate its intention and ability to support the above-referenced requirement.`,
           '',
-          '[Company Name] has successfully completed work of similar scope and size for [agency / customer types]. We specialize in [core services relevant to this notice]. Our team is prepared to provide the personnel, management, and technical capability required for this effort.',
+          `${company} has successfully completed work of similar scope and size for federal and commercial customers. We specialize in ${services}. Our team is prepared to provide the personnel, management, and technical capability required for this effort.`,
           '',
           'Following is a Summary of Qualifications along with the requested submittal information.',
         ].join('\n'),
@@ -211,7 +305,7 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
       {
         label: 'Submittal Requirements',
         draft: [
-          'Submittal Intention: [Company Name] has reviewed this opportunity and is interested in providing services for the above-referenced project. Our team has relevant experience in [similar project type / location / customer environment].',
+          `Submittal Intention: ${company} has reviewed this opportunity and is interested in providing services for the above-referenced project. Our team has relevant experience in ${services}.`,
           '',
           blank('Submission deadline'),
           blank('Submission email / portal'),
@@ -225,67 +319,52 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
       {
         label: 'Company Profile',
         draft: [
-          blank('Company legal name'),
+          fill('Company legal name', profile.legalName),
           blank('Number of employees'),
-          blank('Office location'),
+          fill('Office location', cityState),
           blank('Single bonding capacity / insurance information if requested'),
           blank('Aggregate bonding capacity if requested'),
-          blank('UEI number'),
-          blank('CAGE code'),
-          blank('Primary NAICS code'),
-          blank('Small business designation / status claimed'),
+          fill('UEI number', profile.uei),
+          fill('CAGE code', profile.cageCode),
+          fill('Primary NAICS code', profile.primaryNaics),
+          fill('Small business designation / status claimed', profile.certifications?.join(', ')),
         ].join('\n'),
       },
       {
         label: 'Responsible Office / Contact Person',
         draft: [
-          blank('Responsible office / company address'),
-          blank('Contact person'),
+          fill('Responsible office / company address', cityState),
+          fill('Contact person', profile.contactName),
           blank('Title'),
           blank('Phone'),
-          blank('Email'),
-          blank('Website'),
+          fill('Email', profile.contactEmail),
+          fill('Website', profile.website),
         ].join('\n'),
       },
       {
         label: 'Relevant Experience',
-        draft: [
-          'Project 1',
-          blank('Contract / project title'),
-          blank('Role: Prime / Subcontractor'),
-          blank('Agency / customer'),
-          blank('Contract value'),
-          blank('Period of performance'),
-          blank('Point of contact'),
-          blank('Telephone / email'),
-          blank('Timeliness of performance'),
-          blank('Customer satisfaction / CPARS / performance result'),
-          blank('Scope and relevance to this requirement'),
-          '',
-          'Project 2',
-          blank('Contract / project title'),
-          blank('Role: Prime / Subcontractor'),
-          blank('Agency / customer'),
-          blank('Contract value'),
-          blank('Period of performance'),
-          blank('Point of contact'),
-          blank('Telephone / email'),
-          blank('Timeliness of performance'),
-          blank('Customer satisfaction / CPARS / performance result'),
-          blank('Scope and relevance to this requirement'),
-          '',
-          'Project 3',
-          blank('Contract / project title'),
-          blank('Role: Prime / Subcontractor'),
-          blank('Agency / customer'),
-          blank('Contract value'),
-          blank('Period of performance'),
-          blank('Point of contact'),
-          blank('Telephone / email'),
-          blank('Timeliness of performance'),
-          blank('Customer satisfaction / CPARS / performance result'),
-          blank('Scope and relevance to this requirement'),
-        ].join('\n'),
+        // Pre-fill from the user's Vault past performance; pad to 3 project
+        // blocks so they always have the full template structure to complete.
+        draft: (() => {
+          const pp = profile.pastPerformance || [];
+          const blocks: string[] = [];
+          for (let i = 0; i < Math.max(3, pp.length); i++) {
+            const p = pp[i];
+            blocks.push(`Project ${i + 1}`);
+            blocks.push(fill('Contract / project title', p?.title));
+            blocks.push(fill('Role: Prime / Subcontractor', p?.role));
+            blocks.push(fill('Agency / customer', p?.customer));
+            blocks.push(fill('Contract value', p?.value));
+            blocks.push(fill('Period of performance', p?.pop));
+            blocks.push(blank('Point of contact'));
+            blocks.push(blank('Telephone / email'));
+            blocks.push(blank('Timeliness of performance'));
+            blocks.push(blank('Customer satisfaction / CPARS / performance result'));
+            blocks.push(fill('Scope and relevance to this requirement', p?.scope));
+            blocks.push('');
+          }
+          return blocks.join('\n').trim();
+        })(),
       },
       {
         label: 'Attachment Reminder',
@@ -303,7 +382,7 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
     {
       label: isRfq ? 'RFQ Response Cover' : 'Letter of Intent',
       draft: [
-        blank('Date'),
+        fill('Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })),
         '',
         blank('Attention'),
         blank('Agency / Office'),
@@ -315,10 +394,10 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
         '',
         'To whom it may concern,',
         '',
-        `[Company Name] is pleased to submit this ${isRfq ? 'RFQ response' : 'Letter of Intent'} for the above-referenced requirement.`,
+        `${company} is pleased to submit this ${isRfq ? 'RFQ response' : 'Letter of Intent'} for the above-referenced requirement.`,
         '',
-        blank('One-sentence summary of fit'),
-        blank('Primary NAICS / business designation'),
+        fill('One-sentence summary of fit', profile.oneLiner),
+        fill('Primary NAICS / business designation', [profile.primaryNaics, profile.certifications?.join(', ')].filter(Boolean).join(' / ')),
         blank('Capability statement attached? Yes / No / N/A'),
       ].join('\n'),
     },
@@ -336,24 +415,24 @@ function buildResponseTemplateSections(kind: 'loi' | 'rfq'): Array<{ label: stri
     {
       label: 'Company Profile',
       draft: [
-        blank('Company legal name'),
-        blank('Office location'),
+        fill('Company legal name', profile.legalName),
+        fill('Office location', cityState),
         blank('Number of employees'),
-        blank('UEI number'),
-        blank('CAGE code'),
-        blank('Small business designation / status claimed'),
+        fill('UEI number', profile.uei),
+        fill('CAGE code', profile.cageCode),
+        fill('Small business designation / status claimed', profile.certifications?.join(', ')),
         blank('Bonding capacity / insurance information if requested'),
       ].join('\n'),
     },
     {
       label: 'Responsible Office / Contact Person',
       draft: [
-        blank('Responsible office'),
-        blank('Contact person'),
+        fill('Responsible office', cityState),
+        fill('Contact person', profile.contactName),
         blank('Title'),
         blank('Phone'),
-        blank('Email'),
-        blank('Website'),
+        fill('Email', profile.contactEmail),
+        fill('Website', profile.website),
       ].join('\n'),
     },
     {
@@ -411,9 +490,17 @@ export async function POST(request: NextRequest) {
 
   // Section order in the final doc — caller sends the tab order currently shown
   // in the UI so SS/RFI LOI sections export correctly too.
+  // Load the user's Vault + profile so the LOI / RFQ template pre-fills company
+  // name, UEI, CAGE, NAICS, services, and past performance instead of exporting
+  // as all-blank placeholders. Best-effort — a lookup failure just falls back
+  // to blanks.
+  const companyProfile = isSimpleResponsePackage
+    ? await loadCompanyProfile(email).catch(() => ({} as CompanyProfile))
+    : {} as CompanyProfile;
+
   const orderedSections = sectionOrder.filter(id => drafts[id]?.draft);
   const templateSections = orderedSections.length === 0 && isSimpleResponsePackage
-    ? buildResponseTemplateSections(isRfqPackage ? 'rfq' : 'loi')
+    ? buildResponseTemplateSections(isRfqPackage ? 'rfq' : 'loi', companyProfile)
     : [];
 
   const children: (Paragraph | Table)[] = [];
