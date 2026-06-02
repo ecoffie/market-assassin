@@ -969,11 +969,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               className="flex-1 min-w-[240px] rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
             >
               <option value="">Choose a pursuit…</option>
-              {opportunities.map(opp => (
-                <option key={opp.id} value={opp.id}>
-                  {opp.title}{opp.agency ? ` — ${opp.agency}` : ''}
-                </option>
-              ))}
+              {opportunities.map(opp => {
+                const nt = noticeTypeLabel(opp.notice_type);
+                return (
+                  <option key={opp.id} value={opp.id}>
+                    {opp.title}{opp.agency ? ` — ${opp.agency}` : ''}{nt ? ` · ${nt}` : ''}
+                  </option>
+                );
+              })}
             </select>
             <button
               type="button"
@@ -984,6 +987,33 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               Start drafting →
             </button>
           </div>
+          {/* Colored notice-type cue for the highlighted pursuit, so the user
+              knows whether it's a biddable RFP vs a pre-solicitation Sources
+              Sought BEFORE starting the draft flow. */}
+          {(() => {
+            const picked = opportunities.find(o => o.id === selectedId);
+            const nt = noticeTypeLabel(picked?.notice_type);
+            if (!nt) return null;
+            const isPreSol = /sources sought|rfi/i.test(nt);
+            return (
+              <div className="mt-3">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${
+                    isPreSol
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                      : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                  }`}
+                >
+                  {nt}
+                </span>
+                <span className="ml-2 text-[11px] text-slate-400">
+                  {isPreSol
+                    ? 'Pre-solicitation — not a biddable RFP yet. Check the Sources Sought briefing.'
+                    : 'Biddable solicitation. Check the matching RFP briefing.'}
+                </span>
+              </div>
+            );
+          })()}
           <p className="text-[11px] text-slate-500 mt-2">
             Or upload an RFP below to draft for an opportunity that isn&apos;t saved yet.
           </p>
