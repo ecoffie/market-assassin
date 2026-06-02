@@ -285,6 +285,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         </div>
 
         <div className="space-y-4">
+          <BillingCard email={email} tier={tier} getAuthHeaders={getAuthHeaders} />
+
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <h2 className="font-semibold text-white">Onboarding</h2>
             <div className="mt-4 space-y-3">
@@ -310,6 +312,147 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
 function SectionTitle({ title }: { title: string }) {
   return <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 pt-2">{title}</h2>;
+}
+
+interface BillingState {
+  hasSubscription: boolean;
+  subscription?: {
+    status: string;
+    planName: string;
+    amount: number | null;
+    currency: string;
+    interval: string | null;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  };
+}
+
+// Billing card — current plan + a single "Manage Billing" button that opens
+// Stripe's hosted Billing Portal (change plan, cancel, update card, download
+// invoices, payment history). All subscription mutations + PCI handled by
+// Stripe; we only read the current state for display.
+function BillingCard({
+  email,
+  tier,
+  getAuthHeaders,
+}: {
+  email: string | null;
+  tier: AppTier;
+  getAuthHeaders: (init?: HeadersInit) => HeadersInit;
+}) {
+  const [state, setState] = useState<BillingState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [opening, setOpening] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!email) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/app/billing?email=${encodeURIComponent(email)}`, {
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (!cancelled && data?.success) {
+          setState({ hasSubscription: !!data.hasSubscription, subscription: data.subscription });
+        }
+      } catch { /* non-fatal — card shows the upgrade fallback */ }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [email, getAuthHeaders]);
+
+  const openPortal = useCallback(async () => {
+    if (!email) return;
+    setOpening(true);
+    setErr(null);
+    try {
+      const res = await fetch('/api/app/billing/portal', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email, returnUrl: window.location.href }),
+      });
+      const data = await res.json();
+      if (data?.success && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setErr(data?.error || 'Could not open billing.');
+    } catch {
+      setErr('Could not open billing.');
+    } finally {
+      setOpening(false);
+    }
+  }, [email, getAuthHeaders]);
+
+  const sub = state?.subscription;
+  const renews = sub?.currentPeriodEnd
+    ? new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
+  const priceLabel = sub && sub.amount != null
+    ? `$${sub.amount}${sub.interval ? `/${sub.interval}` : ''}`
+    : null;
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+      <h2 className="font-semibold text-white mb-3">Billing</h2>
+
+      {loading ? (
+        <div className="h-12 rounded-lg bg-slate-800/60 animate-pulse" />
+      ) : state?.hasSubscription && sub ? (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-white">{sub.planName}</span>
+              {priceLabel && <span className="text-sm text-slate-300">{priceLabel}</span>}
+            </div>
+            <div className="mt-1 flex items-center gap-2 text-xs">
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${
+                sub.status === 'active' || sub.status === 'trialing'
+                  ? 'bg-emerald-500/15 text-emerald-300'
+                  : 'bg-amber-500/15 text-amber-300'
+              }`}>
+                {sub.status === 'trialing' ? 'Trial' : sub.status === 'past_due' ? 'Past due' : sub.status === 'active' ? 'Active' : sub.status}
+              </span>
+              {renews && (
+                <span className="text-slate-500">
+                  {sub.cancelAtPeriodEnd ? `Cancels ${renews}` : `Renews ${renews}`}
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={openPortal}
+            disabled={opening}
+            className="w-full px-3 py-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {opening ? 'Opening…' : 'Manage billing'}
+          </button>
+          <p className="text-[11px] text-slate-500">
+            Change plan, update your card, cancel, or download invoices — handled securely by Stripe.
+          </p>
+        </div>
+      ) : (
+        // No active subscription — free user. Show plan + upgrade CTA.
+        <div className="space-y-3">
+          <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-3">
+            <span className="text-sm font-medium text-white">{tierLabel(tier)}</span>
+            <p className="text-xs text-slate-500 mt-1">No active paid subscription.</p>
+          </div>
+          <a
+            href="/market-intelligence"
+            className="block w-full px-3 py-2 text-center text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
+          >
+            Upgrade to Pro
+          </a>
+        </div>
+      )}
+
+      {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+    </div>
+  );
 }
 
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
