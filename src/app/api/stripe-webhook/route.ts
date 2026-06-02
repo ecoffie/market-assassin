@@ -164,6 +164,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Cross-site purchase attribution (non-fatal): join the pre-checkout
+    // attribution captured by the /checkout hop (client_reference_id) and
+    // record this sale in the shared Upstash store so it shows on the unified
+    // govcongiants.com /admin/purchases dashboard tagged site="mindy". Wrapped
+    // so a tracking hiccup can NEVER block access provisioning below.
+    try {
+      const { getCheckoutStart, savePurchase } = await import('@/lib/purchase-attribution');
+      const attributionId =
+        session.client_reference_id || session.metadata?.attribution_id || null;
+      const checkoutStart = await getCheckoutStart(attributionId);
+      await savePurchase({
+        id: session.id,
+        event_id: event.id,
+        event_type: event.type,
+        status: 'paid',
+        product_id: checkoutStart?.product_id || productId,
+        product_name: checkoutStart?.product_name || lineItemDescription || 'Mindy Purchase',
+        product_price: checkoutStart?.product_price,
+        amount_cents: session.amount_total ?? checkoutStart?.amount_cents ?? undefined,
+        currency: session.currency ?? undefined,
+        customer_email: email,
+        customer_name: session.customer_details?.name || undefined,
+        stripe_checkout_session_id: session.id,
+        stripe_customer_id:
+          typeof session.customer === 'string' ? session.customer : session.customer?.id,
+        attribution_id: attributionId ?? undefined,
+        attribution: checkoutStart?.attribution,
+        created_at: new Date().toISOString(),
+        raw_created: event.created,
+      });
+    } catch (attrErr) {
+      console.error('[stripe-webhook] purchase attribution write failed (non-fatal):', attrErr);
+    }
+
     // Auto-update access flags (always update, user_id is optional)
     const accessUpdates = await updateAccessFlags(email, tier, bundle);
 
