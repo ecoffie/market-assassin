@@ -14,19 +14,21 @@
 #     quota is currently exhausted — these builds need ~40 GB of scan budget.
 #   - After each monthly USASpending ingest (the source `awards` table changed).
 #
-# COST: ~6.5 GB (piid_lookup) + ~34 GB (award_detail_lookup) = ~40 GB one-time,
-#       ~$0.25 at $6.25/TB. Confirmed via --dry_run 2026-06-01.
+# COST: full build scans ~6.5 GB (piid_lookup) + ~34 GB (award_detail_lookup)
+#       = ~40 GB one-time, ~$0.25 at $6.25/TB.
+#
+# PARTITIONING: both tables are RANGE_BUCKET-partitioned on a hash bucket
+# (FARM_FINGERPRINT(key) mod 1024) and clustered by key, so a point lookup that
+# filters `bucket = MOD(...@key...) AND key = @key` scans ~1/1024 of the table
+# (~4.5 MB piid / ~25 MB award). Clustering ALONE on an unpartitioned table did
+# NOT prune (measured ~4.86 GB / ~27 GB per lookup on 2026-06-02) — the hash
+# partition is what makes byte cost deterministic. See build-derived.sql §6/§7.
 #
 # AFTER RUNNING: bump DATA_VERSION in src/lib/bigquery/cache.ts so any stale
 # KV entries from the old (full-scan) queries are invalidated.
 set -euo pipefail
 
 PROJECT="market-assasin"
-SQL_FILE="$(dirname "$0")/build-derived.sql"
-
-echo "==> Dry-run validating lookup builds (free)…"
-# Extract just sections 6 & 7 would be brittle; instead run the two CREATEs
-# directly below. Keep them byte-for-byte in sync with build-derived.sql.
 
 run() {
   local label="$1"; shift
@@ -35,8 +37,16 @@ run() {
   echo "    done: ${label}"
 }
 
+# Partition spec changes are incompatible with CREATE OR REPLACE, so DROP first.
+echo "==> Dropping existing lookup tables (if present)…"
+bq query --use_legacy_sql=false --project_id="${PROJECT}" \
+  'DROP TABLE IF EXISTS `market-assasin.usaspending.piid_lookup`'
+bq query --use_legacy_sql=false --project_id="${PROJECT}" \
+  'DROP TABLE IF EXISTS `market-assasin.usaspending.award_detail_lookup`'
+
 run "piid_lookup" '
-CREATE OR REPLACE TABLE `market-assasin.usaspending.piid_lookup`
+CREATE TABLE `market-assasin.usaspending.piid_lookup`
+PARTITION BY RANGE_BUCKET(bucket, GENERATE_ARRAY(0, 1024, 1))
 CLUSTER BY piid_upper AS
 WITH per_award AS (
   SELECT
@@ -51,7 +61,9 @@ WITH per_award AS (
   WHERE piid IS NOT NULL AND TRIM(piid) != ""
   GROUP BY piid_upper, award_id
 )
-SELECT piid_upper, winner.piid AS piid, winner.award_id AS award_id, winner.recipient_name AS recipient_name
+SELECT
+  MOD(MOD(FARM_FINGERPRINT(piid_upper), 1024) + 1024, 1024) AS bucket,
+  piid_upper, winner.piid AS piid, winner.award_id AS award_id, winner.recipient_name AS recipient_name
 FROM (
   SELECT piid_upper,
     ARRAY_AGG(STRUCT(piid, award_id, recipient_name)
@@ -61,9 +73,11 @@ FROM (
 )'
 
 run "award_detail_lookup" '
-CREATE OR REPLACE TABLE `market-assasin.usaspending.award_detail_lookup`
+CREATE TABLE `market-assasin.usaspending.award_detail_lookup`
+PARTITION BY RANGE_BUCKET(bucket, GENERATE_ARRAY(0, 1024, 1))
 CLUSTER BY award_id AS
 SELECT
+  MOD(MOD(FARM_FINGERPRINT(award_id), 1024) + 1024, 1024) AS bucket,
   award_id, latest.piid, latest.recipient_uei, latest.recipient_name, latest.parent_uei,
   latest.parent_name, latest.cage_code, latest.recipient_city, latest.recipient_state,
   latest.awarding_agency, latest.awarding_sub_agency, latest.awarding_office, latest.funding_agency,
@@ -87,7 +101,7 @@ FROM (
 echo ""
 echo "==> Row counts:"
 bq query --use_legacy_sql=false --project_id="${PROJECT}" '
-SELECT "piid_lookup" AS tbl, COUNT(*) AS rows FROM `market-assasin.usaspending.piid_lookup`
+SELECT "piid_lookup" AS tbl, COUNT(*) AS row_count FROM `market-assasin.usaspending.piid_lookup`
 UNION ALL
 SELECT "award_detail_lookup", COUNT(*) FROM `market-assasin.usaspending.award_detail_lookup`'
 

@@ -124,10 +124,12 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
   if (!isValidAwardId(awardId)) return null;
   const rows = await queryCached<AwardDetailRow>({
     cacheKey: `awards:detail:${awardId}`,
-    // Reads the clustered-by-award_id award_detail_lookup table (one row per
-    // award), so a cold lookup scans ~MB instead of the 10-15 GB the same
-    // WHERE on the unclustered awards table used to cost. 1 GiB cap is plenty.
-    maximumBytesBilled: String(1024 * 1024 * 1024),
+    // Reads the hash-partitioned award_detail_lookup table. The
+    // `bucket = MOD(...)` filter prunes to ONE of 1024 partitions so a cold
+    // lookup scans ~10-25 MB (measured 10 MB billed) instead of the ~27 GB an
+    // unpartitioned scan cost. BQ computes the hash from @id, so JS never has
+    // to reproduce FARM_FINGERPRINT. 100 MiB cap is a generous hard ceiling.
+    maximumBytesBilled: String(100 * 1024 * 1024),
     query: `
       SELECT
         award_id,
@@ -160,7 +162,8 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
         fiscal_year,
         description
       FROM ${BQ_TABLES.awardDetailLookup}
-      WHERE award_id = @id
+      WHERE bucket = MOD(MOD(FARM_FINGERPRINT(@id), 1024) + 1024, 1024)
+        AND award_id = @id
       LIMIT 1
     `,
     params: { id: awardId },
@@ -198,13 +201,16 @@ export async function getAwardIdByPiid(piid: string): Promise<{
     recipient_name: string;
   }>({
     cacheKey: `awards:by-piid:${norm}`,
-    // Clustered lookup — a single-equality read scans ~MB. 1 GiB cap is
-    // a generous ceiling that still hard-stops any accidental full scan.
-    maximumBytesBilled: String(1024 * 1024 * 1024),
+    // Hash-partitioned lookup: the `bucket = MOD(...)` filter prunes to ONE of
+    // 1024 partitions so a cold read scans ~4.5 MB (measured 10 MB billed)
+    // instead of the ~4.86 GB an unpartitioned scan cost. BQ computes the hash
+    // from @piid. 100 MiB cap is a generous hard ceiling.
+    maximumBytesBilled: String(100 * 1024 * 1024),
     query: `
       SELECT award_id, piid, recipient_name
       FROM ${BQ_TABLES.piidLookup}
-      WHERE piid_upper = @piid
+      WHERE bucket = MOD(MOD(FARM_FINGERPRINT(@piid), 1024) + 1024, 1024)
+        AND piid_upper = @piid
       LIMIT 1
     `,
     params: { piid: norm },
