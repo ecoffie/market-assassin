@@ -418,7 +418,11 @@ export default function UnifiedSidebar({
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
+      {/* When collapsed, allow horizontal overflow so the hover tooltips can
+          escape past the narrow w-16 rail. overflow-y-auto forces x to hidden,
+          which would clip them — so use overflow-visible in collapsed mode.
+          The compact icon list rarely needs y-scroll when collapsed anyway. */}
+      <nav className={`flex-1 py-4 ${isCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
         {NAV_SECTIONS.map((section) => {
           // SaaS-standard ordering (Linear / Notion pattern): items the
           // current user can actually use come first, locked items after.
@@ -444,6 +448,7 @@ export default function UnifiedSidebar({
                 const isHovered = hoveredItem === item.id;
                 const display = getItemDisplay(item);
                 const sharedClassName = `
+                  group relative
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                   transition-all duration-150
                   ${isActive
@@ -480,6 +485,26 @@ export default function UnifiedSidebar({
                         )}
                       </>
                     )}
+                    {/* Collapsed-state hover tooltip — shows the label (and
+                        badge / lock) to the RIGHT of the icon, like the GCP
+                        console. CSS-only (group-hover), instant, styled —
+                        replaces the slow/ugly native title tooltip. */}
+                    {isCollapsed && (
+                      <span
+                        role="tooltip"
+                        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2
+                                   whitespace-nowrap rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5
+                                   text-xs font-medium text-white shadow-lg shadow-black/40
+                                   opacity-0 translate-x-[-4px] transition-all duration-100
+                                   group-hover:opacity-100 group-hover:translate-x-0"
+                      >
+                        {display.label}
+                        {item.badge && (
+                          <span className="ml-1.5 text-[10px] text-purple-300">{item.badge}</span>
+                        )}
+                        {!canAccess && <span className="ml-1.5 text-[10px] text-slate-400">🔒 Pro</span>}
+                      </span>
+                    )}
                   </>
                 );
 
@@ -495,7 +520,7 @@ export default function UnifiedSidebar({
                       onMouseEnter={() => setHoveredItem(item.id)}
                       onMouseLeave={() => setHoveredItem(null)}
                       className={sharedClassName}
-                      title={isCollapsed ? display.label : undefined}
+                      
                     >
                       {innerContent}
                     </Link>
@@ -518,7 +543,7 @@ export default function UnifiedSidebar({
                     onMouseLeave={() => setHoveredItem(null)}
                     disabled={!canAccess}
                     className={sharedClassName}
-                    title={isCollapsed ? display.label : undefined}
+                    
                   >
                     {innerContent}
                   </button>
