@@ -9,7 +9,8 @@
  *   column added to the same table. Callers don't change.
  *
  * Built 2026-05-26 to power Proposal Assist drafts with Eric Coffie's
- * 8-year teaching corpus (576 indexed documents, ~thousands of chunks).
+ * 8-year teaching corpus (live audit: 1,337 indexed documents,
+ * 12,369 chunks, ~30M characters as of 2026-06-02).
  *
  * Design notes:
  *   - We rank at chunk level, not doc level, so long docs don't drown
@@ -23,6 +24,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { buildLooseRagSearchQuery } from './query';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: SupabaseClient<any> | null = null;
@@ -90,15 +92,31 @@ export async function retrieveRagContext(opts: RetrieveOptions): Promise<RagChun
   // returns `limit` chunks. Cap at 5x limit or 50, whichever is smaller.
   const candidatePool = Math.min(limit * 5, 50);
 
-  const { data, error } = await supabase.rpc('get_rag_chunks', {
-    q: trimmed,
-    doc_types_filter: docTypes && docTypes.length > 0 ? docTypes : null,
+  const docTypesFilter = docTypes && docTypes.length > 0 ? docTypes : null;
+  const runSearch = (q: string) => supabase.rpc('get_rag_chunks', {
+    q,
+    doc_types_filter: docTypesFilter,
     limit_n: candidatePool,
   });
+
+  const { data: strictData, error } = await runSearch(trimmed);
+  let data = strictData;
 
   if (error) {
     console.error('[RAG] retrieve failed:', error.message);
     return [];
+  }
+
+  if (!data || data.length === 0) {
+    const looseQuery = buildLooseRagSearchQuery(trimmed);
+    if (!looseQuery || looseQuery === trimmed) return [];
+
+    const fallback = await runSearch(looseQuery);
+    if (fallback.error) {
+      console.error('[RAG] fallback retrieve failed:', fallback.error.message);
+      return [];
+    }
+    data = fallback.data;
   }
 
   if (!data || data.length === 0) return [];

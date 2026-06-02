@@ -17,7 +17,9 @@
     "predeploy": "npm run test:schema && npm run test:pre-deploy",
     "deploy": "npm run predeploy && vercel --prod",
     "experiment:dry-run": "DRY_RUN=true npx tsx scripts/assign-experiment-cohorts.ts",
-    "experiment:execute": "DRY_RUN=false npx tsx scripts/assign-experiment-cohorts.ts"
+    "experiment:execute": "DRY_RUN=false npx tsx scripts/assign-experiment-cohorts.ts",
+    "rag:repair:dry-run": "node scripts/repair-rag-corpus.js",
+    "rag:repair:apply": "node scripts/repair-rag-corpus.js --apply"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

@@ -50,10 +50,142 @@ const TYPE_OPTIONS: Array<{ value: ContentType; label: string }> = [
 
 const TYPE_BADGE: Record<string, { label: string; color: string }> = {
   proposal_section: { label: 'Proposal', color: 'bg-purple-900/40 text-purple-300' },
+  proposal_wizard_brief: { label: 'Notice Brief', color: 'bg-slate-700/60 text-slate-300' },
+  proposal_wizard_compliance: { label: 'Compliance', color: 'bg-blue-900/40 text-blue-300' },
+  proposal_wizard_draft: { label: 'Draft', color: 'bg-purple-900/40 text-purple-300' },
   cap_statement: { label: 'Cap Stmt', color: 'bg-emerald-900/40 text-emerald-300' },
   briefing: { label: 'Briefing', color: 'bg-blue-900/40 text-blue-300' },
   vault_ai_coach: { label: 'Vault', color: 'bg-amber-900/40 text-amber-300' },
 };
+
+function displaySubtype(value: string | null): string {
+  if (!value) return '';
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\brfp\b/gi, 'RFP')
+    .replace(/\bloi\b/gi, 'LOI')
+    .replace(/\brfq\b/gi, 'RFQ')
+    .replace(/\brfi\b/gi, 'RFI')
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function textArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+}
+
+function displayNextAction(nextAction: unknown): string {
+  return String(nextAction || '')
+    .replace(/\bSubmit\s+(?:a\s+)?Capability Statement package\b/i, 'Submit an LOI with your capability statement (if required or requested)')
+    .replace(/\bSubmit\s+(?:a\s+)?capability statement\b/i, 'Submit an LOI with your capability statement (if required or requested)')
+    .replace(/\bcapability statement package\b/gi, 'LOI response package');
+}
+
+function LibraryBriefView({ content }: { content: Record<string, unknown> }) {
+  const sections = [
+    { title: 'Summary', items: [String(content.summary || '').trim()].filter(Boolean) },
+    { title: 'What They Want', items: textArray(content.what_they_want) },
+    { title: 'Show-Stoppers', items: textArray(content.required) },
+    { title: 'Hard Parts', items: textArray(content.hard_parts) },
+    { title: 'Deadlines', items: textArray(content.deadlines) },
+  ].filter((section) => section.items.length > 0);
+  const nextAction = displayNextAction(content.next_action);
+
+  return (
+    <div className="space-y-4">
+      {sections.map((section) => (
+        <section key={section.title} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{section.title}</h3>
+          {section.title === 'Summary' ? (
+            <p className="mt-2 text-sm leading-relaxed text-slate-200">{section.items[0]}</p>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {section.items.map((item) => (
+                <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-200">
+                  <span className="mt-1 text-slate-600">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+
+      {nextAction && (
+        <section className="rounded-lg border border-purple-500/30 bg-purple-950/20 p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-300">Next Action</h3>
+          <p className="mt-2 text-sm leading-relaxed text-purple-100">{nextAction}</p>
+        </section>
+      )}
+
+      {sections.length === 0 && !nextAction && (
+        <p className="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
+          This archived item does not have a formatted preview.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function LibraryDraftView({ content }: { content: Record<string, unknown> }) {
+  const draft = typeof content.draft === 'string' ? content.draft : '';
+  const sections = Array.isArray(content.sections) ? content.sections : [];
+
+  if (draft) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+        {draft}
+      </div>
+    );
+  }
+
+  if (sections.length > 0) {
+    return (
+      <div className="space-y-4">
+        {sections.map((raw, index) => {
+          const section = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+          const title = displaySubtype(String(section.section || `section_${index + 1}`));
+          const body = String(section.draft || '').trim();
+          return (
+            <section key={`${title}-${index}`} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{body || 'No text saved.'}</p>
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function LibraryContentView({ selected }: { selected: DetailEntry }) {
+  const content = selected.content || {};
+  const isBrief = selected.content_type === 'proposal_wizard_brief' || content.stage === 'brief';
+
+  if (isBrief) return <LibraryBriefView content={content} />;
+  if (
+    typeof content.draft === 'string' ||
+    (Array.isArray(content.sections) && content.sections.length > 0)
+  ) {
+    return <LibraryDraftView content={content} />;
+  }
+  if (selected.content_text) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+        {selected.content_text}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
+      No formatted preview is available for this item.
+    </div>
+  );
+}
 
 export default function LibraryPanel({ email, tier }: Props) {
   void tier;
@@ -183,7 +315,7 @@ export default function LibraryPanel({ email, tier }: Props) {
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${badge.color}`}>
-                    {badge.label}{entry.content_subtype ? ` · ${entry.content_subtype}` : ''}
+                    {badge.label}{entry.content_subtype ? ` · ${displaySubtype(entry.content_subtype)}` : ''}
                   </span>
                   <span className="text-[10px] text-slate-500 whitespace-nowrap">{new Date(entry.created_at).toLocaleDateString()}</span>
                 </div>
@@ -245,27 +377,21 @@ export default function LibraryPanel({ email, tier }: Props) {
                 </button>
               </div>
 
-              {/* Body — try draft first, then fall back to JSON */}
-              {(() => {
-                const draft = (selected.content as { draft?: string })?.draft;
-                if (typeof draft === 'string') {
-                  return (
-                    <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                      {draft}
-                    </div>
-                  );
-                }
-                return (
-                  <pre className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-xs text-slate-300 overflow-x-auto">
-                    {JSON.stringify(selected.content, null, 2).slice(0, 5000)}
-                  </pre>
-                );
-              })()}
+              <LibraryContentView selected={selected} />
+
+              <details className="rounded-lg border border-slate-800 bg-slate-950/40">
+                <summary className="cursor-pointer px-3 py-2 text-xs text-slate-500 hover:text-slate-300">
+                  Raw archive data
+                </summary>
+                <pre className="max-h-80 overflow-x-auto overflow-y-auto px-3 pb-3 pt-1 text-xs text-slate-500">
+                  {JSON.stringify(selected.content, null, 2).slice(0, 5000)}
+                </pre>
+              </details>
 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    const draft = (selected.content as { draft?: string })?.draft || JSON.stringify(selected.content, null, 2);
+                    const draft = (selected.content as { draft?: string })?.draft || selected.content_text || JSON.stringify(selected.content, null, 2);
                     navigator.clipboard.writeText(draft);
                     alert('Copied to clipboard');
                   }}

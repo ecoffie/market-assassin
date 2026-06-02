@@ -92,6 +92,10 @@ const HOME = os.homedir();
 const ROOTS = [
   path.join(HOME, 'Action Plan'),
   path.join(HOME, 'ebooks', '03 Ask Eric Coffie'),
+  path.join(__dirname, '..', 'public', 'templates'),
+  ...(envVars.MINDY_RAG_EXTRA_ROOTS
+    ? envVars.MINDY_RAG_EXTRA_ROOTS.split(',').map(r => r.trim()).filter(Boolean)
+    : []),
 ];
 
 // ---- Skip patterns -----------------------------------------------------
@@ -134,6 +138,18 @@ function walk(dir, files = []) {
 function classifyDocType(filePath, filename) {
   const p = filePath.toLowerCase();
   const n = filename.toLowerCase();
+  if (
+    n.includes('loi') ||
+    n.includes('letter of intent') ||
+    p.includes('sample loi') ||
+    (n.includes('statement of capability') && (p.includes('sources sought') || p.includes('source sought')))
+  ) return 'sources_sought_loi';
+  if (n.includes('sources sought') || n.includes('source sought')) return 'sources_sought_loi';
+  if (n.includes('rfi') || n.includes('request for information')) return 'rfi_response';
+  if (n.includes('rfq') || n.includes('request for quotation') || n.includes('quote response')) return 'rfq_response';
+  if (n.includes('technical volume') || n.includes('technical approach')) return 'technical_volume';
+  if (n.includes('management volume') || n.includes('management approach') || n.includes('staffing plan')) return 'management_volume';
+  if (n.includes('pricing volume') || n.includes('price volume') || n.includes('cost volume')) return 'pricing_volume';
   if (n.includes('cap statement') || n.includes('cap-statement') || n.includes('capability statement')) return 'cap_statement';
   if (n.includes('past performance') || n.includes('past-performance')) return 'past_performance';
   if (n.includes('proposal') || n.includes('rfp ')) return 'proposal_template';

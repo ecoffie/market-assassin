@@ -23,6 +23,7 @@ import { pickLens } from './lenses';
 import { getSectionMeta } from './sections';
 import { humanizeProposalDraft } from './humanize';
 import { isCapStatementSection, type SectionType, type BuiltPrompt, type DraftResult } from './types';
+import { buildTemplateCorpusQuery, getTemplateCorpusDocTypes } from './template-corpus';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -44,9 +45,14 @@ export async function buildV2Prompt(opts: {
   const wasTruncated = sourceText.length > MAX_INPUT_CHARS;
   const inputText = wasTruncated ? sourceText.slice(0, MAX_INPUT_CHARS) : sourceText;
 
-  // RAG query uses section label + RFP head snippet
-  const rfpSnippet = inputText.slice(0, 1000).replace(/\s+/g, ' ');
-  const ragQuery = `${sectionMeta.label} ${rfpSnippet}`;
+  // RAG query uses the output section, notice type, and source head snippet.
+  // This makes Proposal Assist retrieve format-specific examples (LOI, RFI,
+  // RFQ, technical volume, pricing volume) instead of generic GovCon text.
+  const ragQuery = buildTemplateCorpusQuery({
+    sectionLabel: sectionMeta.label,
+    sectionType,
+    sourceText: inputText,
+  });
 
   // Run all the parallel loads
   const [profile, vault, ragChunks] = await Promise.all([
@@ -57,11 +63,7 @@ export async function buildV2Prompt(opts: {
     }),
     retrieveRagContext({
       query: ragQuery,
-      docTypes: (() => {
-        if (sectionType === 'past_performance' || sectionType === 'cap_past_performance') return ['proposal_template', 'past_performance', 'cap_statement', 'course_material'];
-        if (sectionType === 'company_overview' || sectionType === 'capabilities' || sectionType === 'differentiators' || sectionType === 'poc') return ['cap_statement', 'proposal_template', 'course_material'];
-        return ['proposal_template', 'course_material', 'webinar_resource', 'teaching_handout'];
-      })(),
+      docTypes: getTemplateCorpusDocTypes(sectionType, inputText),
       limit: 4,
       maxChars: 3500,
       maxPerDoc: 1,

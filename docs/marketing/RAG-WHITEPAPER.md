@@ -41,8 +41,9 @@ Where Mindy fundamentally departs from generic AI tools: a **proprietary 9-milli
 
 | Asset type | Indexed |
 |---|---|
-| Documents (PDF, DOCX, MD, TXT) | 593 |
-| Searchable knowledge chunks | 3,450 |
+| Documents (PDF, DOCX, MD, TXT, RSS, PPTX) | 1,337 |
+| Searchable knowledge chunks | 12,369 |
+| Podcast / interview transcripts | 743 |
 | Capability statement templates | 2 |
 | Proposal templates | 17 |
 | Past performance examples | 3 |
@@ -50,14 +51,32 @@ Where Mindy fundamentally departs from generic AI tools: a **proprietary 9-milli
 | Slide decks | 103 |
 | Webinar resources | 31 |
 | Q&A datasets | 9 |
-| Total characters of curated content | ~9.4M |
+| Total characters of curated content | ~30.3M |
 
 This isn't generic web data — it's the GovCon Giants curriculum, refined over 8 years of teaching federal contracting at scale.
 
 **Why this matters:**
 - When the AI drafts a proposal section, it doesn't generate from scratch — it retrieves the most relevant teaching passages, treats them as **style references**, and adapts the framing to the user's specific bidder context.
+- When the AI creates a response document, it retrieves the right **format pattern** first: Sources Sought LOIs, RFI responses, RFQ quote responses, capability statements, technical volumes, management volumes, pricing volumes, and past-performance examples are all indexed as distinct reference types.
 - The corpus is **continuously growing** — new templates, new courses, new examples added over time without any engineering effort.
 - This is the part competitors cannot replicate by spinning up another LLM wrapper. It requires 8 years of subject-matter expertise to produce.
+
+---
+
+## Layer 2A — Proposal Assist Format Intelligence
+
+Proposal Assist does not treat every opportunity like an RFP. The retrieval layer changes based on the notice type and the output the user is trying to produce.
+
+| Notice / output type | Primary references Mindy retrieves | What Mindy avoids |
+|---|---|---|
+| **Sources Sought / market research** | LOI / Statement of Capability templates, RFI response examples, capability statement examples, relevant past performance | Full RFP compliance-matrix patterns unless the notice actually asks for them |
+| **RFI** | RFI response examples, LOI formats, requested-information patterns | Pricing-volume language and formal proposal-volume structure |
+| **RFQ** | Quote response formats, pricing / submittal templates, concise capability references | Long technical proposal volumes |
+| **Full RFP** | Technical volume, management volume, past-performance, pricing, and proposal templates | Sources Sought LOI framing |
+
+This is the difference between "using templates" and **training the workflow on formats**. A template is not just a downloadable file. In Mindy, each template becomes a retrievable writing pattern: structure, sequence, federal vocabulary, proof style, and blank fields the user must complete.
+
+The model is instructed to use these documents as **format and style references**, not as facts. Client names, historical values, contact details, and sample project facts are never copied into a user's response unless they come from the user's own vault.
 
 ---
 
@@ -69,7 +88,8 @@ A user uploads a Sources Sought notice for "Cybersecurity Services at Naval Info
 
 1. **Load Vault.** Pulls the user's identity (UEI, certifications, NAICS), 10 most recent past performance entries, and any capability statements they've uploaded.
 2. **Query the Knowledge Corpus.** Builds a query from "Past Performance" + the first 1,000 characters of the RFP. Runs against the indexed corpus using Postgres full-text search with relevance ranking weighted by document type (proposal templates and past performance examples ranked highest).
-3. **Retrieve top 4 passages.** Cap at 3,500 characters total. De-duplicated across source documents to maximize breadth of perspective.
+3. **Apply format rules.** If the notice is Sources Sought, retrieve LOI / Statement of Capability patterns first. If it is an RFQ, retrieve quote/submittal patterns. If it is a true RFP, retrieve proposal-volume references.
+4. **Retrieve top passages.** Cap at 3,500 characters total. De-duplicated across source documents to maximize breadth of perspective.
 
 **Then a single prompt is constructed:**
 
@@ -125,7 +145,7 @@ Solicitation text:
 | Requires expert prompt engineering by the user | Just upload an RFP and click — Mindy handles the construction |
 | No memory across sessions | Vault data persists; each draft gets smarter |
 | No federal contracting context | Notice-type aware (Sources Sought vs RFP vs RFQ get different prompts) |
-| Generic boilerplate templates | Curated 9.4M-character GovCon knowledge corpus |
+| Generic boilerplate templates | Curated 9.4M-character GovCon corpus plus format-specific response templates |
 
 ---
 
