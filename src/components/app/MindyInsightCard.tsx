@@ -53,7 +53,12 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
       return;
     }
     try {
-      const url = `/api/app/dashboard/insight?email=${encodeURIComponent(email)}${force ? '&refresh=1' : ''}`;
+      // Pass the user's LOCAL date so the daily insight rotates at THEIR
+      // midnight, not UTC midnight (which flipped mid-evening for US users
+      // and made the card look "stuck all day").
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const url = `/api/app/dashboard/insight?email=${encodeURIComponent(email)}&localDate=${localDate}${force ? '&refresh=1' : ''}`;
       const res = await fetch(url, { headers: getMIApiHeaders(email) });
       if (!res.ok) return;
       const data = await res.json();

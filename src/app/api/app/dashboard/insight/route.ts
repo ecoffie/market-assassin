@@ -65,8 +65,18 @@ export async function GET(request: NextRequest) {
   const userEmail = auth.email!;
   const supabase = getSupabase();
 
-  const today = new Date().toISOString().split('T')[0];
-  const themeIndex = new Date().getDay() % TOTAL_THEMES;
+  // Key the daily insight on the USER's LOCAL date, not UTC. The client
+  // passes its local YYYY-MM-DD via ?localDate=; without it the insight
+  // flipped at UTC midnight (mid-evening for US users), so it looked
+  // "stuck all day" then changed at a weird time. Validate the param
+  // (YYYY-MM-DD) and fall back to UTC if absent/malformed.
+  const localDateParam = (request.nextUrl.searchParams.get('localDate') || '').trim();
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(localDateParam)
+    ? localDateParam
+    : new Date().toISOString().split('T')[0];
+  // Theme rotates by day-of-week; derive it from `today` so it stays
+  // consistent with the local date the insight is keyed on.
+  const themeIndex = (new Date(`${today}T00:00:00Z`).getUTCDay()) % TOTAL_THEMES;
 
   // refresh=1 forces a NEW insight on demand (the "Refresh" control on
   // the card). It skips the daily cache read and overwrites the cached
