@@ -121,13 +121,15 @@ export async function getLargestAwards(limit = 50): Promise<AwardListRow[]> {
  * Powers /awards/[id] page.
  */
 export async function getAwardById(awardId: string): Promise<AwardDetailRow | null> {
+  if (!isValidAwardId(awardId)) return null;
   const rows = await queryCached<AwardDetailRow>({
     cacheKey: `awards:detail:${awardId}`,
-    // award_id is a globally-unique string and the WHERE clause is
-    // a single equality filter, but award_id isn't in the cluster
-    // key so this still scans 10-15 GB per cold lookup. Bumped from
-    // default 5 GiB.
-    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
+    // Reads the hash-partitioned award_detail_lookup table. The
+    // `bucket = MOD(...)` filter prunes to ONE of 1024 partitions so a cold
+    // lookup scans ~10-25 MB (measured 10 MB billed) instead of the ~27 GB an
+    // unpartitioned scan cost. BQ computes the hash from @id, so JS never has
+    // to reproduce FARM_FINGERPRINT. 100 MiB cap is a generous hard ceiling.
+    maximumBytesBilled: String(100 * 1024 * 1024),
     query: `
       SELECT
         award_id,
@@ -159,9 +161,9 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
         pop_country,
         fiscal_year,
         description
-      FROM ${BQ_TABLES.awards}
-      WHERE award_id = @id
-      ORDER BY action_date DESC
+      FROM ${BQ_TABLES.awardDetailLookup}
+      WHERE bucket = MOD(MOD(FARM_FINGERPRINT(@id), 1024) + 1024, 1024)
+        AND award_id = @id
       LIMIT 1
     `,
     params: { id: awardId },
@@ -174,37 +176,44 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
  *
  * Powers /contracts/[piid] — the URL pattern searchers actually type
  * (e.g. "n0018925fz703"). A PIID can appear on multiple transactions
- * (the award + modifications); we return the canonical contract_award
- * _unique_key with the largest obligation_amount.
+ * (the award + modifications); piid_lookup pre-resolves each PIID to the
+ * award_id carrying the largest total obligation (see build-derived.sql).
  *
- * Case-insensitive match because GSC traffic comes in lowercase.
+ * Reads the clustered-by-piid_upper piid_lookup table, so a cold lookup
+ * scans ~MB instead of the ~830 MB full-table scan the old
+ * `WHERE UPPER(piid)=@x` on the awards table cost. Case-insensitive:
+ * GSC traffic comes in lowercase, and the lookup key is UPPER(TRIM(piid)).
+ *
+ * Invalid/garbage PIIDs (bot probes) are rejected before BQ. Not-found
+ * PIIDs are negatively cached (queryCached writes the empty [] to KV), so
+ * a repeated bogus PIID costs nothing after the first miss.
  */
 export async function getAwardIdByPiid(piid: string): Promise<{
   award_id: string;
   piid: string;
   recipient_name: string;
 } | null> {
+  const norm = normalizePiid(piid);
+  if (!norm) return null;
   const rows = await queryCached<{
     award_id: string;
     piid: string;
     recipient_name: string;
   }>({
-    cacheKey: `awards:by-piid:${piid.toUpperCase()}`,
-    // Full-table scan on piid (not in cluster key) — bumped cap
-    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
+    cacheKey: `awards:by-piid:${norm}`,
+    // Hash-partitioned lookup: the `bucket = MOD(...)` filter prunes to ONE of
+    // 1024 partitions so a cold read scans ~4.5 MB (measured 10 MB billed)
+    // instead of the ~4.86 GB an unpartitioned scan cost. BQ computes the hash
+    // from @piid. 100 MiB cap is a generous hard ceiling.
+    maximumBytesBilled: String(100 * 1024 * 1024),
     query: `
-      SELECT
-        award_id,
-        piid,
-        ANY_VALUE(recipient_name) AS recipient_name,
-        SUM(obligation_amount) AS total
-      FROM ${BQ_TABLES.awards}
-      WHERE UPPER(piid) = @piid
-      GROUP BY award_id, piid
-      ORDER BY total DESC
+      SELECT award_id, piid, recipient_name
+      FROM ${BQ_TABLES.piidLookup}
+      WHERE bucket = MOD(MOD(FARM_FINGERPRINT(@piid), 1024) + 1024, 1024)
+        AND piid_upper = @piid
       LIMIT 1
     `,
-    params: { piid: piid.toUpperCase() },
+    params: { piid: norm },
   });
   if (!rows[0]) return null;
   return {
@@ -212,6 +221,29 @@ export async function getAwardIdByPiid(piid: string): Promise<{
     piid: rows[0].piid,
     recipient_name: rows[0].recipient_name,
   };
+}
+
+/**
+ * Normalize + validate a PIID from a URL before it ever touches BQ/KV.
+ * Returns the canonical UPPER(TRIM(piid)) form, or null if it can't be a
+ * real PIID. Guards against bot-minted garbage creating unbounded KV keys
+ * and pointless (if now-cheap) BQ misses. Real federal PIIDs are short
+ * alphanumeric strings (mostly <= 30 chars) with a limited punctuation set.
+ */
+function normalizePiid(raw: string): string | null {
+  if (!raw) return null;
+  const norm = raw.trim().toUpperCase();
+  if (norm.length < 3 || norm.length > 40) return null;
+  // PIIDs are alphanumeric with occasional hyphens/underscores. Anything
+  // with slashes, spaces, dots, or other chars is a crawler artifact.
+  if (!/^[A-Z0-9_-]+$/.test(norm)) return null;
+  return norm;
+}
+
+/** Award IDs are USAspending unique keys: bounded alphanumeric + _ and -. */
+function isValidAwardId(raw: string): boolean {
+  if (!raw) return false;
+  return raw.length >= 3 && raw.length <= 120 && /^[A-Za-z0-9_-]+$/.test(raw);
 }
 
 /**

@@ -169,3 +169,138 @@ SELECT
 FROM `market-assasin.usaspending.awards`
 WHERE awarding_agency IS NOT NULL
 GROUP BY awarding_agency;
+
+-- 6) PIID lookup  (BQ-quota saver — powers /contracts/[piid])
+-- The awards table is clustered on (recipient_uei, recipient_name), NOT piid,
+-- so `WHERE UPPER(piid)=@x` was a ~830 MB FULL-TABLE SCAN per request. Bots
+-- crawl tens of thousands of unique PIIDs → 45.9 TiB/day → quota blown daily.
+--
+-- HASH-BUCKET PARTITION (not clustering alone): clustering on an UNPARTITIONED
+-- table does NOT prune reliably for selective point lookups — a single-PIID
+-- read measured ~4.86 GB (≈ whole 4.6 GB table) on 2026-06-02. Integer-range
+-- partition pruning IS deterministic. We materialize a `bucket` column
+-- (FARM_FINGERPRINT(piid_upper) mod 1024, normalized non-negative) and
+-- partition on it, so a lookup that filters `bucket = MOD(...@piid...)` scans
+-- ~1/1024 of the table (~4.5 MB) then clusters by piid_upper within. The app
+-- query MUST filter on BOTH bucket AND piid_upper; let BQ compute the hash from
+-- the bound param so JS never has to reproduce FARM_FINGERPRINT.
+--
+-- Aggregation semantics (matches old getAwardIdByPiid intent, hardened):
+-- a PIID can span many transactions across multiple award_ids (mods, etc).
+-- We pick the award_id with the largest TOTAL obligation for that PIID, and
+-- carry the recipient_name FROM THAT SAME award_id (not ANY_VALUE across the
+-- whole PIID, which could surface an unrelated recipient).
+--
+-- NOTE: build-lookup-tables.sh DROPs this table before re-creating, because
+-- BigQuery refuses CREATE OR REPLACE when the partition spec changes.
+CREATE TABLE `market-assasin.usaspending.piid_lookup`
+PARTITION BY RANGE_BUCKET(bucket, GENERATE_ARRAY(0, 1024, 1))
+CLUSTER BY piid_upper
+AS
+WITH per_award AS (
+  SELECT
+    UPPER(TRIM(piid))                                            AS piid_upper,
+    ARRAY_AGG(piid ORDER BY action_date DESC LIMIT 1)[OFFSET(0)] AS piid,
+    award_id,
+    ARRAY_AGG(recipient_name ORDER BY obligation_amount DESC NULLS LAST,
+                                      action_date DESC LIMIT 1)[OFFSET(0)] AS recipient_name,
+    SUM(obligation_amount)  AS total_obligation,
+    MAX(obligation_amount)  AS max_obligation,
+    MAX(action_date)        AS latest_action_date
+  FROM `market-assasin.usaspending.awards`
+  WHERE piid IS NOT NULL AND TRIM(piid) != ''
+  GROUP BY piid_upper, award_id
+)
+SELECT
+  MOD(MOD(FARM_FINGERPRINT(piid_upper), 1024) + 1024, 1024) AS bucket,
+  piid_upper,
+  winner.piid          AS piid,
+  winner.award_id      AS award_id,
+  winner.recipient_name AS recipient_name
+FROM (
+  SELECT
+    piid_upper,
+    ARRAY_AGG(
+      STRUCT(piid, award_id, recipient_name)
+      ORDER BY total_obligation DESC NULLS LAST,
+               max_obligation   DESC NULLS LAST,
+               latest_action_date DESC NULLS LAST
+      LIMIT 1
+    )[OFFSET(0)] AS winner
+  FROM per_award
+  GROUP BY piid_upper
+);
+
+-- 7) Award detail lookup  (BQ-quota saver — powers /awards/[id])
+-- Same disease as PIID: award_id is NOT in the awards cluster key, so
+-- `WHERE award_id=@id` scans 10-15 GB per cold lookup (see getAwardById).
+-- If we restore /contracts→/awards/[id] redirects WITHOUT this, the drain
+-- just moves to award-detail crawls. This holds one row per award_id with
+-- everything the detail page renders.
+--
+-- HASH-BUCKET PARTITION (see piid_lookup note): clustering alone on this
+-- unpartitioned 25 GB table did NOT prune — a single award_id read measured
+-- ~27 GB. We partition on a bucket = FARM_FINGERPRINT(award_id) mod 1024 so a
+-- lookup filtering `bucket = MOD(...@id...)` scans ~1/1024 (~25 MB) then
+-- clusters by award_id within. The app query MUST filter on BOTH bucket AND
+-- award_id; BQ computes the hash from the bound param.
+-- One row per award_id: pick the latest transaction's attributes (ORDER BY
+-- action_date DESC) and SUM obligation across the award's transactions.
+--
+-- NOTE: build-lookup-tables.sh DROPs this table before re-creating (partition
+-- spec change is incompatible with CREATE OR REPLACE).
+CREATE TABLE `market-assasin.usaspending.award_detail_lookup`
+PARTITION BY RANGE_BUCKET(bucket, GENERATE_ARRAY(0, 1024, 1))
+CLUSTER BY award_id
+AS
+SELECT
+  MOD(MOD(FARM_FINGERPRINT(award_id), 1024) + 1024, 1024) AS bucket,
+  award_id,
+  -- scalar attributes taken from the most-recent transaction of the award
+  latest.piid,
+  latest.recipient_uei,
+  latest.recipient_name,
+  latest.parent_uei,
+  latest.parent_name,
+  latest.cage_code,
+  latest.recipient_city,
+  latest.recipient_state,
+  latest.awarding_agency,
+  latest.awarding_sub_agency,
+  latest.awarding_office,
+  latest.funding_agency,
+  latest.funding_office,
+  latest.naics_code,
+  latest.naics_description,
+  latest.psc_code,
+  latest.psc_description,
+  latest.contract_pricing_type,
+  latest.set_aside,
+  total_obligation AS obligation_amount,
+  latest.action_date,
+  latest.pop_start_date,
+  latest.pop_end_date,
+  latest.pop_state,
+  latest.pop_city,
+  latest.pop_country,
+  latest.fiscal_year,
+  latest.description
+FROM (
+  SELECT
+    award_id,
+    SUM(obligation_amount) AS total_obligation,
+    ARRAY_AGG(
+      STRUCT(
+        piid, recipient_uei, recipient_name, parent_uei, parent_name, cage_code,
+        recipient_city, recipient_state, awarding_agency, awarding_sub_agency,
+        awarding_office, funding_agency, funding_office, naics_code,
+        naics_description, psc_code, psc_description, contract_pricing_type,
+        set_aside, action_date, pop_start_date, pop_end_date, pop_state,
+        pop_city, pop_country, fiscal_year, description
+      )
+      ORDER BY action_date DESC LIMIT 1
+    )[OFFSET(0)] AS latest
+  FROM `market-assasin.usaspending.awards`
+  WHERE award_id IS NOT NULL
+  GROUP BY award_id
+);

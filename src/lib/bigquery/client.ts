@@ -88,6 +88,12 @@ export const BQ_TABLES = {
   // Unified rollup for the /top/[slug] listicle pages (top contractors by
   // agency / naics / sub_agency / state / set_aside). Same monthly build.
   topContractorsByDimension: `\`${PROJECT_ID}.${DATASET}.top_contractors_by_dimension\``,
+  // Clustered lookups (built in build-derived.sql) that replace full-table
+  // scans on /contracts/[piid] and /awards/[id]. awards is clustered on
+  // (recipient_uei, recipient_name), so lookups by piid / award_id scanned
+  // the whole 63M-row table — these clustered-by-key tables scan ~MB instead.
+  piidLookup: `\`${PROJECT_ID}.${DATASET}.piid_lookup\``,
+  awardDetailLookup: `\`${PROJECT_ID}.${DATASET}.award_detail_lookup\``,
 } as const;
 
 export interface BqQueryParams {
