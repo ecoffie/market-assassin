@@ -45,6 +45,11 @@ interface PursuitSummary {
 interface Props {
   email: string;
   pursuitId: string;
+  /** Short SAM notice-type label ("Sources Sought", "Solicitation / RFP",
+   *  "RFQ", …) derived from the pursuit. Shown as a badge so the user knows
+   *  the notice type up front — even when there's no attachment to parse —
+   *  and can check the matching briefing. null hides the badge. */
+  noticeType?: string | null;
   /** Called when user taps "Continue to Compliance Matrix". Future
    *  stage 2 lives here; for now the parent can show a placeholder
    *  message or scroll back to the legacy Proposal Assist surface. */
@@ -76,7 +81,7 @@ function relativeTimeSince(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-export default function ProposalWizardBrief({ email, pursuitId, onContinue, authHeaders }: Props) {
+export default function ProposalWizardBrief({ email, pursuitId, noticeType, onContinue, authHeaders }: Props) {
   const [phase, setPhase] = useState<Phase>('hydrating');
   const [error, setError] = useState<string | null>(null);
   const [pursuit, setPursuit] = useState<PursuitSummary | null>(null);
@@ -148,9 +153,25 @@ export default function ProposalWizardBrief({ email, pursuitId, onContinue, auth
             <span className="text-slate-700">·</span>
             <span>Proposal Wizard</span>
           </div>
-          <h2 className="mt-1 text-lg font-semibold text-white">RFP Brief</h2>
+          <div className="mt-1 flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-semibold text-white">RFP Brief</h2>
+            {noticeType && (
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                  /sources sought|rfi/i.test(noticeType)
+                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                    : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                }`}
+                title="SAM.gov notice type for this pursuit — check the matching briefing"
+              >
+                {noticeType}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-xs text-slate-400 max-w-xl">
-            Mindy reads the RFP and tells you what it actually says — in plain English. 2 minutes here saves an hour of skimming.
+            {noticeType && /sources sought|rfi/i.test(noticeType)
+              ? 'This is a pre-solicitation notice — not a biddable RFP yet. Mindy briefs it as a capability-statement opportunity.'
+              : 'Mindy reads the RFP and tells you what it actually says — in plain English. 2 minutes here saves an hour of skimming.'}
           </p>
         </div>
         {artifact && (
@@ -201,7 +222,8 @@ export default function ProposalWizardBrief({ email, pursuitId, onContinue, auth
               </div>
             )}
             <p className="text-sm text-slate-300">
-              Ready to generate a brief for <span className="font-semibold text-white">{pursuit.title}</span>{pursuit.agency ? <span className="text-slate-400"> ({pursuit.agency})</span> : null}.
+              Ready to generate a brief for <span className="font-semibold text-white">{pursuit.title}</span>{pursuit.agency ? <span className="text-slate-400"> ({pursuit.agency})</span> : null}
+              {noticeType ? <span className="text-slate-400"> — this is a <span className="font-semibold text-slate-200">{noticeType}</span> notice.</span> : '.'}
             </p>
             <button
               type="button"

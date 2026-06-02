@@ -31,10 +31,43 @@ interface PipelineOpportunity {
   notes?: string;
   next_action?: string;
   win_probability?: number;
+  notice_type?: string | null;
 }
 
 function isTerminalPipelineStage(stage?: string | null): boolean {
   return ['won', 'lost', 'no_bid', 'archived'].includes(stage || '');
+}
+
+// Classify SAM's free-text notice_type into a short label so the user knows
+// up front whether a pursuit is a Sources Sought, RFP, RFQ, etc. — and can
+// check the right briefing. Mirrors PipelinePanel's noticeBucket. Returns null
+// when the type is unknown so callers can hide the badge rather than show "Other".
+function noticeTypeLabel(nt?: string | null): string | null {
+  if (!nt) return null;
+  const t = nt.toLowerCase();
+  if (t.includes('sources sought')) return 'Sources Sought';
+  if (t.includes('combined')) return 'Combined Synopsis';
+  if (t.includes('presol') || t.includes('pre-sol') || t.includes('pre sol')) return 'Pre-Solicitation';
+  if (t.includes('rfq') || t.includes('quot')) return 'RFQ';
+  if (t.includes('rfi') || t.includes('information')) return 'RFI';
+  if (t.includes('award')) return 'Award Notice';
+  if (t.includes('special')) return 'Special Notice';
+  if (t.includes('solicitation') || t.includes('rfp')) return 'Solicitation / RFP';
+  return null;
+}
+
+// Map a notice_type to the wizard's detectedNoticeType enum so the correct tab
+// set (capability statement vs full proposal) shows BEFORE any doc is parsed.
+function noticeTypeToDetected(
+  nt?: string | null
+): 'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown' {
+  if (!nt) return 'unknown';
+  const t = nt.toLowerCase();
+  if (t.includes('sources sought')) return 'sources_sought';
+  if (t.includes('rfi') || t.includes('information')) return 'rfi';
+  if (t.includes('rfq') || t.includes('quot')) return 'rfq';
+  if (t.includes('solicitation') || t.includes('rfp') || t.includes('combined')) return 'rfp';
+  return 'unknown';
 }
 
 function isMissingPursuitError(error?: string | null): boolean {
@@ -172,6 +205,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const contextPursuitIsLive = Boolean(contextPursuitId && livePursuitIds.has(contextPursuitId));
   const activePursuitId = localPursuitId || (contextPursuitIsLive ? contextPursuitId : null);
   const staleContextPursuit = Boolean(pipelineLoaded && contextPursuitId && !contextPursuitIsLive && !localPursuitId);
+  // The active pursuit's SAM notice_type (Sources Sought / RFP / RFQ / ...),
+  // carried by /api/pipeline. Lets the wizard show the type up front — even
+  // with no attachment to parse — so the user knows which briefing to check.
+  const activePursuitNoticeType = useMemo(
+    () => opportunities.find((opp) => opp.id === activePursuitId)?.notice_type ?? null,
+    [opportunities, activePursuitId]
+  );
   // Reset to Stage 1 when the user switches to a different pursuit so
   // they always see the brief first.
   useEffect(() => {
@@ -359,6 +399,18 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Eric (2026-05-26): 'this may not be an RFP from my understanding
   // this was a SS'.
   const [detectedNoticeType, setDetectedNoticeType] = useState<'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown'>('unknown');
+
+  // Seed the detected type from the pursuit's SAM notice_type so the right tab
+  // set shows BEFORE any document is parsed (this pursuit may have no
+  // attachment at all). Once a doc loads, the text-based detection below can
+  // override it. Only seed while still 'unknown' to avoid stomping a real
+  // doc-based detection.
+  useEffect(() => {
+    const seeded = noticeTypeToDetected(activePursuitNoticeType);
+    if (seeded !== 'unknown') {
+      setDetectedNoticeType(current => (current === 'unknown' ? seeded : current));
+    }
+  }, [activePursuitNoticeType]);
 
   // Pick the right tab set based on what we detected from the loaded
   // doc. SS/RFI = capability statement tabs. Everything else
@@ -979,6 +1031,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               email={email}
               pursuitId={activePursuitId}
               authHeaders={getAuthHeaders}
+              noticeType={noticeTypeLabel(activePursuitNoticeType)}
               onContinue={() => setWizardStage('compliance')}
             />
           )}
