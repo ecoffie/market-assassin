@@ -407,6 +407,26 @@ function normalizeBrief(raw: unknown, pursuitId: string): BriefArtifact {
   };
 }
 
+function isMarketResearchResponse(pipeline: PipelineRow, docText: string): boolean {
+  const text = `${pipeline.title || ''}\n${docText.slice(0, 5000)}`.toLowerCase();
+  return text.includes('sources sought') || text.includes('request for information') || /\brfi\b/.test(text);
+}
+
+function responseNextAction(artifact: BriefArtifact, pipeline: PipelineRow, docText: string): string {
+  if (!isMarketResearchResponse(pipeline, docText)) return artifact.next_action;
+
+  const existing = artifact.next_action || '';
+  const transport = existing.match(/\bvia\s+.+/i)?.[0];
+  const deadline = pipeline.response_deadline
+    ? ` before ${pipeline.response_deadline}`
+    : '';
+  const suffix = transport
+    ? ` ${transport.replace(/^via/i, 'via').replace(/[.。]\s*$/, '')}`
+    : `${deadline}`;
+
+  return `Submit an LOI with your capability statement (if required or requested)${suffix}.`;
+}
+
 const VALID_CATEGORIES: ComplianceItem['category'][] = [
   'technical', 'management', 'past_performance', 'pricing', 'admin', 'other',
 ];
@@ -471,6 +491,7 @@ async function generateBrief(email: string, pipeline: PipelineRow, docs: Pursuit
     source: 'proposal.wizard.brief',
   });
   const artifact = normalizeBrief(parsed, pipeline.id);
+  artifact.next_action = responseNextAction(artifact, pipeline, docText);
 
   // Archive so subsequent GETs return without re-running the LLM.
   // Non-blocking — if it fails we still return the artifact.

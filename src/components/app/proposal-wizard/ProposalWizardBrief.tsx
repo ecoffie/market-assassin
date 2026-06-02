@@ -50,10 +50,13 @@ interface Props {
    *  the notice type up front — even when there's no attachment to parse —
    *  and can check the matching briefing. null hides the badge. */
   noticeType?: string | null;
-  /** Called when user taps "Continue to Compliance Matrix". Future
+  /** Called when user taps the footer continue action. Future
    *  stage 2 lives here; for now the parent can show a placeholder
    *  message or scroll back to the legacy Proposal Assist surface. */
   onContinue?: () => void;
+  continueLabel?: string;
+  continueTitle?: string;
+  simpleResponse?: boolean;
   /** Auth header builder shared with the rest of /app. Returns either
    *  a Headers instance or a plain object — both fetch() understand. */
   authHeaders: () => Headers | Record<string, string>;
@@ -81,7 +84,24 @@ function relativeTimeSince(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-export default function ProposalWizardBrief({ email, pursuitId, noticeType, onContinue, authHeaders }: Props) {
+function displayNextAction(nextAction: string, noticeType?: string | null, simpleResponse = false): string {
+  if (!simpleResponse && !/sources sought|rfi|request for information/i.test(noticeType || '')) return nextAction;
+  return nextAction
+    .replace(/\bSubmit\s+(?:a\s+)?Capability Statement package\b/i, 'Submit an LOI with your capability statement (if required or requested)')
+    .replace(/\bSubmit\s+(?:a\s+)?capability statement\b/i, 'Submit an LOI with your capability statement (if required or requested)')
+    .replace(/\bcapability statement package\b/gi, 'LOI response package');
+}
+
+export default function ProposalWizardBrief({
+  email,
+  pursuitId,
+  noticeType,
+  onContinue,
+  continueLabel = 'Continue to Compliance Matrix',
+  continueTitle = 'Continue to Compliance Matrix (Stage 2)',
+  simpleResponse = false,
+  authHeaders,
+}: Props) {
   const [phase, setPhase] = useState<Phase>('hydrating');
   const [error, setError] = useState<string | null>(null);
   const [pursuit, setPursuit] = useState<PursuitSummary | null>(null);
@@ -154,7 +174,7 @@ export default function ProposalWizardBrief({ email, pursuitId, noticeType, onCo
             <span>Proposal Wizard</span>
           </div>
           <div className="mt-1 flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg font-semibold text-white">RFP Brief</h2>
+            <h2 className="text-lg font-semibold text-white">{simpleResponse ? 'Notice Brief' : 'RFP Brief'}</h2>
             {noticeType && (
               <span
                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
@@ -169,8 +189,8 @@ export default function ProposalWizardBrief({ email, pursuitId, noticeType, onCo
             )}
           </div>
           <p className="mt-0.5 text-xs text-slate-400 max-w-xl">
-            {noticeType && /sources sought|rfi/i.test(noticeType)
-              ? 'Not a priced bid — Mindy briefs this as a capability-statement / letter-of-intent response.'
+            {simpleResponse || (noticeType && /sources sought|rfi/i.test(noticeType))
+              ? 'Not a priced bid — Mindy briefs this as an LOI / response package with an optional capability-statement attachment.'
               : 'Mindy reads the RFP and tells you what it actually says — in plain English. 2 minutes here saves an hour of skimming.'}
           </p>
         </div>
@@ -218,7 +238,7 @@ export default function ProposalWizardBrief({ email, pursuitId, noticeType, onCo
           <div className="space-y-4">
             {docsMissing && (
               <div className="rounded-lg border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
-                ⓘ No SAM attachments on this pursuit. The brief will work from the metadata only — for the best result, upload the RFP below first.
+                ⓘ No SAM attachments on this pursuit. The brief will work from the metadata only — for the best result, upload the {simpleResponse ? 'notice or response instructions' : 'RFP'} below first.
               </div>
             )}
             <p className="text-sm text-slate-300">
@@ -241,7 +261,7 @@ export default function ProposalWizardBrief({ email, pursuitId, noticeType, onCo
           <div className="flex items-center gap-3 rounded-lg border border-purple-900/40 bg-purple-950/20 p-4 text-sm text-purple-200">
             <Loader2 className="w-5 h-5 animate-spin text-purple-300" strokeWidth={1.75} />
             <div>
-              <div className="font-medium">Mindy is reading the RFP…</div>
+              <div className="font-medium">Mindy is reading the {simpleResponse ? 'notice' : 'RFP'}…</div>
               <div className="text-[11px] text-purple-300/70 mt-0.5">Extracting scope, requirements, and deadlines.</div>
             </div>
           </div>
@@ -300,7 +320,7 @@ export default function ProposalWizardBrief({ email, pursuitId, noticeType, onCo
             {artifact.next_action && (
               <div className="rounded-lg border border-purple-500/30 bg-purple-950/20 p-3">
                 <div className="text-[10px] uppercase tracking-wider text-purple-300 font-semibold mb-1">Your next action</div>
-                <p className="text-sm text-purple-100">{artifact.next_action}</p>
+                <p className="text-sm text-purple-100">{displayNextAction(artifact.next_action, noticeType, simpleResponse)}</p>
               </div>
             )}
 
@@ -314,9 +334,9 @@ export default function ProposalWizardBrief({ email, pursuitId, noticeType, onCo
                 onClick={onContinue}
                 disabled={!onContinue}
                 className="inline-flex items-center gap-2 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400 px-4 py-2 text-sm font-semibold text-white"
-                title={onContinue ? 'Continue to Compliance Matrix (Stage 2)' : 'Stage 2 coming next'}
+                title={onContinue ? continueTitle : 'Next stage unavailable'}
               >
-                Continue to Compliance Matrix
+                {continueLabel}
                 <ArrowRight className="w-4 h-4" strokeWidth={2} />
               </button>
             </div>

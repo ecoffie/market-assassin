@@ -130,6 +130,21 @@ function getSolicitationFromSignals(signals: string[]) {
   return signal ? signal.replace(/^Sol#\s*/i, '').trim() : '';
 }
 
+function getBriefingLookupKeys(item: BriefingItem): string[] {
+  const renderId = item.id || '';
+  const localId = renderId.includes('::') ? renderId.split('::').pop() || renderId : renderId;
+  const normalizedTitle = normalizeLookupKey(item.title);
+  const keys = [
+    renderId,
+    localId,
+    localId.replace(/^(opp|deadline)-/i, ''),
+    getSolicitationFromSignals(item.signals),
+    normalizedTitle,
+  ].filter(Boolean);
+
+  return [...new Set(keys.flatMap(key => [key, normalizeLookupKey(key)]).filter(Boolean))];
+}
+
 // A STABLE identifier for an opportunity, used to dedup pipeline saves.
 // The render id (item.id) is a synthetic per-list index (`legacy-N`,
 // `opp-N`) that differs between briefings for the SAME opportunity — so
@@ -184,16 +199,27 @@ function getBriefingItemLocation(item: BriefingItem, liveLocations: Record<strin
 // getBriefingItemLocation. Used to backfill the Industry/Set-Aside detail line
 // on items stored without those fields.
 function resolveFromLive(item: BriefingItem, map: Record<string, string>): string {
-  const keys = [
-    item.id,
-    getSolicitationFromSignals(item.signals),
-    normalizeLookupKey(item.title),
-  ].filter(Boolean);
-  for (const key of keys) {
-    const v = map[key] || map[normalizeLookupKey(key)];
+  for (const key of getBriefingLookupKeys(item)) {
+    const v = map[key];
     if (v) return v;
   }
   return '';
+}
+
+function getBriefingItemNoticeType(item: BriefingItem, liveNoticeTypes: Record<string, string>) {
+  return item.noticeType || resolveFromLive(item, liveNoticeTypes);
+}
+
+function getBriefingItemDescription(item: BriefingItem, liveDescriptions: Record<string, string>) {
+  const existing = (item.description || '').trim();
+  const isGeneric = !existing
+    || /^upcoming response deadline\.?$/i.test(existing)
+    || /^market intelligence item from your briefing\.?$/i.test(existing);
+  if (!isGeneric) return existing;
+
+  const liveDescription = resolveFromLive(item, liveDescriptions);
+  if (!liveDescription) return existing;
+  return liveDescription.length > 700 ? `${liveDescription.slice(0, 700).trim()}...` : liveDescription;
 }
 
 // Build the Industry/Set-Aside detail line, falling back to live SAM data when
@@ -227,10 +253,8 @@ function buildItemDetailLine(
 function getBriefingItemAttachments(item: BriefingItem, liveAttachments: Record<string, unknown[]>): unknown[] {
   if (Array.isArray(item.attachments) && item.attachments.length > 0) return item.attachments;
 
-  const solicitation = getSolicitationFromSignals(item.signals);
-  const lookupKeys = [item.id, solicitation, normalizeLookupKey(item.title)].filter(Boolean);
-  for (const key of lookupKeys) {
-    const att = liveAttachments[key] || liveAttachments[normalizeLookupKey(key)];
+  for (const key of getBriefingLookupKeys(item)) {
+    const att = liveAttachments[key];
     if (att && att.length > 0) return att;
   }
   return [];
@@ -245,15 +269,8 @@ function getBriefingItemBuyer(item: BriefingItem, liveBuyers: Record<string, Ret
     });
   }
 
-  const solicitation = getSolicitationFromSignals(item.signals);
-  const lookupKeys = [
-    item.id,
-    solicitation,
-    normalizeLookupKey(item.title),
-  ].filter(Boolean);
-
-  for (const key of lookupKeys) {
-    const buyer = liveBuyers[key] || liveBuyers[normalizeLookupKey(key)];
+  for (const key of getBriefingLookupKeys(item)) {
+    const buyer = liveBuyers[key];
     if (buyer) return buyer;
   }
 
@@ -400,6 +417,8 @@ function collectGeneratedItems(content: Record<string, unknown>): BriefingItem[]
     return asArray(sectionRecord.items).map((raw, index) => {
       const item = asRecord(raw);
       const buyer = getBuyerFromRecord(item);
+      const noticeType = text(item.noticeType, text(item.notice_type));
+      const signals = asArray(item.signals).map(signal => text(signal)).filter(Boolean);
       return {
         id: text(item.id, `${text(sectionRecord.title, 'section')}-${index}`),
         title: text(item.title, 'Untitled opportunity'),
@@ -415,7 +434,8 @@ function collectGeneratedItems(content: Record<string, unknown>): BriefingItem[]
         location: getLocationFromRecord(item),
         actionUrl: text(item.actionUrl),
         actionLabel: text(item.actionLabel, 'View details'),
-        signals: asArray(item.signals).map(signal => text(signal)).filter(Boolean),
+        noticeType: noticeType || undefined,
+        signals: signals.length > 0 ? signals : [noticeType].filter(Boolean),
       };
     });
   });
@@ -457,19 +477,34 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
     const item = asRecord(raw);
     const daysRemaining = numberValue(item.daysRemaining);
     const buyer = getBuyerFromRecord(item);
+    const naicsCode = text(item.naicsCode);
+    const setAside = text(item.setAside);
+    const noticeType = text(item.noticeType);
+    const solicitationNumber = text(item.solicitationNumber, text(item.noticeId));
+    const detailParts: string[] = [];
+    if (naicsCode) {
+      const title = getNaics(naicsCode)?.title;
+      detailParts.push(`Industry: NAICS ${naicsCode}${title ? ` (${title})` : ''}`);
+    }
+    if (setAside) detailParts.push(`Set-Aside: ${setAside}`);
+    if (daysRemaining !== null) {
+      detailParts.push(`Response due in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}.`);
+    }
+
     return {
       id: `deadline-${text(item.noticeId, String(index))}`,
       title: text(item.title, text(item.fullTitle, 'Upcoming deadline')),
       subtitle: buyer.full,
       description: [
         buyer.full,
-        text(item.noticeType),
-        text(item.setAside),
+        noticeType,
+        setAside,
         getLocationFromRecord(item) ? `Place of performance: ${getLocationFromRecord(item)}` : '',
         daysRemaining !== null
           ? `Response due in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}.`
           : 'Upcoming response deadline.',
       ].filter(Boolean).join(' • '),
+      detailLine: detailParts.join(' • '),
       category: 'Urgent',
       buyerName: buyer.primary,
       buyerOffice: buyer.secondary,
@@ -481,7 +516,14 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: 'View on SAM.gov',
-      signals: [text(item.noticeType), text(item.daysRemaining) ? `${text(item.daysRemaining)} days left` : 'Urgent'].filter(Boolean),
+      noticeType: noticeType || undefined,
+      signals: [
+        noticeType,
+        setAside,
+        naicsCode ? `NAICS ${naicsCode}` : '',
+        solicitationNumber ? `Sol# ${solicitationNumber}` : '',
+        text(item.daysRemaining) ? `${text(item.daysRemaining)} days left` : 'Urgent',
+      ].filter(Boolean),
     };
   });
 
@@ -590,7 +632,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   // briefing item id -> pipeline row id, so the toast's Undo action
   // can DELETE the row that was just inserted. Populated only after
   // the API returns success.
-  const [pipelineRowByItem, setPipelineRowByItem] = useState<Record<string, string>>({});
+  const [, setPipelineRowByItem] = useState<Record<string, string>>({});
   const { showToast } = useToast();
   const [feedbackByItem, setFeedbackByItem] = useState<Record<string, FeedbackType>>({});
   const [savingFeedback, setSavingFeedback] = useState<Set<string>>(new Set());
@@ -606,6 +648,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   // were stored without those fields (e.g. older deadlinesThisWeek entries).
   const [liveNaics, setLiveNaics] = useState<Record<string, string>>({});
   const [liveSetAside, setLiveSetAside] = useState<Record<string, string>>({});
+  const [liveNoticeTypes, setLiveNoticeTypes] = useState<Record<string, string>>({});
+  const [liveDescriptions, setLiveDescriptions] = useState<Record<string, string>>({});
 
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
@@ -701,11 +745,15 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         const nextAttachments: Record<string, unknown[]> = {};
         const nextNaics: Record<string, string> = {};
         const nextSetAside: Record<string, string> = {};
+        const nextNoticeTypes: Record<string, string> = {};
+        const nextDescriptions: Record<string, string> = {};
         for (const raw of asArray(data.opportunities)) {
           const opportunity = asRecord(raw);
           const oppAttachments = Array.isArray(opportunity.attachments) ? opportunity.attachments : [];
           const oppNaics = text(opportunity.naics_code, text(opportunity.naicsCode));
           const oppSetAside = text(opportunity.set_aside_description, text(opportunity.setAsideDescription, text(opportunity.set_aside, text(opportunity.setAside))));
+          const oppNoticeType = text(opportunity.notice_type, text(opportunity.noticeType));
+          const oppDescription = text(opportunity.description);
           // Fields come back snake_case from mi-dashboard; fall back to
           // camelCase so this still works if the source ever changes.
           const location = formatOpportunityLocation({
@@ -731,6 +779,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
             if (oppAttachments.length > 0) nextAttachments[key] = oppAttachments;
             if (oppNaics) nextNaics[key] = oppNaics;
             if (oppSetAside) nextSetAside[key] = oppSetAside;
+            if (oppNoticeType) nextNoticeTypes[key] = oppNoticeType;
+            if (oppDescription) nextDescriptions[key] = oppDescription;
           });
         }
 
@@ -739,6 +789,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         setLiveAttachments(nextAttachments);
         setLiveNaics(nextNaics);
         setLiveSetAside(nextSetAside);
+        setLiveNoticeTypes(nextNoticeTypes);
+        setLiveDescriptions(nextDescriptions);
       } catch (err) {
         console.warn('Failed to load live opportunity enrichment:', err);
       }
@@ -791,6 +843,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
         item.subtitle,
         getBriefingItemBuyer(item, liveBuyers).full,
         item.description,
+        getBriefingItemDescription(item, liveDescriptions),
+        getBriefingItemNoticeType(item, liveNoticeTypes),
         item.category,
         item.location,
         getBriefingItemLocation(item, liveLocations),
@@ -806,7 +860,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
       return matchesSearch && matchesFilter;
     });
-  }, [activeFilter, briefingItems, dismissedItems, liveBuyers, liveLocations, searchTerm]);
+  }, [activeFilter, briefingItems, dismissedItems, liveBuyers, liveDescriptions, liveLocations, liveNoticeTypes, searchTerm]);
 
   const counts = useMemo(() => ({
     all: briefingItems.length,
@@ -1187,6 +1241,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                   const isExpanded = expandedItems.has(item.id);
                   const itemLocation = getBriefingItemLocation(item, liveLocations);
                   const itemBuyer = getBriefingItemBuyer(item, liveBuyers);
+                  const itemNoticeType = getBriefingItemNoticeType(item, liveNoticeTypes);
+                  const itemDescription = getBriefingItemDescription(item, liveDescriptions);
                   const itemAttachments = getBriefingItemAttachments(item, liveAttachments)
                     .filter((a) => a && !(a as Record<string, unknown>)._no_attachments);
                   const itemMetaLine = getBriefingMetaLine(item, itemBuyer);
@@ -1210,7 +1266,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           {(() => {
-                            const badge = noticeTypeBadge(item.noticeType);
+                            const badge = noticeTypeBadge(itemNoticeType);
                             return badge ? (
                               <span className={`inline-block mb-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.cls}`}>
                                 {badge.label}
@@ -1318,7 +1374,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                           ? `${itemAttachments.length > 0 ? 'max-h-[40rem] overflow-y-auto' : 'max-h-96'} opacity-100 mt-4`
                           : 'max-h-0 opacity-0'
                       }`}>
-                        {item.description && <p className="text-sm leading-relaxed text-slate-300">{item.description}</p>}
+                        {itemDescription && <p className="text-sm leading-relaxed text-slate-300">{itemDescription}</p>}
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">{item.category}</span>
                           {itemBuyer.primary && itemBuyer.primary !== 'Unknown agency' && (

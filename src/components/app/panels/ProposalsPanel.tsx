@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
-import ProposalWizardBrief from '../proposal-wizard/ProposalWizardBrief';
-import ProposalWizardCompliance from '../proposal-wizard/ProposalWizardCompliance';
 import { classifyNoticeType, noticeTypeLabel, noticeTypeToDetected } from '@/lib/utils/notice-type';
 
 interface ProposalsPanelProps {
@@ -40,7 +38,7 @@ function isTerminalPipelineStage(stage?: string | null): boolean {
 }
 
 // Notice-type classification (label + respondability) lives in a shared util so
-// PipelinePanel, the picker, and the wizard all agree. See classifyNoticeType.
+// PipelinePanel, the picker, and the workbench agree. See classifyNoticeType.
 
 function isMissingPursuitError(error?: string | null): boolean {
   return (error || '').toLowerCase().includes('pursuit not found');
@@ -109,7 +107,7 @@ const RFP_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: num
 // LOI / market-research response tabs surface when detectedNoticeType ===
 // 'sources_sought' or 'rfi'. Users attach their existing capability statement;
 // Mindy drafts the cover/LOI response around the notice.
-const CAP_STATEMENT_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: number }> = [
+const LOI_RESPONSE_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: number }> = [
   { id: 'company_overview', label: 'LOI Opening', targetWords: 150 },
   { id: 'cap_past_performance', label: 'Relevant Experience', targetWords: 300 },
   { id: 'capabilities', label: 'Capability Fit', targetWords: 250 },
@@ -152,6 +150,60 @@ const SS_RFI_PACKAGE_NOTES = [
   'Keep the response within the notice page limit and submit using the named email, portal, or deadline.',
 ];
 
+function detectNoticeTypeFromText(sourceText: string): 'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown' {
+  const head = sourceText.slice(0, 3000).toLowerCase();
+  if (
+    head.includes('sources sought') ||
+    head.includes('this is not a request for proposal') ||
+    head.includes('this announcement is being used for market research') ||
+    head.includes('not a solicitation')
+  ) {
+    return 'sources_sought';
+  }
+  if (
+    head.includes('request for information') ||
+    /\brfi\b/.test(head) ||
+    head.includes('responses to this rfi')
+  ) {
+    return 'rfi';
+  }
+  if (
+    head.includes('request for quotation') ||
+    /\brfq\b/.test(head)
+  ) {
+    return 'rfq';
+  }
+  if (
+    head.includes('request for proposal') ||
+    /\brfp\b/.test(head) ||
+    head.includes('offerors shall')
+  ) {
+    return 'rfp';
+  }
+  return 'unknown';
+}
+
+function combineUploadedDocuments(documents: UploadedRfp[]): UploadedRfp | null {
+  if (documents.length === 0) return null;
+  if (documents.length === 1) return documents[0];
+
+  const text = documents
+    .map((doc, index) => [
+      `DOCUMENT ${index + 1}: ${doc.fileName}`,
+      '='.repeat(Math.min(80, Math.max(24, doc.fileName.length + 12))),
+      doc.text,
+    ].join('\n'))
+    .join('\n\n');
+
+  return {
+    fileName: `${documents.length}-document-response-package.txt`,
+    fileSize: documents.reduce((sum, doc) => sum + doc.fileSize, 0),
+    charCount: text.length,
+    pageCount: documents.reduce((sum, doc) => sum + (doc.pageCount || 0), 0) || undefined,
+    text,
+  };
+}
+
 export default function ProposalsPanel({ email, tier, panelContext }: ProposalsPanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -159,21 +211,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedRfp, setUploadedRfp] = useState<UploadedRfp | null>(null);
+  const [sourceDocuments, setSourceDocuments] = useState<UploadedRfp[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
-  // Proposal Wizard stage navigation. Only meaningful when the user
-  // landed on this panel via PipelinePanel's Draft Proposal button —
-  // panelContext.pursuit_id is set in that path. Flow is
-  // brief → compliance → draft, auto-advancing (see runWizardDraft).
-  const [wizardStage, setWizardStage] = useState<'brief' | 'compliance' | 'draft'>('brief');
-  // Draft-stage status for the auto-advance runner.
-  const [wizardDraftStatus, setWizardDraftStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
-  const [wizardDraftError, setWizardDraftError] = useState<string | null>(null);
-  const [wizardDraftMeta, setWizardDraftMeta] = useState<{ count: number; metadataOnly: boolean } | null>(null);
-  // The pursuit the wizard is working. Defaults to whatever the Pipeline
+  // The pursuit the workbench is using. Defaults to whatever the Pipeline
   // "Draft Proposal" button passed in (panelContext.pursuit_id), but can
   // also be set IN-PANEL via the "Start from a saved pursuit" picker, so
   // users who open Proposal Assist directly can still begin a draft.
@@ -184,7 +228,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const activePursuitId = localPursuitId || (contextPursuitIsLive ? contextPursuitId : null);
   const staleContextPursuit = Boolean(pipelineLoaded && contextPursuitId && !contextPursuitIsLive && !localPursuitId);
   // The active pursuit's SAM notice_type (Sources Sought / RFP / RFQ / ...),
-  // carried by /api/pipeline. Lets the wizard show the type up front — even
+  // carried by /api/pipeline. Lets the workbench show the type up front — even
   // with no attachment to parse — so the user knows which briefing to check.
   const activePursuitNoticeType = useMemo(
     () => opportunities.find((opp) => opp.id === activePursuitId)?.notice_type ?? null,
@@ -192,19 +236,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   );
   // Respondability of the active pursuit's notice type. 'none' (Special / Award
   // / Justification / Sale of Surplus) means there is nothing to submit, so the
-  // wizard is blocked with an explanation instead of the draft flow.
+  // workbench is blocked with an explanation instead of showing response outputs.
   const activePursuitNotice = useMemo(
     () => classifyNoticeType(activePursuitNoticeType),
     [activePursuitNoticeType]
   );
-  // Reset to Stage 1 when the user switches to a different pursuit so
-  // they always see the brief first.
-  useEffect(() => {
-    setWizardStage('brief');
-    setWizardDraftStatus('idle');
-    setWizardDraftError(null);
-    setWizardDraftMeta(null);
-  }, [activePursuitId]);
+  const activePursuitDetectedType = useMemo(
+    () => noticeTypeToDetected(activePursuitNoticeType),
+    [activePursuitNoticeType]
+  );
+  const activePursuit = useMemo(
+    () => opportunities.find((opp) => opp.id === activePursuitId) || null,
+    [opportunities, activePursuitId]
+  );
 
   // Vault summary — drives the "add to vault for better drafts" nudge
   // shown above the draft sections. Fetched once on mount; if user
@@ -252,12 +296,21 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         setUploadError(data.error || 'Could not parse the file.');
         return;
       }
-      setUploadedRfp({
+      const extractedText = data.text || '';
+      const nextDocument: UploadedRfp = {
         fileName: data.file?.name || file.name,
         fileSize: data.file?.size ?? file.size,
         charCount: data.charCount || 0,
         pageCount: data.pageCount,
-        text: data.text || '',
+        text: extractedText,
+      };
+      setSourceDocuments(prev => {
+        const next = [...prev, nextDocument];
+        const combined = combineUploadedDocuments(next);
+        setUploadedRfp(combined);
+        const detected = detectNoticeTypeFromText(combined?.text || '');
+        if (detected !== 'unknown') setDetectedNoticeType(detected);
+        return next;
       });
     } catch (err) {
       console.error('RFP upload failed:', err);
@@ -268,16 +321,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   }, [email, getAuthHeaders]);
 
   const onFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleRfpFile(file);
+    const files = Array.from(e.target.files || []);
+    for (const file of files) void handleRfpFile(file);
     e.target.value = '';
   }, [handleRfpFile]);
 
   const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleRfpFile(file);
+    const files = Array.from(e.dataTransfer.files || []);
+    for (const file of files) void handleRfpFile(file);
   }, [handleRfpFile]);
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -286,6 +339,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
   const clearRfp = useCallback(() => {
     setUploadedRfp(null);
+    setSourceDocuments([]);
     setUploadError(null);
     setCompliance([]);
     setComplianceError(null);
@@ -305,6 +359,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setChecklist(DEFAULT_CHECKLIST.map(item => ({ ...item, checked: false })));
     setExportError(null);
   }, []);
+
+  const startAnotherProposal = useCallback(() => {
+    setLocalPursuitId(null);
+    setSelectedId(opportunities[0]?.id || '');
+    setAutoLoadStatus('idle');
+    setAutoLoadMessage(null);
+    setDetectedNoticeType('unknown');
+    clearRfp();
+  }, [clearRfp, opportunities]);
 
   // Compliance matrix
   const [compliance, setCompliance] = useState<ComplianceRequirementRow[]>([]);
@@ -360,7 +423,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     });
   }, [compliance, statusFilter, categoryFilter]);
 
-  // Section drafts (Step 3). Holds slots for BOTH RFP + LOI/response
+  // Section drafts. Holds slots for BOTH RFP + LOI/response
   // sections; only the active tab set is shown at any time based on
   // detectedNoticeType.
   const [drafts, setDrafts] = useState<Record<SectionType, SectionDraft | undefined>>({
@@ -377,38 +440,33 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   });
   const [activeSection, setActiveSection] = useState<SectionType>('exec_summary');
 
-  // Detected notice type from the loaded doc text. 'sources_sought'
-  // and 'rfi' don't ask for a proposal — they ask for a capability
-  // statement. The UI was assuming RFP for everything. Detect from
-  // the first ~2KB of extracted text using telltale phrases. Per
-  // Eric (2026-05-26): 'this may not be an RFP from my understanding
-  // this was a SS'.
+  // Detected notice type from the active pursuit and/or loaded doc text.
+  // Sources Sought/RFI are market-research responses, so the workflow should
+  // draft an LOI/response package and treat any capability statement as an
+  // attachment the user already owns.
   const [detectedNoticeType, setDetectedNoticeType] = useState<'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown'>('unknown');
 
-  // Seed the detected type from the pursuit's SAM notice_type so the right tab
-  // set shows BEFORE any document is parsed (this pursuit may have no
-  // attachment at all). Once a doc loads, the text-based detection below can
-  // override it. Only seed while still 'unknown' to avoid stomping a real
-  // doc-based detection.
+  // Seed/reset from SAM notice_type so a Sources Sought/RFI pursuit stays in
+  // the LOI response workflow even when SAM has no cached attachments. Uploaded
+  // text can still refine this later.
   useEffect(() => {
-    const seeded = noticeTypeToDetected(activePursuitNoticeType);
-    if (seeded !== 'unknown') {
-      setDetectedNoticeType(current => (current === 'unknown' ? seeded : current));
-    }
-  }, [activePursuitNoticeType]);
+    setDetectedNoticeType(noticeTypeToDetected(activePursuitNoticeType));
+  }, [activePursuitId, activePursuitNoticeType]);
 
   // Pick the right tab set based on what we detected from the loaded
-  // doc. SS/RFI = LOI/response tabs. Everything else
+  // doc or active pursuit. SS/RFI = LOI/response tabs. Everything else
   // (RFP/RFQ/unknown) = traditional proposal tabs.
-  const isCapStatementMode = detectedNoticeType === 'sources_sought' || detectedNoticeType === 'rfi';
-  const isRfqMode = detectedNoticeType === 'rfq';
-  const isSimpleResponseMode = isCapStatementMode || isRfqMode;
+  const effectiveNoticeType = detectedNoticeType !== 'unknown' ? detectedNoticeType : activePursuitDetectedType;
+  const isLoiResponseMode = effectiveNoticeType === 'sources_sought' || effectiveNoticeType === 'rfi';
+  const isRfqMode = effectiveNoticeType === 'rfq';
+  const isSimpleResponseMode = isLoiResponseMode || isRfqMode;
+  const proposalFlowName = isLoiResponseMode ? 'LOI Response' : isRfqMode ? 'RFQ Response' : 'Proposal';
   // Memoized so its identity is stable across renders (it only flips when the
   // detected mode changes). This lets the hooks below list it as a dependency
   // without re-running every render.
   const currentSectionTabs = useMemo(
-    () => (isCapStatementMode ? CAP_STATEMENT_SECTION_TABS : RFP_SECTION_TABS),
-    [isCapStatementMode]
+    () => (isLoiResponseMode ? LOI_RESPONSE_SECTION_TABS : RFP_SECTION_TABS),
+    [isLoiResponseMode]
   );
 
   // When the detected mode flips (e.g., user loads a different doc),
@@ -420,7 +478,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       setActiveSection(currentSectionTabs[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCapStatementMode]);
+  }, [isLoiResponseMode]);
   const [draftLoading, setDraftLoading] = useState<SectionType | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [draftAllLoading, setDraftAllLoading] = useState(false);
@@ -511,75 +569,6 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     }
   }, [email, uploadedRfp, getAuthHeaders]);
 
-  // Wizard Stage 3 — draft the full proposal for the pursuit. Calls the
-  // wizard 'draft' stage (which reuses the draft-all engine, sourced from
-  // the pursuit's attached docs) and merges the sections into the shared
-  // `drafts` state so the existing section UI + .docx export light up.
-  // This is the auto-advance terminus: brief → compliance → here.
-  const runWizardDraft = useCallback(async (pursuitId: string) => {
-    if (!email) return;
-    setWizardDraftStatus('running');
-    setWizardDraftError(null);
-    try {
-      const res = await fetch(
-        `/api/app/proposal/wizard?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pursuitId)}&stage=draft`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-          body: JSON.stringify({}),
-        },
-      );
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        setWizardDraftError(data?.error || 'Could not draft the proposal.');
-        setWizardDraftStatus('error');
-        return;
-      }
-      const artifact = data.artifact as {
-        sections?: Array<{ section: string; draft: string; wordCount: number; targetWords: number; profileGrounded?: boolean }>;
-        generated_from_metadata_only?: boolean;
-      };
-      const sections = artifact?.sections || [];
-
-      if (sections.length > 0) {
-        setDrafts(prev => {
-          const next = { ...prev };
-          for (const s of sections) {
-            next[s.section as SectionType] = {
-              draft: s.draft,
-              wordCount: s.wordCount,
-              targetWords: s.targetWords,
-              profileGrounded: s.profileGrounded,
-              generatedAt: Date.now(),
-            };
-          }
-          return next;
-        });
-        if (sections[0]?.section) setActiveSection(sections[0].section as SectionType);
-      }
-
-      setWizardDraftMeta({
-        count: sections.length,
-        metadataOnly: !!artifact?.generated_from_metadata_only,
-      });
-      setWizardDraftStatus('done');
-    } catch (err) {
-      console.error('[wizard] draft stage failed:', err);
-      setWizardDraftError('Request failed. Try again.');
-      setWizardDraftStatus('error');
-    }
-  }, [email, getAuthHeaders]);
-
-  // Auto-advance terminus: when the user reaches the draft stage, kick
-  // off drafting once (idle → running). Guarded so re-renders don't
-  // re-fire; switching pursuits resets status to idle above. Declared
-  // after runWizardDraft so the callback reference is initialized.
-  useEffect(() => {
-    if (wizardStage === 'draft' && wizardDraftStatus === 'idle' && activePursuitId) {
-      void runWizardDraft(activePursuitId);
-    }
-  }, [wizardStage, wizardDraftStatus, activePursuitId, runWizardDraft]);
-
   const updateDraftText = useCallback((sectionType: SectionType, text: string) => {
     setDrafts(prev => {
       const existing = prev[sectionType];
@@ -616,7 +605,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     URL.revokeObjectURL(url);
   }, [drafts, uploadedRfp, currentSectionTabs]);
 
-  // Review checklist (Step 4)
+  // Review checklist
   const [checklist, setChecklist] = useState<ChecklistItemState[]>(DEFAULT_CHECKLIST);
   const checklistChecked = useMemo(() => checklist.filter(c => c.checked).length, [checklist]);
   const toggleChecklistItem = useCallback((id: string) => {
@@ -663,7 +652,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           drafts: draftsForExport,
           sectionOrder: currentSectionTabs.map(tab => tab.id),
           checklist: isSimpleResponseMode ? [] : checklist.map(c => ({ label: c.label, checked: c.checked })),
-          packageType: isCapStatementMode ? 'sources_sought_loi' : isRfqMode ? 'rfq_response' : 'proposal',
+          packageType: isLoiResponseMode ? 'sources_sought_loi' : isRfqMode ? 'rfq_response' : 'proposal',
         }),
       });
 
@@ -690,7 +679,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     } finally {
       setExporting(false);
     }
-  }, [email, uploadedRfp, compliance, drafts, checklist, getAuthHeaders, currentSectionTabs, isCapStatementMode, isRfqMode, isSimpleResponseMode]);
+  }, [email, uploadedRfp, compliance, drafts, checklist, getAuthHeaders, currentSectionTabs, isLoiResponseMode, isRfqMode, isSimpleResponseMode]);
 
   const exportComplianceCsv = useCallback(() => {
     if (compliance.length === 0) return;
@@ -777,7 +766,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [autoLoadStatus, setAutoLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'no-docs' | 'error'>('idle');
   const [autoLoadMessage, setAutoLoadMessage] = useState<string | null>(null);
   // detectedNoticeType moved up near currentSectionTabs declaration
-  // so we can derive isCapStatementMode before any consumer needs it.
+  // so we can derive the simple-response workflow before consumers need it.
   useEffect(() => {
     const pursuitId = activePursuitId;
     if (!pursuitId || !email) return;
@@ -835,43 +824,18 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         // different one.
         const primary = docs[0];
         if (primary.extracted_text) {
-          setUploadedRfp({
+          const loadedDocument: UploadedRfp = {
             fileName: primary.filename,
             fileSize: primary.size_bytes || 0,
             charCount: primary.char_count || primary.extracted_text.length,
             pageCount: primary.page_count,
             text: primary.extracted_text,
-          });
-          // Sniff notice type from first 2KB. Order matters — SS
-          // language tends to also mention 'RFP' in the boilerplate
-          // ('this is not an RFP'), so check SS phrases first.
-          const head = primary.extracted_text.slice(0, 2000).toLowerCase();
-          let detected: typeof detectedNoticeType = 'unknown';
-          if (
-            head.includes('sources sought') ||
-            head.includes('this is not a request for proposal') ||
-            head.includes('this announcement is being used for market research') ||
-            head.includes('not a solicitation')
-          ) {
-            detected = 'sources_sought';
-          } else if (
-            head.includes('request for information') ||
-            head.match(/\brfi\b/) ||
-            head.includes('responses to this rfi')
-          ) {
-            detected = 'rfi';
-          } else if (
-            head.includes('request for proposal') ||
-            head.match(/\brfp\b/) ||
-            head.includes('offerors shall')
-          ) {
-            detected = 'rfp';
-          } else if (
-            head.includes('request for quotation') ||
-            head.match(/\brfq\b/)
-          ) {
-            detected = 'rfq';
-          }
+          };
+          setSourceDocuments([loadedDocument]);
+          setUploadedRfp(loadedDocument);
+          // Sniff notice type from the extracted text. Order matters inside
+          // the helper: SS language often says "this is not an RFP."
+          const detected = detectNoticeTypeFromText(primary.extracted_text);
           setDetectedNoticeType(detected);
           setAutoLoadStatus('loaded');
           setAutoLoadMessage(
@@ -924,16 +888,59 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Proposal Assist</h1>
-          <p className="text-slate-400 mt-1">Turn a saved pursuit into the first capture/proposal workspace.</p>
+          <p className="text-slate-400 mt-1">
+            {activePursuitId
+              ? `${proposalFlowName} workspace for ${activePursuit?.title || 'this pursuit'}.`
+              : 'Start from a saved pursuit or upload a source document to prepare the response.'}
+          </p>
         </div>
-        <button
-          onClick={loadPipeline}
-          disabled={loading}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-sm rounded-lg transition-colors"
-        >
-          {loading ? 'Refreshing...' : 'Refresh Pursuits'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {(activePursuitId || uploadedRfp) && (
+            <button
+              type="button"
+              onClick={startAnotherProposal}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              Start another
+            </button>
+          )}
+          <button
+            onClick={loadPipeline}
+            disabled={loading}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-sm rounded-lg transition-colors"
+          >
+            {loading ? 'Refreshing...' : 'Refresh Pursuits'}
+          </button>
+        </div>
       </div>
+
+      {activePursuit && (
+        <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Current pursuit</p>
+              <h2 className="text-base font-semibold text-white truncate">{activePursuit.title}</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                {[activePursuit.agency, noticeTypeLabel(activePursuit.notice_type), activePursuit.naics_code ? `NAICS ${activePursuit.naics_code}` : '']
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setLocalPursuitId(null);
+                setAutoLoadStatus('idle');
+                setAutoLoadMessage(null);
+                clearRfp();
+              }}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300"
+            >
+              Switch pursuit
+            </button>
+          </div>
+        </section>
+      )}
 
       {staleContextPursuit && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
@@ -942,14 +949,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       )}
 
       {/* Start from a saved pursuit — entry point for users who open
-          Proposal Assist directly (no Pipeline "Draft Proposal" click).
-          Pick a saved pursuit and the wizard begins drafting for it. */}
+          Proposal Assist directly (no Pipeline click). Pick a saved
+          pursuit and the workbench will extract available SAM docs. */}
       {email && !activePursuitId && opportunities.length > 0 && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Start here</p>
-          <h2 className="text-lg font-semibold text-white mb-1">Draft from a saved pursuit</h2>
+          <h2 className="text-lg font-semibold text-white mb-1">Start from a saved pursuit</h2>
           <p className="text-sm text-slate-400 mb-3">
-            Pick one of your live pursuits and Mindy will pull its RFP and start the brief → compliance → draft flow.
+            Pick one of your live pursuits. Mindy will pull cached SAM documents when available, then show the outputs you can generate.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <select
@@ -978,7 +985,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   title={!respondable ? 'This notice type has nothing to submit — you cannot draft a response.' : undefined}
                   className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-sm font-semibold text-white"
                 >
-                  Start drafting →
+                  Open workbench →
                 </button>
               );
             })()}
@@ -1017,14 +1024,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             );
           })()}
           <p className="text-[11px] text-slate-500 mt-2">
-            Or upload an RFP below to draft for an opportunity that isn&apos;t saved yet.
+            Or upload documents below for an opportunity that isn&apos;t saved yet.
           </p>
         </section>
       )}
 
       {/* Non-respondable notice type (Special Notice, Award Notice,
           Justification, Sale of Surplus Property): you cannot write a response,
-          so block the wizard with a clear, TYPE-SPECIFIC next step instead of
+          so block the workbench with a clear, TYPE-SPECIFIC next step instead of
           letting the user draft a bid that has nowhere to go.
             - Award Notice → add the awardee to Relationships (subcontracting).
             - Everything else → use as market intel + track the real solicitation. */}
@@ -1086,127 +1093,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         );
       })()}
 
-      {/* Proposal Wizard — brief → compliance → draft, auto-advancing.
-          Mounted from the Pipeline "Draft Proposal" button OR the saved-
-          pursuit picker above. Sits over the legacy surface so the user
-          gets the structured brief + compliance before the full draft. */}
-      {email && activePursuitId && activePursuitNotice.respondability !== 'none' && (
-        <>
-          {/* 3-step progress indicator */}
-          <div className="flex items-center gap-2 mb-4 text-xs">
-            {([
-              { key: 'brief', label: '1 · RFP Brief' },
-              { key: 'compliance', label: '2 · Compliance' },
-              { key: 'draft', label: '3 · Draft' },
-            ] as const).map((step, i) => {
-              const order = ['brief', 'compliance', 'draft'];
-              const current = order.indexOf(wizardStage);
-              const mine = order.indexOf(step.key);
-              const state = mine < current ? 'done' : mine === current ? 'active' : 'upcoming';
-              return (
-                <span key={step.key} className="flex items-center gap-2">
-                  <span
-                    className={`px-2.5 py-1 rounded-full border ${
-                      state === 'active'
-                        ? 'border-purple-500/50 bg-purple-500/15 text-purple-200'
-                        : state === 'done'
-                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                          : 'border-slate-700 bg-slate-800/40 text-slate-500'
-                    }`}
-                  >
-                    {state === 'done' ? '✓ ' : ''}{step.label}
-                  </span>
-                  {i < 2 && <span className="text-slate-600">→</span>}
-                </span>
-              );
-            })}
-          </div>
-
-          {wizardStage === 'brief' && (
-            <ProposalWizardBrief
-              email={email}
-              pursuitId={activePursuitId}
-              authHeaders={getAuthHeaders}
-              noticeType={noticeTypeLabel(activePursuitNoticeType)}
-              onContinue={() => setWizardStage('compliance')}
-            />
-          )}
-          {wizardStage === 'compliance' && (
-            <>
-              <div className="flex items-center gap-2 mb-3 text-xs text-slate-400">
-                <button
-                  type="button"
-                  onClick={() => setWizardStage('brief')}
-                  className="text-slate-400 hover:text-purple-300"
-                >
-                  ← Back to RFP Brief
-                </button>
-              </div>
-              <ProposalWizardCompliance
-                email={email}
-                pursuitId={activePursuitId}
-                authHeaders={getAuthHeaders}
-                onContinue={() => setWizardStage('draft')}
-              />
-            </>
-          )}
-          {wizardStage === 'draft' && (
-            <section className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-4">
-              <div className="flex items-center gap-2 mb-3 text-xs text-slate-400">
-                <button
-                  type="button"
-                  onClick={() => setWizardStage('compliance')}
-                  className="text-slate-400 hover:text-purple-300"
-                >
-                  ← Back to Compliance
-                </button>
-              </div>
-              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 3 · Draft</p>
-              <h2 className="text-lg font-semibold text-white mb-1">Full proposal draft</h2>
-
-              {wizardDraftStatus === 'running' && (
-                <div className="flex items-center gap-3 mt-4 text-sm text-blue-200">
-                  <span className="inline-block w-4 h-4 border-2 border-blue-300/40 border-t-blue-300 rounded-full animate-spin" />
-                  Mindy is drafting every section from your RFP — this takes ~30–60 seconds.
-                </div>
-              )}
-              {wizardDraftStatus === 'error' && (
-                <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-                  {wizardDraftError || 'Draft failed.'}
-                  <button
-                    type="button"
-                    onClick={() => activePursuitId && runWizardDraft(activePursuitId)}
-                    className="ml-3 underline hover:text-red-100"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              {wizardDraftStatus === 'done' && wizardDraftMeta?.metadataOnly && (
-                <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-                  No RFP document is attached to this pursuit, so there&apos;s nothing to draft from.
-                  Upload the solicitation below and Mindy will draft every section.
-                </div>
-              )}
-              {wizardDraftStatus === 'done' && !wizardDraftMeta?.metadataOnly && (
-                <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
-                  Drafted {wizardDraftMeta?.count ?? 0} section{(wizardDraftMeta?.count ?? 0) === 1 ? '' : 's'}.
-                  Review and edit them below, then export to .docx.
-                </div>
-              )}
-            </section>
-          )}
-        </>
-      )}
-
-      {/* RFP Upload */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+      {/* Document Workbench */}
+      <section id="proposal-source-document" className="bg-slate-900 border border-slate-800 rounded-xl p-5">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div>
-            <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 1 · Source Document</p>
-            <h2 className="text-lg font-semibold text-white">Upload an RFP / Sources Sought / Solicitation</h2>
+            <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Source Documents</p>
+            <h2 className="text-lg font-semibold text-white">
+              Upload or extract everything for this response
+            </h2>
             <p className="text-sm text-slate-400 mt-1">
-              PDF, DOCX, or TXT, up to 10 MB. Mindy extracts the text so future steps can pull compliance requirements and draft sections.
+              Add the notice, RFP/RFQ, PWS/SOW, amendments, Q&A, pricing schedule, or attachments. Mindy extracts the text, classifies the response type, then unlocks the outputs below.
             </p>
           </div>
         </div>
@@ -1239,13 +1135,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             Sought or RFI, switch the user into an LOI / market-research
             response workflow. Users attach their existing capability
             statement separately if the notice requests one. */}
-        {uploadedRfp && (detectedNoticeType === 'sources_sought' || detectedNoticeType === 'rfi') && (
+        {uploadedRfp && isLoiResponseMode && (
           <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
             <div className="font-semibold mb-1">
-              ⚠ This looks like a {detectedNoticeType === 'sources_sought' ? 'Sources Sought' : 'Request for Information'}, not an RFP.
+              ⚠ This looks like a {effectiveNoticeType === 'sources_sought' ? 'Sources Sought' : 'Request for Information'}, not an RFP.
             </div>
             <div className="text-xs text-amber-200/90">
-              {detectedNoticeType === 'sources_sought'
+              {effectiveNoticeType === 'sources_sought'
                 ? 'Sources Sought notices are market research — the agency wants to know who can do the work. Mindy drafts the LOI / response narrative. Attach your existing capability statement separately if the notice requests it.'
                 : 'RFIs ask for information about your capabilities, methods, or pricing. Mindy drafts the response narrative and requested answers, not a full proposal or Section L/M compliance package.'}
             </div>
@@ -1261,12 +1157,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             <input
               ref={fileInputRef}
               type="file"
+              multiple
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
               onChange={onFileInputChange}
               className="hidden"
             />
             <p className="text-slate-300">
-              Drop a file here, or{' '}
+              Drop files here, or{' '}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -1276,7 +1173,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 browse
               </button>
             </p>
-            <p className="text-xs text-slate-500 mt-2">PDF · DOCX · TXT · max 10 MB</p>
+            <p className="text-xs text-slate-500 mt-2">PDF · DOCX · TXT · max 10 MB each</p>
             {uploading && (
               <p className="text-xs text-purple-300 mt-3 flex items-center justify-center gap-2">
                 <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
@@ -1292,7 +1189,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white truncate">{uploadedRfp.fileName}</p>
                   <p className="text-xs text-slate-500">
-                    {(uploadedRfp.fileSize / 1024).toFixed(1)} KB · {uploadedRfp.charCount.toLocaleString()} chars
+                    {sourceDocuments.length} document{sourceDocuments.length === 1 ? '' : 's'} · {(uploadedRfp.fileSize / 1024).toFixed(1)} KB · {uploadedRfp.charCount.toLocaleString()} chars
                     {uploadedRfp.pageCount ? ` · ${uploadedRfp.pageCount} page${uploadedRfp.pageCount === 1 ? '' : 's'}` : ''}
                   </p>
                 </div>
@@ -1304,7 +1201,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   disabled={uploading}
                   className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
                 >
-                  Replace
+                  Add / replace
                 </button>
                 <button
                   type="button"
@@ -1317,6 +1214,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
             </div>
 
+            {sourceDocuments.length > 1 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {sourceDocuments.map((doc) => (
+                  <div key={`${doc.fileName}-${doc.charCount}`} className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2">
+                    <p className="truncate text-xs font-medium text-slate-200">{doc.fileName}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {(doc.fileSize / 1024).toFixed(1)} KB · {doc.charCount.toLocaleString()} chars
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <details className="bg-slate-950/40 border border-slate-800 rounded-lg">
               <summary className="cursor-pointer px-3 py-2 text-sm text-slate-300 hover:text-white">
                 Preview extracted text ({uploadedRfp.text.length.toLocaleString()} chars)
@@ -1328,12 +1238,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </details>
 
             <p className="text-xs text-slate-500">
-              Requirement extraction and drafting coming next — for now this text is held in your session.
+              Extracted text is held in this session and used by each output you run below.
             </p>
 
             <input
               ref={fileInputRef}
               type="file"
+              multiple
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
               onChange={onFileInputChange}
               className="hidden"
@@ -1348,14 +1259,83 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         )}
       </section>
 
-      {/* Step 2 · Compliance Matrix / Response Requirements */}
       {uploadedRfp && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Available Outputs</p>
+              <h2 className="text-lg font-semibold text-white">Choose what Mindy should produce</h2>
+              <p className="text-sm text-slate-400 mt-1">
+                No forced order. Generate the artifact you need, review it below, then export.
+              </p>
+            </div>
+            <span className="rounded-full border border-slate-700 bg-slate-800/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+              {noticeTypeLabel(activePursuitNoticeType) || (effectiveNoticeType === 'sources_sought' ? 'Sources Sought' : effectiveNoticeType.toUpperCase())}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {isSimpleResponseMode ? (
+              <OutputActionCard
+                eyebrow={isRfqMode ? 'RFQ' : 'LOI / Market Research'}
+                title={isRfqMode ? 'Export RFQ response template' : 'Export LOI response template'}
+                description={isRfqMode
+                  ? 'Create a Word response template with blanks for pricing, attachments, and submission details.'
+                  : 'Create a Word LOI response with blanks and reminders to attach the capability statement only if requested.'}
+                status={exporting ? 'Working...' : 'Ready'}
+                buttonLabel={exporting ? 'Assembling...' : isRfqMode ? 'Export RFQ .docx' : 'Export LOI .docx'}
+                disabled={exporting}
+                onClick={exportProposalPackage}
+              />
+            ) : (
+              <OutputActionCard
+                eyebrow="Compliance"
+                title="Build compliance matrix"
+                description="Extract shall / must / required clauses into a working table with owner and status fields."
+                status={compliance.length > 0 ? `${compliance.length} requirements` : complianceLoading ? 'Extracting...' : 'Not generated'}
+                buttonLabel={complianceLoading ? 'Extracting...' : compliance.length > 0 ? 'Regenerate matrix' : 'Generate matrix'}
+                disabled={complianceLoading}
+                onClick={generateCompliance}
+              />
+            )}
+
+            {!isRfqMode && (
+              <OutputActionCard
+                eyebrow={isLoiResponseMode ? 'Narrative' : 'Draft'}
+                title={isLoiResponseMode ? 'Draft LOI response sections' : 'Draft proposal sections'}
+                description={isLoiResponseMode
+                  ? 'Draft the LOI opening, relevant experience, capability fit, differentiators, and POC sections.'
+                  : 'Draft the first proposal sections from the extracted documents and saved profile.'}
+                status={draftAllSummary ? `${draftAllSummary.count} sections drafted` : draftAllLoading ? 'Drafting...' : 'Not generated'}
+                buttonLabel={draftAllLoading ? 'Drafting...' : draftAllSummary ? 'Regenerate drafts' : 'Draft sections'}
+                disabled={draftAllLoading || !!draftLoading}
+                onClick={generateAllDrafts}
+              />
+            )}
+
+            <OutputActionCard
+              eyebrow="Export"
+              title={isSimpleResponseMode ? 'Export response package' : 'Export Word package'}
+              description={isSimpleResponseMode
+                ? 'Download the response package. Attach the existing capability statement separately when the notice requests it.'
+                : 'Download a Word package with matrix, drafts, and checklist when available.'}
+              status={hasAnyDraft || compliance.length > 0 || isSimpleResponseMode ? 'Ready' : 'Needs an output'}
+              buttonLabel={exporting ? 'Assembling...' : 'Export .docx'}
+              disabled={exporting || (!isSimpleResponseMode && !hasAnyDraft && compliance.length === 0)}
+              onClick={exportProposalPackage}
+            />
+          </div>
+        </section>
+      )}
+
+      {/* Output · Compliance Matrix / Response Requirements */}
+      {uploadedRfp && (
+        <section id={isSimpleResponseMode ? 'proposal-response-template' : undefined} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           {isSimpleResponseMode ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 2 · Word Response Template</p>
+                  <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Output · Word Response Template</p>
                   <h2 className="text-lg font-semibold text-white">
                     {isRfqMode ? 'Create RFQ response template' : 'Create LOI response template'}
                   </h2>
@@ -1399,7 +1379,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             <>
               <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 2 · Compliance Matrix</p>
+                  <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Output · Compliance Matrix</p>
                   <h2 className="text-lg font-semibold text-white">Extract every shall / must / required</h2>
                   <p className="text-sm text-slate-400 mt-1">
                     Mindy reads the source doc and lists each obligation so you can assign owners and track status before drafting.
@@ -1551,21 +1531,21 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </section>
       )}
 
-      {/* Step 3 · Draft Sections */}
+      {/* Output · Draft Sections */}
       {uploadedRfp && !isRfqMode && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">
-                Step 3 · {isCapStatementMode ? 'LOI Response Sections' : 'Draft Sections'}
+                Output · {isLoiResponseMode ? 'LOI Response Sections' : 'Draft Sections'}
               </p>
               <h2 className="text-lg font-semibold text-white">
-                {isCapStatementMode
+                {isLoiResponseMode
                   ? 'LOI drafts grounded in the notice + your profile'
                   : 'First drafts grounded in the RFP + your profile'}
               </h2>
               <p className="text-sm text-slate-400 mt-1">
-                {isCapStatementMode
+                {isLoiResponseMode
                   ? 'Pick a section. Mindy uses the Sources Sought / RFI text and your saved profile to draft the letter of intent / response narrative. Attach your existing capability statement separately when the notice asks for one.'
                   : 'Pick a section. Mindy uses the source doc and your saved profile (NAICS, set-asides, target agencies) to write a first pass with [placeholders] for facts it shouldn\'t invent.'}
               </p>
@@ -1581,7 +1561,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             >
               {draftAllLoading
                 ? <>⏳ Drafting all sections…</>
-                : <>✨ Draft Entire {isCapStatementMode ? 'LOI Response' : 'Proposal'}</>}
+                : <>✨ Draft Entire {isLoiResponseMode ? 'LOI Response' : 'Proposal'}</>}
             </button>
           </div>
 
@@ -1724,29 +1704,29 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           })()}
 
           <p className="text-xs text-slate-500 mt-3">
-            Edits live in this session only. Use Step 4 below to bundle the package as a Word doc.
+            Edits live in this session only. Use Export Package below to bundle the package as a Word doc.
           </p>
         </section>
       )}
 
-      {/* Step 4 · Review Checklist + Export */}
+      {/* Output · Review Checklist + Export */}
       {uploadedRfp && !isRfqMode && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
-              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Step 4 · Review &amp; Export</p>
+              <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Output · Review &amp; Export</p>
               <h2 className="text-lg font-semibold text-white">
-                {isCapStatementMode
+                {isLoiResponseMode
                   ? 'Export LOI response package'
                   : 'Final compliance review + Word export'}
               </h2>
               <p className="text-sm text-slate-400 mt-1">
-                {isCapStatementMode
+                {isLoiResponseMode
                   ? 'Export the LOI / Sources Sought response draft. If the notice asks for a capability statement, attach your existing capability statement as a separate document.'
                   : 'Walk the checklist before you ship. Then export a single .docx containing the compliance matrix, drafted sections, and the checklist appendix.'}
               </p>
             </div>
-            {!isCapStatementMode && (
+            {!isLoiResponseMode && (
               <div className="text-right">
                 <div className="text-2xl font-bold text-white">{checklistChecked}<span className="text-slate-500 text-base font-normal">/{checklist.length}</span></div>
                 <div className="text-xs text-slate-500">items confirmed</div>
@@ -1754,7 +1734,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             )}
           </div>
 
-          {isCapStatementMode ? (
+          {isLoiResponseMode ? (
             <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3 mb-4">
               <p className="text-sm font-medium text-slate-200 mb-2">Before submitting:</p>
               <ul className="space-y-1 text-sm text-slate-400">
@@ -1789,7 +1769,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <p className="text-slate-300 font-medium mb-1">Package will include:</p>
                 <ul className="space-y-0.5 text-xs">
                   <li>• Title page + table of contents</li>
-                  {!isCapStatementMode && (
+                  {!isLoiResponseMode && (
                     <li className={compliance.length > 0 ? 'text-emerald-400' : 'text-slate-600'}>
                       {compliance.length > 0 ? '✓' : '○'} Compliance Matrix ({compliance.length} requirements)
                     </li>
@@ -1802,7 +1782,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       </li>
                     );
                   })}
-                  {isCapStatementMode ? (
+                  {isLoiResponseMode ? (
                     <li className="text-slate-400">• Attach existing capability statement separately if required</li>
                   ) : (
                     <li className="text-emerald-400">
@@ -1814,7 +1794,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               <button
                 type="button"
                 onClick={exportProposalPackage}
-                disabled={exporting || (!hasAnyDraft && (!compliance.length || isCapStatementMode))}
+                disabled={exporting || (!hasAnyDraft && (!compliance.length || isLoiResponseMode))}
                 className="px-5 py-2.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium flex items-center gap-2 transition-colors"
               >
                 {exporting && (
@@ -1830,9 +1810,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
             )}
 
-            {!hasAnyDraft && (isCapStatementMode || compliance.length === 0) && !exporting && (
+            {!hasAnyDraft && (isLoiResponseMode || compliance.length === 0) && !exporting && (
               <p className="text-xs text-slate-500">
-                {isCapStatementMode
+                {isLoiResponseMode
                   ? 'Draft at least one LOI response section before exporting.'
                   : 'Generate at least the compliance matrix or one section before exporting.'}
               </p>
@@ -1847,7 +1827,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </div>
       )}
 
-      {opportunities.length === 0 ? (
+      {!activePursuitId && !uploadedRfp && (opportunities.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
           <h2 className="text-xl font-semibold text-white mb-2">Save a pursuit first</h2>
           <p className="text-slate-400">
@@ -1925,7 +1905,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </main>
           )}
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -1989,6 +1969,47 @@ function PrepSection({ title, items, tone }: { title: string; items: string[]; t
         ))}
       </ul>
     </section>
+  );
+}
+
+function OutputActionCard({
+  eyebrow,
+  title,
+  description,
+  status,
+  buttonLabel,
+  disabled,
+  onClick,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  status: string;
+  buttonLabel: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div className="flex min-h-52 flex-col justify-between rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-300">{eyebrow}</p>
+          <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+            {status}
+          </span>
+        </div>
+        <h3 className="mt-2 text-base font-semibold text-white">{title}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-slate-400">{description}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="mt-4 w-full rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+      >
+        {buttonLabel}
+      </button>
+    </div>
   );
 }
 
