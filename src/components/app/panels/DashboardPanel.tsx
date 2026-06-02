@@ -303,6 +303,25 @@ function formatDate(dateStr?: string) {
   }
 }
 
+// Normalize a deadline value to the "Jun 10, 2026 4:00 PM ET" display style.
+// Briefing items are inconsistent: some already carry a human-formatted string,
+// others a raw ISO timestamp (2026-06-05T21:00:00+00:00). Detect the raw ISO
+// form and format it; pass already-formatted strings through unchanged.
+function formatDeadline(value?: string): string {
+  const v = (value || '').trim();
+  if (!v) return '';
+  // Raw ISO timestamp? (starts YYYY-MM-DD, has a T or +offset)
+  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(v)) {
+    const d = new Date(v);
+    if (!Number.isNaN(d.getTime())) {
+      const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+      return `${date} ${time} ET`;
+    }
+  }
+  return v; // already human-formatted
+}
+
 function formatDateLong(dateStr?: string) {
   if (!dateStr) return '';
   try {
@@ -350,7 +369,7 @@ function collectGeneratedItems(content: Record<string, unknown>): BriefingItem[]
         buyerOffice: buyer.secondary,
         parentAgency: buyer.parent,
         amount: text(item.amount),
-        deadline: text(item.deadline),
+        deadline: formatDeadline(text(item.deadline)),
         location: getLocationFromRecord(item),
         actionUrl: text(item.actionUrl),
         actionLabel: text(item.actionLabel, 'View details'),
@@ -376,7 +395,7 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
       buyerOffice: buyer.secondary,
       parentAgency: buyer.parent,
       amount: narrative.quickWinAssessment,
-      deadline: text(item.responseDeadline),
+      deadline: formatDeadline(text(item.responseDeadline)),
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: 'View on SAM.gov',
@@ -416,7 +435,7 @@ function collectGreenItems(content: Record<string, unknown>): BriefingItem[] {
       amount: daysRemaining !== null
         ? `Due in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`
         : 'Upcoming deadline',
-      deadline: text(item.deadline),
+      deadline: formatDeadline(text(item.deadline)),
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: 'View on SAM.gov',
@@ -441,7 +460,7 @@ function collectLegacyItems(content: Record<string, unknown>): BriefingItem[] {
       buyerOffice: buyer.secondary,
       parentAgency: buyer.parent,
       amount: text(item.value),
-      deadline: text(item.window),
+      deadline: formatDeadline(text(item.window)),
       location: getLocationFromRecord(item),
       actionUrl: text(item.samLink),
       actionLabel: text(item.samLink) ? 'View on SAM.gov' : 'View details',
