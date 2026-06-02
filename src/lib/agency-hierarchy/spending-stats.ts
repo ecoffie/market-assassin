@@ -40,6 +40,20 @@ export interface SpendingSummary {
   fiscalYear: number;
 }
 
+interface AgencyAwardsResponse {
+  fiscal_year?: number;
+  toptier_code?: string;
+  transaction_count?: number | null;
+  obligations?: number | null;
+  total_obligations?: number | null;
+  outlays?: number | null;
+  messages?: string[];
+}
+
+function numericValue(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
 /**
  * Get spending for a specific agency
  */
@@ -64,11 +78,17 @@ export async function getAgencySpending(
       return null;
     }
 
-    // Fetch agency overview
+    // Fetch agency-wide award obligations + transaction count.
+    //
+    // The agency overview endpoint does not return budget_authority_amount,
+    // total_outlays, or transaction_count. The fallback Gov Buyers path only
+    // has agency names, so this intentionally uses agency-wide totals while the
+    // richer selectedAgencyData flow continues to carry NAICS-scoped spend.
     const response = await fetch(
-      `${USASPENDING_BASE_URL}/agency/${agencyCode}/?fiscal_year=${fy}`,
+      `${USASPENDING_BASE_URL}/agency/${agencyCode}/awards/?fiscal_year=${fy}`,
       {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(15000),
       }
     );
 
@@ -77,16 +97,16 @@ export async function getAgencySpending(
       return null;
     }
 
-    const data = await response.json();
+    const data = await response.json() as AgencyAwardsResponse;
 
     // Extract spending data
     const spending: AgencySpending = {
-      agencyName: data.name || agencyName,
+      agencyName,
       toptierCode: agencyCode,
-      fiscalYear: fy,
-      totalObligations: data.budget_authority_amount || 0,
-      totalOutlays: data.total_outlays || 0,
-      contractCount: data.transaction_count || 0,
+      fiscalYear: data.fiscal_year || fy,
+      totalObligations: numericValue(data.obligations ?? data.total_obligations),
+      totalOutlays: numericValue(data.outlays),
+      contractCount: numericValue(data.transaction_count),
       topNaics: []
     };
 
@@ -188,8 +208,6 @@ async function getAgencyTopNaics(
     );
 
     if (!response.ok) return [];
-
-    const data = await response.json();
 
     // USASpending doesn't directly provide top NAICS per agency
     // This is a simplified approximation
