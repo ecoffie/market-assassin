@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
+const { execFileSync } = require('child_process');
 
 const g = globalThis;
 if (typeof g.DOMMatrix === 'undefined') {
@@ -51,14 +52,14 @@ const ENDPOINT = (endpointArg ? endpointArg.split('=').slice(1).join('=') : 'htt
 const PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
 const HOME = os.homedir();
-const GDRIVE = path.join(
+const MY_DRIVE = path.join(
   HOME,
   'Library',
   'CloudStorage',
   'GoogleDrive-evankoffdev@gmail.com',
-  'My Drive',
-  'GOVCON EDU'
+  'My Drive'
 );
+const GDRIVE = path.join(MY_DRIVE, 'GOVCON EDU');
 
 const ROOTS = [
   path.join(GDRIVE, 'Value Ladders', 'Sample Lead Magnet Content', 'Sample LOI'),
@@ -67,8 +68,54 @@ const ROOTS = [
   path.join(GDRIVE, 'PRODUCTS', 'Micro Course Govcon ', 'Better Bid Response PDFS'),
 ];
 
+const EXTRA_FILES = [
+  {
+    path: path.join(MY_DRIVE, 'Copy of DOE LOI.docx'),
+    topLevelFolder: 'Sample LOI',
+    docType: 'sources_sought_loi',
+  },
+  {
+    path: path.join(GDRIVE, 'Courses', 'Govcon Giants Course', 'Documents', 'Technical MJ Global JDMTA  .pdf'),
+    topLevelFolder: 'Technical Volumes',
+    docType: 'technical_volume',
+  },
+  {
+    path: path.join(GDRIVE, 'Courses', 'Govcon Giants Course', 'Documents', 'RFP info', 'Hanscom MACC', 'VOLUME 1 TECHNICAL VOLUME - FACTOR 1[3].pdf'),
+    topLevelFolder: 'Technical Volumes',
+    docType: 'technical_volume',
+  },
+  {
+    path: path.join(GDRIVE, 'Courses', 'Govcon Giants Course', 'Documents', 'RFP info', 'Hanscom MACC', 'VOLUME 1 TECHNICAL VOLUME - FACTOR 2[1].pdf'),
+    topLevelFolder: 'Technical Volumes',
+    docType: 'technical_volume',
+  },
+  {
+    path: path.join(GDRIVE, 'Courses', 'Govcon Giants Course', 'Documents', 'RFP info', 'Hanscom MACC', 'proposal writeup', 'final Hanscom AFB MACC Volume I Factor 1.docx'),
+    topLevelFolder: 'Technical Volumes',
+    docType: 'technical_volume',
+  },
+  {
+    path: path.join(GDRIVE, 'Courses', 'Govcon Giants Course', 'Documents', 'RFP info', 'Hanscom MACC', 'proposal writeup', 'final Hanscom AFB MACC Volume I Factor 2.docx'),
+    topLevelFolder: 'Technical Volumes',
+    docType: 'technical_volume',
+  },
+  {
+    path: path.join(GDRIVE, 'Bids : Contracts', 'Submitted', 'Colombia+Anti+Money+Laundering+Campaign', '191NLE25R0003 – INL Colombia -Volume I Technical Proposal signed.pdf'),
+    topLevelFolder: 'Technical Volumes',
+    docType: 'technical_volume',
+  },
+];
+
 const ALLOWED_EXTS = new Set(['pdf', 'docx', 'doc', 'txt', 'md', 'pptx']);
 const MAX_BYTES = 25 * 1024 * 1024;
+
+function fileRecord(filePath, meta = {}) {
+  const ext = path.extname(filePath).slice(1).toLowerCase();
+  if (!ALLOWED_EXTS.has(ext)) return null;
+  const stat = fs.statSync(filePath);
+  if (stat.size > MAX_BYTES) return null;
+  return { path: filePath, ext, size: stat.size, mtime: stat.mtime, ...meta };
+}
 
 function walk(dir, files = []) {
   let entries;
@@ -85,17 +132,51 @@ function walk(dir, files = []) {
       continue;
     }
     if (!entry.isFile()) continue;
-    const ext = path.extname(entry.name).slice(1).toLowerCase();
-    if (!ALLOWED_EXTS.has(ext)) continue;
-    const stat = fs.statSync(full);
-    if (stat.size > MAX_BYTES) continue;
-    files.push({ path: full, ext, size: stat.size, mtime: stat.mtime });
+    const record = fileRecord(full);
+    if (record) files.push(record);
   }
   return files;
 }
 
 function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+function ocrPdfWithTesseract(filePath) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mindy-pdf-ocr-'));
+  try {
+    const outputPrefix = path.join(tempDir, 'page');
+    execFileSync('pdftoppm', ['-r', '220', '-png', filePath, outputPrefix], {
+      encoding: 'utf8',
+      maxBuffer: 5 * 1024 * 1024,
+      timeout: 180_000,
+    });
+
+    const pageImages = fs.readdirSync(tempDir)
+      .filter((name) => name.endsWith('.png'))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((name) => path.join(tempDir, name));
+
+    if (pageImages.length === 0) return '';
+
+    return pageImages
+      .map((imagePath) => {
+        try {
+          return execFileSync('tesseract', [imagePath, 'stdout', '-l', 'eng', '--psm', '6'], {
+            encoding: 'utf8',
+            maxBuffer: 10 * 1024 * 1024,
+            timeout: 120_000,
+          });
+        } catch {
+          return '';
+        }
+      })
+      .join('\n\n');
+  } catch {
+    return '';
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 function bestTitle(filename, text) {
@@ -113,6 +194,8 @@ function classifyDocType(filePath, filename, fullText = '') {
   const n = filename.toLowerCase();
   const head = fullText.slice(0, 1500).toLowerCase();
   const combined = `${p} ${n}`;
+  const extra = EXTRA_FILES.find((item) => item.path === filePath);
+  if (extra?.docType) return extra.docType;
 
   if (n.includes('eda rfi response') || n.includes('rfi response')) return 'rfi_response';
   if (n.includes('gcg eda national pilot program')) return 'rfi_response';
@@ -140,7 +223,25 @@ function classifyDocType(filePath, filename, fullText = '') {
     return 'pricing_volume';
   }
 
-  if (hasAny(n, ['volume i - technical', 'vol 1_technical', 'vol 1 technical', 'vol i technical', 'technical proposal', 'technical approach'])) {
+  if (
+    hasAny(n, [
+      'volume i - technical',
+      'volume i technical',
+      'volume i_technical',
+      'volume  i_technical',
+      'volume 1 technical',
+      'volume 1_technical',
+      'technical volume',
+      'vol 1_technical',
+      'vol 1 technical',
+      'vol i technical',
+      'technical proposal',
+      'technical approach',
+      'non-price proposal',
+      'non price proposal',
+    ]) ||
+    /\bvolume\s+(i|1)\s+factor\s+[12]\b/.test(n)
+  ) {
     return 'technical_volume';
   }
 
@@ -150,6 +251,9 @@ function classifyDocType(filePath, filename, fullText = '') {
 }
 
 function topLevelFolder(filePath) {
+  const extra = EXTRA_FILES.find((item) => item.path === filePath);
+  if (extra?.topLevelFolder) return extra.topLevelFolder;
+
   for (const root of ROOTS) {
     if (filePath.startsWith(root + path.sep)) {
       return path.basename(root) || 'proposal-template-corpus';
@@ -166,7 +270,12 @@ async function extractText(filePath, ext) {
     const parser = new PDFParse({ data: new Uint8Array(buf) });
     try {
       const result = await parser.getText();
-      return { text: result.text || '', pageCount: result.total };
+      let text = result.text || '';
+      if (text.trim().length < 200) {
+        const ocrText = ocrPdfWithTesseract(filePath);
+        if (ocrText.trim().length > text.trim().length) text = ocrText;
+      }
+      return { text, pageCount: result.total };
     } finally {
       await parser.destroy().catch(() => {});
     }
@@ -229,6 +338,17 @@ async function main() {
     const found = walk(root);
     console.log(`${found.length.toString().padStart(3)} files  ${root}`);
     files = files.concat(found);
+  }
+  for (const extra of EXTRA_FILES) {
+    try {
+      const record = fileRecord(extra.path, { topLevelFolder: extra.topLevelFolder });
+      if (record) {
+        files.push(record);
+        console.log(`  1 file   ${extra.path}`);
+      }
+    } catch (err) {
+      console.log(`  0 files  ${extra.path} (${err.message})`);
+    }
   }
 
   if (LIMIT < files.length) files = files.slice(0, LIMIT);
