@@ -18,6 +18,16 @@ import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+// The POST handler kicks off a background SAM doc-fetch via after(). On Vercel,
+// after() work is bounded by the function's maxDuration — at the old ~60s
+// default a cold notice (download + PDF extract) was killed mid-fetch, leaving
+// docs_status wedged at 'fetching' forever (infinite spinner in the drawer).
+// 300s matches the dedicated refetch endpoint so the background fetch can
+// actually finish and write a terminal status.
+export const maxDuration = 300;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
 function getSupabase() {
@@ -369,6 +379,17 @@ export async function POST(request: NextRequest) {
           });
         } catch (err) {
           console.warn('[Pipeline POST] background doc fetch threw:', err);
+          // fetchPursuitDocs sets docs_status='fetching' before the slow work;
+          // if it throws before its own terminal write, the row is wedged at
+          // 'fetching' (infinite spinner). Terminalize it to 'failed' here so
+          // the drawer shows Retry instead of spinning forever.
+          try {
+            await getSupabase()
+              .from('user_pipeline')
+              .update({ docs_status: 'failed', docs_fetched_at: new Date().toISOString() })
+              .eq('id', data.id)
+              .in('docs_status', ['fetching', 'pending']);
+          } catch { /* best-effort */ }
         }
       });
     }

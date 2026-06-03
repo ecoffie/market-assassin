@@ -18,6 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
 import { ensureWorkspaceMember } from '@/lib/app/workspace';
+import { isValidSamNoticeId } from '@/lib/sam/utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
   // pursuit context for the UI in one round-trip).
   const { data: pipelineRow, error: pipelineErr } = await supabase
     .from('user_pipeline')
-    .select('id, user_email, workspace_id, title, agency, notice_id, naics_code, set_aside, response_deadline, docs_status, docs_count, docs_fetched_at')
+    .select('id, user_email, workspace_id, title, agency, notice_id, naics_code, set_aside, response_deadline, docs_status, docs_count, docs_fetched_at, updated_at')
     .eq('id', pipelineId)
     .single();
 
@@ -90,6 +91,58 @@ export async function GET(request: NextRequest) {
       { success: false, error: 'not your pursuit' },
       { status: 403 }
     );
+  }
+
+  // Self-heal a STUCK fetch. The background fetcher (after()) sets
+  // docs_status='fetching' before the slow SAM download/extract. If that
+  // serverless invocation was killed mid-flight (Vercel timeout on a big
+  // RFP), the row is wedged at 'fetching' forever and the drawer spins
+  // endlessly. updated_at is bumped by a trigger whenever the row changes,
+  // so 'fetching' + a stale updated_at means the worker is dead. Flip it to
+  // 'failed' so the UI shows the Retry affordance instead of an infinite
+  // spinner. The user (or the poll) can then re-run the fetch.
+  const STALE_FETCH_MS = 3 * 60 * 1000; // 3 min — far longer than a real fetch
+  const stuckStatus = pipelineRow.docs_status; // 'fetching' | 'pending' | ...
+  if (stuckStatus === 'fetching' || stuckStatus === 'pending') {
+    const updatedAt = pipelineRow.updated_at ? new Date(pipelineRow.updated_at).getTime() : 0;
+    if (updatedAt && Date.now() - updatedAt > STALE_FETCH_MS) {
+      pipelineRow.docs_status = 'failed';
+      // Best-effort, conditional on the row still being stuck (so we don't
+      // clobber a fetch that just succeeded between read and write). Never
+      // block the read on this.
+      await supabase
+        .from('user_pipeline')
+        .update({ docs_status: 'failed' })
+        .eq('id', pipelineId)
+        .eq('docs_status', stuckStatus)
+        .then(() => {}, () => {});
+    }
+  }
+
+  // Backfill a missing response_deadline from the SAM cache. The save-time
+  // backfill (pipeline POST) only runs at creation and only for valid notice
+  // IDs; pursuits saved before that, or whose feed lacked a deadline, show
+  // "No deadline" even though SAM has the date. Opening the drawer now fixes
+  // it. Best-effort — never block the read.
+  if (!pipelineRow.response_deadline && isValidSamNoticeId(pipelineRow.notice_id)) {
+    try {
+      const { data: samRow } = await supabase
+        .from('sam_opportunities')
+        .select('response_deadline')
+        .eq('notice_id', pipelineRow.notice_id)
+        .maybeSingle();
+      if (samRow?.response_deadline) {
+        const d = new Date(samRow.response_deadline);
+        if (!Number.isNaN(d.getTime())) {
+          pipelineRow.response_deadline = d.toISOString();
+          await supabase
+            .from('user_pipeline')
+            .update({ response_deadline: pipelineRow.response_deadline })
+            .eq('id', pipelineId)
+            .then(() => {}, () => {});
+        }
+      }
+    } catch { /* non-fatal — drawer just shows "No deadline" as before */ }
   }
 
   // Pull the cached docs. Order by downloaded_at so the user sees the

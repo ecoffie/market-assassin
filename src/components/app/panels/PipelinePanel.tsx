@@ -1363,11 +1363,21 @@ function PipelineEditDrawer({
         { headers: authHeaders() },
       );
       const data = await res.json().catch(() => null);
-      if (data?.success) setDocList(data.documents || []);
+      if (data?.success) {
+        setDocList(data.documents || []);
+        // The GET endpoint self-heals a stuck 'fetching' row (killed
+        // background worker) to 'failed'. If the live status differs from the
+        // prop we're rendering the spinner off of, refresh the parent so the
+        // drawer stops spinning and shows the Retry affordance.
+        const liveStatus = data.pursuit?.docs_status;
+        if (liveStatus && liveStatus !== opportunity.docs_status) {
+          onDocsUpdated();
+        }
+      }
     } catch { /* non-fatal */ } finally {
       setDocsLoading(false);
     }
-  }, [email, opportunity.id, authHeaders]);
+  }, [email, opportunity.id, authHeaders, opportunity.docs_status, onDocsUpdated]);
   useEffect(() => { loadDocList(); }, [loadDocList]);
 
   // Poll while the SAM doc fetch is still running. The background fetcher
