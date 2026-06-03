@@ -40,7 +40,7 @@ Master feature list and development roadmap for all GovCon tools. This file cons
 | Teaming Recommendation Engine | HIGH | Pending | Suggest 3-5 primes per report based on subcontracting needs. Include draft outreach email. |
 | Location Optimization | MEDIUM | Pending | "Near Me" filter (user ZIP) + Proximity Score. Haversine formula for distance. |
 | Agency Gap Analysis | MEDIUM | Pending | Show agencies with unmet small biz goals (e.g., "DoD under 3% SDVOSB spend"). |
-| Custom Alerts | MEDIUM | **DONE** | Daily/weekly alerts FREE during beta (Mar 23, 2026). NAICS, keywords, PSC crosswalk. Timezone-aware delivery. Deduplication. Retry logic. |
+| Custom Alerts | MEDIUM | **DONE** | Daily alerts FREE for everyone (permanent, Jun 3 2026); weekly is the free fallback when daily tier-gate is enforced. NAICS, keywords, PSC crosswalk. Timezone-aware delivery. Deduplication. Retry logic. |
 | Proposal Prep Starter | LOW | Pending | One-click "Start Proposal" button. Export key data + AI outline prompt. Integrate with AI Proposal Toolkit. |
 | **Simplified Acquisition Entry Points** | HIGH | **DONE** | SAT (≤$250K) and micro (≤$10K) metrics computed during existing award aggregation — zero extra API calls. Premium "Entry Points" tab with ranked agencies, satFriendlinessScore (0-100), accessibility levels (high/moderate/low), strategic recommendations. "Easy Entry" badge on AgencySelectionTable. Blurred teaser in Opportunity Hunter drives MA upgrades. |
 
@@ -92,7 +92,7 @@ Tracking all instances of hardcoded/simulated data that should be replaced with 
 |---------|----------|--------|-------|
 | AI Win Probability Score | HIGH | Pending | Score each recompete 1-100% based on NAICS, certs, location, incumbent weakness. |
 | Teaming Suggestions | HIGH | Pending | 3-5 primes per recompete. Include draft outreach email. |
-| Custom Alerts | MEDIUM | **DONE** | Daily alerts system integrated with recompetes. FREE during beta. |
+| Custom Alerts | MEDIUM | **DONE** | Daily alerts system integrated with recompetes. FREE for everyone (permanent, Jun 3 2026). |
 | Historical Trends Dashboard | MEDIUM | Pending | Past winners, average value, win rates. Agency overview tab with spend graphs. |
 | Location Optimization | MEDIUM | Pending | "Near Me" filter + Proximity Score. Haversine formula. |
 | Proposal Prep Starter | LOW | Pending | One-click "Start Proposal" per recompete. Export key data + AI outline. |

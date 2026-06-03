@@ -542,9 +542,16 @@ Top 15 highest-scoring opportunities selected for each template.
 ### 8. Daily Alerts System
 **Location:** `/src/app/api/cron/daily-alerts/`, `/src/app/alerts/`
 **Purpose:** Automated opportunity alert emails based on user NAICS/keywords
-**Price:** $19/mo (FREE during beta through April 27, 2026)
+**Price:** $19/mo — but **DAILY alerts are FREE for everyone (permanent, decided 2026-06-03)**
 **Value Prop:** "Don't miss opportunities" (volume play)
-**Free for:** Any product purchaser (except OH free tier)
+**Free for:** Everyone with `alert_frequency='daily'` — no tier check by default
+
+**⚠️ Daily tier gate (READ BEFORE TOUCHING `daily-alerts/route.ts`):**
+The daily-alerts cron is nominally "PAID TIER ONLY," but the tier check is **OFF by default** — free users always get daily alerts. This is the permanent model.
+- Controlled by env: `DAILY_ALERT_BETA=off` enforces paid-only (free → weekly fallback); unset/anything-else = everyone-daily.
+- There used to be a hardcoded `BETA_END_DATE = '2026-05-28'`. When that date passed it silently flipped the tier check on and **collapsed the daily send from ~922 to ~1/day** (free users fell through to the weekly cron). The bare date gate was **removed** — never reintroduce a calendar-based gate here.
+- **Do NOT set `ENABLE_MINDY_INSIGHTS=true`** in Vercel — the #91 Mindy Insights RAG quote awaited in the per-user send loop crashed the batch May 28–31. It's gated off via `MINDY_INSIGHTS_ROLLOUT_PERCENT=0`.
+- Real alert numbers: `/api/admin/dashboard` + `/api/admin/briefing-status`. `/api/admin/alert-status` reads the dropped `user_alert_settings` table and is stale.
 **Features:**
 - **Notice Type Badges:** Color-coded RFP (green), RFQ (blue), Sources Sought (purple), Pre-Sol (orange), Combined (teal)
 - **Posted Date:** Shows when opportunity was released
@@ -1298,7 +1305,7 @@ GROQ_API_KEY=gsk_...
 
 ### Batch Enroll Bootcamp Attendees (April 12-19, 2026)
 
-**Status:** Waiting 2-3 weeks to verify alerts working with current 457 users
+**Status:** Daily alerts confirmed working at scale (~1,284 active users, June 3, 2026 — free-daily is now the permanent model). 8,803 bootcamp attendees already invited (last batch May 21). Remaining enroll batches can proceed.
 
 **Action:** Enroll 8,804 bootcamp attendees from `data/bootcamp-attendees-to-enroll.txt`
 
@@ -1353,4 +1360,4 @@ getmindy.ai purchases feed a **unified cross-site dashboard** hosted at `govcong
 
 ---
 
-*Last Updated: June 2, 2026 — Mindy purchase attribution → unified cross-site sales dashboard (PR #5, PURCHASE_SITE=mindy). Prev May 20: Mindy OAuth custom domain cutover (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d, onboarding/profile-persistence fixes*
+*Last Updated: June 3, 2026 — Daily alerts: removed the hardcoded BETA_END_DATE that silently collapsed the daily send ~922→1 on May 28; free-daily is now the permanent model (env-gated via DAILY_ALERT_BETA). Prev Jun 2: Mindy purchase attribution → unified cross-site sales dashboard (PR #5, PURCHASE_SITE=mindy). May 20: Mindy OAuth custom domain cutover (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
