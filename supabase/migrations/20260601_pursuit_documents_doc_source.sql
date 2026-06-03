@@ -1,5 +1,12 @@
 -- Explicit source guard for the notice_id dedup (2026-06-01).
 --
+-- ⚠️ APPLIED TO PRODUCTION MANUALLY on 2026-06-03 via the Supabase SQL editor.
+-- This DB has no exec_sql/exec_migration RPC, so this file did NOT auto-apply
+-- when first committed — the column was absent in prod and EVERY attachment
+-- insert silently failed with PGRST204 ("Could not find the 'doc_source'
+-- column"), leaving Proposal Assist with 0 documents. Run new column migrations
+-- by hand in the Supabase SQL editor; do not assume committing the .sql applies it.
+--
 -- fetchPursuitDocs reuses extracted docs from ANY pursuit with the same
 -- notice_id (scalability — fetch a public SAM attachment once, share it
 -- with every user who saves that notice). That reuse is SAFE only
