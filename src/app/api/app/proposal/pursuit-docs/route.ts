@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
+import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { ensureWorkspaceMember } from '@/lib/app/workspace';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 
@@ -206,7 +206,7 @@ export async function POST(request: NextRequest) {
 
   const { data: pipelineRow, error: pipelineErr } = await supabase
     .from('user_pipeline')
-    .select('id, user_email, workspace_id, notice_id, title')
+    .select('id, user_email, workspace_id, notice_id, title, source')
     .eq('id', pipelineId)
     .single();
 
@@ -224,10 +224,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await fetchPursuitDocs({
+    const result = await fetchPursuitDocsAuto({
       pipelineId: pipelineRow.id,
       userEmail: email,
       noticeId: pipelineRow.notice_id,
+      source: pipelineRow.source,
     });
     return NextResponse.json({
       success: true,

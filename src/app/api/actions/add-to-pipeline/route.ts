@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
-import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
+import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { sanitizeValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
@@ -145,10 +145,11 @@ export async function GET(request: NextRequest) {
     if (insertedRow?.notice_id && insertedRow?.id) {
       after(async () => {
         try {
-          await fetchPursuitDocs({
+          await fetchPursuitDocsAuto({
             pipelineId: insertedRow.id,
             userEmail: email,
             noticeId: insertedRow.notice_id,
+            source: insertedRow.source ?? source,
           });
         } catch (err) {
           console.warn('[add-to-pipeline GET] background doc fetch threw:', err);
@@ -274,10 +275,11 @@ export async function POST(request: NextRequest) {
     if (data?.notice_id && data?.id) {
       after(async () => {
         try {
-          await fetchPursuitDocs({
+          await fetchPursuitDocsAuto({
             pipelineId: data.id,
             userEmail: email.toLowerCase(),
             noticeId: data.notice_id,
+            source: data.source,
           });
         } catch (err) {
           console.warn('[add-to-pipeline POST] background doc fetch threw:', err);

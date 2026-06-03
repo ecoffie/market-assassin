@@ -21,7 +21,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
+import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { extractPdf } from '@/lib/sam/pdf-extract';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
 
@@ -52,6 +52,7 @@ interface PipelineRow {
   title: string | null;
   docs_status: string | null;
   docs_count: number | null;
+  source: string | null;
 }
 
 // A pursuit needs healing if it has a notice_id but either the id isn't a UUID
@@ -69,7 +70,7 @@ async function loadCandidates(opts: { email?: string | null; pipelineId?: string
   const sb = getSupabase();
   let query = sb
     .from('user_pipeline')
-    .select('id, user_email, notice_id, title, docs_status, docs_count')
+    .select('id, user_email, notice_id, title, docs_status, docs_count, source')
     .not('notice_id', 'is', null)
     .limit(2000);
   if (opts.pipelineId) query = query.eq('id', opts.pipelineId);
@@ -273,10 +274,11 @@ export async function POST(request: NextRequest) {
     for (const row of batch) {
       if (!row.notice_id || !row.user_email) continue;
       try {
-        const r = await fetchPursuitDocs({
+        const r = await fetchPursuitDocsAuto({
           pipelineId: row.id,
           userEmail: row.user_email,
           noticeId: row.notice_id,
+          source: row.source,
         });
         if (r.status === 'ready') { healed++; withDocs++; }
         else if (r.status === 'none') healed++; // confirmed: genuinely no attachments

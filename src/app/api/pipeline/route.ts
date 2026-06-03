@@ -13,7 +13,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
-import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
+import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
@@ -379,10 +379,11 @@ export async function POST(request: NextRequest) {
     if (data.notice_id && data.id) {
       after(async () => {
         try {
-          await fetchPursuitDocs({
+          await fetchPursuitDocsAuto({
             pipelineId: data.id,
             userEmail: body.user_email,
             noticeId: data.notice_id,
+            source: data.source,
           });
         } catch (err) {
           console.warn('[Pipeline POST] background doc fetch threw:', err);
