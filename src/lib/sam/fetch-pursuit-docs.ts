@@ -193,7 +193,7 @@ async function resolveFromCache(
 async function discoverFiles(
   noticeId: string,
   apiKey: string,
-): Promise<{ refs: SamFileRef[]; resolvedUuid: string | null }> {
+): Promise<{ refs: SamFileRef[]; resolvedUuid: string | null; foundNotice: boolean }> {
   const today = new Date();
   const fmt = (d: Date) =>
     `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
@@ -246,7 +246,9 @@ async function discoverFiles(
       }
     }
   }
-  if (!opp) return { refs: [], resolvedUuid: null };
+  // foundNotice=false means SAM had no matching opportunity at all (bad id, a
+  // grant, a contract-vehicle base number, or archived beyond the date window).
+  if (!opp) return { refs: [], resolvedUuid: null, foundNotice: false };
 
   // SAM returns the canonical UUID as opp.noticeId — capture it so the caller
   // can heal a sol#-keyed pursuit to the right id.
@@ -254,7 +256,9 @@ async function discoverFiles(
     typeof opp.noticeId === 'string' && /^[a-f0-9]{32}$/i.test(opp.noticeId) ? opp.noticeId : null;
 
   const links: string[] = Array.isArray(opp.resourceLinks) ? opp.resourceLinks : [];
-  return { refs: urlsToFileRefs(links), resolvedUuid };
+  // foundNotice=true even with zero links: the notice exists, it just has no
+  // attachments → caller marks 'none' (normal), not 'failed' (looks broken).
+  return { refs: urlsToFileRefs(links), resolvedUuid, foundNotice: true };
 }
 
 /**
@@ -420,9 +424,11 @@ export async function fetchPursuitDocs(opts: {
   // window. We only hit the live API when the notice isn't in our cache.
   let fileRefs: SamFileRef[] = [];
   let cacheHit = false;
+  let noticeFound = false; // did we positively locate the notice (cache or live)?
   const cached = await resolveFromCache(supabase, noticeId).catch(() => null);
   if (cached) {
     cacheHit = true;
+    noticeFound = true;
     // If the pursuit was saved with a solicitation number, heal its notice_id
     // to the canonical UUID so future fetches and the UI use the right key.
     if (cached.uuid && cached.uuid !== noticeId) {
@@ -439,6 +445,7 @@ export async function fetchPursuitDocs(opts: {
     // so we look them up live and heal notice_id to the discovered UUID.
     const discovered = await discoverFiles(noticeId, apiKey);
     fileRefs = discovered.refs;
+    noticeFound = discovered.foundNotice;
     if (discovered.resolvedUuid && discovered.resolvedUuid !== noticeId) {
       await supabase.from('user_pipeline')
         .update({ notice_id: discovered.resolvedUuid })
@@ -448,11 +455,11 @@ export async function fetchPursuitDocs(opts: {
   }
 
   if (fileRefs.length === 0) {
-    // Distinguish "we know this notice and it genuinely has no attachments"
-    // (cache hit, empty list → 'none', no Retry needed) from "we couldn't find
-    // the notice at all" (cache miss + live discover empty → 'failed', show
-    // Retry, since this is often a transient/ID issue worth re-running).
-    const emptyStatus: 'none' | 'failed' = cacheHit ? 'none' : 'failed';
+    // 'none' = we located the notice and it has no attachments (normal — most
+    // notice types, grants, contract-vehicle base numbers). 'failed' = we could
+    // not find the notice at all (bad id / transient), worth a Retry. Either
+    // cache hit or a live-found notice means 'none'.
+    const emptyStatus: 'none' | 'failed' = (cacheHit || noticeFound) ? 'none' : 'failed';
     await supabase.from('user_pipeline')
       .update({
         docs_status: emptyStatus,
