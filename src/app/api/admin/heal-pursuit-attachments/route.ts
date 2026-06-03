@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
 import { extractPdf } from '@/lib/sam/pdf-extract';
+import { getRotatedSAMKey } from '@/lib/sam/utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -191,6 +192,24 @@ export async function GET(request: NextRequest) {
       out.downloadError = e instanceof Error ? e.message : String(e);
     }
     return NextResponse.json({ success: true, trace: out });
+  }
+
+  // ?samkey=true → is a SAM API key available in this runtime? (fetchPursuitDocs
+  // early-returns 'failed' when getRotatedSAMKey() is empty.)
+  if (url.searchParams.get('samkey') === 'true') {
+    const k = getRotatedSAMKey();
+    return NextResponse.json({ success: true, hasSamKey: !!k, keyLength: k ? k.length : 0 });
+  }
+
+  // ?docs_for=<pipeline_id> → dump pursuit_documents rows for a pursuit, so we
+  // can tell "no row = download failed" from "row with extraction_error".
+  const docsFor = url.searchParams.get('docs_for');
+  if (docsFor) {
+    const sb = getSupabase();
+    const { data } = await sb.from('pursuit_documents')
+      .select('sam_file_id, filename, mime_type, size_bytes, char_count, extraction_error, doc_source, downloaded_at')
+      .eq('pipeline_id', docsFor);
+    return NextResponse.json({ success: true, pipeline_id: docsFor, rows: data || [] });
   }
 
   // ?stats=true → attachment coverage gauge (no candidate scan)
