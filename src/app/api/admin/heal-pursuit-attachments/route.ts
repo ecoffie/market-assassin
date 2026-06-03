@@ -221,8 +221,9 @@ export async function GET(request: NextRequest) {
     const key = getRotatedSAMKey();
     if (!key) return NextResponse.json({ success: false, error: 'No SAM key' }, { status: 500 });
     const id = samTrace.trim();
-    const isUuid = /^[a-f0-9]{32}$/i.test(id);
-    const params = isUuid ? ['noticeid'] : ['solnum', 'noticeid'];
+    // Also allow passing a separate solicitation number via &sol= to test the
+    // solnum path even when the primary id is a UUID.
+    const sol = url.searchParams.get('sol');
     const today = new Date();
     const fmt = (d: Date) => `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
     const yr = today.getFullYear();
@@ -230,15 +231,20 @@ export async function GET(request: NextRequest) {
       { from: `01/01/${yr}`, to: fmt(today) },
       { from: `01/01/${yr - 1}`, to: `12/31/${yr - 1}` },
     ];
+    // Try the UUID via noticeid, AND the solicitation number via solnum (both
+    // windows). solnum often returns notices that noticeid exact-match misses.
+    const probes: { param: string; value: string }[] = [{ param: 'noticeid', value: id }];
+    if (sol) probes.push({ param: 'solnum', value: sol });
     const attempts: Record<string, unknown>[] = [];
-    for (const param of params) {
+    for (const probe of probes) {
       for (const w of windows) {
         const u = new URL('https://api.sam.gov/opportunities/v2/search');
         u.searchParams.set('api_key', key);
-        u.searchParams.set(param, id);
+        u.searchParams.set(probe.param, probe.value);
         u.searchParams.set('postedFrom', w.from);
         u.searchParams.set('postedTo', w.to);
         u.searchParams.set('limit', '1');
+        const param = probe.param;
         try {
           const res = await fetch(u.toString(), { headers: { Accept: 'application/json' } });
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
