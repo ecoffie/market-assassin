@@ -213,6 +213,56 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, pipeline_id: docsFor, rows: data || [] });
   }
 
+  // ?sam_trace=<noticeId|solnum> → run the LIVE SAM opportunities search the
+  // fetcher uses and dump what it returns (resourceLinks count, title), so we
+  // can tell "SAM has no links" from "SAM didn't return the notice".
+  const samTrace = url.searchParams.get('sam_trace');
+  if (samTrace) {
+    const key = getRotatedSAMKey();
+    if (!key) return NextResponse.json({ success: false, error: 'No SAM key' }, { status: 500 });
+    const id = samTrace.trim();
+    const isUuid = /^[a-f0-9]{32}$/i.test(id);
+    const params = isUuid ? ['noticeid'] : ['solnum', 'noticeid'];
+    const today = new Date();
+    const fmt = (d: Date) => `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+    const yr = today.getFullYear();
+    const windows = [
+      { from: `01/01/${yr}`, to: fmt(today) },
+      { from: `01/01/${yr - 1}`, to: `12/31/${yr - 1}` },
+    ];
+    const attempts: Record<string, unknown>[] = [];
+    for (const param of params) {
+      for (const w of windows) {
+        const u = new URL('https://api.sam.gov/opportunities/v2/search');
+        u.searchParams.set('api_key', key);
+        u.searchParams.set(param, id);
+        u.searchParams.set('postedFrom', w.from);
+        u.searchParams.set('postedTo', w.to);
+        u.searchParams.set('limit', '1');
+        try {
+          const res = await fetch(u.toString(), { headers: { Accept: 'application/json' } });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const body: any = await res.json().catch(() => null);
+          const opp = body?.opportunitiesData?.[0];
+          attempts.push({
+            param, window: `${w.from}-${w.to}`, http: res.status,
+            totalRecords: body?.totalRecords,
+            error: body?.error || body?.errorMessage || null,
+            found: !!opp,
+            title: opp?.title,
+            resolvedNoticeId: opp?.noticeId,
+            resourceLinks: Array.isArray(opp?.resourceLinks) ? opp.resourceLinks.length : null,
+            resourceSample: Array.isArray(opp?.resourceLinks) ? opp.resourceLinks[0] : null,
+          });
+          if (opp) return NextResponse.json({ success: true, id, matched: { param, ...attempts[attempts.length - 1] }, attempts });
+        } catch (e) {
+          attempts.push({ param, window: `${w.from}-${w.to}`, threw: e instanceof Error ? e.message : String(e) });
+        }
+      }
+    }
+    return NextResponse.json({ success: true, id, matched: null, attempts });
+  }
+
   // ?stats=true → attachment coverage gauge (no candidate scan)
   if (url.searchParams.get('stats') === 'true') {
     try {
