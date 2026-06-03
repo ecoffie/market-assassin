@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchPursuitDocs } from '@/lib/sam/fetch-pursuit-docs';
+import { extractPdf } from '@/lib/sam/pdf-extract';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -158,6 +159,38 @@ export async function GET(request: NextRequest) {
         sample: Array.isArray(raw.resourceLinks) ? raw.resourceLinks[0] : null,
       },
     });
+  }
+
+  // ?trace_url=<sam download url> → run download + extract on ONE file and
+  // report exactly where it fails (download HTTP, magic bytes, extracted chars).
+  const traceUrl = url.searchParams.get('trace_url');
+  if (traceUrl) {
+    const out: Record<string, unknown> = { url: traceUrl };
+    try {
+      const res = await fetch(traceUrl, { headers: { Accept: '*/*' }, redirect: 'follow' });
+      out.downloadStatus = res.status;
+      out.contentType = res.headers.get('content-type');
+      out.finalUrl = res.url;
+      if (res.ok) {
+        const ab = await res.arrayBuffer();
+        const buf = Buffer.from(ab);
+        out.bytes = buf.length;
+        out.magic = buf.slice(0, 5).toString('ascii');
+        if (out.magic === '%PDF-') {
+          try {
+            const r = await extractPdf(buf);
+            out.extractedChars = (r.text || '').length;
+            out.pageCount = r.pageCount;
+            out.extractSample = (r.text || '').slice(0, 200);
+          } catch (e) {
+            out.extractError = e instanceof Error ? e.message : String(e);
+          }
+        }
+      }
+    } catch (e) {
+      out.downloadError = e instanceof Error ? e.message : String(e);
+    }
+    return NextResponse.json({ success: true, trace: out });
   }
 
   // ?stats=true → attachment coverage gauge (no candidate scan)
