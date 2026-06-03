@@ -167,10 +167,15 @@ async function resolveFromCache(
 
 /**
  * Step 1: ask SAM opportunities API for this notice's resourceLinks.
- * Returns a list of file refs with id + URL + best-effort filename
- * (HEAD'd via the proxy logic to get real Content-Disposition).
+ *
+ * Accepts either a 32-char UUID (exact-match via 'noticeid') OR a solicitation
+ * number (resolved via 'solnum'). Returns the file refs AND the resolved UUID
+ * (so the caller can heal user_pipeline.notice_id when we were handed a sol#).
  */
-async function discoverFiles(noticeId: string, apiKey: string): Promise<SamFileRef[]> {
+async function discoverFiles(
+  noticeId: string,
+  apiKey: string,
+): Promise<{ refs: SamFileRef[]; resolvedUuid: string | null }> {
   const today = new Date();
   const fmt = (d: Date) =>
     `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
@@ -185,62 +190,53 @@ async function discoverFiles(noticeId: string, apiKey: string): Promise<SamFileR
     { from: `01/01/${currentYear - 1}`, to: `12/31/${currentYear - 1}` },
   ];
 
+  // SAM exact-match param: 'noticeid' for a UUID, 'solnum' for a solicitation
+  // number. We were storing solicitation numbers as notice_id, so when the id
+  // isn't a UUID, search by solnum first (then fall back to noticeid in case a
+  // non-standard UUID format slipped through).
+  const isUuid = /^[a-f0-9]{32}$/i.test(noticeId.trim());
+  const params = isUuid ? ['noticeid'] : ['solnum', 'noticeid'];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let opp: any = null;
-  for (const window of dateWindows) {
-    const url = new URL(SAM_OPPS_URL);
-    url.searchParams.set('api_key', apiKey);
-    // SAM API quirk: the parameter MUST be lowercase 'noticeid' for
-    // exact-match lookup. Camel-case 'noticeId' returns broad fuzzy
-    // results (often the wrong opportunity entirely). Tested 2026-05-25.
-    url.searchParams.set('noticeid', noticeId);
-    url.searchParams.set('postedFrom', window.from);
-    url.searchParams.set('postedTo', window.to);
-    url.searchParams.set('limit', '1');
+  outer:
+  for (const param of params) {
+    for (const window of dateWindows) {
+      const url = new URL(SAM_OPPS_URL);
+      url.searchParams.set('api_key', apiKey);
+      // MUST be lowercase 'noticeid' for exact-match (camel-case returns fuzzy
+      // results). 'solnum' matches the solicitation number. Tested 2026-05-25.
+      url.searchParams.set(param, noticeId);
+      url.searchParams.set('postedFrom', window.from);
+      url.searchParams.set('postedTo', window.to);
+      url.searchParams.set('limit', '1');
 
-    let res: Response;
-    try {
-      res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-    } catch (err) {
-      console.warn('[fetch-pursuit-docs] discoverFiles fetch failed:', err);
-      continue;
-    }
-    if (!res.ok) continue;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const payload = await res.json().catch(() => null) as any;
-    const candidate = payload?.opportunitiesData?.[0];
-    if (candidate) {
-      opp = candidate;
-      break;
+      let res: Response;
+      try {
+        res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+      } catch (err) {
+        console.warn('[fetch-pursuit-docs] discoverFiles fetch failed:', err);
+        continue;
+      }
+      if (!res.ok) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload = await res.json().catch(() => null) as any;
+      const candidate = payload?.opportunitiesData?.[0];
+      if (candidate) {
+        opp = candidate;
+        break outer;
+      }
     }
   }
-  if (!opp) return [];
+  if (!opp) return { refs: [], resolvedUuid: null };
+
+  // SAM returns the canonical UUID as opp.noticeId — capture it so the caller
+  // can heal a sol#-keyed pursuit to the right id.
+  const resolvedUuid: string | null =
+    typeof opp.noticeId === 'string' && /^[a-f0-9]{32}$/i.test(opp.noticeId) ? opp.noticeId : null;
 
   const links: string[] = Array.isArray(opp.resourceLinks) ? opp.resourceLinks : [];
-  if (links.length === 0) return [];
-
-  // Don't HEAD-then-GET — SAM doesn't reliably surface Content-Disposition
-  // on HEAD (saw blank filenames in production despite the file having
-  // a real Content-Disposition on GET). Return fileId-only refs here.
-  // The actual GET in downloadFile() captures filename from the same
-  // request that's pulling bytes — one round trip, more reliable.
-  return links.map((rawUrl: string, i: number): SamFileRef => {
-    let fileId = '';
-    try {
-      const parts = new URL(rawUrl).pathname.split('/').filter(Boolean);
-      const last = parts[parts.length - 1];
-      if (last && last.toLowerCase() !== 'download') fileId = last;
-      else if (parts.length >= 2) fileId = parts[parts.length - 2];
-    } catch { /* leave empty */ }
-
-    return {
-      url: rawUrl,
-      fileId: fileId || `unknown-${i}`,
-      // Provisional fallback name; downloadFile() upgrades it from
-      // Content-Disposition header if SAM provides one.
-      filename: fileId ? `Document ${i + 1} (${fileId.slice(0, 8)})` : `Document ${i + 1}`,
-    };
-  });
+  return { refs: urlsToFileRefs(links), resolvedUuid };
 }
 
 /**
@@ -407,8 +403,18 @@ export async function fetchPursuitDocs(opts: {
     }
     fileRefs = urlsToFileRefs(cached.attachments);
   } else {
-    // Cold path: notice not in our cache → fall back to the live SAM discover.
-    fileRefs = await discoverFiles(noticeId, apiKey);
+    // Cold path: notice not in our cache → live SAM discover. This now also
+    // resolves a solicitation number → UUID (via solnum search), which is how
+    // the remaining sol#-keyed pursuits get fixed: their id isn't in our cache,
+    // so we look them up live and heal notice_id to the discovered UUID.
+    const discovered = await discoverFiles(noticeId, apiKey);
+    fileRefs = discovered.refs;
+    if (discovered.resolvedUuid && discovered.resolvedUuid !== noticeId) {
+      await supabase.from('user_pipeline')
+        .update({ notice_id: discovered.resolvedUuid })
+        .eq('id', pipelineId)
+        .then(() => {}, () => {});
+    }
   }
 
   if (fileRefs.length === 0) {
