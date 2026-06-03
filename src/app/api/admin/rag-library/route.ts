@@ -99,6 +99,8 @@ const ADMIN_INGEST_DOC_TYPES = new Set([
   'course_material',
   'teaching_handout',
   'webinar_resource',
+  'coaching_call',
+  'sales_call',
   'misc',
 ]);
 
