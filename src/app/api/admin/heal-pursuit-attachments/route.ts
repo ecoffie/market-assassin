@@ -335,6 +335,7 @@ export async function POST(request: NextRequest) {
           userEmail: row.user_email,
           noticeId: row.notice_id,
           source: row.source,
+          title: row.title,
         });
         if (r.status === 'ready') { healed++; withDocs++; }
         else if (r.status === 'none') healed++; // confirmed: genuinely no attachments

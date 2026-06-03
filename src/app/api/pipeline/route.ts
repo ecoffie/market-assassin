@@ -384,6 +384,7 @@ export async function POST(request: NextRequest) {
             userEmail: body.user_email,
             noticeId: data.notice_id,
             source: data.source,
+            title: data.title,
           });
         } catch (err) {
           console.warn('[Pipeline POST] background doc fetch threw:', err);

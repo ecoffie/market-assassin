@@ -229,6 +229,7 @@ export async function POST(request: NextRequest) {
       userEmail: email,
       noticeId: pipelineRow.notice_id,
       source: pipelineRow.source,
+      title: pipelineRow.title,
     });
     return NextResponse.json({
       success: true,

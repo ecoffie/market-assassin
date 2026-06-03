@@ -186,13 +186,25 @@ async function resolveFromCache(
 /**
  * Step 1: ask SAM opportunities API for this notice's resourceLinks.
  *
- * Accepts either a 32-char UUID (exact-match via 'noticeid') OR a solicitation
- * number (resolved via 'solnum'). Returns the file refs AND the resolved UUID
- * (so the caller can heal user_pipeline.notice_id when we were handed a sol#).
+ * SAM's search index is incomplete by 'noticeid': some live notices (seen with
+ * Combined Synopsis/Solicitation types, and pursuits saved with a stale/wrong
+ * UUID) return totalRecords:0 for an exact noticeid match even though they're
+ * on sam.gov with attachments. Verified 2026-06-03: "Laboratory Renovation"
+ * (sol 1232SA26Q0454) → noticeid match 0, but solnum match returned the notice
+ * with all 12 resourceLinks and the CORRECT noticeId.
+ *
+ * So we try multiple keys in order and stop at the first hit:
+ *   1. noticeid  (when the id is a UUID — exact, cheapest)
+ *   2. solnum    (the solicitation number — recovers notices noticeid misses)
+ *   3. title     (last resort — title is always available on the pursuit)
+ *
+ * Returns the file refs AND the resolved (correct) UUID so the caller can heal
+ * user_pipeline.notice_id when the stored id was a sol# or a wrong UUID.
  */
 async function discoverFiles(
   noticeId: string,
   apiKey: string,
+  opts?: { solicitationNumber?: string | null; title?: string | null },
 ): Promise<{ refs: SamFileRef[]; resolvedUuid: string | null; foundNotice: boolean }> {
   const today = new Date();
   const fmt = (d: Date) =>
@@ -208,23 +220,28 @@ async function discoverFiles(
     { from: `01/01/${currentYear - 1}`, to: `12/31/${currentYear - 1}` },
   ];
 
-  // SAM exact-match param: 'noticeid' for a UUID, 'solnum' for a solicitation
-  // number. We were storing solicitation numbers as notice_id, so when the id
-  // isn't a UUID, search by solnum first (then fall back to noticeid in case a
-  // non-standard UUID format slipped through).
+  // Build the ordered list of (param, value) probes. noticeid first if the id
+  // is a UUID; then solnum (the stored solicitation number, OR the id itself if
+  // it isn't a UUID); then title as a last resort.
   const isUuid = /^[a-f0-9]{32}$/i.test(noticeId.trim());
-  const params = isUuid ? ['noticeid'] : ['solnum', 'noticeid'];
+  const sol = (opts?.solicitationNumber || (!isUuid ? noticeId : '') || '').trim();
+  const title = (opts?.title || '').trim();
+  const probes: { param: string; value: string }[] = [];
+  if (isUuid) probes.push({ param: 'noticeid', value: noticeId });
+  if (sol) probes.push({ param: 'solnum', value: sol });
+  if (!isUuid) probes.push({ param: 'noticeid', value: noticeId }); // non-standard UUID fallthrough
+  if (title && title.length >= 6) probes.push({ param: 'title', value: title });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let opp: any = null;
   outer:
-  for (const param of params) {
+  for (const probe of probes) {
     for (const window of dateWindows) {
       const url = new URL(SAM_OPPS_URL);
       url.searchParams.set('api_key', apiKey);
       // MUST be lowercase 'noticeid' for exact-match (camel-case returns fuzzy
-      // results). 'solnum' matches the solicitation number. Tested 2026-05-25.
-      url.searchParams.set(param, noticeId);
+      // results). 'solnum' matches the solicitation number; 'title' is fuzzy.
+      url.searchParams.set(probe.param, probe.value);
       url.searchParams.set('postedFrom', window.from);
       url.searchParams.set('postedTo', window.to);
       url.searchParams.set('limit', '1');
@@ -321,6 +338,10 @@ export async function fetchPursuitDocs(opts: {
   pipelineId: string;
   userEmail: string;
   noticeId: string;
+  // Used to recover notices SAM's noticeid search misses: solnum is precise,
+  // title is the last-resort fallback. Both are best-effort.
+  solicitationNumber?: string | null;
+  title?: string | null;
 }): Promise<{
   attempted: number;
   succeeded: number;
@@ -443,7 +464,10 @@ export async function fetchPursuitDocs(opts: {
     // resolves a solicitation number → UUID (via solnum search), which is how
     // the remaining sol#-keyed pursuits get fixed: their id isn't in our cache,
     // so we look them up live and heal notice_id to the discovered UUID.
-    const discovered = await discoverFiles(noticeId, apiKey);
+    const discovered = await discoverFiles(noticeId, apiKey, {
+      solicitationNumber: opts.solicitationNumber,
+      title: opts.title,
+    });
     fileRefs = discovered.refs;
     noticeFound = discovered.foundNotice;
     if (discovered.resolvedUuid && discovered.resolvedUuid !== noticeId) {

@@ -150,6 +150,7 @@ export async function GET(request: NextRequest) {
             userEmail: email,
             noticeId: insertedRow.notice_id,
             source: insertedRow.source ?? source,
+            title: insertedRow.title,
           });
         } catch (err) {
           console.warn('[add-to-pipeline GET] background doc fetch threw:', err);
@@ -280,6 +281,7 @@ export async function POST(request: NextRequest) {
             userEmail: email.toLowerCase(),
             noticeId: data.notice_id,
             source: data.source,
+            title: data.title,
           });
         } catch (err) {
           console.warn('[add-to-pipeline POST] background doc fetch threw:', err);

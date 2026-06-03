@@ -330,6 +330,8 @@ export async function fetchPursuitDocsAuto(opts: {
   userEmail: string;
   noticeId: string;
   source?: string | null;
+  solicitationNumber?: string | null;
+  title?: string | null;
 }): Promise<{
   attempted: number;
   succeeded: number;
@@ -342,5 +344,11 @@ export async function fetchPursuitDocsAuto(opts: {
   if (isGrantPursuit(opts.noticeId, opts.source)) {
     return fetchGrantDocs({ pipelineId: opts.pipelineId, userEmail: opts.userEmail, noticeId: opts.noticeId });
   }
-  return fetchPursuitDocs({ pipelineId: opts.pipelineId, userEmail: opts.userEmail, noticeId: opts.noticeId });
+  return fetchPursuitDocs({
+    pipelineId: opts.pipelineId,
+    userEmail: opts.userEmail,
+    noticeId: opts.noticeId,
+    solicitationNumber: opts.solicitationNumber,
+    title: opts.title,
+  });
 }
