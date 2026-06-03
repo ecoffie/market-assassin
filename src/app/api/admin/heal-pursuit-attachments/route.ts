@@ -234,8 +234,10 @@ export async function GET(request: NextRequest) {
     ];
     // Try the UUID via noticeid, AND the solicitation number via solnum (both
     // windows). solnum often returns notices that noticeid exact-match misses.
+    const titleProbe = url.searchParams.get('title');
     const probes: { param: string; value: string }[] = [{ param: 'noticeid', value: id }];
     if (sol) probes.push({ param: 'solnum', value: sol });
+    if (titleProbe) probes.push({ param: 'title', value: titleProbe });
     const attempts: Record<string, unknown>[] = [];
     for (const probe of probes) {
       for (const w of windows) {
@@ -258,6 +260,8 @@ export async function GET(request: NextRequest) {
             found: !!opp,
             title: opp?.title,
             resolvedNoticeId: opp?.noticeId,
+            candSolicitation: opp?.solicitationNumber,
+            candAgency: opp?.fullParentPathName || opp?.department,
             resourceLinks: Array.isArray(opp?.resourceLinks) ? opp.resourceLinks.length : null,
             resourceSample: Array.isArray(opp?.resourceLinks) ? opp.resourceLinks[0] : null,
           });
