@@ -503,12 +503,20 @@ async function runDailyAlertJob(options?: {
           if (user.alert_frequency === 'tth' && !isTTh) continue;
         }
 
-        // BETA MODE: Skip tier check for users with alert_frequency='daily' (Apr 19, 2026)
         // Note: This route ONLY processes users where alert_frequency='daily' (line 327 query filter)
-        // Users with alert_frequency='weekly' go through weekly-alerts route instead
-        // After beta ends, re-enable tier check to limit free users to weekly-only
-        const BETA_END_DATE = new Date('2026-05-28');
-        const isBetaPeriod = new Date() < BETA_END_DATE;
+        // Users with alert_frequency='weekly' go through weekly-alerts route instead.
+        //
+        // PERMANENT MODEL (decided 2026-06-03): free users always get DAILY alerts.
+        // The daily tier check is OFF by default. A hardcoded BETA_END_DATE of
+        // 2026-05-28 previously flipped this on a calendar day with no deploy and
+        // collapsed the daily send from ~922 to ~1 (free users fell through to the
+        // weekly fallback) — never reintroduce a bare date gate here.
+        //
+        // To enforce paid-only daily in the future, flip the env WITHOUT a redeploy:
+        //   DAILY_ALERT_BETA=off → enforce paid-tier check (free users → weekly)
+        //   DAILY_ALERT_BETA=on (or unset) → everyone with daily frequency gets daily
+        const betaFlag = (process.env.DAILY_ALERT_BETA || '').trim().toLowerCase();
+        const isBetaPeriod = betaFlag !== 'off';
 
         if (!isBetaPeriod) {
           // Post-beta: Check tier - free tier users should use weekly alerts

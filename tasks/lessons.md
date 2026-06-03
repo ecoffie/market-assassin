@@ -1334,3 +1334,17 @@ if (keywords.length > 0) {
 4. [ ] Visual hierarchy makes free path obvious (different color, first in order)
 
 **File:** `src/app/briefings/page.tsx` (gate state ~line 1256, denied state ~line 1292)
+
+---
+
+## Lesson (2026-06-03): "Alerts broke" = a hardcoded beta-end date, not a code crash
+
+**Symptom:** Daily alert send collapsed from ~922/day to ~1-2/day starting 2026-05-28. Dashboard showed `dailyAlerts: 2`, throughput monitor `daily baselineDays=[1,1,1,1,1,922,919]`.
+
+**Root cause:** `daily-alerts/route.ts` had `const BETA_END_DATE = new Date('2026-05-28')`. During beta, ALL daily-frequency users (~922) got free daily alerts. The moment `new Date() >= BETA_END_DATE`, the post-beta tier check kicked in and `continue`'d every free-tier user out of daily (→ weekly fallback). Only 24 users are paid-daily-eligible, so daily dropped to ~1. The ~900 audience didn't vanish — it moved to the weekly cron (weekly sent 485 same day).
+
+**Rule:** Always X, not Y because Z → **Always gate beta/rollout windows behind an env var with the date as a default, never a bare hardcoded `new Date('...')`, because Z: a hardcoded date silently flips behavior on a calendar day with no deploy, no log, and no alert — and it looks identical to a crash.** Now `DAILY_ALERT_BETA=on|off` + `DAILY_ALERT_BETA_END=<ISO>`.
+
+**Diagnostic lesson:** "Keeps breaking" with NO errors in tool-health, NO guardrail trips, and the parallel pipeline (briefings) healthy → suspect an **eligibility/tier/flag change**, not an exception. The tell here was zero new `alert_log` rows (not a flood of `skipped` rows) + a date-aligned cliff. Confirm audience math via `/api/admin/dashboard` (`postBetaPaidDailyEligible` vs `dailyFrequencyConfigured`) before touching send/cache code.
+
+**Also note:** `/api/admin/alert-status` reads the DROPPED `user_alert_settings` table (returns `total_users: 0`) — it's stale; use `/api/admin/dashboard` or `/api/admin/briefing-status` for real alert numbers.
