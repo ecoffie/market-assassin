@@ -1640,9 +1640,12 @@ function PipelineEditDrawer({
                 </button>
               ) : null;
 
-              // Manual-upload affordance: offer it whenever auto-fetch came up
-              // empty (failed/none), so the user can attach the RFP/notice docs
-              // themselves for notices SAM/grants.gov can't serve.
+              // Manual upload — available on EVERY pursuit, not just empty ones.
+              // Auto-fetch pulls the agency's posted docs; upload is how the user
+              // adds anything else: their capability statement / past proposal to
+              // draft from, an emailed RFP amendment, portal-gated docs, or the
+              // file for an archived notice SAM/grants.gov no longer serves.
+              const isFetching = status === 'fetching' || status === 'pending';
               const UploadLink = (
                 <button
                   type="button"
@@ -1650,14 +1653,14 @@ function PipelineEditDrawer({
                   disabled={uploading}
                   className="ml-2 underline text-blue-400 hover:text-blue-300 disabled:opacity-50"
                 >
-                  {uploading ? 'uploading…' : 'Upload a document'}
+                  {uploading ? 'uploading…' : (count > 0 ? 'Add your own document' : 'Upload a document')}
                 </button>
               );
 
               let body: React.ReactNode;
               if (count > 0) {
                 body = <span className="text-emerald-300">📎 {count} document{count === 1 ? '' : 's'} attached — ready to draft</span>;
-              } else if (status === 'fetching' || status === 'pending') {
+              } else if (isFetching) {
                 body = (
                   <span className="text-amber-300 inline-flex items-center gap-1">
                     <span className="inline-block w-3 h-3 rounded-full border-2 border-amber-300/40 border-t-amber-300 animate-spin" />
@@ -1667,19 +1670,22 @@ function PipelineEditDrawer({
               } else if (status === 'failed') {
                 body = (
                   <span className="text-red-300">
-                    ⚠ Couldn&apos;t pull attachments automatically.{RetryLink}{UploadLink}
+                    ⚠ Couldn&apos;t pull attachments automatically.{RetryLink}
                   </span>
                 );
               } else {
                 body = (
                   <span className="text-slate-400">
-                    📭 No attachments on this notice — that&apos;s normal for many notice types. The wizard works from the metadata.{RetryLink}{UploadLink}
+                    📭 No attachments on this notice — that&apos;s normal for many notice types. The wizard works from the metadata.{RetryLink}
                   </span>
                 );
               }
               return (
                 <div className="text-xs">
                   {body}
+                  {/* Upload is offered in every state except while a fetch is in
+                      flight (avoid racing the background writer). */}
+                  {!isFetching && UploadLink}
                   <input
                     ref={uploadInputRef}
                     type="file"
