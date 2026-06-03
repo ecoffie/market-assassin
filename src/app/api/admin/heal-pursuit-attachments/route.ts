@@ -121,6 +121,45 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // ?debug_notice=<uuid|solicitation> → dump exactly what the SAM cache holds
+  // for one notice, so we can tell "not synced" from "synced but no attachments".
+  const debugNotice = url.searchParams.get('debug_notice');
+  if (debugNotice) {
+    const sb = getSupabase();
+    const id = debugNotice.trim();
+    const byId = await sb.from('sam_opportunities')
+      .select('notice_id, solicitation_number, title, attachments, raw_data')
+      .eq('notice_id', id).maybeSingle();
+    const bySol = byId.data ? null : await sb.from('sam_opportunities')
+      .select('notice_id, solicitation_number, title, attachments, raw_data')
+      .ilike('solicitation_number', id).limit(1).maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row: any = byId.data || bySol?.data || null;
+    if (!row) {
+      return NextResponse.json({ success: true, found: false, id, note: 'Notice not in sam_opportunities cache' });
+    }
+    const raw = row.raw_data || {};
+    return NextResponse.json({
+      success: true,
+      found: true,
+      matchedBy: byId.data ? 'notice_id' : 'solicitation_number',
+      notice_id: row.notice_id,
+      solicitation_number: row.solicitation_number,
+      title: row.title,
+      attachmentsColumn: {
+        isArray: Array.isArray(row.attachments),
+        length: Array.isArray(row.attachments) ? row.attachments.length : null,
+        sample: Array.isArray(row.attachments) ? row.attachments[0] : row.attachments,
+      },
+      rawResourceLinks: {
+        present: 'resourceLinks' in raw,
+        isArray: Array.isArray(raw.resourceLinks),
+        length: Array.isArray(raw.resourceLinks) ? raw.resourceLinks.length : null,
+        sample: Array.isArray(raw.resourceLinks) ? raw.resourceLinks[0] : null,
+      },
+    });
+  }
+
   // ?stats=true → attachment coverage gauge (no candidate scan)
   if (url.searchParams.get('stats') === 'true') {
     try {
