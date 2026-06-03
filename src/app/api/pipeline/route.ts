@@ -385,6 +385,7 @@ export async function POST(request: NextRequest) {
             noticeId: data.notice_id,
             source: data.source,
             title: data.title,
+            agency: data.agency,
           });
         } catch (err) {
           console.warn('[Pipeline POST] background doc fetch threw:', err);

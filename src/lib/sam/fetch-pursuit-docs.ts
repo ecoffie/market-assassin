@@ -204,7 +204,7 @@ async function resolveFromCache(
 async function discoverFiles(
   noticeId: string,
   apiKey: string,
-  opts?: { solicitationNumber?: string | null; title?: string | null },
+  opts?: { solicitationNumber?: string | null; title?: string | null; agency?: string | null },
 ): Promise<{ refs: SamFileRef[]; resolvedUuid: string | null; foundNotice: boolean }> {
   const today = new Date();
   const fmt = (d: Date) =>
@@ -257,10 +257,26 @@ async function discoverFiles(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const payload = await res.json().catch(() => null) as any;
       const candidate = payload?.opportunitiesData?.[0];
-      if (candidate) {
-        opp = candidate;
-        break outer;
+      if (!candidate) continue;
+
+      // GUARD the fuzzy 'title' probe: a generic pursuit title (e.g.
+      // "236220 - COMMERCIAL... CONSTRUCTION") could match a stranger's notice
+      // and download the wrong docs. Only accept a title hit if it corroborates
+      // — same solicitation number, OR the agency name overlaps. noticeid/solnum
+      // are exact, so they're accepted unconditionally.
+      if (probe.param === 'title') {
+        const candSol = String(candidate.solicitationNumber || '').trim().toLowerCase();
+        const wantSol = (opts?.solicitationNumber || '').trim().toLowerCase();
+        const candAgency = String(candidate.fullParentPathName || candidate.department || '').toLowerCase();
+        const wantAgency = (opts?.agency || '').toLowerCase();
+        const solOk = !!candSol && !!wantSol && candSol === wantSol;
+        const agencyOk = !!candAgency && !!wantAgency &&
+          (candAgency.includes(wantAgency.split(',')[0].trim()) || wantAgency.includes(candAgency.split(',')[0].trim()));
+        if (!solOk && !agencyOk) continue; // unverified title match — skip
       }
+
+      opp = candidate;
+      break outer;
     }
   }
   // foundNotice=false means SAM had no matching opportunity at all (bad id, a
@@ -339,9 +355,10 @@ export async function fetchPursuitDocs(opts: {
   userEmail: string;
   noticeId: string;
   // Used to recover notices SAM's noticeid search misses: solnum is precise,
-  // title is the last-resort fallback. Both are best-effort.
+  // title is the last-resort fallback (guarded by sol#/agency). Best-effort.
   solicitationNumber?: string | null;
   title?: string | null;
+  agency?: string | null;
 }): Promise<{
   attempted: number;
   succeeded: number;
@@ -467,6 +484,7 @@ export async function fetchPursuitDocs(opts: {
     const discovered = await discoverFiles(noticeId, apiKey, {
       solicitationNumber: opts.solicitationNumber,
       title: opts.title,
+      agency: opts.agency,
     });
     fileRefs = discovered.refs;
     noticeFound = discovered.foundNotice;

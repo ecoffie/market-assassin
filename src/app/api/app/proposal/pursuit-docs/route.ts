@@ -206,7 +206,7 @@ export async function POST(request: NextRequest) {
 
   const { data: pipelineRow, error: pipelineErr } = await supabase
     .from('user_pipeline')
-    .select('id, user_email, workspace_id, notice_id, title, source')
+    .select('id, user_email, workspace_id, notice_id, title, source, agency')
     .eq('id', pipelineId)
     .single();
 
@@ -230,6 +230,7 @@ export async function POST(request: NextRequest) {
       noticeId: pipelineRow.notice_id,
       source: pipelineRow.source,
       title: pipelineRow.title,
+      agency: pipelineRow.agency,
     });
     return NextResponse.json({
       success: true,

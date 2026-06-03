@@ -332,6 +332,7 @@ export async function fetchPursuitDocsAuto(opts: {
   source?: string | null;
   solicitationNumber?: string | null;
   title?: string | null;
+  agency?: string | null;
 }): Promise<{
   attempted: number;
   succeeded: number;
@@ -350,5 +351,6 @@ export async function fetchPursuitDocsAuto(opts: {
     noticeId: opts.noticeId,
     solicitationNumber: opts.solicitationNumber,
     title: opts.title,
+    agency: opts.agency,
   });
 }

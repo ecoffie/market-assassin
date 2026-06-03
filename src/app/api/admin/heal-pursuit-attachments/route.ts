@@ -53,6 +53,7 @@ interface PipelineRow {
   docs_status: string | null;
   docs_count: number | null;
   source: string | null;
+  agency: string | null;
 }
 
 // A pursuit needs healing if it has a notice_id but either the id isn't a UUID
@@ -70,7 +71,7 @@ async function loadCandidates(opts: { email?: string | null; pipelineId?: string
   const sb = getSupabase();
   let query = sb
     .from('user_pipeline')
-    .select('id, user_email, notice_id, title, docs_status, docs_count, source')
+    .select('id, user_email, notice_id, title, docs_status, docs_count, source, agency')
     .not('notice_id', 'is', null)
     .limit(2000);
   if (opts.pipelineId) query = query.eq('id', opts.pipelineId);
@@ -336,6 +337,7 @@ export async function POST(request: NextRequest) {
           noticeId: row.notice_id,
           source: row.source,
           title: row.title,
+          agency: row.agency,
         });
         if (r.status === 'ready') { healed++; withDocs++; }
         else if (r.status === 'none') healed++; // confirmed: genuinely no attachments
