@@ -263,7 +263,10 @@ export async function POST(request: NextRequest) {
     });
     const batch = candidates.slice(0, limit);
 
-    const results: Array<{ id: string; title: string | null; before: string | null; status: string; docs: number }> = [];
+    const results: Array<{
+      id: string; title: string | null; before: string | null; status: string; docs: number;
+      attempted?: number; downloadNulls?: number; lastInsertError?: string | null;
+    }> = [];
     let healed = 0;
     let withDocs = 0;
 
@@ -277,7 +280,11 @@ export async function POST(request: NextRequest) {
         });
         if (r.status === 'ready') { healed++; withDocs++; }
         else if (r.status === 'none') healed++; // confirmed: genuinely no attachments
-        results.push({ id: row.id, title: row.title, before: row.docs_status, status: r.status, docs: r.succeeded });
+        results.push({
+          id: row.id, title: row.title, before: row.docs_status, status: r.status, docs: r.succeeded,
+          // diagnostics (cold/download path)
+          attempted: r.attempted, downloadNulls: r.downloadNulls, lastInsertError: r.lastInsertError,
+        } as typeof results[number]);
       } catch (err) {
         results.push({ id: row.id, title: row.title, before: row.docs_status, status: 'error', docs: 0 });
         console.warn(`[heal-pursuit-attachments] ${row.id} threw:`, err);

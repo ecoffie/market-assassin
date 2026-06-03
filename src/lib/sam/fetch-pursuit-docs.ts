@@ -308,6 +308,9 @@ export async function fetchPursuitDocs(opts: {
   succeeded: number;
   failed: number;
   status: 'ready' | 'none' | 'failed';
+  // Optional diagnostics — populated on the cold/download path only.
+  downloadNulls?: number;
+  lastInsertError?: string | null;
 }> {
   const { pipelineId, userEmail, noticeId } = opts;
   const supabase = getSupabase();
@@ -426,11 +429,13 @@ export async function fetchPursuitDocs(opts: {
 
   let succeeded = 0;
   let failed = 0;
+  let downloadNulls = 0;
+  let lastInsertError: string | null = null;
 
   for (const ref of fileRefs) {
     try {
       const dl = await downloadFile(ref, apiKey);
-      if (!dl) { failed++; continue; }
+      if (!dl) { failed++; downloadNulls++; continue; }
 
       // Upgrade the provisional 'Document N (xxx)' filename with the
       // real Content-Disposition filename if SAM sent one. Falls back
@@ -520,6 +525,7 @@ export async function fetchPursuitDocs(opts: {
 
       if (insertErr) {
         console.warn(`[fetch-pursuit-docs] upsert ${ref.fileId} failed:`, insertErr);
+        lastInsertError = insertErr instanceof Error ? insertErr.message : JSON.stringify(insertErr);
         failed++;
       } else {
         succeeded++;
@@ -544,5 +550,7 @@ export async function fetchPursuitDocs(opts: {
     succeeded,
     failed,
     status: finalStatus,
+    downloadNulls,
+    lastInsertError,
   };
 }
