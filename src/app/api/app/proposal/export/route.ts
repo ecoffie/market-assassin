@@ -16,6 +16,7 @@ import {
 } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
+import type { LoiFields } from '@/lib/proposal/loi-fields';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -145,6 +146,10 @@ interface ExportBody {
   sectionOrder?: string[];
   packageType?: 'proposal' | 'sources_sought_loi' | 'rfq_response';
   rfpFileName?: string;
+  // Structured fields extracted from the SAM.gov notice text (Sources Sought /
+  // RFI). When present, the LOI template pre-fills agency/address/solicitation/
+  // submission-requirement blanks instead of leaving them empty.
+  loiFields?: LoiFields;
 }
 
 const HEADING_BORDER = {
@@ -290,6 +295,7 @@ function fill(label: string, value?: string | null) {
 function buildResponseTemplateSections(
   kind: 'loi' | 'rfq',
   profile: CompanyProfile = {},
+  loi: LoiFields = {},
 ): Array<{ label: string; draft: string }> {
   const isRfq = kind === 'rfq';
   const company = profile.legalName || '[Company Name]';
@@ -299,6 +305,27 @@ function buildResponseTemplateSections(
     : '[small-business designation(s)]';
   const services = profile.oneLiner || '[core services relevant to this notice]';
   const cityStateLabel = cityState || '[City / State]';
+
+  // Agency address assembled from extracted fields (any subset).
+  const addr = loi.agencyAddress || {};
+  const cityStateZip = [
+    [addr.city, addr.state].filter(Boolean).join(', '),
+    addr.zip,
+  ].filter(Boolean).join(' ');
+  // The requirement title prefers an explicit project title, else falls back to
+  // whatever the notice called the requirement.
+  const capRequested = loi.capabilityStatementRequested === 'yes' ? 'Yes'
+    : loi.capabilityStatementRequested === 'no' ? 'No'
+    : loi.capabilityStatementRequested === 'not_stated' ? 'Not stated'
+    : undefined;
+  // Join list fields into a single readable line; leave a blank if absent.
+  const requestedContent = loi.requestedContent?.length
+    ? loi.requestedContent.map((s) => `  • ${s}`).join('\n')
+    : undefined;
+  const requiredAttachments = loi.requiredAttachments?.length
+    ? loi.requiredAttachments.join(', ')
+    : undefined;
+
   if (!isRfq) {
     return [
       {
@@ -306,13 +333,13 @@ function buildResponseTemplateSections(
         draft: [
           fill('Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })),
           '',
-          blank('Attention'),
-          blank('Agency / Office'),
-          blank('Street Address'),
-          blank('City, State ZIP'),
+          fill('Attention', loi.agencyAttention || loi.contactName),
+          fill('Agency / Office', loi.agencyName),
+          fill('Street Address', addr.street),
+          fill('City, State ZIP', cityStateZip),
           '',
-          blank('Reference / Solicitation Number'),
-          blank('Project / Requirement Title'),
+          fill('Reference / Solicitation Number', loi.solicitationNumber),
+          fill('Project / Requirement Title', loi.projectTitle),
           '',
           'To whom it may concern,',
           '',
@@ -328,12 +355,16 @@ function buildResponseTemplateSections(
         draft: [
           `Submittal Intention: ${company} has reviewed this opportunity and is interested in providing services for the above-referenced project. Our team has relevant experience in ${services}.`,
           '',
-          blank('Submission deadline'),
-          blank('Submission email / portal'),
-          blank('Page limit / format instructions'),
-          blank('Requested response content / questions from the notice'),
-          blank('Required attachments'),
-          blank('Capability statement requested? Yes / No / Not stated'),
+          fill('Submission deadline', loi.submissionDeadline),
+          fill('Submission email / portal', loi.submissionMethod),
+          fill('Page limit / format instructions', loi.pageLimit),
+          // Requested response content can be multi-line; render the label then
+          // the bullets beneath it, else a single blank.
+          requestedContent
+            ? `Requested response content / questions from the notice:\n${requestedContent}`
+            : blank('Requested response content / questions from the notice'),
+          fill('Required attachments', requiredAttachments),
+          fill('Capability statement requested? Yes / No / Not stated', capRequested),
           blank('Capability statement attached? Yes / No / N/A'),
         ].join('\n'),
       },
@@ -347,7 +378,9 @@ function buildResponseTemplateSections(
           blank('Aggregate bonding capacity if requested'),
           fill('UEI number', profile.uei),
           fill('CAGE code', profile.cageCode),
-          fill('Primary NAICS code', profile.primaryNaics),
+          // Prefer the NAICS the notice itself cites (authoritative for THIS
+          // opportunity), then the company's primary NAICS.
+          fill('Primary NAICS code', loi.naicsCode || profile.primaryNaics),
           fill('Small business designation / status claimed', profile.certifications?.join(', ')),
         ].join('\n'),
       },
@@ -675,7 +708,7 @@ export async function POST(request: NextRequest) {
 
   const orderedSections = sectionOrder.filter(id => drafts[id]?.draft);
   const templateSections = orderedSections.length === 0 && isSimpleResponsePackage
-    ? buildResponseTemplateSections(isRfqPackage ? 'rfq' : 'loi', companyProfile)
+    ? buildResponseTemplateSections(isRfqPackage ? 'rfq' : 'loi', companyProfile, body.loiFields || {})
     : [];
 
   const children: (Paragraph | Table)[] = [];

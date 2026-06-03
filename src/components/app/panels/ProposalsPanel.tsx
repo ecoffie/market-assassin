@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { classifyNoticeType, noticeTypeLabel, noticeTypeToDetected } from '@/lib/utils/notice-type';
+import type { LoiFields } from '@/lib/proposal/loi-fields';
+import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -411,6 +413,64 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     }
   }, [email, uploadedRfp, getAuthHeaders]);
 
+  // ── Sources Sought / RFI: extract LOI fields straight from the notice text ──
+  // The notice text IS the input — no document upload needed for 90% of SS.
+  // We pull agency/address/solicitation #/deadline/submission method/required
+  // content from the pasted (or cached) SAM text and pre-fill the LOI .docx.
+  const [loiFields, setLoiFields] = useState<LoiFields | null>(null);
+  const [loiFieldsLoading, setLoiFieldsLoading] = useState(false);
+  const [loiFieldsError, setLoiFieldsError] = useState<string | null>(null);
+
+  // Paste-the-notice-text path (the hero for Sources Sought). No upload — the
+  // user copies the SAM.gov notice text and drops it here; we treat it as the
+  // source doc so it flows through the same compliance/draft/export pipeline.
+  const [pastedNotice, setPastedNotice] = useState('');
+  const usePastedNotice = useCallback(() => {
+    const text = pastedNotice.trim();
+    if (text.length < 80) return;
+    const pseudoDoc: UploadedRfp = {
+      fileName: 'Pasted SAM.gov notice',
+      fileSize: text.length,
+      charCount: text.length,
+      text,
+    };
+    setSourceDocuments([pseudoDoc]);
+    setUploadedRfp(pseudoDoc);
+    const detected = detectNoticeTypeFromText(text);
+    setDetectedNoticeType(detected);
+    setPastedNotice('');
+    // The auto-extract effect picks it up from uploadedRfp.text.
+  }, [pastedNotice]);
+
+  const extractLoiFields = useCallback(async (text: string, fileName?: string) => {
+    if (!email || !text.trim()) return;
+    setLoiFieldsLoading(true);
+    setLoiFieldsError(null);
+    try {
+      const res = await fetch(`/api/app/proposal/extract-loi-fields?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          text,
+          fileName: fileName || activePursuit?.title || 'SAM.gov notice',
+          agency: activePursuit?.agency,
+          title: activePursuit?.title,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setLoiFieldsError(data.error || 'Could not read the notice. The blank template still exports.');
+        return;
+      }
+      setLoiFields(loiFieldsHaveContent(data.fields) ? data.fields : null);
+    } catch (err) {
+      console.error('LOI field extraction failed:', err);
+      setLoiFieldsError('Request failed — the blank template still exports.');
+    } finally {
+      setLoiFieldsLoading(false);
+    }
+  }, [email, getAuthHeaders, activePursuit?.title, activePursuit?.agency]);
+
   const updateRequirement = useCallback((id: string, patch: Partial<ComplianceRequirementRow>) => {
     setCompliance(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
   }, []);
@@ -485,6 +545,21 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoiResponseMode]);
+
+  // Auto-extract LOI fields when we already HAVE the notice text (cached SAM
+  // doc / upload) and we're in Sources Sought / RFI mode. Keyed on the text so
+  // it runs once per distinct notice, not on every render. The paste-box path
+  // calls extractLoiFields() directly instead.
+  const lastExtractedTextRef = useRef<string>('');
+  useEffect(() => {
+    const text = uploadedRfp?.text?.trim();
+    if (!isLoiResponseMode || !text || text.length < 80) return;
+    if (lastExtractedTextRef.current === text) return;
+    lastExtractedTextRef.current = text;
+    setLoiFields(null);
+    extractLoiFields(text, uploadedRfp?.fileName);
+  }, [isLoiResponseMode, uploadedRfp?.text, uploadedRfp?.fileName, extractLoiFields]);
+
   const [draftLoading, setDraftLoading] = useState<SectionType | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [draftAllLoading, setDraftAllLoading] = useState(false);
@@ -660,6 +735,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           sectionOrder: currentSectionTabs.map(tab => tab.id),
           checklist: isSimpleResponseMode ? [] : checklist.map(c => ({ label: c.label, checked: c.checked })),
           packageType: isLoiResponseMode ? 'sources_sought_loi' : isRfqMode ? 'rfq_response' : 'proposal',
+          // Pre-fill the LOI template from the notice text when we extracted fields.
+          loiFields: isLoiResponseMode && loiFields ? loiFields : undefined,
         }),
       });
 
@@ -686,7 +763,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     } finally {
       setExporting(false);
     }
-  }, [email, uploadedRfp, isSimpleResponseMode, currentSectionTabs, drafts, getAuthHeaders, exportContextName, compliance, checklist, isLoiResponseMode, isRfqMode]);
+  }, [email, uploadedRfp, isSimpleResponseMode, currentSectionTabs, drafts, getAuthHeaders, exportContextName, compliance, checklist, isLoiResponseMode, isRfqMode, loiFields]);
 
   const exportComplianceCsv = useCallback(() => {
     if (compliance.length === 0) return;
@@ -1162,6 +1239,48 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </div>
         )}
 
+        {/* HERO: paste the SAM.gov notice text. For Sources Sought / RFI the
+            notice text IS the input — 90% have no attachments — so this is the
+            primary path. Upload (below) stays for the 10% with real documents. */}
+        {!uploadedRfp && (
+          <div className="mb-3 rounded-lg border border-purple-500/30 bg-purple-500/5 p-4">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-sm font-semibold text-purple-200">
+                📋 Paste the SAM.gov notice text
+              </p>
+              <span className="text-[11px] text-slate-500">no upload needed</span>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">
+              Copy the notice body from SAM.gov (Description + Contact Information)
+              and paste it here. Mindy reads the agency, solicitation number,
+              deadline, submission email, and required content — then pre-fills your
+              LOI / response.
+            </p>
+            <textarea
+              value={pastedNotice}
+              onChange={(e) => setPastedNotice(e.target.value)}
+              placeholder="Paste the SAM.gov notice text here…"
+              rows={5}
+              className="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:border-purple-500/60 focus:outline-none resize-y"
+            />
+            <div className="flex items-center justify-between gap-3 mt-2">
+              <span className="text-[11px] text-slate-500">
+                {pastedNotice.trim().length > 0
+                  ? `${pastedNotice.trim().length.toLocaleString()} chars`
+                  : 'Tip: include the Description and Contact Information sections'}
+              </span>
+              <button
+                type="button"
+                onClick={usePastedNotice}
+                disabled={pastedNotice.trim().length < 80}
+                className="px-4 py-1.5 text-sm rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Use this notice
+              </button>
+            </div>
+          </div>
+        )}
+
         {!uploadedRfp ? (
           <div
             onDrop={onDrop}
@@ -1290,6 +1409,37 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </span>
           </div>
 
+          {/* LOI field-extraction status — shows when Mindy has read the notice
+              text and pre-filled the template. */}
+          {isLoiResponseMode && (loiFieldsLoading || loiFields || loiFieldsError) && (
+            <div className={`mb-3 rounded-lg border p-3 text-sm ${
+              loiFieldsLoading ? 'border-purple-500/30 bg-purple-500/5 text-purple-200'
+              : loiFields ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+            }`}>
+              {loiFieldsLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                  Reading the notice — extracting agency, deadline, submission method, and required content…
+                </span>
+              ) : loiFields ? (
+                <span>
+                  ✓ Pre-filled from the notice:{' '}
+                  {[
+                    loiFields.solicitationNumber && 'solicitation #',
+                    loiFields.agencyName && 'agency',
+                    loiFields.submissionDeadline && 'deadline',
+                    loiFields.submissionMethod && 'submit-to',
+                    loiFields.requestedContent?.length && 'required content',
+                    loiFields.naicsCode && 'NAICS',
+                  ].filter(Boolean).join(', ') || 'available fields'}. The LOI export fills these for you.
+                </span>
+              ) : (
+                <span>{loiFieldsError}</span>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {isSimpleResponseMode ? (
               <OutputActionCard
@@ -1297,7 +1447,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 title={isRfqMode ? 'Export RFQ response template' : 'Export LOI response template'}
                 description={isRfqMode
                   ? 'Create a Word response template with blanks for pricing, attachments, and submission details.'
-                  : 'Create a Word LOI from Mindy\'s curated response-template library, with blanks for anything the user must complete.'}
+                  : loiFields
+                    ? 'Mindy read the notice and pre-filled the agency, solicitation number, deadline, submission method, NAICS, and required content. Export the LOI with those fields already in place.'
+                    : 'Create a Word LOI from Mindy\'s curated response-template library, with blanks for anything the user must complete.'}
                 status={exporting ? 'Working...' : 'Ready'}
                 buttonLabel={exporting ? 'Assembling...' : isRfqMode ? 'Export RFQ .docx' : 'Export LOI .docx'}
                 disabled={exporting}
