@@ -1331,17 +1331,22 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               />
             )}
 
-            <OutputActionCard
-              eyebrow="Export"
-              title={isSimpleResponseMode ? 'Export response package' : 'Export Word package'}
-              description={isSimpleResponseMode
-                ? 'Download the response package. Attach the existing capability statement separately when the notice requests it.'
-                : 'Download a Word package with matrix, drafts, and checklist when available.'}
-              status={hasAnyDraft || compliance.length > 0 || isSimpleResponseMode ? 'Ready' : 'Needs an output'}
-              buttonLabel={exporting ? 'Assembling...' : 'Export .docx'}
-              disabled={exporting || (!isSimpleResponseMode && !hasAnyDraft && compliance.length === 0)}
-              onClick={exportProposalPackage}
-            />
+            {/* The dedicated "Export" card is only for FULL proposals, where it
+                bundles the compliance matrix + drafts + checklist into one
+                package. For Sources Sought / RFI the first "Export LOI .docx"
+                card already produces the complete letter (template + any drafted
+                sections), so a second identical button was just confusing. */}
+            {!isSimpleResponseMode && (
+              <OutputActionCard
+                eyebrow="Export"
+                title="Export Word package"
+                description="Download a Word package with matrix, drafts, and checklist when available."
+                status={hasAnyDraft || compliance.length > 0 ? 'Ready' : 'Needs an output'}
+                buttonLabel={exporting ? 'Assembling...' : 'Export .docx'}
+                disabled={exporting || (!hasAnyDraft && compliance.length === 0)}
+                onClick={exportProposalPackage}
+              />
+            )}
           </div>
         </section>
       )}

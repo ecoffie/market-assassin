@@ -673,12 +673,21 @@ export async function POST(request: NextRequest) {
 
   const children: (Paragraph | Table)[] = [];
 
-  // Pure LOI / Statement of Capability (Sources Sought / RFI with no AI-drafted
-  // sections): render the template-faithful letter (no title/contents page).
-  // Mirrors public/templates/loi-govcon-edu-template.docx.
-  const useLoiTemplate = isLoiPackage && orderedSections.length === 0;
+  // LOI / Statement of Capability (Sources Sought / RFI): render the
+  // template-faithful letter (no title/contents page), mirroring
+  // public/templates/loi-govcon-edu-template.docx. Any AI-drafted narrative
+  // sections the user generated are appended after the template body, so the
+  // single "Export LOI .docx" button always produces the complete document.
+  const useLoiTemplate = isLoiPackage;
   if (useLoiTemplate) {
     children.push(...buildLoiChildren(companyProfile, rfpName));
+    // Append drafted narrative sections, if any.
+    for (const id of orderedSections) {
+      const s = drafts[id];
+      if (!s || !s.draft) continue;
+      children.push(sectionHeader(`${s.label}:`));
+      children.push(...paragraphsFromMarkdown(s.draft));
+    }
     const loiDoc = new Document({
       creator: 'Mindy',
       title: `Statement of Capability — ${rfpName}`,
