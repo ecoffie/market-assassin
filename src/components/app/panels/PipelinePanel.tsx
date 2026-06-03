@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Mic } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
@@ -1471,6 +1471,43 @@ function PipelineEditDrawer({
     }
   }, [email, opportunity.id, refetching, authHeaders, onDocsUpdated, loadDocList]);
 
+  // Manual document upload — the last-resort path when neither SAM nor
+  // grants.gov can serve a pursuit's attachments (archived / forecasted / bad
+  // notice id). Posts to the upload route with pipeline_id so it persists a
+  // pursuit_documents row (doc_source='user_upload') and flips docs to 'ready'.
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  const onManualUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file || !email || !opportunity.id) return;
+    setUploading(true);
+    setUploadMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(
+        `/api/app/proposal/upload?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
+        { method: 'POST', headers: authHeaders(), body: fd },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setUploadMsg(data?.error || 'Upload failed.');
+      } else if (data.persisted) {
+        setUploadMsg(`Attached ${file.name}.`);
+        onDocsUpdated();
+        loadDocList();
+      } else {
+        setUploadMsg('Uploaded, but could not attach to this pursuit.');
+      }
+    } catch {
+      setUploadMsg('Network error.');
+    } finally {
+      setUploading(false);
+    }
+  }, [email, opportunity.id, authHeaders, onDocsUpdated, loadDocList]);
+
   const [stage, setStage] = useState<PipelineStage>(opportunity.stage);
   const [priority, setPriority] = useState<PipelinePriority>(opportunity.priority || 'medium');
   const [winProbability, setWinProbability] = useState(opportunity.win_probability?.toString() || '');
@@ -1603,6 +1640,20 @@ function PipelineEditDrawer({
                 </button>
               ) : null;
 
+              // Manual-upload affordance: offer it whenever auto-fetch came up
+              // empty (failed/none), so the user can attach the RFP/notice docs
+              // themselves for notices SAM/grants.gov can't serve.
+              const UploadLink = (
+                <button
+                  type="button"
+                  onClick={() => uploadInputRef.current?.click()}
+                  disabled={uploading}
+                  className="ml-2 underline text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                >
+                  {uploading ? 'uploading…' : 'Upload a document'}
+                </button>
+              );
+
               let body: React.ReactNode;
               if (count > 0) {
                 body = <span className="text-emerald-300">📎 {count} document{count === 1 ? '' : 's'} attached — ready to draft</span>;
@@ -1614,17 +1665,29 @@ function PipelineEditDrawer({
                   </span>
                 );
               } else if (status === 'failed') {
-                body = <span className="text-red-300">⚠ Couldn&apos;t reach SAM.gov for attachments.{RetryLink}</span>;
+                body = (
+                  <span className="text-red-300">
+                    ⚠ Couldn&apos;t pull attachments automatically.{RetryLink}{UploadLink}
+                  </span>
+                );
               } else {
                 body = (
                   <span className="text-slate-400">
-                    📭 No attachments on this notice — that&apos;s normal for many notice types. The wizard works from the metadata.{RetryLink}
+                    📭 No attachments on this notice — that&apos;s normal for many notice types. The wizard works from the metadata.{RetryLink}{UploadLink}
                   </span>
                 );
               }
               return (
                 <div className="text-xs">
                   {body}
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                    onChange={onManualUpload}
+                    className="hidden"
+                  />
+                  {uploadMsg && <div className="mt-1 text-[11px] text-slate-500">{uploadMsg}</div>}
                   {refetchMsg && <div className="mt-1 text-[11px] text-slate-500">{refetchMsg}</div>}
                 </div>
               );
