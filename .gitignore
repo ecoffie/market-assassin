@@ -50,3 +50,7 @@ market-assasin-*.json
 *-sa-key*.json
 # GCP service-account keys have this exact shape — catch any stray one
 *[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].json
+
+# Exported call transcripts (proprietary, may contain PII — never commit)
+tasks/cache/calls/
+tasks/cache/fireflies-titles.txt

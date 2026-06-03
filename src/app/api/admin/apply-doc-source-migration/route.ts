@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { error } = await getSupabase().rpc('exec_migration', { sql_query: DDL });
+  const { error } = await getSupabase().rpc('exec_sql', { sql: DDL });
   if (error) {
     return NextResponse.json(
       { success: false, error: error.message || String(error) },
