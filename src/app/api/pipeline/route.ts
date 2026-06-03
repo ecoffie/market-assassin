@@ -272,7 +272,14 @@ export async function POST(request: NextRequest) {
       title: body.title,
       agency: body.agency,
     });
-    if (samMatch?.noticeId && !body.notice_id) {
+    // Persist the canonical SAM UUID, not a solicitation number. The attachment
+    // fetcher keys off notice_id and SAM's file API only matches the 32-char
+    // UUID — saving "70203926CGASHED" instead of the UUID was silently breaking
+    // every attachment fetch. Prefer the resolved UUID whenever the stored value
+    // isn't already one. (Old logic only filled when the field was empty, so a
+    // user-supplied solicitation number was kept and the UUID discarded.)
+    const isUuid = (v?: string | null) => !!v && /^[a-f0-9]{32}$/i.test(v.trim());
+    if (samMatch?.noticeId && isUuid(samMatch.noticeId) && !isUuid(body.notice_id)) {
       body.notice_id = samMatch.noticeId;
     }
     if (samMatch?.responseDeadline && !body.response_deadline) {

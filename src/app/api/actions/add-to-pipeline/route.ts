@@ -98,7 +98,10 @@ export async function GET(request: NextRequest) {
       title: decodeURIComponent(title),
       agency: agency ? decodeURIComponent(agency) : null,
     });
-    if (!cleanNoticeId && samMatch?.noticeId) {
+    // Prefer the canonical SAM UUID over a solicitation number — the attachment
+    // fetcher needs the UUID. Resolve whenever the current value isn't a UUID.
+    const isUuid = (v?: string | null) => !!v && /^[a-f0-9]{32}$/i.test(v.trim());
+    if (samMatch?.noticeId && isUuid(samMatch.noticeId) && !isUuid(cleanNoticeId)) {
       cleanNoticeId = samMatch.noticeId;
     }
 

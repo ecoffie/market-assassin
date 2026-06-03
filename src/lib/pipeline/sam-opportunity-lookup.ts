@@ -21,16 +21,21 @@ export interface SamOpportunityRow {
   sub_tier: string | null;
   office: string | null;
   description: string | null;
+  attachments: unknown;
 }
 
 export interface SamOpportunityLookup {
   noticeId: string | null;
+  solicitationNumber: string | null;
   noticeType: string | null;
   responseDeadline: string | null;
   description: string | null;
+  // Attachment download URLs synced nightly from SAM (resourceLinks). When
+  // present we can fetch docs straight from these without a live SAM call.
+  attachments: string[];
 }
 
-const SAM_SELECT = 'notice_id, solicitation_number, notice_type, response_deadline, title, department, sub_tier, office, description';
+const SAM_SELECT = 'notice_id, solicitation_number, notice_type, response_deadline, title, department, sub_tier, office, description, attachments';
 
 function normalize(value?: string | null): string {
   return String(value || '')
@@ -62,11 +67,19 @@ function consistent(rows: SamOpportunityRow[], agency?: string | null): SamOppor
 
 function toLookup(row: SamOpportunityRow | null): SamOpportunityLookup | null {
   if (!row) return null;
+  // attachments is stored as a JSON array of SAM resourceLink URLs. Be
+  // defensive — older rows or sync gaps may have null / non-array values.
+  const rawLinks = row.attachments;
+  const attachments = Array.isArray(rawLinks)
+    ? rawLinks.filter((u): u is string => typeof u === 'string' && u.length > 0)
+    : [];
   return {
     noticeId: row.notice_id || null,
+    solicitationNumber: row.solicitation_number || null,
     noticeType: row.notice_type || null,
     responseDeadline: row.response_deadline || null,
     description: row.description || null,
+    attachments,
   };
 }
 

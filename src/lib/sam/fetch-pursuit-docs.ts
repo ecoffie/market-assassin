@@ -101,6 +101,70 @@ function parseFilenameFromDisposition(cd: string | null): string | null {
   return null;
 }
 
+/** Turn a list of SAM resourceLink URLs into file refs (id + url + provisional name). */
+function urlsToFileRefs(links: string[]): SamFileRef[] {
+  return links
+    .filter((u) => typeof u === 'string' && u.length > 0)
+    .map((rawUrl, i): SamFileRef => {
+      let fileId = '';
+      try {
+        const parts = new URL(rawUrl).pathname.split('/').filter(Boolean);
+        const last = parts[parts.length - 1];
+        if (last && last.toLowerCase() !== 'download') fileId = last;
+        else if (parts.length >= 2) fileId = parts[parts.length - 2];
+      } catch { /* leave empty */ }
+      return {
+        url: rawUrl,
+        fileId: fileId || `unknown-${i}`,
+        filename: fileId ? `Document ${i + 1} (${fileId.slice(0, 8)})` : `Document ${i + 1}`,
+      };
+    });
+}
+
+/**
+ * Cache-first resolver. The nightly sync stores every notice's attachment URLs
+ * in sam_opportunities.attachments (resourceLinks), keyed by the canonical UUID
+ * and with solicitation_number alongside. So before any live SAM call we:
+ *   1. resolve the stored notice_id (UUID *or* solicitation number) to a row
+ *   2. return its cached attachment URLs + the real UUID
+ * This sidesteps the live discover call entirely (and its date-window quirk and
+ * UUID-only exact-match requirement) for any notice we've synced — which is the
+ * vast majority. Returns null only when the notice isn't in our cache at all.
+ */
+async function resolveFromCache(
+  supabase: ReturnType<typeof getSupabase>,
+  noticeIdOrSolicitation: string,
+): Promise<{ uuid: string; attachments: string[] } | null> {
+  const id = noticeIdOrSolicitation.trim();
+  const isUuid = /^[a-f0-9]{32}$/i.test(id);
+
+  // Try notice_id (UUID) first, then solicitation_number.
+  let row: { notice_id: string | null; attachments: unknown } | null = null;
+  if (isUuid) {
+    const { data } = await supabase
+      .from('sam_opportunities')
+      .select('notice_id, attachments')
+      .eq('notice_id', id)
+      .maybeSingle();
+    row = data || null;
+  }
+  if (!row) {
+    const { data } = await supabase
+      .from('sam_opportunities')
+      .select('notice_id, attachments')
+      .ilike('solicitation_number', id)
+      .limit(1)
+      .maybeSingle();
+    row = data || null;
+  }
+  if (!row?.notice_id) return null;
+
+  const attachments = Array.isArray(row.attachments)
+    ? (row.attachments as unknown[]).filter((u): u is string => typeof u === 'string' && u.length > 0)
+    : [];
+  return { uuid: row.notice_id, attachments };
+}
+
 /**
  * Step 1: ask SAM opportunities API for this notice's resourceLinks.
  * Returns a list of file refs with id + URL + best-effort filename
@@ -188,17 +252,27 @@ async function downloadFile(ref: SamFileRef, apiKey: string): Promise<{ buffer: 
   const fetchUrl = new URL(ref.url.startsWith('http') ? ref.url : `${SAM_FILE_URL_PREFIX}${ref.fileId}/download`);
   if (!fetchUrl.searchParams.has('api_key')) fetchUrl.searchParams.set('api_key', apiKey);
 
-  let res: Response;
-  try {
-    res = await fetch(fetchUrl.toString(), { headers: { Accept: '*/*' } });
-  } catch (err) {
-    console.warn(`[fetch-pursuit-docs] download ${ref.fileId} failed:`, err);
-    return null;
+  // Retry transient failures (network errors, 429 rate-limit, 5xx). Don't retry
+  // 4xx auth/permission errors — those won't change on a retry. SAM's CDN is
+  // flaky enough that a single attempt was dropping legitimate attachments.
+  const MAX_TRIES = 3;
+  let res: Response | null = null;
+  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+    try {
+      res = await fetch(fetchUrl.toString(), { headers: { Accept: '*/*' } });
+    } catch (err) {
+      console.warn(`[fetch-pursuit-docs] download ${ref.fileId} attempt ${attempt} threw:`, err);
+      res = null;
+      if (attempt < MAX_TRIES) { await new Promise((r) => setTimeout(r, attempt * 1500)); continue; }
+      return null;
+    }
+    if (res.ok) break;
+    const retryable = res.status === 429 || res.status >= 500;
+    console.warn(`[fetch-pursuit-docs] download ${ref.fileId} attempt ${attempt} HTTP ${res.status}${retryable ? ' (retryable)' : ''}`);
+    if (retryable && attempt < MAX_TRIES) { await new Promise((r) => setTimeout(r, attempt * 1500)); continue; }
+    return null; // non-retryable, or out of attempts
   }
-  if (!res.ok) {
-    console.warn(`[fetch-pursuit-docs] download ${ref.fileId} HTTP ${res.status}`);
-    return null;
-  }
+  if (!res || !res.ok) return null;
 
   // Grab filename from THIS response's headers — same round trip,
   // more reliable than a separate HEAD which SAM's CDN may strip.
@@ -309,16 +383,45 @@ export async function fetchPursuitDocs(opts: {
     .update({ docs_status: 'fetching' })
     .eq('id', pipelineId);
 
-  const fileRefs = await discoverFiles(noticeId, apiKey);
+  // CACHE-FIRST attachment discovery. Our nightly sync already stores every
+  // notice's attachment URLs, keyed by UUID (and findable by solicitation
+  // number). Reading them from our own DB is far more reliable than the live
+  // SAM discover call, which (a) only exact-matches the UUID, breaking when we
+  // stored a solicitation number, and (b) has a brittle calendar-year date
+  // window. We only hit the live API when the notice isn't in our cache.
+  let fileRefs: SamFileRef[] = [];
+  let cacheHit = false;
+  const cached = await resolveFromCache(supabase, noticeId).catch(() => null);
+  if (cached) {
+    cacheHit = true;
+    // If the pursuit was saved with a solicitation number, heal its notice_id
+    // to the canonical UUID so future fetches and the UI use the right key.
+    if (cached.uuid && cached.uuid !== noticeId) {
+      await supabase.from('user_pipeline')
+        .update({ notice_id: cached.uuid })
+        .eq('id', pipelineId)
+        .then(() => {}, () => {});
+    }
+    fileRefs = urlsToFileRefs(cached.attachments);
+  } else {
+    // Cold path: notice not in our cache → fall back to the live SAM discover.
+    fileRefs = await discoverFiles(noticeId, apiKey);
+  }
+
   if (fileRefs.length === 0) {
+    // Distinguish "we know this notice and it genuinely has no attachments"
+    // (cache hit, empty list → 'none', no Retry needed) from "we couldn't find
+    // the notice at all" (cache miss + live discover empty → 'failed', show
+    // Retry, since this is often a transient/ID issue worth re-running).
+    const emptyStatus: 'none' | 'failed' = cacheHit ? 'none' : 'failed';
     await supabase.from('user_pipeline')
       .update({
-        docs_status: 'none',
+        docs_status: emptyStatus,
         docs_count: 0,
         docs_fetched_at: new Date().toISOString(),
       })
       .eq('id', pipelineId);
-    return { attempted: 0, succeeded: 0, failed: 0, status: 'none' };
+    return { attempted: 0, succeeded: 0, failed: 0, status: emptyStatus };
   }
 
   let succeeded = 0;
