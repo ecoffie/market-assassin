@@ -12,6 +12,7 @@ import {
   WidthType,
   BorderStyle,
   PageBreak,
+  TableLayoutType,
 } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
@@ -497,20 +498,26 @@ const NO_BORDERS = {
 
 // A borderless 2-column table: left = label, right = ": value" (value or a
 // fill-in underline when empty). Colons align because the label column has a
-// fixed width.
+// fixed width. Uses FIXED layout + explicit DXA (twip) column widths — without
+// these, renderers (Google Docs) collapse the columns to ~1 char wide and wrap
+// every character onto its own line.
+const LABEL_COL_DXA = 3600;   // ~2.5"
+const VALUE_COL_DXA = 5760;   // ~4.0"  (total ~6.5" content width)
 function labelValueTable(rows: Array<[string, string | undefined]>): Table {
   return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
+    width: { size: LABEL_COL_DXA + VALUE_COL_DXA, type: WidthType.DXA },
+    columnWidths: [LABEL_COL_DXA, VALUE_COL_DXA],
+    layout: TableLayoutType.FIXED,
     borders: NO_BORDERS,
     rows: rows.map(([label, value]) => new TableRow({
       children: [
         new TableCell({
-          width: { size: 38, type: WidthType.PERCENTAGE },
+          width: { size: LABEL_COL_DXA, type: WidthType.DXA },
           borders: NO_BORDERS,
-          children: [new Paragraph({ children: [new TextRun({ text: label, bold: false })] })],
+          children: [new Paragraph({ children: [new TextRun({ text: label })] })],
         }),
         new TableCell({
-          width: { size: 62, type: WidthType.PERCENTAGE },
+          width: { size: VALUE_COL_DXA, type: WidthType.DXA },
           borders: NO_BORDERS,
           children: [new Paragraph({
             children: [new TextRun({
