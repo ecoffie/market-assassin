@@ -101,6 +101,24 @@ function parseFilenameFromDisposition(cd: string | null): string | null {
   return null;
 }
 
+/**
+ * Normalize a stored notice_id into the canonical SAM form before lookup.
+ *   - Strip leaked React render-key prefixes ('opp-', 'deadline-', etc.) that
+ *     slipped in via email action URLs — the real id is what follows.
+ *   - Collapse a dashed UUID ('9fa33405-cb9d-46ad-...') to bare 32-hex, which
+ *     is the form SAM's 'noticeid' exact-match expects and our regex checks.
+ * Leaves genuine solicitation numbers untouched.
+ */
+function normalizeNoticeId(raw: string): string {
+  let id = (raw || '').trim();
+  const prefix = id.match(/^(opp|deadline|alert|brief|item)-(.+)$/i);
+  if (prefix) id = prefix[2];
+  // Dashed UUID → bare 32-hex.
+  const dashed = id.replace(/-/g, '');
+  if (/^[a-f0-9]{32}$/i.test(dashed)) return dashed.toLowerCase();
+  return id;
+}
+
 /** Turn a list of SAM resourceLink URLs into file refs (id + url + provisional name). */
 function urlsToFileRefs(links: string[]): SamFileRef[] {
   return links
@@ -308,8 +326,20 @@ export async function fetchPursuitDocs(opts: {
   downloadNulls?: number;
   lastInsertError?: string | null;
 }> {
-  const { pipelineId, userEmail, noticeId } = opts;
+  const { pipelineId, userEmail } = opts;
   const supabase = getSupabase();
+
+  // Normalize the stored id up front: strip leaked 'opp-'/'deadline-' render-key
+  // prefixes and collapse dashed UUIDs to bare 32-hex. Everything below (dedup,
+  // cache lookup, live discover) keys off this canonical form. Persist it back
+  // so the pursuit's notice_id stops tripping the same issue on every fetch.
+  const noticeId = normalizeNoticeId(opts.noticeId);
+  if (noticeId && noticeId !== opts.noticeId) {
+    await supabase.from('user_pipeline')
+      .update({ notice_id: noticeId })
+      .eq('id', pipelineId)
+      .then(() => {}, () => {});
+  }
 
   // --- Dedup by notice_id (scalability) -----------------------------
   // Documents for a SAM notice are IDENTICAL for every user who saves
