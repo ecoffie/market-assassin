@@ -19,10 +19,13 @@ A long screenshot-driven pass over the Contractors + Decision Makers surfaces. E
 
 ### Decision Makers tab
 - [x] **Honest roles** — SAM POC `title` is null at source, so "Primary Contact" is a POC designation, not a job title. Column → "Role/POC": real role when identifiable (`normalizeTitle`, ~700 of 112K), else muted "Primary POC", junk blanked.
-- [x] **Agency → contracting-office drill-down** — built `agency_office_summary` BQ rollup (top 100 offices/agency by spend; one-time 7GB build, ~0.13MB reads). Pick an agency → "Top contracting offices" panel (DoD → NAVAIR $401B, NAVSEA $345B, DLA, DHA, MDA…). HONEST: it's agency intelligence (which commands buy), NOT a contact filter — SAM POC contacts don't carry office. `getOfficesForAgency` contains-matches SAM agency names → rollup names.
+- [x] **Agency → contracting-office drill-down** — built `agency_office_summary` BQ rollup (top 100 offices/agency by spend; one-time 7GB build, ~0.13MB reads). Pick an agency → "Top contracting offices" panel (DoD → NAVAIR $401B, NAVSEA $345B, DLA, DHA, MDA…). HONEST: it's agency intelligence (which commands buy), NOT a contact filter — SAM POC contacts don't carry office. `getOfficesForAgency` contains-matches SAM agency names → rollup names. **Verified against LIVE prod API** (HTTP 200; DoD 100 offices, VA 100, Energy 51) + rendered the panel markup with that live data.
 
 ### Research (no build — scoping)
 - [x] **`docs/RESEARCH-gov-decision-maker-roles.md`** — probed the sources for real gov roles. Findings: roles are NULL at source (SAM POC title null; FPDS/awards has no CO name, only contractor execs) → real CO/PM/end-user roles need COMMERCIAL enrichment (a buy, not a build). But `awards.awarding_office` is 100% populated → the office drill-down (above) was the achievable win. Memory: [[gov_roles_not_in_sam_fpds]].
+
+### Verification method (this session)
+All UI work was verified by hitting the LIVE deployed API with a minted MI token + rendering the panel's real markup against that live data (puppeteer screenshot). NOT a click in the authed `/app` sidebar — `/app` is Supabase-session-gated, so headless can't reach the authed view without real Google/MS/password creds. `scripts/clickthrough-*.mjs` document this. If anything looks off in-browser, screenshot it (that workflow caught the grants "Email required", the contractor 404 drawer, and the empty-office issue this session).
 
 ### Follow-ups
 - [ ] **Real gov roles** — only via commercial enrichment (HigherGov/LinkedIn-grade). Gate on the tab proving demand. See research doc.
