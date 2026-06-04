@@ -662,16 +662,31 @@ export async function getBqContractorHistory(opts: { uei?: string; slug?: string
   if (!profile) return null;
   const uei = profile.recipient_uei;
 
-  const [yearly, agencies, naics, recent] = await Promise.all([
+  const [yearly, agencies, naics, recent, yearlyByAgency] = await Promise.all([
     getYearlyTotalsForRecipient(uei),
     getTopAgenciesForRecipient(uei, 8),
     getTopNaicsForRecipient(uei, 8),
     getRecentAwardsForRecipient(uei, 25),
+    getYearlyByAgencyForRecipient(uei), // per-year agency split → chart drill-down
   ]);
+
+  // Group the per-(year,agency) rows so each fiscal year carries its agency
+  // breakdown — this is what the chart's click-to-drill-down renders.
+  const byYear = new Map<number, Array<{ agency: string; amount: number; count: number }>>();
+  for (const r of yearlyByAgency) {
+    const arr = byYear.get(r.fiscal_year) || [];
+    arr.push({ agency: r.awarding_agency, amount: Number(r.total_amount || 0), count: Number(r.award_count || 0) });
+    byYear.set(r.fiscal_year, arr);
+  }
 
   const series = yearly
     .sort((a, b) => a.fiscal_year - b.fiscal_year)
-    .map(y => ({ fiscalYear: y.fiscal_year, totalObligations: Number(y.total_obligated || 0), awardCount: Number(y.award_count || 0), agencyBreakdown: [] }));
+    .map(y => ({
+      fiscalYear: y.fiscal_year,
+      totalObligations: Number(y.total_obligated || 0),
+      awardCount: Number(y.award_count || 0),
+      agencyBreakdown: byYear.get(y.fiscal_year) || [],
+    }));
   const latestFiscalYear = yearly.length ? Math.max(...yearly.map(y => y.fiscal_year)) : null;
   const topAgency = agencies[0]?.awarding_agency || null;
   const awardCount = Number(profile.award_count || 0);
