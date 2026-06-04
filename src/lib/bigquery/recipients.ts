@@ -550,10 +550,16 @@ export interface RecipientSearchRow {
 }
 
 /**
- * Search the recipients table (~317K award-winning contractors) by name,
- * with optional state filter and NAICS filter (via EXISTS on awards, only
- * applied when a NAICS is given so the common name-search stays cheap).
- * Powers the in-app Contractors panel — replaces the static 2,768-row JSON.
+ * Search award-winning federal contractors for the in-app Contractors panel
+ * — replaces the static 2,768-row JSON with real BQ data (~317K recipients).
+ *
+ * QUOTA-AWARE (Eric 2026-06-04 — "keep the quota limit down"): BigQuery
+ * bills by bytes scanned. Two paths, both cheap + cached:
+ *   - No NAICS: query `recipients` (name/state search) — ~12-24 MB.
+ *   - With NAICS: query the pre-aggregated `top_contractors_by_dimension`
+ *     rollup (naics dimension) — ~6 MB. The naive alternative (EXISTS on the
+ *     63M-row awards table) scanned ~1.2 GB — 200× worse. NEVER do that here.
+ * Every query goes through queryCached, so repeats cost 0 bytes.
  */
 export async function searchRecipients(opts: {
   search?: string;
@@ -570,16 +576,51 @@ export async function searchRecipients(opts: {
   const limit = Math.min(opts.limit ?? 25, 100);
   const offset = Math.max(opts.offset ?? 0, 0);
 
+  // ── NAICS path: cheap pre-aggregated rollup (top contractors per NAICS) ──
+  if (naics) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rp: Record<string, any> = { naics, limit, offset };
+    const conds = ['dimension = "naics"', 'dimension_value = @naics'];
+    if (search) { conds.push('LOWER(recipient_name) LIKE @search'); rp.search = `%${search.toLowerCase()}%`; }
+    // rollup has total_amount/award_count/rank; no state/agency/naics counts.
+    const orderCol = sortBy === 'recipient_name' ? 'recipient_name'
+      : sortBy === 'award_count' ? 'award_count' : 'total_amount';
+    const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
+    const rolled = await queryCached<{
+      recipient_uei: string; recipient_name: string; total_amount: number; award_count: number; total_rows: number;
+    }>({
+      cacheKey: `recipient-search-naics:${naics}:${search}:${sortBy}:${limit}:${offset}:v1`,
+      query: `
+        SELECT recipient_uei, recipient_name, total_amount, award_count,
+          COUNT(*) OVER() AS total_rows
+        FROM ${BQ_TABLES.topContractorsByDimension}
+        WHERE ${conds.join(' AND ')}
+        ORDER BY ${orderCol} ${orderDir}
+        LIMIT @limit OFFSET @offset
+      `,
+      params: rp,
+    });
+    const total = rolled.length ? Number(rolled[0].total_rows) : 0;
+    return {
+      total,
+      rows: rolled.map(r => ({
+        recipient_uei: r.recipient_uei,
+        recipient_name: r.recipient_name,
+        state: null,
+        total_obligated: Number(r.total_amount || 0),
+        award_count: Number(r.award_count || 0),
+        distinct_agency_count: 0,
+        distinct_naics_count: 0,
+      })),
+    };
+  }
+
+  // ── No-NAICS path: name/state search over recipients (cheap) ──
   const where: string[] = ['r.recipient_name IS NOT NULL'];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params: Record<string, any> = { limit, offset };
   if (search) { where.push('LOWER(r.recipient_name) LIKE @search'); params.search = `%${search.toLowerCase()}%`; }
   if (state) { where.push('r.state = @state'); params.state = state; }
-  if (naics) {
-    // EXISTS keeps it cheap vs. a join; awards is clustered on recipient_uei.
-    where.push(`EXISTS (SELECT 1 FROM ${BQ_TABLES.awards} a WHERE a.recipient_uei = r.recipient_uei AND a.naics_code = @naics)`);
-    params.naics = naics;
-  }
 
   const orderCol = sortBy === 'recipient_name' ? 'r.recipient_name'
     : sortBy === 'award_count' ? 'r.award_count'
@@ -587,7 +628,7 @@ export async function searchRecipients(opts: {
   const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
 
   const rows = await queryCached<RecipientSearchRow & { total_rows: number }>({
-    cacheKey: `recipient-search:${search}:${state}:${naics}:${sortBy}:${limit}:${offset}:v1`,
+    cacheKey: `recipient-search:${search}:${state}:${sortBy}:${limit}:${offset}:v1`,
     query: `
       SELECT
         r.recipient_uei, r.recipient_name, r.state,

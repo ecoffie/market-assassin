@@ -33,10 +33,6 @@ interface Contractor {
 
 interface ContractorStats {
   totalContractors: number;
-  withContact: number;
-  withEmail: number;
-  withPhone: number;
-  sources: string[];
 }
 
 interface SavedContractorDefaults {
@@ -84,10 +80,11 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
 
   const loadStats = async () => {
     try {
-      const res = await fetch('/api/contractors?action=stats');
+      // BQ-backed: get the full recipient count from a 0-row probe (cheap).
+      const res = await fetch('/api/contractors/search-bq?limit=1');
       const data = await res.json();
-      if (data.totalContractors) {
-        setStats(data);
+      if (typeof data.totalCount === 'number') {
+        setStats({ totalContractors: data.totalCount });
       }
     } catch (err) {
       console.error('Failed to load stats:', err);
@@ -106,18 +103,18 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
     setError(null);
 
     try {
+      // BQ-backed: 317K award-winning contractors (recipients table + the
+      // top-contractors-by-NAICS rollup). Quota-aware — see searchRecipients.
+      // The `contact`/agency filters from the old static JSON aren't supported
+      // by BQ (no contact data), so they're ignored here.
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (naics) params.set('naics', naics);
-      if (agency) params.set('agency', agency);
-      if (contact === 'withContact') params.set('hasContact', 'true');
-      if (contact === 'withEmail') params.set('hasEmail', 'true');
       params.set('sortBy', sort);
-      params.set('sortOrder', 'desc');
       params.set('limit', limit.toString());
       params.set('offset', (pageNum * limit).toString());
 
-      const res = await fetch(`/api/contractors?${params.toString()}`);
+      const res = await fetch(`/api/contractors/search-bq?${params.toString()}`);
       const data = await res.json();
 
       if (data.contractors) {
@@ -248,14 +245,12 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
           <h1 className="text-2xl font-bold text-white">Contractors</h1>
           <p className="text-slate-400 mt-1">
             {stats
-              ? `${stats.totalContractors.toLocaleString()} federal contractor records`
+              ? `${stats.totalContractors.toLocaleString()} award-winning federal contractors`
               : 'Federal contractor database'}
           </p>
-          {stats && (
-            <p className="text-sm text-slate-500 mt-1">
-              {stats.withContact.toLocaleString()} with contact data · {stats.withEmail.toLocaleString()} with email · {stats.withPhone.toLocaleString()} with phone
-            </p>
-          )}
+          <p className="text-sm text-slate-500 mt-1">
+            Real award history from USASpending — search by name, or filter by NAICS for the top contractors in a code.
+          </p>
           {profileDefaults && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
               <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
@@ -285,28 +280,6 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
         )}
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-white">{stats.totalContractors.toLocaleString()}</div>
-            <div className="text-xs text-slate-500">Total Contractors</div>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-emerald-400">{stats.withContact.toLocaleString()}</div>
-            <div className="text-xs text-slate-500">With Contact Data</div>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-blue-400">{stats.withEmail.toLocaleString()}</div>
-            <div className="text-xs text-slate-500">With Email</div>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-amber-400">{stats.withPhone.toLocaleString()}</div>
-            <div className="text-xs text-slate-500">With Phone</div>
-          </div>
-        </div>
-      )}
-
       {/* Search & Filters */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -318,7 +291,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Company, contact name, or email..."
+              placeholder="Company name..."
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
             />
           </div>
@@ -332,20 +305,6 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               placeholder="541512, 236, 238"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
             />
-          </div>
-
-          {/* Contact Filter */}
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Contact Info</label>
-            <select
-              value={contactFilter}
-              onChange={(e) => setContactFilter(e.target.value as 'all' | 'withContact' | 'withEmail')}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none"
-            >
-              <option value="all">All Contractors</option>
-              <option value="withContact">With Contact Data</option>
-              <option value="withEmail">With Email</option>
-            </select>
           </div>
 
           {/* Search Button */}
