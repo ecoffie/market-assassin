@@ -79,8 +79,20 @@ function AgencyContent() {
 
   useEffect(() => {
     const t = localStorage.getItem(MI_AUTH_TOKEN_KEY);
-    const e = localStorage.getItem('ma_access_email');
     if (t) setToken(t);
+    // Email is stored under mi_beta_email by /app's auth flow. Fall back to
+    // the legacy ma_access_email cookie-key, then to decoding it out of the
+    // JWT token itself (its payload carries the email).
+    let e = localStorage.getItem('mi_beta_email') || localStorage.getItem('ma_access_email') || '';
+    if (!e && t) {
+      try {
+        // Token is `base64url(payload).signature` (2 parts, not a 3-part
+        // JWT). The email lives in payload = part [0], base64url-encoded.
+        const part = (t.split('.')[0] || '').replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(atob(part));
+        if (payload?.email) e = String(payload.email);
+      } catch { /* couldn't decode — leave blank, user re-enters */ }
+    }
     if (e) setEmail(e);
   }, []);
 
