@@ -25,6 +25,11 @@ function getSupabase() {
   return _sb;
 }
 
+// In-memory cache for the agency facet (~56 values, changes ~daily with the
+// sync). Avoids re-scanning 112K rows on every panel mount.
+let _agencyCache: { list: string[]; at: number } | null = null;
+const AGENCY_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const email = sp.get('email');
@@ -36,17 +41,32 @@ export async function GET(request: NextRequest) {
 
   // Facets: distinct agency list for the filter dropdown.
   if (sp.get('facets') === 'agencies') {
-    // Pull a capped set of agency values and dedupe in-app (cheaper than a
-    // distinct over 112K without a materialized view).
-    const { data } = await sb
-      .from('federal_contacts')
-      .select('department_ind_agency')
-      .not('department_ind_agency', 'is', null)
-      .limit(5000);
-    const agencies = Array.from(
-      new Set((data || []).map((r: { department_ind_agency: string }) => r.department_ind_agency).filter(Boolean)),
-    ).sort();
-    return NextResponse.json({ success: true, agencies });
+    if (_agencyCache && Date.now() - _agencyCache.at < AGENCY_TTL_MS) {
+      return NextResponse.json({ success: true, agencies: _agencyCache.list, cached: true });
+    }
+    // There are ~56 distinct agencies but they DON'T cluster in the first N
+    // rows — the column is alphabetically ordered, so a single .limit(5000)
+    // only ever saw the first 3 (bug 2026-06-04). We must page the WHOLE
+    // column: NO early-exit, because one agency (DoD) spans many consecutive
+    // pages, which would falsely look "done" before reaching later-alphabet
+    // agencies. The 6h cache above makes this full scan a once-per-6h cost.
+    const set = new Set<string>();
+    const PAGE = 1000;
+    for (let from = 0; from < 120_000; from += PAGE) {
+      const { data, error } = await sb
+        .from('federal_contacts')
+        .select('department_ind_agency')
+        .not('department_ind_agency', 'is', null)
+        .range(from, from + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      for (const r of data as { department_ind_agency: string }[]) {
+        if (r.department_ind_agency) set.add(r.department_ind_agency);
+      }
+      if (data.length < PAGE) break;
+    }
+    const list = Array.from(set).sort();
+    _agencyCache = { list, at: Date.now() };
+    return NextResponse.json({ success: true, agencies: list });
   }
 
   const search = (sp.get('search') || '').trim();
