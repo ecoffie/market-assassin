@@ -6,6 +6,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import ContractorLink from '../contractors/ContractorLink';
+import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/location-match';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -27,6 +28,7 @@ interface ExpiringContract {
   competitionLevel: string;
   competitionType: string;
   location: { city?: string; state?: string; zip?: string };
+  locationMatch?: LocationMatch; // computed vs. the user's service area
 }
 
 interface ContractSummary {
@@ -36,6 +38,7 @@ interface ContractSummary {
   soleSourceContracts: number;
   lowCompetitionContracts: number;
   urgentContracts: number;
+  inAreaContracts: number; // hq + service + neighboring
 }
 
 interface RecompeteApiContract {
@@ -77,6 +80,7 @@ interface SavedProfileDefaults {
   naicsCodes: string[];
   agencies: string[];
   states: string[];
+  hqState?: string;
   source: string;
 }
 
@@ -269,9 +273,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         }
       }
 
-      if (stateTerms.length > 0 && contract.location.state && !stateTerms.includes(contract.location.state)) {
-        return false;
-      }
+      // Geography is NO LONGER a silent filter. We show all contracts and
+      // surface a visible location-match badge instead (Eric 2026-06-04 —
+      // "I don't see how it measures against the places I work"). The badge
+      // is computed below; out-of-area contracts stay visible, labeled.
 
       if (monthsNumber) {
         const expiration = new Date(`${contract.expirationDate}T00:00:00`);
@@ -291,7 +296,22 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       );
     }
 
-    mappedContracts = mappedContracts.sort((a, b) => b.value - a.value);
+    // Tag every contract with its location match vs. the user's service area.
+    const geo = { hqState: defaults?.hqState, serviceStates: stateTerms };
+    mappedContracts = mappedContracts.map(contract => ({
+      ...contract,
+      locationMatch: classifyLocation(contract.location.state, geo),
+    }));
+
+    // Sort: in-area first (hq > service > neighbor > outside > unknown), then
+    // by value within each tier. So the places you work surface to the top,
+    // but nothing is hidden.
+    mappedContracts = mappedContracts.sort((a, b) => {
+      const ra = MATCH_META[a.locationMatch || 'unknown'].rank;
+      const rb = MATCH_META[b.locationMatch || 'unknown'].rank;
+      if (ra !== rb) return ra - rb;
+      return b.value - a.value;
+    });
 
     const totalValue = mappedContracts.reduce((sum, contract) => sum + contract.value, 0);
     const offersWithValues = mappedContracts.filter(contract => contract.bidsReceived > 0);
@@ -308,6 +328,9 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       lowCompetitionContracts: mappedContracts.filter(contract => contract.competitionLevel === 'low').length,
       urgentContracts: mappedContracts.filter(contract =>
         contract.daysUntilExpiration > 0 && contract.daysUntilExpiration <= 90
+      ).length,
+      inAreaContracts: mappedContracts.filter(contract =>
+        contract.locationMatch === 'hq' || contract.locationMatch === 'service' || contract.locationMatch === 'neighbor'
       ).length,
     });
   }, []);
@@ -398,6 +421,16 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             ...(prefs?.data?.locationStates || []),
             prefs?.data?.locationState,
           ]).map(state => state.toUpperCase()),
+          // HQ state for the location-match badge: prefer an explicit HQ from
+          // the identity profile/workspace, else the singular locationState
+          // (typically the user's primary state), else the first service state.
+          hqState: (
+            workspaceProfile.identity?.hq_state ||
+            workspaceProfile.profile?.hq_state ||
+            prefs?.data?.locationState ||
+            prefs?.data?.locationStates?.[0] ||
+            ''
+          ).toString().toUpperCase() || undefined,
           source: prefs?.data ? 'saved settings profile' : 'workspace profile',
         };
 
@@ -529,7 +562,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-white">{summary.totalContracts}</div>
             <div className="text-xs text-slate-500">{usingProfileDefaults ? 'Profile Matches' : 'Expiring Awards Shown'}</div>
-            <div className="text-[11px] text-slate-600 mt-1">{allContracts.length.toLocaleString()} total in database</div>
+            {(profileDefaults?.states?.length || profileDefaults?.hqState) ? (
+              <div className="text-[11px] text-blue-400 mt-1">
+                📍 {summary.inAreaContracts} in or near your service area
+              </div>
+            ) : (
+              <div className="text-[11px] text-slate-600 mt-1">{allContracts.length.toLocaleString()} total in database</div>
+            )}
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-emerald-400">{formatCurrency(summary.totalValue)}</div>
@@ -704,12 +743,29 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         </div>
                       )}
 
-                      {/* Location */}
-                      {contract.location?.state && (
-                        <div className="text-xs text-slate-500">
-                          📍 {contract.location.city ? `${contract.location.city}, ` : ''}{contract.location.state}
-                        </div>
-                      )}
+                      {/* Location — always shown, with a match badge vs. the
+                          user's service area so geography is visible, not a
+                          silent filter. */}
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 mt-0.5">
+                        <span>
+                          📍 {contract.location?.state
+                            ? `${contract.location.city ? `${contract.location.city}, ` : ''}${contract.location.state}${contract.location.zip ? ` ${contract.location.zip}` : ''}`
+                            : 'Location not specified'}
+                        </span>
+                        {contract.locationMatch && contract.locationMatch !== 'unknown' && (
+                          <span
+                            title={MATCH_META[contract.locationMatch].hint}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                              contract.locationMatch === 'hq' ? 'bg-emerald-500/20 text-emerald-300'
+                              : contract.locationMatch === 'service' ? 'bg-blue-500/20 text-blue-300'
+                              : contract.locationMatch === 'neighbor' ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-slate-600/40 text-slate-400'
+                            }`}
+                          >
+                            {MATCH_META[contract.locationMatch].label}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Value & Dates */}
