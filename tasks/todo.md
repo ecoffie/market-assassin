@@ -4,6 +4,28 @@
 
 ---
 
+## Session Handoff — 2026-06-04 (Proposal Assist one-one-one simplify)
+
+Eric, testing a Fort Devens Sources Sought pursuit: "Available outputs has two 'Export LOI', then another export, then LOI response sections — a wall of options. For someone over 50 it's confusing. We want ChatGPT-simple: give me an answer. Go back to one-one-one." Merged to `main`, deployed.
+
+### The problem
+For SIMPLE responses (Sources Sought / RFI / RFQ — the common case), the output area had **3 overlapping sections doing the same job**: "Available Outputs" cards (Export LOI + Draft sections) + "Output · Word Response Template" (a DUPLICATE export button) + "Output · LOI Response Sections" (per-section editing). Two "Export LOI .docx" buttons, two draft paths. Deltek-style choice overload — the explicit anti-goal.
+
+### Shipped (`src/components/app/panels/ProposalsPanel.tsx`)
+- [x] **One hero, one button** — simple mode now shows "Let Mindy write your response" + a single **"Draft my response"** button (= `generateAllDrafts`, the full draft). The ChatGPT "give me an answer" moment.
+- [x] **"✓ Pre-filled from the notice"** line in the hero (solicitation #, agency, deadline, NAICS…) so Mindy visibly did the homework.
+- [x] **Everything secondary collapsed** behind ONE "More options" toggle (export .docx, blank template, per-section editing) — `showAdvancedOutputs` state gates the two redundant sections.
+- [x] **Section editor auto-appears after drafting** (`draftAllSummary || hasAnyDraft`) so users can review/edit without hunting for "More options".
+- [x] **Full-proposal (RFP) mode UNCHANGED** — it genuinely needs the multi-output flow (compliance matrix + drafts + package). Only `isSimpleResponseMode` was simplified.
+
+### Principle
+Low floor (one obvious action for the new/older user), high ceiling (full control on demand). Filtered through [[mindy_product_principles]].
+
+### Verify
+- Built clean + rendered the hero (collapsed + post-draft states). NOT clicked in authed `/app` (Supabase-gated). **This is a core-flow behavior change** — Eric should click through a real Sources Sought pursuit end-to-end and confirm "Draft my response" produces the expected draft + the "More options" reveal works. Screenshot if off.
+
+---
+
 ## Session Handoff — 2026-06-04 (Contractors + Decision Makers overhaul, from screenshots)
 
 A long screenshot-driven pass over the Contractors + Decision Makers surfaces. Every item below was render-verified (puppeteer screenshot of real data) before shipping. All merged to `main`, deployed.
