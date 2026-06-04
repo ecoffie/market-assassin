@@ -20,6 +20,7 @@ interface Grant {
   status?: string;
   docType?: string;
   url: string;
+  score?: number; // profile-relevance score when sorted by relevance
 }
 
 interface GrantsMetadata {
@@ -37,6 +38,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
   const [selectedStatus, setSelectedStatus] = useState('posted');
   const [error, setError] = useState<string | null>(null);
   const [totalHits, setTotalHits] = useState(0);
+  const [sortedByRelevance, setSortedByRelevance] = useState(false);
   const track = useAppTracker(email);
 
   // Load metadata on mount
@@ -82,6 +84,9 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       if (category) params.set('category', category);
       params.set('status', status);
       params.set('limit', '25');
+      // Pass email so the API ranks grants by profile relevance (NAICS /
+      // keywords / agencies) instead of just newest-first.
+      if (email) params.set('email', email);
 
       const res = await fetch(`/api/grants?${params.toString()}`);
       const data = await res.json();
@@ -89,6 +94,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       if (data.success) {
         setGrants(data.grants || []);
         setTotalHits(data.totalHits || 0);
+        setSortedByRelevance(!!data.sortedByRelevance);
       } else {
         setError(data.error || 'Failed to search grants');
         setGrants([]);
@@ -144,6 +150,9 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
         <p className="text-slate-400 mt-1">
           Search open and forecasted opportunities from Grants.gov
           {totalHits > 0 && <span className="text-emerald-400 ml-2">({totalHits} results)</span>}
+          {sortedByRelevance && totalHits > 0 && (
+            <span className="text-blue-400 ml-2 text-sm">· ranked by your profile</span>
+          )}
         </p>
       </div>
 
@@ -245,6 +254,18 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
                   <div className="flex-1 min-w-0">
                     {/* Badges */}
                     <div className="flex flex-wrap items-center gap-2 mb-2">
+                      {sortedByRelevance && typeof grant.score === 'number' && grant.score > 0 && (
+                        <span
+                          title="How well this grant matches your NAICS, keywords, and target agencies"
+                          className={`px-2 py-0.5 text-xs rounded font-semibold ${
+                            grant.score >= 50 ? 'bg-emerald-500/20 text-emerald-300'
+                            : grant.score >= 30 ? 'bg-blue-500/20 text-blue-300'
+                            : 'bg-slate-700 text-slate-400'
+                          }`}
+                        >
+                          {grant.score >= 50 ? '★ Strong match' : grant.score >= 30 ? 'Good match' : 'Weak match'}
+                        </span>
+                      )}
                       {grant.agencyCode && (
                         <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded">
                           {grant.agencyCode}
