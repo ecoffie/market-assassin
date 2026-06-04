@@ -41,11 +41,25 @@ if (!SUPABASE_URL || !SUPABASE_KEY) { console.error('Missing Supabase env'); pro
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Which NAICS to keep. Default = the gov-buyer seed set. --all-naics keeps all.
+// Which NAICS to keep:
+//   --all-naics       keep every entity (full registry)
+//   SECTORS=54,23,33  keep all NAICS whose 2-digit prefix matches (sector
+//                     mode — covers whole industries, e.g. all construction)
+//   NAICS=541512,...  keep only these exact 6-digit codes (default seed set)
 const ALL_NAICS = process.argv.includes('--all-naics');
+const SECTORS = (process.env.SECTORS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
 const SEED_NAICS = new Set((process.env.NAICS ||
   '541512,541511,541611,541330,541990,561210,541519,518210')
   .split(',').map(s => s.trim()).filter(Boolean));
+// Match if any of a firm's NAICS is in the exact seed set OR starts with a
+// requested sector prefix.
+function naicsMatches(codes) {
+  if (SECTORS.length) {
+    if (codes.some(n => SECTORS.some(sec => n.startsWith(sec)))) return true;
+  }
+  return codes.some(n => SEED_NAICS.has(n));
+}
 
 const fileArgIdx = process.argv.indexOf('--file');
 const ZIP_PATH = fileArgIdx > -1 ? process.argv[fileArgIdx + 1] : '/tmp/sam-extract/entities.zip';
@@ -178,7 +192,11 @@ async function downloadIfNeeded() {
 
 async function main() {
   await downloadIfNeeded();
-  console.log(ALL_NAICS ? 'Importing ALL NAICS' : `Filtering to NAICS: ${[...SEED_NAICS].join(',')}`);
+  console.log(
+    ALL_NAICS ? 'Importing ALL NAICS (full registry)'
+    : SECTORS.length ? `Filtering to sectors: ${SECTORS.join(',')} (+ seed NAICS)`
+    : `Filtering to NAICS: ${[...SEED_NAICS].join(',')}`,
+  );
 
   let parsed = 0, kept = 0, upserted = 0, lineNo = 0;
   let batch = [];
@@ -206,7 +224,7 @@ async function main() {
     const row = parseRecord(fields);
     if (!row) continue;
     parsed++;
-    if (!ALL_NAICS && !row.naics_codes.some(n => SEED_NAICS.has(n))) continue;
+    if (!ALL_NAICS && !naicsMatches(row.naics_codes)) continue;
     kept++;
     batch.push(row);
     if (batch.length >= 500) await flush();
