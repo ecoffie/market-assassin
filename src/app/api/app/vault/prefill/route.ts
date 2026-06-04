@@ -511,20 +511,36 @@ export async function POST(request: NextRequest) {
 
   // ---- AI-drafted capabilities (with marker so user knows they're starters) ----
   if (capabilities.length > 0) {
-    const rows = capabilities.map((c) => ({
-      user_email: userEmail,
-      capability_name: (c.capability_name as string)?.slice(0, 200) || 'Untitled capability',
-      description: (c.description as string)?.slice(0, 2000) || '',
-      evidence: (c.evidence as string)?.slice(0, 1000) || null,
-      related_naics: [],
-      keywords: [],
-      tools_methods: [],
-    }));
-    const { error: capErr } = await supabase
+    // DEDUP: don't re-add capabilities the user already has. Without this,
+    // re-running prefill .insert()s another full batch — that's how a 5-cap
+    // draft became 10 (one IT-themed run + one consulting-themed run stacked).
+    // Match case-insensitively on capability_name.
+    const { data: existingCaps } = await supabase
       .from('user_capabilities_library')
-      .insert(rows);
-    if (capErr) errors.push(`capabilities: ${capErr.message}`);
-    else capabilitiesWritten = rows.length;
+      .select('capability_name')
+      .eq('user_email', userEmail)
+      .is('archived_at', null);
+    const haveCap = new Set(
+      (existingCaps || []).map((r: { capability_name: string }) => (r.capability_name || '').trim().toLowerCase()),
+    );
+    const rows = capabilities
+      .map((c) => ({
+        user_email: userEmail,
+        capability_name: (c.capability_name as string)?.slice(0, 200) || 'Untitled capability',
+        description: (c.description as string)?.slice(0, 2000) || '',
+        evidence: (c.evidence as string)?.slice(0, 1000) || null,
+        related_naics: [],
+        keywords: [],
+        tools_methods: [],
+      }))
+      .filter((r) => !haveCap.has(r.capability_name.trim().toLowerCase()));
+    if (rows.length > 0) {
+      const { error: capErr } = await supabase
+        .from('user_capabilities_library')
+        .insert(rows);
+      if (capErr) errors.push(`capabilities: ${capErr.message}`);
+      else capabilitiesWritten = rows.length;
+    }
   }
 
   // ---- AI-drafted sample past performance (with [placeholders]) ----
@@ -532,26 +548,36 @@ export async function POST(request: NextRequest) {
   // USASpending rows. We tag source='ai_coach_sample' so the UI can
   // surface a "this is a starter — edit in your real details" hint.
   if (samplePastPerformance.length > 0) {
-    const rows = samplePastPerformance.map((p) => ({
-      user_email: userEmail,
-      contract_title: (p.contract_title as string)?.slice(0, 200) || '[Contract Title]',
-      contract_number: null,
-      agency: (p.agency as string)?.slice(0, 100) || '[Agency]',
-      sub_agency: null,
-      period_start: null,
-      period_end: null,
-      contract_value: null,  // String placeholder values can't go in numeric column
-      role: 'prime',
-      scope_description: ((p.scope_description as string) + (p.coaching_note ? `\n\n📝 ${p.coaching_note}` : '')).slice(0, 2000),
-      naics_codes: [],
-      relevance_keywords: [],
-      source: 'ai_coach_sample',
-    }));
-    const { error: spErr } = await supabase
+    // DEDUP: skip if the user already has any ai_coach_sample rows — re-running
+    // prefill should not stack another set of placeholder templates.
+    const { count: existingSamples } = await supabase
       .from('user_past_performance')
-      .insert(rows);
-    if (spErr) errors.push(`sample_past_performance: ${spErr.message}`);
-    else samplePpWritten = rows.length;
+      .select('*', { count: 'exact', head: true })
+      .eq('user_email', userEmail)
+      .eq('source', 'ai_coach_sample')
+      .is('archived_at', null);
+    if (!existingSamples || existingSamples === 0) {
+      const rows = samplePastPerformance.map((p) => ({
+        user_email: userEmail,
+        contract_title: (p.contract_title as string)?.slice(0, 200) || '[Contract Title]',
+        contract_number: null,
+        agency: (p.agency as string)?.slice(0, 100) || '[Agency]',
+        sub_agency: null,
+        period_start: null,
+        period_end: null,
+        contract_value: null,  // String placeholder values can't go in numeric column
+        role: 'prime',
+        scope_description: ((p.scope_description as string) + (p.coaching_note ? `\n\n📝 ${p.coaching_note}` : '')).slice(0, 2000),
+        naics_codes: [],
+        relevance_keywords: [],
+        source: 'ai_coach_sample',
+      }));
+      const { error: spErr } = await supabase
+        .from('user_past_performance')
+        .insert(rows);
+      if (spErr) errors.push(`sample_past_performance: ${spErr.message}`);
+      else samplePpWritten = rows.length;
+    }
   }
 
   return NextResponse.json({
