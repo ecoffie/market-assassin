@@ -4,6 +4,30 @@
 
 ---
 
+## Session Handoff — 2026-06-04 (Decision Makers tab + Contractors→BQ)
+
+Two data-wiring fixes — surfaced data that existed but wasn't connected. Both merged to `main`, deployed to prod.
+
+### Shipped
+- [x] **Government Decision Makers tab** (sidebar → Research). New panel `GovDecisionMakersPanel` + `/api/app/federal-contacts` over the `federal_contacts` table (~112K SAM contacts, synced daily, was never surfaced in UI). Search by name/title, filter by agency + office, dedupes repeat people, reachable (email/phone) first. Honest footnote: SAM POCs = contracting officers/specialists, NOT PMs/end-users yet.
+- [x] **Contractors panel → BigQuery** — was stuck on static `contractors.json` (2,768). Now reads `/api/contractors/search-bq` → `searchRecipients` over BQ recipients: **317,106 award-winning contractors** with real award $ + counts. Dropped SBLO/contact filter (BQ has no contacts — those live in Decision Makers); rows degrade gracefully.
+
+### QUOTA discipline (BigQuery bills by bytes scanned — measured via dry-run)
+- Name/state search → `recipients` table: ~12-24 MB.
+- **NAICS filter → `top_contractors_by_dimension` rollup (naics dim): ~6 MB.** The naive EXISTS-on-awards was **1.2 GB (200× worse)** — explicitly avoided. NAICS path returns top-50 per code (rollup is top-N), which is what the panel wants.
+- All queries via `queryCached` → repeats cost 0 bytes.
+
+### Verification
+- API verified live (317K total, name + NAICS paths). Render layer + field-mapping verified by rendering the panel's row markup against the live prod API + screenshot (Booz $21B/858, Leidos $16.6B/11342, etc. — correct).
+- **NOT verified:** a literal click in the real `/app` sidebar — `/app` is gated by a Supabase session (not the MI token), so headless can't reach the authed view without live creds. `scripts/clickthrough-contractors-panel.mjs` documents this. If the panel looks off in-browser, screenshot it (caught the grants "Email required" bug fast last time).
+
+### Follow-ups
+- [ ] **5-role gov contacts** — Decision Makers shows only `role_category='contracting'`; PM/engineer/end-user need a source (PRD §7).
+- [ ] **Link contractor rows to /contractors/[slug]** — BQ route returns `slug`; could make the company name a link to the public profile page.
+- [ ] **NAICS coverage** — Contractors NAICS filter = top-50 per code (rollup). Fine for "top performers"; full-list would need a different (costlier) path.
+
+---
+
 ## Session Handoff — 2026-06-04 (Podcast Guest Insights · Today's Intel)
 
 Founders-style guest quotes on the **Today's Intel** Mindy Insight hero card, sourced from `podcast_episode_metadata.key_lessons` (Groq extraction on ~312+ guest episodes). **Live in production** at full rollout.
