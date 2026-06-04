@@ -88,10 +88,31 @@ export default function ContractorSalesHistoryDrawer({
     };
   }, [contractor.company, contractor.uei, contractor.slug, email]);
 
-  const maxYearAmount = useMemo(() => {
-    if (!history?.series.length) return 1;
-    return Math.max(...history.series.map((year) => year.totalObligations), 1);
+  // Fill the chart to a CONSISTENT window so every contractor's "Sales by
+  // Fiscal Year" is comparable — a firm with awards only in 24–26 (e.g. EXCELL)
+  // should still show the full timeline with $0 columns for the empty years,
+  // like a decade-long incumbent (e.g. RQ). Eric 2026-06-04. Window = the last
+  // ~10 fiscal years up to the latest year that has data; existing years keep
+  // their data + agency breakdown, gaps become $0 placeholders.
+  const displaySeries = useMemo(() => {
+    const series = history?.series ?? [];
+    if (series.length === 0) return [];
+    const byYear = new Map(series.map(y => [y.fiscalYear, y]));
+    const maxYear = Math.max(...series.map(y => y.fiscalYear));
+    const minData = Math.min(...series.map(y => y.fiscalYear));
+    // Show at least the last 10 years, but don't truncate older real data.
+    const startYear = Math.min(minData, maxYear - 9);
+    const out: typeof series = [];
+    for (let y = startYear; y <= maxYear; y++) {
+      out.push(byYear.get(y) ?? { fiscalYear: y, totalObligations: 0, awardCount: 0, agencyBreakdown: [] });
+    }
+    return out;
   }, [history]);
+
+  const maxYearAmount = useMemo(() => {
+    if (!displaySeries.length) return 1;
+    return Math.max(...displaySeries.map((year) => year.totalObligations), 1);
+  }, [displaySeries]);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
@@ -189,17 +210,20 @@ export default function ContractorSalesHistoryDrawer({
                   </a>
                 </div>
 
-                {history.series.length > 0 ? (
+                {displaySeries.length > 0 ? (
                   <div>
                     {/* Vertical column chart (HigherGov / GovTribe style):
                         years across the bottom, bars rising to their value.
                         Reads the spending trajectory left-to-right at a glance.
-                        Click a column to drill into that year's agencies. */}
+                        Click a column to drill into that year's agencies.
+                        displaySeries fills empty years with $0 so the timeline
+                        is consistent across contractors. */}
                     <div className="flex items-end gap-2 h-56 overflow-x-auto pb-1">
-                      {history.series.map((year) => {
+                      {displaySeries.map((year) => {
                         const isExpanded = expandedYear === year.fiscalYear;
                         const breakdown = year.agencyBreakdown || [];
-                        const pct = Math.max(2, (year.totalObligations / maxYearAmount) * 100);
+                        const isZero = year.totalObligations === 0;
+                        const pct = isZero ? 0 : Math.max(2, (year.totalObligations / maxYearAmount) * 100);
                         return (
                           <button
                             key={year.fiscalYear}
@@ -210,19 +234,24 @@ export default function ContractorSalesHistoryDrawer({
                             }`}
                             title={`FY ${year.fiscalYear}: ${formatCurrency(year.totalObligations)}`}
                           >
-                            {/* value label on top of the column */}
-                            <span className="text-[10px] font-semibold text-slate-300 mb-1 whitespace-nowrap">
-                              {formatCurrency(year.totalObligations)}
+                            {/* value label on top of the column ($0 dimmed) */}
+                            <span className={`text-[10px] font-semibold mb-1 whitespace-nowrap ${isZero ? 'text-slate-600' : 'text-slate-300'}`}>
+                              {isZero ? '$0' : formatCurrency(year.totalObligations)}
                             </span>
-                            {/* the rising bar */}
-                            <div
-                              className={`w-full max-w-[40px] rounded-t transition-colors ${
-                                isExpanded ? 'bg-emerald-400' : 'bg-emerald-500 group-hover:bg-emerald-400'
-                              }`}
-                              style={{ height: `${pct}%` }}
-                            />
+                            {/* the rising bar — $0 years show a faint baseline
+                                stub so the year reads "present but zero". */}
+                            {isZero ? (
+                              <div className="w-full max-w-[40px] h-[2px] rounded bg-slate-700" />
+                            ) : (
+                              <div
+                                className={`w-full max-w-[40px] rounded-t transition-colors ${
+                                  isExpanded ? 'bg-emerald-400' : 'bg-emerald-500 group-hover:bg-emerald-400'
+                                }`}
+                                style={{ height: `${pct}%` }}
+                              />
+                            )}
                             {/* year axis label */}
-                            <span className={`mt-1.5 text-[11px] font-medium whitespace-nowrap ${isExpanded ? 'text-emerald-400' : 'text-slate-400'}`}>
+                            <span className={`mt-1.5 text-[11px] font-medium whitespace-nowrap ${isExpanded ? 'text-emerald-400' : isZero ? 'text-slate-600' : 'text-slate-400'}`}>
                               {`'${String(year.fiscalYear).slice(2)}`}
                             </span>
                           </button>
