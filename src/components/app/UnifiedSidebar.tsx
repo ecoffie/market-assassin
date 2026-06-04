@@ -443,13 +443,15 @@ export default function UnifiedSidebar({
         />
       )}
 
-      {/* Navigation — always vertically scrollable so the nav list can never
-          push the footer (and its controls) off-screen. (A previous
-          overflow-visible-when-collapsed tweak for tooltip escape did exactly
-          that, leaving no reachable expand control on short viewports — the
-          collapsed expand action now lives on the header logo, which is always
-          visible regardless of nav scroll.) */}
-      <nav className="flex-1 py-4 overflow-y-auto">
+      {/* Navigation. EXPANDED: scrolls vertically (overflow-y-auto) so a long
+          nav list can't push the footer off-screen. COLLAPSED: the icon-only
+          list is short enough to fit without scrolling, so we use
+          overflow-visible — otherwise overflow-y-auto also clips the X axis and
+          eats the hover tooltips that sit to the RIGHT of each icon (the
+          regression Eric reported: collapsed icons stopped showing their
+          names). The collapsed expand control lives on the header logo, which
+          is always visible regardless. */}
+      <nav className={`flex-1 py-4 ${isCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
         {NAV_SECTIONS.map((section) => {
           // SaaS-standard ordering (Linear / Notion pattern): items the
           // current user can actually use come first, locked items after.
