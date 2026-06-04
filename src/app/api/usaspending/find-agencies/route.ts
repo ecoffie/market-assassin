@@ -381,8 +381,23 @@ export async function POST(request: NextRequest) {
 
     const limit = 100;
 
+    /** USAspending returns Award Amount as number or string — coerce before SAT thresholds. */
+    function parseAwardAmount(raw: unknown): number {
+      if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+      if (typeof raw === 'string') {
+        const n = Number(raw.replace(/[$,\s]/g, ''));
+        return Number.isFinite(n) ? n : 0;
+      }
+      return 0;
+    }
+
     // Helper to fetch a batch of contracts with a specific sort
-    async function fetchBatch(sortField: string, sortOrder: string, maxPgs: number): Promise<any[]> {
+    async function fetchBatch(
+      sortField: string,
+      sortOrder: string,
+      maxPgs: number,
+      batchFilters: Record<string, unknown> = filters,
+    ): Promise<any[]> {
       const results: any[] = [];
       for (let page = 1; page <= maxPgs; page++) {
         try {
@@ -390,7 +405,7 @@ export async function POST(request: NextRequest) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              filters,
+              filters: batchFilters,
               fields,
               page,
               limit,
@@ -421,7 +436,10 @@ export async function POST(request: NextRequest) {
       return results;
     }
 
-    console.log(`📊 Smart sampling: fetching up to ${maxPagesPerSort * limit * 2} contracts (${maxPagesPerSort * limit} by $ + ${maxPagesPerSort * limit} by date)...`);
+    const satPages = Math.min(maxPagesPerSort, 15);
+    console.log(
+      `📊 Smart sampling: up to ${maxPagesPerSort * limit} by $ + ${maxPagesPerSort * limit} by date + ${satPages * limit} SAT-eligible (≤$${SIMPLIFIED_ACQUISITION_THRESHOLD / 1000}K)...`,
+    );
 
     // PASS 1: Fetch by Award Amount (biggest contracts first)
     console.log('   Pass 1: Fetching by Award Amount (largest contracts)...');
@@ -433,29 +451,43 @@ export async function POST(request: NextRequest) {
     const byDate = await fetchBatch('Award Date', 'desc', maxPagesPerSort);
     console.log(`   ✓ Retrieved ${byDate.length} contracts by date`);
 
+    // PASS 3: SAT-eligible awards only. Pass 1 sorts amount DESC so
+    // high-volume NAICS fill the sample with mega-contracts and SAT%
+    // was always 0 (tasks/todo.md 2026-05-25). This pass guarantees
+    // sub-$350K awards enter the merge for honest office-level SAT%.
+    const satFilters = {
+      ...filters,
+      award_amounts: [{ lower_bound: 1, upper_bound: SIMPLIFIED_ACQUISITION_THRESHOLD }],
+    };
+    console.log(`   Pass 3: Fetching SAT-eligible awards (≤$${SIMPLIFIED_ACQUISITION_THRESHOLD / 1000}K)...`);
+    const bySat = await fetchBatch('Award Amount', 'desc', satPages, satFilters);
+    console.log(`   ✓ Retrieved ${bySat.length} SAT-eligible contracts`);
+
     // Deduplicate by Award ID
     const seenAwardIds = new Set<string>();
     const allAwards: any[] = [];
 
-    for (const award of byAmount) {
-      const awardId = award['Award ID'];
-      if (awardId && !seenAwardIds.has(awardId)) {
-        seenAwardIds.add(awardId);
-        allAwards.push(award);
+    const mergeAwards = (batch: any[]) => {
+      for (const award of batch) {
+        const awardId = award['Award ID'];
+        if (awardId && !seenAwardIds.has(awardId)) {
+          seenAwardIds.add(awardId);
+          allAwards.push(award);
+        }
       }
-    }
+    };
+
+    mergeAwards(byAmount);
     const amountOnlyCount = allAwards.length;
-
-    for (const award of byDate) {
-      const awardId = award['Award ID'];
-      if (awardId && !seenAwardIds.has(awardId)) {
-        seenAwardIds.add(awardId);
-        allAwards.push(award);
-      }
-    }
+    mergeAwards(byDate);
     const uniqueFromDate = allAwards.length - amountOnlyCount;
+    const beforeSat = allAwards.length;
+    mergeAwards(bySat);
+    const uniqueFromSat = allAwards.length - beforeSat;
 
-    console.log(`✅ Smart sampling complete: ${allAwards.length} unique contracts (${amountOnlyCount} by $, +${uniqueFromDate} unique from recent)`);
+    console.log(
+      `✅ Smart sampling complete: ${allAwards.length} unique contracts (${amountOnlyCount} by $, +${uniqueFromDate} recent, +${uniqueFromSat} SAT-eligible)`,
+    );
 
     // Track if we applied a fallback to show users what changed
     let wasAutoAdjusted = false;
@@ -717,7 +749,7 @@ export async function POST(request: NextRequest) {
       const awardingAgencyCode = award['Awarding Agency Code'] || '';
       const awardingSubAgencyCode = award['Awarding Sub Agency Code'] || '';
       const location = award['Place of Performance State Code'] || null;
-      const amount = award['Award Amount'] || 0;
+      const amount = parseAwardAmount(award['Award Amount']);
 
       // Track if we have a specific office or just aggregating by sub-agency
       const hasSpecificOffice = !!rawAwardingOffice && rawAwardingOffice !== rawAwardingSubAgency;

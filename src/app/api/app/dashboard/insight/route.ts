@@ -6,11 +6,12 @@
  *   dashboard_insights table). Generates fresh on first call of the
  *   day, returns cached on subsequent calls.
  *
- * Strategy (hybrid):
+ * Strategy (pulse vs lesson):
  *   1. Check cache — return immediately if today's row exists
- *   2. Try AI extraction from the user's most recent briefing template
- *   3. Fall back to deterministic data point (top opp, NAICS stat)
- *   4. Last resort: a static "Mindy is watching X opportunities today" message
+ *   2. Build pulse candidate (briefing AI, else deterministic stats)
+ *   3. Build lesson candidate (podcast guest, NAICS-fit + quality gate)
+ *   4. selectPulseOrLesson() — urgent opp → pulse; strong guest fit → lesson
+ *   5. Last resort: static fallback quote
  *
  * Content Reaper pattern #1 (visual quote cards) applied to in-app
  * surfaces. Browser does the Canvas rendering using the data returned
@@ -22,6 +23,13 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { dateSeed, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
+import { getPodcastInsightForProfile, podcastInsightFeatureEnabled } from '@/lib/rag/podcast-insights';
+import {
+  briefingHasUrgentOpportunity,
+  selectPulseOrLesson,
+  type DailyInsightSource,
+  type LessonCandidate,
+} from '@/lib/dashboard/insight-pulse-lesson';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,10 +58,13 @@ const INSIGHT_FORMATS = ['stat', 'question', 'contrarian', 'fragment', 'sentence
 interface InsightResponse {
   quote: string;
   format: string;             // 'stat' | 'question' | 'contrarian' | 'fragment' | 'sentence'
-  source: 'ai_briefing' | 'deterministic_data' | 'fallback';
+  source: 'ai_briefing' | 'deterministic_data' | 'podcast_guest' | 'fallback';
   attribution?: string;
   themeIndex: number;
   insightDate: string;
+  /** pulse = today's market; lesson = podcast guest (when pulse vs lesson runs) */
+  mode?: 'pulse' | 'lesson';
+  selectionReason?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -114,33 +125,118 @@ export async function GET(request: NextRequest) {
   }
 
   const recentQuotes = await loadRecentInsightQuotes(userEmail, today);
+  const recentSources = await loadRecentInsightSources(userEmail, today);
 
-  // 2. Try AI extraction from user's most recent briefing
-  let insight: InsightResponse | null = null;
-  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !insight; attempt++) {
-    try {
-      const candidate = await extractFromBriefing(userEmail, themeIndex, today, refreshSeed + attempt);
-      if (candidate && !isSimilarToRecent(candidate.quote, recentQuotes)) {
-        insight = candidate;
-      }
-    } catch (err) {
-      console.warn('[dashboard/insight] AI extraction failed:', err);
-    }
+  let excludeSource: DailyInsightSource | undefined;
+  if (forceRefresh) {
+    const { data: prev } = await supabase
+      .from('dashboard_insights')
+      .select('source')
+      .eq('user_email', userEmail)
+      .eq('insight_date', today)
+      .maybeSingle();
+    if (prev?.source) excludeSource = prev.source as DailyInsightSource;
   }
 
-  // 3. Deterministic fallback: top opportunity or NAICS stat
-  if (!insight) {
-    for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !insight; attempt++) {
+  const { data: profileSettings } = await supabase
+    .from('user_notification_settings')
+    .select('naics_codes, agencies')
+    .eq('user_email', userEmail)
+    .maybeSingle();
+  const profileNaics = (profileSettings?.naics_codes || []) as string[];
+  const profileAgencies = (profileSettings?.agencies || []) as string[];
+
+  const podcastLive = podcastInsightFeatureEnabled(userEmail);
+  const briefingCtx = await loadUserBriefing(userEmail);
+  const hasUrgency = briefingHasUrgentOpportunity(briefingCtx?.briefing);
+
+  let lesson: LessonCandidate | null = null;
+  let pulse: InsightResponse | null = null;
+
+  if (podcastLive && profileNaics.length > 0) {
+    for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !lesson; attempt++) {
       try {
-        const candidate = await deterministicFallback(userEmail, themeIndex, today, refreshSeed + attempt, recentQuotes);
-        if (candidate && !isSimilarToRecent(candidate.quote, recentQuotes)) {
-          insight = candidate;
+        const guest = await getPodcastInsightForProfile({
+          naicsCodes: profileNaics,
+          agencies: profileAgencies,
+          today,
+          rotateSeed: refreshSeed + attempt,
+          recentQuotes,
+          qualityGate: true,
+        });
+        if (guest && !isSimilarToRecent(guest.quote, recentQuotes)) {
+          lesson = {
+            quote: guest.quote,
+            format: guest.format,
+            source: 'podcast_guest',
+            attribution: guest.attribution,
+            relevanceScore: guest.relevanceScore,
+            matchTier: guest.matchTier,
+          };
         }
       } catch (err) {
-        console.warn('[dashboard/insight] deterministic fallback failed:', err);
+        console.warn('[dashboard/insight] podcast lesson candidate failed:', err);
       }
     }
   }
+
+  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !pulse; attempt++) {
+    try {
+      const candidate = await extractFromBriefing(
+        userEmail,
+        themeIndex,
+        today,
+        refreshSeed + attempt,
+        briefingCtx?.briefing,
+      );
+      if (candidate && !isSimilarToRecent(candidate.quote, recentQuotes)) {
+        pulse = candidate;
+      }
+    } catch (err) {
+      console.warn('[dashboard/insight] briefing pulse candidate failed:', err);
+    }
+  }
+
+  if (!pulse) {
+    for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS && !pulse; attempt++) {
+      try {
+        const candidate = await deterministicFallback(
+          userEmail,
+          themeIndex,
+          today,
+          refreshSeed + attempt,
+          recentQuotes,
+        );
+        if (candidate && !isSimilarToRecent(candidate.quote, recentQuotes)) {
+          pulse = candidate;
+        }
+      } catch (err) {
+        console.warn('[dashboard/insight] deterministic pulse failed:', err);
+      }
+    }
+  }
+
+  const pick = selectPulseOrLesson({
+    pulse,
+    lesson,
+    briefingHasUrgency: hasUrgency,
+    podcastEnabled: podcastLive,
+    excludeSource,
+    recentSources,
+  });
+
+  let insight: InsightResponse | null = pick
+    ? {
+        quote: pick.insight.quote,
+        format: pick.insight.format,
+        source: pick.insight.source,
+        attribution: pick.insight.attribution,
+        themeIndex,
+        insightDate: today,
+        mode: pick.mode,
+        selectionReason: pick.reason,
+      }
+    : null;
 
   // 4. Static last-resort fallback (every user always sees something)
   if (!insight) {
@@ -173,30 +269,18 @@ export async function GET(request: NextRequest) {
 
 // ---- AI extraction from briefing -----------------------------------
 
-async function extractFromBriefing(
-  userEmail: string,
-  themeIndex: number,
-  today: string,
-  rotateSeed = 0
-): Promise<InsightResponse | null> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
-
+async function loadUserBriefing(userEmail: string): Promise<{ briefing: Record<string, unknown> } | null> {
   const supabase = getSupabase();
-
-  // Get this user's briefing data — first check user_notification_settings
-  // for their profile hash, then find the most recent briefing template
   const { data: settings } = await supabase
     .from('user_notification_settings')
     .select('naics_profile_hash')
     .eq('user_email', userEmail)
     .maybeSingle();
-
   if (!settings?.naics_profile_hash) return null;
 
   const { data: template } = await supabase
     .from('briefing_templates')
-    .select('briefing_content, generated_at')
+    .select('briefing_content')
     .eq('naics_profile_hash', settings.naics_profile_hash)
     .eq('briefing_type', 'daily')
     .order('generated_at', { ascending: false })
@@ -204,13 +288,32 @@ async function extractFromBriefing(
     .maybeSingle();
 
   if (!template?.briefing_content) return null;
+  return { briefing: template.briefing_content as Record<string, unknown> };
+}
+
+async function extractFromBriefing(
+  userEmail: string,
+  themeIndex: number,
+  today: string,
+  rotateSeed = 0,
+  preloadedBriefing?: Record<string, unknown> | null,
+): Promise<InsightResponse | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  let briefing = preloadedBriefing;
+  if (!briefing) {
+    const ctx = await loadUserBriefing(userEmail);
+    briefing = ctx?.briefing ?? null;
+  }
+  if (!briefing) return null;
 
   // Build a tight prompt around a date-rotated focus opportunity. Briefing
   // templates change slowly, so always sending the top five makes the model
   // keep extracting the same #1 opportunity day after day.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const briefing = template.briefing_content as any;
-  const opps = selectInsightOpportunities(briefing.opportunities || [], today, rotateSeed, 5);
+  const briefingAny = briefing as any;
+  const opps = selectInsightOpportunities(briefingAny.opportunities || [], today, rotateSeed, 5);
   if (opps.length === 0) return null;
   const angle = INSIGHT_FORMATS[(dateSeed(today) + rotateSeed) % INSIGHT_FORMATS.length];
 
@@ -352,6 +455,23 @@ async function loadRecentInsightQuotes(userEmail: string, today: string): Promis
       .order('insight_date', { ascending: false })
       .limit(RECENT_DEDUPE_DAYS);
     return (data || []).map((row: { quote?: string | null }) => row.quote || '').filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function loadRecentInsightSources(userEmail: string, today: string): Promise<DailyInsightSource[]> {
+  try {
+    const { data } = await getSupabase()
+      .from('dashboard_insights')
+      .select('source')
+      .eq('user_email', userEmail)
+      .lt('insight_date', today)
+      .order('insight_date', { ascending: false })
+      .limit(RECENT_DEDUPE_DAYS);
+    return (data || [])
+      .map((row: { source?: string | null }) => row.source as DailyInsightSource)
+      .filter(Boolean);
   } catch {
     return [];
   }

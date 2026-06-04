@@ -5044,7 +5044,6 @@ function ReportViewer({
       )
     : [];
   const analyticsReport = reportData as ReportData['simplifiedAcquisition'];
-  const analyticsRows = reportId === 'analytics' ? analyticsReport?.agencies || [] : [];
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -5379,43 +5378,11 @@ function ReportViewer({
         </div>
       )}
 
-      {/* Simplified Acquisition */}
+      {/* Market Analytics — full Entry Accessibility table (task #41) */}
       {reportId === 'analytics' && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-emerald-400">{formatCurrency(analyticsReport?.summary?.totalSATSpending)}</div>
-              <div className="text-xs text-slate-500">SAT Spending</div>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="text-lg font-bold text-white">{formatCount(analyticsReport?.summary?.totalSATContracts)}</div>
-              <div className="text-xs text-slate-500">SAT Contracts</div>
-            </div>
-          </div>
-          {analyticsRows.slice(0, 10).map((agency, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="font-medium text-white">{agency.agency}</div>
-                <span className={`px-2 py-0.5 rounded text-xs ${
-                  agency.accessibilityLevel === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
-                  agency.accessibilityLevel === 'moderate' ? 'bg-amber-500/20 text-amber-400' :
-                  'bg-slate-500/20 text-slate-400'
-                }`}>
-                  {agency.accessibilityLevel}
-                </span>
-              </div>
-              <div className="flex gap-4 mt-2 text-sm">
-                <span className="text-emerald-400">{formatCurrency(agency.satSpending)}</span>
-                <span className="text-slate-400">{formatCount(agency.satContractCount)} contracts</span>
-              </div>
-            </div>
-          ))}
-          {analyticsRows.length === 0 && (
-            <p className="rounded-lg border border-slate-800 bg-slate-800/40 p-3 text-sm text-slate-400">
-              No simplified-acquisition rows came back for this profile. The main Market Map above can still show spending and buyer charts from target-market research data.
-            </p>
-          )}
-        </div>
+        <EntryAccessibilityCard
+          data={analyticsReport as SimplifiedAcquisitionReport | undefined}
+        />
       )}
 
       {/* Teaming Partners */}

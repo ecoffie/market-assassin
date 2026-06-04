@@ -4,22 +4,6 @@
 
 ---
 
-## Session Handoff — 2026-06-04 (Recompete geography + Grants relevance)
-
-Two seller-side relevance fixes. Both merged to `main` and deployed to prod.
-
-### Shipped
-- [x] **Recompete location match** — expiring contracts now show HOW they match your service area, not a silent filter. New `src/lib/geo/location-match.ts` (state-adjacency map) classifies each contract's place-of-performance vs. profile `hq_state`+`service_states` into hq / service / neighbor / outside. `RecompetesPanel` stopped hiding out-of-area contracts; shows all, sorted in-area-first, with a colored badge + "X in or near your service area" count. Location now always shown (city/state/zip or "not specified").
-- [x] **Grants alert relevance fixed** — `scoreGrant` was loose (kidney-research / highway-bridge grants scored same as real IT). Now separates topical RELEVANCE from bonuses: zero relevance → score 0; bonuses only apply with real fit; weak NAICS-keyword brush drops to +10. New `GRANT_RELEVANCE_THRESHOLD=30`. Verified: IT profile → 0 grants (was 9 noise); research profile → 3 real NIH matches.
-- [x] **In-app Grants panel ranked by profile** — `/api/grants?email=` loads profile, scores with same `scoreGrant`, sorts best-match first. Panel shows "★ Strong/Good/Weak match" badge + "ranked by your profile" header. (Was newest-first, no matching.)
-
-### Honest notes
-- **Grants are thin for most NAICS contractors** — grants fund PROGRAMS (research/social), not contracting services. So even ranked, IT/construction profiles often see all-zero (correct, not a bug). Grants shine for research/health/education firms.
-- **HQ-state source for recompete badge** falls back through `identity.hq_state` → `locationState` → first service state. If a user's distinct `user_identity_profile.hq_state` should be authoritative, wire the panel to read the identity vault directly (one-line fix).
-- `/api/grants` profile load reads NAICS/keywords/agencies from `user_notification_settings`; `business_description` from `user_business_profiles` (separate table — the column does NOT exist on notification_settings).
-
----
-
 ## Session Handoff — 2026-06-04 (Podcast Guest Insights · Today's Intel)
 
 Founders-style guest quotes on the **Today's Intel** Mindy Insight hero card, sourced from `podcast_episode_metadata.key_lessons` (Groq extraction on ~312+ guest episodes). **Live in production** at full rollout.
@@ -102,6 +86,7 @@ New REVERSE-search feature for federal contracting officers ("find businesses fo
 - [x] **Leaderboard agency drill-down** (click 'Department of the Army' → filter All Agencies + scroll)
 - [x] **Top 10 Funding Agencies leaderboard cut** (near-duplicate of Departments)
 - [x] **'Start Here' 3-card row deleted** (broken picker showing Homeland $0/0 as 'best first')
+- [x] **SAT sampling fix** — `find-agencies` Pass 3 (`award_amounts` ≤$350K) + `parseAwardAmount`; target-list GET enriches `sat_ratio` from `agency_target_data_cache`
 - [x] **Pain pts badge clickable** in My Target List → expandable panel with documented issues + priorities
 - [x] **Events split into 2 independent toggle buttons** (Scheduled Events purple, Sources Sought amber)
 - [x] **SAT% shows 'SAT —' instead of misleading 0%** when sample has no small-dollar contracts
@@ -134,7 +119,7 @@ New REVERSE-search feature for federal contracting officers ("find businesses fo
 
 ### Next session priorities (in order)
 1. **Diagnose triage crash** (task #47): open DevTools console, get stack trace, fix specific line, resurrect from `git show feb239b -- src/components/app/panels/triage/StartTrackingModal.tsx` etc.
-2. **SAT/Entry Accessibility table** in Reports view where 'Start Here' used to be (task #41) — after triage stable
+2. **SAT% fix (sampling)** — Pass 3 in `find-agencies` fetches ≤$350K awards; target-list GET backfills `sat_ratio` from TMR cache when snapshot was 0 (2026-06-04)
 3. **Check SAM System Account status weekly** (task #20) — if approved → can build real office-level data layer
 4. **Other ideas surfaced this session:**
    - Map "Reports" view is still confusing — needs an audit similar to what we did for Map view

@@ -17,10 +17,12 @@ import { getMIApiHeaders } from './authHeaders';
 interface InsightData {
   quote: string;
   format: string;
-  source: 'ai_briefing' | 'deterministic_data' | 'fallback';
+  source: 'ai_briefing' | 'deterministic_data' | 'podcast_guest' | 'fallback';
   attribution?: string;
   themeIndex: number;
   insightDate: string;
+  mode?: 'pulse' | 'lesson';
+  selectionReason?: string;
 }
 
 interface MindyInsightCardProps {
@@ -137,9 +139,13 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
           <span>
             💡 Mindy Insight ·{' '}
             <span className="text-slate-500">
-              {insight.source === 'ai_briefing' ? 'from today\'s briefing' :
-               insight.source === 'deterministic_data' ? 'from your data' :
-               'federal contracting'}
+              {insight.mode === 'lesson' || insight.source === 'podcast_guest'
+                ? 'guest lesson'
+                : insight.mode === 'pulse' || insight.source === 'ai_briefing'
+                  ? 'today\'s market'
+                  : insight.source === 'deterministic_data'
+                    ? 'your data today'
+                    : 'federal contracting'}
             </span>
             {insight.attribution && <span className="text-slate-500"> · {insight.attribution}</span>}
           </span>

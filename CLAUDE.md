@@ -551,6 +551,7 @@ The daily-alerts cron is nominally "PAID TIER ONLY," but the tier check is **OFF
 - Controlled by env: `DAILY_ALERT_BETA=off` enforces paid-only (free → weekly fallback); unset/anything-else = everyone-daily.
 - There used to be a hardcoded `BETA_END_DATE = '2026-05-28'`. When that date passed it silently flipped the tier check on and **collapsed the daily send from ~922 to ~1/day** (free users fell through to the weekly cron). The bare date gate was **removed** — never reintroduce a calendar-based gate here.
 - **Do NOT set `ENABLE_MINDY_INSIGHTS=true`** in Vercel — the #91 Mindy Insights RAG quote awaited in the per-user send loop crashed the batch May 28–31. It's gated off via `MINDY_INSIGHTS_ROLLOUT_PERCENT=0`.
+- **Today's Intel Mindy Insight card (June 4, 2026):** Podcast **guest lesson** quotes on `/app` dashboard — **separate flags**, **LIVE** at `ENABLE_PODCAST_INSIGHTS=true` + `PODCAST_INSIGHTS_ROLLOUT_PERCENT=100`. Uses **pulse vs lesson** (`src/lib/dashboard/insight-pulse-lesson.ts`): pulse = briefing/stats; lesson = NAICS-matched `key_lessons` from `podcast_episode_metadata`. QA: `/admin/podcast-highlights`. Runbook: `tasks/podcast-highlights-QA.md`. API: `GET /api/app/dashboard/insight`.
 - Real alert numbers: `/api/admin/dashboard` + `/api/admin/briefing-status`. `/api/admin/alert-status` reads the dropped `user_alert_settings` table and is stale.
 **Features:**
 - **Notice Type Badges:** Color-coded RFP (green), RFQ (blue), Sources Sought (purple), Pre-Sol (orange), Combined (teal)

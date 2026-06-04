@@ -7,6 +7,7 @@
 - Profile Vault: persistent user knowledge base
 - Pursuit Document Pipeline: auto-ingest SAM resources into Proposal Assist
 - Daily alerts + Mindy Insight cards
+- **Today's Intel guest lessons (June 2026):** Podcast `key_lessons` on dashboard hero card via pulse vs lesson; `tasks/podcast-highlights-QA.md`
 - Proposal Assist v2 with anti-repetition memory + 12 content lenses
 - Pipeline Tracker, Teaming CRM, Market Research, Forecast Intelligence
 
@@ -17,7 +18,8 @@
 ## Tier 1 — Killer features (ship in week 1-2)
 
 ### 1. Mindy Chat — RAG-backed Q&A
-**Estimated build:** 3-4 hours
+**Status:** Shipped (v1) — `/app` chat + `podcast-search.ts` episode cards
+**Estimated build:** 3-4 hours (initial)
 **Dev Tier requirement:** Sustained 30+ RPM across users
 **Pitch:** Type a question, get an answer grounded in 8 years of teaching + 743 guest interviews, with citations.
 

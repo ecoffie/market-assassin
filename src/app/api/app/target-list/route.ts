@@ -39,6 +39,80 @@ function getSupabase() {
 const VALID_STATUSES = ['targeting', 'contacted', 'qualified', 'passed', 'won'] as const;
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const;
 
+function normalizeOfficeName(name: string): string {
+  return name.toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+/** Match a saved office to a cached TMR row and return satRatio 0..1. */
+function satRatioForOffice(
+  officeName: string,
+  agencies: Array<{ contractingOffice?: string; name?: string; satRatio?: number }>,
+): number {
+  const want = normalizeOfficeName(officeName);
+  if (!want) return 0;
+  for (const row of agencies) {
+    for (const label of [row.contractingOffice, row.name]) {
+      if (!label) continue;
+      const norm = normalizeOfficeName(label);
+      if (norm === want || norm.includes(want) || want.includes(norm)) {
+        const ratio = Number(row.satRatio);
+        return Number.isFinite(ratio) && ratio > 0 ? ratio : 0;
+      }
+    }
+  }
+  return 0;
+}
+
+/** Backfill sat_ratio from agency_target_data_cache when the snapshot was saved as 0. */
+async function enrichTargetsSatFromCache(
+  targets: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const needsSat = targets.filter((t) => !Number(t.sat_ratio));
+  if (needsSat.length === 0) return targets;
+
+  const naicsKeys = [
+    ...new Set(
+      needsSat
+        .map((t) => String(t.source_naics || '').split(',')[0].trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (naicsKeys.length === 0) return targets;
+
+  const cacheByNaics = new Map<string, Array<{ contractingOffice?: string; name?: string; satRatio?: number }>>();
+  const supabase = getSupabase();
+
+  for (const naics of naicsKeys) {
+    try {
+      const { data: rows } = await supabase
+        .from('agency_target_data_cache')
+        .select('agencies, generated_at')
+        .eq('naics_code', naics)
+        .order('generated_at', { ascending: false })
+        .limit(3);
+      const merged: Array<{ contractingOffice?: string; name?: string; satRatio?: number }> = [];
+      for (const row of rows || []) {
+        if (Array.isArray(row.agencies)) merged.push(...row.agencies);
+      }
+      if (merged.length > 0) cacheByNaics.set(naics, merged);
+    } catch (err) {
+      console.warn('[target-list] SAT cache lookup failed for', naics, err);
+    }
+  }
+
+  if (cacheByNaics.size === 0) return targets;
+
+  return targets.map((t) => {
+    if (Number(t.sat_ratio) > 0) return t;
+    const naics = String(t.source_naics || '').split(',')[0].trim();
+    const agencies = naics ? cacheByNaics.get(naics) : undefined;
+    if (!agencies?.length) return t;
+    const ratio = satRatioForOffice(String(t.office_name || ''), agencies);
+    if (ratio <= 0) return t;
+    return { ...t, sat_ratio: ratio };
+  });
+}
+
 // ---------------------------------------------------------------------
 // GET — list my saved targets
 // ---------------------------------------------------------------------
@@ -64,7 +138,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, targets: data || [], count: (data || []).length });
+    const targets = await enrichTargetsSatFromCache((data || []) as Array<Record<string, unknown>>);
+
+    return NextResponse.json({ success: true, targets, count: targets.length });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[target-list] GET threw:', err);

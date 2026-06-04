@@ -1,11 +1,10 @@
 'use client';
 
 /**
- * EntryAccessibilityCard — SAT / Entry Accessibility surface for the
- * Market Research "Reports" view. Ports the EntryPointsTab pattern
- * from federal-market-assassin/reports/ReportsDisplay so users have
- * an honest "where can a small biz get in" view in the same spot
- * where the deleted "Start Here" cards used to live.
+ * EntryAccessibilityCard — SAT / Entry Accessibility table for Market
+ * Research. Replaces the deleted "Start Here" 3-card row (2026-05-25).
+ * Shown on Market Map (default) and Reports view; also used in the
+ * Market Analytics lens modal. Ports EntryPointsTab from MA ReportsDisplay.
  *
  * Data source: reportData.simplifiedAcquisition (same shape MA uses).
  * Falls back to an honest empty-state when the award sample didn't
