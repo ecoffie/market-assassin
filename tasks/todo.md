@@ -4,6 +4,34 @@
 
 ---
 
+## Session Handoff — 2026-06-04 (Contractors + Decision Makers overhaul, from screenshots)
+
+A long screenshot-driven pass over the Contractors + Decision Makers surfaces. Every item below was render-verified (puppeteer screenshot of real data) before shipping. All merged to `main`, deployed.
+
+### Contractors panel
+- [x] **Wired to BigQuery** — was static `contractors.json` (2,768); now `/api/contractors/search-bq` → 317K award-winning recipients with real award $ + counts. Quota-aware (name search ~12-24MB; NAICS via rollup ~6MB; never the 1.2GB awards scan).
+- [x] **Company rows link** to `/contractors/[slug]` (canonical `recipientSlug`, verified no 404s).
+- [x] **HQ location on cards** (📍 McLean, VA) — disambiguates same-named firms. `recipients` has city+state.
+- [x] **State filter** (dropdown) — name-search only; NAICS path has no location (rollup), dropdown hides + `locationAvailable:false`.
+- [x] **Award-history drawer fixed** — was "Contractor not found" for ~all BQ firms (only resolved the static 2,768). New `getBqContractorHistory` (resolve by uei/slug → BQ per-recipient functions).
+- [x] **Sales-by-Fiscal-Year → vertical column chart** (HigherGov/GovTribe style), was horizontal bars.
+- [x] **Per-year agency drill-down** populated for BQ contractors (was empty `agencyBreakdown`); `getYearlyByAgencyForRecipient`.
+
+### Decision Makers tab
+- [x] **Honest roles** — SAM POC `title` is null at source, so "Primary Contact" is a POC designation, not a job title. Column → "Role/POC": real role when identifiable (`normalizeTitle`, ~700 of 112K), else muted "Primary POC", junk blanked.
+- [x] **Agency → contracting-office drill-down** — built `agency_office_summary` BQ rollup (top 100 offices/agency by spend; one-time 7GB build, ~0.13MB reads). Pick an agency → "Top contracting offices" panel (DoD → NAVAIR $401B, NAVSEA $345B, DLA, DHA, MDA…). HONEST: it's agency intelligence (which commands buy), NOT a contact filter — SAM POC contacts don't carry office. `getOfficesForAgency` contains-matches SAM agency names → rollup names.
+
+### Research (no build — scoping)
+- [x] **`docs/RESEARCH-gov-decision-maker-roles.md`** — probed the sources for real gov roles. Findings: roles are NULL at source (SAM POC title null; FPDS/awards has no CO name, only contractor execs) → real CO/PM/end-user roles need COMMERCIAL enrichment (a buy, not a build). But `awards.awarding_office` is 100% populated → the office drill-down (above) was the achievable win. Memory: [[gov_roles_not_in_sam_fpds]].
+
+### Follow-ups
+- [ ] **Real gov roles** — only via commercial enrichment (HigherGov/LinkedIn-grade). Gate on the tab proving demand. See research doc.
+- [ ] **Contractors NAICS+state combo** — state filter is name-search only (rollup has no location). Would need a costlier location-aware NAICS path.
+- [ ] **Office → contact join** — solicitation_number prefix encodes the office; decoding it could eventually link POC contacts to offices (sub-project).
+- [ ] **Monthly rollup refresh** must now also build `agency_office_summary` (added to `scripts/bq-build-agency-rollups.sql`).
+
+---
+
 ## Session Handoff — 2026-06-04 (Vault/Settings IA + NAICS sync fix)
 
 IA cleanup from Eric's review of Vault/Settings/Library + a real data bug found underneath it. All merged to `main`, deployed.
