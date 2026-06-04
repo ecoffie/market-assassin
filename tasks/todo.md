@@ -4,6 +4,63 @@
 
 ---
 
+## Session Handoff — 2026-06-04 (Recompete geography + Grants relevance)
+
+Two seller-side relevance fixes. Both merged to `main` and deployed to prod.
+
+### Shipped
+- [x] **Recompete location match** — expiring contracts now show HOW they match your service area, not a silent filter. New `src/lib/geo/location-match.ts` (state-adjacency map) classifies each contract's place-of-performance vs. profile `hq_state`+`service_states` into hq / service / neighbor / outside. `RecompetesPanel` stopped hiding out-of-area contracts; shows all, sorted in-area-first, with a colored badge + "X in or near your service area" count. Location now always shown (city/state/zip or "not specified").
+- [x] **Grants alert relevance fixed** — `scoreGrant` was loose (kidney-research / highway-bridge grants scored same as real IT). Now separates topical RELEVANCE from bonuses: zero relevance → score 0; bonuses only apply with real fit; weak NAICS-keyword brush drops to +10. New `GRANT_RELEVANCE_THRESHOLD=30`. Verified: IT profile → 0 grants (was 9 noise); research profile → 3 real NIH matches.
+- [x] **In-app Grants panel ranked by profile** — `/api/grants?email=` loads profile, scores with same `scoreGrant`, sorts best-match first. Panel shows "★ Strong/Good/Weak match" badge + "ranked by your profile" header. (Was newest-first, no matching.)
+
+### Honest notes
+- **Grants are thin for most NAICS contractors** — grants fund PROGRAMS (research/social), not contracting services. So even ranked, IT/construction profiles often see all-zero (correct, not a bug). Grants shine for research/health/education firms.
+- **HQ-state source for recompete badge** falls back through `identity.hq_state` → `locationState` → first service state. If a user's distinct `user_identity_profile.hq_state` should be authoritative, wire the panel to read the identity vault directly (one-line fix).
+- `/api/grants` profile load reads NAICS/keywords/agencies from `user_notification_settings`; `business_description` from `user_business_profiles` (separate table — the column does NOT exist on notification_settings).
+
+---
+
+## Session Handoff — 2026-06-04 (Podcast Guest Insights · Today's Intel)
+
+Founders-style guest quotes on the **Today's Intel** Mindy Insight hero card, sourced from `podcast_episode_metadata.key_lessons` (Groq extraction on ~312+ guest episodes). **Live in production** at full rollout.
+
+### Shipped
+- [x] **`src/lib/rag/podcast-insights.ts`** — NAICS-matched guest quote picker
+- [x] **`src/lib/rag/podcast-naics-relevance.ts`** — industry-fit scoring (demotes tangential matches e.g. CMMC in construction NAICS)
+- [x] **`src/lib/dashboard/insight-pulse-lesson.ts`** — **pulse vs lesson** selection (not calendar rotation)
+- [x] **`/api/app/dashboard/insight`** — builds pulse + lesson candidates, picks winner
+- [x] **`MindyInsightCard`** — footer: `today's market` vs `guest lesson`
+- [x] **`/admin/podcast-highlights`** — QA UI + API (`op=stats|sample|preview`)
+- [x] **Vercel prod** — `ENABLE_PODCAST_INSIGHTS=true`, `PODCAST_INSIGHTS_ROLLOUT_PERCENT=100`
+
+### Pulse vs lesson (one card per day)
+| Mode | Source | When |
+|------|--------|------|
+| **Pulse** | Briefing AI or opp stats | Urgent deadline in briefing (≤14d), weak guest fit, or variety after guest streak |
+| **Lesson** | Podcast guest | ≥50% industry fit + primary/sector; ≥36% minimum |
+
+### Env vars (Today's Intel only — NOT daily email)
+```bash
+ENABLE_PODCAST_INSIGHTS=true          # master switch
+PODCAST_INSIGHTS_ROLLOUT_PERCENT=100    # 0–100, deterministic per email
+```
+**Still OFF for email:** `ENABLE_MINDY_INSIGHTS` / `MINDY_INSIGHTS_ROLLOUT_PERCENT` (per-notice-type RAG in daily-alerts cron — separate feature, crashed batch May 28–31).
+
+### Key files
+| File | Purpose |
+|------|---------|
+| `tasks/podcast-highlights-QA.md` | Ops runbook + enable/disable |
+| `scripts/extract-podcast-metadata.js` | Back-catalog `key_lessons` extraction |
+| `scripts/export-podcast-highlights-review.js` | Offline HTML QA report |
+| `src/lib/rag/podcast-insights-flag.ts` | Feature gate |
+
+### Follow-ups (optional)
+- [ ] **`highlight_quotes` column** — shorter punchy pulls if card copy needs ≤15 words without trim
+- [ ] **Email Mindy Insights (#91)** — re-enable with per-cron cache only; do not mix with this card path
+- [ ] **Cap statement from podcast** (mindy-v2-build-list #8)
+
+---
+
 ## Session Handoff — 2026-06-04 (Government Buyer Market Research)
 
 New REVERSE-search feature for federal contracting officers ("find businesses for a requirement"). Merged to `main`, deployed to prod, gated to `gov_buyer` users. PRD: `docs/PRD-gov-buyer-market-research.md`.
