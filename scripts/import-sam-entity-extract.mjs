@@ -69,6 +69,22 @@ function sbaLabel(code) {
   return null;
 }
 
+// SELF-CERTIFIED set-aside business types live in the BUSINESS TYPE field
+// (field 32 / index 31), distinct from the SBA-CERTIFIED field (118).
+// Codes verified against live SAM API descriptions (2026-06-04):
+//   8W = Women-Owned Small Business    A2 = Women-Owned Business      -> WOSB
+//   QF = Service-Disabled Veteran-Owned   JV = SDVOSB Joint Venture  -> SDVOSB
+//   A5 = Veteran-Owned Business                                       -> VOSB
+// These are SELF-certified (NOT SBA/VA-vetted) — the rubric weights them
+// lower than 8(a)/HUBZone, and the memo footnotes the distinction.
+function selfCertLabel(code) {
+  const c = (code || '').toUpperCase().trim();
+  if (c === '8W' || c === 'A2') return 'WOSB';
+  if (c === 'QF' || c === 'JV') return 'SDVOSB';
+  if (c === 'A5') return 'VOSB';
+  return null;
+}
+
 /**
  * Parse one pipe-delimited record into a sam_entities row (or null to skip).
  * Positions VERIFIED against real SAM_PUBLIC_MONTHLY_V2_20260503 data
@@ -107,13 +123,18 @@ function parseRecord(fields) {
     naicsCodes.unshift(primaryNaics);
   }
 
-  // SBA CERTIFIED types live in field index 117 (1-indexed 118), NOT 31.
-  // Verified 2026-06-04: field 31 is GENERAL business types (2X=For-Profit
-  // etc.), which wrongly inflated 8(a) to 95%. Field 118 holds the real
-  // certified codes, space-padded + tilde-delimited ("A6        ~XX        ").
+  // Two cert sources, both surfaced into certifications[]:
+  //  - field 118 (idx 117): SBA-CERTIFIED programs — 8(a), HUBZone (vetted).
+  //  - field 32  (idx 31):  SELF-CERTIFIED business types — WOSB/SDVOSB/VOSB.
+  // (Field 31 also holds general types like 2X=For-Profit; selfCertLabel
+  // only maps the set-aside ones, so those are correctly ignored.)
   const certs = new Set();
   for (const tok of (fields[117] || '').split('~')) {
     const label = sbaLabel(tok.trim());
+    if (label) certs.add(label);
+  }
+  for (const tok of (fields[31] || '').split('~')) {
+    const label = selfCertLabel(tok.trim());
     if (label) certs.add(label);
   }
 
