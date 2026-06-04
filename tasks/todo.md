@@ -4,6 +4,24 @@
 
 ---
 
+## Session Handoff — 2026-06-04 (Vault/Settings IA + NAICS sync fix)
+
+IA cleanup from Eric's review of Vault/Settings/Library + a real data bug found underneath it. All merged to `main`, deployed.
+
+### Shipped
+- [x] **Vault "Team" → "Key Personnel"** — the Vault tab is proposal CONTENT (people you put in proposals: PMs, leads, bios/clearances), a different thing from inviting workspace teammates. Renamed to kill the shared-word confusion; empty state points to Settings for account-teammate invites. (No data moved — Eric chose "rename, don't move".)
+- [x] **Settings identity clarity** — "Opportunity Matching" now notes company profile (legal name, UEI, certs) lives in My Vault → Identity, so Settings NAICS reads as an alert-matching PREFERENCE, not the authoritative profile.
+- [x] **NAICS sync bug FIXED** — the real bug behind the "NAICS in 3 tables" IA question. The daily-alerts cron reads NAICS from `user_notification_settings`, but Vault Identity save wrote `primary_naics` ONLY to `user_identity_profile`. So a user who set NAICS in the Vault (with SAM auto-fill) silently got no matching alerts. **Fix:** on Vault save, seed `user_notification_settings.naics_codes` from the Vault — but ONLY when the alert filter is EMPTY (never clobber a tuned filter). Vault primary_naics = all registered codes (identity); alert naics_codes = what the user chose to watch (preference) — they diverge in practice, so a blind copy would've been worse than the bug. Verified: empty→seeds, tuned→skips. Vault shows an "applied to alerts" note.
+
+### Deliberately NOT done (correct scope)
+- The 3rd NAICS copy (`mi_beta_user_settings`, display-only) left as-is — Settings already writes the cron table correctly, so it doesn't affect alerts. The Vault→cron gap was the only real bug.
+- The two/three settings surfaces (sidebar gear "Personal Workspace" vs Settings nav) are INTENTIONALLY separate (Eric, May 20) — do NOT merge.
+
+### Pending (waiting on Eric)
+- [ ] **Vault + Library VISUAL redesign** — Eric asked "is this the best UI?" for Vault (Past Performance/Capabilities) + Library. Can't assess pixels from code; **waiting on screenshots** to propose specific design changes. Gamma was mentioned as a reference.
+
+---
+
 ## Session Handoff — 2026-06-04 (Decision Makers tab + Contractors→BQ)
 
 Two data-wiring fixes — surfaced data that existed but wasn't connected. Both merged to `main`, deployed to prod.
