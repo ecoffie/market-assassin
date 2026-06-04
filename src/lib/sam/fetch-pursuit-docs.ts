@@ -484,7 +484,13 @@ export async function fetchPursuitDocs(opts: {
   let noticeFound = false; // did we positively locate the notice (cache or live)?
   let discoverTrace: string[] = [];
   const cached = await resolveFromCache(supabase, noticeId).catch(() => null);
-  if (cached) {
+  // IMPORTANT: only trust a cache hit that actually HAS attachments. A cache row
+  // with 0 attachments is NOT proof the notice has none — the sync may not have
+  // captured them, or (as with a wrong/stale UUID) the row is a near-miss. In
+  // that case fall through to live discover, which can find the real notice via
+  // solnum/title and recover its attachments. (This was the "Laboratory
+  // Renovation" bug: cache hit, 0 attachments → 'none', never tried live.)
+  if (cached && cached.attachments.length > 0) {
     cacheHit = true;
     noticeFound = true;
     discoverTrace = [`cache-hit uuid=${cached.uuid} attachments=${cached.attachments.length}`];
@@ -498,6 +504,7 @@ export async function fetchPursuitDocs(opts: {
     }
     fileRefs = urlsToFileRefs(cached.attachments);
   } else {
+    if (cached) discoverTrace.push(`cache-hit-empty uuid=${cached.uuid} → live discover`);
     // Cold path: notice not in our cache → live SAM discover. This now also
     // resolves a solicitation number → UUID (via solnum search), which is how
     // the remaining sol#-keyed pursuits get fixed: their id isn't in our cache,
@@ -509,7 +516,7 @@ export async function fetchPursuitDocs(opts: {
     });
     fileRefs = discovered.refs;
     noticeFound = discovered.foundNotice;
-    discoverTrace = discovered.trace;
+    discoverTrace = [...discoverTrace, ...discovered.trace];
     if (discovered.resolvedUuid && discovered.resolvedUuid !== noticeId) {
       await supabase.from('user_pipeline')
         .update({ notice_id: discovered.resolvedUuid })
