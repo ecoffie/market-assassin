@@ -231,6 +231,15 @@ export default function LibraryPanel({ email, tier }: Props) {
   // Reset page when filter or query changes
   useEffect(() => { setPage(0); }, [type, debouncedQuery]);
 
+  // Auto-preview the top entry so the detail pane is never dead space.
+  // Only when nothing is selected yet (don't yank the user off their choice).
+  useEffect(() => {
+    if (!selected && !selectedLoading && entries.length > 0) {
+      openDetail(entries[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries]);
+
   const openDetail = async (id: string) => {
     if (!email) return;
     setSelectedLoading(true);
@@ -311,19 +320,18 @@ export default function LibraryPanel({ email, tier }: Props) {
               <button
                 key={entry.id}
                 onClick={() => openDetail(entry.id)}
-                className={`block w-full text-left px-4 py-3 border-b border-slate-800 hover:bg-slate-900/40 transition ${selected?.id === entry.id ? 'bg-slate-900/60' : ''}`}
+                className={`block w-full text-left px-4 py-2.5 border-b border-slate-800 hover:bg-slate-900/40 transition ${selected?.id === entry.id ? 'bg-slate-900/60 border-l-2 border-l-emerald-500' : 'border-l-2 border-l-transparent'}`}
               >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${badge.color}`}>
+                {/* Tightened to type · title · agency · date — full content is
+                    in the preview pane (no per-row snippet). Scan many fast. */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${badge.color}`}>
                     {badge.label}{entry.content_subtype ? ` · ${displaySubtype(entry.content_subtype)}` : ''}
                   </span>
-                  <span className="text-[10px] text-slate-500 whitespace-nowrap">{new Date(entry.created_at).toLocaleDateString()}</span>
+                  <span className="text-[10px] text-slate-500 whitespace-nowrap shrink-0">{new Date(entry.created_at).toLocaleDateString()}</span>
                 </div>
-                <div className="text-sm text-white truncate">{entry.title}</div>
+                <div className="text-sm text-white truncate mt-1">{entry.title}</div>
                 {entry.agency && <div className="text-xs text-slate-400 truncate">{entry.agency}</div>}
-                {entry.content_text && (
-                  <div className="text-xs text-slate-500 mt-1 line-clamp-2">{entry.content_text.slice(0, 200)}</div>
-                )}
               </button>
             );
           })}
