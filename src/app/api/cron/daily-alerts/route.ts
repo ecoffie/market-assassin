@@ -8,7 +8,7 @@ import {
   SAMOpportunity,
   SAMNoticeSummary,
 } from '@/lib/briefings/pipelines/sam-gov';
-import { searchGrantsByNAICS, scoreGrant, GrantOpportunity } from '@/lib/briefings/pipelines/grants-gov';
+import { searchGrantsByNAICS, scoreGrant, GrantOpportunity, GRANT_RELEVANCE_THRESHOLD } from '@/lib/briefings/pipelines/grants-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import nodemailer from 'nodemailer';
@@ -691,7 +691,7 @@ async function runDailyAlertJob(options?: {
                 business_description: user.business_description || null,
               }),
             }))
-            .filter(g => g.score >= 20) // Only include relevant grants
+            .filter(g => g.score >= GRANT_RELEVANCE_THRESHOLD) // genuinely relevant only
             .sort((a, b) => b.score - a.score)
             .slice(0, 5); // Top 5 grants
 

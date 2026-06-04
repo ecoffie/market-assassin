@@ -191,47 +191,58 @@ export function scoreGrant(
     business_description?: string | null;
   }
 ): number {
-  let score = 0;
-
-  // Keyword match in title/description
   const grantText = `${grant.title} ${grant.description}`.toLowerCase();
 
-  // Check user keywords
-  const keywordMatches = userProfile.keywords.filter(k =>
-    grantText.includes(k.toLowerCase())
-  ).length;
-  score += keywordMatches * 15;
+  // ── RELEVANCE signal (topical fit) — kept SEPARATE from bonuses ──
+  // The old scorer let urgency (+15) + funding (+10) push an irrelevant
+  // grant over the bar, and a lone loose NAICS-keyword brush (+20) alone
+  // cleared it — so IT/construction profiles got kidney-research and
+  // highway-bridge grants. Fix: bonuses only count when there's real
+  // topical relevance, and the loose NAICS brush can't pass on its own.
+  let relevance = 0;
 
+  // Explicit user keywords — the strongest, most intentional signal.
+  const keywordMatches = userProfile.keywords.filter(k =>
+    k && grantText.includes(k.toLowerCase())
+  ).length;
+  relevance += keywordMatches * 15;
+
+  // Business-description terms — moderate signal.
   const descriptionTerms = extractDescriptionTerms(userProfile.business_description);
   if (descriptionTerms.length > 0) {
     const descriptionMatches = descriptionTerms.filter(term => grantText.includes(term)).length;
-    score += Math.min(descriptionMatches * 3, 15);
+    relevance += Math.min(descriptionMatches * 5, 20);
   }
 
-  // Check NAICS-derived keywords
+  // NAICS-derived keyword — WEAK proxy (NAICS = contracting work, grants =
+  // programs). +10, so it can't clear the threshold alone.
   for (const naics of userProfile.naics_codes.slice(0, 5)) {
     const naicsKeyword = getNAICSKeyword(naics);
     if (naicsKeyword && grantText.includes(naicsKeyword.toLowerCase())) {
-      score += 20;
+      relevance += 10;
       break;
     }
   }
 
-  // Agency match
-  const grantAgency = grant.agency.toLowerCase();
-  if (userProfile.agencies.some(a => grantAgency.includes(a.toLowerCase()))) {
-    score += 25;
+  // Agency match — strong: the user already targets this funder.
+  const grantAgency = (grant.agency || '').toLowerCase();
+  if (userProfile.agencies.some(a => a && grantAgency.includes(a.toLowerCase()))) {
+    relevance += 25;
   }
 
-  // Deadline urgency
+  // No topical relevance at all → score 0 (never surfaced), regardless of
+  // how big or urgent the grant is.
+  if (relevance === 0) return 0;
+
+  let score = relevance;
+
+  // ── BONUSES — only applied once baseline relevance exists ──
   if (grant.closeDate) {
     const daysUntil = getDaysUntil(grant.closeDate);
     if (daysUntil <= 14) score += 15;
     else if (daysUntil <= 30) score += 10;
     else if (daysUntil <= 60) score += 5;
   }
-
-  // Funding amount bonus (larger grants = more opportunity)
   if (grant.awardCeiling) {
     if (grant.awardCeiling >= 1000000) score += 10;
     else if (grant.awardCeiling >= 100000) score += 5;
@@ -239,6 +250,11 @@ export function scoreGrant(
 
   return Math.min(score, 100);
 }
+
+// Minimum score for a grant to appear in an alert email. Set ABOVE the lone
+// NAICS-keyword brush (10) so a weak proxy match alone never qualifies — a
+// grant needs a real user-keyword hit, an agency match, or multiple signals.
+export const GRANT_RELEVANCE_THRESHOLD = 30;
 
 // Helper functions
 const DESCRIPTION_STOP_WORDS = new Set([
