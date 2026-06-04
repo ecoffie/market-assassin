@@ -18,10 +18,6 @@
       "schedule": "0 1 * * *"
     },
     {
-      "path": "/api/cron/sync-gov-buyer-data",
-      "schedule": "0 2 * * *"
-    },
-    {
       "path": "/api/cron/backfill-sam-descriptions",
       "schedule": "0 3 * * *"
     },
