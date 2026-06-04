@@ -29,6 +29,8 @@ interface Contractor {
   has_phone: boolean;
   has_contact: boolean;
   contract_value_num: number;
+  slug?: string; // BQ-backed rows include this — links to /contractors/[slug]
+  uei?: string;
 }
 
 interface ContractorStats {
@@ -409,8 +411,20 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     )}
                   </div>
 
-                  {/* Company Name */}
-                  <h3 className="text-white font-semibold text-lg mb-1">{contractor.company}</h3>
+                  {/* Company Name — links to the public profile page (BQ rows) */}
+                  {contractor.slug ? (
+                    <a
+                      href={`/contractors/${contractor.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white hover:text-emerald-400 font-semibold text-lg mb-1 inline-flex items-center gap-1 transition-colors"
+                    >
+                      {contractor.company}
+                      <span className="text-slate-500 text-sm">↗</span>
+                    </a>
+                  ) : (
+                    <h3 className="text-white font-semibold text-lg mb-1">{contractor.company}</h3>
+                  )}
 
                   {/* SBLO Contact */}
                   {contractor.sblo_name && contractor.sblo_name !== 'N/A' && (

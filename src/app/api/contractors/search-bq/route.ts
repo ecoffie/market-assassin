@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { searchRecipients } from '@/lib/bigquery/recipients';
+import { searchRecipients, recipientSlug } from '@/lib/bigquery/recipients';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -44,9 +44,9 @@ export async function GET(request: NextRequest) {
       contract_count: r.award_count,
       agencies_count: r.distinct_agency_count,
       naics_count: r.distinct_naics_count,
-      // slug for the public profile page (mirrors slugifyContractorName)
-      slug: r.recipient_name.toLowerCase().replace(/&/g, ' and ')
-        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120),
+      // slug for the public /contractors/[slug] page — use the SAME canonical
+      // recipientSlug() the page resolves with, so the link never 404s.
+      slug: recipientSlug(r.recipient_name),
       source: 'usaspending',
     }));
 
