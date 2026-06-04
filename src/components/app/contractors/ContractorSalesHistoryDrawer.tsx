@@ -190,75 +190,71 @@ export default function ContractorSalesHistoryDrawer({
                 </div>
 
                 {history.series.length > 0 ? (
-                  <div className="space-y-2">
-                    {history.series.map((year) => {
-                      const isExpanded = expandedYear === year.fiscalYear;
-                      const breakdown = year.agencyBreakdown || [];
-                      return (
-                        <div key={year.fiscalYear} className="rounded-lg border border-transparent hover:border-slate-800 transition-colors">
-                          {/* Clickable row — click to expand the per-
-                              agency breakdown for that fiscal year.
-                              Matches HigherGov's drill-down pattern. */}
+                  <div>
+                    {/* Vertical column chart (HigherGov / GovTribe style):
+                        years across the bottom, bars rising to their value.
+                        Reads the spending trajectory left-to-right at a glance.
+                        Click a column to drill into that year's agencies. */}
+                    <div className="flex items-end gap-2 h-56 overflow-x-auto pb-1">
+                      {history.series.map((year) => {
+                        const isExpanded = expandedYear === year.fiscalYear;
+                        const breakdown = year.agencyBreakdown || [];
+                        const pct = Math.max(2, (year.totalObligations / maxYearAmount) * 100);
+                        return (
                           <button
+                            key={year.fiscalYear}
                             type="button"
-                            onClick={() => setExpandedYear(isExpanded ? null : year.fiscalYear)}
-                            disabled={breakdown.length === 0}
-                            className={`w-full grid grid-cols-[1.5rem_4rem_1fr_6rem] items-center gap-3 px-2 py-1.5 rounded-md text-left transition-colors ${
-                              breakdown.length > 0 ? 'hover:bg-slate-800/40 cursor-pointer' : 'cursor-default'
+                            onClick={() => breakdown.length > 0 && setExpandedYear(isExpanded ? null : year.fiscalYear)}
+                            className={`group flex flex-col items-center justify-end flex-1 min-w-[44px] h-full rounded-md px-1 pt-1 transition-colors ${
+                              breakdown.length > 0 ? 'hover:bg-slate-800/30 cursor-pointer' : 'cursor-default'
                             }`}
+                            title={`FY ${year.fiscalYear}: ${formatCurrency(year.totalObligations)}`}
                           >
-                            <span className="text-slate-500 text-xs">
-                              {breakdown.length > 0 ? (isExpanded ? '▼' : '▸') : ' '}
-                            </span>
-                            <div className="text-sm font-medium text-slate-300">FY {year.fiscalYear}</div>
-                            <div className="h-4 overflow-hidden rounded-full bg-slate-800">
-                              <div
-                                className={`h-full rounded-full transition-colors ${
-                                  isExpanded ? 'bg-emerald-400' : 'bg-emerald-500'
-                                }`}
-                                style={{ width: `${Math.max(4, (year.totalObligations / maxYearAmount) * 100)}%` }}
-                              />
-                            </div>
-                            <div className="text-right text-sm font-semibold text-white">
+                            {/* value label on top of the column */}
+                            <span className="text-[10px] font-semibold text-slate-300 mb-1 whitespace-nowrap">
                               {formatCurrency(year.totalObligations)}
-                            </div>
+                            </span>
+                            {/* the rising bar */}
+                            <div
+                              className={`w-full max-w-[40px] rounded-t transition-colors ${
+                                isExpanded ? 'bg-emerald-400' : 'bg-emerald-500 group-hover:bg-emerald-400'
+                              }`}
+                              style={{ height: `${pct}%` }}
+                            />
+                            {/* year axis label */}
+                            <span className={`mt-1.5 text-[11px] font-medium whitespace-nowrap ${isExpanded ? 'text-emerald-400' : 'text-slate-400'}`}>
+                              {`'${String(year.fiscalYear).slice(2)}`}
+                            </span>
                           </button>
+                        );
+                      })}
+                    </div>
 
-                          {/* Per-year agency breakdown — only renders
-                              when this year is the active expansion.
-                              Limited to top 8 agencies for legibility;
-                              users can click "See all" to expand
-                              further (future iteration). */}
-                          {isExpanded && breakdown.length > 0 && (
-                            <div className="ml-10 mr-2 mt-2 mb-3 space-y-1.5 border-l border-slate-800 pl-3">
-                              <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
-                                Agencies awarding in FY {year.fiscalYear}
-                              </p>
-                              {[...breakdown]
-                                .sort((a, b) => b.amount - a.amount)
-                                .slice(0, 8)
-                                .map((row) => (
-                                  <div key={`${year.fiscalYear}-${row.agency}`} className="flex items-center justify-between gap-3 text-xs">
-                                    <span className="text-slate-300 truncate flex-1">{row.agency}</span>
-                                    <span className="text-slate-500 shrink-0">{row.count} {row.count === 1 ? 'award' : 'awards'}</span>
-                                    <span className="text-emerald-400 font-semibold shrink-0 w-20 text-right">
-                                      {formatCurrency(row.amount)}
-                                    </span>
-                                  </div>
-                                ))}
-                              {breakdown.length > 8 && (
-                                <p className="text-[10px] text-slate-600 italic pt-1">
-                                  +{breakdown.length - 8} more agencies in FY {year.fiscalYear}
-                                </p>
-                              )}
+                    {/* Drill-down: agencies for the selected year, below the chart */}
+                    {expandedYear !== null && (() => {
+                      const yr = history.series.find(y => y.fiscalYear === expandedYear);
+                      const breakdown = (yr?.agencyBreakdown || []).slice().sort((a, b) => b.amount - a.amount);
+                      if (breakdown.length === 0) return null;
+                      return (
+                        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/40 p-4 space-y-1.5">
+                          <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Agencies awarding in FY {expandedYear}</p>
+                          {breakdown.slice(0, 8).map((row) => (
+                            <div key={`${expandedYear}-${row.agency}`} className="flex items-center justify-between gap-3 text-xs">
+                              <span className="text-slate-300 truncate flex-1">{row.agency}</span>
+                              <span className="text-slate-500 shrink-0">{row.count} {row.count === 1 ? 'award' : 'awards'}</span>
+                              <span className="text-emerald-400 font-semibold shrink-0 w-20 text-right">{formatCurrency(row.amount)}</span>
                             </div>
+                          ))}
+                          {breakdown.length > 8 && (
+                            <p className="text-[10px] text-slate-600 italic pt-1">+{breakdown.length - 8} more agencies in FY {expandedYear}</p>
                           )}
                         </div>
                       );
-                    })}
-                    <p className="text-[10px] text-slate-500 italic pt-2 text-center">
-                      Click any year to see which agencies awarded.
-                    </p>
+                    })()}
+
+                    {history.series.some(y => (y.agencyBreakdown || []).length > 0) && (
+                      <p className="text-[10px] text-slate-500 italic pt-3 text-center">Click any year to see which agencies awarded.</p>
+                    )}
                   </div>
                 ) : (
                   <div className="rounded-lg border border-slate-800 bg-slate-950 p-5 text-sm text-slate-400">
