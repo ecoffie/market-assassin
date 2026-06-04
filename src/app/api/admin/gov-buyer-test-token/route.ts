@@ -14,9 +14,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
-import { getOrCreateProfile } from '@/lib/supabase/user-profiles';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -33,32 +33,39 @@ export async function GET(request: NextRequest) {
 
   let provisioned = false;
   if (sp.get('provision') === 'true') {
-    // Use the existing helper to guarantee the row exists (it handles
-    // license_key + default access flags + email normalization) — the
-    // codebase does select-then-insert here, NOT upsert(onConflict:email),
-    // so we don't assume a unique constraint that may not exist.
-    const profile = await getOrCreateProfile(email);
-    if (!profile) {
-      return NextResponse.json(
-        { error: 'provision failed: could not get/create profile' },
-        { status: 500 },
-      );
-    }
-    // Flip user_type by email (the column added in
-    // 20260604_user_type_gov_buyer.sql).
     const sb = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
-    const { error } = await sb
+    const normEmail = email.toLowerCase().trim();
+
+    // Does a profile already exist for this email?
+    const { data: existing } = await sb
       .from('user_profiles')
-      .update({ user_type: 'gov_buyer' })
-      .eq('email', email.toLowerCase().trim());
-    if (error) {
-      return NextResponse.json(
-        { error: `provision failed: ${error.message}` },
-        { status: 500 },
-      );
+      .select('user_id')
+      .eq('email', normEmail)
+      .maybeSingle();
+
+    if (existing) {
+      // Just flip the type.
+      const { error } = await sb
+        .from('user_profiles')
+        .update({ user_type: 'gov_buyer' })
+        .eq('email', normEmail);
+      if (error) {
+        return NextResponse.json({ error: `provision failed: ${error.message}` }, { status: 500 });
+      }
+    } else {
+      // Create a minimal row. user_profiles.user_id is NOT NULL (it's the
+      // Supabase Auth UUID); a test email has no auth user, so we supply a
+      // synthetic UUID. TEST-ONLY provisioning — real gov buyers get a row
+      // via the normal signup/auth flow, then an admin sets user_type.
+      const { error } = await sb
+        .from('user_profiles')
+        .insert({ user_id: crypto.randomUUID(), email: normEmail, user_type: 'gov_buyer' });
+      if (error) {
+        return NextResponse.json({ error: `provision failed: ${error.message}` }, { status: 500 });
+      }
     }
     provisioned = true;
   }
