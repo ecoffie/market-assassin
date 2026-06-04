@@ -646,3 +646,72 @@ export async function searchRecipients(opts: {
   const total = rows.length ? Number(rows[0].total_rows) : 0;
   return { rows: rows.map(({ total_rows, ...r }) => r), total };
 }
+
+/**
+ * Build the in-app drawer's ContractorSalesHistory shape directly from BQ.
+ * Used as the fallback when a contractor isn't in the static contractor DB
+ * (i.e. most of the 317K BQ recipients). Resolves by UEI (exact) or slug.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getBqContractorHistory(opts: { uei?: string; slug?: string }): Promise<any | null> {
+  const profile = opts.uei
+    ? await getRecipientByUei(opts.uei)
+    : opts.slug
+    ? await getRecipientBySlug(opts.slug)
+    : null;
+  if (!profile) return null;
+  const uei = profile.recipient_uei;
+
+  const [yearly, agencies, naics, recent] = await Promise.all([
+    getYearlyTotalsForRecipient(uei),
+    getTopAgenciesForRecipient(uei, 8),
+    getTopNaicsForRecipient(uei, 8),
+    getRecentAwardsForRecipient(uei, 25),
+  ]);
+
+  const series = yearly
+    .sort((a, b) => a.fiscal_year - b.fiscal_year)
+    .map(y => ({ fiscalYear: y.fiscal_year, totalObligations: Number(y.total_obligated || 0), awardCount: Number(y.award_count || 0), agencyBreakdown: [] }));
+  const latestFiscalYear = yearly.length ? Math.max(...yearly.map(y => y.fiscal_year)) : null;
+  const topAgency = agencies[0]?.awarding_agency || null;
+  const awardCount = Number(profile.award_count || 0);
+  const totalObligations = Number(profile.total_obligated || 0);
+
+  return {
+    success: true,
+    source: 'usaspending_cache',
+    coverage: 'cached',
+    lastUpdated: profile.last_action_date || null,
+    contractor: {
+      company: profile.recipient_name,
+      slug: recipientSlug(profile.recipient_name),
+      naics: naics.map(n => n.naics_code),
+      agencies: agencies.map(a => a.awarding_agency),
+      totalContractValue: totalObligations,
+      contractCount: awardCount,
+      hasContact: false, hasEmail: false, hasPhone: false,
+    },
+    match: { method: 'recipient_name', confidence: 'high', name: profile.recipient_name },
+    summary: {
+      totalObligations, awardCount, latestFiscalYear, topAgency,
+      averageAwardSize: awardCount > 0 ? totalObligations / awardCount : 0,
+    },
+    series,
+    topAgencies: agencies.map(a => ({ agency: a.awarding_agency, amount: Number(a.total_amount || 0), count: 0 })),
+    topNaics: naics.map(n => ({ naics: n.naics_code, description: n.naics_description || null, amount: Number(n.total_amount || 0), count: Number(n.award_count || 0) })),
+    recentAwards: recent.map(r => ({
+      id: r.award_id,
+      title: (r.description || r.piid || r.award_id || '').slice(0, 160),
+      agency: r.awarding_agency || '—',
+      subAgency: r.awarding_office || null,
+      naics: r.naics_code || null,
+      naicsDescription: r.naics_description || null,
+      amount: Number(r.obligation_amount || 0),
+      startDate: r.pop_start_date || null,
+      endDate: r.pop_end_date || null,
+      state: r.pop_state || null,
+      url: r.piid ? `https://www.usaspending.gov/award/${r.award_id}` : null,
+    })),
+    gated: { fullHistory: false, contacts: false, workflowActions: false, exports: false },
+  };
+}

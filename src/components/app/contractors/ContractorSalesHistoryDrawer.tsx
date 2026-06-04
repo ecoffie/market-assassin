@@ -11,6 +11,8 @@ interface ContractorSummary {
   contract_count: string;
   agencies: string;
   naics: string;
+  uei?: string;   // BQ-backed rows carry this — the exact award-history key
+  slug?: string;
 }
 
 interface ContractorSalesHistoryDrawerProps {
@@ -53,6 +55,10 @@ export default function ContractorSalesHistoryDrawer({
       try {
         const params = new URLSearchParams({ company: contractor.company });
         if (email) params.set('email', email);
+        // Pass UEI/slug when available (BQ rows) so the route can resolve the
+        // exact recipient even when it's not in the static contractor DB.
+        if (contractor.uei) params.set('uei', contractor.uei);
+        if (contractor.slug) params.set('slug', contractor.slug);
 
         const response = await fetch(
           `/api/app/contractors/sales-history?${params.toString()}`,
@@ -80,7 +86,7 @@ export default function ContractorSalesHistoryDrawer({
     return () => {
       cancelled = true;
     };
-  }, [contractor.company, email]);
+  }, [contractor.company, contractor.uei, contractor.slug, email]);
 
   const maxYearAmount = useMemo(() => {
     if (!history?.series.length) return 1;
