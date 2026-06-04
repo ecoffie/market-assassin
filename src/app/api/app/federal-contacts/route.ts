@@ -30,6 +30,27 @@ function getSupabase() {
 let _agencyCache: { list: string[]; at: number } | null = null;
 const AGENCY_TTL_MS = 6 * 60 * 60 * 1000; // 6h
 
+// SAM's contact "title" is messy: ~25% is the generic POC designation
+// ("Primary Contact"), some is a real role ("Contracting Officer"), much is
+// noise ("MR", "MRS", "GM", "NONE"). Be honest about which is which rather
+// than presenting a POC label as a job title. Returns:
+//   role        — a real job title, or null
+//   pocLabel    — "Primary"/"Secondary" when the title is just the POC slot
+// The UI shows the role when present, else the POC label as a muted hint.
+const REAL_ROLE_RE = /(contracting officer|contract specialist|contracting specialist|program manager|program analyst|specialist|director|administrator|procurement|small business|osbp|chief|officer|analyst|manager|coordinator|liaison|buyer)/i;
+const JUNK_TITLE_RE = /^(mr|mrs|ms|miss|dr|none|n\/a|na|gm|khan|rector|head of organization|business poc|government business poc|electronic business poc)\.?$/i;
+
+function normalizeTitle(title: string | null): { role: string | null; pocLabel: string | null } {
+  const t = (title || '').trim();
+  if (!t) return { role: null, pocLabel: null };
+  const pocMatch = /^(primary|secondary)\s+contact$/i.exec(t);
+  if (pocMatch) return { role: null, pocLabel: pocMatch[1][0].toUpperCase() + pocMatch[1].slice(1).toLowerCase() };
+  if (JUNK_TITLE_RE.test(t)) return { role: null, pocLabel: null };
+  if (REAL_ROLE_RE.test(t)) return { role: t, pocLabel: null };
+  // Unknown but non-junk title — keep it as a role (could be a real one).
+  return { role: t.length <= 60 ? t : null, pocLabel: null };
+}
+
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const email = sp.get('email');
@@ -67,6 +88,30 @@ export async function GET(request: NextRequest) {
     const list = Array.from(set).sort();
     _agencyCache = { list, at: Date.now() };
     return NextResponse.json({ success: true, agencies: list });
+  }
+
+  // Facet: distinct OFFICES for a given agency (drill-down from the broad
+  // agency, e.g. DoD → NAVSEA / DLA / ...). Scoped to one agency, so it's a
+  // small query — no full-table scan needed. ~73% of contacts have an office.
+  if (sp.get('facets') === 'offices') {
+    const facetAgency = (sp.get('agency') || '').trim();
+    if (!facetAgency) return NextResponse.json({ success: true, offices: [] });
+    const set = new Set<string>();
+    const PAGE = 1000;
+    for (let from = 0; from < 60_000; from += PAGE) {
+      const { data, error } = await sb
+        .from('federal_contacts')
+        .select('office')
+        .ilike('department_ind_agency', `%${facetAgency}%`)
+        .not('office', 'is', null)
+        .range(from, from + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      for (const r of data as { office: string }[]) {
+        if (r.office) set.add(r.office);
+      }
+      if (data.length < PAGE) break;
+    }
+    return NextResponse.json({ success: true, offices: Array.from(set).sort() });
   }
 
   const search = (sp.get('search') || '').trim();
@@ -114,7 +159,8 @@ export async function GET(request: NextRequest) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }).map((r: any) => ({ ...r, ...normalizeTitle(r.contact_title) }));
 
   return NextResponse.json({
     success: true,

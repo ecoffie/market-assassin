@@ -25,6 +25,8 @@ interface Contact {
   office: string | null;
   sub_tier: string | null;
   role_category: string | null;
+  role: string | null;       // real job title if we could identify one
+  pocLabel: string | null;   // "Primary"/"Secondary" SAM POC designation
 }
 
 export default function GovDecisionMakersPanel({ email }: Props) {
@@ -34,6 +36,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const [search, setSearch] = useState('');
   const [agency, setAgency] = useState('');
   const [office, setOffice] = useState('');
+  const [offices, setOffices] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +48,18 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       .then(d => { if (d.success) setAgencies(d.agencies || []); })
       .catch(() => {});
   }, [email]);
+
+  // Load the OFFICE list for the selected agency (drill-down). Reset office
+  // when the agency changes.
+  useEffect(() => {
+    setOffice('');
+    setOffices([]);
+    if (!email || !agency) return;
+    fetch(`/api/app/federal-contacts?facets=offices&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setOffices(d.offices || []); })
+      .catch(() => {});
+  }, [email, agency]);
 
   const load = useCallback(async () => {
     if (!email) return;
@@ -111,13 +126,20 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             <option value="">All Agencies</option>
             {agencies.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
-          <input
-            value={office}
-            onChange={e => setOffice(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && load()}
-            placeholder="Filter by office…"
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 outline-none"
-          />
+          {/* Office drill-down only appears IF the selected agency actually has
+              office data. SAM's POC records don't carry the contracting office
+              for most federal agencies (DoD/VA/etc. = 0%), so we don't show an
+              empty dropdown — we only surface it when there's something to pick. */}
+          {agency && offices.length > 0 && (
+            <select
+              value={office}
+              onChange={e => setOffice(e.target.value)}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
+            >
+              <option value="">All offices ({offices.length})</option>
+              {offices.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          )}
         </div>
       </div>
 
@@ -130,7 +152,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             <thead>
               <tr className="bg-slate-800/60 text-left text-slate-400">
                 <th className="px-4 py-3 font-medium">Name</th>
-                <th className="px-4 py-3 font-medium">Title</th>
+                <th className="px-4 py-3 font-medium">Role / POC</th>
                 <th className="px-4 py-3 font-medium">Agency</th>
                 <th className="px-4 py-3 font-medium">Office</th>
                 <th className="px-4 py-3 font-medium">Contact</th>
@@ -140,7 +162,15 @@ export default function GovDecisionMakersPanel({ email }: Props) {
               {contacts.map(c => (
                 <tr key={c.id} className="border-t border-slate-800 hover:bg-slate-800/30">
                   <td className="px-4 py-3 text-white font-medium">{c.contact_fullname || '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{c.contact_title || '—'}</td>
+                  <td className="px-4 py-3">
+                    {c.role ? (
+                      <span className="text-slate-200">{c.role}</span>
+                    ) : c.pocLabel ? (
+                      <span className="text-slate-500 italic" title="SAM point-of-contact designation, not a job title">{c.pocLabel} POC</span>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-300">{c.department_ind_agency || '—'}</td>
                   <td className="px-4 py-3 text-slate-400">{c.office || c.sub_tier || '—'}</td>
                   <td className="px-4 py-3">
@@ -176,8 +206,10 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       )}
 
       <p className="text-xs text-slate-600">
-        Source: SAM.gov points of contact (contracting officers &amp; specialists named on solicitations), synced daily.
-        Program managers and end users aren&apos;t in this dataset yet.
+        Source: SAM.gov points of contact named on solicitations, synced daily. &quot;Primary/Secondary POC&quot; is SAM&apos;s
+        designation for who was listed on a notice — not always a job title. SAM only carries a real role
+        (e.g. Contracting Officer) for a minority of contacts; program managers and end users aren&apos;t in this
+        dataset yet.
       </p>
     </div>
   );
