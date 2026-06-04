@@ -54,6 +54,20 @@ const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const EVENT_HORIZON_DAYS = 90;
 
+// Normalize an agency name to a stable key by stripping department/agency
+// filler and keeping the core tokens. Makes "DEPT OF DEFENSE",
+// "Department of Defense", and "VETERANS AFFAIRS, DEPARTMENT OF" all match
+// their spending-side equivalents. Used to join sam_opportunities /
+// sam_events (keyed by top-level DEPARTMENT) to the spending agency rows.
+function normalizeAgencyKey(s: string): string {
+  return (s || '')
+    .toUpperCase()
+    .replace(/[.,]/g, ' ')
+    .replace(/\b(DEPARTMENT|DEPT|OF|THE|U S|US|ADMINISTRATION|AGENCY|NATIONAL)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
 function getSupabase() {
@@ -297,25 +311,26 @@ export async function POST(request: NextRequest) {
         if (key) totalSpendingByOffice[key] = t.setAsideSpending || 0;
       }
     }
-    const agencyNames = Array.from(new Set(
-      findAgencies.flatMap((a) => [a.subAgency, a.parentAgency, a.contractingOffice]).filter(Boolean) as string[]
-    ));
 
-    // Enrichment 1: open SAM opps per agency. ONE grouped query, not
-    // N+1. We aggregate by department name client-side after the
-    // fetch (Postgres GROUP BY is fine but the typed query gets ugly
-    // through PostgREST).
+    // Enrichment 1: open SAM opps per agency. Counts were ALWAYS 0 because
+    // the old code matched sam_opportunities.department EXACTLY against the
+    // spending-side agency names — but the formats differ ("DEPT OF DEFENSE"
+    // vs "Department of Defense", "VETERANS AFFAIRS, DEPARTMENT OF" vs
+    // "Department of Veterans Affairs"). Exact .in() never matched. Fix: pull
+    // ALL future-deadline opps grouped by department and bucket by a NORMALIZED
+    // key (core agency tokens, filler stripped), then look up rows by the same
+    // normalized key. (Eric 2026-06-04: "open opportunities column shows 0".)
     const oppsStart = Date.now();
-    let oppCounts: Record<string, number> = {};
+    const oppCounts: Record<string, number> = {};   // keyed by normalizeAgencyKey()
     try {
       const { data: oppRows } = await supabase
         .from('sam_opportunities')
         .select('department')
-        .in('department', agencyNames)
         .gte('response_deadline', new Date().toISOString());
       for (const row of oppRows || []) {
-        const dept = row.department || '';
-        oppCounts[dept] = (oppCounts[dept] || 0) + 1;
+        const key = normalizeAgencyKey(row.department || '');
+        if (!key) continue;
+        oppCounts[key] = (oppCounts[key] || 0) + 1;
       }
     } catch (oppErr) {
       console.warn('[target-market-research] sam_opportunities count failed:', oppErr);
@@ -328,17 +343,17 @@ export async function POST(request: NextRequest) {
     const eventsStart = Date.now();
     const eventHorizon = new Date();
     eventHorizon.setDate(eventHorizon.getDate() + EVENT_HORIZON_DAYS);
-    let eventCounts: Record<string, number> = {};
+    const eventCounts: Record<string, number> = {};   // keyed by normalizeAgencyKey()
     try {
       const { data: eventRows } = await supabase
         .from('sam_events')
         .select('agency')
-        .in('agency', agencyNames)
         .gte('event_date', new Date().toISOString().slice(0, 10))
         .lte('event_date', eventHorizon.toISOString().slice(0, 10));
       for (const row of eventRows || []) {
-        const ag = row.agency || '';
-        eventCounts[ag] = (eventCounts[ag] || 0) + 1;
+        const key = normalizeAgencyKey(row.agency || '');
+        if (!key) continue;
+        eventCounts[key] = (eventCounts[key] || 0) + 1;
       }
     } catch (eventErr) {
       console.warn('[target-market-research] sam_events count failed:', eventErr);
@@ -459,8 +474,14 @@ export async function POST(request: NextRequest) {
       const painPointCount = painData
         ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0)
         : 0;
-      const openOppCount = oppCounts[lookupKey] || oppCounts[a.parentAgency || ''] || 0;
-      const upcomingEventCount = eventCounts[lookupKey] || eventCounts[a.parentAgency || ''] || 0;
+      // Match opps/events by NORMALIZED agency key. SAM opps/events are keyed
+      // by top-level DEPARTMENT, so try the row's parent department first, then
+      // sub-agency / name. (This is what fixed the always-0 columns.)
+      const oppKeyCandidates = [a.parentAgency, a.subAgency, a.name, lookupKey]
+        .map(s => normalizeAgencyKey(s || ''))
+        .filter(Boolean);
+      const openOppCount = oppKeyCandidates.reduce((n, k) => n || oppCounts[k] || 0, 0);
+      const upcomingEventCount = oppKeyCandidates.reduce((n, k) => n || eventCounts[k] || 0, 0);
       const satRatio = (a.contractCount && a.contractCount > 0)
         ? (a.satContractCount || 0) / a.contractCount
         : 0;

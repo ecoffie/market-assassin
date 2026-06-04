@@ -1733,8 +1733,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
             <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" />
-            <MetricCard label="Competition signals" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} />
-            <MetricCard label="Upcoming signals" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" />
+            <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" />
+            <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" />
           </section>
 
           {/* Chart placeholders — Slice 2 fills these with Recharts
@@ -1831,8 +1831,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
             <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" />
-            <MetricCard label="Competition signals" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} />
-            <MetricCard label="Upcoming signals" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" />
+            <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" />
+            <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" />
           </section>
 
           {/* 'Start Here' 3-card row removed 2026-05-25 per Eric.
@@ -2246,12 +2246,13 @@ function DetailTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MetricCard({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'green' | 'amber' }) {
+function MetricCard({ label, value, tone = 'default', hint }: { label: string; value: string; tone?: 'default' | 'green' | 'amber'; hint?: string }) {
   const color = tone === 'green' ? 'text-emerald-400' : tone === 'amber' ? 'text-amber-300' : 'text-white';
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5" title={hint || undefined}>
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
       <div className="mt-1 text-sm text-slate-500">{label}</div>
+      {hint && <div className="mt-1 text-xs text-slate-600 leading-snug">{hint}</div>}
     </div>
   );
 }
