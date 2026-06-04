@@ -4,6 +4,25 @@
 
 ---
 
+## Session Handoff — 2026-06-04 (Market Research 0-column + Grants + fiscal-year chart)
+
+More screenshot-driven fixes from Eric clicking through. All merged to `main`, deployed. Render/API-verified (not authed-`/app` clicks — see verify note in the Decision Makers handoff below).
+
+### Market Research (`MarketResearchPanel.tsx`, `api/app/target-market-research`)
+- [x] **"Open opportunities / events" column was ALWAYS 0** — real bug. The TMR route matched `sam_opportunities.department` EXACTLY against spending-side agency names, but formats differ ("DEPT OF DEFENSE" vs "Department of Defense", "VETERANS AFFAIRS, DEPARTMENT OF" vs "Department of Veterans Affairs") → exact `.in()` never matched, despite **12,012 future-deadline opps + 1,100 events** in the tables. Fix: `normalizeAgencyKey()` strips department/agency filler to core tokens, buckets both sides by that key. Verified: DoD → 633 open opps, VA → 117, HHS → 21.
+- [x] **Confusing headline labels** — Eric "not sure what 'Competition signals' / 'Upcoming signals' mean". Relabeled: "Competition signals" → **"Competitors in your space"** (hint: incumbent primes you'd compete with / team with); "Upcoming signals" → **"Upcoming opportunities"** (hint: forecasts 6–18mo out). `MetricCard` now takes a `hint` subtitle.
+- Left alone (Eric said good): Agencies to review, Relevant spending, the report side.
+
+### Federal Grants (`GrantsPanel.tsx`, `api/grants`)
+- [x] **Only 25 results, no sense of total** — real bug: route read `data.totalHits` (NOT a real Grants.gov field → empty), so the UI only knew the 25 it fetched. The true total is `hitCount` (e.g. **1,209 posted**). Now: "Showing 25 of 1,209".
+- [x] **Can't see more / paginate** — added offset/`startRecordNum` paging + a "Load more (N more)" button that appends. Pages through the full set.
+- [x] **Forced profile ranking, no escape** — added a **"★ For me / Newest" sort toggle** (`sort=relevance|newest`). For-me ranks by profile; Newest browses the full unranked list. API returns `total`, `count`, `hasMore`, `hasProfile`, `offset`.
+
+### Contractor award-history chart (`ContractorSalesHistoryDrawer.tsx`)
+- [x] **Inconsistent fiscal-year window** — RQ showed 11 yrs ('16-'26), EXCELL only '24-'26 (looked incomplete). Eric: "show the last 10 years, $0 where there's zero, make them comparable." `displaySeries` fills a consistent window (last ~10 FY up to the latest data year, never truncating older real data) with $0 placeholder columns (dimmed + faint baseline stub). EXCELL now reads as a new entrant ('17-'23 = $0, then real bars), directly comparable to RQ.
+
+---
+
 ## Session Handoff — 2026-06-04 (Proposal Assist one-one-one simplify)
 
 Eric, testing a Fort Devens Sources Sought pursuit: "Available outputs has two 'Export LOI', then another export, then LOI response sections — a wall of options. For someone over 50 it's confusing. We want ChatGPT-simple: give me an answer. Go back to one-one-one." Merged to `main`, deployed.
