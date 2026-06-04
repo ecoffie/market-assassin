@@ -85,6 +85,10 @@ export const BQ_TABLES = {
   // BQ-quota saver.
   agencyTopRecipients: `\`${PROJECT_ID}.${DATASET}.agency_top_recipients\``,
   agencyTopNaics: `\`${PROJECT_ID}.${DATASET}.agency_top_naics\``,
+  // Agency → contracting-office summary (Decision Makers office drill-down).
+  // SAM POC data has no office; awards.awarding_office does — pre-aggregated
+  // here (top 100 offices/agency by spend). Monthly build, ~MB reads.
+  agencyOfficeSummary: `\`${PROJECT_ID}.${DATASET}.agency_office_summary\``,
   // Unified rollup for the /top/[slug] listicle pages (top contractors by
   // agency / naics / sub_agency / state / set_aside). Same monthly build.
   topContractorsByDimension: `\`${PROJECT_ID}.${DATASET}.top_contractors_by_dimension\``,

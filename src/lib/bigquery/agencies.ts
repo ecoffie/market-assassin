@@ -77,3 +77,39 @@ export async function getTopNaicsForAgency(
     params: { agency: agencyName, limit },
   });
 }
+
+export interface AgencyOfficeRow {
+  awarding_office: string;
+  awarding_office_code: string | null;
+  total_amount: number;
+  award_count: number;
+}
+
+/**
+ * Contracting offices for an agency, from the agency_office_summary rollup
+ * (top 100 per agency by spend). Powers the Decision Makers office drill-down
+ * — SAM POC data has no office, but awards.awarding_office does. Cheap (~MB,
+ * cached): the rollup is tiny. Matches by contains() because the rollup's
+ * agency names (title-case "Department of Defense") differ from SAM's
+ * ("DEPT OF DEFENSE") — caller passes whichever it has.
+ */
+export async function getOfficesForAgency(agencyName: string, limit = 100): Promise<AgencyOfficeRow[]> {
+  const needle = (agencyName || '').trim().toLowerCase();
+  if (!needle) return [];
+  // Take the most distinctive word from the SAM agency name to contains-match
+  // (e.g. "AGRICULTURE, DEPARTMENT OF" → "agriculture"). Avoids matching on
+  // stopwords like "department"/"of" that appear in every agency.
+  const STOP = new Set(['department', 'of', 'the', 'and', 'for', 'u.s.', 'us', 'office']);
+  const key = needle.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).sort((a, b) => b.length - a.length)[0] || needle;
+  return queryCached<AgencyOfficeRow>({
+    cacheKey: `agency-offices:${key}:${limit}:v1`,
+    query: `
+      SELECT awarding_office, awarding_office_code, total_amount, award_count
+      FROM ${BQ_TABLES.agencyOfficeSummary}
+      WHERE LOWER(awarding_agency) LIKE @needle
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { needle: `%${key}%`, limit },
+  });
+}

@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { getOfficesForAgency } from '@/lib/bigquery/agencies';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,28 +91,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, agencies: list });
   }
 
-  // Facet: distinct OFFICES for a given agency (drill-down from the broad
-  // agency, e.g. DoD → NAVSEA / DLA / ...). Scoped to one agency, so it's a
-  // small query — no full-table scan needed. ~73% of contacts have an office.
+  // Facet: contracting OFFICES for an agency (drill-down DoD → NAVAIR /
+  // NAVSEA / DLA …). SAM POC data has NO office for the real agencies, so we
+  // read awards.awarding_office via the agency_office_summary BQ rollup
+  // (top 100/agency by spend, ~MB cached). Returns rich offices with $ scale.
   if (sp.get('facets') === 'offices') {
     const facetAgency = (sp.get('agency') || '').trim();
     if (!facetAgency) return NextResponse.json({ success: true, offices: [] });
-    const set = new Set<string>();
-    const PAGE = 1000;
-    for (let from = 0; from < 60_000; from += PAGE) {
-      const { data, error } = await sb
-        .from('federal_contacts')
-        .select('office')
-        .ilike('department_ind_agency', `%${facetAgency}%`)
-        .not('office', 'is', null)
-        .range(from, from + PAGE - 1);
-      if (error || !data || data.length === 0) break;
-      for (const r of data as { office: string }[]) {
-        if (r.office) set.add(r.office);
-      }
-      if (data.length < PAGE) break;
+    try {
+      const rows = await getOfficesForAgency(facetAgency, 100);
+      // Return names for the dropdown, plus richer data the UI can show.
+      return NextResponse.json({
+        success: true,
+        offices: rows.map(r => r.awarding_office),
+        officeDetail: rows.map(r => ({ name: r.awarding_office, amount: r.total_amount, awards: r.award_count })),
+      });
+    } catch (e) {
+      console.error('[federal-contacts] offices facet:', e);
+      return NextResponse.json({ success: true, offices: [] });
     }
-    return NextResponse.json({ success: true, offices: Array.from(set).sort() });
   }
 
   const search = (sp.get('search') || '').trim();

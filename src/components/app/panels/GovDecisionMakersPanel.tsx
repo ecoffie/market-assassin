@@ -35,8 +35,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [agency, setAgency] = useState('');
-  const [office, setOffice] = useState('');
-  const [offices, setOffices] = useState<string[]>([]);
+  const [officeDetail, setOfficeDetail] = useState<Array<{ name: string; amount: number; awards: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,15 +48,16 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       .catch(() => {});
   }, [email]);
 
-  // Load the OFFICE list for the selected agency (drill-down). Reset office
-  // when the agency changes.
+  // Load the agency's top CONTRACTING OFFICES (from awards data) when an
+  // agency is selected — the "DoD is too broad → here are its real offices"
+  // drill-down. This is intelligence, not a contact filter (SAM POC contacts
+  // don't carry office, so we can't filter the rows by office).
   useEffect(() => {
-    setOffice('');
-    setOffices([]);
+    setOfficeDetail([]);
     if (!email || !agency) return;
     fetch(`/api/app/federal-contacts?facets=offices&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`)
       .then(r => r.json())
-      .then(d => { if (d.success) setOffices(d.offices || []); })
+      .then(d => { if (d.success) setOfficeDetail(d.officeDetail || []); })
       .catch(() => {});
   }, [email, agency]);
 
@@ -68,7 +68,6 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       const p = new URLSearchParams({ email });
       if (search.trim()) p.set('search', search.trim());
       if (agency) p.set('agency', agency);
-      if (office.trim()) p.set('office', office.trim());
       p.set('limit', '100');
       const res = await fetch(`/api/app/federal-contacts?${p}`);
       const d = await res.json();
@@ -84,7 +83,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       setContacts([]);
     }
     setLoading(false);
-  }, [email, search, agency, office]);
+  }, [email, search, agency]);
 
   // Initial load + reload when agency filter changes.
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [agency]);
@@ -126,22 +125,28 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             <option value="">All Agencies</option>
             {agencies.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
-          {/* Office drill-down only appears IF the selected agency actually has
-              office data. SAM's POC records don't carry the contracting office
-              for most federal agencies (DoD/VA/etc. = 0%), so we don't show an
-              empty dropdown — we only surface it when there's something to pick. */}
-          {agency && offices.length > 0 && (
-            <select
-              value={office}
-              onChange={e => setOffice(e.target.value)}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
-            >
-              <option value="">All offices ({offices.length})</option>
-              {offices.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          )}
         </div>
       </div>
+
+      {/* Contracting offices in the selected agency — the "DoD is too broad"
+          drill-down, sourced from awards.awarding_office (SAM POC contacts
+          don't carry office, so this is agency intelligence, not a row filter). */}
+      {agency && officeDetail.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="flex items-baseline justify-between mb-2">
+            <h3 className="text-sm font-semibold text-white">Top contracting offices in {agency}</h3>
+            <span className="text-xs text-slate-500">{officeDetail.length} offices · by spend</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {officeDetail.slice(0, 12).map((o) => (
+              <span key={o.name} className="text-xs bg-slate-800 text-slate-300 rounded px-2 py-1" title={`${o.awards.toLocaleString()} awards`}>
+                {o.name} <span className="text-emerald-400 font-medium">${o.amount >= 1e9 ? (o.amount / 1e9).toFixed(0) + 'B' : (o.amount / 1e6).toFixed(0) + 'M'}</span>
+              </span>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-600 mt-2">From federal award data. The contacts below are SAM points of contact, which don&apos;t carry office — use the office list to know which commands buy, then search by name.</p>
+        </div>
+      )}
 
       {error && <div className="p-4 bg-red-500/10 text-red-300 rounded-lg text-sm">{error}</div>}
 

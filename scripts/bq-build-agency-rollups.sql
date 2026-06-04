@@ -136,3 +136,37 @@ SELECT dimension, dimension_value, recipient_uei, recipient_name, total_amount, 
 FROM ranked
 WHERE rank <= 50;
 
+
+-- ---------------------------------------------------------------------
+-- 4) Agency → office summary (office drill-down for Decision Makers)
+-- ---------------------------------------------------------------------
+-- The federal_contacts (SAM POC) table has NO contracting office for the
+-- real agencies, but awards.awarding_office is 100% populated. Pre-aggregate
+-- the distinct offices per agency (with $ + award counts) so the Decision
+-- Makers tab can drill "Department of Defense" → its actual contracting
+-- offices. Tiny output (~few thousand rows); the 7 GB awards scan is a
+-- one-time monthly cost. Keep top 100 offices per agency by spend.
+CREATE OR REPLACE TABLE `PROJECT.DATASET.agency_office_summary`
+CLUSTER BY awarding_agency
+AS
+WITH per_office AS (
+  SELECT
+    awarding_agency,
+    awarding_office,
+    ANY_VALUE(awarding_office_code) AS awarding_office_code,
+    SUM(obligation_amount) AS total_amount,
+    COUNT(DISTINCT award_id) AS award_count
+  FROM `PROJECT.DATASET.awards`
+  WHERE awarding_agency IS NOT NULL
+    AND awarding_office IS NOT NULL
+  GROUP BY awarding_agency, awarding_office
+),
+ranked AS (
+  SELECT
+    awarding_agency, awarding_office, awarding_office_code, total_amount, award_count,
+    ROW_NUMBER() OVER (PARTITION BY awarding_agency ORDER BY total_amount DESC) AS rank
+  FROM per_office
+)
+SELECT awarding_agency, awarding_office, awarding_office_code, total_amount, award_count, rank
+FROM ranked
+WHERE rank <= 100;
