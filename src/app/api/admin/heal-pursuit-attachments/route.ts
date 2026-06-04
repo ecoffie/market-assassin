@@ -327,7 +327,7 @@ export async function POST(request: NextRequest) {
 
     const results: Array<{
       id: string; title: string | null; before: string | null; status: string; docs: number;
-      attempted?: number; downloadNulls?: number; lastInsertError?: string | null;
+      attempted?: number; downloadNulls?: number; lastInsertError?: string | null; discoverTrace?: string[];
     }> = [];
     let healed = 0;
     let withDocs = 0;
@@ -349,6 +349,7 @@ export async function POST(request: NextRequest) {
           id: row.id, title: row.title, before: row.docs_status, status: r.status, docs: r.succeeded,
           // diagnostics (cold/download path)
           attempted: r.attempted, downloadNulls: r.downloadNulls, lastInsertError: r.lastInsertError,
+          discoverTrace: r.discoverTrace,
         } as typeof results[number]);
       } catch (err) {
         results.push({ id: row.id, title: row.title, before: row.docs_status, status: 'error', docs: 0 });

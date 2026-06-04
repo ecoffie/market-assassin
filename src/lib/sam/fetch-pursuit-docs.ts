@@ -205,7 +205,7 @@ async function discoverFiles(
   noticeId: string,
   apiKey: string,
   opts?: { solicitationNumber?: string | null; title?: string | null; agency?: string | null },
-): Promise<{ refs: SamFileRef[]; resolvedUuid: string | null; foundNotice: boolean }> {
+): Promise<{ refs: SamFileRef[]; resolvedUuid: string | null; foundNotice: boolean; trace: string[] }> {
   const today = new Date();
   const fmt = (d: Date) =>
     `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
@@ -232,6 +232,9 @@ async function discoverFiles(
   if (!isUuid) probes.push({ param: 'noticeid', value: noticeId }); // non-standard UUID fallthrough
   if (title && title.length >= 6) probes.push({ param: 'title', value: title });
 
+  // Diagnostic trail (surfaced via fetchPursuitDocs return → heal endpoint).
+  const trace: string[] = [`probes=[${probes.map((p) => p.param).join(',')}] titleLen=${title.length} sol=${sol ? 'y' : 'n'}`];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let opp: any = null;
   outer:
@@ -253,11 +256,12 @@ async function discoverFiles(
         console.warn('[fetch-pursuit-docs] discoverFiles fetch failed:', err);
         continue;
       }
-      if (!res.ok) continue;
+      if (!res.ok) { trace.push(`${probe.param}:http${res.status}`); continue; }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const payload = await res.json().catch(() => null) as any;
       const candidate = payload?.opportunitiesData?.[0];
-      if (!candidate) continue;
+      if (!candidate) { trace.push(`${probe.param}:0`); continue; }
+      trace.push(`${probe.param}:found links=${Array.isArray(candidate.resourceLinks) ? candidate.resourceLinks.length : 0}`);
 
       // GUARD the fuzzy 'title' probe: a generic pursuit title (e.g.
       // "236220 - COMMERCIAL... CONSTRUCTION") could match a stranger's notice
@@ -282,7 +286,11 @@ async function discoverFiles(
         const firstTok = (s: string) => s.split(' ').find((t) => t.length > 3) || s.split(' ')[0] || '';
         const agencyOk = !!candAgency && !!wantAgency &&
           (candAgency.includes(firstTok(wantAgency)) || wantAgency.includes(firstTok(candAgency)));
-        if (!titleOk && !solOk && !agencyOk) continue; // unverified — skip
+        if (!titleOk && !solOk && !agencyOk) {
+          trace.push(`title:guard-reject titleOk=${titleOk} solOk=${solOk} agencyOk=${agencyOk} candAg="${candAgency.slice(0, 30)}" wantAg="${wantAgency.slice(0, 30)}"`);
+          continue; // unverified — skip
+        }
+        trace.push(`title:guard-pass titleOk=${titleOk} agencyOk=${agencyOk}`);
       }
 
       opp = candidate;
@@ -291,7 +299,7 @@ async function discoverFiles(
   }
   // foundNotice=false means SAM had no matching opportunity at all (bad id, a
   // grant, a contract-vehicle base number, or archived beyond the date window).
-  if (!opp) return { refs: [], resolvedUuid: null, foundNotice: false };
+  if (!opp) return { refs: [], resolvedUuid: null, foundNotice: false, trace };
 
   // SAM returns the canonical UUID as opp.noticeId — capture it so the caller
   // can heal a sol#-keyed pursuit to the right id.
@@ -301,7 +309,7 @@ async function discoverFiles(
   const links: string[] = Array.isArray(opp.resourceLinks) ? opp.resourceLinks : [];
   // foundNotice=true even with zero links: the notice exists, it just has no
   // attachments → caller marks 'none' (normal), not 'failed' (looks broken).
-  return { refs: urlsToFileRefs(links), resolvedUuid, foundNotice: true };
+  return { refs: urlsToFileRefs(links), resolvedUuid, foundNotice: true, trace };
 }
 
 /**
@@ -377,6 +385,7 @@ export async function fetchPursuitDocs(opts: {
   // Optional diagnostics — populated on the cold/download path only.
   downloadNulls?: number;
   lastInsertError?: string | null;
+  discoverTrace?: string[];
 }> {
   const { pipelineId, userEmail } = opts;
   const supabase = getSupabase();
@@ -473,10 +482,12 @@ export async function fetchPursuitDocs(opts: {
   let fileRefs: SamFileRef[] = [];
   let cacheHit = false;
   let noticeFound = false; // did we positively locate the notice (cache or live)?
+  let discoverTrace: string[] = [];
   const cached = await resolveFromCache(supabase, noticeId).catch(() => null);
   if (cached) {
     cacheHit = true;
     noticeFound = true;
+    discoverTrace = [`cache-hit uuid=${cached.uuid} attachments=${cached.attachments.length}`];
     // If the pursuit was saved with a solicitation number, heal its notice_id
     // to the canonical UUID so future fetches and the UI use the right key.
     if (cached.uuid && cached.uuid !== noticeId) {
@@ -498,6 +509,7 @@ export async function fetchPursuitDocs(opts: {
     });
     fileRefs = discovered.refs;
     noticeFound = discovered.foundNotice;
+    discoverTrace = discovered.trace;
     if (discovered.resolvedUuid && discovered.resolvedUuid !== noticeId) {
       await supabase.from('user_pipeline')
         .update({ notice_id: discovered.resolvedUuid })
@@ -519,7 +531,7 @@ export async function fetchPursuitDocs(opts: {
         docs_fetched_at: new Date().toISOString(),
       })
       .eq('id', pipelineId);
-    return { attempted: 0, succeeded: 0, failed: 0, status: emptyStatus };
+    return { attempted: 0, succeeded: 0, failed: 0, status: emptyStatus, discoverTrace };
   }
 
   let succeeded = 0;

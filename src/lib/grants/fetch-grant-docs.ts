@@ -341,6 +341,7 @@ export async function fetchPursuitDocsAuto(opts: {
   // SAM-path diagnostics (undefined on the grants path).
   downloadNulls?: number;
   lastInsertError?: string | null;
+  discoverTrace?: string[];
 }> {
   if (isGrantPursuit(opts.noticeId, opts.source)) {
     return fetchGrantDocs({ pipelineId: opts.pipelineId, userEmail: opts.userEmail, noticeId: opts.noticeId });
