@@ -41,7 +41,14 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 // one invocation stays well under the SAM 1k/day cap and the timeout.
 // Remaining slices get picked up on subsequent daily runs (checkpointed).
 const ENTITY_SLICES_PER_RUN = Number(process.env.GOV_BUYER_ENTITY_SLICES_PER_RUN || 8);
-const ENTITY_PAGE_SIZE = 100; // SAM entity API max per page
+// SAM entity API caps page size at 10 — verified 2026-06-04: size>10
+// returns HTTP 400 "size is N", which searchEntities swallows to
+// totalCount=0. That made the cron mark every slice 'complete' with 0
+// rows. Pages per slice are bounded below so we still make progress.
+const ENTITY_PAGE_SIZE = 10;
+// Pages to pull per slice PER RUN (10 entities each). 5 pages = 50
+// entities/slice/run × 8 slices = ~40 SAM calls/run, well under the cap.
+const ENTITY_PAGES_PER_SLICE = Number(process.env.GOV_BUYER_ENTITY_PAGES_PER_SLICE || 5);
 
 // Seed NAICS for the pilot. The two officials' NAICS go here first;
 // expand over time. (Same IT/consulting spine the rest of the app seeds.)
@@ -149,6 +156,7 @@ async function syncEntities() {
     .order('last_synced_at', { ascending: true, nullsFirst: true })
     .limit(ENTITY_SLICES_PER_RUN);
 
+  const debug: Array<Record<string, unknown>> = [];
   for (const slice of slices || []) {
     slicesRun++;
     try {
@@ -156,36 +164,44 @@ async function syncEntities() {
         .update({ status: 'in_progress' })
         .eq('id', slice.id);
 
-      const result = await searchEntities({
-        naicsCode: slice.naics_code,
-        stateCode: slice.state_code || undefined,
-        registrationStatus: 'Active',
-        page: (slice.last_page || 0) + 1,
-        size: ENTITY_PAGE_SIZE,
-      });
+      // Pull several small (size=10) pages per slice this run. SAM caps
+      // entity page size at 10, so we page through to make real progress.
+      let page = (slice.last_page || 0) + 1;
+      let sliceRows = 0;
+      let totalCount = slice.total_records || 0;
+      let hasMore = true;
+      for (let p = 0; p < ENTITY_PAGES_PER_SLICE && hasMore; p++) {
+        const result = await searchEntities({
+          naicsCode: slice.naics_code,
+          stateCode: slice.state_code || undefined,
+          registrationStatus: 'Active',
+          page,
+          size: ENTITY_PAGE_SIZE,
+        });
+        totalCount = result.totalCount;
+        hasMore = result.hasMore;
 
-      const rows = result.entities
-        .filter((e) => e.ueiSAM)
-        .map(entityToRow);
-
-      if (rows.length) {
-        const { error } = await sb
-          .from('sam_entities')
-          .upsert(rows, { onConflict: 'uei', ignoreDuplicates: false });
-        if (error) {
-          errors.push(`entities ${slice.naics_code}: ${error.message}`);
-        } else {
+        const rows = result.entities.filter((e) => e.ueiSAM).map(entityToRow);
+        if (rows.length) {
+          const { error } = await sb
+            .from('sam_entities')
+            .upsert(rows, { onConflict: 'uei', ignoreDuplicates: false });
+          if (error) { errors.push(`entities ${slice.naics_code} p${page}: ${error.message}`); break; }
           upserted += rows.length;
+          sliceRows += rows.length;
         }
+        page++;
       }
 
-      // Advance / complete the checkpoint.
-      const nextPage = (slice.last_page || 0) + 1;
-      const done = !result.hasMore;
+      debug.push({ naics: slice.naics_code, fromPage: (slice.last_page || 0) + 1, toPage: page - 1, totalCount, sliceRows });
+
+      // Advance / complete the checkpoint. last_page = next page to fetch;
+      // reset to 0 when we've swept the whole NAICS so it re-checks later.
+      const done = !hasMore;
       await sb.from('sam_entities_sync_state').update({
-        last_page: done ? 0 : nextPage,       // reset to re-sweep next cycle
-        total_records: result.totalCount,
-        entities_upserted: (slice.entities_upserted || 0) + rows.length,
+        last_page: done ? 0 : page - 1,
+        total_records: totalCount,
+        entities_upserted: (slice.entities_upserted || 0) + sliceRows,
         status: done ? 'complete' : 'in_progress',
         last_error: null,
         last_synced_at: new Date().toISOString(),
@@ -199,7 +215,7 @@ async function syncEntities() {
     }
   }
 
-  return { slicesRun, upserted, errors };
+  return { slicesRun, upserted, errors, debug };
 }
 
 // ───────────────────────── gov POC pull ─────────────────────────
