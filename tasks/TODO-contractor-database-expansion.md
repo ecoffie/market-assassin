@@ -18,6 +18,22 @@ OpenGov IQ has **50,000+ federal contractor entities** in their BigQuery dataset
 
 HigherGov / GovTribe rank for tens of thousands of contractor names because they have 50K+ profile pages each. We can match that surface once the entities are ingested.
 
+> **⚠️ Update (2026-06-04): OpenGov IQ access is GONE — re-source from SAM.gov directly.**
+> We lost BigQuery access to `fresh-ward-455220-j0.samgovcons` (Base44 CSV only, stale). Do NOT plan around re-importing OpenGov's snapshot.
+> - The "50,000+" was OpenGov IQ's **claim** for `SAMEntities`, captured second-hand and never row-verified the way `IDIQ_details` was (that one was a confirmed 50,000). The real SAM-registered universe is **far larger** (hundreds of thousands). 50K was a vendor's curated slice, not "all small businesses."
+> - **New source: SAM.gov bulk Entity Extract** (official, free, daily-refreshed) → the `sam_entities` table below. More complete + fresher than OpenGov ever was.
+>
+> **⚠️ DSBS is dead — it's "SBS" now.** SBA retired Dynamic Small Business Search on **2025-07-09**, replaced by **Small Business Search (SBS)** at `search.certifications.sba.gov`. SBS is the free government tool a contracting officer uses for vendor market research — and **its profiles are driven by the same SAM.gov data we'd ingest.** So a bare "search SAM entities by NAICS/state/set-aside" feature just rebuilds a staler SBS and is NOT a product.
+>
+> **The differentiation vs. SBS (our actual moat):** join the SAM registry onto data SBS has no access to —
+> - **Award history + 5yr federal revenue per firm** (BQ `awards`/`recipients`, 63M awards) — separates real performers from dormant/paper registrations.
+> - **Incumbency** (`recompete_opportunities`) — who holds the expiring contract this requirement replaces.
+> - **Rule-of-Two market-depth count** — "are there ≥2 capable small businesses?" as one defensible number.
+> - **Searchable capability statements** (seller uploads, Path A) — SBS has only self-typed profile text.
+> - **Exportable market-research determination memo** (.docx) for the CO's file.
+>
+> One line: *SBS tells a CO who claims to qualify; we tell them who actually performs.* See the activity rubric below — we build the buyer list from **winners + recent awardees cross-referenced against registrations**, not raw registrant counts.
+
 ---
 
 ## Where we stand
