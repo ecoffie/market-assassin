@@ -32,7 +32,13 @@ function getSupabase() {
 }
 
 // Verified certs (SBA/VA-vetted) weight higher than self-certified ones.
-const VERIFIED_CERTS = new Set(['8(a)', 'HUBZone', 'SDVOSB']);
+// Which certifications in our data come from the SBA-CERTIFIED field
+// (vetted) vs. the self-certified business-type field. Verified 2026-06-04:
+// only 8(a) and HUBZone are sourced from SAM's certified-programs field;
+// WOSB/SDVOSB/VOSB are self-certified business types. The rubric weights
+// the vetted ones higher (a CO trusts a certified cert more than a
+// self-attestation), and the memo footnotes the distinction.
+const VERIFIED_CERTS = new Set(['8(a)', 'HUBZone']);
 
 export type Tier = 'active_performer' | 'capable' | 'emerging' | 'registered_only';
 
@@ -270,7 +276,7 @@ export async function runMarketResearch(params: MarketResearchParams): Promise<M
 
   const caveats = [
     'Counts reflect SAM-registered, active entities as of the sync date below.',
-    'Set-aside certifications are self-certified in SAM except 8(a), HUBZone, and SDVOSB (SBA/VA-verified); the rubric weights verified certifications higher.',
+    'Certification source matters: 8(a) and HUBZone come from SAM’s SBA-certified field (vetted). WOSB, SDVOSB, and VOSB are self-certified business types in SAM (not independently vetted here). The rubric weights vetted certifications higher; verify self-certified status before a set-aside determination.',
     'Activity (award history, revenue) is sourced from USASpending. "Registered Only" firms have no relevant award history and are shown separately — they do not count toward the Rule-of-Two depth.',
   ];
 
