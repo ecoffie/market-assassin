@@ -149,6 +149,29 @@ function AgencyContent() {
     setLoading(false);
   }
 
+  // Download the determination memo (.docx) for the current query.
+  async function exportMemo() {
+    const params = new URLSearchParams({ email, naics });
+    if (state) params.set('state', state);
+    if (setAside) params.set('setAside', setAside);
+    if (!includeEmerging) params.set('includeEmerging', 'false');
+    try {
+      const res = await fetch(`/api/gov-buyer/market-research/export?${params}`, {
+        headers: token ? { 'x-mi-auth-token': token } : {},
+      });
+      if (!res.ok) { setError('Could not generate the memo. Please try again.'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Market_Research_${naics}${state ? '_' + state : ''}.docx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Network error while exporting — please try again.');
+    }
+  }
+
   // ─────────────────── gate: not signed in ───────────────────
   if (!token) {
     return (
@@ -253,8 +276,14 @@ function AgencyContent() {
                   </div>
                 ))}
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 14 }}>
-                Data as of {new Date(result.dataAsOf).toLocaleDateString()}. Registered-Only firms are shown but excluded from the depth count.
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 14, flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  Data as of {new Date(result.dataAsOf).toLocaleDateString()}. Registered-Only firms are shown but excluded from the depth count.
+                </div>
+                <button onClick={exportMemo}
+                  style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid #1e3a8a', background: '#fff', color: '#1e3a8a', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  ⬇ Export determination memo (.docx)
+                </button>
               </div>
             </div>
 
