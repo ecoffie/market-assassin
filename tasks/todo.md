@@ -1,6 +1,12 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** May 25, 2026
+**Last Updated:** June 4, 2026
+
+---
+
+## Backlog — Infrastructure / Scale
+
+- [ ] **Cron Dispatcher** (P1 infra) — `docs/PRD-cron-dispatcher.md`. Vercel caps `vercel.json` crons at **100 and we're AT the limit** (the gov-buyer deploy hit it; chained off `sync-sam-opportunities` as a band-aid). Cron count grows with features + timezone batch windows (daily-alerts alone = 21 entries). Long-term fix: one dispatcher tick → Supabase `cron_jobs` schedule table → ~6 vercel crons supporting 1000s of logical jobs; migrate the existing ~100 onto it. **Will recur as we scale toward 100K users — do this before the next feature that needs a cron.**
 
 ---
 
