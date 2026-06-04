@@ -88,7 +88,7 @@ const SECTIONS: { id: VaultSection; label: string; icon: string; blurb: string }
   { id: 'identity', label: 'Identity', icon: '🪪', blurb: 'UEI, CAGE, certifications, one-liner' },
   { id: 'past_performance', label: 'Past Performance', icon: '🏆', blurb: 'Real contracts you have won' },
   { id: 'capabilities', label: 'Capabilities', icon: '🛠️', blurb: 'What you can do, tagged by NAICS' },
-  { id: 'team', label: 'Team', icon: '👤', blurb: 'Key personnel and bios' },
+  { id: 'team', label: 'Key Personnel', icon: '👤', blurb: 'People you put in proposals — bios, clearances' },
   { id: 'documents', label: 'Documents', icon: '📄', blurb: 'Capability statements + boilerplate' },
 ];
 
@@ -633,9 +633,9 @@ function TeamSection({ email, items, onChanged }: { email: string; items: TeamMe
     return (
       <EmptyState
         icon="👤"
-        title="No team members in vault"
-        body="Add your key personnel. Mindy uses these to draft Management Plan + Key Personnel sections automatically. Resume PDFs can be attached later."
-        action="+ Add team member"
+        title="No key personnel yet"
+        body="Add the people you put in proposals — PMs, technical leads, key staff. Mindy uses these to draft Management Plan + Key Personnel sections automatically. Resume PDFs can be attached later. (To invite teammates to your Mindy account, use Settings.)"
+        action="+ Add key personnel"
         onAction={() => setAdding(true)}
       />
     );
