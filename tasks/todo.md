@@ -17,8 +17,14 @@ IA cleanup from Eric's review of Vault/Settings/Library + a real data bug found 
 - The 3rd NAICS copy (`mi_beta_user_settings`, display-only) left as-is — Settings already writes the cron table correctly, so it doesn't affect alerts. The Vault→cron gap was the only real bug.
 - The two/three settings surfaces (sidebar gear "Personal Workspace" vs Settings nav) are INTENTIONALLY separate (Eric, May 20) — do NOT merge.
 
-### Pending (waiting on Eric)
-- [ ] **Vault + Library VISUAL redesign** — Eric asked "is this the best UI?" for Vault (Past Performance/Capabilities) + Library. Can't assess pixels from code; **waiting on screenshots** to propose specific design changes. Gamma was mentioned as a reference.
+### Vault + Library visual redesign — SHIPPED (from screenshots)
+- [x] **Vault content tabs** (Past Performance, Capabilities, Key Personnel) → one consistent **scannable-row** pattern: collapsed rows show key fields inline (e.g. PP = agency · $ · role · period · CPARS), click to expand detail + archive. Replaces the bulky always-expanded cards.
+- [x] **Draft badges** — unfilled SAM auto-fill templates (bracketed titles / boilerplate-prompt scope / thin entries) get an amber **"DRAFT — ADD DETAILS"** badge + border; real/complete entries sort to the top. Fixes the "looks full but is all placeholders" problem. Helpers: `isPastPerfDraft` / `isCapabilityDraft` / `isTeamDraft` in VaultPanel.tsx.
+- [x] **Library** — was ~40% dead space (empty "Click any entry to preview" pane) + tall snippet-heavy rows. Now: auto-previews the top entry (pane never empty), tightened rows to type · title · agency · date (snippet moved to preview pane), emerald left-border on selected row. Find-and-reuse optimized.
+- Each redesign render-verified (puppeteer screenshot of the new markup) before shipping. Eric should eyeball live with real data.
+
+### Verification note
+- All Vault/Library/Settings UI work this session was render-verified against sample data, NOT clicked in live `/app` (Supabase-session-gated, headless can't reach the authed view). If anything looks off in-browser, screenshot it.
 
 ---
 
