@@ -52,9 +52,28 @@ We can answer that with ~80% existing infrastructure. The reverse search is most
 
 ## 3. The Data Picture (audited 2026-06-04)
 
+### Entity coverage — TWO ingest paths (decided 2026-06-04)
+The SAM Entity **API** caps page size at **10**, so covering one NAICS needs
+thousands of calls against a 1,000/day shared limit (~31 days for 8 NAICS).
+The **PUBLIC monthly extract** is the whole registry in one ~138MB ZIP, no
+per-record limit — the real coverage path.
+
+- **Bulk extract** (`scripts/import-sam-entity-extract.mjs`) — downloads
+  `SAM_PUBLIC_MONTHLY_V2_*.ZIP`, stream-parses the pipe-delimited `.dat`
+  (884K entities), filters to seed NAICS, bulk-upserts. Run on a worker /
+  locally (NOT serverless — too big). **Initial load: 160K rows for the 8
+  seed NAICS.** Re-run monthly (SAM refreshes 1st Sunday). `--all-naics` for
+  the full registry. **Cert codes are subtle:** the certified set-asides
+  (8(a)=A6/JT, HUBZone=XX) live in field 118, NOT field 31 (which is general
+  business types — mapping it inflated 8(a) to 95%, a trust-killer). A6
+  carries a concatenated expiry date, so prefix-match.
+- **API cron** (`sync-gov-buyer-data`) — the daily incremental top-up for
+  freshness between monthly extracts (new registrations, status changes).
+
 ### What we have
 | Asset | Source | Status |
 |---|---|---|
+| **SAM entity registry** | `sam_entities` ← bulk extract + API top-up | ✅ Live (160K seed-NAICS rows) |
 | Award history per contractor | BQ `awards` (63M rows, all NAICS) | ✅ Live |
 | 5yr revenue + activity per firm | BQ `recipients` (~317K, `total_obligated`, `last_action_date`, `award_count`, `distinct_agency_count`) | ✅ Live |
 | Incumbent / recompete data | `recompete_opportunities` (Supabase) | ✅ Live |
