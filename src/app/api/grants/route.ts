@@ -64,10 +64,15 @@ async function loadUserProfile(email: string) {
   }
 }
 
-// The API returns opportunities directly in totalHits array (confusing naming)
+// Grants.gov returns the page of opportunities in `oppHits` and the TRUE
+// total match count in `hitCount` (e.g. 1209 posted). `totalHits` is not a
+// real field — older code read it and got an empty array, which is why the
+// UI only ever knew about the 25 it fetched, never the full volume.
 interface GrantsGovResponse {
-  totalHits?: GrantsGovOpp[];
   oppHits?: GrantsGovOpp[];
+  totalHits?: GrantsGovOpp[]; // legacy/fallback only
+  hitCount?: number;
+  startRecord?: number;
 }
 
 // Grants.gov public REST API
@@ -112,7 +117,11 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get('category') || '';
   const status = searchParams.get('status') || 'posted';
   const limit = parseInt(searchParams.get('limit') || '25', 10);
+  const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10), 0);
   const email = searchParams.get('email') || '';
+  // sort: 'relevance' (rank by profile) or 'newest'. Default relevance when an
+  // email/profile exists, but the UI can force 'newest' to browse everything.
+  const sort = searchParams.get('sort') || (email ? 'relevance' : 'newest');
 
   const isMetadataRequest = !searchParams.has('keyword')
     && !searchParams.has('agency')
@@ -144,6 +153,7 @@ export async function GET(request: NextRequest) {
       agency: agency || undefined,
       fundingCategories: category || undefined,
       rows: Math.min(limit, 100),
+      startRecordNum: offset || undefined, // Grants.gov paging cursor
       sortBy: 'openDate|desc',
     };
 
@@ -170,8 +180,11 @@ export async function GET(request: NextRequest) {
 
     const data: GrantsGovResponse = await response.json();
 
-    // Grants.gov returns opportunities in totalHits or oppHits array
-    const rawOpportunities = data.totalHits || data.oppHits || [];
+    // Grants.gov returns this page in `oppHits` and the TRUE total in
+    // `hitCount`. (Old code read `totalHits` — not a real field — so it only
+    // knew the 25 it fetched.)
+    const rawOpportunities = data.oppHits || data.totalHits || [];
+    const totalAvailable = typeof data.hitCount === 'number' ? data.hitCount : rawOpportunities.length;
 
     // Transform to consistent format
     let grants = rawOpportunities.map((opp) => ({
@@ -195,13 +208,18 @@ export async function GET(request: NextRequest) {
     // profile, score each grant (same scoreGrant as the alert emails) and
     // sort best-match first, newest breaking ties. Without a profile we keep
     // grants.gov's newest-first order. This makes "profile matches" real.
+    // Relevance ranking is applied ONLY when sort='relevance' AND the user has
+    // a profile. sort='newest' gives the plain, unranked, browse-everything
+    // view (already newest-first from Grants.gov).
     let sortedByRelevance = false;
+    let hasProfile = false;
     if (email) {
       const profile = await loadUserProfile(email);
-      if (profile && (profile.naics_codes.length || profile.keywords.length || profile.agencies.length)) {
+      hasProfile = !!(profile && (profile.naics_codes.length || profile.keywords.length || profile.agencies.length));
+      if (hasProfile && sort === 'relevance') {
         grants = grants.map((g) => ({
           ...g,
-          score: scoreGrant(g as unknown as GrantOpportunity, profile),
+          score: scoreGrant(g as unknown as GrantOpportunity, profile!),
         }));
         grants.sort((a, b) => {
           const s = (b.score ?? 0) - (a.score ?? 0);
@@ -214,11 +232,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      totalHits: grants.length,
-      count: grants.length,
+      total: totalAvailable,       // TRUE total matching grants (e.g. 1209)
+      count: grants.length,        // grants in THIS page
+      offset,
+      limit,
+      hasMore: offset + grants.length < totalAvailable,
+      hasProfile,                  // whether a "For me" sort is even possible
       sortedByRelevance,
       grants,
-      searchCriteria: { keyword, agency, category, status, limit },
+      searchCriteria: { keyword, agency, category, status, limit, sort },
     });
 
   } catch (error) {

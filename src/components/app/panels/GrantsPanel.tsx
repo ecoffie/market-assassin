@@ -37,8 +37,13 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('posted');
   const [error, setError] = useState<string | null>(null);
-  const [totalHits, setTotalHits] = useState(0);
+  const [totalHits, setTotalHits] = useState(0);       // TRUE total (e.g. 1209)
   const [sortedByRelevance, setSortedByRelevance] = useState(false);
+  const [hasProfile, setHasProfile] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // 'relevance' = ranked for me; 'newest' = browse everything unranked.
+  const [sort, setSort] = useState<'relevance' | 'newest'>(email ? 'relevance' : 'newest');
   const track = useAppTracker(email);
 
   // Load metadata on mount
@@ -66,16 +71,18 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       console.error('Failed to load grants metadata:', err);
     }
     // After metadata, load initial grants
-    searchGrants('', '', '', 'posted');
+    searchGrants('', '', '', 'posted', email ? 'relevance' : 'newest', 0);
   };
 
   const searchGrants = useCallback(async (
     keyword: string,
     agency: string,
     category: string,
-    status: string
+    status: string,
+    sortMode: 'relevance' | 'newest',
+    offset = 0,
   ) => {
-    setIsLoading(true);
+    if (offset > 0) setLoadingMore(true); else setIsLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
@@ -84,32 +91,38 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       if (category) params.set('category', category);
       params.set('status', status);
       params.set('limit', '25');
-      // Pass email so the API ranks grants by profile relevance (NAICS /
-      // keywords / agencies) instead of just newest-first.
+      params.set('offset', String(offset));
+      params.set('sort', sortMode);
+      // Email lets the API rank grants by profile (NAICS / keywords / agencies)
+      // when sort='relevance'. sort='newest' browses everything, unranked.
       if (email) params.set('email', email);
 
       const res = await fetch(`/api/grants?${params.toString()}`);
       const data = await res.json();
 
       if (data.success) {
-        setGrants(data.grants || []);
-        setTotalHits(data.totalHits || 0);
+        // Append on "load more", replace on a fresh search.
+        setGrants(prev => offset > 0 ? [...prev, ...(data.grants || [])] : (data.grants || []));
+        setTotalHits(data.total || 0);
+        setHasMore(!!data.hasMore);
+        setHasProfile(!!data.hasProfile);
         setSortedByRelevance(!!data.sortedByRelevance);
       } else {
         setError(data.error || 'Failed to search grants');
-        setGrants([]);
+        if (offset === 0) setGrants([]);
       }
     } catch (err) {
       console.error('Grant search error:', err);
       setError('Failed to connect to Grants.gov');
-      setGrants([]);
+      if (offset === 0) setGrants([]);
     } finally {
       setIsLoading(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [email]);
 
   const handleSearch = () => {
-    searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus);
+    searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, sort, 0);
     track('tool_use', 'grants', {
       action: 'search',
       // Length signals (vs values) — captures intent without leaking
@@ -145,15 +158,36 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Federal Grants</h1>
-        <p className="text-slate-400 mt-1">
-          Search open and forecasted opportunities from Grants.gov
-          {totalHits > 0 && <span className="text-emerald-400 ml-2">({totalHits} results)</span>}
-          {sortedByRelevance && totalHits > 0 && (
-            <span className="text-blue-400 ml-2 text-sm">· ranked by your profile</span>
-          )}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Federal Grants</h1>
+          <p className="text-slate-400 mt-1">
+            Search open and forecasted opportunities from Grants.gov
+            {totalHits > 0 && (
+              <span className="text-emerald-400 ml-2">
+                Showing {grants.length} of {totalHits.toLocaleString()}
+              </span>
+            )}
+          </p>
+        </div>
+        {/* Sort toggle — "For me" (profile rank) vs "Newest" (browse all).
+            Only shown when the user has a profile to rank by. */}
+        {hasProfile && (
+          <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-sm">
+            <button
+              onClick={() => { setSort('relevance'); searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, 'relevance', 0); }}
+              className={`px-3 py-1.5 rounded-md transition-colors ${sort === 'relevance' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              ★ For me
+            </button>
+            <button
+              onClick={() => { setSort('newest'); searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, 'newest', 0); }}
+              className={`px-3 py-1.5 rounded-md transition-colors ${sort === 'newest' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              Newest
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Search & Filters */}
@@ -322,6 +356,20 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
               </a>
             );
           })}
+
+          {/* Load more — pages through the full result set (e.g. all 1,209). */}
+          {hasMore && (
+            <button
+              onClick={() => searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, sort, grants.length)}
+              disabled={loadingMore}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-medium rounded-lg border border-slate-700 transition-colors"
+            >
+              {loadingMore ? 'Loading…' : `Load more (${(totalHits - grants.length).toLocaleString()} more)`}
+            </button>
+          )}
+          {!hasMore && grants.length > 0 && totalHits > 25 && (
+            <p className="text-center text-xs text-slate-500 py-2">That&apos;s all {totalHits.toLocaleString()} — end of results.</p>
+          )}
         </div>
       )}
 
@@ -341,7 +389,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
         <button
           onClick={() => {
             setSearchKeyword('SBIR');
-            searchGrants('SBIR', '', '', 'posted');
+            searchGrants('SBIR', '', '', 'posted', sort, 0);
           }}
           className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
@@ -350,7 +398,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
         <button
           onClick={() => {
             setSearchKeyword('cybersecurity');
-            searchGrants('cybersecurity', '', '', 'posted');
+            searchGrants('cybersecurity', '', '', 'posted', sort, 0);
           }}
           className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
@@ -359,7 +407,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
         <button
           onClick={() => {
             setSearchKeyword('research');
-            searchGrants('research', '', '', 'posted');
+            searchGrants('research', '', '', 'posted', sort, 0);
           }}
           className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
@@ -369,7 +417,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
           onClick={() => {
             setSearchKeyword('');
             setSelectedAgency('DOD');
-            searchGrants('', 'DOD', '', 'posted');
+            searchGrants('', 'DOD', '', 'posted', sort, 0);
           }}
           className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
@@ -379,7 +427,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
           onClick={() => {
             setSearchKeyword('');
             setSelectedAgency('HHS');
-            searchGrants('', 'HHS', '', 'posted');
+            searchGrants('', 'HHS', '', 'posted', sort, 0);
           }}
           className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
