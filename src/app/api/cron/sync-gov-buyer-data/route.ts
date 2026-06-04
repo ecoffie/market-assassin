@@ -145,9 +145,14 @@ async function syncEntities() {
 
   // Pick the next NAICS slices to work: those never synced or stalest.
   // Ensure a sync_state row exists for each seed NAICS (nationwide slice).
+  // Use the sentinel 'ALL' for nationwide, NOT null — Postgres treats
+  // NULL != NULL, so a UNIQUE(naics_code, state_code) constraint never
+  // dedupes null state and every run inserted a NEW duplicate slice row
+  // (bug 2026-06-04: checkpoints never advanced, table stuck re-pulling
+  // pages 1-5). A non-null sentinel makes the conflict target work.
   for (const naics of SEED_NAICS) {
     await sb.from('sam_entities_sync_state')
-      .upsert({ naics_code: naics, state_code: null }, { onConflict: 'naics_code,state_code', ignoreDuplicates: true });
+      .upsert({ naics_code: naics, state_code: 'ALL' }, { onConflict: 'naics_code,state_code', ignoreDuplicates: true });
   }
 
   const { data: slices } = await sb
@@ -173,7 +178,8 @@ async function syncEntities() {
       for (let p = 0; p < ENTITY_PAGES_PER_SLICE && hasMore; p++) {
         const result = await searchEntities({
           naicsCode: slice.naics_code,
-          stateCode: slice.state_code || undefined,
+          // 'ALL' sentinel = nationwide → no state filter.
+          stateCode: slice.state_code && slice.state_code !== 'ALL' ? slice.state_code : undefined,
           registrationStatus: 'Active',
           page,
           size: ENTITY_PAGE_SIZE,
