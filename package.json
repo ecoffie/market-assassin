@@ -44,7 +44,8 @@
     "recharts": "^3.8.1",
     "resend": "^6.10.0",
     "stripe": "^20.1.0",
-    "twilio": "^5.12.2"
+    "twilio": "^5.12.2",
+    "unzipper": "^0.12.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
