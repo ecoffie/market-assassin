@@ -12,6 +12,8 @@ Use MI's existing SAM cache, profile, and pipeline data as the product foundatio
 
 Use the existing OpenGov IQ database as an enrichment reference and temporary seed source only. Do not make the old system a launch dependency.
 
+> **⚠️ Superseded (2026-06-04):** OpenGov IQ BigQuery access (`fresh-ward-455220-j0.samgovcons`) is LOST — Base44 CSV only, treated as dead. Entity registry is being re-sourced from the **SAM.gov bulk Entity Extract** (official, free, daily) into a `sam_entities` table. See `tasks/TODO-contractor-database-expansion.md` for the re-source plan + the government-buyer "vs. SBS" differentiation. Note: DSBS was retired 2025-07-09 and replaced by **SBS** (`search.certifications.sba.gov`); SBS runs on the same SAM data, so our moat is the award-history/incumbency/cap-statement join, not the registry itself.
+
 MI beta is the release candidate for the live Market Intelligence product. Build every feature as production-bound, with the goal of switching beta into the actual customer-facing tool by the end of May 2026.
 
 ## Core Principle

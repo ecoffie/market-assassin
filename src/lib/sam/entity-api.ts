@@ -93,15 +93,38 @@ export interface EntitySearchResult {
   fromCache: boolean;
 }
 
-// SBA Business Type Codes
+// SBA Business Type Codes → normalized set-aside labels.
+// CORRECTED 2026-06-04 against live SAM v3 data — the old map used
+// guessed codes (2X/XY/23/A2) that DON'T appear in real responses, so
+// certifications never normalized. Verified live codes:
+//   A6 = "SBA Certified 8(a) Program Participant"   (n≈5,009)
+//   JT = "SBA Certified 8(a) Joint Venture"          (n≈781)
+//   XX = "SBA Certified HUBZone Firm"                (n≈4,603)
+// (WOSB/EDWOSB/SDVOSB are self-certified and live in a different SAM
+//  field, not this SBA-certified list — we read those elsewhere.)
 const SBA_TYPE_MAP: Record<string, string> = {
-  '2X': '8(a)',
+  'A6': '8(a)',
+  'JT': '8(a)',      // 8(a) joint venture — still 8(a)-eligible
   'XX': 'HUBZone',
+  // Legacy guessed codes kept as harmless fallbacks:
+  '2X': '8(a)',
   'XY': 'SDVOSB',
   '23': 'WOSB',
   'A2': 'EDWOSB',
-  '27': 'Small Business'
 };
+
+// Normalize an SBA business-type label from the DESCRIPTION text, which
+// is self-describing and more stable than the cryptic codes. Used as the
+// primary signal; the code map is the fallback.
+function sbaLabelFromDesc(desc: string): string | null {
+  const d = desc.toLowerCase();
+  if (d.includes('8(a)') || d.includes('8a')) return '8(a)';
+  if (d.includes('hubzone')) return 'HUBZone';
+  if (d.includes('service-disabled') || d.includes('sdvosb')) return 'SDVOSB';
+  if (d.includes('women')) return d.includes('economically') ? 'EDWOSB' : 'WOSB';
+  if (d.includes('small disadvantaged') || d.includes('sdb')) return 'Small Disadvantaged Business';
+  return null;
+}
 
 /**
  * Transform raw API response to our SAMEntity type
@@ -127,14 +150,33 @@ function transformEntity(raw: Record<string, unknown>): SAMEntity {
 
   const status = (er.registrationStatus as string) || (raw.registrationStatus as string) || 'Unknown';
 
-  // SBA business types live under assertions.goodsAndServices or directly on raw
+  // SBA business types live under coreData.businessTypes.sbaBusinessTypeList
+  // in the live v3 response (verified 2026-06-04). The old code read
+  // assertions.goodsAndServices.sbaBusinessTypeList — which is undefined —
+  // so 8(a)/WOSB/SDVOSB/HUBZone flags NEVER populated. Keep the old paths
+  // as fallbacks in case the shape varies by entity.
   const goodsServices = (assertions.goodsAndServices as Record<string, unknown>) || {};
+  const businessTypes = (core.businessTypes as Record<string, unknown>) || {};
   const sbaTypesArr =
+    (businessTypes.sbaBusinessTypeList as Array<Record<string, unknown>>) ||
     (goodsServices.sbaBusinessTypeList as Array<Record<string, unknown>>) ||
     (raw.sbaBusinessTypes as unknown as Array<Record<string, unknown>>) ||
     [];
+  // Normalize each SBA entry to a clean label: prefer the description
+  // text (self-describing), fall back to the code map, then the raw code.
+  // De-dupe (8(a) + 8(a) JV both normalize to '8(a)').
   const sbaTypes: string[] = Array.isArray(sbaTypesArr)
-    ? sbaTypesArr.map(t => (typeof t === 'string' ? t : (t.sbaBusinessTypeCode as string) || (t.sbaBusinessTypeDesc as string) || '')).filter(Boolean)
+    ? Array.from(new Set(
+        sbaTypesArr
+          .map(t => {
+            if (typeof t === 'string') return SBA_TYPE_MAP[t] || t;
+            const desc = (t.sbaBusinessTypeDesc as string) || '';
+            const code = (t.sbaBusinessTypeCode as string) || '';
+            if (!desc && !code) return '';
+            return sbaLabelFromDesc(desc) || SBA_TYPE_MAP[code] || code;
+          })
+          .filter(Boolean),
+      ))
     : [];
 
   // NAICS list lives under assertions.goodsAndServices.naicsList
@@ -200,16 +242,17 @@ function transformEntity(raw: Record<string, unknown>): SAMEntity {
     naicsList,
     pscList,
     certifications: {
-      sbaBusinessTypes: sbaTypes.map(t => SBA_TYPE_MAP[t] || t),
+      // sbaTypes already holds normalized labels (8(a)/HUBZone/...).
+      sbaBusinessTypes: sbaTypes,
       certificationExpirations: [],
     },
     pointsOfContact,
     isActive: status === 'Active',
     daysUntilExpiration,
-    has8a: sbaTypes.includes('2X') || sbaTypes.some(t => /8\(a\)/i.test(t)),
-    hasSDVOSB: sbaTypes.includes('XY') || sbaTypes.some(t => /SDVOSB|Service.Disabled/i.test(t)),
-    hasWOSB: sbaTypes.includes('23') || sbaTypes.includes('A2') || sbaTypes.some(t => /WOSB|Women.Owned/i.test(t)),
-    hasHUBZone: sbaTypes.includes('XX') || sbaTypes.some(t => /HUBZone/i.test(t)),
+    has8a: sbaTypes.some(t => /8\(a\)/i.test(t)),
+    hasSDVOSB: sbaTypes.some(t => /SDVOSB|Service.Disabled/i.test(t)),
+    hasWOSB: sbaTypes.some(t => /WOSB|Women/i.test(t)),
+    hasHUBZone: sbaTypes.some(t => /HUBZone/i.test(t)),
   };
 }
 
@@ -259,7 +302,15 @@ export async function searchEntities(
   }
 
   if (params.registrationStatus) {
-    queryParams.registrationStatus = params.registrationStatus;
+    // SAM v3 entity API expects single-letter status CODES, not the
+    // friendly word. Passing 'Active' silently returns totalRecords=0
+    // (verified 2026-06-04 — this was making every NAICS entity search
+    // come back empty). Translate to the code SAM actually filters on.
+    const REG_STATUS_CODE: Record<string, string> = {
+      Active: 'A', Inactive: 'I', Expired: 'E',
+    };
+    queryParams.registrationStatus =
+      REG_STATUS_CODE[params.registrationStatus] || params.registrationStatus;
   }
 
   if (params.sbaBusinessTypes) {
