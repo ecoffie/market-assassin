@@ -43,11 +43,23 @@ function normalizeOfficeName(name: string): string {
   return name.toUpperCase().replace(/\s+/g, ' ').trim();
 }
 
-/** Match a saved office to a cached TMR row and return satRatio 0..1. */
-function satRatioForOffice(
-  officeName: string,
-  agencies: Array<{ contractingOffice?: string; name?: string; satRatio?: number }>,
-): number {
+interface SatLookupAgency {
+  contractingOffice?: string;
+  name?: string;
+  satRatio?: number;
+  satContractCount?: number;
+  contractCount?: number;
+}
+
+interface SatBackfillProfile {
+  naicsCodes: string[];
+  pscCode: string;
+  businessType: string;
+  veteranStatus: string;
+}
+
+/** Match a saved office to TMR cache or find-agencies row; return satRatio 0..1. */
+function satRatioForOffice(officeName: string, agencies: SatLookupAgency[]): number {
   const want = normalizeOfficeName(officeName);
   if (!want) return 0;
   for (const row of agencies) {
@@ -55,62 +67,232 @@ function satRatioForOffice(
       if (!label) continue;
       const norm = normalizeOfficeName(label);
       if (norm === want || norm.includes(want) || want.includes(norm)) {
-        const ratio = Number(row.satRatio);
-        return Number.isFinite(ratio) && ratio > 0 ? ratio : 0;
+        const precomputed = Number(row.satRatio);
+        if (Number.isFinite(precomputed) && precomputed > 0) return precomputed;
+        const sat = row.satContractCount || 0;
+        const count = row.contractCount || 0;
+        if (sat > 0 && count > 0) return sat / count;
       }
     }
   }
   return 0;
 }
 
-/** Backfill sat_ratio from agency_target_data_cache when the snapshot was saved as 0. */
-async function enrichTargetsSatFromCache(
+function cacheLookupKey(naics: string, psc: string): string {
+  return `${naics.trim()}|${(psc || '').trim()}`;
+}
+
+/** NAICS/PSC pairs to search: per-target provenance + profile defaults. */
+function collectSatCacheKeys(
   targets: Array<Record<string, unknown>>,
-): Promise<Array<Record<string, unknown>>> {
-  const needsSat = targets.filter((t) => !Number(t.sat_ratio));
-  if (needsSat.length === 0) return targets;
+  profile: SatBackfillProfile,
+): Array<{ naics: string; psc: string }> {
+  const keys = new Map<string, { naics: string; psc: string }>();
+  const add = (naics: string, psc = '') => {
+    const n = naics.trim();
+    if (!n) return;
+    const k = cacheLookupKey(n, psc);
+    if (!keys.has(k)) keys.set(k, { naics: n, psc: psc.trim() });
+  };
 
-  const naicsKeys = [
-    ...new Set(
-      needsSat
-        .map((t) => String(t.source_naics || '').split(',')[0].trim())
-        .filter(Boolean),
-    ),
-  ];
-  if (naicsKeys.length === 0) return targets;
+  for (const t of targets) {
+    if (Number(t.sat_ratio) > 0) continue;
+    const naicsRaw = String(t.source_naics || '').split(',')[0].trim();
+    add(naicsRaw);
+    add(naicsRaw, String(t.source_psc || ''));
+  }
+  for (const n of profile.naicsCodes) {
+    add(n);
+    add(n, profile.pscCode);
+  }
+  return [...keys.values()];
+}
 
-  const cacheByNaics = new Map<string, Array<{ contractingOffice?: string; name?: string; satRatio?: number }>>();
+async function loadCachedAgencies(
+  keys: Array<{ naics: string; psc: string }>,
+  profile: SatBackfillProfile,
+): Promise<Map<string, SatLookupAgency[]>> {
+  const cacheByKey = new Map<string, SatLookupAgency[]>();
   const supabase = getSupabase();
 
-  for (const naics of naicsKeys) {
+  for (const { naics, psc } of keys) {
+    const lookupKey = cacheLookupKey(naics, psc);
+    if (cacheByKey.has(lookupKey)) continue;
+
     try {
-      const { data: rows } = await supabase
+      let rows: Array<{ agencies?: SatLookupAgency[] }> | null = null;
+
+      const exact = await supabase
         .from('agency_target_data_cache')
         .select('agencies, generated_at')
         .eq('naics_code', naics)
+        .eq('psc_code', psc)
+        .eq('business_type', profile.businessType || '')
+        .eq('veteran_status', profile.veteranStatus || '')
         .order('generated_at', { ascending: false })
-        .limit(3);
-      const merged: Array<{ contractingOffice?: string; name?: string; satRatio?: number }> = [];
+        .limit(2);
+      rows = exact.data;
+
+      if (!rows?.length) {
+        const loose = await supabase
+          .from('agency_target_data_cache')
+          .select('agencies, generated_at')
+          .eq('naics_code', naics)
+          .eq('psc_code', psc)
+          .order('generated_at', { ascending: false })
+          .limit(3);
+        rows = loose.data;
+      }
+
+      const merged: SatLookupAgency[] = [];
       for (const row of rows || []) {
         if (Array.isArray(row.agencies)) merged.push(...row.agencies);
       }
-      if (merged.length > 0) cacheByNaics.set(naics, merged);
+      if (merged.length > 0) cacheByKey.set(lookupKey, merged);
     } catch (err) {
-      console.warn('[target-list] SAT cache lookup failed for', naics, err);
+      console.warn('[target-list] SAT cache lookup failed:', lookupKey, err);
     }
   }
 
-  if (cacheByNaics.size === 0) return targets;
+  return cacheByKey;
+}
 
-  return targets.map((t) => {
+async function loadLiveFindAgencies(
+  profile: SatBackfillProfile,
+  request: NextRequest,
+): Promise<SatLookupAgency[]> {
+  const primaryNaics = profile.naicsCodes[0]?.trim();
+  if (!primaryNaics && !profile.pscCode.trim()) return [];
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+    || (request.headers.get('x-forwarded-proto') && request.headers.get('host')
+      ? `${request.headers.get('x-forwarded-proto')}://${request.headers.get('host')}`
+      : 'https://tools.govcongiants.org');
+
+  try {
+    const res = await fetch(`${baseUrl}/api/usaspending/find-agencies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        naicsCode: primaryNaics,
+        pscCode: profile.pscCode,
+        businessType: profile.businessType,
+        veteranStatus: profile.veteranStatus,
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+    const data = await res.json().catch(() => null);
+    if (!data?.success || !Array.isArray(data.agencies)) return [];
+    return data.agencies as SatLookupAgency[];
+  } catch (err) {
+    console.warn('[target-list] live find-agencies SAT backfill failed:', err);
+    return [];
+  }
+}
+
+function resolveSatRatio(
+  target: Record<string, unknown>,
+  cacheByKey: Map<string, SatLookupAgency[]>,
+  liveAgencies: SatLookupAgency[],
+  profile: SatBackfillProfile,
+): number {
+  const office = String(target.office_name || '');
+  const tryKeys: Array<{ naics: string; psc: string }> = [];
+  const targetNaics = String(target.source_naics || '').split(',')[0].trim();
+  const targetPsc = String(target.source_psc || '').trim();
+  if (targetNaics) {
+    tryKeys.push({ naics: targetNaics, psc: targetPsc });
+    tryKeys.push({ naics: targetNaics, psc: '' });
+  }
+  for (const n of profile.naicsCodes) {
+    tryKeys.push({ naics: n, psc: profile.pscCode });
+    tryKeys.push({ naics: n, psc: '' });
+  }
+
+  for (const key of tryKeys) {
+    const agencies = cacheByKey.get(cacheLookupKey(key.naics, key.psc));
+    if (agencies?.length) {
+      const ratio = satRatioForOffice(office, agencies);
+      if (ratio > 0) return ratio;
+    }
+  }
+  if (liveAgencies.length > 0) {
+    return satRatioForOffice(office, liveAgencies);
+  }
+  return 0;
+}
+
+/** Backfill sat_ratio from TMR cache, profile NAICS, then live find-agencies. */
+async function enrichTargetsSat(
+  targets: Array<Record<string, unknown>>,
+  profile: SatBackfillProfile,
+  request: NextRequest,
+): Promise<{ targets: Array<Record<string, unknown>>; persisted: number }> {
+  const needsSat = targets.some((t) => !Number(t.sat_ratio));
+  if (!needsSat) return { targets, persisted: 0 };
+
+  const cacheKeys = collectSatCacheKeys(targets, profile);
+  const cacheByKey = cacheKeys.length > 0
+    ? await loadCachedAgencies(cacheKeys, profile)
+    : new Map<string, SatLookupAgency[]>();
+
+  let enriched = targets.map((t) => {
     if (Number(t.sat_ratio) > 0) return t;
-    const naics = String(t.source_naics || '').split(',')[0].trim();
-    const agencies = naics ? cacheByNaics.get(naics) : undefined;
-    if (!agencies?.length) return t;
-    const ratio = satRatioForOffice(String(t.office_name || ''), agencies);
-    if (ratio <= 0) return t;
-    return { ...t, sat_ratio: ratio };
+    const ratio = resolveSatRatio(t, cacheByKey, [], profile);
+    if (ratio > 0) return { ...t, sat_ratio: ratio };
+    return t;
   });
+
+  const stillNeedLive = enriched.some(
+    (t) => !Number(t.sat_ratio) && profile.naicsCodes.length > 0,
+  );
+  if (stillNeedLive) {
+    const liveAgencies = await loadLiveFindAgencies(profile, request);
+    if (liveAgencies.length > 0) {
+      enriched = enriched.map((t) => {
+        if (Number(t.sat_ratio) > 0) return t;
+        const ratio = satRatioForOffice(String(t.office_name || ''), liveAgencies);
+        if (ratio > 0) return { ...t, sat_ratio: ratio };
+        return t;
+      });
+    }
+  }
+
+  const supabase = getSupabase();
+  let persisted = 0;
+  for (const t of enriched) {
+    const id = t.id as string | undefined;
+    const newRatio = Number(t.sat_ratio);
+    const old = targets.find((row) => row.id === id);
+    if (!id || !old || Number(old.sat_ratio) > 0 || !(newRatio > 0)) continue;
+    const { error } = await supabase
+      .from('user_target_list')
+      .update({ sat_ratio: newRatio, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (!error) persisted++;
+    else console.warn('[target-list] SAT persist failed for', id, error.message);
+  }
+
+  return { targets: enriched, persisted };
+}
+
+async function loadSatBackfillProfile(email: string): Promise<SatBackfillProfile> {
+  try {
+    const { data } = await getSupabase()
+      .from('user_notification_settings')
+      .select('naics_codes, business_type')
+      .eq('user_email', email.toLowerCase())
+      .maybeSingle();
+    const codes = (data?.naics_codes || []) as string[];
+    return {
+      naicsCodes: codes.map((c) => String(c).trim()).filter(Boolean),
+      pscCode: '',
+      businessType: String(data?.business_type || ''),
+      veteranStatus: '',
+    };
+  } catch {
+    return { naicsCodes: [], pscCode: '', businessType: '', veteranStatus: '' };
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -138,9 +320,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const targets = await enrichTargetsSatFromCache((data || []) as Array<Record<string, unknown>>);
+    const profile = await loadSatBackfillProfile(email);
+    const { targets, persisted } = await enrichTargetsSat(
+      (data || []) as Array<Record<string, unknown>>,
+      profile,
+      request,
+    );
 
-    return NextResponse.json({ success: true, targets, count: targets.length });
+    return NextResponse.json({
+      success: true,
+      targets,
+      count: targets.length,
+      sat_backfill_persisted: persisted,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[target-list] GET threw:', err);

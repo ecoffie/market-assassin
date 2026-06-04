@@ -128,7 +128,7 @@ New REVERSE-search feature for federal contracting officers ("find businesses fo
 - [x] **Leaderboard agency drill-down** (click 'Department of the Army' → filter All Agencies + scroll)
 - [x] **Top 10 Funding Agencies leaderboard cut** (near-duplicate of Departments)
 - [x] **'Start Here' 3-card row deleted** (broken picker showing Homeland $0/0 as 'best first')
-- [x] **SAT sampling fix** — `find-agencies` Pass 3 (`award_amounts` ≤$350K) + `parseAwardAmount`; target-list GET enriches `sat_ratio` from `agency_target_data_cache`
+- [x] **SAT sampling fix** — `find-agencies` Pass 3 + target-list GET backfill (TMR cache, profile NAICS, live find-agencies, persists to DB)
 - [x] **Pain pts badge clickable** in My Target List → expandable panel with documented issues + priorities
 - [x] **Events split into 2 independent toggle buttons** (Scheduled Events purple, Sources Sought amber)
 - [x] **SAT% shows 'SAT —' instead of misleading 0%** when sample has no small-dollar contracts
