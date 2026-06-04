@@ -622,35 +622,59 @@ function CapabilitiesSection({ email, items, onChanged }: { email: string; items
           </div>
         </div>
       )}
-      <div className="space-y-3">
-        {items.map((c) => (
-          <div key={c.id} className="border border-slate-800 rounded-lg p-4 bg-slate-900/40">
-            <div className="flex justify-between items-start">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-white font-medium">{c.capability_name}</h3>
-                <p className="text-sm text-slate-300 mt-1">{c.description}</p>
-                {(c.related_naics || []).length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {c.related_naics!.map((n) => (
-                      <span key={n} className="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{n}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={async () => {
-                  if (!confirm('Archive this capability?')) return;
-                  await fetch(`/api/app/vault/capabilities?id=${c.id}&email=${encodeURIComponent(email)}`, {
-                    method: 'DELETE', headers: getMIApiHeaders(email),
-                  });
-                  onChanged();
-                }}
-                className="ml-3 text-xs text-slate-500 hover:text-rose-400"
-              >Archive</button>
-            </div>
-          </div>
+      <div className="space-y-2">
+        {[...items].sort((a, b) => Number(isCapabilityDraft(a)) - Number(isCapabilityDraft(b))).map((c) => (
+          <CapabilityRow key={c.id} c={c} email={email} onChanged={onChanged} />
         ))}
       </div>
+    </div>
+  );
+}
+
+// A thin/placeholder capability (AI draft prompt or empty evidence/keywords).
+function isCapabilityDraft(c: Capability): boolean {
+  const d = (c.description || '').toLowerCase();
+  const prompty = d.includes('describe ') || d.includes('in your own words') || d.length < 20;
+  const noTags = (c.related_naics || []).length === 0 && (c.keywords || []).length === 0;
+  return prompty || noTags;
+}
+
+function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const draft = isCapabilityDraft(c);
+  return (
+    <div className={`border rounded-lg bg-slate-900/40 ${draft ? 'border-amber-500/20' : 'border-slate-800'}`}>
+      <button onClick={() => setOpen(o => !o)} className="w-full text-left px-4 py-3 flex items-center gap-3">
+        <span className={`shrink-0 transition-transform text-slate-500 ${open ? 'rotate-90' : ''}`}>▸</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-white font-medium truncate">{c.capability_name || '(unnamed)'}</span>
+            {draft && <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">DRAFT — ADD DETAILS</span>}
+          </div>
+          <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap mt-0.5">
+            {(c.related_naics || []).slice(0, 4).map(n => (
+              <span key={n} className="text-[11px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{n}</span>
+            ))}
+            {(c.keywords || []).length > 0 && <span className="text-xs text-slate-500 truncate">{c.keywords!.slice(0, 3).join(' · ')}</span>}
+          </div>
+        </div>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
+          <p className="text-sm text-slate-300">{c.description}</p>
+          {c.evidence && <p className="text-xs text-slate-400">Evidence: {c.evidence}</p>}
+          <button
+            onClick={async () => {
+              if (!confirm('Archive this capability?')) return;
+              await fetch(`/api/app/vault/capabilities?id=${c.id}&email=${encodeURIComponent(email)}`, {
+                method: 'DELETE', headers: getMIApiHeaders(email),
+              });
+              onChanged();
+            }}
+            className="text-xs text-slate-500 hover:text-rose-400"
+          >Archive</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -701,8 +725,8 @@ function TeamSection({ email, items, onChanged }: { email: string; items: TeamMe
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-medium text-white">{items.length} team {items.length === 1 ? 'member' : 'members'}</h2>
-        <button onClick={() => setAdding(true)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded">+ Add team member</button>
+        <h2 className="text-lg font-medium text-white">{items.length} key {items.length === 1 ? 'person' : 'people'}</h2>
+        <button onClick={() => setAdding(true)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded">+ Add key personnel</button>
       </div>
       {adding && (
         <div className="border border-emerald-900 rounded-lg p-5 mb-5 bg-emerald-950/20 space-y-3">
@@ -726,30 +750,57 @@ function TeamSection({ email, items, onChanged }: { email: string; items: TeamMe
           </div>
         </div>
       )}
-      <div className="space-y-3">
-        {items.map((m) => (
-          <div key={m.id} className="border border-slate-800 rounded-lg p-4 bg-slate-900/40 flex justify-between items-start">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-white font-medium">
-                {m.full_name}
-                {m.is_key_personnel && <span className="ml-2 text-xs bg-emerald-900 text-emerald-300 px-1.5 py-0.5 rounded">Key Personnel</span>}
-              </h3>
-              <p className="text-sm text-slate-400">{m.title}{m.years_experience && ` · ${m.years_experience} yrs`}{m.security_clearance && ` · ${m.security_clearance} cleared`}</p>
-              {m.bio_short && <p className="text-sm text-slate-300 mt-1">{m.bio_short}</p>}
-            </div>
-            <button
-              onClick={async () => {
-                if (!confirm('Archive this team member?')) return;
-                await fetch(`/api/app/vault/team?id=${m.id}&email=${encodeURIComponent(email)}`, {
-                  method: 'DELETE', headers: getMIApiHeaders(email),
-                });
-                onChanged();
-              }}
-              className="ml-3 text-xs text-slate-500 hover:text-rose-400"
-            >Archive</button>
-          </div>
+      <div className="space-y-2">
+        {/* Key personnel first, then the rest */}
+        {[...items].sort((a, b) => Number(!!b.is_key_personnel) - Number(!!a.is_key_personnel)).map((m) => (
+          <TeamRow key={m.id} m={m} email={email} onChanged={onChanged} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function isTeamDraft(m: TeamMember): boolean {
+  // Thin entry: no bio AND no clearance/certs/experience to show.
+  return !m.bio_short && !m.security_clearance && !(m.certifications || []).length && !m.years_experience;
+}
+
+function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const draft = isTeamDraft(m);
+  return (
+    <div className={`border rounded-lg bg-slate-900/40 ${draft ? 'border-amber-500/20' : 'border-slate-800'}`}>
+      <button onClick={() => setOpen(o => !o)} className="w-full text-left px-4 py-3 flex items-center gap-3">
+        <span className={`shrink-0 transition-transform text-slate-500 ${open ? 'rotate-90' : ''}`}>▸</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-white font-medium truncate">{m.full_name || '(unnamed)'}</span>
+            {m.is_key_personnel && <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-900 text-emerald-300">KEY PERSONNEL</span>}
+            {draft && <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">DRAFT — ADD DETAILS</span>}
+          </div>
+          <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-xs text-slate-400 mt-0.5">
+            <span>{m.title || '—'}</span>
+            {m.years_experience ? <span>{m.years_experience} yrs</span> : null}
+            {m.security_clearance ? <span className="text-slate-300">{m.security_clearance} cleared</span> : null}
+            {(m.certifications || []).length > 0 ? <span>{m.certifications!.slice(0, 3).join(', ')}</span> : null}
+          </div>
+        </div>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
+          {m.bio_short && <p className="text-sm text-slate-300">{m.bio_short}</p>}
+          <button
+            onClick={async () => {
+              if (!confirm('Archive this person?')) return;
+              await fetch(`/api/app/vault/team?id=${m.id}&email=${encodeURIComponent(email)}`, {
+                method: 'DELETE', headers: getMIApiHeaders(email),
+              });
+              onChanged();
+            }}
+            className="text-xs text-slate-500 hover:text-rose-400"
+          >Archive</button>
+        </div>
+      )}
     </div>
   );
 }
