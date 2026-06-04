@@ -1,6 +1,33 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** May 25, 2026
+**Last Updated:** June 4, 2026
+
+---
+
+## Session Handoff — 2026-06-04 (Government Buyer Market Research)
+
+New REVERSE-search feature for federal contracting officers ("find businesses for a requirement"). Merged to `main`, deployed to prod, gated to `gov_buyer` users. PRD: `docs/PRD-gov-buyer-market-research.md`.
+
+### Shipped (all live on prod)
+- [x] **`sam_entities` registry** — SAM public entity data, sourced via bulk extract (not the rate-limited API). Migration `20260604_gov_buyer_combined.sql` (hand-run; this DB has no in-app DDL).
+- [x] **Active Performer rubric** — scores firms by award history (LEFT-join BQ recipients). Tiers: Active Performer / Capable / Emerging / Registered-Only. Emerging INCLUDED in Rule-of-Two count by default + toggle (fairness rule — never bury new entrants).
+- [x] **`/agency` buyer UI** — gated (.gov/.mil → magic link), NAICS+state+set-aside search, market-depth headline, tier breakdown, ranked firm table.
+- [x] **`.docx` determination memo export** — the filable artifact (`/api/gov-buyer/market-research/export`).
+- [x] **Gov people search groundwork** — `federal_contacts` + `role_category` column (ships `contracting` now; PM/engineer/end-user buckets await a source).
+- [x] **`user_type` gate** — `gov_buyer` vs `seller` on `user_profiles`.
+
+### Data coverage (as of June 4, 2026)
+- **487,660 entities loaded** (was 160K) across the **6 top services sectors**: 54 (Professional/Tech), 23 (Construction), 33 (Manufacturing), 56 (Admin/Support), 81 (Other Services), 62 (Health). ~85% of where federal set-asides happen.
+- Source: SAM `SAM_PUBLIC_MONTHLY_V2_20260503` extract (138MB ZIP). Re-run `SECTORS=.. node scripts/import-sam-entity-extract.mjs` to widen further; `--all-naics` for the full registry.
+- Cert rates verified realistic across all sectors: 8(a) 1.2%, HUBZone 0.9%, WOSB 23%, SDVOSB 8.9%, VOSB 13%.
+- **Cert source caveat:** 8(a)/HUBZone are SBA-vetted (field 118); WOSB/SDVOSB/VOSB are self-certified (field 32) — memo footnotes this; rubric weights vetted higher.
+
+### Follow-ups (not blocking)
+- [ ] **Widen to remaining sectors** if COs query retail/wholesale/transport/ag/finance (44,42,48,11,52...) — extract on disk, cheap re-run.
+- [ ] **Monthly freshness** — re-run the bulk import each month (SAM refreshes 1st Sunday); daily API cron top-ups new registrations between extracts.
+- [ ] **Cap-statement search (Path A)** — link seller `user_boilerplate_docs` uploads to UEI so buyers see them (PRD §6).
+- [ ] **5-role gov people** — source PM/engineer/end-user contacts beyond the KO (PRD §7).
+- [ ] **Cron Dispatcher (P1 infra)** — see backlog below; the gov-buyer sync is chained off `sync-sam-opportunities` as a band-aid for the 100-cron cap.
 
 ---
 
