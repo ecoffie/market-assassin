@@ -18,6 +18,7 @@ import {
   Clock,
   Banknote,
   Building2,
+  Landmark,
   FolderKanban,
   Library,
   Settings,
@@ -38,6 +39,7 @@ export type AppPanel =
   | 'forecasts'      // 7,700+ upcoming procurements
   | 'recompetes'     // Expiring contracts
   | 'contractors'    // prime contractor database
+  | 'decision-makers' // government contacts directory (federal_contacts)
   | 'pipeline'       // Track pursuits
   | 'contacts'       // Relationships
   | 'team'           // Team access and seats
@@ -237,6 +239,13 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Contractors',
         icon: Building2,
         description: 'Prime contractor DB',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        id: 'decision-makers',
+        label: 'Decision Makers',
+        icon: Landmark,
+        description: 'Gov contacts by agency',
         tier: ['pro', 'team', 'enterprise'],
       },
     ],

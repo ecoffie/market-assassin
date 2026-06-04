@@ -1,0 +1,107 @@
+/**
+ * GET /api/app/federal-contacts
+ *
+ * Browse the government decision-makers / contacts directory — the
+ * federal_contacts table (~112K rows, synced daily from SAM POCs).
+ * Search by name/title, filter by agency + office, sort. This is the
+ * read-only directory; saving to CRM stays in /api/app/relationships.
+ *
+ * Params: email (auth), search, agency, office, role, limit, offset.
+ * Special: ?facets=agencies → distinct agency list for the filter dropdown.
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
+
+export const dynamic = 'force-dynamic';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _sb: any = null;
+function getSupabase() {
+  if (!_sb) {
+    _sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  }
+  return _sb;
+}
+
+export async function GET(request: NextRequest) {
+  const sp = request.nextUrl.searchParams;
+  const email = sp.get('email');
+
+  const auth = requireMIAuthSession(request, email);
+  if (!auth.ok) return auth.response;
+
+  const sb = getSupabase();
+
+  // Facets: distinct agency list for the filter dropdown.
+  if (sp.get('facets') === 'agencies') {
+    // Pull a capped set of agency values and dedupe in-app (cheaper than a
+    // distinct over 112K without a materialized view).
+    const { data } = await sb
+      .from('federal_contacts')
+      .select('department_ind_agency')
+      .not('department_ind_agency', 'is', null)
+      .limit(5000);
+    const agencies = Array.from(
+      new Set((data || []).map((r: { department_ind_agency: string }) => r.department_ind_agency).filter(Boolean)),
+    ).sort();
+    return NextResponse.json({ success: true, agencies });
+  }
+
+  const search = (sp.get('search') || '').trim();
+  const agency = (sp.get('agency') || '').trim();
+  const office = (sp.get('office') || '').trim();
+  const role = (sp.get('role') || '').trim();
+  const limit = Math.min(Number(sp.get('limit')) || 50, 200);
+  const offset = Math.max(Number(sp.get('offset')) || 0, 0);
+
+  let q = sb
+    .from('federal_contacts')
+    .select(
+      'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category',
+      { count: 'exact' },
+    );
+
+  if (search) {
+    // name OR title match
+    q = q.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
+  }
+  if (agency) q = q.ilike('department_ind_agency', `%${agency}%`);
+  if (office) q = q.ilike('office', `%${office}%`);
+  if (role) q = q.eq('role_category', role);
+
+  // Surface contacts that are actually reachable first (have email/phone),
+  // then alphabetical by agency so the directory reads cleanly.
+  q = q
+    .order('contact_email', { ascending: true, nullsFirst: false })
+    .order('department_ind_agency', { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  const { data, error, count } = await q;
+  if (error) {
+    console.error('[federal-contacts]', error);
+    return NextResponse.json({ success: false, error: 'Query failed' }, { status: 500 });
+  }
+
+  // The table has duplicate people (same person named on multiple
+  // solicitations). Dedupe this page by email (fallback name+agency) so the
+  // directory doesn't show the same contact 5 times.
+  const seen = new Set<string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contacts = (data || []).filter((r: any) => {
+    const key = (r.contact_email || `${r.contact_fullname}|${r.department_ind_agency}`).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return NextResponse.json({
+    success: true,
+    total: count ?? contacts.length, // pre-dedupe total (approx; for "X of N")
+    count: contacts.length,
+    offset,
+    limit,
+    contacts,
+  });
+}

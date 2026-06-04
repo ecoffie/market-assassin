@@ -538,3 +538,70 @@ export async function getSimilarRecipients(
     },
   });
 }
+
+export interface RecipientSearchRow {
+  recipient_uei: string;
+  recipient_name: string;
+  state: string | null;
+  total_obligated: number;
+  award_count: number;
+  distinct_agency_count: number;
+  distinct_naics_count: number;
+}
+
+/**
+ * Search the recipients table (~317K award-winning contractors) by name,
+ * with optional state filter and NAICS filter (via EXISTS on awards, only
+ * applied when a NAICS is given so the common name-search stays cheap).
+ * Powers the in-app Contractors panel — replaces the static 2,768-row JSON.
+ */
+export async function searchRecipients(opts: {
+  search?: string;
+  state?: string;
+  naics?: string;
+  sortBy?: 'total_obligated' | 'award_count' | 'recipient_name';
+  limit?: number;
+  offset?: number;
+}): Promise<{ rows: RecipientSearchRow[]; total: number }> {
+  const search = (opts.search || '').trim();
+  const state = (opts.state || '').trim().toUpperCase();
+  const naics = (opts.naics || '').trim().replace(/[^0-9]/g, '');
+  const sortBy = opts.sortBy || 'total_obligated';
+  const limit = Math.min(opts.limit ?? 25, 100);
+  const offset = Math.max(opts.offset ?? 0, 0);
+
+  const where: string[] = ['r.recipient_name IS NOT NULL'];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params: Record<string, any> = { limit, offset };
+  if (search) { where.push('LOWER(r.recipient_name) LIKE @search'); params.search = `%${search.toLowerCase()}%`; }
+  if (state) { where.push('r.state = @state'); params.state = state; }
+  if (naics) {
+    // EXISTS keeps it cheap vs. a join; awards is clustered on recipient_uei.
+    where.push(`EXISTS (SELECT 1 FROM ${BQ_TABLES.awards} a WHERE a.recipient_uei = r.recipient_uei AND a.naics_code = @naics)`);
+    params.naics = naics;
+  }
+
+  const orderCol = sortBy === 'recipient_name' ? 'r.recipient_name'
+    : sortBy === 'award_count' ? 'r.award_count'
+    : 'r.total_obligated';
+  const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
+
+  const rows = await queryCached<RecipientSearchRow & { total_rows: number }>({
+    cacheKey: `recipient-search:${search}:${state}:${naics}:${sortBy}:${limit}:${offset}:v1`,
+    query: `
+      SELECT
+        r.recipient_uei, r.recipient_name, r.state,
+        r.total_obligated, r.award_count,
+        r.distinct_agency_count, r.distinct_naics_count,
+        COUNT(*) OVER() AS total_rows
+      FROM ${BQ_TABLES.recipients} r
+      WHERE ${where.join(' AND ')}
+      ORDER BY ${orderCol} ${orderDir}
+      LIMIT @limit OFFSET @offset
+    `,
+    params,
+  });
+
+  const total = rows.length ? Number(rows[0].total_rows) : 0;
+  return { rows: rows.map(({ total_rows, ...r }) => r), total };
+}
