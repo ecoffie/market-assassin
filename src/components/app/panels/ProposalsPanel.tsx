@@ -499,6 +499,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     poc: undefined,
   });
   const [activeSection, setActiveSection] = useState<SectionType>('exec_summary');
+  // One-one-one: for simple responses (Sources Sought / RFI), show ONE primary
+  // "Draft my response" action by default and tuck the export / blank-template /
+  // per-section editing behind this toggle. Eric: "give me an answer, not a wall
+  // of options" (2026-06-04).
+  const [showAdvancedOutputs, setShowAdvancedOutputs] = useState(false);
 
   // Detected notice type from the active pursuit and/or loaded doc text.
   // Sources Sought/RFI are market-research responses, so the workflow should
@@ -1392,7 +1397,82 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         )}
       </section>
 
-      {responseOutputsReady && (
+      {/* SIMPLE RESPONSE (Sources Sought / RFI / RFQ) — one-one-one hero.
+          ONE obvious action: "Draft my response". Export + blank template +
+          per-section editing are tucked behind "More options" below. */}
+      {responseOutputsReady && isSimpleResponseMode && (
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <p className="text-xs uppercase tracking-wider text-purple-300">Your response</p>
+            <span className="rounded-full border border-slate-700 bg-slate-800/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+              {noticeTypeLabel(activePursuitNoticeType) || (effectiveNoticeType === 'sources_sought' ? 'Sources Sought' : effectiveNoticeType.toUpperCase())}
+            </span>
+          </div>
+          <h2 className="text-xl font-semibold text-white">Let Mindy write your response</h2>
+          <p className="text-sm text-slate-400 mt-1 mb-4">
+            Mindy reads {uploadedRfp ? 'the notice' : 'this opportunity'} and your saved profile, then drafts the full {isRfqMode ? 'RFQ response' : 'letter of intent / response'} — opening, relevant experience, capability fit, and point of contact. One click.
+          </p>
+
+          {/* What Mindy pre-filled from the notice (LOI field extraction). */}
+          {isLoiResponseMode && loiFields && (
+            <p className="mb-4 text-xs text-emerald-300/90">
+              ✓ Pre-filled from the notice:{' '}
+              {[
+                loiFields.solicitationNumber && 'solicitation #',
+                loiFields.agencyName && 'agency',
+                loiFields.submissionDeadline && 'deadline',
+                loiFields.submissionMethod && 'submit-to',
+                loiFields.requestedContent?.length && 'required content',
+                loiFields.naicsCode && 'NAICS',
+              ].filter(Boolean).join(', ') || 'available fields'}.
+            </p>
+          )}
+          {isLoiResponseMode && loiFieldsLoading && (
+            <p className="mb-4 text-xs text-purple-200 flex items-center gap-2">
+              <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+              Reading the notice — extracting agency, deadline, and required content…
+            </p>
+          )}
+
+          {/* THE one button */}
+          {!isRfqMode ? (
+            <button
+              onClick={generateAllDrafts}
+              disabled={draftAllLoading || !!draftLoading}
+              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-base font-semibold rounded-xl shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {draftAllLoading ? '⏳ Drafting your response…' : draftAllSummary ? '✨ Redraft my response' : '✨ Draft my response'}
+            </button>
+          ) : (
+            <button
+              onClick={exportProposalPackage}
+              disabled={exporting}
+              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-base font-semibold rounded-xl shadow-lg disabled:opacity-50"
+            >
+              {exporting ? 'Assembling…' : '✨ Build my RFQ response'}
+            </button>
+          )}
+
+          {draftAllSummary && !draftAllLoading && !isRfqMode && (
+            <p className="text-sm text-emerald-300 mt-3">
+              ✅ Drafted {draftAllSummary.count} section{draftAllSummary.count === 1 ? '' : 's'} — review and export below.
+            </p>
+          )}
+
+          {/* Secondary: collapsed "more options" (export blank template, edit
+              individual sections). Hidden by default — the answer comes first. */}
+          <button
+            type="button"
+            onClick={() => setShowAdvancedOutputs(v => !v)}
+            className="mt-4 text-sm text-slate-400 hover:text-slate-200 inline-flex items-center gap-1.5"
+          >
+            <span className={`transition-transform ${showAdvancedOutputs ? 'rotate-90' : ''}`}>▸</span>
+            More options {showAdvancedOutputs ? '' : '(export .docx, blank template, edit sections)'}
+          </button>
+        </section>
+      )}
+
+      {responseOutputsReady && !isSimpleResponseMode && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
@@ -1405,7 +1485,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </p>
             </div>
             <span className="rounded-full border border-slate-700 bg-slate-800/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
-              {noticeTypeLabel(activePursuitNoticeType) || (effectiveNoticeType === 'sources_sought' ? 'Sources Sought' : effectiveNoticeType.toUpperCase())}
+              {noticeTypeLabel(activePursuitNoticeType) || effectiveNoticeType.toUpperCase()}
             </span>
           </div>
 
@@ -1504,7 +1584,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       )}
 
       {/* Output · Compliance Matrix / Response Requirements */}
-      {responseOutputsReady && (
+      {/* In simple mode this (blank template export) is a secondary option —
+          only when "More options" is expanded. Full-proposal mode always shows
+          the compliance-matrix variant. */}
+      {responseOutputsReady && (!isSimpleResponseMode || showAdvancedOutputs) && (
         <section id={isSimpleResponseMode ? 'proposal-response-template' : undefined} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           {isSimpleResponseMode ? (
             <>
@@ -1715,13 +1798,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </section>
       )}
 
-      {/* Output · Draft Sections */}
-      {uploadedRfp && !isRfqMode && (
+      {/* Output · Draft Sections — in simple mode, show once the user has
+          drafted (to review/edit individual sections) or expanded More options.
+          The hero "Draft my response" button above is the primary entry. */}
+      {uploadedRfp && !isRfqMode && (!isSimpleResponseMode || showAdvancedOutputs || !!draftAllSummary || hasAnyDraft) && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">
-                Output · {isLoiResponseMode ? 'LOI Response Sections' : 'Draft Sections'}
+                Output · {isLoiResponseMode ? 'Review & edit sections' : 'Draft Sections'}
               </p>
               <h2 className="text-lg font-semibold text-white">
                 {isLoiResponseMode
