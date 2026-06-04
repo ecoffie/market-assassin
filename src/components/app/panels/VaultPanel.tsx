@@ -403,49 +403,93 @@ function PastPerfSection({ email, items, onChanged }: { email: string; items: Pa
       />
     );
   }
+  // Sort: completed (real) entries first, unfilled SAM templates last.
+  const sorted = [...items].sort((a, b) => Number(isPastPerfDraft(a)) - Number(isPastPerfDraft(b)));
+  const draftCount = items.filter(isPastPerfDraft).length;
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-1">
         <h2 className="text-lg font-medium text-white">{items.length} past performance {items.length === 1 ? 'entry' : 'entries'}</h2>
         <button onClick={() => setAdding(true)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded">
           + Add past performance
         </button>
       </div>
-      {adding && (
-        <PastPerfForm email={email} onSaved={() => { setAdding(false); onChanged(); }} onCancel={() => setAdding(false)} />
+      {draftCount > 0 && (
+        <p className="text-xs text-amber-300/80 mb-4">{draftCount} {draftCount === 1 ? 'entry is' : 'entries are'} an unfilled template — add real details so Mindy cites them instead of placeholders.</p>
       )}
-      <div className="space-y-3">
-        {items.map((p) => (
-          <div key={p.id} className="border border-slate-800 rounded-lg p-4 bg-slate-900/40">
-            <div className="flex justify-between items-start">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-white font-medium">{p.contract_title}</h3>
-                <p className="text-sm text-slate-400">
-                  {p.agency}
-                  {p.sub_agency && ` · ${p.sub_agency}`}
-                  {p.contract_number && ` · ${p.contract_number}`}
-                </p>
-                {p.contract_value && (
-                  <p className="text-sm text-emerald-400 mt-1">${(p.contract_value).toLocaleString()}</p>
-                )}
-                {p.scope_description && (
-                  <p className="text-sm text-slate-300 mt-2">{p.scope_description}</p>
-                )}
-              </div>
-              <button
-                onClick={async () => {
-                  if (!confirm('Archive this past performance?')) return;
-                  await fetch(`/api/app/vault/past-performance?id=${p.id}&email=${encodeURIComponent(email)}`, {
-                    method: 'DELETE', headers: getMIApiHeaders(email),
-                  });
-                  onChanged();
-                }}
-                className="ml-3 text-xs text-slate-500 hover:text-rose-400"
-              >Archive</button>
-            </div>
-          </div>
+      {adding && (
+        <div className="mb-4">
+          <PastPerfForm email={email} onSaved={() => { setAdding(false); onChanged(); }} onCancel={() => setAdding(false)} />
+        </div>
+      )}
+      <div className="space-y-2">
+        {sorted.map((p) => (
+          <PastPerfRow key={p.id} p={p} email={email} onChanged={onChanged} />
         ))}
       </div>
+    </div>
+  );
+}
+
+// A SAM auto-fill template the user hasn't filled in yet — title/agency still
+// in [brackets] or scope still has the boilerplate prompt.
+function isPastPerfDraft(p: PastPerf): boolean {
+  const t = (p.contract_title || '').trim();
+  const a = (p.agency || '').trim();
+  const s = (p.scope_description || '').toLowerCase();
+  const bracketed = /^\[.*\]$/.test(t) || /^\[.*\]$/.test(a);
+  const promptScope = s.includes('briefly describe') || s.includes('describe the specific') || s.includes('summarize the scope') || s.includes('fill in the contract');
+  return bracketed || promptScope;
+}
+
+function PastPerfRow({ p, email, onChanged }: { p: PastPerf; email: string; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const draft = isPastPerfDraft(p);
+  const fmtPeriod = () => {
+    const y = (d?: string | null) => (d ? new Date(d).getFullYear() : null);
+    const s = y(p.period_start), e = y(p.period_end);
+    return s || e ? `${s ?? '?'}–${e ?? 'present'}` : null;
+  };
+  return (
+    <div className={`border rounded-lg bg-slate-900/40 ${draft ? 'border-amber-500/20' : 'border-slate-800'}`}>
+      {/* Collapsed row — scannable key fields */}
+      <button onClick={() => setOpen(o => !o)} className="w-full text-left px-4 py-3 flex items-center gap-3">
+        <span className={`shrink-0 transition-transform text-slate-500 ${open ? 'rotate-90' : ''}`}>▸</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-white font-medium truncate">{p.contract_title || '(untitled)'}</span>
+            {draft && <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">DRAFT — ADD DETAILS</span>}
+          </div>
+          <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-xs text-slate-400 mt-0.5">
+            <span>{p.agency || '—'}</span>
+            {p.contract_value ? <span className="text-emerald-400 font-medium">${p.contract_value.toLocaleString()}</span> : null}
+            {p.role ? <span className="capitalize">{p.role}</span> : null}
+            {fmtPeriod() ? <span>{fmtPeriod()}</span> : null}
+            {p.cpars_rating ? <span className="text-slate-300">CPARS: {p.cpars_rating}</span> : null}
+          </div>
+        </div>
+      </button>
+      {/* Expanded detail */}
+      {open && (
+        <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
+          {p.sub_agency && <p className="text-xs text-slate-500">{p.sub_agency}{p.contract_number ? ` · ${p.contract_number}` : ''}</p>}
+          {p.scope_description && <p className="text-sm text-slate-300">{p.scope_description}</p>}
+          {(p.reference_name || p.reference_email) && (
+            <p className="text-xs text-slate-400">Reference: {p.reference_name || ''}{p.reference_email ? ` · ${p.reference_email}` : ''}</p>
+          )}
+          <button
+            onClick={async () => {
+              if (!confirm('Archive this past performance?')) return;
+              await fetch(`/api/app/vault/past-performance?id=${p.id}&email=${encodeURIComponent(email)}`, {
+                method: 'DELETE', headers: getMIApiHeaders(email),
+              });
+              onChanged();
+            }}
+            className="text-xs text-slate-500 hover:text-rose-400"
+          >Archive</button>
+        </div>
+      )}
     </div>
   );
 }
