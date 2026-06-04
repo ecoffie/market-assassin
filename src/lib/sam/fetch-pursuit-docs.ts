@@ -261,18 +261,28 @@ async function discoverFiles(
 
       // GUARD the fuzzy 'title' probe: a generic pursuit title (e.g.
       // "236220 - COMMERCIAL... CONSTRUCTION") could match a stranger's notice
-      // and download the wrong docs. Only accept a title hit if it corroborates
-      // — same solicitation number, OR the agency name overlaps. noticeid/solnum
-      // are exact, so they're accepted unconditionally.
+      // and download the wrong docs. Accept a title hit only if it corroborates.
+      // noticeid/solnum are exact, so they're accepted unconditionally.
       if (probe.param === 'title') {
-        const candSol = String(candidate.solicitationNumber || '').trim().toLowerCase();
-        const wantSol = (opts?.solicitationNumber || '').trim().toLowerCase();
-        const candAgency = String(candidate.fullParentPathName || candidate.department || '').toLowerCase();
-        const wantAgency = (opts?.agency || '').toLowerCase();
+        const norm = (s: unknown) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        const candTitle = norm(candidate.title);
+        const wantTitle = norm(probe.value);
+        const candSol = norm(candidate.solicitationNumber);
+        const wantSol = norm(opts?.solicitationNumber);
+        const candAgency = norm(candidate.fullParentPathName || candidate.department);
+        const wantAgency = norm(opts?.agency);
+        // (a) exact title equality is itself strong corroboration (SAM returned
+        // ONE result whose title matches the pursuit verbatim).
+        const titleOk = !!candTitle && candTitle === wantTitle;
+        // (b) same solicitation number.
         const solOk = !!candSol && !!wantSol && candSol === wantSol;
+        // (c) agency token overlap (first meaningful token of either side
+        // appears in the other) — tolerant of "AGRICULTURE, DEPARTMENT OF" vs
+        // the dotted fullParentPathName.
+        const firstTok = (s: string) => s.split(' ').find((t) => t.length > 3) || s.split(' ')[0] || '';
         const agencyOk = !!candAgency && !!wantAgency &&
-          (candAgency.includes(wantAgency.split(',')[0].trim()) || wantAgency.includes(candAgency.split(',')[0].trim()));
-        if (!solOk && !agencyOk) continue; // unverified title match — skip
+          (candAgency.includes(firstTok(wantAgency)) || wantAgency.includes(firstTok(candAgency)));
+        if (!titleOk && !solOk && !agencyOk) continue; // unverified — skip
       }
 
       opp = candidate;
