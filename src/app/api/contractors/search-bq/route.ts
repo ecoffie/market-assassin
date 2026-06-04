@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     const contractors = rows.map((r) => ({
       uei: r.recipient_uei,
       company: r.recipient_name,
+      city: r.city || '',
       state: r.state || '',
       total_contract_value: r.total_obligated,
       contract_value_num: r.total_obligated,
@@ -56,6 +57,10 @@ export async function GET(request: NextRequest) {
       totalCount: total,     // full DB size (317K) — for the headline stat
       filteredCount: total,  // matches after filters
       count: contractors.length,
+      // The NAICS path uses a pre-aggregated rollup with NO location data, so
+      // city/state + the state filter only apply to NAME search. The UI uses
+      // this to explain why location/state-filter aren't shown for NAICS.
+      locationAvailable: !naics,
       contractors,
     });
   } catch (err) {

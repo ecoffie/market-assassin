@@ -7,6 +7,8 @@ import ContractorSalesHistoryDrawer from '../contractors/ContractorSalesHistoryD
 import { getMIApiHeaders } from '../authHeaders';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
+const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+
 interface ContractorsPanelProps {
   email: string | null;
   tier: AppTier;
@@ -31,6 +33,8 @@ interface Contractor {
   contract_value_num: number;
   slug?: string; // BQ-backed rows include this — links to /contractors/[slug]
   uei?: string;
+  city?: string;  // BQ rows carry HQ city/state — shown to disambiguate
+  state?: string;
 }
 
 interface ContractorStats {
@@ -72,6 +76,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   // Search filters
   const [searchQuery, setSearchQuery] = useState('');
   const [naicsFilter, setNaicsFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
   const [profileAgencyFilter, setProfileAgencyFilter] = useState('');
   const [contactFilter, setContactFilter] = useState<'all' | 'withContact' | 'withEmail'>('all');
   const [sortBy, setSortBy] = useState<'contract_value' | 'company' | 'contract_count'>('contract_value');
@@ -99,7 +104,8 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
     agency: string,
     contact: 'all' | 'withContact' | 'withEmail',
     sort: 'contract_value' | 'company' | 'contract_count',
-    pageNum: number
+    pageNum: number,
+    stateArg?: string
   ) => {
     setSearching(true);
     setError(null);
@@ -108,10 +114,13 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       // BQ-backed: 317K award-winning contractors (recipients table + the
       // top-contractors-by-NAICS rollup). Quota-aware — see searchRecipients.
       // The `contact`/agency filters from the old static JSON aren't supported
-      // by BQ (no contact data), so they're ignored here.
+      // by BQ (no contact data), so they're ignored here. State filter applies
+      // to NAME search only (the NAICS rollup has no location).
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (naics) params.set('naics', naics);
+      const stateVal = stateArg !== undefined ? stateArg : stateFilter;
+      if (stateVal && !naics) params.set('state', stateVal);
       params.set('sortBy', sort);
       params.set('limit', limit.toString());
       params.set('offset', (pageNum * limit).toString());
@@ -135,7 +144,8 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       setSearching(false);
       setLoading(false);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateFilter]);
 
   // Load stats on mount
   useEffect(() => {
@@ -198,7 +208,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
     setPage(0);
     setUsingProfileDefaults(false);
     setProfileAgencyFilter('');
-    searchContractors(searchQuery, naicsFilter, '', contactFilter, sortBy, 0);
+    searchContractors(searchQuery, naicsFilter, '', contactFilter, sortBy, 0, stateFilter);
   };
 
   const handlePageChange = (newPage: number) => {
@@ -284,7 +294,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
 
       {/* Search & Filters */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
             <label className="block text-xs text-slate-500 mb-1">Search</label>
@@ -307,6 +317,22 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               placeholder="541512, 236, 238"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
             />
+          </div>
+
+          {/* State filter — name-search only (NAICS rollup has no location). */}
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">
+              State{naicsFilter.trim() ? <span className="text-slate-600"> (name search only)</span> : ''}
+            </label>
+            <select
+              value={stateFilter}
+              onChange={(e) => { setStateFilter(e.target.value); setPage(0); searchContractors(searchQuery, naicsFilter, profileAgencyFilter, contactFilter, sortBy, 0, e.target.value); }}
+              disabled={!!naicsFilter.trim()}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+            >
+              <option value="">All states</option>
+              {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
 
           {/* Search Button */}
@@ -424,6 +450,13 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     </a>
                   ) : (
                     <h3 className="text-white font-semibold text-lg mb-1">{contractor.company}</h3>
+                  )}
+
+                  {/* HQ location — disambiguates same-named firms (which Excell?) */}
+                  {(contractor.city || contractor.state) && (
+                    <div className="text-xs text-slate-400 -mt-0.5 mb-1">
+                      📍 {[contractor.city, contractor.state].filter(Boolean).join(', ')}
+                    </div>
                   )}
 
                   {/* SBLO Contact */}

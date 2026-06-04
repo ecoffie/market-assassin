@@ -542,6 +542,7 @@ export async function getSimilarRecipients(
 export interface RecipientSearchRow {
   recipient_uei: string;
   recipient_name: string;
+  city: string | null;
   state: string | null;
   total_obligated: number;
   award_count: number;
@@ -603,9 +604,11 @@ export async function searchRecipients(opts: {
     const total = rolled.length ? Number(rolled[0].total_rows) : 0;
     return {
       total,
+      // The NAICS rollup has no location columns — city/state are null here.
       rows: rolled.map(r => ({
         recipient_uei: r.recipient_uei,
         recipient_name: r.recipient_name,
+        city: null,
         state: null,
         total_obligated: Number(r.total_amount || 0),
         award_count: Number(r.award_count || 0),
@@ -628,10 +631,10 @@ export async function searchRecipients(opts: {
   const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
 
   const rows = await queryCached<RecipientSearchRow & { total_rows: number }>({
-    cacheKey: `recipient-search:${search}:${state}:${sortBy}:${limit}:${offset}:v1`,
+    cacheKey: `recipient-search:${search}:${state}:${sortBy}:${limit}:${offset}:v2`,
     query: `
       SELECT
-        r.recipient_uei, r.recipient_name, r.state,
+        r.recipient_uei, r.recipient_name, r.city, r.state,
         r.total_obligated, r.award_count,
         r.distinct_agency_count, r.distinct_naics_count,
         COUNT(*) OVER() AS total_rows
