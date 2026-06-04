@@ -225,6 +225,7 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
   const [form, setForm] = useState<IdentityProfile>(data);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [naicsSeededNote, setNaicsSeededNote] = useState<string | null>(null);
   const [showAutoFill, setShowAutoFill] = useState(false);
 
   useEffect(() => { setForm(data); }, [data]);
@@ -251,6 +252,13 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         body: JSON.stringify({ email, profile: form }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json().catch(() => ({}));
+      // If the save seeded the user's alert NAICS from this profile (because
+      // their alert filter was empty), tell them — otherwise the sync is
+      // invisible. We don't auto-overwrite an existing alert filter.
+      if (result?.alertNaicsSeeded) {
+        setNaicsSeededNote('Your NAICS were also applied to alerts & briefings. Fine-tune them anytime in Settings.');
+      }
       setSavedAt(new Date().toLocaleTimeString());
       onSaved();
     } catch (e) {
@@ -372,6 +380,11 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         </button>
         {savedAt && <span className="text-xs text-emerald-400">Saved at {savedAt}</span>}
       </div>
+      {naicsSeededNote && (
+        <div className="mt-2 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
+          ✓ {naicsSeededNote}
+        </div>
+      )}
     </div>
   );
 }

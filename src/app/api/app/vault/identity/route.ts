@@ -56,5 +56,42 @@ export async function PUT(request: NextRequest) {
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ success: true, identity: data });
+
+  // NAICS SYNC (guarded): the daily-alerts cron reads NAICS from
+  // user_notification_settings, NOT from the Vault. A user who set their NAICS
+  // only in the Vault would never get matching alerts (the gap Eric flagged
+  // 2026-06-04). Seed the alert NAICS from the Vault — but ONLY when the alert
+  // NAICS is currently EMPTY. We must NOT overwrite a tuned alert filter:
+  // Vault primary_naics = all registered codes (identity); alert naics_codes =
+  // what the user chose to watch (preference). Verified those diverge in
+  // practice, so a blind copy would clobber the filter. This makes the Vault a
+  // helpful starting point for new users without being destructive.
+  let alertNaicsSeeded = false;
+  const vaultNaics = Array.isArray(row.primary_naics)
+    ? row.primary_naics.filter((c: unknown) => typeof c === 'string' && /^\d{2,6}$/.test(c))
+    : [];
+  if (vaultNaics.length > 0) {
+    try {
+      const { data: ns } = await getSupabase()
+        .from('user_notification_settings')
+        .select('naics_codes')
+        .eq('user_email', auth.email!)
+        .maybeSingle();
+      const alertEmpty = !ns || !Array.isArray(ns.naics_codes) || ns.naics_codes.length === 0;
+      if (alertEmpty) {
+        await getSupabase()
+          .from('user_notification_settings')
+          .upsert(
+            { user_email: auth.email!, naics_codes: vaultNaics, updated_at: new Date().toISOString() },
+            { onConflict: 'user_email' },
+          );
+        alertNaicsSeeded = true;
+      }
+    } catch (e) {
+      // Non-fatal — the identity save already succeeded. Log only.
+      console.error('[vault/identity] alert NAICS seed failed:', (e as Error)?.message);
+    }
+  }
+
+  return NextResponse.json({ success: true, identity: data, alertNaicsSeeded });
 }
