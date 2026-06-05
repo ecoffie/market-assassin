@@ -7,13 +7,14 @@ export const alt = 'A federal opportunity shared via Mindy';
 
 // Dynamic share-preview image: the opportunity headline + agency on Mindy's
 // brand card. This is what shows in iMessage/Slack/LinkedIn when a user shares.
-export default async function Image({ params }: { params: { shareId: string } }) {
+export default async function Image({ params }: { params: Promise<{ shareId: string }> }) {
+  const { shareId } = await params;
   const base = process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai';
   let title = 'A federal opportunity';
   let agency = '';
   let meta = '';
   try {
-    const res = await fetch(`${base}/api/share/opportunity?shareId=${params.shareId}`, { next: { revalidate: 300 } });
+    const res = await fetch(`${base}/api/share/opportunity?shareId=${shareId}`, { next: { revalidate: 300 } });
     const json = await res.json();
     if (json?.success && json.opportunity) {
       const o = json.opportunity;
