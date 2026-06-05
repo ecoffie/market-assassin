@@ -28,6 +28,9 @@ interface Contact {
   role: string | null;       // real job title if we could identify one
   pocLabel: string | null;   // "Primary"/"Secondary" SAM POC designation
   subAgency: string | null;  // derived branch/command (Air Force, Navy, DLA…)
+  derivedOffice: string | null; // DoDAAC-decoded office (NAVSUP WSS, DLA Aviation…)
+  dodaac: string | null;
+  instrumentType: string | null; // BPA / IDIQ / OTA / Purchase Order / RFQ…
 }
 
 export default function GovDecisionMakersPanel({ email }: Props) {
@@ -204,7 +207,10 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                     {c.department_ind_agency || '—'}
                     {c.subAgency && <span className="block text-xs text-emerald-400/80">{c.subAgency}</span>}
                   </td>
-                  <td className="px-4 py-3 text-slate-400">{c.office || c.sub_tier || '—'}</td>
+                  <td className="px-4 py-3 text-slate-400">
+                    {c.derivedOffice || c.office || c.sub_tier || '—'}
+                    {c.instrumentType && <span className="block text-[11px] text-slate-600">{c.instrumentType}{c.dodaac ? ` · ${c.dodaac}` : ''}</span>}
+                  </td>
                   <td className="px-4 py-3">
                     {c.contact_email ? (
                       <a href={`mailto:${c.contact_email}`} className="text-emerald-400 hover:underline">{c.contact_email}</a>

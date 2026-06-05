@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getOfficesForAgency } from '@/lib/bigquery/agencies';
 import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
+import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
 
 export const dynamic = 'force-dynamic';
 
@@ -187,13 +188,23 @@ export async function GET(request: NextRequest) {
     seen.add(key);
     return true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }).map((r: any) => ({
-    ...r,
-    ...normalizeTitle(r.contact_title),
-    // Derived command/branch within the broad parent agency (e.g. "Air Force"
-    // under DEPT OF DEFENSE). Lets the UI narrow huge agencies.
-    subAgency: deriveSubAgency(r.contact_email, r.solicitation_number),
-  }));
+  }).map((r: any) => {
+    // Decode the DoDAAC from the solicitation number → the specific contracting
+    // OFFICE (N00104 = NAVSUP WSS), fiscal year, and instrument type. This is
+    // the office-level granularity SAM doesn't store (Eric 2026-06-05).
+    const dod = decodeDodaac(r.solicitation_number);
+    return {
+      ...r,
+      ...normalizeTitle(r.contact_title),
+      // Derived command/branch within the broad parent agency (e.g. "Air Force"
+      // under DEPT OF DEFENSE).
+      subAgency: deriveSubAgency(r.contact_email, r.solicitation_number),
+      // DoDAAC-derived office: prefer the friendly name, else the raw code.
+      derivedOffice: dod?.officeName || dod?.dodaac || null,
+      dodaac: dod?.dodaac || null,
+      instrumentType: dod?.instrumentType || null,
+    };
+  });
 
   // Filter by derived sub-agency (JS, since it's not a column).
   if (subAgency) {
