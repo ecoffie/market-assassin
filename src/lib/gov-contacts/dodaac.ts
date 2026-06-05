@@ -106,9 +106,13 @@ export function decodeDodaac(solicitationNumber: string | null): DodaacInfo | nu
  * (civilian formats, non-DoD) so callers can fall back to the agency name.
  * e.g. "NAVSUP Weapon Systems Support" or "DLA Aviation · IDIQ" or "N00104".
  */
-export function formatDodaacOffice(solicitationNumber: string | null): string | null {
+export function formatDodaacOffice(
+  solicitationNumber: string | null,
+  nameMap?: Map<string, string>,
+): string | null {
   const d = decodeDodaac(solicitationNumber);
   if (!d) return null;
-  const office = d.officeName || d.dodaac;
+  // Name resolution: directory table (passed in) > in-code map > raw code.
+  const office = (nameMap && nameMap.get(d.dodaac)) || d.officeName || d.dodaac;
   return d.instrumentType ? `${office} · ${d.instrumentType}` : office;
 }

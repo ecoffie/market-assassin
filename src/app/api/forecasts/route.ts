@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
+import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -297,6 +298,9 @@ export async function GET(request: NextRequest) {
     // early signal isn't dropped just because its short response window closed.
     const lookbackDays = Math.min(Math.max(parseInt(searchParams.get('lookbackDays') || '180', 10) || 180, 30), 730);
     let dodSignals: Array<Record<string, unknown>> = [];
+    // Office names for DoDAAC codes (directory table) — so forecast offices read
+    // "10th Contracting Squadron", not "FA7000".
+    const dodaacNames = dodInScope ? await loadDodaacNames() : new Map<string, string>();
     if (dodInScope) {
       const since = new Date(Date.now() - lookbackDays * 86400000).toISOString();
       let sig = supabase
@@ -390,7 +394,7 @@ export async function GET(request: NextRequest) {
           agency: 'Department of Defense',
           department: s.department,
           // Use the DoDAAC-decoded office when the solicitation # allows it.
-          office: formatDodaacOffice(String(s.solicitation_number || '')) || s.office || null,
+          office: formatDodaacOffice(String(s.solicitation_number || ''), dodaacNames) || s.office || null,
           naics: s.naics_code,
           naicsDescription: null,
           psc: null,
