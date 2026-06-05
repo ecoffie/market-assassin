@@ -7,6 +7,7 @@ import { classifyNoticeType, noticeTypeLabel, noticeTypeToDetected } from '@/lib
 import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
+import ProposalChat from './ProposalChat';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -214,6 +215,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedRfp, setUploadedRfp] = useState<UploadedRfp | null>(null);
+  // Auto (one-click draft, default) vs Manual/Sport (Perplexity-style chat —
+  // upload + drive the LLM yourself). PRD-proposal-manual-mode.md. Eric 2026-06.
+  const [driveMode, setDriveMode] = useState<'auto' | 'manual'>('auto');
   const [sourceDocuments, setSourceDocuments] = useState<UploadedRfp[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -1403,10 +1407,46 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         )}
       </section>
 
+      {/* Auto ↔ Manual (Sport Mode) toggle. Auto = one-click draft (default);
+          Manual = upload + chat-drive the proposal LLM yourself. */}
+      {responseOutputsReady && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3">
+          <div className="text-sm text-slate-400">
+            <span className="font-medium text-slate-200">How do you want to drive?</span>{' '}
+            {driveMode === 'auto' ? 'Auto — Mindy drafts it for you.' : 'Manual — you direct Mindy with your own files.'}
+          </div>
+          <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-sm shrink-0">
+            <button
+              onClick={() => setDriveMode('auto')}
+              className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              ⚡ Auto
+            </button>
+            <button
+              onClick={() => setDriveMode('manual')}
+              className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'manual' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              🏎 Manual · Sport
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MANUAL MODE — Perplexity-style proposal chat over your uploaded files
+          + Vault. You type what you want; Mindy drafts grounded in YOUR docs. */}
+      {responseOutputsReady && driveMode === 'manual' && email && (
+        <ProposalChat
+          email={email}
+          rfpText={uploadedRfp?.text || ''}
+          rfpFileName={uploadedRfp?.fileName || ''}
+          hasVault={!!vaultSummary?.hasIdentity || (vaultSummary?.past_performance ?? 0) > 0 || (vaultSummary?.capabilities ?? 0) > 0}
+        />
+      )}
+
       {/* SIMPLE RESPONSE (Sources Sought / RFI / RFQ) — one-one-one hero.
           ONE obvious action: "Draft my response". Export + blank template +
           per-section editing are tucked behind "More options" below. */}
-      {responseOutputsReady && isSimpleResponseMode && (
+      {responseOutputsReady && isSimpleResponseMode && driveMode === 'auto' && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <div className="flex items-center justify-between gap-3 mb-1">
             <p className="text-xs uppercase tracking-wider text-purple-300">Your response</p>
@@ -1478,7 +1518,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </section>
       )}
 
-      {responseOutputsReady && !isSimpleResponseMode && (
+      {responseOutputsReady && !isSimpleResponseMode && driveMode === 'auto' && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
@@ -1593,7 +1633,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       {/* In simple mode this (blank template export) is a secondary option —
           only when "More options" is expanded. Full-proposal mode always shows
           the compliance-matrix variant. */}
-      {responseOutputsReady && (!isSimpleResponseMode || showAdvancedOutputs) && (
+      {responseOutputsReady && driveMode === 'auto' && (!isSimpleResponseMode || showAdvancedOutputs) && (
         <section id={isSimpleResponseMode ? 'proposal-response-template' : undefined} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           {isSimpleResponseMode ? (
             <>
@@ -1807,7 +1847,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       {/* Output · Draft Sections — in simple mode, show once the user has
           drafted (to review/edit individual sections) or expanded More options.
           The hero "Draft my response" button above is the primary entry. */}
-      {uploadedRfp && !isRfqMode && (!isSimpleResponseMode || showAdvancedOutputs || !!draftAllSummary || hasAnyDraft) && (
+      {uploadedRfp && !isRfqMode && driveMode === 'auto' && (!isSimpleResponseMode || showAdvancedOutputs || !!draftAllSummary || hasAnyDraft) && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
@@ -1985,7 +2025,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       )}
 
       {/* Output · Review Checklist + Export */}
-      {uploadedRfp && !isRfqMode && (
+      {uploadedRfp && !isRfqMode && driveMode === 'auto' && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
