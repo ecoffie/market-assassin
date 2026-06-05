@@ -160,14 +160,6 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Buyers + partners',
         tier: ['pro', 'team', 'enterprise'],
       },
-      {
-        id: 'team',
-        label: 'Team Access',
-        icon: UsersRound,
-        description: 'Seats + roles',
-        tier: ['team', 'enterprise'],
-        badge: 'Teams',
-      },
     ],
   },
   {
@@ -266,6 +258,17 @@ const NAV_SECTIONS: NavSection[] = [
         icon: Library,
         description: 'Every AI draft, searchable',
         tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        // Account-level team management (seats + roles) — moved here from
+        // Pipeline (Eric 2026-06-05): Pipeline is the DEAL board; team admin is
+        // account stuff, so it belongs with Vault / Library / Settings.
+        id: 'team',
+        label: 'Team Access',
+        icon: UsersRound,
+        description: 'Seats + roles',
+        tier: ['team', 'enterprise'],
+        badge: 'Teams',
       },
       {
         id: 'settings',
