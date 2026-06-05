@@ -1025,18 +1025,31 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   .join(' · ')}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setLocalPursuitId(null);
-                setAutoLoadStatus('idle');
-                setAutoLoadMessage(null);
-                clearRfp();
-              }}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300"
-            >
-              Switch pursuit
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {activePursuit?.notice_id && (
+                <a
+                  href={`https://sam.gov/opp/${activePursuit.notice_id}/view`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 text-xs font-medium text-blue-300 hover:bg-blue-500/20"
+                  title="Verify all documents + notice text on the official SAM.gov listing"
+                >
+                  🔎 Verify on SAM.gov ↗
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setLocalPursuitId(null);
+                  setAutoLoadStatus('idle');
+                  setAutoLoadMessage(null);
+                  clearRfp();
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300"
+              >
+                Switch pursuit
+              </button>
+            </div>
           </div>
         </section>
       )}
@@ -1204,6 +1217,20 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               Add the notice, RFP/RFQ, PWS/SOW, amendments, Q&A, pricing schedule, or attachments. Mindy extracts the text, classifies the response type, then unlocks the outputs below.
             </p>
           </div>
+          {/* Verify on SAM.gov — cross-check every doc + the notice text against
+              the official source. Builds trust (Eric: confidence I'm not missing
+              anything) + lets users download/upload as needed. */}
+          {activePursuit?.notice_id && (
+            <a
+              href={`https://sam.gov/opp/${activePursuit.notice_id}/view`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-300 hover:bg-blue-500/20 transition-colors"
+              title="Open the official SAM.gov notice to verify all documents + text"
+            >
+              🔎 Verify on SAM.gov ↗
+            </a>
+          )}
         </div>
 
         {/* Auto-load status banner — appears when user landed here from
