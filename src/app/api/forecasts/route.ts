@@ -291,16 +291,22 @@ export async function GET(request: NextRequest) {
       || agency.toLowerCase().includes('army')
       || agency.toLowerCase().includes('navy')
       || agency.toLowerCase().includes('air force');
+    // Lookback window for DoD early signals (how far back the Sources Sought
+    // can have been POSTED). Default 180d; ?lookbackDays= overrides. We also
+    // include items with no/expired deadline when within the window so a useful
+    // early signal isn't dropped just because its short response window closed.
+    const lookbackDays = Math.min(Math.max(parseInt(searchParams.get('lookbackDays') || '180', 10) || 180, 30), 730);
     let dodSignals: Array<Record<string, unknown>> = [];
     if (dodInScope) {
+      const since = new Date(Date.now() - lookbackDays * 86400000).toISOString();
       let sig = supabase
         .from('sam_opportunities')
         .select('solicitation_number, title, description, naics_code, department, office, posted_date, response_deadline, set_aside_description, notice_type')
         .ilike('department', '%defense%')
         .in('notice_type', ['Sources Sought', 'Special Notice', 'Presolicitation'])
-        .gte('response_deadline', new Date().toISOString())
+        .gte('posted_date', since)
         .order('posted_date', { ascending: false })
-        .limit(50);
+        .limit(60);
       if (naics) {
         const term = naics.split(/[, ]+/)[0].trim();
         sig = term.length <= 4 ? sig.ilike('naics_code', `${term}%`) : sig.eq('naics_code', term);
@@ -308,6 +314,29 @@ export async function GET(request: NextRequest) {
       if (search) sig = sig.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
       const { data: sigData } = await sig;
       dodSignals = sigData || [];
+
+      // RELEASE DETECTION (Eric: "how do we know if they let out the
+      // solicitation?"): a Sources Sought whose RFP already dropped shows up
+      // again under the SAME solicitation_number as a Solicitation / Combined /
+      // Award. Flag those so the user knows the stage — still pre-RFP (shape it)
+      // vs already released (go bid). One batched lookup, not N+1.
+      const solNums = dodSignals.map(s => s.solicitation_number).filter(Boolean) as string[];
+      if (solNums.length > 0) {
+        const { data: followOns } = await supabase
+          .from('sam_opportunities')
+          .select('solicitation_number, notice_type')
+          .in('solicitation_number', solNums)
+          .in('notice_type', ['Solicitation', 'Combined Synopsis/Solicitation', 'Award Notice']);
+        const released = new Map<string, string>();
+        for (const f of (followOns || []) as { solicitation_number: string; notice_type: string }[]) {
+          released.set(f.solicitation_number, f.notice_type);
+        }
+        dodSignals = dodSignals.map(s => ({
+          ...s,
+          rfpReleased: released.has(s.solicitation_number as string),
+          rfpStage: released.get(s.solicitation_number as string) || null,
+        }));
+      }
     }
 
     // Build response
@@ -384,6 +413,8 @@ export async function GET(request: NextRequest) {
           noticeType: s.notice_type,
           solicitationNumber: s.solicitation_number,
           responseDeadline: s.response_deadline,
+          rfpReleased: !!s.rfpReleased,
+          rfpStage: s.rfpStage || null,
         })),
       ],
       dodEarlySignalCount: dodSignals.length,

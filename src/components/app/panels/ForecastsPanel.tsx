@@ -48,6 +48,8 @@ interface Forecast {
   noticeType?: string;
   solicitationNumber?: string;
   responseDeadline?: string;
+  rfpReleased?: boolean;
+  rfpStage?: string | null;
 }
 
 interface ForecastsSummary {
@@ -606,9 +608,22 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                         {/* DoD early signal (SAM Sources Sought/RFI) — labeled
                             distinctly from a formal LRAF forecast. */}
                         {forecast.signalType === 'dod_early_signal' ? (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300" title="Early signal from SAM (Sources Sought / RFI) — 6-12 months pre-RFP. DoD doesn't publish a formal forecast feed.">
-                            ⚡ Early signal{forecast.noticeType ? ` · ${forecast.noticeType}` : ''}
-                          </span>
+                          <>
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300" title="Early signal from SAM (Sources Sought / RFI) — 6-12 months pre-RFP. DoD doesn't publish a formal forecast feed.">
+                              ⚡ Early signal{forecast.noticeType ? ` · ${forecast.noticeType}` : ''}
+                            </span>
+                            {/* Stage: still pre-RFP (shape it) vs RFP already
+                                dropped (go bid) — detected via matching sol #. */}
+                            {forecast.rfpReleased ? (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-rose-500/20 text-rose-300" title="The solicitation/RFP for this has already been released — time to bid, not shape.">
+                                ✓ RFP released
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/15 text-emerald-300" title="No solicitation released yet — still time to engage the office and shape the requirement.">
+                                pre-RFP
+                              </span>
+                            )}
+                          </>
                         ) : forecast.status && forecast.status !== 'forecast' ? (
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
                             {forecast.status}
