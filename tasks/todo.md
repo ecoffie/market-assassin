@@ -106,6 +106,7 @@ Two data-wiring fixes — surfaced data that existed but wasn't connected. Both 
 
 ### Shipped
 - [x] **Government Decision Makers tab** (sidebar → Research). New panel `GovDecisionMakersPanel` + `/api/app/federal-contacts` over the `federal_contacts` table (~112K SAM contacts, synced daily, was never surfaced in UI). Search by name/title, filter by agency + office, dedupes repeat people, reachable (email/phone) first. Honest footnote: SAM POCs = contracting officers/specialists, NOT PMs/end-users yet.
+  - [x] **Agency-facet bug fixed (caught by render-verify)** — the agency dropdown returned only **3 of 56** agencies. Cause: `federal_contacts` is alphabetically ordered, so a single `.limit(5000)` only saw the first ~3 agencies' worth of rows. First fix attempt added an early-exit that wrongly returned 12 (DoD spans many consecutive pages, looked "done"). Final fix: page the WHOLE column with **NO early-exit** + a **6h in-memory cache** (`_agencyCache`) so the full scan is a once-per-6h cost. This is exactly why we render-verify — an API smoke test passed while the dropdown was broken.
 - [x] **Contractors panel → BigQuery** — was stuck on static `contractors.json` (2,768). Now reads `/api/contractors/search-bq` → `searchRecipients` over BQ recipients: **317,106 award-winning contractors** with real award $ + counts. Dropped SBLO/contact filter (BQ has no contacts — those live in Decision Makers); rows degrade gracefully.
 
 ### QUOTA discipline (BigQuery bills by bytes scanned — measured via dry-run)
