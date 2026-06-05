@@ -4,6 +4,26 @@
 
 ---
 
+## Session Handoff — 2026-06-05 (Growth/virality: share loop + newcomer clarity)
+
+Eric: the Today's Intel **Share** button was lost beta→new (the viral loop); also "what does the share preview show?" and "a student asked what Mindy was." Closed the whole loop. All deployed, verified live.
+
+### Share / viral loop
+- [x] **Share button restored** on Today's Intel opportunity cards (Review Fit · +Track · ⬆ Share · Dismiss). Infra survived (ShareButton, /api/share/opportunity, /shared/opp page) — just rewired into DashboardPanel.
+- [x] **Share links → getmindy.ai** — set `NEXT_PUBLIC_APP_URL=https://getmindy.ai` in Vercel prod + redeployed. Verified: share API now returns `getmindy.ai/shared/opp/...`. Also flips workspace invites / access links / reports to getmindy.ai (all checked safe). Advances the mi→getmindy cutover.
+- [x] **Dynamic share PREVIEW** (the Fireflies/Loom growth lever) — /shared/opp split into server page.tsx (generateMetadata) + opengraph-image.tsx. Preview is now ABOUT THE OPP ("X shared a federal opp via Mindy · Sources Sought · See your fit"). Bugs fixed mid-build: params is a Promise (Next 16); Satori fontFamily; **OG image must read Supabase DIRECTLY by shareId — a self-fetch to our own API 500'd, and Next OG routes don't get searchParams.**
+
+### Today's Intel UX
+- [x] **Stat cards are clickable filters** — Opportunities/Urgent/Total Matched/Briefings looked interactive but did nothing. Now filter shortcuts (active = ring). The All/Urgent/Opportunities/Teaming tabs were already wired.
+
+### Newcomer clarity (student asked "what is Mindy?") — PRD `docs/PRD-newcomer-clarity.md`
+- [x] **`MeetMindyStrip`** — reusable dismissible "New here? Meet Mindy → try free" (banner + card). Links to getmindy.ai.
+- [x] Shared-opp page: strip + re-branded header (was "GovCon Giants → Get Free Briefings" → now "Mindy → Try Mindy free"); funnel CTAs repointed /briefings → getmindy.ai.
+- [x] Rolled strip onto public SEO pages: /contractors, /contractors/[slug], /agencies, /awards. SKIPPED /agency (gov-buyer login gate, wrong audience) + /contracts/[piid] (redirect-only). Verified live (rendered).
+- [ ] **Remaining newcomer-clarity:** add specific OG previews to public pages that lack them (agencies/awards), and the "card" strip variant lower on long pages. Per the PRD.
+
+---
+
 ## Session Handoff — 2026-06-05 (DoDAAC names + reference table + CRM linkage)
 
 Eric: "pulling office CODES is good but we need the NAMES — can't have people figuring that out. And how should CRM linkage work — how do Fortune-1000 SaaS handle it?" Did all three in order. Merged to `main`, deployed.
