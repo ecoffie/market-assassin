@@ -572,30 +572,52 @@ export async function searchRecipients(opts: {
 }): Promise<{ rows: RecipientSearchRow[]; total: number }> {
   const search = (opts.search || '').trim();
   const state = (opts.state || '').trim().toUpperCase();
-  const naics = (opts.naics || '').trim().replace(/[^0-9]/g, '');
+  // Parse NAICS into a list of codes, PRESERVING separate codes (don't strip
+  // commas — that turned "236,237,238" into "236237238" → 0 results). Each code
+  // can be a 2-6 digit PREFIX (3-digit "236" should match all 236xxx in the
+  // rollup, which is keyed by full 6-digit codes). Eric 2026-06-05.
+  const naicsCodes = (opts.naics || '')
+    .split(/[, ]+/)
+    .map(c => c.replace(/[^0-9]/g, '').trim())
+    .filter(Boolean);
   const sortBy = opts.sortBy || 'total_obligated';
   const limit = Math.min(opts.limit ?? 25, 100);
   const offset = Math.max(opts.offset ?? 0, 0);
 
   // ── NAICS path: cheap pre-aggregated rollup (top contractors per NAICS) ──
-  if (naics) {
+  if (naicsCodes.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rp: Record<string, any> = { naics, limit, offset };
-    const conds = ['dimension = "naics"', 'dimension_value = @naics'];
+    const rp: Record<string, any> = { limit, offset };
+    // Match each code: exact when 6 digits, prefix (STARTS_WITH) when shorter.
+    const naicsConds = naicsCodes.map((code, i) => {
+      rp[`n${i}`] = code;
+      return code.length >= 6
+        ? `dimension_value = @n${i}`
+        : `STARTS_WITH(dimension_value, @n${i})`;
+    });
+    const conds = ['dimension = "naics"', `(${naicsConds.join(' OR ')})`];
     if (search) { conds.push('LOWER(recipient_name) LIKE @search'); rp.search = `%${search.toLowerCase()}%`; }
     // rollup has total_amount/award_count/rank; no state/agency/naics counts.
     const orderCol = sortBy === 'recipient_name' ? 'recipient_name'
       : sortBy === 'award_count' ? 'award_count' : 'total_amount';
     const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
+    // A recipient can appear under several NAICS in the list — aggregate to one
+    // row (sum $ + awards) so the same firm isn't listed multiple times.
     const rolled = await queryCached<{
       recipient_uei: string; recipient_name: string; total_amount: number; award_count: number; total_rows: number;
     }>({
-      cacheKey: `recipient-search-naics:${naics}:${search}:${sortBy}:${limit}:${offset}:v1`,
+      cacheKey: `recipient-search-naics:${naicsCodes.join('_')}:${search}:${sortBy}:${limit}:${offset}:v2`,
       query: `
+        WITH matched AS (
+          SELECT recipient_uei, ANY_VALUE(recipient_name) AS recipient_name,
+            SUM(total_amount) AS total_amount, SUM(award_count) AS award_count
+          FROM ${BQ_TABLES.topContractorsByDimension}
+          WHERE ${conds.join(' AND ')}
+          GROUP BY recipient_uei
+        )
         SELECT recipient_uei, recipient_name, total_amount, award_count,
           COUNT(*) OVER() AS total_rows
-        FROM ${BQ_TABLES.topContractorsByDimension}
-        WHERE ${conds.join(' AND ')}
+        FROM matched
         ORDER BY ${orderCol} ${orderDir}
         LIMIT @limit OFFSET @offset
       `,

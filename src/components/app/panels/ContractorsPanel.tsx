@@ -294,62 +294,63 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
 
       {/* Search & Filters */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          {/* Search */}
-          <div className="md:col-span-2">
-            <label className="block text-xs text-slate-500 mb-1">Search</label>
+        {/* items-end so every field bottom-aligns regardless of label height —
+            fixes the misaligned row Eric flagged. 12-col grid for clean spans. */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+          {/* Search — widest */}
+          <div className="md:col-span-4">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Company name</label>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Company name..."
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+              placeholder="Search by company…"
+              className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
           {/* NAICS Filter */}
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
+          <div className="md:col-span-3">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">NAICS code(s)</label>
             <NaicsAutocompleteInput
               value={naicsFilter}
               onChange={setNaicsFilter}
-              placeholder="541512, 236, 238"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+              placeholder="541512, 236…"
+              className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
           {/* State filter — name-search only (NAICS rollup has no location). */}
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">
-              State{naicsFilter.trim() ? <span className="text-slate-600"> (name search only)</span> : ''}
-            </label>
+          <div className="md:col-span-3">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">State</label>
             <select
               value={stateFilter}
               onChange={(e) => { setStateFilter(e.target.value); setPage(0); searchContractors(searchQuery, naicsFilter, profileAgencyFilter, contactFilter, sortBy, 0, e.target.value); }}
               disabled={!!naicsFilter.trim()}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+              title={naicsFilter.trim() ? 'State filter applies to name search only — the NAICS path has no location data' : ''}
+              className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">All states</option>
+              <option value="">{naicsFilter.trim() ? 'All states (n/a with NAICS)' : 'All states'}</option>
               {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
           {/* Search Button */}
-          <div className="flex items-end">
+          <div className="md:col-span-2">
             <button
               onClick={handleSearch}
               disabled={searching}
-              className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+              className="w-full h-10 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg transition-colors"
             >
-              {searching ? 'Searching...' : 'Search'}
+              {searching ? 'Searching…' : 'Search'}
             </button>
           </div>
         </div>
 
         {/* Sort Options */}
-        <div className="flex gap-2 mt-4 pt-4 border-t border-slate-800">
-          <span className="text-xs text-slate-500 mr-2 self-center">Sort by:</span>
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-800">
+          <span className="text-xs text-slate-500 mr-1">Sort by:</span>
           {[
             { key: 'contract_value', label: 'Contract Value' },
             { key: 'contract_count', label: 'Contract Count' },
