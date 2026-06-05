@@ -1,23 +1,34 @@
 import { ImageResponse } from 'next/og';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 export const alt = 'A federal opportunity shared via Mindy';
 
-// Dynamic share-preview image. Reads the opportunity headline from query params
-// (?title/?agency/?meta) that generateMetadata appends — so we do NOT fetch
-// inside image generation (a self-referential fetch to our own API during the
-// OG render was the 500). No custom fontFamily — Satori uses its default.
-export default async function Image({
-  searchParams,
-}: {
-  searchParams?: Promise<{ title?: string; agency?: string; meta?: string }>;
-}) {
-  const sp = (await searchParams) || {};
-  const title = (sp.title || 'A federal opportunity').slice(0, 110);
-  const agency = (sp.agency || 'Federal opportunity').slice(0, 70);
-  const meta = (sp.meta || '').slice(0, 90);
+// Dynamic share-preview image. Reads the opportunity DIRECTLY from Supabase by
+// shareId (NOT via a self-fetch to our own API — that self-referential fetch
+// during OG render returned 500). No custom fontFamily (Satori default).
+export default async function Image({ params }: { params: Promise<{ shareId: string }> }) {
+  const { shareId } = await params;
+  let title = 'A federal opportunity';
+  let agency = 'Federal opportunity';
+  let meta = '';
+
+  try {
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { data } = await sb
+      .from('opportunity_shares')
+      .select('opportunity_data')
+      .eq('share_id', shareId)
+      .maybeSingle();
+    const o = (data?.opportunity_data || {}) as Record<string, unknown>;
+    if (o.title) title = String(o.title).slice(0, 110);
+    agency = String(o.agency || o.department || 'Federal opportunity').slice(0, 70);
+    const bits = [o.notice_type, o.set_aside, o.naics_code ? `NAICS ${o.naics_code}` : '']
+      .filter(Boolean).map(String);
+    meta = bits.join('  •  ').slice(0, 90);
+  } catch { /* fall back to generic copy */ }
 
   return new ImageResponse(
     (

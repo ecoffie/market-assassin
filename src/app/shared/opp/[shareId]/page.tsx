@@ -32,14 +32,8 @@ export async function generateMetadata(
 
     const title = `${o.title} — ${agency}`;
     const description = `${sharer} this federal opportunity via Mindy${bits.length ? `. ${bits.join(' · ')}` : ''}. See your fit + find more like it.`;
-    // OG image: pass the opp headline via query params so the image route
-    // renders it WITHOUT fetching (a self-fetch during OG render 500'd).
-    const ogq = new URLSearchParams({
-      title: o.title || 'A federal opportunity',
-      agency,
-      meta: bits.join('  •  '),
-    });
-    const ogImage = `${base}/shared/opp/${shareId}/opengraph-image?${ogq.toString()}`;
+    // OG image route reads the opp directly from Supabase by shareId.
+    const ogImage = `${base}/shared/opp/${shareId}/opengraph-image`;
 
     return {
       title,
