@@ -10,6 +10,7 @@ import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 import { getNaics, getPsc } from '@/lib/codes/lookup';
 import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
+import { useDodaacNames } from '@/components/app/useDodaacNames';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -95,6 +96,7 @@ function getAlertBuyer(alert: Alert) {
 }
 
 export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
+  const dodaacNames = useDodaacNames();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -959,8 +961,8 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     )}
                     {/* Decoded contracting office from the DoDAAC (DoD only) —
                         office-level intel, not just the broad agency. */}
-                    {formatDodaacOffice(alert.solicitationNumber || null) && (
-                      <span className="text-emerald-400/80">🏛 {formatDodaacOffice(alert.solicitationNumber || null)}</span>
+                    {formatDodaacOffice(alert.solicitationNumber || null, dodaacNames) && (
+                      <span className="text-emerald-400/80">🏛 {formatDodaacOffice(alert.solicitationNumber || null, dodaacNames)}</span>
                     )}
                   </div>
                 </div>

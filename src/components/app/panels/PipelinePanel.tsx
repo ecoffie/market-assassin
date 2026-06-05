@@ -10,6 +10,7 @@ import { getNaics } from '@/lib/codes/lookup';
 import { classifyNoticeType } from '@/lib/utils/notice-type';
 import VoiceCaptureModal from '../voice/VoiceCaptureModal';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
+import { useDodaacNames } from '@/components/app/useDodaacNames';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -100,6 +101,7 @@ const PRIORITIES: Array<{ id: PipelinePriority; label: string }> = [
 ];
 
 export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePanelProps) {
+  const dodaacNames = useDodaacNames();
   // Owner column only matters when multiple teammates share pursuits.
   // Solo users (free/pro) always see their own email on every row —
   // that's just visual noise. Show only on team/enterprise tiers.
@@ -916,8 +918,8 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                     {opp.agency && (
                       <div className="text-xs text-slate-500 mb-1">
                         {opp.agency}
-                        {formatDodaacOffice(opp.notice_id || null) && (
-                          <span className="text-emerald-400/80"> · 🏛 {formatDodaacOffice(opp.notice_id || null)}</span>
+                        {formatDodaacOffice(opp.notice_id || null, dodaacNames) && (
+                          <span className="text-emerald-400/80"> · 🏛 {formatDodaacOffice(opp.notice_id || null, dodaacNames)}</span>
                         )}
                       </div>
                     )}

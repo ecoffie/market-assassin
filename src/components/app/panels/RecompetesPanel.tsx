@@ -8,6 +8,7 @@ import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import ContractorLink from '../contractors/ContractorLink';
 import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/location-match';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
+import { useDodaacNames } from '@/components/app/useDodaacNames';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -221,6 +222,7 @@ function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract 
 }
 
 export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
+  const dodaacNames = useDodaacNames();
   void tier;
   const [contracts, setContracts] = useState<ExpiringContract[]>([]);
   const [allContracts, setAllContracts] = useState<ExpiringContract[]>([]);
@@ -727,8 +729,8 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       <p className="text-slate-400 text-sm mb-1">
                         {contract.agency}
                         {contract.subAgency && <span className="text-slate-500"> • {contract.subAgency}</span>}
-                        {formatDodaacOffice(contract.piid || null) && (
-                          <span className="text-emerald-400/80"> • 🏛 {formatDodaacOffice(contract.piid || null)}</span>
+                        {formatDodaacOffice(contract.piid || null, dodaacNames) && (
+                          <span className="text-emerald-400/80"> • 🏛 {formatDodaacOffice(contract.piid || null, dodaacNames)}</span>
                         )}
                       </p>
 
