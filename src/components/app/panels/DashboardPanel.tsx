@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
@@ -623,6 +623,14 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<BriefingFilter>('all');
+  // The stat cards / filter chips DO filter the list, but the list lives below
+  // the fold — so a click looked like nothing happened (Eric 2026-06-05).
+  // filterTo() sets the filter AND scrolls the results into view.
+  const resultsRef = useRef<HTMLElement>(null);
+  const filterTo = useCallback((f: BriefingFilter) => {
+    setActiveFilter(prev => (prev === f && f !== 'all' ? 'all' : f));
+    requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, []);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1219,10 +1227,10 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-2">
-                  <FilterButton label="All" count={counts.all} active={activeFilter === 'all'} onClick={() => setActiveFilter('all')} />
-                  <FilterButton label="Urgent" count={counts.urgent} active={activeFilter === 'urgent'} onClick={() => setActiveFilter('urgent')} />
-                  <FilterButton label="Opportunities" count={counts.opportunity} active={activeFilter === 'opportunity'} onClick={() => setActiveFilter('opportunity')} />
-                  <FilterButton label="Teaming" count={counts.teaming} active={activeFilter === 'teaming'} onClick={() => setActiveFilter('teaming')} />
+                  <FilterButton label="All" count={counts.all} active={activeFilter === 'all'} onClick={() => filterTo('all')} />
+                  <FilterButton label="Urgent" count={counts.urgent} active={activeFilter === 'urgent'} onClick={() => filterTo('urgent')} />
+                  <FilterButton label="Opportunities" count={counts.opportunity} active={activeFilter === 'opportunity'} onClick={() => filterTo('opportunity')} />
+                  <FilterButton label="Teaming" count={counts.teaming} active={activeFilter === 'teaming'} onClick={() => filterTo('teaming')} />
                 </div>
                 <div className="text-sm text-slate-500">{filteredItems.length} shown</div>
               </div>
@@ -1234,17 +1242,17 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
               <SummaryStat
                 label="Opportunities" value={counts.opportunity}
                 active={activeFilter === 'opportunity'}
-                onClick={() => setActiveFilter(activeFilter === 'opportunity' ? 'all' : 'opportunity')}
+                onClick={() => filterTo('opportunity')}
               />
               <SummaryStat
                 label="Urgent Alerts" value={summary.urgentAlerts} urgent
                 active={activeFilter === 'urgent'}
-                onClick={() => setActiveFilter(activeFilter === 'urgent' ? 'all' : 'urgent')}
+                onClick={() => filterTo('urgent')}
               />
               <SummaryStat
                 label="Total Matched" value={summary.totalMatched || counts.all}
                 active={activeFilter === 'all'}
-                onClick={() => setActiveFilter('all')}
+                onClick={() => filterTo('all')}
               />
               {/* Briefings → reveal/scroll the Past Briefings rail. */}
               <SummaryStat
@@ -1253,8 +1261,11 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
               />
             </div>
 
-            <section>
-              <h3 className="text-xl font-semibold mb-4">Top Opportunities to Review</h3>
+            <section ref={resultsRef} className="scroll-mt-4">
+              <h3 className="text-xl font-semibold mb-4">
+                Top Opportunities to Review
+                {activeFilter !== 'all' && <span className="ml-2 text-sm font-normal text-slate-400">· filtered: {activeFilter} ({filteredItems.length})</span>}
+              </h3>
               <div className="space-y-3">
                 {filteredItems.map(item => {
                   const isExpanded = expandedItems.has(item.id);

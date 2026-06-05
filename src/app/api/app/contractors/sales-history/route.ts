@@ -27,13 +27,17 @@ export async function GET(request: NextRequest) {
     awardLimit: 50,
   });
 
-  // BQ FALLBACK: the Contractors panel now lists all 317K BQ recipients, but
-  // most aren't in the static DB → getContractorSalesHistory returns null
-  // ("Contractor not found" — Eric saw this on EXCELL CONSTRUCTION CORP).
-  // When a UEI/slug is provided (BQ rows carry it), build history from BQ —
-  // the same source the list came from.
-  if (!history && (uei || slug)) {
-    history = await getBqContractorHistory({ uei, slug });
+  // BQ is the real source of award HISTORY. Use it when:
+  //  (a) static returned nothing (most of the 317K BQ recipients), OR
+  //  (b) static returned a row but with NO year-by-year series — the bug Eric
+  //      hit: BL Harbert is in the static 2,768 (summary only, $10.1B/127) so
+  //      the old code stopped there and showed "no cached awards", even though
+  //      BQ has its full 11-year history. So: if there's no series and we have
+  //      a uei/slug, build the real history from BQ.
+  const hasSeries = !!(history && Array.isArray((history as { series?: unknown[] }).series) && (history as { series: unknown[] }).series.length > 0);
+  if ((!history || !hasSeries) && (uei || slug)) {
+    const bq = await getBqContractorHistory({ uei, slug });
+    if (bq) history = bq;
   }
 
   if (!history) {
