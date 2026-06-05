@@ -1,6 +1,28 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 4, 2026
+**Last Updated:** June 5, 2026
+
+---
+
+## Session Handoff — 2026-06-05 (Cron Dispatcher Phase 1 — SHIPPED + verified on prod)
+
+Implemented Phase 1 of `docs/PRD-cron-dispatcher.md` — escapes the Vercel 100-cron cap so scheduling stops growing with features/users. **Live and verified on prod.**
+
+### Shipped
+- [x] **Tables** `cron_jobs` (registry) + `cron_job_runs` (history) — `migrations/20260604_cron_dispatcher.sql`. Hand-run in Supabase (no in-app DDL). NOTE: after CREATE TABLE, PostgREST needed `NOTIFY pgrst, 'reload schema';` before writes worked (stale schema cache — known Supabase quirk).
+- [x] **Cron evaluator** `src/lib/cron/cron-expr.ts` — self-contained 5-field parser (no new dep), `isDue(expr, now)` in UTC. Unit-tested 12/12 (ranges, lists, steps, day-of-week).
+- [x] **Dispatcher** `/api/cron/dispatch?tick=...` — reads enabled jobs, fires the due ones, this-minute dedupe, per-job overlap lock (stale-lock auto-recovers), records each run. Auth: CRON_SECRET / x-vercel-cron / password. `?dry_run=1`.
+- [x] **Admin** `/api/admin/cron-jobs` — list jobs+runs, upsert/enable/disable/unlock/delete. **Adding a scheduled job = one POST, no deploy.**
+- [x] **vercel.json**: added 2 ticks (`dispatch?tick=hour|day`), migrated 3 low-risk jobs off native cron (refresh-bq-rollups, aggregate-profiles, health-check). **100 → 99 entries**, but ticks now scale to thousands of logical jobs. Load-bearing send pipelines stay native (migrate LAST, Phase 2).
+
+### Verified on LIVE prod (not just local)
+Forced a real fire of `aggregate-profiles` via the deployed dispatcher → **HTTP 200, 11s, run row recorded, lock released, last_status=success**, and a second dispatch in the same minute correctly **skipped (dedupe)**. End-to-end proven.
+
+### Bug fixed mid-build
+The fireJob claim used `.or('last_run_at.is.null,last_run_at.lt.<iso>')` — PostgREST mis-parses an `.or()` with a colon/dot-laden ISO timestamp ("column does not exist") → claim matched 0 rows → nothing fired. Fixed to CAS via `.is(null)` / `.eq(value)`.
+
+### Next (Phase 2, separate effort — NOT done)
+- Migrate the remaining ~24 distinct routes into `cron_jobs` rows, collapse the 21 daily-alerts timezone windows into data-driven "whose local time is now," delete migrated vercel.json entries → target ~6 entries. Do the load-bearing send pipelines LAST, incrementally, with watchdogs intact. Keep briefing-watchdog on native cron as a backstop (dispatcher is now a single point of failure for scheduling).
 
 ---
 

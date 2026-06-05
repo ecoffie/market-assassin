@@ -90,13 +90,20 @@ it eventually will.
 
 ## 4. Scope
 
-### Phase 1 — Dispatcher core (unblocks future growth)
-- `cron_jobs` + `cron_job_runs` tables.
-- `/api/cron/dispatch` with a cron-expression evaluator (e.g. a tiny
-  `cron-parser`-style "is this due?" check; no new heavy dep if avoidable).
-- ~6 fixed tick entries in `vercel.json`.
-- Admin UI/endpoint to enable/disable/inspect jobs + recent runs.
-- Idempotency + overlap guard (a job already running doesn't double-fire).
+### Phase 1 — Dispatcher core (unblocks future growth) ✅ SHIPPED 2026-06-05
+- [x] `cron_jobs` + `cron_job_runs` tables (`migrations/20260604_cron_dispatcher.sql`).
+- [x] `/api/cron/dispatch` with a self-contained cron-expression evaluator
+  (`src/lib/cron/cron-expr.ts`, no new dep; unit-tested 12/12). isDue + minute
+  dedupe + overlap lock + run-recording.
+- [x] 2 fixed tick entries in `vercel.json` (`dispatch?tick=hour|day`); migrated
+  3 low-risk jobs off native cron (refresh-bq-rollups, aggregate-profiles,
+  health-check). Net 100 → 99, ticks now scale to thousands of jobs.
+- [x] Admin endpoint `/api/admin/cron-jobs` — list/upsert/enable/disable/unlock/
+  delete + recent runs. Adding a job = one POST, no deploy.
+- [x] Idempotency (this-minute dedupe) + overlap guard (per-job lock, stale-lock
+  auto-recovery).
+- **Verified on LIVE prod:** forced a real fire of aggregate-profiles → HTTP 200,
+  11s, run recorded, lock released, dedupe skipped the double-fire. Done.
 
 ### Phase 2 — Migrate existing crons onto it
 - Move the ~27 distinct routes into `cron_jobs` rows.
