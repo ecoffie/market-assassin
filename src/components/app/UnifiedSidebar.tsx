@@ -307,6 +307,17 @@ export default function UnifiedSidebar({
   onMobileClose,
 }: UnifiedSidebarProps) {
   const [hoveredItem, setHoveredItem] = useState<AppPanel | null>(null);
+  // Collapsed-state tooltip rendered with position:fixed so the nav's
+  // overflow-y-auto scroll clip can't eat it. Captured from the hovered
+  // row's bounding rect on mouse-enter.
+  const [tooltip, setTooltip] = useState<{ label: string; badge?: string; locked: boolean; top: number; left: number } | null>(null);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function showTooltip(e: { currentTarget: HTMLElement }, label: string, badge: string | undefined, locked: boolean) {
+    if (!isCollapsed) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTooltip({ label, badge, locked, top: r.top + r.height / 2, left: r.right + 12 });
+  }
 
   const hasAccess = (itemTier: AppTier[]) => {
     return itemTier.includes(userTier);
@@ -443,15 +454,13 @@ export default function UnifiedSidebar({
         />
       )}
 
-      {/* Navigation. EXPANDED: scrolls vertically (overflow-y-auto) so a long
-          nav list can't push the footer off-screen. COLLAPSED: the icon-only
-          list is short enough to fit without scrolling, so we use
-          overflow-visible — otherwise overflow-y-auto also clips the X axis and
-          eats the hover tooltips that sit to the RIGHT of each icon (the
-          regression Eric reported: collapsed icons stopped showing their
-          names). The collapsed expand control lives on the header logo, which
-          is always visible regardless. */}
-      <nav className={`flex-1 py-4 ${isCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
+      {/* Navigation — ALWAYS overflow-y-auto so a long nav list scrolls and can
+          never push the pinned Collapse footer off-screen. The collapsed-state
+          hover tooltips would normally be clipped by this scroll container, so
+          they render with position:FIXED (computed from the hovered icon's rect)
+          — fixed elements escape a scrolling ancestor's clip. This gives us BOTH
+          the footer AND the tooltips, instead of trading one for the other. */}
+      <nav className="flex-1 py-4 overflow-y-auto">
         {NAV_SECTIONS.map((section) => {
           // SaaS-standard ordering (Linear / Notion pattern): items the
           // current user can actually use come first, locked items after.
@@ -514,26 +523,9 @@ export default function UnifiedSidebar({
                         )}
                       </>
                     )}
-                    {/* Collapsed-state hover tooltip — shows the label (and
-                        badge / lock) to the RIGHT of the icon, like the GCP
-                        console. CSS-only (group-hover), instant, styled —
-                        replaces the slow/ugly native title tooltip. */}
-                    {isCollapsed && (
-                      <span
-                        role="tooltip"
-                        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2
-                                   whitespace-nowrap rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5
-                                   text-xs font-medium text-white shadow-lg shadow-black/40
-                                   opacity-0 translate-x-[-4px] transition-all duration-100
-                                   group-hover:opacity-100 group-hover:translate-x-0"
-                      >
-                        {display.label}
-                        {item.badge && (
-                          <span className="ml-1.5 text-[10px] text-purple-300">{item.badge}</span>
-                        )}
-                        {!canAccess && <span className="ml-1.5 text-[10px] text-slate-400">🔒 Pro</span>}
-                      </span>
-                    )}
+                    {/* Tooltip is rendered ONCE at the sidebar root with
+                        position:fixed (see below) so the nav's scroll clip
+                        can't eat it — not per-item here anymore. */}
                   </>
                 );
 
@@ -546,10 +538,9 @@ export default function UnifiedSidebar({
                       key={item.id}
                       href={item.href}
                       onClick={() => onMobileClose?.()}
-                      onMouseEnter={() => setHoveredItem(item.id)}
-                      onMouseLeave={() => setHoveredItem(null)}
+                      onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, display.label, item.badge, !canAccess); }}
+                      onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
                       className={sharedClassName}
-                      
                     >
                       {innerContent}
                     </Link>
@@ -568,8 +559,8 @@ export default function UnifiedSidebar({
                         onMobileClose?.();
                       }
                     }}
-                    onMouseEnter={() => setHoveredItem(item.id)}
-                    onMouseLeave={() => setHoveredItem(null)}
+                    onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, display.label, item.badge, !canAccess); }}
+                    onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
                     disabled={!canAccess}
                     className={sharedClassName}
                     
@@ -612,6 +603,22 @@ export default function UnifiedSidebar({
           </button>
         )}
       </div>
+
+      {/* Single fixed-position tooltip for the collapsed sidebar. position:fixed
+          (vs absolute inside the scrolling nav) means the overflow-y-auto clip
+          can't hide it — so we keep BOTH the scrollable nav (pinned Collapse
+          footer) AND the hover labels. */}
+      {isCollapsed && tooltip && (
+        <div
+          role="tooltip"
+          className="pointer-events-none fixed z-[60] -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg shadow-black/40"
+          style={{ top: tooltip.top, left: tooltip.left }}
+        >
+          {tooltip.label}
+          {tooltip.badge && <span className="ml-1.5 text-[10px] text-purple-300">{tooltip.badge}</span>}
+          {tooltip.locked && <span className="ml-1.5 text-[10px] text-slate-400">🔒 Pro</span>}
+        </div>
+      )}
       </aside>
     </>
   );
