@@ -42,6 +42,7 @@ interface PipelineOpportunity {
   teaming_partners?: string[];
   external_url?: string;
   owner_email?: string;
+  user_email?: string;   // creator — fallback owner for the Team/Mine filter
   created_at?: string;
   // Doc auto-ingest status (Pursuit Document Pipeline v1, 2026-05-25).
   // Set by fetchPursuitDocs background job after pursuit save.
@@ -116,6 +117,9 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // Filter by SAM notice type (Solicitation / Sources Sought / etc.).
   // 'all' = no filter. Lets the user categorize pursuits by sol type.
   const [noticeTypeFilter, setNoticeTypeFilter] = useState<string>('all');
+  // Team workspace filter: 'all' (everyone's), 'mine' (I own), 'others'
+  // (teammates'). Only shown when the workspace actually has shared pursuits.
+  const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine' | 'others'>('all');
   const [voiceOpen, setVoiceOpen] = useState(false);          // Voice capture modal (#119)
   const [sortField, setSortField] = useState<'deadline' | 'value' | 'stage' | 'priority' | 'title'>('deadline');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -298,9 +302,22 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // filter dropdown (only show types they actually have).
   const availableNoticeTypes = [...new Set(stageScoped.map(o => noticeBucket(o.notice_type)))].sort();
 
-  const filteredOpportunities = noticeTypeFilter === 'all'
+  // Owner of a pursuit = explicit owner_email, else the creator (user_email).
+  const ownerOf = (o: PipelineOpportunity) => (o.owner_email || o.user_email || '').toLowerCase();
+  const me = (email || '').toLowerCase();
+  // Whether this workspace has any teammate-owned pursuits — drives showing the
+  // Team/Mine filter at all (solo users never see it).
+  const hasSharedPursuits = stageScoped.some(o => ownerOf(o) && ownerOf(o) !== me);
+
+  const noticeFiltered = noticeTypeFilter === 'all'
     ? stageScoped
     : stageScoped.filter(o => noticeBucket(o.notice_type) === noticeTypeFilter);
+
+  const filteredOpportunities = ownerFilter === 'all'
+    ? noticeFiltered
+    : ownerFilter === 'mine'
+      ? noticeFiltered.filter(o => ownerOf(o) === me)
+      : noticeFiltered.filter(o => ownerOf(o) !== me && !!ownerOf(o));
 
   // Sorted opportunities for list view
   const sortedOpportunities = [...filteredOpportunities].sort((a, b) => {
@@ -803,6 +820,27 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+        )}
+        {/* Team / Mine filter — only when the workspace has teammate-owned
+            pursuits (solo users never see it). Lets you see everyone's,
+            just yours, or just your teammates'. */}
+        {hasSharedPursuits && (
+          <div className="inline-flex rounded-lg border border-slate-800 bg-slate-900 p-0.5 shrink-0 text-sm">
+            {([
+              { id: 'all', label: 'All' },
+              { id: 'mine', label: 'Mine' },
+              { id: 'others', label: 'Team' },
+            ] as const).map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => setOwnerFilter(opt.id)}
+                className={`px-3 py-1.5 rounded-md transition-colors ${ownerFilter === opt.id ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title={opt.id === 'mine' ? 'Pursuits you own' : opt.id === 'others' ? "Teammates' pursuits" : 'Everyone on the team'}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         )}
         {/* Completed toggle (Won + Lost + No-Bid) */}
         {completedOpportunities.length > 0 && (
