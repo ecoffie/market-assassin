@@ -23,6 +23,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { getAgencySatForNaics } from '@/lib/bigquery/agencies';
+
+// Normalize an agency name so the BQ SAT data ("DEPARTMENT OF VETERANS AFFAIRS")
+// matches the saved target's name ("Department of Veterans Affairs"). Strip
+// punctuation/case + the "department of" filler down to core tokens.
+function normalizeAgencyName(s: string): string {
+  return (s || '')
+    .toUpperCase()
+    .replace(/[.,]/g, ' ')
+    .replace(/\b(DEPARTMENT|DEPT|OF|THE|U S|US|ADMINISTRATION|AGENCY|NATIONAL)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -243,6 +256,37 @@ async function enrichTargetsSat(
     if (ratio > 0) return { ...t, sat_ratio: ratio };
     return t;
   });
+
+  // PRIMARY reliable source: BigQuery agency-level set-aside ratio per NAICS.
+  // The old path (TMR cache + ~40s live USASpending call) left agencies at 0%
+  // when they shouldn't be (e.g. VA construction is 78% set-aside, was showing
+  // 0). BQ has the awards data and is cached — compute SAT = set-aside$/total$
+  // for the target's agency in the target's (or profile's) NAICS. Eric 2026-06-05.
+  if (enriched.some((t) => !Number(t.sat_ratio))) {
+    // One BQ lookup per distinct NAICS needed (cached), then match by agency.
+    const naicsNeeded = new Set<string>();
+    for (const t of enriched) {
+      if (Number(t.sat_ratio) > 0) continue;
+      const n = String(t.source_naics || '').split(',')[0].trim() || profile.naicsCodes[0] || '';
+      if (n) naicsNeeded.add(n.slice(0, 3)); // 3-digit prefix = the sector (236 = construction)
+    }
+    const satByNaics = new Map<string, Map<string, number>>();
+    for (const n of naicsNeeded) {
+      try {
+        const rows = await getAgencySatForNaics(n);
+        satByNaics.set(n, new Map(rows.map((r) => [normalizeAgencyName(r.awarding_agency), r.sat_ratio])));
+      } catch (e) {
+        console.warn('[target-list] BQ SAT lookup failed for', n, (e as Error)?.message);
+      }
+    }
+    enriched = enriched.map((t) => {
+      if (Number(t.sat_ratio) > 0) return t;
+      const n = (String(t.source_naics || '').split(',')[0].trim() || profile.naicsCodes[0] || '').slice(0, 3);
+      const ratio = satByNaics.get(n)?.get(normalizeAgencyName(String(t.agency_name || '')));
+      if (ratio && ratio > 0) return { ...t, sat_ratio: ratio };
+      return t;
+    });
+  }
 
   // The live USASpending find-agencies call takes ~40s — NEVER block a page
   // load on it (Eric 2026-06-05: target list took 11-14s; commit b1259f2 added

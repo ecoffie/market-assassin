@@ -113,3 +113,41 @@ export async function getOfficesForAgency(agencyName: string, limit = 100): Prom
     params: { needle: `%${key}%`, limit },
   });
 }
+
+export interface AgencySatRow {
+  awarding_agency: string;
+  total_amount: number;
+  setaside_amount: number;
+  sat_ratio: number; // 0..1 — share of this agency's NAICS spend that is set-aside
+}
+
+/**
+ * Set-aside ratio per agency for a given NAICS — "of what this agency spends in
+ * your NAICS, how much goes to set-asides." The reliable source for the Target
+ * List SAT column (the old path relied on a flaky ~40s USASpending call + an
+ * empty cache, leaving e.g. VA construction at 0% when it's actually 78%).
+ * Cached; ~2-3 GB scan per NAICS prefix on a cold miss.
+ */
+export async function getAgencySatForNaics(naicsPrefix: string): Promise<AgencySatRow[]> {
+  const prefix = (naicsPrefix || '').replace(/[^0-9]/g, '').slice(0, 6);
+  if (!prefix) return [];
+  return queryCached<AgencySatRow>({
+    cacheKey: `agency-sat:naics:${prefix}:v1`,
+    query: `
+      SELECT
+        awarding_agency,
+        SUM(obligation_amount) AS total_amount,
+        SUM(IF(set_aside IS NOT NULL AND set_aside NOT IN ('', 'NONE', 'NO SET ASIDE USED.'), obligation_amount, 0)) AS setaside_amount,
+        SAFE_DIVIDE(
+          SUM(IF(set_aside IS NOT NULL AND set_aside NOT IN ('', 'NONE', 'NO SET ASIDE USED.'), obligation_amount, 0)),
+          SUM(obligation_amount)
+        ) AS sat_ratio
+      FROM ${BQ_TABLES.awards}
+      WHERE naics_code LIKE @prefix AND awarding_agency IS NOT NULL
+      GROUP BY awarding_agency
+      HAVING total_amount > 0
+    `,
+    params: { prefix: `${prefix}%` },
+    maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
+  });
+}
