@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import MeetMindyStrip from '@/components/MeetMindyStrip';
 
 interface OpportunityData {
   id: string;
@@ -134,20 +135,23 @@ export default function SharedOpportunityClient() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
+      {/* New-here strip — first-timers landing from a shared link learn what
+          Mindy is + can sign up (newcomer-clarity PRD). */}
+      <MeetMindyStrip variant="banner" />
+      {/* Header — Mindy-branded (this is a getmindy.ai funnel entry, not GCG). */}
       <header className="bg-gray-900/80 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/briefings" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">GC</span>
+          <Link href="https://getmindy.ai" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-emerald-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">M</span>
             </div>
-            <span className="text-white font-semibold">GovCon Giants</span>
+            <span className="text-white font-semibold">Mindy</span>
           </Link>
           <Link
-            href={`/briefings?ref=${shareId}`}
-            className="text-sm px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+            href={`https://getmindy.ai/?ref=${shareId}`}
+            className="text-sm px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
           >
-            Get Free Briefings
+            Try Mindy free
           </Link>
         </div>
       </header>
@@ -275,7 +279,7 @@ export default function SharedOpportunityClient() {
               </a>
             )}
             <Link
-              href={`/briefings?ref=${shareId}`}
+              href={`https://getmindy.ai/?ref=${shareId}`}
               className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -296,7 +300,7 @@ export default function SharedOpportunityClient() {
             Set up your profile in 2 minutes.
           </p>
           <Link
-            href={`/briefings?ref=${shareId}`}
+            href={`https://getmindy.ai/?ref=${shareId}`}
             className="inline-flex items-center gap-2 px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors text-lg"
           >
             Start Free Daily Briefings
