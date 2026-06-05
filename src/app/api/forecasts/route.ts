@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -278,6 +279,37 @@ export async function GET(request: NextRequest) {
       throw new Error(error.message);
     }
 
+    // DoD EARLY SIGNALS (Option B, docs/PRD-dod-forecast-coverage.md): the
+    // agency_forecasts table has ZERO DoD rows, but DoD posts Sources Sought /
+    // RFIs / Special Notices on SAM 6-12 months pre-RFP — real forward signal
+    // we already ingest in sam_opportunities. Surface those in the forecast
+    // feed when DoD is in scope, clearly labeled as "early signal" (not a
+    // formal LRAF). Honest interim until component scrapers land (Option A).
+    const dodInScope = !agency
+      || agency.toLowerCase().includes('def')
+      || agency.toLowerCase().includes('dod')
+      || agency.toLowerCase().includes('army')
+      || agency.toLowerCase().includes('navy')
+      || agency.toLowerCase().includes('air force');
+    let dodSignals: Array<Record<string, unknown>> = [];
+    if (dodInScope) {
+      let sig = supabase
+        .from('sam_opportunities')
+        .select('solicitation_number, title, description, naics_code, department, office, posted_date, response_deadline, set_aside_description, notice_type')
+        .ilike('department', '%defense%')
+        .in('notice_type', ['Sources Sought', 'Special Notice', 'Presolicitation'])
+        .gte('response_deadline', new Date().toISOString())
+        .order('posted_date', { ascending: false })
+        .limit(50);
+      if (naics) {
+        const term = naics.split(/[, ]+/)[0].trim();
+        sig = term.length <= 4 ? sig.ilike('naics_code', `${term}%`) : sig.eq('naics_code', term);
+      }
+      if (search) sig = sig.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+      const { data: sigData } = await sig;
+      dodSignals = sigData || [];
+    }
+
     // Build response
     const response = {
       success: true,
@@ -295,30 +327,66 @@ export async function GET(request: NextRequest) {
         offset,
         hasMore: (count || 0) > offset + limit,
       },
-      forecasts: forecasts?.map(f => ({
-        id: f.id,
-        title: f.title,
-        description: f.description?.substring(0, 200),
-        agency: f.source_agency,
-        department: f.department,
-        office: f.contracting_office || f.program_office,
-        naics: f.naics_code,
-        naicsDescription: f.naics_description,
-        psc: f.psc_code,
-        fiscalYear: f.fiscal_year,
-        quarter: f.anticipated_quarter,
-        awardDate: f.anticipated_award_date,
-        valueMin: f.estimated_value_min,
-        valueMax: f.estimated_value_max,
-        valueRange: f.estimated_value_range,
-        setAside: f.set_aside_type,
-        contractType: f.contract_type,
-        incumbent: f.incumbent_name,
-        state: f.pop_state,
-        status: f.status,
-        contact: isAdmin && f.poc_email ? { name: f.poc_name, email: f.poc_email } : null,
-        lastSynced: f.last_synced_at,
-      })) || [],
+      forecasts: [
+        ...(forecasts?.map(f => ({
+          id: f.id,
+          title: f.title,
+          description: f.description?.substring(0, 200),
+          agency: f.source_agency,
+          department: f.department,
+          office: f.contracting_office || f.program_office,
+          naics: f.naics_code,
+          naicsDescription: f.naics_description,
+          psc: f.psc_code,
+          fiscalYear: f.fiscal_year,
+          quarter: f.anticipated_quarter,
+          awardDate: f.anticipated_award_date,
+          valueMin: f.estimated_value_min,
+          valueMax: f.estimated_value_max,
+          valueRange: f.estimated_value_range,
+          setAside: f.set_aside_type,
+          contractType: f.contract_type,
+          incumbent: f.incumbent_name,
+          state: f.pop_state,
+          status: f.status,
+          contact: isAdmin && f.poc_email ? { name: f.poc_name, email: f.poc_email } : null,
+          lastSynced: f.last_synced_at,
+          signalType: 'forecast' as const,
+        })) || []),
+        // DoD early signals from SAM, mapped into the same shape + flagged.
+        ...dodSignals.map(s => ({
+          id: `sam:${s.solicitation_number}`,
+          title: s.title,
+          description: String(s.description || '').substring(0, 200),
+          agency: 'Department of Defense',
+          department: s.department,
+          // Use the DoDAAC-decoded office when the solicitation # allows it.
+          office: formatDodaacOffice(String(s.solicitation_number || '')) || s.office || null,
+          naics: s.naics_code,
+          naicsDescription: null,
+          psc: null,
+          fiscalYear: null,
+          quarter: null,
+          awardDate: null,
+          valueMin: null,
+          valueMax: null,
+          valueRange: null,
+          setAside: s.set_aside_description,
+          contractType: null,
+          incumbent: null,
+          state: null,
+          status: 'early_signal',
+          contact: null,
+          lastSynced: s.posted_date,
+          // Label so the UI can distinguish a real LRAF forecast from an early
+          // SAM signal (Sources Sought / Special Notice).
+          signalType: 'dod_early_signal' as const,
+          noticeType: s.notice_type,
+          solicitationNumber: s.solicitation_number,
+          responseDeadline: s.response_deadline,
+        })),
+      ],
+      dodEarlySignalCount: dodSignals.length,
       timing: `${Date.now() - startTime}ms`,
     };
 

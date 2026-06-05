@@ -44,6 +44,10 @@ interface Forecast {
   state?: string;
   pop_state?: string;
   status?: string;
+  signalType?: 'forecast' | 'dod_early_signal';
+  noticeType?: string;
+  solicitationNumber?: string;
+  responseDeadline?: string;
 }
 
 interface ForecastsSummary {
@@ -538,6 +542,11 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       )}
 
       {/* Search Results */}
+      {forecasts.some(f => f.signalType === 'dod_early_signal') && (
+        <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-4 py-2.5 text-xs text-amber-300/90">
+          ⚡ DoD doesn&apos;t publish a formal forecast feed — its <strong>⚡ Early signal</strong> items are SAM Sources Sought / RFIs (6–12 months pre-RFP), the earliest forward signal we can surface for the largest buyer.
+        </div>
+      )}
       {forecasts.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-800">
@@ -594,11 +603,17 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                             PSC {forecast.psc}
                           </span>
                         )}
-                        {forecast.status && forecast.status !== 'forecast' && (
+                        {/* DoD early signal (SAM Sources Sought/RFI) — labeled
+                            distinctly from a formal LRAF forecast. */}
+                        {forecast.signalType === 'dod_early_signal' ? (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300" title="Early signal from SAM (Sources Sought / RFI) — 6-12 months pre-RFP. DoD doesn't publish a formal forecast feed.">
+                            ⚡ Early signal{forecast.noticeType ? ` · ${forecast.noticeType}` : ''}
+                          </span>
+                        ) : forecast.status && forecast.status !== 'forecast' ? (
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
                             {forecast.status}
                           </span>
-                        )}
+                        ) : null}
                       </div>
 
                       {/* Title */}
