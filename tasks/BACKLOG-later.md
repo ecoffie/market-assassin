@@ -7,6 +7,25 @@
 
 ---
 
+## ⏰ DEADLINE — ship by June 19 (Juneteenth)
+
+### 0. Proposal Assist — Manual Drive (Perplexity-style proposal LLM)
+- **What:** add a "Manual / Sport Mode" toggle next to today's Auto draft.
+  Manual = upload your project files + chat with a proposal-scoped LLM that
+  reads them + your Vault and helps you write — autonomy over the outcome,
+  "see everything happening."
+- **Reuse:** the Mindy Chat streaming RAG engine (`/api/app/chat`) scoped to
+  the proposal's files + Vault; the existing `/api/app/proposal/upload` +
+  draft generators. New: `/api/app/proposal/chat` wrapper + a chat panel in
+  Manual mode. Auto stays the default, unchanged.
+- **v1 (June 19):** both modes work, basic — toggle + proposal-scoped chat that
+  can draft into the response.
+- **v2.0 (NOT June 19):** notes area, compliance-matrix who/status tracking,
+  draft version history (v1/v2/v3), multi-user.
+- **PRD:** `docs/PRD-proposal-manual-mode.md`
+
+---
+
 ## 🔴 P0 — Big features with a PRD, ready to build
 
 ### 1. DoD Forecast Coverage (the real one)
