@@ -131,19 +131,25 @@ async function fireJob(
   tick: string,
   request: NextRequest,
 ): Promise<{ job_name: string; fired: boolean; status?: string; error?: string }> {
-  // Claim the job: set last_run_at + lock, but ONLY if no other tick already
-  // claimed it this minute. The .neq guard makes this an atomic-ish CAS — if a
-  // concurrent tick updated last_run_at to this minute first, our update of
-  // 0 rows tells us to back off.
+  // Claim the job: set last_run_at + lock, but ONLY if it hasn't already been
+  // claimed for this minute (the CAS guard against two concurrent ticks). We
+  // match on the job's CURRENT last_run_at via .eq() — PostgREST handles a
+  // null/timestamp equality cleanly, unlike .or() with a colon-laden ISO
+  // string (which it mis-parses). If another tick claimed it first, the
+  // last_run_at we read no longer matches → 0 rows → we back off.
   const claimMinute = minuteKey(now);
-  const { data: claimed, error: claimErr } = await supabase
+  // Already claimed this minute? (belt-and-suspenders with the loop's dedupe)
+  if (job.last_run_at && minuteKey(new Date(job.last_run_at)) === claimMinute) {
+    return { job_name: job.job_name, fired: false };
+  }
+  let claimQ = supabase
     .from('cron_jobs')
     .update({ last_run_at: now.toISOString(), locked_at: now.toISOString(), last_status: 'running' })
-    .eq('id', job.id)
-    // re-check the dedupe condition inside the write to avoid a race
-    .or(`last_run_at.is.null,last_run_at.lt.${claimMinute}:00.000Z`)
-    .select('id')
-    .maybeSingle();
+    .eq('id', job.id);
+  claimQ = job.last_run_at === null
+    ? claimQ.is('last_run_at', null)
+    : claimQ.eq('last_run_at', job.last_run_at);
+  const { data: claimed, error: claimErr } = await claimQ.select('id').maybeSingle();
   if (claimErr || !claimed) {
     return { job_name: job.job_name, fired: false };
   }
