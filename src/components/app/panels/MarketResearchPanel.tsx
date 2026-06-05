@@ -16,6 +16,7 @@ import StartTrackingModal, { type TriageAgencyCard } from './triage/StartTrackin
 import { EntryAccessibilityCard } from './EntryAccessibilityCard';
 import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market-assassin';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
+import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 
 interface MarketResearchPanelProps {
   email: string | null;
@@ -2131,7 +2132,7 @@ function RecommendedOpportunityDrawer({
 
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           <section className="grid grid-cols-2 gap-3">
-            <DetailTile label="Buyer / Office" value={agency} />
+            <DetailTile label="Buyer / Office" value={formatDodaacOffice(opportunity.solicitationNumber || null) || agency} />
             <DetailTile label="Parent Agency" value={parentAgency || '-'} />
             <DetailTile label="Due" value={deadline} />
             <DetailTile label="Solicitation" value={opportunity.solicitationNumber || '-'} />

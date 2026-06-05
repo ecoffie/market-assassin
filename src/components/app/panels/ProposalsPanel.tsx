@@ -6,6 +6,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { classifyNoticeType, noticeTypeLabel, noticeTypeToDetected } from '@/lib/utils/notice-type';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
+import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -1010,7 +1011,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Current pursuit</p>
               <h2 className="text-base font-semibold text-white truncate">{activePursuit.title}</h2>
               <p className="text-xs text-slate-400 mt-1">
-                {[activePursuit.agency, noticeTypeLabel(activePursuit.notice_type), activePursuit.naics_code ? `NAICS ${activePursuit.naics_code}` : '']
+                {[
+                  activePursuit.agency,
+                  formatDodaacOffice(activePursuit.notice_id || null),
+                  noticeTypeLabel(activePursuit.notice_type),
+                  activePursuit.naics_code ? `NAICS ${activePursuit.naics_code}` : '',
+                ]
                   .filter(Boolean)
                   .join(' · ')}
               </p>
