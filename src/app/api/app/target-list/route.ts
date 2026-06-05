@@ -445,6 +445,26 @@ export async function POST(request: NextRequest) {
     return 0;
   };
 
+  // CRM LINKAGE (Eric 2026-06-05): when an office is added with a DoDAAC code,
+  // pull its canonical NAME + sub-agency from the dodaac_directory reference
+  // table — the Fortune-1000 pattern (the code is the key; the name lives once
+  // in the directory). So the CRM record always carries the official office
+  // name, even if the caller only had the code. Falls back to the passed name.
+  let officeName = String(body.office_name || '');
+  let subAgencyName = body.sub_agency_name as string | null || null;
+  const officeCode = (body.office_code ? String(body.office_code) : '').toUpperCase().trim();
+  if (officeCode && /^[A-Z][A-Z0-9]{5}$/.test(officeCode)) {
+    try {
+      const { data: ref } = await getSupabase()
+        .from('dodaac_directory')
+        .select('office_name, sub_agency')
+        .eq('dodaac', officeCode)
+        .maybeSingle();
+      if (ref?.office_name) officeName = ref.office_name;
+      if (ref?.sub_agency && !subAgencyName) subAgencyName = ref.sub_agency;
+    } catch { /* directory unavailable — keep the passed name */ }
+  }
+
   const insertPayload: Record<string, unknown> = {
     user_email: email.toLowerCase(),
     workspace_id: body.workspace_id || null,
@@ -452,9 +472,9 @@ export async function POST(request: NextRequest) {
     agency_code: body.agency_code || null,
     agency_name: body.agency_name,
     sub_agency_code: body.sub_agency_code || null,
-    sub_agency_name: body.sub_agency_name || null,
-    office_code: body.office_code || null,
-    office_name: body.office_name,
+    sub_agency_name: subAgencyName,
+    office_code: officeCode || body.office_code || null,
+    office_name: officeName,
     location: body.location || null,
 
     // Provenance (roadmap Slice 5b) — remember the NAICS/PSC the user

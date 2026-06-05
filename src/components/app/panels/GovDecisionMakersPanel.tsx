@@ -44,6 +44,33 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const [subAgencies, setSubAgencies] = useState<Array<{ name: string; count: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [trackedOffices, setTrackedOffices] = useState<Set<string>>(new Set());
+
+  // Add a contracting office to My Target List (CRM). Sends the DoDAAC as
+  // office_code — the API resolves the canonical name + sub-agency from the
+  // dodaac_directory reference table, so the CRM record is always correct.
+  const trackOffice = async (c: Contact) => {
+    if (!c.dodaac) return;
+    try {
+      const res = await fetch('/api/app/target-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: email,
+          agency_name: c.department_ind_agency || 'Department of Defense',
+          sub_agency_name: c.subAgency || null,
+          office_code: c.dodaac,
+          office_name: c.derivedOffice || c.dodaac,
+          added_from: 'decision_makers',
+        }),
+      });
+      if (res.ok) {
+        setTrackedOffices(prev => new Set(prev).add(c.dodaac!));
+      } else if (res.status === 402) {
+        setError('Saved target lists are a Mindy Pro feature.');
+      }
+    } catch { /* non-fatal */ }
+  };
 
   // Load agency facet list once.
   useEffect(() => {
@@ -208,8 +235,24 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                     {c.subAgency && <span className="block text-xs text-emerald-400/80">{c.subAgency}</span>}
                   </td>
                   <td className="px-4 py-3 text-slate-400">
-                    {c.derivedOffice || c.office || c.sub_tier || '—'}
-                    {c.instrumentType && <span className="block text-[11px] text-slate-600">{c.instrumentType}{c.dodaac ? ` · ${c.dodaac}` : ''}</span>}
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0">
+                        {c.derivedOffice || c.office || c.sub_tier || '—'}
+                        {c.instrumentType && <span className="block text-[11px] text-slate-600">{c.instrumentType}{c.dodaac ? ` · ${c.dodaac}` : ''}</span>}
+                      </div>
+                      {/* Track this contracting office to My Target List (CRM).
+                          Links via DoDAAC; the name auto-fills from the directory. */}
+                      {c.dodaac && c.derivedOffice && (
+                        <button
+                          onClick={() => trackOffice(c)}
+                          disabled={trackedOffices.has(c.dodaac)}
+                          className="shrink-0 text-[11px] px-1.5 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-600 disabled:opacity-50 disabled:cursor-default"
+                          title="Add this office to My Target List"
+                        >
+                          {trackedOffices.has(c.dodaac) ? '✓ Tracked' : '+ Track'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {c.contact_email ? (
