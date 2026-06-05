@@ -1334,7 +1334,7 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                             {item.amount && <p className="text-sm font-semibold text-emerald-400 break-words">{item.amount}</p>}
                             {item.deadline && <p className="text-sm text-slate-500 mt-1 break-words">{item.deadline}</p>}
                           </div>
-                          <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                          <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
                             <button
                               type="button"
                               onClick={(event) => {
@@ -1383,11 +1383,11 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                                 teammates/friends; the public /shared/opp page
                                 pulls them in. Eric 2026-06-05. */}
                             {email && (
-                              <div className="inline-flex w-full" onClick={(e) => e.stopPropagation()}>
+                              <div className="inline-flex" onClick={(e) => e.stopPropagation()}>
                                 <ShareButton
                                   variant="small"
                                   email={email}
-                                  className="inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded bg-slate-800 px-2.5 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white sm:px-3 md:min-h-0 md:py-1.5"
+                                  className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded bg-slate-800 px-2.5 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white sm:px-3 md:min-h-0 md:py-1.5"
                                   opportunity={{
                                     id: getStableNoticeId(item),
                                     title: item.title,
