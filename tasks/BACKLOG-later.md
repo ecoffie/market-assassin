@@ -31,6 +31,16 @@
 
 ## 🔴 P0 — Big features with a PRD, ready to build
 
+### 1a. Relationships driven by Target List (BD workflow fix)
+- **What:** Relationships is a disconnected silo today. Make My Target List the
+  ENTRY POINT: click a target agency → its Gov Buyers / OSBP / Find-Partners,
+  pre-filtered. Save attaches to the AGENCY (long-game BD), not a pursuit —
+  relationships are developed BEFORE pursuing. My Network grouped by agency.
+- **Mostly rewiring:** reuse Target List + Relationships panels + existing data
+  (federal_contacts, OSBP, teaming). Add a target_agency link to saved contacts.
+- **PRD:** `docs/PRD-relationships-from-target-list.md`
+- **Related (done today):** Team Access already moved Pipeline → Account.
+
 ### 1. DoD Forecast Coverage (the real one)
 - **What:** DoD is the ~$400B largest buyer but we have **0 formal forecasts**.
   Option B (SAM Sources Sought as "early signals") already SHIPPED as the
