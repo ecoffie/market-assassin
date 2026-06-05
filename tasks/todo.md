@@ -4,6 +4,24 @@
 
 ---
 
+## Session Handoff — 2026-06-05 (DoDAAC names + reference table + CRM linkage)
+
+Eric: "pulling office CODES is good but we need the NAMES — can't have people figuring that out. And how should CRM linkage work — how do Fortune-1000 SaaS handle it?" Did all three in order. Merged to `main`, deployed.
+
+### The architecture (Fortune-1000 pattern, as Eric intuited)
+A **reference table**: the code (DoDAAC) is the stable key, the office NAME lives ONCE, everything joins to it. Built `dodaac_directory` (migration `20260605_dodaac_directory.sql`, hand-run), populated from **BigQuery awards.awarding_office (FPDS — authoritative)** via `scripts/populate-dodaac-directory.mjs`. **4,813 office names.** Name coverage 7% → **94%**. (FA7000 = "10 CONS LGC", N00104 = "NAVSUP Weapon Systems Support".)
+
+### Shipped (in order)
+- [x] **Names everywhere** — `loadDodaacNames()` (server, cached) + `useDodaacNames()` hook + `/api/app/dodaac-directory` (client map). Name resolution order: directory table > in-code map > raw code. Wired into Decision Makers, Forecasts (server) and Alerts, Recompetes, Pipeline (client). Offices now read as names, not codes, across Mindy.
+- [x] **#1 CRM linkage** — adding an office to My Target List sends the DoDAAC; the target-list POST resolves the canonical name + sub-agency from `dodaac_directory` (so the CRM record is always official + stays current if the directory updates). "+ Track" button on Decision Makers rows.
+- [x] **#2 remaining panels** — Alerts/Recompetes/Pipeline get directory names via the client hook (fetched once/session).
+- [x] **#3** — this todo.
+
+### Ops note
+- Re-run `node scripts/populate-dodaac-directory.mjs` periodically (offices/names change slowly) to refresh the directory.
+
+---
+
 ## Session Handoff — 2026-06-05 (Decision Makers sub-agency + DoDAAC office decode platform-wide)
 
 Eric: "parent agency way too broad for DoD/HHS" → narrow to sub-agency + office. Then "apply DoDAAC across all data — no more agency-only stuff."
