@@ -251,8 +251,8 @@ function generateTeamInviteEmail({
           <tr>
             <td style="background-color: #1e293b; padding: 32px 24px;">
               <p style="margin: 0 0 20px; color: #e2e8f0; font-size: 16px; line-height: 1.6;">
-                <strong style="color: white;">${inviterEmail}</strong> has invited you to join
-                <strong style="color: #10b981;">${workspaceName}</strong> as a <strong style="color: white;">${role}</strong>.
+                <a href="mailto:${inviterEmail}" style="color: #ffffff; font-weight: 700; text-decoration: none;">${inviterEmail}</a> has invited you to join
+                <strong style="color: #34d399;">${workspaceName}</strong> as a <strong style="color: white;">${role}</strong>.
               </p>
 
               <div style="background-color: #334155; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
@@ -277,8 +277,8 @@ function generateTeamInviteEmail({
                 </tr>
               </table>
 
-              <p style="margin: 24px 0 0; color: #64748b; font-size: 13px; text-align: center;">
-                Simply sign in with <strong style="color: #94a3b8;">${invitedEmail}</strong> to join the team.
+              <p style="margin: 24px 0 0; color: #94a3b8; font-size: 13px; text-align: center;">
+                Simply sign in with <a href="mailto:${invitedEmail}" style="color: #34d399; font-weight: 600; text-decoration: none;">${invitedEmail}</a> to join the team.
               </p>
             </td>
           </tr>
