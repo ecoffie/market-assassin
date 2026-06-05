@@ -4,6 +4,26 @@
 
 ---
 
+## Session Handoff — 2026-06-05 (Decision Makers sub-agency + DoDAAC office decode platform-wide)
+
+Eric: "parent agency way too broad for DoD/HHS" → narrow to sub-agency + office. Then "apply DoDAAC across all data — no more agency-only stuff."
+
+### Shipped
+- [x] **Sub-agency/branch filter** (Decision Makers) — SAM has no sub-agency for DoD (0%), so `deriveSubAgency()` infers it from email domain (us.af.mil=Air Force, dla.mil=DLA, navy.mil=Navy) + solicitation prefix. 98.6% DoD coverage. Dropdown + per-row branch label.
+- [x] **DoDAAC office decode** (`src/lib/gov-contacts/dodaac.ts`) — Eric's insight: the solicitation number IS the office. First 6 chars = DoDAAC (contracting office), chars 7-8 = FY, 9th char = instrument type (A=BPA, D=IDIQ, 9=OTA, P=PurchaseOrder). Handles packed + dashed forms. Named the common DoDAACs (NAVSUP WSS, DLA Aviation, NSWC Dahlgren…); unknown → raw code. 297 distinct offices in 1000 DoD contacts.
+- [x] **Rolled out platform-wide** via shared `formatDodaacOffice()`: Decision Makers, Alerts, Recompetes, Pipeline, Proposals, Market Research all show the decoded office (🏛) instead of agency-only.
+- [x] **HARDENED the decoder** — Pipeline's `notice_id` is often a SAM UUID; a hex fragment falsely decoded (`c164a7b1…` → "C164A7"). Now rejects 32-char hex UUIDs + requires a plausible 2-digit FY at the FY position. Verified: real PIIDs decode, all UUID/civilian formats reject (fall back to agency).
+
+### Deliberately NOT wired
+- **Forecasts** — verified its data is 100% civilian formats (89xxx=DOE/NASA, GS-/47Q=GSA, NNG=NASA); 0/15 decode. Decoder correctly returns null. Not a gap in the rollout — but it surfaced a real coverage hole (below).
+
+### Follow-ups
+- [ ] **DoD FORECAST COVERAGE — real gap.** `agency_forecasts` = 7,824 rows, **0 DoD** (live coverage = DHS+DOE only). DoD is ~$400B+/yr, the biggest buyer, and Forecasts is blind to it. PRD: **`docs/PRD-dod-forecast-coverage.md`**. Plan: SAM Sources Sought as free interim early-signal (Option B), then component scrapers Army/Navy/NAVFAC/AF/DLA into `agency_forecasts` (Option A).
+- [ ] **Civilian office decode** — GSA/VA/HHS solicitation formats, or join `awards.awarding_office`. Scoped separately (decoder is DoD-only by design).
+- [ ] **Expand DoDAAC name lookup** — only ~18 named; unknown DoDAACs show the raw code. A fuller reference table would name more offices.
+
+---
+
 ## Session Handoff — 2026-06-05 (Target List perf + SAT data fix; Team filter; sidebar; invite email)
 
 Screenshot-driven fixes. All merged to `main`, deployed, verified on prod.
