@@ -16,6 +16,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getOfficesForAgency } from '@/lib/bigquery/agencies';
 import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
+import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
 
 export const dynamic = 'force-dynamic';
 
@@ -181,6 +182,9 @@ export async function GET(request: NextRequest) {
   // The table has duplicate people (same person named on multiple
   // solicitations). Dedupe this page by email (fallback name+agency) so the
   // directory doesn't show the same contact 5 times.
+  // Load the DoDAAC directory (code → office NAME) so users see
+  // "10th Contracting Squadron", not "FA7000". Cached in-process.
+  const dodaacNames = await loadDodaacNames();
   const seen = new Set<string>();
   let contacts = (data || []).filter((r: any) => {
     const key = (r.contact_email || `${r.contact_fullname}|${r.department_ind_agency}`).toLowerCase();
@@ -193,14 +197,17 @@ export async function GET(request: NextRequest) {
     // OFFICE (N00104 = NAVSUP WSS), fiscal year, and instrument type. This is
     // the office-level granularity SAM doesn't store (Eric 2026-06-05).
     const dod = decodeDodaac(r.solicitation_number);
+    // Name resolution order: directory table > in-code map > raw code.
+    const officeName = dod?.dodaac
+      ? (dodaacNames.get(dod.dodaac) || dod.officeName || dod.dodaac)
+      : null;
     return {
       ...r,
       ...normalizeTitle(r.contact_title),
       // Derived command/branch within the broad parent agency (e.g. "Air Force"
       // under DEPT OF DEFENSE).
       subAgency: deriveSubAgency(r.contact_email, r.solicitation_number),
-      // DoDAAC-derived office: prefer the friendly name, else the raw code.
-      derivedOffice: dod?.officeName || dod?.dodaac || null,
+      derivedOffice: officeName,
       dodaac: dod?.dodaac || null,
       instrumentType: dod?.instrumentType || null,
     };
