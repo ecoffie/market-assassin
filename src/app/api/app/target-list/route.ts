@@ -227,6 +227,7 @@ async function enrichTargetsSat(
   targets: Array<Record<string, unknown>>,
   profile: SatBackfillProfile,
   request: NextRequest,
+  allowLive: boolean,
 ): Promise<{ targets: Array<Record<string, unknown>>; persisted: number }> {
   const needsSat = targets.some((t) => !Number(t.sat_ratio));
   if (!needsSat) return { targets, persisted: 0 };
@@ -243,7 +244,12 @@ async function enrichTargetsSat(
     return t;
   });
 
-  const stillNeedLive = enriched.some(
+  // The live USASpending find-agencies call takes ~40s — NEVER block a page
+  // load on it (Eric 2026-06-05: target list took 11-14s; commit b1259f2 added
+  // this live lookup on every GET). Only run it when explicitly requested
+  // (?live=1, e.g. a manual/background "refresh SAT data"). Normal loads use
+  // the fast cache + profile backfill above and render instantly.
+  const stillNeedLive = allowLive && enriched.some(
     (t) => !Number(t.sat_ratio) && profile.naicsCodes.length > 0,
   );
   if (stillNeedLive) {
@@ -321,10 +327,14 @@ export async function GET(request: NextRequest) {
     }
 
     const profile = await loadSatBackfillProfile(email);
+    // Live SAT lookup (~40s) only on explicit ?live=1 — never on the default
+    // page load, so the list renders fast.
+    const allowLive = request.nextUrl.searchParams.get('live') === '1';
     const { targets, persisted } = await enrichTargetsSat(
       (data || []) as Array<Record<string, unknown>>,
       profile,
       request,
+      allowLive,
     );
 
     return NextResponse.json({
