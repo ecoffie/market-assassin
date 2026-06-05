@@ -6,8 +6,9 @@
 > way people are used to working with LLMs on proposals. Gives the user autonomy
 > over the outcome.
 
-**Status:** Draft / scoping — 2026-06-05. **v1 target: ship by June 19
-(Juneteenth).** Notes + collaboration = v2.
+**Status:** **v1 SHIPPED 2026-06-05** (toggle + proposal chat + Verify-on-SAM
+link, all deployed + verified live — ahead of the June 19 target). Notes +
+collaboration = v2 (not done).
 **Trigger:** Eric: "Proposal Assist should have a Perplexity-style function —
 upload files, it reads them, you type what you want, like Mindy Chat but for the
 proposal. Auto vs Manual drive. I like to see everything happening. Notes /

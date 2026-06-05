@@ -7,22 +7,25 @@
 
 ---
 
-## ⏰ DEADLINE — ship by June 19 (Juneteenth)
+## ⏰ DEADLINE — June 19 (Juneteenth) work
 
 ### 0. Proposal Assist — Manual Drive (Perplexity-style proposal LLM)
-- **What:** add a "Manual / Sport Mode" toggle next to today's Auto draft.
-  Manual = upload your project files + chat with a proposal-scoped LLM that
-  reads them + your Vault and helps you write — autonomy over the outcome,
-  "see everything happening."
-- **Reuse:** the Mindy Chat streaming RAG engine (`/api/app/chat`) scoped to
-  the proposal's files + Vault; the existing `/api/app/proposal/upload` +
-  draft generators. New: `/api/app/proposal/chat` wrapper + a chat panel in
-  Manual mode. Auto stays the default, unchanged.
-- **v1 (June 19):** both modes work, basic — toggle + proposal-scoped chat that
-  can draft into the response.
-- **v2.0 (NOT June 19):** notes area, compliance-matrix who/status tracking,
-  draft version history (v1/v2/v3), multi-user.
 - **PRD:** `docs/PRD-proposal-manual-mode.md`
+- [x] **v1 SHIPPED 2026-06-05** — Auto↔Manual·Sport toggle in Proposal Assist
+  (Auto = one-click draft, default; Manual = chat workspace). New
+  `/api/app/proposal/chat` reuses the Mindy Chat SSE/Groq engine but grounds in
+  the user's OWN docs (uploaded RFP + Vault via loadVaultContext/
+  loadBidderProfile), proposal-writer prompt, no fabrication (placeholders when
+  a fact is missing). `ProposalChat.tsx` streaming panel (sources, starters,
+  copy). Verified live: 742 tokens, sources [RFP+Vault]. All auto sections gated
+  to driveMode==='auto'.
+- [x] **"Verify on SAM.gov" link SHIPPED** — deep link `sam.gov/opp/{notice_id}
+  /view` in the pursuit header + Source Documents (shows when notice_id exists;
+  33/58 pursuits have it). Trust-building: cross-check all docs + notice text;
+  download/upload as needed.
+- [ ] **v2.0 (NOT June 19, per Eric):** per-proposal notes area; compliance-
+  matrix who/status assignee tracking; draft version history (v1/v2/v3);
+  multi-user on one proposal (ties to Team Access).
 
 ---
 
