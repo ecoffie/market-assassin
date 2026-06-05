@@ -26,6 +26,17 @@ The fireJob claim used `.or('last_run_at.is.null,last_run_at.lt.<iso>')` — Pos
 
 ---
 
+## Planned (not executed) — mi.govcongiants.com → getmindy.ai cutover
+
+**Runbook written + ready:** `tasks/mi-to-getmindy-cutover-runbook.md`. Execute on Eric's go ("do the final migration"). Memory: [[mi_to_getmindy_cutover]].
+
+- [ ] **Final domain migration** — make getmindy.ai canonical, retire mi.govcongiants.com to a **permanent 301 redirect** (NEVER a shutdown — years of email links depend on it). Both domains already run the same code (host-based rewrites), so this is a URL/canonical/redirect migration, NOT an app rewrite. No data migration.
+  - Surface (2026-06-05): **139 hardcoded `mi.govcongiants.com` refs / 61 files**, bucketed: (A) env-var fallbacks → set the var; (B) hardcoded URLs (send-email, stripe-webhook, planner, access-links) → code change; (C) host-pinned auth redirects (reset/setup-password) → flip carefully, auth-critical.
+  - Sequence: infra/console (DNS, Supabase URL config keeping BOTH redirect URLs during overlap, OAuth, Stripe) → one-PR code change → verify on prod with both live → flip the 301. `auth.getmindy.ai` OAuth surface already done — verify only.
+  - Re-run the audit grep first (the 139/61 count may have grown).
+
+---
+
 ## Session Handoff — 2026-06-04 (Market Research 0-column + Grants + fiscal-year chart)
 
 More screenshot-driven fixes from Eric clicking through. All merged to `main`, deployed. Render/API-verified (not authed-`/app` clicks — see verify note in the Decision Makers handoff below).
