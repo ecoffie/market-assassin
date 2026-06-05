@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getOfficesForAgency } from '@/lib/bigquery/agencies';
+import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,6 +113,29 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Facet: derived SUB-AGENCIES present in a (broad) agency's CONTACTS — e.g.
+  // DoD → Air Force / Navy / Army / DLA. SAM has no sub-agency field for these,
+  // so we derive it from each contact's email domain / solicitation prefix and
+  // tally which ones actually appear. Sampled (the big agencies have plenty).
+  if (sp.get('facets') === 'subagencies') {
+    const facetAgency = (sp.get('agency') || '').trim();
+    if (!facetAgency) return NextResponse.json({ success: true, subAgencies: [] });
+    const { data } = await sb
+      .from('federal_contacts')
+      .select('contact_email, solicitation_number')
+      .ilike('department_ind_agency', `%${facetAgency}%`)
+      .limit(5000);
+    const counts = new Map<string, number>();
+    for (const r of (data || []) as { contact_email: string | null; solicitation_number: string | null }[]) {
+      const sa = deriveSubAgency(r.contact_email, r.solicitation_number);
+      if (sa) counts.set(sa, (counts.get(sa) || 0) + 1);
+    }
+    const subAgencies = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+    return NextResponse.json({ success: true, subAgencies });
+  }
+
   const search = (sp.get('search') || '').trim();
   const agency = (sp.get('agency') || '').trim();
   const office = (sp.get('office') || '').trim();
@@ -119,10 +143,12 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Number(sp.get('limit')) || 50, 200);
   const offset = Math.max(Number(sp.get('offset')) || 0, 0);
 
+  const subAgency = (sp.get('subAgency') || '').trim();
+
   let q = sb
     .from('federal_contacts')
     .select(
-      'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category',
+      'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
       { count: 'exact' },
     );
 
@@ -133,13 +159,17 @@ export async function GET(request: NextRequest) {
   if (agency) q = q.ilike('department_ind_agency', `%${agency}%`);
   if (office) q = q.ilike('office', `%${office}%`);
   if (role) q = q.eq('role_category', role);
+  // subAgency is DERIVED (from email domain / solicitation prefix), not a
+  // column — so it's filtered in JS below. When set, pull a wider window so
+  // the page still fills after filtering.
+  const fetchLimit = subAgency ? Math.min(limit * 8, 1000) : limit;
 
   // Surface contacts that are actually reachable first (have email/phone),
   // then alphabetical by agency so the directory reads cleanly.
   q = q
     .order('contact_email', { ascending: true, nullsFirst: false })
     .order('department_ind_agency', { ascending: true })
-    .range(offset, offset + limit - 1);
+    .range(offset, offset + fetchLimit - 1);
 
   const { data, error, count } = await q;
   if (error) {
@@ -151,14 +181,25 @@ export async function GET(request: NextRequest) {
   // solicitations). Dedupe this page by email (fallback name+agency) so the
   // directory doesn't show the same contact 5 times.
   const seen = new Set<string>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const contacts = (data || []).filter((r: any) => {
+  let contacts = (data || []).filter((r: any) => {
     const key = (r.contact_email || `${r.contact_fullname}|${r.department_ind_agency}`).toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }).map((r: any) => ({ ...r, ...normalizeTitle(r.contact_title) }));
+  }).map((r: any) => ({
+    ...r,
+    ...normalizeTitle(r.contact_title),
+    // Derived command/branch within the broad parent agency (e.g. "Air Force"
+    // under DEPT OF DEFENSE). Lets the UI narrow huge agencies.
+    subAgency: deriveSubAgency(r.contact_email, r.solicitation_number),
+  }));
+
+  // Filter by derived sub-agency (JS, since it's not a column).
+  if (subAgency) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    contacts = contacts.filter((c: any) => c.subAgency === subAgency).slice(0, limit);
+  }
 
   return NextResponse.json({
     success: true,

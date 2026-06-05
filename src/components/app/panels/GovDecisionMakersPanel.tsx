@@ -27,6 +27,7 @@ interface Contact {
   role_category: string | null;
   role: string | null;       // real job title if we could identify one
   pocLabel: string | null;   // "Primary"/"Secondary" SAM POC designation
+  subAgency: string | null;  // derived branch/command (Air Force, Navy, DLA…)
 }
 
 export default function GovDecisionMakersPanel({ email }: Props) {
@@ -36,6 +37,8 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const [search, setSearch] = useState('');
   const [agency, setAgency] = useState('');
   const [officeDetail, setOfficeDetail] = useState<Array<{ name: string; amount: number; awards: number }>>([]);
+  const [subAgency, setSubAgency] = useState('');
+  const [subAgencies, setSubAgencies] = useState<Array<{ name: string; count: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,10 +57,18 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   // don't carry office, so we can't filter the rows by office).
   useEffect(() => {
     setOfficeDetail([]);
+    setSubAgency('');
+    setSubAgencies([]);
     if (!email || !agency) return;
     fetch(`/api/app/federal-contacts?facets=offices&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`)
       .then(r => r.json())
       .then(d => { if (d.success) setOfficeDetail(d.officeDetail || []); })
+      .catch(() => {});
+    // Derived sub-agencies present in this agency's contacts (DoD → AF/Navy/…),
+    // so the dropdown narrows huge agencies.
+    fetch(`/api/app/federal-contacts?facets=subagencies&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setSubAgencies(d.subAgencies || []); })
       .catch(() => {});
   }, [email, agency]);
 
@@ -68,6 +79,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       const p = new URLSearchParams({ email });
       if (search.trim()) p.set('search', search.trim());
       if (agency) p.set('agency', agency);
+      if (subAgency) p.set('subAgency', subAgency);
       p.set('limit', '100');
       const res = await fetch(`/api/app/federal-contacts?${p}`);
       const d = await res.json();
@@ -83,10 +95,10 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       setContacts([]);
     }
     setLoading(false);
-  }, [email, search, agency]);
+  }, [email, search, agency, subAgency]);
 
-  // Initial load + reload when agency filter changes.
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [agency]);
+  // Initial load + reload when agency or sub-agency filter changes.
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [agency, subAgency]);
 
   return (
     <div className="p-6 space-y-6">
@@ -125,6 +137,18 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             <option value="">All Agencies</option>
             {agencies.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
+          {/* Sub-agency / branch drill-down (DoD → Air Force / Navy / DLA…).
+              Only shows when the selected agency has derivable sub-agencies. */}
+          {agency && subAgencies.length > 1 && (
+            <select
+              value={subAgency}
+              onChange={e => setSubAgency(e.target.value)}
+              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
+            >
+              <option value="">All sub-agencies</option>
+              {subAgencies.map(s => <option key={s.name} value={s.name}>{s.name} ({s.count})</option>)}
+            </select>
+          )}
         </div>
       </div>
 
@@ -176,7 +200,10 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                       <span className="text-slate-600">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-300">{c.department_ind_agency || '—'}</td>
+                  <td className="px-4 py-3 text-slate-300">
+                    {c.department_ind_agency || '—'}
+                    {c.subAgency && <span className="block text-xs text-emerald-400/80">{c.subAgency}</span>}
+                  </td>
                   <td className="px-4 py-3 text-slate-400">{c.office || c.sub_tier || '—'}</td>
                   <td className="px-4 py-3">
                     {c.contact_email ? (
