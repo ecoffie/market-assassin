@@ -17,8 +17,11 @@ Eric: "parent agency way too broad for DoD/HHS" → narrow to sub-agency + offic
 ### Deliberately NOT wired
 - **Forecasts** — verified its data is 100% civilian formats (89xxx=DOE/NASA, GS-/47Q=GSA, NNG=NASA); 0/15 decode. Decoder correctly returns null. Not a gap in the rollout — but it surfaced a real coverage hole (below).
 
-### Follow-ups
-- [ ] **DoD FORECAST COVERAGE — real gap.** `agency_forecasts` = 7,824 rows, **0 DoD** (live coverage = DHS+DOE only). DoD is ~$400B+/yr, the biggest buyer, and Forecasts is blind to it. PRD: **`docs/PRD-dod-forecast-coverage.md`**. Plan: SAM Sources Sought as free interim early-signal (Option B), then component scrapers Army/Navy/NAVFAC/AF/DLA into `agency_forecasts` (Option A).
+### DoD forecast coverage — Option B SHIPPED, Option A queued
+- [x] **Option B — DoD early signals from SAM (SHIPPED).** Forecasts had 0 DoD (the ~$400B largest buyer). Now surfaces open DoD Sources Sought / RFIs / Presolicitations from `sam_opportunities` in the forecast feed, mapped to the forecast shape, labeled **⚡ Early signal** (amber, distinct from formal forecasts). Office via DoDAAC decode. ~50 open signals for construction alone.
+  - [x] **Lookback control** — `?lookbackDays=` (default 180d, 30-730). Answers "how far back."
+  - [x] **RFP-release stage** — answers "do we know if they let the solicitation out?": a Sources Sought whose RFP dropped reappears under the same solicitation_number as a Solicitation/Award. UI shows **pre-RFP** (green, shape it) vs **✓ RFP released** (rose, go bid).
+- [ ] **Option A — DoD forecast scrapers (NOT executing; queued after the fix list).** The REAL coverage: component LRAF scrapers (Army/Navy/NAVFAC first, then AF/DLA, then DHA/SOCOM/etc.) into `agency_forecasts`, reusing the civilian forecast pipeline. PRD: **`docs/PRD-dod-forecast-scrapers.md`** (parent: `docs/PRD-dod-forecast-coverage.md`). Eric: save for after current fixes.
 - [ ] **Civilian office decode** — GSA/VA/HHS solicitation formats, or join `awards.awarding_office`. Scoped separately (decoder is DoD-only by design).
 - [ ] **Expand DoDAAC name lookup** — only ~18 named; unknown DoDAACs show the raw code. A fuller reference table would name more offices.
 
