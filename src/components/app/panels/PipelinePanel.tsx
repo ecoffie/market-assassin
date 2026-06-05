@@ -9,6 +9,7 @@ import { useToast } from '../Toast';
 import { getNaics } from '@/lib/codes/lookup';
 import { classifyNoticeType } from '@/lib/utils/notice-type';
 import VoiceCaptureModal from '../voice/VoiceCaptureModal';
+import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -913,7 +914,12 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                       {opp.title}
                     </div>
                     {opp.agency && (
-                      <div className="text-xs text-slate-500 mb-1">{opp.agency}</div>
+                      <div className="text-xs text-slate-500 mb-1">
+                        {opp.agency}
+                        {formatDodaacOffice(opp.notice_id || null) && (
+                          <span className="text-emerald-400/80"> · 🏛 {formatDodaacOffice(opp.notice_id || null)}</span>
+                        )}
+                      </div>
                     )}
                     {opp.value_estimate && (
                       <div className="mb-2 text-xs font-medium text-emerald-400">{opp.value_estimate}</div>

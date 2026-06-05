@@ -66,6 +66,10 @@ export function decodeDodaac(solicitationNumber: string | null): DodaacInfo | nu
   const raw = solicitationNumber.toUpperCase().trim();
   // DoDAAC = first 6 alphanumerics (works for both dashed and undashed forms).
   const compact = raw.replace(/[^A-Z0-9]/g, '');
+  // Reject SAM notice UUIDs (32-char hex blobs) — they aren't solicitation
+  // numbers and a fragment can falsely look like a DoDAAC (e.g. "C164A7...").
+  if (/^[0-9A-F]{32}$/.test(compact)) return null;
+
   const dodaac = compact.slice(0, 6);
   // A valid DoDAAC is 6 chars and starts with a letter (N/W/F/S/M/H...).
   if (dodaac.length !== 6 || !/^[A-Z]/.test(dodaac)) return null;
@@ -83,10 +87,28 @@ export function decodeDodaac(solicitationNumber: string | null): DodaacInfo | nu
   }
   const fyNum = /^\d{2}$/.test(fyStr) ? 2000 + parseInt(fyStr, 10) : null;
 
+  // REQUIRE a plausible fiscal year at the FY position. This is the strongest
+  // signal that the input is a real PIID and not a UUID / random ID — without
+  // it we'd decode garbage. A DoDAAC PIID always carries the FY here.
+  if (!fyNum || fyNum < 2010 || fyNum > 2035) return null;
+
   return {
     dodaac,
     officeName: DODAAC_NAMES[dodaac] || null,
-    fiscalYear: fyNum && fyNum >= 2010 && fyNum <= 2035 ? fyNum : null,
+    fiscalYear: fyNum,
     instrumentType: typeChar ? (TYPE_BY_CHAR[typeChar] || null) : null,
   };
+}
+
+/**
+ * One-line office label for a solicitation number, for inline display across
+ * Mindy (Alerts, Pipeline, Recompetes, ...). Returns null when it can't decode
+ * (civilian formats, non-DoD) so callers can fall back to the agency name.
+ * e.g. "NAVSUP Weapon Systems Support" or "DLA Aviation · IDIQ" or "N00104".
+ */
+export function formatDodaacOffice(solicitationNumber: string | null): string | null {
+  const d = decodeDodaac(solicitationNumber);
+  if (!d) return null;
+  const office = d.officeName || d.dodaac;
+  return d.instrumentType ? `${office} · ${d.instrumentType}` : office;
 }

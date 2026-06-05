@@ -9,6 +9,7 @@ import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 import { getNaics, getPsc } from '@/lib/codes/lookup';
 import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
+import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -955,6 +956,11 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     )}
                     {alert.solicitationNumber && (
                       <span>#{alert.solicitationNumber}</span>
+                    )}
+                    {/* Decoded contracting office from the DoDAAC (DoD only) —
+                        office-level intel, not just the broad agency. */}
+                    {formatDodaacOffice(alert.solicitationNumber || null) && (
+                      <span className="text-emerald-400/80">🏛 {formatDodaacOffice(alert.solicitationNumber || null)}</span>
                     )}
                   </div>
                 </div>

@@ -7,6 +7,7 @@ import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButto
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import ContractorLink from '../contractors/ContractorLink';
 import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/location-match';
+import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -722,10 +723,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         </span>
                       </button>
 
-                      {/* Agency */}
+                      {/* Agency + decoded contracting office (DoDAAC, DoD only) */}
                       <p className="text-slate-400 text-sm mb-1">
                         {contract.agency}
                         {contract.subAgency && <span className="text-slate-500"> • {contract.subAgency}</span>}
+                        {formatDodaacOffice(contract.piid || null) && (
+                          <span className="text-emerald-400/80"> • 🏛 {formatDodaacOffice(contract.piid || null)}</span>
+                        )}
                       </p>
 
                       {/* Incumbent — clickable to open YoY award history */}
