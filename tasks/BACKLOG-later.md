@@ -32,6 +32,18 @@
 
 ## 🟠 P1 — Scoped features / meaningful UX
 
+### 3a. Knowledge Base — searchable repository page
+- **What:** Mindy Chat answers well but getting to the SOURCE docs "gets lost."
+  Build a searchable repository page over `mindy_rag_documents` (**1,364 docs**
+  already there — templates, cap statements, past perf, training…). Chat
+  citation chips deep-link into it.
+- **Mostly surfacing, not a rebuild:** reuse the Library split-pane UI +
+  `/api/app/rag-doc` viewer. Content + viewer already exist.
+- **Naming:** distinct name ("Knowledge Base" — NOT "Vault" = company profile,
+  NOT "Library" = user AI outputs). Don't migrate vault.govcongiants.org.
+- **Guardrail:** filter `has_pii`/`usage_rights` — no internal/host docs leak.
+- **PRD:** `docs/PRD-knowledge-base-repository.md`
+
 ### 3. Light / Dark mode (themeable Mindy)
 - **What:** Mindy is dark-only. A real light mode is a **themeable-tokens
   refactor** (~29 components hard-code dark colors), not a toggle. Default stays
