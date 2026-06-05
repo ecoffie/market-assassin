@@ -4,6 +4,27 @@
 
 ---
 
+## Session Handoff — 2026-06-05 (Target List perf + SAT data fix; Team filter; sidebar; invite email)
+
+Screenshot-driven fixes. All merged to `main`, deployed, verified on prod.
+
+### Target List — two SEPARATE bugs (Eric: slow load, then "SAT still not fixed")
+- [x] **11–14s load → ~1.7s** — commit `b1259f2` ("backfill SAT...live lookup") added a live USASpending `find-agencies` call inside the GET (fires when any target lacks a SAT ratio). That endpoint takes **~40s** (measured), 45s timeout → the whole list BLOCKED on it every load. Fix: gate the live call behind `?live=1`; default load uses fast cache/profile backfill only. `enrichTargetsSat(allowLive)`.
+- [x] **Animated loading state** — replaced bare "Loading your target list…" text with a spinner + pulsing skeleton cards (header stays visible), so a slow load never looks frozen.
+- [x] **SAT ratio was WRONG (the real data bug)** — VA construction showed **0%** when it's actually **78%** ($16B of $21B set-aside). Cause: rows stored set-aside $ but no TOTAL $; the TMR cache was empty for construction NAICS; only fallback was the flaky 40s call. **Fix: `getAgencySatForNaics()` computes the real set-aside % per agency for a NAICS straight from the BQ awards table (set-aside$/total$), cached (~2.6GB cold scan/sector).** Target-list enrichment now uses BQ as PRIMARY, matched by normalized agency name; result is persisted back to the row. One-time backfill corrected the stuck VA row to 78%. Verified live: SAT now real (Energy 82%, DOT 75%, Interior 67%…), load 1.7s.
+
+### Pipeline — Team / Mine / All filter
+- [x] Owner filter on My Pursuits (`ownerOf = owner_email || user_email`). Only shows when the workspace has teammate-owned pursuits. Answers "one person on X, another on Y, but we share."
+
+### Sidebar — collapsed tooltips AND pinned Collapse (the tradeoff, fixed)
+- [x] Prior fix toggled nav overflow (visible = tooltips but Collapse pushed off; auto = Collapse but tooltips clipped — they fought over one overflow prop). Fix: nav ALWAYS overflow-y-auto (Collapse pinned) + tooltip rendered once at the aside root with `position:fixed` (escapes the scroll clip). Both now work.
+
+### Team Access — verified + invite email fix
+- [x] **Verified** Team Access is real & working: workspace = email domain, invite auto-sends email, shared pipeline (`workspace_id`), activity feed, member roles. `mi_beta_workspace_settings` table + save path healthy (0 rows = unused, not broken). Eric's govcongiants.com workspace already has 3 members.
+- [x] **Invite email contrast** — email addresses were dark-blue auto-links on dark navy (unreadable). Wrapped in explicit-colored `<a>` (white inviter, emerald sign-in) so clients don't auto-link with their blue.
+
+---
+
 ## Session Handoff — 2026-06-05 (Cron Dispatcher Phase 1 — SHIPPED + verified on prod)
 
 Implemented Phase 1 of `docs/PRD-cron-dispatcher.md` — escapes the Vercel 100-cron cap so scheduling stops growing with features/users. **Live and verified on prod.**
