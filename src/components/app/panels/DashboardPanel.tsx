@@ -1228,11 +1228,29 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
               </div>
             </div>
 
+            {/* Stat cards double as filter shortcuts — click to jump straight
+                to those items (Eric: they should sort/filter/take you there). */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-              <SummaryStat label="Opportunities" value={counts.opportunity} />
-              <SummaryStat label="Urgent Alerts" value={summary.urgentAlerts} urgent />
-              <SummaryStat label="Total Matched" value={summary.totalMatched || counts.all} />
-              <SummaryStat label="Briefings" value={briefings.length} />
+              <SummaryStat
+                label="Opportunities" value={counts.opportunity}
+                active={activeFilter === 'opportunity'}
+                onClick={() => setActiveFilter(activeFilter === 'opportunity' ? 'all' : 'opportunity')}
+              />
+              <SummaryStat
+                label="Urgent Alerts" value={summary.urgentAlerts} urgent
+                active={activeFilter === 'urgent'}
+                onClick={() => setActiveFilter(activeFilter === 'urgent' ? 'all' : 'urgent')}
+              />
+              <SummaryStat
+                label="Total Matched" value={summary.totalMatched || counts.all}
+                active={activeFilter === 'all'}
+                onClick={() => setActiveFilter('all')}
+              />
+              {/* Briefings → reveal/scroll the Past Briefings rail. */}
+              <SummaryStat
+                label="Briefings" value={briefings.length}
+                onClick={() => setBriefingsCollapsed(false)}
+              />
             </div>
 
             <section>
@@ -1548,11 +1566,24 @@ function FilterButton({ label, count, active, onClick }: { label: string; count:
   );
 }
 
-function SummaryStat({ label, value, urgent = false }: { label: string; value: string | number; urgent?: boolean }) {
-  return (
-    <div className={`border p-5 text-center ${urgent ? 'bg-red-950/30 border-red-500/30' : 'bg-slate-900 border-slate-800'}`}>
+function SummaryStat({ label, value, urgent = false, onClick, active = false }: { label: string; value: string | number; urgent?: boolean; onClick?: () => void; active?: boolean }) {
+  // Clickable stats act as filter shortcuts (Eric: the stat cards looked
+  // interactive but weren't). A ring marks the active filter; hover affords it.
+  const base = `rounded-lg border p-5 text-center transition-colors ${urgent ? 'bg-red-950/30 border-red-500/30' : 'bg-slate-900 border-slate-800'}`;
+  const interactive = onClick ? 'cursor-pointer hover:border-purple-500/50' : '';
+  const ring = active ? (urgent ? 'ring-2 ring-red-500/60' : 'ring-2 ring-purple-500/60') : '';
+  const content = (
+    <>
       <div className={urgent ? 'text-2xl font-bold text-red-300' : 'text-2xl font-bold text-purple-300'}>{value}</div>
       <div className={urgent ? 'text-xs uppercase tracking-wider text-red-300 mt-2' : 'text-xs uppercase tracking-wider text-slate-500 mt-2'}>{label}</div>
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${base} ${interactive} ${ring} w-full`} aria-pressed={active}>
+        {content}
+      </button>
+    );
+  }
+  return <div className={base}>{content}</div>;
 }
