@@ -160,7 +160,7 @@ export default function ShareButton({
         <button
           onClick={handleShare}
           disabled={loading}
-          className={`flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-purple-400 transition-colors disabled:opacity-50 ${className}`}
+          className={className || `flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-purple-400 transition-colors disabled:opacity-50`}
         >
           {buttonContent()}
           <span>Share</span>

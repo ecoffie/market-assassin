@@ -12,6 +12,7 @@ import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
 import { MindyInsightCard } from '../MindyInsightCard';
 import { getNaics } from '@/lib/codes/lookup';
+import ShareButton from '@/components/briefings/ShareButton';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -1359,6 +1360,28 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               </button>
                             );
                           })()}
+                            {/* Share — the viral loop (lost in the beta→new
+                                migration). Users send opps to partners/
+                                teammates/friends; the public /shared/opp page
+                                pulls them in. Eric 2026-06-05. */}
+                            {email && (
+                              <div className="inline-flex w-full" onClick={(e) => e.stopPropagation()}>
+                                <ShareButton
+                                  variant="small"
+                                  email={email}
+                                  className="inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded bg-slate-800 px-2.5 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white sm:px-3 md:min-h-0 md:py-1.5"
+                                  opportunity={{
+                                    id: getStableNoticeId(item),
+                                    title: item.title,
+                                    agency: item.subtitle,
+                                    notice_type: item.noticeType,
+                                    deadline: item.deadline,
+                                    description: item.description,
+                                    link: item.actionUrl,
+                                  }}
+                                />
+                              </div>
+                            )}
                             <button
                               type="button"
                               onClick={(event) => {
