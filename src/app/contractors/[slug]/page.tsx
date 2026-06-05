@@ -18,6 +18,7 @@
  *   - Rest → ISR on first request, revalidate every 7 days
  */
 import type { Metadata } from 'next';
+import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -195,6 +196,7 @@ export default async function ContractorPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      <MeetMindyStrip variant="banner" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

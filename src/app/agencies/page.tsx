@@ -12,6 +12,7 @@
  * mapping rules.
  */
 import type { Metadata } from 'next';
+import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
 import {
   AGENCIES_SEO,
@@ -100,6 +101,7 @@ export default function AgenciesIndexPage() {
 
   return (
     <main className="min-h-screen bg-slate-950">
+      <MeetMindyStrip variant="banner" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

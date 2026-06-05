@@ -20,6 +20,7 @@
  * (matches the contractor page TTL).
  */
 import type { Metadata } from 'next';
+import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
 import contractorsData from '@/data/contractors.json';
 import {
@@ -152,6 +153,7 @@ export default function ContractorsIndexPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-200">
+      <MeetMindyStrip variant="banner" />
       <div className="mx-auto max-w-6xl px-6 py-12">
         {/* Hero */}
         <header className="mb-10">
