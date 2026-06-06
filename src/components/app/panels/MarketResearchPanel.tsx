@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
 import {
   BarChart, Bar,
   PieChart, Pie, Cell,
@@ -3404,6 +3404,27 @@ function AgencyTable({
   // the user clicks Add / Remove inside the drawer.
   const [savedTargets, setSavedTargets] = useState<Record<string, string>>({});
 
+  // Office drill-down (Eric: break out USACE/NAVFAC). Expand an agency row to
+  // see its real buying offices for this NAICS (BQ awards data).
+  const [expandedOffices, setExpandedOffices] = useState<Record<string, { loading: boolean; offices: Array<{ name: string; total: number; awards: number }> }>>({});
+  const toggleOffices = useCallback(async (row: AgencyTableRow) => {
+    const key = row.id;
+    const ag = row.subAgency || row.parentAgency || row.name;
+    setExpandedOffices(prev => {
+      if (prev[key]) { const n = { ...prev }; delete n[key]; return n; } // collapse
+      return { ...prev, [key]: { loading: true, offices: [] } };
+    });
+    // only fetch when expanding (not when collapsing)
+    if (expandedOffices[key]) return;
+    try {
+      const res = await fetch(`/api/app/agency-offices?email=${encodeURIComponent(email || '')}&agency=${encodeURIComponent(ag)}&naics=${encodeURIComponent(naicsCode)}`, { headers: getMIApiHeaders(email) });
+      const d = await res.json();
+      setExpandedOffices(prev => ({ ...prev, [key]: { loading: false, offices: d.offices || [] } }));
+    } catch {
+      setExpandedOffices(prev => ({ ...prev, [key]: { loading: false, offices: [] } }));
+    }
+  }, [email, naicsCode, expandedOffices]);
+
   // Report the distinct PARENT AGENCIES of starred rows up to the
   // parent, so report generation can scope to the user's selection.
   // Keyed lookup matches how savedTargets is keyed (office || name).
@@ -4132,22 +4153,23 @@ function AgencyTable({
             </thead>
             <tbody className="text-slate-300">
               {visibleRows.map(row => (
+                <Fragment key={row.id}>
                 <tr
-                  key={row.id}
                   onClick={() => setSelectedRow(row)}
                   className="border-t border-slate-800/60 hover:bg-slate-800/30 cursor-pointer"
                 >
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-1.5">
-                      {/* Slice 3B — ★ when this office is in the
-                          user's saved target list. Tiny but high-
-                          signal: lets users scan their list at a
-                          glance while browsing. */}
+                      {/* Office drill-down toggle — surfaces NAVFAC/USACE etc. */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleOffices(row); }}
+                        className="text-slate-500 hover:text-emerald-400 text-xs w-4 shrink-0"
+                        title="Show contracting offices in your NAICS"
+                      >
+                        {expandedOffices[row.id] ? '▾' : '▸'}
+                      </button>
                       {savedTargets[row.contractingOffice || row.name] && (
-                        <span
-                          className="text-amber-400 text-xs"
-                          title="In your target list"
-                        >★</span>
+                        <span className="text-amber-400 text-xs" title="In your target list">★</span>
                       )}
                       <div className="font-medium text-slate-200">{row.contractingOffice || row.name}</div>
                     </div>
@@ -4191,6 +4213,29 @@ function AgencyTable({
                   </td>
                   <td className="px-4 py-2 text-slate-400 text-xs">{row.location}</td>
                 </tr>
+                {/* Office drill-down rows — NAVFAC/USACE etc. for this NAICS. */}
+                {expandedOffices[row.id] && (
+                  <tr className="bg-slate-950/40">
+                    <td colSpan={20} className="px-4 py-2">
+                      {expandedOffices[row.id].loading ? (
+                        <span className="text-xs text-slate-500">Loading contracting offices…</span>
+                      ) : expandedOffices[row.id].offices.length === 0 ? (
+                        <span className="text-xs text-slate-500">No office-level data for this NAICS.</span>
+                      ) : (
+                        <div className="space-y-1 pl-6">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Contracting offices in NAICS {naicsCode}</div>
+                          {expandedOffices[row.id].offices.map((o, i) => (
+                            <div key={i} className="flex items-center justify-between gap-3 text-xs">
+                              <span className="text-slate-300 truncate">🏛 {o.name}</span>
+                              <span className="text-slate-400 shrink-0">{formatRowCurrency(o.total)} · {o.awards.toLocaleString()} awards</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>

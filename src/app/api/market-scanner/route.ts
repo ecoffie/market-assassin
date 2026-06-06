@@ -199,18 +199,21 @@ async function getWhoIsBuying(naics: string, states: string[]): Promise<MarketSc
       }));
     }
 
+    // ACCURATE "WHO is buying?" ranking — use spending_by_CATEGORY (true
+    // aggregate per agency), NOT spending_by_award limited to the top 100 awards
+    // (which under-counts big-but-low-individual-award buyers and over-weights
+    // a few mega-contracts). Same source as the FPDS leaderboard. (Eric 2026-06)
     const response = await fetch(
-      'https://api.usaspending.gov/api/v2/search/spending_by_award/',
+      'https://api.usaspending.gov/api/v2/search/spending_by_category',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          category: 'awarding_subagency',
           filters,
-          fields: ['Awarding Agency', 'Awarding Sub Agency', 'Award Amount'],
+          subawards: false,
+          limit: 10,
           page: 1,
-          limit: 100,
-          order: 'desc',
-          sort: 'Award Amount',
         }),
         signal: AbortSignal.timeout(30000),
       }
@@ -221,31 +224,11 @@ async function getWhoIsBuying(naics: string, states: string[]): Promise<MarketSc
     }
 
     const data = await response.json();
-    const awards = data.results || [];
+    const results = (data.results || []) as Array<{ name: string; amount: number }>;
+    const totalSpend = results.reduce((s, r) => s + (r.amount || 0), 0);
 
-    // Aggregate by agency
-    const agencyMap = new Map<string, { spending: number; department: string }>();
-    let totalSpend = 0;
-
-    for (const award of awards) {
-      const agency = award['Awarding Agency'] || 'Unknown';
-      const department = award['Awarding Sub Agency'] || agency;
-      const amount = award['Award Amount'] || 0;
-
-      totalSpend += amount;
-
-      const existing = agencyMap.get(agency) || { spending: 0, department };
-      existing.spending += amount;
-      agencyMap.set(agency, existing);
-    }
-
-    // Convert to array and sort
-    const agencies: AgencyBuyer[] = Array.from(agencyMap.entries())
-      .map(([name, data]) => ({
-        name,
-        annualSpend: data.spending,
-        department: data.department,
-      }))
+    const agencies: AgencyBuyer[] = results
+      .map((r) => ({ name: r.name || 'Unknown', annualSpend: r.amount || 0, department: r.name || 'Unknown' }))
       .sort((a, b) => b.annualSpend - a.annualSpend)
       .slice(0, 10);
 

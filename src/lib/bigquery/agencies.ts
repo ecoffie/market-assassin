@@ -114,6 +114,42 @@ export async function getOfficesForAgency(agencyName: string, limit = 100): Prom
   });
 }
 
+/**
+ * Contracting OFFICES under a (sub)agency for a specific NAICS — the office-level
+ * drill-down that surfaces the real buying offices (NAVFAC Mid-Atlantic, USACE
+ * districts) hidden inside "Department of the Navy/Army" (Eric: break out USACE/
+ * NAVFAC as their own rows). Queries the raw awards table because the office
+ * rollup isn't NAICS-keyed. ~GB scan per (agency,naics) cold; cached.
+ */
+export async function getOfficesForAgencyNaics(
+  subAgencyName: string,
+  naicsPrefix: string,
+  limit = 12,
+): Promise<AgencyOfficeRow[]> {
+  const needle = (subAgencyName || '').trim().toLowerCase();
+  const prefix = (naicsPrefix || '').replace(/[^0-9]/g, '');
+  if (!needle || !prefix) return [];
+  const STOP = new Set(['department', 'of', 'the', 'and', 'for', 'u.s.', 'us', 'office']);
+  const key = needle.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).sort((a, b) => b.length - a.length)[0] || needle;
+  return queryCached<AgencyOfficeRow>({
+    cacheKey: `agency-offices-naics:${key}:${prefix}:${limit}:v1`,
+    query: `
+      SELECT awarding_office, awarding_office_code,
+             SUM(obligation_amount) AS total_amount,
+             COUNT(*) AS award_count
+      FROM ${BQ_TABLES.awards}
+      WHERE naics_code LIKE @prefix
+        AND LOWER(awarding_sub_agency) LIKE @needle
+        AND awarding_office IS NOT NULL
+        AND obligation_amount > 0
+      GROUP BY awarding_office, awarding_office_code
+      ORDER BY total_amount DESC
+      LIMIT @limit
+    `,
+    params: { needle: `%${key}%`, prefix: `${prefix}%`, limit },
+  });
+}
+
 export interface AgencySatRow {
   awarding_agency: string;
   total_amount: number;
