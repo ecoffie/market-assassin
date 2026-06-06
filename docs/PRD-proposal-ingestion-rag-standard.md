@@ -19,6 +19,35 @@ build/advise on documents?"
 
 ---
 
+## QUALITY BAR — "perfect the proposal writer like Content Reaper" (Eric, 2026-06-06)
+
+The Content Reaper bar = output users judge you on. Hit ALL FOUR before QC:
+
+1. **Output quality (prose, no AI-tells, human voice).** Tight per-section
+   prompts; banned phrases (no "world-class/cutting-edge/leverage/robust
+   scalable"); humanization pass; varied framing (lenses) so drafts read like a
+   real capture writer, not GPT. *Status: partly in `lib/proposal/v2.ts`
+   (anti-pattern bans, lenses, humanizeProposalDraft) — AUDIT vs the Content
+   Reaper bar + close gaps.*
+2. **Volume / variety (multiple drafts/angles per click).** Like Content
+   Reaper's 30 posts — offer multiple section variants/angles to pick from, not
+   one take. *Status: lenses give per-generation variety; add explicit
+   "give me 3 versions" / regenerate-with-different-angle.*
+3. **Bulk / export workflow (.docx, packaging).** Clean .docx export, bulk-draft
+   all sections, assemble a submittable package. *Status: export + draft-all +
+   SOW.docx exist; verify the assembled package is submission-clean.*
+4. **Grounding accuracy (RFP + Vault).** Every claim traces to an RFP
+   requirement + the user's REAL Vault facts; zero fabricated past performance /
+   contract numbers. *Status: RAG-as-standard + Vault grounding shipped; verify
+   no-fabrication holds across a full proposal.*
+
+**Sequencing (Eric):** (1) finalize + perfect Proposal Assist to this bar →
+(2) final QC pass on Mindy → (3) THEN build the interactive product tour
+(`PRD-interactive-product-tour.md`, deliberately deferred so it teaches a STABLE
+proposal flow and the data-tour anchors don't churn).
+
+---
+
 ## 0. What ALREADY exists (don't rebuild — extend)
 
 - **RAG retrieval w/ doc_type filter:** `retrieveRagContext({ query, filters })`
