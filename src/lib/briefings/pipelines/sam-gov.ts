@@ -1002,28 +1002,39 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
     filteredQuery = filteredQuery.lte('posted_date', postedTo);
   }
 
+  // "WHAT" filter — NAICS, PSC, and KEYWORDS combined as a SINGLE OR clause.
+  // CRITICAL FIX (Eric, the "drone problem"): chaining separate .or() calls
+  // ANDs them in PostgREST, and keywords were never applied at all — so search
+  // was NAICS-only AND a drone opp filed under an unlisted NAICS was excluded
+  // even though "drone" is in its title. Now an opp matches if it's in the
+  // user's NAICS/PSC *OR* mentions their keywords (title/description). Keywords
+  // catch the misclassified / "they-call-it-something-else" opps across all the
+  // 70+ NAICS a term like "drone" or "environmental" spans.
+  const keywords = (params.keywords || []).filter(k => k && k.trim().length >= 3).slice(0, 15);
+  const whatClauses: string[] = [];
+
   if (naicsCodes.length > 0) {
     const prefixes = new Set<string>();
     for (const code of naicsCodes) {
       const prefix = code.slice(0, 3);
-      if (prefix.length === 3 && /^\d{3}$/.test(prefix)) {
-        prefixes.add(prefix);
-      }
+      if (prefix.length === 3 && /^\d{3}$/.test(prefix)) prefixes.add(prefix);
     }
-
-    const naicsFilters = Array.from(prefixes).map(prefix => `naics_code.like.${prefix}%`).join(',');
-    if (naicsFilters) {
-      filteredQuery = filteredQuery.or(naicsFilters);
-      console.log(`[SAM Cache] Using NAICS prefix filters: ${naicsFilters}`);
+    for (const prefix of prefixes) whatClauses.push(`naics_code.like.${prefix}%`);
+  }
+  if (pscCodes.length > 0) {
+    for (const psc of pscCodes) whatClauses.push(`psc_code.like.${psc}%`);
+  }
+  if (keywords.length > 0) {
+    // Escape commas/parens that would break PostgREST .or() syntax.
+    for (const kw of keywords) {
+      const safe = kw.trim().replace(/[(),]/g, ' ').replace(/\s+/g, ' ');
+      whatClauses.push(`title.ilike.%${safe}%`);
+      whatClauses.push(`description.ilike.%${safe}%`);
     }
   }
-
-  if (pscCodes.length > 0) {
-    const pscFilters = pscCodes.map(psc => `psc_code.like.${psc}%`).join(',');
-    if (pscFilters) {
-      filteredQuery = filteredQuery.or(pscFilters);
-      console.log(`[SAM Cache] Using PSC prefix filters: ${pscFilters}`);
-    }
+  if (whatClauses.length > 0) {
+    filteredQuery = filteredQuery.or(whatClauses.join(','));
+    console.log(`[SAM Cache] WHAT filter (NAICS OR PSC OR keywords): ${whatClauses.length} clauses, ${keywords.length} keywords`);
   }
 
   if (setAsides.length > 0) {
