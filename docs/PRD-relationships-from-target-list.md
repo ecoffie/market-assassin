@@ -5,9 +5,12 @@
 > a relationship attaches to a TARGET AGENCY (the long game), not a pursuit
 > (by the time you're pursuing, it's too late to build the relationship).
 
-**Status:** **v1 SHIPPED 2026-06-05.** Target List drives Decision Makers
-(⭐ My Targets default) + Relationships (🤝 Relationships at this agency entry +
-attach-to-AGENCY not pursuit). v2 (relationship stage, smarter suggestions) open.
+**Status:** **v1 + v2 SHIPPED 2026-06-05.** v1: Target List drives Decision
+Makers (⭐ My Targets) + Relationships (🤝 entry + attach-to-AGENCY). v2: My
+Network grouped by agency + relationship stages (prospect→warm→contacted→met→
+champion). ⚠️ v2 needs migration `20260605_relationships_v2.sql` hand-run in
+Supabase + `NOTIFY pgrst` (API degrades gracefully until then). Remaining v2:
+smarter per-agency partner suggestions; outreach-tracking tie-in.
 **Trigger:** Eric: "Relationships is a separate disconnected item. From My Target
 List I should click an agency and see ITS buyers / OSBP / partners. 'Attach to a
 pursuit' is backwards — you develop relationships BEFORE a pursuit, not after.
