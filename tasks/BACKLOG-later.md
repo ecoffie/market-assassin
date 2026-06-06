@@ -7,6 +7,30 @@
 
 ---
 
+## ✅ SHIPPED 2026-06-05 (this session — all deployed to getmindy.ai)
+
+**Proposal Assist Manual Drive (v1)** — Auto↔Manual·Sport toggle (top/Start-Here),
+`/api/app/proposal/chat` grounded in user's RFP+Vault, ProposalChat.tsx,
+Verify-on-SAM link. Loads ALL pursuit PDFs (was 1). PRD-proposal-manual-mode.
+
+**Target-List hub** (PRD-relationships-from-target-list, v1):
+- Decision Makers defaults to **⭐ My Targets** (user's target agencies).
+- Relationships: attach to **AGENCY not pursuit**; pursuit-attach optional.
+- My Target List row → **🤝 Relationships at this agency →** (pre-scoped).
+- Team Access moved **Pipeline → Account**.
+
+**QA bug fixes (from Eric's live walk-through):**
+- Today's Intel stat cards/tabs now scroll to results + show filter state.
+- Contractor award-history drawer uses BQ (BL Harbert → 11yrs/$11B, was empty).
+- Forecasts shows DoD early signals on the default "All agencies" view.
+- DoDAAC office names: stripped FPDS code prefixes (W7NC… → real names).
+- Decision Makers "Track" shows where it went (→ My Target List).
+
+**Growth/virality (earlier today):** Share button restored, share links →
+getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
+
+---
+
 ## ⏰ DEADLINE — June 19 (Juneteenth) work
 
 ### 0. Proposal Assist — Manual Drive (Perplexity-style proposal LLM)
