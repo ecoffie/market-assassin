@@ -70,3 +70,22 @@ keyword — they're CONTRACT VEHICLES, not response styles.
   on the grown corpus to lift the baseline.
 Fine-tune = house VOICE (stable, 2 models). RAG = situation KNOWLEDGE (grows
 forever). This is how Perplexity/Harvey-class products scale.
+
+## ⚠️ SAM is a biased sample — RAG is the GROWTH ENGINE, not a "long tail" (Eric)
+
+IDIQ task orders = the bulk of real per-unit spend, but competed OFF-SAM. Serious
+contractors bid in universes SAM never sees: National Labs (NREL + DOE labs),
+NECO, Unison/PIEE, GSA eBuy, state/local.
+
+**Voice fine-tunes TRANSFER across sources** — a technical volume reads the same
+for SAM, NREL, or a GSA task order. So the 2 fine-tunes stay correct.
+
+**RAG is how we onboard whole new solicitation universes** (not leftovers):
+- New source/type (NREL response, NECO format, GSA task order, state RFP, OTA,
+  `task_order_response`) → add winning examples to the corpus, tagged by type/
+  source. Instantly usable, no retraining.
+- `task_order_response` is its own corpus doc_type: shorter, vehicle-aware,
+  references the base IDIQ. Technical voice + corpus shape.
+
+The extraction layer is built SOURCE-PLUGGABLE (SAM = first adapter) so the same
+pipeline absorbs many sources over time. See PRD-proposal-extraction-compliance.

@@ -25,9 +25,36 @@ an independent evaluator so at minimum it's compliant."
   have 5+ docs, some 10+** — Eric's "10 documents" is real.
 - Attachments are stored as **bare download URLs** in `sam_opportunities.
   attachments` — NO filename, NO type, NO classification today.
-- RFQ/IDIQ/BPA/OTA are <1% by keyword — they're CONTRACT VEHICLES, not response
-  styles. Confirms the model strategy: **2 fine-tunes (LOI + technical) + RAG for
-  the long tail**, not a model per vehicle.
+
+## 0b. ⚠️ SAM IS A BIASED SAMPLE — build SOURCE-AGNOSTIC from day one (Eric)
+
+The SAM numbers above UNDERCOUNT reality. **IDIQ task orders are the bulk of
+real per-unit contract spending — but they're competed OFF-SAM** (inside the
+vehicle, via agency portals). And serious contractors bid in whole universes SAM
+never sees:
+- **National Labs** (NREL + ~17 DOE labs: Sandia, Oak Ridge, Argonne…) — each
+  its own procurement portal
+- **NECO** (Navy Electronic Commerce Online), **Unison/PIEE/FedConnect**
+- **GSA eBuy** (task orders against Schedules)
+- **State/local** procurement systems
+
+**Implication for the build:**
+- **Voice fine-tunes TRANSFER** — a technical volume reads the same for SAM,
+  NREL, or a GSA task order. The 2 fine-tunes (LOI + technical) are source-
+  agnostic; keep them.
+- **RAG is the GROWTH ENGINE, not a long tail.** It's how we onboard entire new
+  solicitation universes (NREL, NECO, GSA eBuy, state) — add winning responses
+  to the corpus, instantly usable, no retraining.
+- **Extraction must be source-pluggable:** SAM is the FIRST adapter, not the
+  whole system. The doc-fetch + classify + manifest layer takes a solicitation
+  from ANY source (SAM API now; NECO/Unison/GSA/lab portals/state next) and
+  produces the same typed doc set downstream.
+- **Task-order responses = their own RAG `doc_type`** (`task_order_response`):
+  shorter, vehicle-aware, reference the base IDIQ. Technical voice still applies;
+  the corpus teaches the task-order shape.
+
+So model strategy stands (**2 fine-tunes + RAG**), but the data layer is built to
+absorb many sources, not SAM-only.
 
 ---
 
@@ -48,9 +75,14 @@ extracts text, upserts `pursuit_documents`. What's MISSING:
 
 ## 2. Build — three connected pieces
 
-### A. Complete extraction + classification
-- **Capture filename + mime** for every attachment (pull SAM resource metadata,
-  not just the download URL).
+### A. Complete extraction + classification — SOURCE-PLUGGABLE
+- **Adapter pattern (source-agnostic):** a `SolicitationSource` interface =
+  `{ listAttachments(noticeRef) → {url, filename, mime}[] }`. SAM is the first
+  adapter (`SamSource`); NECO / Unison / GSA eBuy / lab portals / state are
+  future adapters implementing the SAME interface. Everything downstream
+  (download → extract → classify → manifest) is source-independent.
+- **Capture filename + mime** for every attachment (SAM gives a filename in the
+  resource metadata we're not keeping — pull it). Classification needs it.
 - **Get ALL of them** (today's auto-load already loads all extracted docs — keep
   that; just enrich with type).
 - **Classify each doc** by filename + first-page content into:
@@ -58,8 +90,8 @@ extracts text, upserts `pursuit_documents`. What's MISSING:
   (DBA/SCA wage determination), `qa` (questions & answers), `amendment`,
   `instructions` (Section L), `eval_factors` (Section M), `attachment_other`.
   Heuristic (filename + heading patterns) first; an LLM classifier for the
-  ambiguous ones.
-- Store the type on `pursuit_documents.doc_kind`.
+  ambiguous ones. Classification is source-independent (works on any PDF).
+- Store the type + source on `pursuit_documents.doc_kind` + `doc_source`.
 
 ### B. Route + disseminate (right file → right person)
 - A **doc manifest** view in Proposal Assist: every attachment, its type, size,
