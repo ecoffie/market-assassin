@@ -3,6 +3,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'node:crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -134,15 +135,40 @@ async function extractChunk(apiKey: string, fileName: string | undefined, chunk:
  * requirements from each, then merge: a later amendment that revises a base
  * requirement WINS and is flagged `revised`. Returns the current, accurate set.
  */
-async function extractMultiDoc(apiKey: string, pipelineId: string, email: string): Promise<{ requirements: ComplianceRequirement[]; sources: string[] } | null> {
+async function extractMultiDoc(apiKey: string, pipelineId: string, email: string): Promise<{ requirements: ComplianceRequirement[]; sources: string[]; cached?: boolean } | null> {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data: docs } = await supabase
     .from('pursuit_documents')
-    .select('filename, doc_kind, extracted_text, downloaded_at')
+    .select('filename, doc_kind, extracted_text, downloaded_at, notice_id, doc_source')
     .eq('pipeline_id', pipelineId)
     .in('doc_kind', ['solicitation', 'qa', 'amendment', 'instructions', 'eval_factors', 'sow_pws'])
     .not('extracted_text', 'is', null);
   if (!docs || docs.length === 0) return null;
+
+  // SHARED CACHE (Eric: scaling — the matrix for a PUBLIC SAM notice is identical
+  // for every user bidding it; extract once, serve all). Only cache when the
+  // docs are public SAM attachments (a user's OWN uploads stay private). Key on
+  // a content hash of the doc set so an amendment landing → new docs → new hash
+  // → re-extract automatically.
+  const noticeId = docs.find(d => d.notice_id)?.notice_id || '';
+  const allPublic = docs.every(d => d.doc_source === 'sam_public');
+  const sig = docs.map(d => `${d.filename}:${(d.extracted_text || '').length}`).sort().join('|');
+  const contentHash = noticeId && allPublic
+    ? crypto.createHash('sha256').update(`${noticeId}::${sig}`).digest('hex')
+    : null;
+
+  if (contentHash) {
+    const { data: hit } = await supabase
+      .from('compliance_matrix_cache')
+      .select('requirements, doc_sources, hits')
+      .eq('content_hash', contentHash)
+      .maybeSingle();
+    if (hit?.requirements) {
+      // count the hit (fire-and-forget) and serve instantly — ~0 tokens.
+      supabase.from('compliance_matrix_cache').update({ hits: (hit.hits || 0) + 1 }).eq('content_hash', contentHash).then(() => {});
+      return { requirements: hit.requirements as ComplianceRequirement[], sources: (hit.doc_sources as string[]) || [], cached: true };
+    }
+  }
 
   // Order: base/scope first, amendments LAST (so they override) by amd number.
   const amdNum = (fn: string) => parseInt((fn.match(/amd[_ -]?(\d+)/i)?.[1]) || '0', 10);
@@ -176,6 +202,19 @@ async function extractMultiDoc(apiKey: string, pipelineId: string, email: string
     }
   }
   const requirements = Array.from(map.values()).map((r, i) => ({ ...r, id: `REQ-${String(i + 1).padStart(3, '0')}` }));
+  // Store in the shared cache so the next user bidding this notice is instant +
+  // free (only for public SAM doc sets).
+  if (contentHash && requirements.length > 0) {
+    supabase.from('compliance_matrix_cache').upsert({
+      content_hash: contentHash,
+      notice_id: noticeId,
+      requirements,
+      doc_sources: sources,
+      req_count: requirements.length,
+      model: GROQ_MODEL,
+    }, { onConflict: 'content_hash' }).then(() => {}, () => {});
+  }
+
   return { requirements, sources };
 }
 
@@ -208,7 +247,7 @@ export async function POST(request: NextRequest) {
   // pipeline_id is sent, extract from base solicitation + AMENDMENTS + Q&A, and
   // merge with AMENDMENT PRECEDENCE (later amendments win; flag what changed).
   let sourceText = (body.text || '').trim();
-  let multiDocResult: { requirements: ComplianceRequirement[]; sources: string[] } | null = null;
+  let multiDocResult: { requirements: ComplianceRequirement[]; sources: string[]; cached?: boolean } | null = null;
   if (body.pipeline_id && email) {
     multiDocResult = await extractMultiDoc(apiKey, body.pipeline_id, email);
   }
@@ -285,6 +324,8 @@ export async function POST(request: NextRequest) {
         truncated: wasTruncated,
         originalChars: sourceText.length,
         count: requirements.length,
+        sources: multiDocResult?.sources,
+        cached: multiDocResult?.cached || false,
       },
     });
   } catch (err) {
