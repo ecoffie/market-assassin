@@ -5,7 +5,9 @@
 > a relationship attaches to a TARGET AGENCY (the long game), not a pursuit
 > (by the time you're pursuing, it's too late to build the relationship).
 
-**Status:** Draft / scoping — 2026-06-05. Build next (focused effort).
+**Status:** **v1 SHIPPED 2026-06-05.** Target List drives Decision Makers
+(⭐ My Targets default) + Relationships (🤝 Relationships at this agency entry +
+attach-to-AGENCY not pursuit). v2 (relationship stage, smarter suggestions) open.
 **Trigger:** Eric: "Relationships is a separate disconnected item. From My Target
 List I should click an agency and see ITS buyers / OSBP / partners. 'Attach to a
 pursuit' is backwards — you develop relationships BEFORE a pursuit, not after.
