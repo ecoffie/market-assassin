@@ -15,7 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getOfficesForAgency } from '@/lib/bigquery/agencies';
 import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
-import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
+import { decodeDodaac, expandOfficeName } from '@/lib/gov-contacts/dodaac';
 import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
 
 export const dynamic = 'force-dynamic';
@@ -197,10 +197,13 @@ export async function GET(request: NextRequest) {
     // OFFICE (N00104 = NAVSUP WSS), fiscal year, and instrument type. This is
     // the office-level granularity SAM doesn't store (Eric 2026-06-05).
     const dod = decodeDodaac(r.solicitation_number);
-    // Name resolution order: directory table > in-code map > raw code.
-    const officeName = dod?.dodaac
+    // Name resolution order: directory table > in-code map > raw code, then
+    // expand terse military abbreviations ("87 CONS PK" → "87 Contracting
+    // Squadron") so it reads like a name.
+    const rawOffice = dod?.dodaac
       ? (dodaacNames.get(dod.dodaac) || dod.officeName || dod.dodaac)
       : null;
+    const officeName = rawOffice ? expandOfficeName(rawOffice) : null;
     return {
       ...r,
       ...normalizeTitle(r.contact_title),

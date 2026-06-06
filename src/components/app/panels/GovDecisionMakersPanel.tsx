@@ -258,6 +258,20 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       {trackNote && <div className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-lg text-sm">{trackNote}</div>}
 
       {/* Results table */}
+      {/* Count at the TOP (Eric: so people see how many names are in the DB
+          under their target agencies before scrolling). Scope-aware. */}
+      {!loading && visibleContacts.length > 0 && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-300">
+            <b className="text-white">{scope === 'targets' && !agency ? visibleContacts.length.toLocaleString() : total.toLocaleString()}</b>
+            {scope === 'targets' && !agency
+              ? <> contacts across your <b className="text-emerald-400">{targetAgencies.length} target agencies</b></>
+              : <> contacts{agency ? ` at ${agency}` : ' in the directory'}</>}
+          </span>
+          {total > visibleContacts.length && <span className="text-xs text-slate-500">showing {visibleContacts.length}</span>}
+        </div>
+      )}
+
       {!loading && visibleContacts.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
