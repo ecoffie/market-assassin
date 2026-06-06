@@ -113,9 +113,11 @@ export async function sendEmail({
   tags,
   metadata,
 }: SendEmailParams): Promise<boolean> {
-  // Use alerts@govcongiants.com (verified in Resend)
-  const fromEmail = process.env.EMAIL_FROM || 'alerts@govcongiants.com';
-  const fromName = process.env.MINDY_FROM_NAME || "Mindy";
+  // FROM = the VERIFIED Mindy domain. mail.getmindy.ai is verified in Resend;
+  // govcongiants.com shows "failed" (Eric: weekly deep dive should be a Mindy
+  // email — and the old domain wasn't even verifying). Override via EMAIL_FROM.
+  const fromEmail = process.env.EMAIL_FROM || 'mindy@mail.getmindy.ai';
+  const fromName = process.env.MINDY_FROM_NAME || 'Mindy';
   const fromAddress = from || `${fromName} <${fromEmail}>`;
 
   // Try Resend first (primary)
