@@ -99,7 +99,29 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
   const [error, setError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  // Target-List-driven (Eric: Relationships should flow FROM My Target List,
+  // and a relationship attaches to a target AGENCY — built BEFORE a pursuit,
+  // not after). Load the user's target agencies; default discovery to them;
+  // saving attaches to an agency, not a pursuit.
+  const [targetAgencies, setTargetAgencies] = useState<string[]>([]);
+  const [attachAgency, setAttachAgency] = useState('');
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
+
+  useEffect(() => {
+    if (!email) return;
+    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+      .then(r => r.json())
+      .then(d => {
+        const ags = Array.from(new Set(((d?.targets || []) as Array<{ agency_name?: string }>)
+          .map(t => (t.agency_name || '').trim()).filter(Boolean)));
+        setTargetAgencies(ags);
+        if (ags.length > 0) {
+          setAttachAgency(ags[0]);          // default attach target = first target agency
+          setAgencyFilter(prev => prev || ags[0]); // scope discovery to a target agency
+        }
+      })
+      .catch(() => {});
+  }, [email]);
 
   // Stats computed from saved contacts
   const stats = useMemo(() => {
@@ -254,6 +276,9 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
           phone: contact.phone,
           organization: contact.organization,
           agency: contact.agency,
+          // Attach to the chosen TARGET AGENCY (the long-game BD relationship),
+          // not a pursuit. Falls back to the contact's own agency.
+          target_agency: (attachAgency && attachAgency !== '__other__') ? attachAgency : contact.agency,
           office: contact.office,
           sub_tier: contact.sub_tier,
           source: contact.source,
@@ -499,23 +524,41 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
           </button>
         </div>
 
+        {/* Attach to a TARGET AGENCY, not a pursuit (Eric: relationships are
+            built BEFORE pursuing). The relationship lives with the agency in
+            your Target List; pursuit-attach is optional + secondary. */}
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-slate-500">
-            {activeTab === 'network' ? 'Attach saved contacts to:' : 'Save + attach to:'}
+            {activeTab === 'network' ? 'These contacts belong to:' : 'Save to agency:'}
           </span>
-          <select
-            value={selectedPursuit}
-            onChange={(event) => setSelectedPursuit(event.target.value)}
-            className="min-w-[260px] px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white outline-none focus:border-emerald-500"
-          >
-            <option value="">Choose a pursuit...</option>
-            {pursuits.map(pursuit => (
-              <option key={pursuit.id} value={pursuit.id}>
-                {pursuit.title.slice(0, 70)}{pursuit.title.length > 70 ? '...' : ''}
-              </option>
-            ))}
-          </select>
-          {pursuits.length === 0 && <span className="text-xs text-slate-500">Track an opportunity first to attach contacts.</span>}
+          {targetAgencies.length > 0 ? (
+            <select
+              value={attachAgency}
+              onChange={(event) => setAttachAgency(event.target.value)}
+              className="min-w-[260px] px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white outline-none focus:border-emerald-500"
+            >
+              {targetAgencies.map(a => <option key={a} value={a}>{a}</option>)}
+              <option value="__other__">Other agency…</option>
+            </select>
+          ) : (
+            <span className="text-xs text-slate-500">Add agencies to <b>My Target List</b> first — relationships are built per target agency.</span>
+          )}
+          {/* Optional: also link to a pursuit (late-stage teaming). */}
+          {pursuits.length > 0 && (
+            <details className="text-xs text-slate-500">
+              <summary className="cursor-pointer hover:text-slate-300">also link a pursuit (optional)</summary>
+              <select
+                value={selectedPursuit}
+                onChange={(event) => setSelectedPursuit(event.target.value)}
+                className="mt-1 min-w-[220px] px-2 py-1.5 rounded bg-slate-800 border border-slate-700 text-white text-xs outline-none"
+              >
+                <option value="">No pursuit</option>
+                {pursuits.map(pursuit => (
+                  <option key={pursuit.id} value={pursuit.id}>{pursuit.title.slice(0, 60)}</option>
+                ))}
+              </select>
+            </details>
+          )}
         </div>
       </div>
 
@@ -588,13 +631,19 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
 
                 <div className="flex flex-wrap xl:flex-col items-stretch gap-2 shrink-0">
                   {activeTab === 'network' ? (
-                    <button
-                      onClick={() => attachContact(contact.id)}
-                      disabled={!selectedPursuit || savingId === contact.id}
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium"
-                    >
-                      {savingId === contact.id ? 'Attaching...' : 'Attach to Pursuit'}
-                    </button>
+                    // Optional pursuit-attach only when a pursuit is chosen
+                    // (relationships belong to agencies now, not pursuits).
+                    selectedPursuit ? (
+                      <button
+                        onClick={() => attachContact(contact.id)}
+                        disabled={savingId === contact.id}
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium"
+                      >
+                        {savingId === contact.id ? 'Attaching...' : 'Attach to Pursuit'}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-500 px-2">In your network{contact.agency ? ` · ${contact.agency}` : ''}</span>
+                    )
                   ) : (
                     <button
                       onClick={() => saveContact(contact)}
