@@ -4,6 +4,7 @@ import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'node:crypto';
+import { callLLM } from '@/lib/llm/call-llm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -96,37 +97,26 @@ Phrase each as the CURRENT requirement (e.g. "Submit offers by the revised closi
 Return ONLY JSON {"requirements":[{"id","requirement","category","section"}]} category in submission|evaluation|technical|past_performance|pricing|admin|other. Skip the SF30 boilerplate (copies, acknowledgment instructions). If the amendment makes no substantive change, return an empty array.`;
 
 /** Extract requirements from ONE chunk. Uses the amendment/Q&A prompt when
- *  isChange. 70B first; fall back to 8B on rate-limit/too-large. */
-async function extractChunk(apiKey: string, fileName: string | undefined, chunk: string, isChange = false): Promise<ComplianceRequirement[] | null> {
+ *  isChange. PROVIDER-AGNOSTIC via callLLM: Groq 70B → 8B → Claude → OpenAI →
+ *  Grok, so a throttle on any one provider (Eric: Groq's paid tier is closed)
+ *  falls through to the next instead of returning an empty matrix. */
+async function extractChunk(_apiKey: string, fileName: string | undefined, chunk: string, isChange = false): Promise<ComplianceRequirement[] | null> {
   const prompt = isChange ? AMENDMENT_PROMPT : SYSTEM_PROMPT;
-  const call = async (model: string) => fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: prompt },
-        { role: 'user', content: `${isChange ? 'Amendment/Q&A' : 'Solicitation'}: ${fileName || 'untitled'}\n\n--- SOURCE TEXT ---\n${chunk}` },
-      ],
-      temperature: 0.2,
-      max_tokens: 4000,
-      response_format: { type: 'json_object' },
-    }),
-  });
-
-  let res = await call(GROQ_MODEL);
-  // 429 (rate limit) OR 413/400 "request too large" → fall back to 8B.
-  if ((res.status === 429 || res.status === 413 || res.status === 400) && GROQ_MODEL !== GROQ_MODEL_FALLBACK) {
-    res = await call(GROQ_MODEL_FALLBACK);
-  }
-  if (!res.ok) { console.warn('[compliance] chunk failed:', res.status); return null; }
-  const j = await res.json();
-  const raw = j.choices?.[0]?.message?.content || '';
   try {
+    const { text: raw } = await callLLM({
+      system: prompt,
+      user: `${isChange ? 'Amendment/Q&A' : 'Solicitation'}: ${fileName || 'untitled'}\n\n--- SOURCE TEXT ---\n${chunk}`,
+      json: true,
+      maxTokens: 4000,
+      temperature: 0.2,
+    });
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(cleaned);
     return Array.isArray(parsed.requirements) ? parsed.requirements : [];
-  } catch { return []; }
+  } catch (err) {
+    console.warn('[compliance] chunk failed (all providers):', err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /**
@@ -234,8 +224,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
+  // Any one provider key is enough — callLLM falls through the chain.
+  const apiKey = process.env.GROQ_API_KEY || '';
+  if (!process.env.GROQ_API_KEY && !process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.GROK_API_KEY) {
     return NextResponse.json(
       { success: false, error: 'AI service not configured' },
       { status: 500 }
