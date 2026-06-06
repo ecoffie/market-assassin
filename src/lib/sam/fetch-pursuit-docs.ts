@@ -23,6 +23,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from './utils';
 import { extractPdf, extractDocx, extractTxt } from './pdf-extract';
+import { classifyDoc } from '@/lib/proposal/classify-doc';
 
 const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_FILE_URL_PREFIX = 'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/';
@@ -615,27 +616,43 @@ export async function fetchPursuitDocs(opts: {
         console.warn(`[fetch-pursuit-docs] storage upload ${ref.fileId} threw:`, err);
       }
 
+      // Classify the doc (SOW / pricing / wage det / amendment / …) so Proposal
+      // Assist can separate + route it. Source-agnostic; runs on filename + text.
+      const cls = classifyDoc(ref.filename, extractedText);
+
       // Upsert metadata row
-      const { error: insertErr } = await supabase
+      const docRow = {
+        pipeline_id: pipelineId,
+        user_email: userEmail,
+        sam_file_id: ref.fileId,
+        sam_url: ref.url,
+        notice_id: noticeId,
+        filename: ref.filename,
+        mime_type: dl.mime,
+        size_bytes: dl.size,
+        storage_path: finalStoragePath,
+        extracted_text: extractedText || null,
+        page_count: pageCount,
+        char_count: extractedText.length,
+        doc_source: 'sam_public',  // a public SAM attachment — safe to dedup
+        doc_kind: cls.kind,
+        doc_kind_confidence: cls.confidence,
+        downloaded_at: new Date().toISOString(),
+        extracted_at: extractionError ? null : new Date().toISOString(),
+        extraction_error: extractionError,
+      };
+      let { error: insertErr } = await supabase
         .from('pursuit_documents')
-        .upsert({
-          pipeline_id: pipelineId,
-          user_email: userEmail,
-          sam_file_id: ref.fileId,
-          sam_url: ref.url,
-          notice_id: noticeId,
-          filename: ref.filename,
-          mime_type: dl.mime,
-          size_bytes: dl.size,
-          storage_path: finalStoragePath,
-          extracted_text: extractedText || null,
-          page_count: pageCount,
-          char_count: extractedText.length,
-          doc_source: 'sam_public',  // a public SAM attachment — safe to dedup
-          downloaded_at: new Date().toISOString(),
-          extracted_at: extractionError ? null : new Date().toISOString(),
-          extraction_error: extractionError,
-        }, { onConflict: 'pipeline_id,sam_file_id' });
+        .upsert(docRow, { onConflict: 'pipeline_id,sam_file_id' });
+
+      // Pre-migration: doc_kind columns may not exist → retry without them.
+      if (insertErr && /doc_kind|column|schema cache/.test(insertErr.message || '')) {
+        const { doc_kind: _k, doc_kind_confidence: _c, ...base } = docRow;
+        void _k; void _c;
+        ({ error: insertErr } = await supabase
+          .from('pursuit_documents')
+          .upsert(base, { onConflict: 'pipeline_id,sam_file_id' }));
+      }
 
       if (insertErr) {
         console.warn(`[fetch-pursuit-docs] upsert ${ref.fileId} failed:`, insertErr);
