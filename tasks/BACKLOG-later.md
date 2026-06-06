@@ -85,6 +85,23 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 ## 🔴 P0 — Big features with a PRD, ready to build
 
+### 1z. Coach Mode (APEX Accelerators) — strategic
+- **What:** one counselor manages MANY client businesses — client switcher +
+  per-client pipeline/vault/profile + an "APEX Tab" (cross-client deadlines/
+  alerts/news). Knowledge Base = the APEX "Workbench". From the APEX Illinois
+  proposal ("designed, never built").
+- **Key insight:** ~80% of the proposal already exists in Mindy (CRM, pipeline,
+  market intel, teaming, events, proposal/compliance, Knowledge Base). Net-new =
+  multi-client switching + the APEX Tab. **Architecture: reuse WORKSPACES** —
+  each client = a workspace the coach belongs to (9+ routes already
+  workspace-scoped). Main eng surface = explicit active-workspace plumbing.
+- **v1:** client switcher + per-client operation + APEX Tab. **v2:** Slack/
+  Outlook/Drive integrations; branding; coach analytics.
+- **Risk:** cross-client data isolation must be airtight (workspace membership
+  gates every read/write).
+- **PRD:** `docs/PRD-coach-mode-apex.md` (open Qs: coach→client link, active-
+  workspace mechanism, APEX-news admin, billing model).
+
 ### 1a. Relationships driven by Target List — ✅ v1 + v2 SHIPPED
 - **Done:** entry from Target List, attach-to-agency, grouped My Network +
   relationship stages (see Shipped section). Migration run + verified.
