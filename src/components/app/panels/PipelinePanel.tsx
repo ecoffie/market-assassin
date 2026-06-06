@@ -130,6 +130,26 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   const [isSaving, setIsSaving] = useState(false);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
   const track = useAppTracker(email);
+
+  // Pursuit change/amendment alerts — unacknowledged changes per pursuit drive
+  // the "⚠️ Amendment" badge (Eric: notify me of changes to tracked pursuits).
+  const [pursuitChanges, setPursuitChanges] = useState<Record<string, Array<{ change_type: string; summary: string }>>>({});
+  useEffect(() => {
+    if (!email) return;
+    fetch(`/api/app/pursuit-changes?email=${encodeURIComponent(email)}`, { headers: getAuthHeaders() })
+      .then(r => r.json())
+      .then(d => { if (d.success) setPursuitChanges(d.byPursuit || {}); })
+      .catch(() => {});
+  }, [email, getAuthHeaders]);
+  const ackChanges = useCallback(async (pursuitId: string) => {
+    setPursuitChanges(prev => { const next = { ...prev }; delete next[pursuitId]; return next; });
+    try {
+      await fetch('/api/app/pursuit-changes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ email, pursuit_id: pursuitId }),
+      });
+    } catch { /* optimistic */ }
+  }, [email, getAuthHeaders]);
   const { showToast } = useToast();
 
   const loadPipeline = useCallback(async () => {
@@ -915,6 +935,15 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                     <div className="text-sm text-white font-medium line-clamp-2 mb-2">
                       {opp.title}
                     </div>
+                    {pursuitChanges[opp.id]?.length > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); ackChanges(opp.id); }}
+                        className="mb-2 inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/40 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/25"
+                        title={pursuitChanges[opp.id].map(c => c.summary).join('\n')}
+                      >
+                        ⚠️ {pursuitChanges[opp.id].length} change{pursuitChanges[opp.id].length === 1 ? '' : 's'}
+                      </button>
+                    )}
                     {opp.agency && (
                       <div className="text-xs text-slate-500 mb-1">
                         {opp.agency}
@@ -1104,6 +1133,15 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                           name (was truncating at 1 line / 300px). */}
                       <td className="px-4 py-3 max-w-[420px]">
                         <div className="text-sm text-white font-medium line-clamp-2" title={opp.title}>{opp.title}</div>
+                        {pursuitChanges[opp.id]?.length > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); ackChanges(opp.id); }}
+                            className="mt-1 inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/40 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/25"
+                            title={pursuitChanges[opp.id].map(c => c.summary).join('\n')}
+                          >
+                            ⚠️ {pursuitChanges[opp.id].length} change{pursuitChanges[opp.id].length === 1 ? '' : 's'} — {pursuitChanges[opp.id][0].summary.slice(0, 40)}
+                          </button>
+                        )}
                         <div className="flex items-center gap-2 mt-0.5">
                           {opp.notice_type && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300 shrink-0" title={opp.notice_type}>
