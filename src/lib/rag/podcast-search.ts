@@ -284,7 +284,7 @@ export function formatPodcastCardsForPrompt(cards: PodcastEpisodeCard[]): string
   if (cards.length === 0) return '';
   return cards
     .map((c) => {
-      const epLabel = c.episode_number ? `Episode ${c.episode_number}` : c.episode_title;
+      const epLabel = c.episode_title ? (c.episode_number ? `Ep ${c.episode_number}: ${c.episode_title}` : c.episode_title) : (c.episode_number ? `Episode ${c.episode_number}` : 'GovCon Giants Podcast');
       const guest = c.guest_name ? ` — ${c.guest_name}${c.guest_company ? ` (${c.guest_company})` : ''}` : '';
       const tags: string[] = [];
       if (c.business_type) tags.push(`type: ${c.business_type}`);

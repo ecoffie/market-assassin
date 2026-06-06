@@ -153,7 +153,11 @@ function chunksToCitations(chunks: RagChunkResult[]): CitedSource[] {
 
 function podcastCardsToCitations(cards: PodcastEpisodeCard[]): CitedSource[] {
   return cards.map(c => ({
-    title: c.episode_number ? `Episode ${c.episode_number}` : c.episode_title,
+    // Show the episode TITLE — far more useful to the listener than a bare
+    // number (Eric). Prefix the number for context when both exist.
+    title: c.episode_title
+      ? (c.episode_number ? `Ep ${c.episode_number}: ${c.episode_title}` : c.episode_title)
+      : (c.episode_number ? `Episode ${c.episode_number}` : 'GovCon Giants Podcast'),
     url: c.episode_url,
     doc_type: 'podcast_interview',
     source_path: c.episode_url,
