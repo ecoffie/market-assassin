@@ -463,65 +463,62 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
               : 'Contractors you can partner with for teaming arrangements.'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="rounded-lg bg-slate-800 px-4 py-2 text-center">
-            <div className="text-lg font-bold text-white">{stats.buyers}</div>
-            <div className="text-xs text-slate-500">Buyers</div>
-          </div>
-          <div className="rounded-lg bg-slate-800 px-4 py-2 text-center">
-            <div className="text-lg font-bold text-white">{stats.partners}</div>
-            <div className="text-xs text-slate-500">Partners</div>
-          </div>
-          <div className="rounded-lg bg-slate-800 px-4 py-2 text-center">
-            <div className="text-lg font-bold text-emerald-400">{stats.attached}</div>
-            <div className="text-xs text-slate-500">Linked</div>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">In your network</div>
+          <div className="flex flex-wrap gap-3">
+            <div className="rounded-lg bg-slate-800 px-4 py-2 text-center">
+              <div className="text-lg font-bold text-white">{stats.buyers}</div>
+              <div className="text-xs text-slate-500">Gov buyers</div>
+            </div>
+            <div className="rounded-lg bg-slate-800 px-4 py-2 text-center">
+              <div className="text-lg font-bold text-white">{stats.partners}</div>
+              <div className="text-xs text-slate-500">Partners</div>
+            </div>
+            <div className="rounded-lg bg-slate-800 px-4 py-2 text-center" title="Contacts you've linked to a specific pursuit">
+              <div className="text-lg font-bold text-emerald-400">{stats.attached}</div>
+              <div className="text-xs text-slate-500">On a pursuit</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs - My Network (CRM) | Find New Contacts (Discovery) */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
-        {/* My Network tab (CRM) */}
-        <button
-          onClick={() => {
-            setActiveTab('network');
-            setNotice(null);
-            setError(null);
-          }}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'network'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
-          }`}
-        >
-          📇 My Network
-          {stats.total > 0 && (
-            <span className="ml-2 text-xs text-slate-500">({stats.total})</span>
-          )}
-        </button>
-
-        {/* Divider */}
-        <div className="h-6 w-px bg-slate-700 mx-2" />
-        <span className="text-xs text-slate-500 uppercase tracking-wide">Find New:</span>
-
-        {/* Discovery tabs */}
-        {TABS.filter(tab => tab.isDiscovery).map(tab => (
+      {/* TWO distinct modes (Eric: confusing that "my saved" and "search to
+          find new" looked like the same kind of tab). Row 1 = what you HAVE.
+          Row 2 = where you go FIND more. */}
+      <div className="space-y-3">
+        {/* Row 1 — MY NETWORK (what you have) */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-20 shrink-0">Your network</span>
           <button
-            key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id);
-              setNotice(null);
-              setError(null);
-            }}
+            onClick={() => { setActiveTab('network'); setNotice(null); setError(null); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              activeTab === 'network'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
             }`}
           >
-            {tab.label}
+            📇 My Saved Contacts
+            <span className="ml-2 text-xs text-slate-500">({stats.total})</span>
           </button>
-        ))}
+        </div>
+
+        {/* Row 2 — FIND NEW (discovery search) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-20 shrink-0">Find new</span>
+          {TABS.filter(tab => tab.isDiscovery).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setNotice(null); setError(null); }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
+              }`}
+            >
+              🔍 {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {(notice || error) && (
@@ -636,17 +633,17 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
           <div>
-            <h2 className="font-semibold text-white">{activeTabConfig.label}</h2>
+            <h2 className="font-semibold text-white">
+              {activeTab === 'network' ? '📇 My Saved Contacts' : `🔍 Search results · ${activeTabConfig.label}`}
+            </h2>
             <p className="text-xs text-slate-500 mt-1">
               {activeTab === 'network'
-                ? `${savedContacts.length} saved contacts`
+                ? `${savedContacts.length} contact${savedContacts.length === 1 ? '' : 's'} in your network`
                 : candidatesTruncated && candidatesTotal > candidates.length
                   ? <>
-                      Showing first <span className="text-white">{candidates.length}</span> of{' '}
-                      <span className="text-amber-300 font-semibold">{candidatesTotal.toLocaleString()}+</span> matches
-                      <span className="text-slate-500"> — narrow your search by NAICS or agency to focus</span>
+                      <span className="text-blue-300">Found {candidatesTotal.toLocaleString()}+</span> — showing {candidates.length}. <span className="text-slate-400">Click <b>Save</b> on anyone to add them to your network.</span> Narrow by NAICS/agency to focus.
                     </>
-                  : `${candidates.length} suggested records`}
+                  : <><span className="text-blue-300">Found {candidates.length}</span> you can add — click <b>Save</b> on anyone to add them to your network.</>}
             </p>
           </div>
         </div>
