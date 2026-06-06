@@ -480,6 +480,38 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setCompliance(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
   }, []);
 
+  // Extract the SOW/PWS to a standalone .docx (send subs for pricing/bids).
+  const [sowBusy, setSowBusy] = useState(false);
+  const [sowError, setSowError] = useState<string | null>(null);
+  const downloadSow = useCallback(async () => {
+    const text = uploadedRfp?.text?.trim();
+    if (!email || !text) return;
+    setSowBusy(true); setSowError(null);
+    try {
+      const res = await fetch('/api/app/proposal/extract-sow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ email, text, fileName: uploadedRfp?.fileName || 'solicitation' }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setSowError(j.error || 'Could not extract the SOW.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (res.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'Statement-of-Work.docx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setSowError('Could not extract the SOW.');
+    } finally {
+      setSowBusy(false);
+    }
+  }, [email, uploadedRfp?.text, uploadedRfp?.fileName, getAuthHeaders]);
+
   const filteredCompliance = useMemo(() => {
     return compliance.filter(r => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
@@ -1242,18 +1274,33 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           {/* Verify on SAM.gov — cross-check every doc + the notice text against
               the official source. Builds trust (Eric: confidence I'm not missing
               anything) + lets users download/upload as needed. */}
-          {activePursuit?.notice_id && (
-            <a
-              href={`https://sam.gov/opp/${activePursuit.notice_id}/view`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-300 hover:bg-blue-500/20 transition-colors"
-              title="Open the official SAM.gov notice to verify all documents + text"
-            >
-              🔎 Verify on SAM.gov ↗
-            </a>
-          )}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Extract SOW/PWS to a .docx to send subs for pricing/bids. */}
+            {uploadedRfp?.text && (
+              <button
+                type="button"
+                onClick={downloadSow}
+                disabled={sowBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-60"
+                title="Pull the Statement of Work / PWS into its own Word doc to send subcontractors for pricing"
+              >
+                {sowBusy ? 'Extracting…' : '📄 SOW for subs (.docx)'}
+              </button>
+            )}
+            {activePursuit?.notice_id && (
+              <a
+                href={`https://sam.gov/opp/${activePursuit.notice_id}/view`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-300 hover:bg-blue-500/20 transition-colors"
+                title="Open the official SAM.gov notice to verify all documents + text"
+              >
+                🔎 Verify on SAM.gov ↗
+              </a>
+            )}
+          </div>
         </div>
+        {sowError && <p className="mt-1 text-xs text-amber-400/80">{sowError}</p>}
 
         {/* Auto-load status banner — appears when user landed here from
             PipelinePanel's 'Draft Proposal' button and a pursuit_id was
