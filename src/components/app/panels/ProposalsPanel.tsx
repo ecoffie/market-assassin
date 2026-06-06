@@ -912,34 +912,34 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           );
           return;
         }
-        // Use the largest doc as the "main" RFP — typically the SOW
-        // or the actual RFP rather than amendments / Q&A which tend
-        // to be smaller. User can manually re-upload to pick a
-        // different one.
-        const primary = docs[0];
-        if (primary.extracted_text) {
-          const loadedDocument: UploadedRfp = {
-            fileName: primary.filename,
-            fileSize: primary.size_bytes || 0,
-            charCount: primary.char_count || primary.extracted_text.length,
-            pageCount: primary.page_count,
-            text: primary.extracted_text,
-          };
-          setSourceDocuments([loadedDocument]);
-          setUploadedRfp(loadedDocument);
-          // Sniff notice type from the extracted text. Order matters inside
-          // the helper: SS language often says "this is not an RFP."
-          const detected = detectNoticeTypeFromText(primary.extracted_text);
+        // Load ALL extracted docs, not just the first (Eric QA 2026-06-05: a
+        // pursuit with 8 PDFs only showed 1). Combine them into one package so
+        // Mindy sees the full solicitation (RFP + SOW + amendments + Q&A).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const loadedDocs: UploadedRfp[] = (docs as any[])
+          .filter(d => d.extracted_text)
+          .map(d => ({
+            fileName: d.filename,
+            fileSize: d.size_bytes || 0,
+            charCount: d.char_count || (d.extracted_text?.length ?? 0),
+            pageCount: d.page_count,
+            text: d.extracted_text,
+          }));
+        if (loadedDocs.length > 0) {
+          const combined = combineUploadedDocuments(loadedDocs);
+          setSourceDocuments(loadedDocs);
+          setUploadedRfp(combined);
+          const detected = detectNoticeTypeFromText(combined?.text || '');
           setDetectedNoticeType(detected);
           setAutoLoadStatus('loaded');
           setAutoLoadMessage(
-            docs.length > 1
-              ? `Loaded ${primary.filename} (${docs.length} total docs in this pursuit — pick a different one with the upload button below)`
-              : `Loaded ${primary.filename} from this pursuit`
+            loadedDocs.length > 1
+              ? `Loaded all ${loadedDocs.length} documents from this pursuit (combined for drafting). Add or replace any below.`
+              : `Loaded ${loadedDocs[0].fileName} from this pursuit`
           );
-        } else if (primary.extraction_error) {
+        } else if (docs[0]?.extraction_error) {
           setAutoLoadStatus('error');
-          setAutoLoadMessage(`Could not extract text from ${primary.filename}: ${primary.extraction_error}. Upload manually below.`);
+          setAutoLoadMessage(`Could not extract text from ${docs[0].filename}: ${docs[0].extraction_error}. Upload manually below.`);
         } else {
           setAutoLoadStatus('no-docs');
           setAutoLoadMessage('Docs found but text not yet extracted. Try again in a moment.');
@@ -1216,6 +1216,28 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             <p className="text-sm text-slate-400 mt-1">
               Add the notice, RFP/RFQ, PWS/SOW, amendments, Q&A, pricing schedule, or attachments. Mindy extracts the text, classifies the response type, then unlocks the outputs below.
             </p>
+            {/* Auto ↔ Manual choice — at the TOP / Start Here (Eric QA: it was
+                buried at the bottom; users decide their style up front). */}
+            <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 p-1 text-sm">
+              <span className="pl-2 text-xs text-slate-500">Mode:</span>
+              <button
+                onClick={() => setDriveMode('auto')}
+                className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Mindy drafts the whole response for you"
+              >
+                ⚡ Auto
+              </button>
+              <button
+                onClick={() => setDriveMode('manual')}
+                className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'manual' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="You drive — upload files + chat to write the proposal yourself"
+              >
+                🏎 Manual · Sport
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-500">
+              {driveMode === 'auto' ? '⚡ Auto: Mindy drafts it for you (safe mode).' : '🏎 Sport: you direct Mindy with your own files.'}
+            </p>
           </div>
           {/* Verify on SAM.gov — cross-check every doc + the notice text against
               the official source. Builds trust (Eric: confidence I'm not missing
@@ -1433,31 +1455,6 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </div>
         )}
       </section>
-
-      {/* Auto ↔ Manual (Sport Mode) toggle. Auto = one-click draft (default);
-          Manual = upload + chat-drive the proposal LLM yourself. */}
-      {responseOutputsReady && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3">
-          <div className="text-sm text-slate-400">
-            <span className="font-medium text-slate-200">How do you want to drive?</span>{' '}
-            {driveMode === 'auto' ? 'Auto — Mindy drafts it for you.' : 'Manual — you direct Mindy with your own files.'}
-          </div>
-          <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-sm shrink-0">
-            <button
-              onClick={() => setDriveMode('auto')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              ⚡ Auto
-            </button>
-            <button
-              onClick={() => setDriveMode('manual')}
-              className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'manual' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              🏎 Manual · Sport
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* MANUAL MODE — Perplexity-style proposal chat over your uploaded files
           + Vault. You type what you want; Mindy drafts grounded in YOUR docs. */}
