@@ -16,6 +16,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { loadBidderProfile, formatProfileForPrompt, loadVaultContext } from '@/lib/proposal/loaders';
+import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
+
+// RAG-as-standard: Manual Drive answers are informed by Mindy's real proposal
+// corpus (winning technical/pricing/past-perf volumes, templates, cap
+// statements) — the same de-facto standard Auto mode uses — so "draft the
+// technical approach" reflects how real proposal volumes are built, not just
+// the user's Vault. STYLE reference only; never copy verbatim.
+const PROPOSAL_DOC_TYPES = ['technical_volume', 'pricing_volume', 'past_performance', 'proposal_template', 'cap_statement', 'sources_sought_loi'];
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -30,6 +38,7 @@ const SYSTEM_PROMPT = `You are Mindy, a senior federal proposal writer helping a
 
 Rules:
 - Ground EVERYTHING in the provided RFP TEXT and the user's VAULT (their real past performance, capabilities, identity). Do NOT invent contract numbers, agencies, dollar values, or experience the user doesn't have.
+- Use the PROPOSAL CORPUS as the STANDARD for HOW to structure, format, and word a federal proposal volume (technical, pricing, past performance). Learn the structure and framing from it — but NEVER copy its phrasing verbatim, and never use its facts (those belong to the corpus author, not the user). When you advise on structure, you may note "a technical volume typically covers X, Y, Z."
 - When a fact isn't in the RFP or Vault, write a clearly-marked [bracketed placeholder] for the user to fill — never fabricate.
 - Write in the user's voice: concrete, specific, no marketing fluff, no "we are pleased to".
 - When asked to draft a section, return clean prose ready to paste into the proposal. When asked a question about the RFP, answer directly and cite the relevant requirement.
@@ -63,24 +72,32 @@ export async function POST(request: NextRequest) {
       const encoder = new TextEncoder();
       const send = (obj: unknown) => controller.enqueue(encoder.encode(sseEvent(obj)));
       try {
-        // Context = the user's OWN docs: bidder profile + full Vault + the RFP.
-        const [profile, vault] = await Promise.all([
+        // Context = the user's OWN docs (profile + Vault + RFP) PLUS the
+        // proposal RAG as the build standard. RAG query = the user's message +
+        // a slice of the RFP so retrieval is relevant to what they're writing.
+        const ragQuery = `${message}\n${rfpText.slice(0, 1500)}`.trim();
+        const [profile, vault, ragChunks] = await Promise.all([
           loadBidderProfile(email),
           // 'exec_summary' pulls identity + past performance + capabilities.
           loadVaultContext(email, 'exec_summary'),
+          retrieveRagContext({ query: ragQuery, docTypes: PROPOSAL_DOC_TYPES, limit: 4, maxChars: 3000, maxPerDoc: 1 })
+            .catch(() => []),
         ]);
 
         const profileBlock = formatProfileForPrompt(profile);
         const vaultBlock = formatVaultForPrompt(vault);
+        const ragBlock = formatChunksForPrompt(ragChunks);
         const sources: string[] = [];
         if (rfpText) sources.push(rfpFileName || 'Uploaded RFP');
         if (vault.has_any) sources.push('Your Vault (profile, past performance, capabilities)');
+        if (ragChunks.length) sources.push(`Proposal corpus (${ragChunks.length} winning-volume references)`);
         send({ type: 'sources', sources });
 
         const contextParts = [
           profileBlock ? `COMPANY PROFILE:\n${profileBlock}` : '',
           vaultBlock ? `VAULT:\n${vaultBlock}` : '',
           rfpText ? `RFP / SOLICITATION TEXT${rfpFileName ? ` (${rfpFileName})` : ''}:\n${rfpText}` : '',
+          ragBlock ? `PROPOSAL CORPUS — how real winning volumes are built (STYLE reference, DO NOT copy verbatim):\n${ragBlock}` : '',
         ].filter(Boolean).join('\n\n---\n\n');
 
         const messages: Array<{ role: string; content: string }> = [
