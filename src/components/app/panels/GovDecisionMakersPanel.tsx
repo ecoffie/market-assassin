@@ -46,6 +46,24 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [trackedOffices, setTrackedOffices] = useState<Set<string>>(new Set());
   const [trackNote, setTrackNote] = useState<string | null>(null);
+  // The user's target agencies (from My Target List) — Decision Makers should
+  // default to THESE (Eric QA: "it should already track my 9 pre-selected
+  // agencies"). 'targets' scope filters contacts to any target agency.
+  const [targetAgencies, setTargetAgencies] = useState<string[]>([]);
+  const [scope, setScope] = useState<'targets' | 'all'>('all');
+
+  useEffect(() => {
+    if (!email) return;
+    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`)
+      .then(r => r.json())
+      .then(d => {
+        const ags = Array.from(new Set(((d?.targets || d?.targetList || []) as Array<{ agency_name?: string }>)
+          .map(t => (t.agency_name || '').trim()).filter(Boolean)));
+        setTargetAgencies(ags);
+        if (ags.length > 0) setScope('targets'); // default to the user's targets
+      })
+      .catch(() => {});
+  }, [email]);
 
   // Add a contracting office to My Target List (CRM). Sends the DoDAAC as
   // office_code — the API resolves the canonical name + sub-agency from the
@@ -114,7 +132,9 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       if (search.trim()) p.set('search', search.trim());
       if (agency) p.set('agency', agency);
       if (subAgency) p.set('subAgency', subAgency);
-      p.set('limit', '100');
+      // In 'targets' scope we filter client-side across the user's agencies, so
+      // pull a wider window to ensure all targets are represented.
+      p.set('limit', scope === 'targets' && !agency ? '400' : '100');
       const res = await fetch(`/api/app/federal-contacts?${p}`);
       const d = await res.json();
       if (d.success) {
@@ -129,10 +149,19 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       setContacts([]);
     }
     setLoading(false);
-  }, [email, search, agency, subAgency]);
+  }, [email, search, agency, subAgency, scope]);
 
-  // Initial load + reload when agency or sub-agency filter changes.
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [agency, subAgency]);
+  // Initial load + reload when agency / sub-agency / scope changes.
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [agency, subAgency, scope]);
+
+  // Scope to the user's target agencies (My Target List) when 'targets' is on
+  // and no single agency is explicitly selected. Normalized match so "DEPT OF
+  // DEFENSE" matches "Department of Defense".
+  const normAg = (s: string) => (s || '').toUpperCase().replace(/[.,]/g, ' ').replace(/\b(DEPARTMENT|DEPT|OF|THE|US|U S|ADMINISTRATION|AGENCY|NATIONAL)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  const targetKeys = new Set(targetAgencies.map(normAg).filter(Boolean));
+  const visibleContacts = (scope === 'targets' && !agency && targetKeys.size > 0)
+    ? contacts.filter(c => targetKeys.has(normAg(c.department_ind_agency || '')))
+    : contacts;
 
   return (
     <div className="p-6 space-y-6">
@@ -162,10 +191,29 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             {loading ? 'Searching…' : 'Search'}
           </button>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Scope to the user's Target List agencies (Eric QA: DM should
+              default to my pre-selected agencies). Only when targets exist. */}
+          {targetAgencies.length > 0 && (
+            <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-sm">
+              <button
+                onClick={() => { setScope('targets'); setAgency(''); }}
+                className={`px-3 py-1.5 rounded-md transition-colors ${scope === 'targets' && !agency ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title={`Only your ${targetAgencies.length} target agencies`}
+              >
+                ⭐ My Targets ({targetAgencies.length})
+              </button>
+              <button
+                onClick={() => setScope('all')}
+                className={`px-3 py-1.5 rounded-md transition-colors ${scope === 'all' || agency ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                All
+              </button>
+            </div>
+          )}
           <select
             value={agency}
-            onChange={e => setAgency(e.target.value)}
+            onChange={e => { setAgency(e.target.value); if (e.target.value) setScope('all'); }}
             className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
           >
             <option value="">All Agencies</option>
@@ -210,7 +258,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       {trackNote && <div className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-lg text-sm">{trackNote}</div>}
 
       {/* Results table */}
-      {!loading && contacts.length > 0 && (
+      {!loading && visibleContacts.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -223,7 +271,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
               </tr>
             </thead>
             <tbody>
-              {contacts.map(c => (
+              {visibleContacts.map(c => (
                 <tr key={c.id} className="border-t border-slate-800 hover:bg-slate-800/30">
                   <td className="px-4 py-3 text-white font-medium">{c.contact_fullname || '—'}</td>
                   <td className="px-4 py-3">
@@ -270,15 +318,15 @@ export default function GovDecisionMakersPanel({ email }: Props) {
               ))}
             </tbody>
           </table>
-          {total > contacts.length && (
+          {total > visibleContacts.length && (
             <div className="px-4 py-3 text-xs text-slate-500 border-t border-slate-800">
-              Showing {contacts.length} of ~{total.toLocaleString()} — narrow with search, agency, or office.
+              Showing {visibleContacts.length} of ~{total.toLocaleString()} — narrow with search, agency, or office.
             </div>
           )}
         </div>
       )}
 
-      {!loading && contacts.length === 0 && !error && (
+      {!loading && visibleContacts.length === 0 && !error && (
         <div className="text-center py-12 text-slate-400">
           <div className="text-lg font-medium text-white mb-1">No contacts found</div>
           <div className="text-sm">Try a broader search or a different agency.</div>
