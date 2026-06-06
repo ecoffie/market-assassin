@@ -9,6 +9,7 @@ import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import ProposalChat from './ProposalChat';
 import DocManifest from './DocManifest';
+import { alignRequirement } from '@/lib/proposal/section-alignment';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -108,6 +109,12 @@ const RFP_SECTION_TABS: Array<{ id: SectionType; label: string; targetWords: num
   { id: 'past_performance', label: 'Past Performance', targetWords: 400 },
   { id: 'pricing', label: 'Pricing', targetWords: 300 },
 ];
+
+// Short label for a section type (for the compliance-matrix "Drafted in" column).
+function sectionLabel(s: SectionType): string {
+  return RFP_SECTION_TABS.find(t => t.id === s)?.label
+    || s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 
 // LOI / market-research response tabs surface when detectedNoticeType ===
 // 'sources_sought' or 'rfi'. Users attach their existing capability statement;
@@ -1874,6 +1881,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       <th className="text-left px-3 py-2 font-medium">Requirement</th>
                       <th className="text-left px-3 py-2 font-medium w-28">Category</th>
                       <th className="text-left px-3 py-2 font-medium w-24">Section</th>
+                      <th className="text-left px-3 py-2 font-medium w-36">Drafted in</th>
                       <th className="text-left px-3 py-2 font-medium w-40">Owner</th>
                       <th className="text-left px-3 py-2 font-medium w-32">Status</th>
                     </tr>
@@ -1889,7 +1897,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                         <Fragment key={r.id}>
                         {showGroup && (
                           <tr className="bg-slate-900/70">
-                            <td colSpan={6} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-purple-300 border-t border-slate-700">{grp}</td>
+                            <td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-purple-300 border-t border-slate-700">{grp}</td>
                           </tr>
                         )}
                         <tr className="border-t border-slate-800 hover:bg-slate-800/30 align-top">
@@ -1909,6 +1917,21 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                             </span>
                           </td>
                           <td className="px-3 py-2 text-xs text-slate-400 font-mono">{r.section || '—'}</td>
+                          <td className="px-3 py-2 text-xs">
+                            {(() => {
+                              // Section alignment: which draft section answers
+                              // this requirement, and is it drafted yet?
+                              const aligned = alignRequirement({ requirement: r.requirement, category: r.category, section: r.section });
+                              if (aligned === 'all') return <span className="text-slate-600" title="Cross-cutting (format / evaluation) — applies across the response">all sections</span>;
+                              const hasDraft = !!drafts[aligned as SectionType]?.draft;
+                              const label = sectionLabel(aligned as SectionType);
+                              return (
+                                <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 ${hasDraft ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/10 text-amber-300/80'}`} title={hasDraft ? 'A draft exists for this section' : 'Not drafted yet'}>
+                                  {hasDraft ? '✓' : '○'} {label}
+                                </span>
+                              );
+                            })()}
+                          </td>
                           <td className="px-3 py-2">
                             <input
                               type="text"
@@ -2031,6 +2054,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             {currentSectionTabs.map(tab => {
               const hasDraft = !!drafts[tab.id];
               const isActive = activeSection === tab.id;
+              // How many compliance requirements this section must cover (align).
+              const reqCount = compliance.filter(r =>
+                alignRequirement({ requirement: r.requirement, category: r.category, section: r.section }) === tab.id
+              ).length;
               return (
                 <button
                   key={tab.id}
@@ -2041,8 +2068,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       ? 'border-purple-500 text-white'
                       : 'border-transparent text-slate-400 hover:text-slate-200'
                   }`}
+                  title={reqCount > 0 ? `Covers ${reqCount} compliance requirement${reqCount === 1 ? '' : 's'}` : undefined}
                 >
                   {tab.label}
+                  {reqCount > 0 && <span className="ml-1.5 text-[10px] text-amber-300/80" title={`${reqCount} requirements map here`}>{reqCount}</span>}
                   {hasDraft && <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                 </button>
               );
