@@ -80,10 +80,20 @@ function sectionFromRef(ref?: string): SectionType | null {
 
 export type AlignedSection = SectionType | 'all';
 
+// MANAGEMENT-volume content (Eric QC: key personnel, schedule, QC, safety,
+// subcontracting plan, org chart were all collapsing to technical/all). These
+// belong in the Management section regardless of the model's category. Detected
+// from the requirement TEXT since "management" isn't one of the 7 categories.
+const MANAGEMENT_TEXT = /\b(key[ _-]?personnel|resume|project[ _-]?manager|superintendent|staffing[ _-]?plan|organizational?[ _-]?chart|org[ _-]?chart|management[ _-]?(plan|approach|volume)|quality[ _-]?control[ _-]?plan|\bqc[ _-]?plan|safety[ _-]?plan|em[ _-]?385|subcontract(ing)?[ _-]?plan|project[ _-]?schedule|schedule[ _-]?with[ _-]?milestones|risk[ _-]?management|transition[ _-]?plan|labor[ _-]?categories)\b/i;
+
 /** Map ONE requirement to its target draft section. */
 export function alignRequirement(req: ComplianceReq): AlignedSection {
+  // Section-ref hint wins (most explicit).
   const fromRef = sectionFromRef(req.section);
   if (fromRef) return fromRef;
+  // Management content → Management section (text-based; overrides the broad
+  // 'technical'/'all' category routing).
+  if (MANAGEMENT_TEXT.test(req.requirement || '')) return 'management';
   return CATEGORY_TO_SECTION[req.category] ?? 'all';
 }
 
