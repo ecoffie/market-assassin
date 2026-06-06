@@ -604,9 +604,10 @@ export async function searchRecipients(opts: {
     // A recipient can appear under several NAICS in the list — aggregate to one
     // row (sum $ + awards) so the same firm isn't listed multiple times.
     const rolled = await queryCached<{
-      recipient_uei: string; recipient_name: string; total_amount: number; award_count: number; total_rows: number;
+      recipient_uei: string; recipient_name: string; total_amount: number; award_count: number;
+      distinct_agency_count: number; total_rows: number;
     }>({
-      cacheKey: `recipient-search-naics:${naicsCodes.join('_')}:${search}:${sortBy}:${limit}:${offset}:v2`,
+      cacheKey: `recipient-search-naics:${naicsCodes.join('_')}:${search}:${sortBy}:${limit}:${offset}:v3`,
       query: `
         WITH matched AS (
           SELECT recipient_uei, ANY_VALUE(recipient_name) AS recipient_name,
@@ -615,10 +616,14 @@ export async function searchRecipients(opts: {
           WHERE ${conds.join(' AND ')}
           GROUP BY recipient_uei
         )
-        SELECT recipient_uei, recipient_name, total_amount, award_count,
+        -- Join the recipients table for agency breadth ("works with N agencies"),
+        -- a strong capture signal — does this firm sell to many buyers or one?
+        SELECT m.recipient_uei, m.recipient_name, m.total_amount, m.award_count,
+          COALESCE(r.distinct_agency_count, 0) AS distinct_agency_count,
           COUNT(*) OVER() AS total_rows
-        FROM matched
-        ORDER BY ${orderCol} ${orderDir}
+        FROM matched m
+        LEFT JOIN ${BQ_TABLES.recipients} r USING (recipient_uei)
+        ORDER BY ${orderCol === 'recipient_name' ? 'm.recipient_name' : orderCol === 'award_count' ? 'm.award_count' : 'm.total_amount'} ${orderDir}
         LIMIT @limit OFFSET @offset
       `,
       params: rp,
@@ -634,7 +639,7 @@ export async function searchRecipients(opts: {
         state: null,
         total_obligated: Number(r.total_amount || 0),
         award_count: Number(r.award_count || 0),
-        distinct_agency_count: 0,
+        distinct_agency_count: Number(r.distinct_agency_count || 0),
         distinct_naics_count: 0,
       })),
     };

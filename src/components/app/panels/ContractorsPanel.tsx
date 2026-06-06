@@ -35,6 +35,7 @@ interface Contractor {
   uei?: string;
   city?: string;  // BQ rows carry HQ city/state — shown to disambiguate
   state?: string;
+  agencies_count?: number;  // distinct federal agencies this firm has sold to
 }
 
 interface ContractorStats {
@@ -500,11 +501,20 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     const scale = contractor.contract_value_num >= 1e9 ? 'Mega prime ($1B+)'
                       : contractor.contract_value_num >= 1e8 ? 'Large ($100M+)'
                       : contractor.contract_value_num >= 1e7 ? 'Mid ($10M+)' : 'Emerging';
+                    const agencies = Number(contractor.agencies_count) || 0;
                     return (
                       <div className="flex flex-wrap gap-2 mt-3 text-[11px]">
                         {avg > 0 && (
                           <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300" title="Average obligated per contract">
                             ~{formatCurrency(avg)}/contract avg
+                          </span>
+                        )}
+                        {agencies > 0 && (
+                          <span
+                            className={`rounded px-2 py-0.5 ${agencies >= 5 ? 'bg-blue-500/15 text-blue-300' : 'bg-slate-800 text-slate-300'}`}
+                            title={agencies >= 5 ? 'Diversified — sells to many federal buyers' : 'Sells to few federal buyers'}
+                          >
+                            🏛 {agencies} {agencies === 1 ? 'agency' : 'agencies'}
                           </span>
                         )}
                         <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300">{scale}</span>
