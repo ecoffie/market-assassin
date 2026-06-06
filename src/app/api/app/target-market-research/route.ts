@@ -44,6 +44,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import {
   getPainPointsForAgency,
   getPainPointsByNaics,
@@ -298,6 +299,41 @@ export async function POST(request: NextRequest) {
 
     const findAgencies = findData.agencies;
 
+    // ACCURATE TOTAL SPEND (Eric: USACE/NAVFAC weren't surfacing — the sampled
+    // award re-aggregation under-counts the giants). USASpending's
+    // spending_by_category gives the TRUE aggregate spend per subagency for the
+    // NAICS — the same source the FPDS leaderboard uses. We map it by normalized
+    // agency name and use it as the authoritative metric_top_total. Falls back
+    // to the sampled total when an agency isn't in the category response.
+    const categoryTotalByKey: Record<string, number> = {};
+    try {
+      const expanded = expandNAICSCodes(naics ? [naics] : []);
+      if (expanded.length > 0) {
+        const catRes = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category: 'awarding_subagency',
+            filters: {
+              naics_codes: expanded,
+              time_period: [{ start_date: '2023-10-01', end_date: new Date().toISOString().slice(0, 10) }],
+              award_type_codes: ['A', 'B', 'C', 'D'],
+            },
+            subawards: false, limit: 100, page: 1,
+          }),
+        });
+        if (catRes.ok) {
+          const catJson = await catRes.json();
+          for (const r of (catJson.results || []) as Array<{ name: string; amount: number }>) {
+            const k = normalizeAgencyKey(r.name || '');
+            if (k) categoryTotalByKey[k] = (categoryTotalByKey[k] || 0) + (r.amount || 0);
+          }
+        }
+      }
+    } catch (catErr) {
+      console.warn('[target-market-research] spending_by_category total failed:', catErr);
+    }
+
     // Build officeId -> totalSpending map from the no-set-aside pass.
     // Same officeId scheme as the primary pass (find-agencies dedupes
     // by parentAgency+subAgency+contractingOffice), so the lookup is
@@ -488,11 +524,14 @@ export async function POST(request: NextRequest) {
       const naicsAligned = naicsAlignedPainAgencies.has((lookupKey || '').toLowerCase());
 
       const lookupOfficeKey = a.officeId || a.subAgencyCode || a.agencyCode || a.id || '';
-      const totalSpending = totalSpendingByOffice[lookupOfficeKey]
-        // Fallback: if the total pass missed this office under the same
-        // key (rare but possible if the dedupe keying drifts), at least
-        // use the set-aside number so the row isn't an obvious zero.
-        ?? (a.setAsideSpending || 0);
+      // Prefer the ACCURATE aggregate total (spending_by_category, matched by
+      // normalized sub-agency or parent name) so the real giants (Army/Navy/
+      // USACE/NAVFAC) rank correctly. Fall back to the sampled total, then set-
+      // aside, so a row is never an obvious zero.
+      const catKey = normalizeAgencyKey(a.subAgency || a.parentAgency || a.name || '');
+      const accurateTotal = categoryTotalByKey[catKey];
+      const sampledTotal = totalSpendingByOffice[lookupOfficeKey] ?? (a.setAsideSpending || 0);
+      const totalSpending = (accurateTotal && accurateTotal > sampledTotal) ? accurateTotal : sampledTotal;
 
       return {
         id: a.id,
