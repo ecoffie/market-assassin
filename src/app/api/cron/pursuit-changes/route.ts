@@ -114,14 +114,16 @@ export async function GET(request: NextRequest) {
 
     if (changes.length) {
       totalChanges += changes.length;
-      // Log each change (drives the in-app badge).
+      // Attribute to the OWNER (workspace pursuits may have owner_email ≠
+      // user_email) so both the email AND the in-app badge go to the same
+      // person — the one actually working the pursuit.
+      const owner = p.owner_email || p.user_email;
       await supabase.from('pursuit_change_log').insert(
         changes.map(c => ({
-          pursuit_id: p.id, user_email: p.user_email, notice_id: p.notice_id,
+          pursuit_id: p.id, user_email: owner, notice_id: p.notice_id,
           change_type: c.change_type, summary: c.summary, old_value: c.old_value, new_value: c.new_value,
         }))
       );
-      const owner = p.owner_email || p.user_email;
       if (!changesByUser.has(owner)) changesByUser.set(owner, []);
       changesByUser.get(owner)!.push({ title: p.title || 'Untitled pursuit', changes });
     }
